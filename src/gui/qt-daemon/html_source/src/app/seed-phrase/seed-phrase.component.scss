@@ -1,0 +1,24 @@
+.seed-phrase-title {
+  line-height: 2.2rem;
+  padding: 2.2rem 0;
+}
+
+.seed-phrase-content {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  padding: 1.4rem;
+  width: 100%;
+  height: 12rem;
+
+  .word {
+    line-height: 2.2rem;
+    max-width: 13rem;
+  }
+}
+
+button {
+  margin: 2.8rem 0;
+  width: 25%;
+  min-width: 1.5rem;
+}

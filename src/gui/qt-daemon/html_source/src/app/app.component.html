@@ -1,0 +1,11 @@
+<app-sidebar *ngIf="variablesService.appPass"></app-sidebar>
+
+<div class="app-content scrolled-content">
+  <router-outlet></router-outlet>
+</div>
+
+<context-menu>
+  <ng-template contextMenuItem (execute)="contextMenuCopy($event.item)">copy</ng-template>
+  <ng-template contextMenuItem (execute)="contextMenuPaste($event.item)">paste</ng-template>
+  <ng-template contextMenuItem (execute)="contextMenuSelect($event.item)">select all</ng-template>
+</context-menu>

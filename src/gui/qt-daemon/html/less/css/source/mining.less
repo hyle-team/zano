@@ -1,0 +1,296 @@
+@import "../variables";
+@import "mixins";
+
+#mining {
+  padding: 2.5rem 8rem;
+
+  .main-options-wrapper {
+
+    .mining-options {
+      margin-bottom: 8rem;
+    }
+  }
+
+  .calculate-options {
+    .flex-container;
+    .flex-container-alignment(center, space-between);
+    color: @program-main-color;
+    height: 30.5rem;
+    padding: 2.5rem 11rem 0;
+
+    .calculate-tile {
+      .flex-container;
+      font-size: 3.5rem;
+
+      label {
+        .flex-container;
+        .flex-container-alignment(center, flex-end);
+        font-weight: 600;
+        height: 7rem;
+        line-height: 4.5rem;
+        margin-bottom: 0;
+        max-width: 45rem;
+        padding-right: 3rem;
+        text-align: end;
+      }
+
+      .general-input-wrapper {
+        width: 42rem;
+      }
+
+      .calculate-mining-btn {
+        border: 1px solid @mining-range-border-color;
+        height: 8rem;
+        width: 44rem;
+        font-size: 4rem;
+        margin-left: 3rem;
+      }
+
+      &:hover, &.focused-line {
+
+        label {
+          color: @program-hover-color;
+        }
+
+        .general-input-wrapper {
+          border-bottom-color: @program-hover-color;
+
+          .general-input {
+            color: @program-hover-color;
+          }
+
+          ::-webkit-input-placeholder {
+            color: @program-input-placeholder-hover-color;
+          }
+        }
+      }
+    }
+  }
+
+  .chart-wrapper {
+    padding-top: 1rem;
+    padding-bottom: 5rem;
+    transition: all 0.5s linear;
+    overflow: hidden;
+
+    .chart-label {
+      .flex-container;
+      .flex-container-alignment(center, center);
+      position: relative;
+      color: @program-dark-color;
+      font-size: 5rem;
+      font-style: italic;
+      font-weight: 300;
+      padding-top: 5rem;
+      padding-bottom: 1rem;
+
+      .base-icon {
+        .icon-sizing(4rem, 4rem, -4rem, -5rem);
+        top: -1rem;
+        right: -1rem;
+        color: @program-label-info-color;
+      }
+    }
+  }
+
+  .mining-select-wrapper {
+    .flex-container;
+    .flex-container-alignment(center, space-between);
+    flex-grow: 1;
+
+    .mining-select {
+      .flex-container;
+
+      .dropdown-toggle {
+        border-bottom: none;
+        color: @program-hover-color;
+        font-size: 5rem;
+        line-height: 6rem;
+        padding: 0 3rem 0 0;
+
+        .caret {
+          color: @program-hover-color;
+        }
+      }
+
+      .dropdown-menu {
+        border-radius: 2rem;
+        min-width: 44rem;
+        width: 100%;
+      }
+
+      &.mining-safe {
+        padding-left: 5rem;
+      }
+
+      &.mining-view {
+        padding-left: 5rem;
+        padding-right: 6rem;
+
+        .dropdown-menu {
+          right: 0;
+          left: auto;
+        }
+      }
+    }
+  }
+
+  .mined-empty {
+    .flex-container;
+    .flex-container-alignment(center, center);
+    color: @program-empty-color;
+    font-size: 3.75rem;
+    height: 35rem;
+  }
+
+  .mined-statistics {
+    padding: 3rem 0;
+
+    .mined-statistics-options {
+      .flex-container;
+      .flex-container-alignment(flex-start, space-between);
+      padding: 7rem 7rem 0;
+
+      .chart-range-wrapper {
+        .flex-container;
+        .flex-container-alignment(center, space-between);
+        margin-top: 1rem;
+
+        .chart-range-group {
+          .flex-container;
+          .flex-container-alignment(center, center);
+          color: @program-dark-color;
+          font-size: 3rem;
+
+          .chart-range-selector {
+            .flex-container;
+            margin: 0 2.5rem;
+            padding: 0;
+
+            li {
+              border: 1px solid @mining-range-border-color;
+              color: @mining-range-text-color;
+              line-height: 5.5rem;
+              height: 6rem;
+              width: 13rem;
+              text-align: center;
+              list-style-type: none;
+
+              &:first-child {
+                border-radius: 3rem 0 0 3rem;
+                width: 13.5rem;
+              }
+
+              &:not(:first-child) {
+                border-left: none;
+              }
+
+              &:last-child {
+                border-radius: 0 3rem 3rem 0;
+                width: 13.5rem;
+              }
+            }
+
+            .active {
+              background: white;
+              color: @program-dark-color;
+            }
+          }
+
+          &:first-child {
+            margin-right: 8.5rem;
+
+            @media screen and (max-width: 1150px) {
+              margin-right: 2.5rem;
+            }
+          }
+        }
+      }
+
+      .total-mined-chart {
+        color: @program-dark-color;
+        font-size: 5rem;
+        font-style: italic;
+        font-weight: 300;
+        line-height: 7rem;
+        white-space: nowrap;
+        text-align: right;
+      }
+
+      .total-mined-table {
+        color: @program-dark-color;
+        font-size: 5rem;
+        font-style: italic;
+        font-weight: 300;
+        line-height: 7rem;
+        text-align: right;
+        width: 100%;
+      }
+    }
+  }
+
+  .statistics-table {
+    margin: 8rem 2.5rem 2.5rem;
+    overflow: hidden;
+    transition: height 1s;
+
+    table {
+
+      tbody {
+
+        tr {
+
+          td {
+            width: 33.33%;
+
+            .order-icon {
+              opacity: 0.6;
+            }
+
+            &:first-child {
+              position: relative;
+              padding-left: 8rem;
+
+              &::after {
+                content: "";
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                border-left: 1rem solid @marker-light-green;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .pagination-wrapper {
+    margin: 5rem 2.5rem 3rem;
+
+    .pagination {
+
+      .pages {
+        color: @program-pagination-text-inactive-color;
+      }
+
+      .next-page, .prev-page {
+        background-color: transparent;
+        border-color: @program-main-color;
+        color: @program-main-color;
+      }
+    }
+  }
+
+  #chart-calculate {
+    width: 100%;
+    height: 70rem;
+  }
+
+  #chart-statistics{
+    width: 100%;
+    height: 142rem;
+  }
+}

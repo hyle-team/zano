@@ -1,0 +1,119 @@
+@import "../variables";
+@import "mixins";
+
+.pagination-wrapper {
+  .flex-container-direction(row);
+  .flex-container-alignment(center, space-between);
+
+  .display {
+    .flex-container-direction(row);
+    .flex-container-alignment(center, space-between);
+    font-size: 3.75rem;
+    
+    .display-text {
+      color: @program-pagination-text-color;
+      margin-right: 2rem;
+    }
+
+    .display-values {
+      .flex-container-direction(row);
+      color: @program-pagination-text-inactive-color;
+      padding: 0;
+      margin: 0;
+      
+      li {
+        display: inline-block;
+        margin: 0 2rem;
+        width: 4rem;
+
+        &:hover {
+          color: @program-pagination-text-color;
+          cursor: pointer;
+        }
+        
+        &.active {
+          color: @program-pagination-text-color;
+        }
+      }
+    }
+  }
+
+  .show-all {
+    .flex-container;
+    color: @program-pagination-text-color;
+    cursor: pointer;
+
+    .base-icon {
+      .icon-sizing(6rem, 6rem, -3rem, -4rem);
+      margin-right: 2rem;
+
+      &.rotate-icon {
+        transform: rotate(180deg);
+      }
+    }
+
+    .show-all-text {
+      font-size: 3.75rem;
+      line-height: 6rem;
+    }
+  }
+
+  .pagination {
+    .flex-container-direction(row);
+    .flex-container-alignment(center, space-between);
+    margin: 0;
+    
+    .prev-page, .next-page {
+      .flex-container;
+      .flex-container-alignment(center, center);
+      background-color: fade(white, 30%);
+      border: 1px solid @program-pagination-border-color;
+      border-radius: 3rem;
+      color: white;
+      height: 6rem;
+      width: 7.5rem;
+
+      .pagination-arrow {
+        .icon-sizing(4rem, 4rem, -3rem, -3.75rem);
+        font-size: 12rem;
+      }
+
+      &:hover {
+        background-color: fade(white, 45%);
+        cursor: pointer;
+      }
+    }
+
+    .prev-page {
+
+      .pagination-arrow {
+        transform: rotate(180deg);
+      }
+    }
+    
+    .pages {
+
+      .flex-container;
+
+      color: @program-pagination-pages-color;
+      font-size: 3.75rem;
+      margin: 0 2.5rem;
+
+      span {
+        margin: 0 0.5rem;
+      }
+
+      .active-page {
+        width: 6rem;
+
+        .general-input{
+          border-bottom: none;
+          color: white;
+          padding: 0;
+          text-align: center;
+        }
+
+      }
+    }
+  }
+}

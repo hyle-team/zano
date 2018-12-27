@@ -1,0 +1,41 @@
+.head {
+  justify-content: flex-end;
+}
+
+.settings-title {
+  font-size: 1.7rem;
+}
+
+.theme-selection {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 2.4rem 0;
+  width: 50%;
+
+  .radio-block {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    font-size: 1.3rem;
+    line-height: 2.7rem;
+  }
+}
+
+.master-password {
+  width: 50%;
+
+  .master-password-title {
+    display: flex;
+    font-size: 1.5rem;
+    line-height: 2.7rem;
+    margin-bottom: 1rem;
+  }
+
+  button {
+    margin: 2.5rem auto;
+    width: 100%;
+    max-width: 15rem;
+  }
+}
+

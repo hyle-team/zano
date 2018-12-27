@@ -1,0 +1,113 @@
+@import "../variables";
+
+.flex-container {
+  display: -webkit-flex;
+  display: flex;
+}
+
+.flex-container-direction(@direction) {
+  .flex-container;
+  -webkit-flex-direction: @direction;
+  flex-direction: @direction;
+}
+
+.flex-container-alignment(@align-items, @justify-content) {
+  -webkit-align-items: @align-items;
+  align-items: @align-items;
+  -webkit-justify-content: @justify-content;
+  justify-content: @justify-content;
+}
+
+.general-button(@width, @height) {
+  .flex-container;
+  .flex-container-alignment(center, center);
+  background: fade(white, 40%);
+  border: none;
+  border-radius: 10rem;
+  padding: 0 3rem;
+  height: @height;
+  width: @width;
+
+  &:hover {
+    background: fade(white, 55%);
+  }
+
+  &:active {
+    background: fade(white, 55%);
+  }
+}
+
+.icon-sizing(@height, @width, @top, @left) {
+  width: @width;
+  height: @height;
+
+  &:before {
+    top: @top;
+    left: @left;
+  }
+}
+
+.menu-list(@top, @left, @right, @width) {
+  position: absolute;
+  top: @top;
+  left: @left;
+  right: @right;
+  min-width: @width;
+  padding: 0;
+  margin: 0;
+  border: none;
+  box-shadow: @box-shadow;
+  border-radius: 2rem;
+  overflow: hidden;
+
+  li {
+    width: 100%;
+
+    button {
+      .flex-container;
+      .flex-container-alignment(center, flex-start);
+      background: transparent;
+      border: none;
+      color: @program-exuding-color;
+      font-size: 3.5rem;
+      height: 8.25rem;
+      padding-left: 3rem;
+      text-align: left;
+      width: 100%;
+      white-space: nowrap;
+
+      &:disabled {
+        color: @program-light-color;
+      }
+
+      &:hover {
+
+        &:not(:disabled) {
+          background: @program-select-hover-color;
+          cursor: pointer;
+        }
+      }
+    }
+
+    &:first-child {
+
+      button {
+        border-top-left-radius: 2rem;
+        border-top-right-radius: 2rem;
+      }
+    }
+
+    &:last-child {
+
+      button {
+        border-bottom-left-radius: 2rem;
+        border-bottom-right-radius: 2rem;
+      }
+    }
+  }
+
+  .menu-divider {
+    border-top: 1px solid @program-divider-color;
+    margin: 0 3.5rem;
+  }
+}

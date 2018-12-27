@@ -1,0 +1,134 @@
+@import "../variables";
+
+.datepicker {
+  border: none !important;
+  border-radius: 2.5rem !important;
+  -webkit-box-shadow: @box-shadow !important;
+  box-shadow: @box-shadow !important;
+  font-family: 'Titillium Web', 'AgoraSansPro', sans-serif;
+  width: 65rem !important;
+
+  .datepicker--pointer {
+    display: none;
+  }
+
+  .datepicker--nav {
+    border-bottom: none;
+
+    .datepicker--nav-action {
+
+      path {
+        stroke: @datepicker-nav-action-color;
+        stroke-width: 1px;
+      }
+
+      &:hover {
+        background: none;
+      }
+    }
+
+    .datepicker--nav-title {
+      color: @datepicker-nav-title-color;
+      font-size: 4rem;
+      text-transform: uppercase;
+      font-style: normal !important;
+
+      i {
+        color: @datepicker-nav-title-color;
+      }
+
+      &:hover {
+        background: none;
+      }
+    }
+  }
+
+  .datepicker--content {
+    color: @program-dark-color;
+    font-size: 3.25rem;
+
+    .datepicker--body {
+
+      .datepicker--days-names {
+
+        .datepicker--day-name {
+          color: @datepicker-day-name-color;
+          font-size: 3.25rem;
+          text-transform: uppercase;
+        }
+      }
+
+      .datepicker--cells {
+        justify-content: space-between;
+
+        .datepicker--cell {
+          height: 7rem !important;
+          width: 7rem !important;
+          margin: 0.5rem;
+
+          &.-selected- {
+            color: @program-dark-color;
+            border-radius: 100%;
+            background: @datepicker-cell-selected-color;
+
+            &:hover {
+              color: @program-dark-color;
+              background: @datepicker-cell-selected-color;
+            }
+          }
+
+          &.-focus- {
+            border-radius: 100%;
+            border: 1px solid @datepicker-cell-border-color;
+            background: transparent;
+          }
+
+          &.-disabled- {
+            color: @program-dark-color;
+
+            &:hover {
+              border: none !important;
+            }
+          }
+
+          &.-other-month- {
+            color: @datepicker-day-other-month-color;
+
+            &.-selected- {
+
+              &:hover {
+                color: @datepicker-day-other-month-color;
+              }
+            }
+
+            &:hover {
+              border-radius: 100%;
+              border: 1px solid @datepicker-cell-border-color;
+            }
+          }
+
+          &.-current- {
+            color: @program-dark-color;
+            border-radius: 100%;
+            border: 1px solid @datepicker-cell-border-color;
+
+            &.-selected- {
+
+              &:hover {
+                color: @program-dark-color;
+                background: @datepicker-cell-selected-color;
+              }
+            }
+
+            &:hover {
+              border-radius: 100%;
+              border: 1px solid @datepicker-cell-border-color;
+              color: @program-dark-color;
+              background: transparent;
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+table {
+  font-size: 1.3rem;
+  width: 100%;
+
+  thead {
+    text-align: left;
+
+    @include themify($themes) {
+      color: themed(optionalTextColor);
+    }
+
+    tr {
+      height: 4rem;
+
+      th {
+        padding: 1rem;
+        vertical-align: bottom;
+
+        &:first-child {
+          padding-left: 3rem;
+        }
+
+        &:last-child {
+          padding-right: 3rem;
+        }
+      }
+    }
+  }
+
+  tbody {
+    text-align: left;
+
+    @include themify($themes) {
+      color: themed(mainTextColor);
+    }
+
+    tr {
+      height: 3.5rem;
+
+      &:nth-child(odd) {
+
+        @include themify($themes) {
+          background-color: themed(tableBackgroundColor);
+        }
+      }
+
+      td {
+        line-height: 1.7rem;
+        padding: 0 1rem;
+        vertical-align: middle;
+        white-space: nowrap;
+
+        &:first-child {
+          padding-left: 3rem;
+        }
+
+        &:last-child {
+          padding-right: 3rem;
+        }
+      }
+    }
+  }
+}

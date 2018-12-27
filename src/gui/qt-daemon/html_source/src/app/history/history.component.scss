@@ -1,0 +1,63 @@
+:host {
+  width: 100%;
+}
+
+.wrap-table {
+  margin: -3rem;
+
+  table {
+
+    tbody {
+
+      tr {
+
+        .status {
+          position: relative;
+          display: flex;
+          align-items: center;
+
+          .confirmation {
+            position: absolute;
+            top: 50%;
+            left: -2rem;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: flex-end;
+            width: 0.7rem;
+            height: 1.5rem;
+
+            .fill {
+              width: 100%;
+            }
+          }
+
+          .icon {
+            margin-right: 1rem;
+            width: 1.7rem;
+            height: 1.7rem;
+          }
+
+          &.send  {
+
+            .icon {
+              mask: url(../../assets/icons/send.svg) no-repeat center;
+            }
+          }
+
+          &.received {
+
+            .icon {
+              mask: url(../../assets/icons/receive.svg) no-repeat center;
+            }
+          }
+        }
+
+        .remote-address {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 25vw;
+        }
+      }
+    }
+  }
+}

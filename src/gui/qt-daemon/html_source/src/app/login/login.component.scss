@@ -1,0 +1,34 @@
+:host {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  .content {
+    display: flex;
+
+    .wrap-login {
+      margin: auto;
+      width: 100%;
+      max-width: 40rem;
+
+      .logo {
+        background: url("../../assets/images/logo.png") no-repeat center top;
+        width: 100%;
+        height: 14rem;
+      }
+
+      .form-login {
+        display: flex;
+        flex-direction: column;
+
+        button {
+          margin: 2.5rem auto;
+          width: 100%;
+          max-width: 15rem;
+        }
+      }
+    }
+  }
+}

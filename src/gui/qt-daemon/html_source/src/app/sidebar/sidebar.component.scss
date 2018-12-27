@@ -1,0 +1,232 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 0 0 25rem;
+  padding: 0 3rem 3rem;
+}
+
+.sidebar-accounts {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+
+  .sidebar-accounts-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 auto;
+    height: 8rem;
+    font-weight: 400;
+
+    h3 {
+      font-size: 1.7rem;
+    }
+
+    button {
+      background: transparent;
+      border: none;
+      outline: none;
+    }
+  }
+
+  .sidebar-accounts-list {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    margin: 0 -3rem;
+    overflow-y: overlay;
+
+    .sidebar-account {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      cursor: pointer;
+      padding: 2rem 3rem;
+
+      .sidebar-account-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        &.account-title-balance {
+          line-height: 2.7rem;
+
+          .title {
+            font-size: 1.5rem;
+          }
+
+          .balance {
+            font-size: 1.8rem;
+            font-weight: 600;
+          }
+        }
+
+        &.account-alias {
+          font-size: 1.3rem;
+          line-height: 3.4rem;
+          margin-bottom: 0.7rem;
+        }
+
+        &.account-staking {
+          line-height: 2.9rem;
+
+          .text {
+            font-size: 1.3rem;
+          }
+        }
+
+        &.account-messages {
+          line-height: 2.7rem;
+
+          .text {
+            font-size: 1.3rem;
+          }
+
+          .indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1rem;
+            font-size: 1rem;
+            min-width: 24px;
+            height: 16px;
+            padding: 0 5px;
+          }
+        }
+
+        &.account-synchronization {
+          flex-direction: column;
+          height: 5.6rem;
+
+          .status {
+            align-self: flex-start;
+            font-size: 1.3rem;
+            line-height: 2.6rem;
+          }
+
+          .progress-bar-container {
+            display: flex;
+            margin: 0.4rem 0;
+            height: 0.7rem;
+            width: 100%;
+
+            .progress-bar {
+              flex: 1 0 auto;
+
+              .fill {
+                height: 100%;
+              }
+            }
+
+            .progress-percent {
+              flex: 0 0 auto;
+              font-size: 1.3rem;
+              line-height: 0.7rem;
+              padding-left: 0.7rem;
+            }
+          }
+        }
+      }
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+}
+
+.sidebar-settings {
+  flex: 0 0 auto;
+  padding-bottom: 1rem;
+
+  button {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: none;
+    line-height: 3rem;
+    outline: none;
+    padding: 0;
+    font-weight: 400;
+
+    .icon {
+      margin-right: 1.2rem;
+      width: 1.7rem;
+      height: 1.7rem;
+
+      &.settings {
+        mask: url(../../assets/icons/settings.svg) no-repeat center;
+      }
+
+      &.logout {
+        mask: url(../../assets/icons/logout.svg) no-repeat center;
+      }
+    }
+  }
+}
+
+.sidebar-synchronization-status {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  flex: 0 0 4rem;
+  font-size: 1.3rem;
+
+  .status-container {
+
+    .offline, .online {
+      position: relative;
+      display: block;
+      line-height: 1.2rem;
+      padding-left: 2.2rem;
+
+      &:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        border-radius: 50%;
+        width: 1.2rem;
+        height: 1.2rem;
+      }
+    }
+
+    .syncing, .loading {
+      line-height: 4rem;
+    }
+  }
+
+  .progress-bar-container {
+    position: absolute;
+    bottom: -0.7rem;
+    left: 0;
+    height: 0.7rem;
+    width: 100%;
+
+    .syncing {
+      display: flex;
+
+      .progress-bar {
+        flex: 1 0 auto;
+
+        .fill {
+          height: 100%;
+        }
+      }
+
+      .progress-percent {
+        flex: 0 0 auto;
+        font-size: 1.3rem;
+        line-height: 0.7rem;
+        padding-left: 0.7rem;
+      }
+    }
+
+    .loading {
+      background-image: url("../../assets/images/loading.png");
+      height: 100%;
+    }
+  }
+}

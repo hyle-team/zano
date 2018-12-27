@@ -1,0 +1,388 @@
+app-wallet {
+
+  @include themify($themes) {
+    color: themed(mainTextColor);
+  }
+
+  .header {
+
+    button {
+
+      @include themify($themes) {
+        color: themed(mainTextColor);
+      }
+
+      .icon {
+
+        @include themify($themes) {
+          background-color: themed(blueTextColor);
+        }
+      }
+    }
+  }
+
+  .address {
+
+    @include themify($themes) {
+      color: themed(blueTextColor);
+    }
+
+    .icon {
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+      }
+    }
+  }
+
+  .tabs {
+
+    .tabs-header {
+
+      .tab {
+
+        @include themify($themes) {
+          background-color: themed(tabInactiveBackgroundColor);
+        }
+
+        .icon {
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+        }
+
+        .indicator {
+
+          @include themify($themes) {
+            background-color: themed(accountIndicatorBackgroundColor);
+            color: themed(accountIndicatorTextColor);
+          }
+        }
+
+        &.active {
+
+          @include themify($themes) {
+            background-color: themed(contentBackgroundColor);
+          }
+        }
+      }
+    }
+
+    .tabs-content {
+
+      @include themify($themes) {
+        background-color: themed(contentBackgroundColor);
+      }
+    }
+  }
+}
+
+app-send {
+
+  .form-send {
+
+    .send-select {
+
+      @include themify($themes) {
+        color: themed(mainTextColor);
+      }
+
+      .icon {
+
+        @include themify($themes) {
+          background-color: themed(blueTextColor);
+        }
+      }
+    }
+
+    .additional-details {
+
+      @include themify($themes) {
+        border: 0.2rem solid themed(transparentButtonBorderColor);
+      }
+    }
+  }
+}
+
+app-receive {
+
+  .btn-copy-address {
+
+    @include themify($themes) {
+      background-color: themed(blueTextColor);
+    }
+  }
+}
+
+app-history {
+
+  table {
+
+    tbody {
+
+      tr {
+
+        .status {
+
+          .confirmation {
+
+            @include themify($themes) {
+              background-color: themed(progressBarBackgroundColor);
+            }
+
+            .fill {
+
+              @include themify($themes) {
+                background-color: themed(progressBarFullBackgroundColor);
+              }
+            }
+          }
+        }
+
+        .status.send  {
+
+          .icon {
+            background-color: #ff5252;
+          }
+        }
+
+        .status.received {
+
+          .icon {
+            background-color: #00c853;
+          }
+        }
+      }
+    }
+  }
+}
+
+app-contracts {
+
+  .wrap-table {
+
+    .contract {
+
+      .icon {
+
+        &.new, &.alert {
+
+          @include themify($themes) {
+            background-color: themed(redTextColor);
+          }
+        }
+
+        &.purchase, &.sell {
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+        }
+      }
+    }
+  }
+}
+
+app-purchase {
+
+  .form-purchase {
+
+    .purchase-select {
+
+      @include themify($themes) {
+        color: themed(mainTextColor);
+      }
+
+      .icon {
+
+        @include themify($themes) {
+          background-color: themed(blueTextColor);
+        }
+      }
+    }
+
+    .purchase-states {
+
+      @include themify($themes) {
+        color: themed(blueTextColor);
+      }
+    }
+
+    .additional-details {
+
+      @include themify($themes) {
+        border: 0.2rem solid themed(transparentButtonBorderColor);
+      }
+    }
+  }
+
+  .progress-bar-container {
+
+    .progress-bar {
+
+      @include themify($themes) {
+        background-color: themed(progressBarBackgroundColor);
+      }
+
+      .progress-bar-full {
+
+        @include themify($themes) {
+          background-color: themed(progressBarFullBackgroundColor);
+        }
+      }
+    }
+  }
+}
+
+app-messages {
+
+  table {
+
+    tbody {
+
+      tr {
+
+        td:first-child {
+
+          span {
+            @include text-truncate;
+          }
+
+          .icon {
+
+            @include themify($themes) {
+              background-color: themed(redTextColor);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+app-typing-message {
+
+  .head {
+
+    .interlocutor {
+
+      @include themify($themes) {
+        color: themed(blueTextColor);
+      }
+    }
+  }
+
+  .messages-content {
+
+    .messages-list {
+
+      div {
+
+        &.date {
+
+          @include themify($themes) {
+            color: themed(optionalTextColor);
+          }
+        }
+
+        &.my {
+
+          @include themify($themes) {
+            background-color: themed(messageMyBackgroundColor);
+          }
+
+          &:before {
+
+            @include pseudo;
+            top: 0;
+            left: -1.1rem;
+            border: 1.2rem solid transparent;
+
+            @include themify($themes) {
+              border-top-color: themed(messageMyBackgroundColor);
+            }
+          }
+        }
+
+        &.buddy {
+
+          @include themify($themes) {
+            background-color: themed(messageBuddyBackgroundColor);
+          }
+
+          &:after {
+
+            @include pseudo;
+            right: -1.1rem;
+            top: 0;
+            border: 1.2rem solid transparent;
+
+            @include themify($themes) {
+              border-top-color: themed(messageBuddyBackgroundColor);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+app-staking {
+
+  .chart-header {
+
+    .general {
+
+      .label {
+
+        @include themify($themes) {
+          color: themed(optionalTextColor);
+        }
+      }
+
+      .options {
+
+        @include themify($themes) {
+          color: themed(mainTextColor);
+        }
+      }
+    }
+
+    .selected {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-grow: 1;
+      font-size: 1.6rem;
+    }
+  }
+
+  .chart-options {
+
+    .title {
+
+      @include themify($themes) {
+        color: themed(optionalTextColor);
+      }
+    }
+
+    .options {
+
+      button {
+
+        @include themify($themes) {
+          color: themed(mainTextColor);
+          background-color: themed(chartOptionsBackgroundColor);
+        }
+
+        &.active {
+
+          @include themify($themes) {
+            background-color: themed(chartOptionsHoverColor);
+          }
+        }
+      }
+    }
+  }
+}

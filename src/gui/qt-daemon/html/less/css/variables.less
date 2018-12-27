@@ -1,0 +1,173 @@
+@xs: ~"(max-width: 767px)";
+@sm: ~"(min-width: 768px)";
+@md: ~"(min-width: 992px)";
+@lg: ~"(min-width: 1200px)";
+
+@min-width: 250rem;
+
+@background-image: url('../img/bg_blue.jpg');
+@program-online-color: #5d6c78;
+@program-offline-color: #cd5044;
+@scroll-light-color: fade(white, 70%);
+@scroll-dark-color: #7b919e;
+@error-color: #e9301d;
+@success-color: #1d9f5f;
+@box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25);
+@modal-form-shadow: 0 0.5rem 0.75rem 0 rgba(0, 0, 0, 0.15);
+@table-item-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.175);
+@market-details-shadow: 0 2.5rem 6rem 0 rgba(0, 0, 0, 0.45);
+
+@program-header-text-color: #004d73;
+@program-header-text-blocked-color: #aaafb4;
+@program-header-border-color: #edf2f4;
+@program-header-bg-hover-color: #f4f9fb;
+@program-header-bg-active-color: #d5e6f0;
+@program-header-indicator-text-color: #b83a2d;
+@program-header-indicator-border-color: #d48279;
+
+@program-table-bg-color: fade(white, 60%);
+@program-table-header-bg-color: fade(white, 40%);
+@program-table-border-color: #e1e8eb;
+@program-table-icon-color: #5a7388;
+@program-table-button-border-color: #adbbbe;
+@program-table-button-border-hover-color: #b3ac90;
+@program-table-button-icon-hover-color: #7d5d1f;
+
+@program-tab-bg-color: fade(white, 50%);
+@program-tab-hover-bg-color: white;
+@program-tab-border-color: #e1e8eb;
+@program-tab-text-color: #4d7a92;
+
+@program-filter-button-border-color: #e1e8eb;
+@program-options-bg-hover-color: #f1f6f9;
+
+@program-panel-bg-color: fade(white, 60%);
+@program-panel-header-bg-color: #d5e6ef;
+@program-panel-border-color: #e1e8eb;
+@program-panel-divider-color: #e1e8eb;
+
+@program-pagination-text-color: #1f415d;
+@program-pagination-text-inactive-color: #83919d;
+@program-pagination-border-color: #e3eaec;
+@program-pagination-pages-color: #a2bac9;
+
+@marker-red: #f1b2b2;
+@marker-yellow: #fce493;
+@marker-grey: #aaafb4;
+@marker-escrow: #65a9de;
+@marker-light-green: #a7c790;
+
+@program-exuding-color: #142839;
+@program-main-color: #1f415d;
+@program-dark-color: #004d73;
+@program-light-color: #929ca4;
+@program-empty-color: #7190a1;
+@program-hover-color: #74520f;
+@program-label-color: #004d73;
+@program-label-subtext-color: #417b96;
+@program-label-info-color: #548ca8;
+
+@program-modal-header-color: #d5e6ef;
+@program-modal-header-close-color: #88a1b5;
+@program-modal-divider-color: #dae1e2;
+@program-modal-active-line-color: #61de11;
+
+@program-select-hover-color: #eef3f6;
+@program-select-selected-color: #e3ecf1;
+@program-input-text-color: #142839;
+@program-input-border-color: #828d97;
+@program-input-placeholder-color: #aaafb4;
+@program-input-placeholder-hover-color: #bca577;
+@program-input-icon-color: #787f86;
+@program-checkbox-border-color: #718ea7;
+@program-switch-text-color: #5888a1;
+@program-range-border-color: #a2b9c5;
+@program-range-selected-color: #4d7a92;
+@program-button-bg-color: white;
+@program-button-hover-bg-color: #f5f8f9;
+@program-button-active-bg-color: #f1f6f9;
+@program-button-text-color: #004d73;
+@program-button-border-color: #e2eaed;
+@program-button-border-hover-color: #e1e2d9;
+@program-button-divider-color: #c3ced4;
+@program-button-done-icon-color: #60d22d;
+@program-button-subtext-color: #709bb1;
+@program-clear-button-color: #a64833;
+@program-clear-button-hover-color: #a64833;
+@program-progress-bar-bg-color: #e1e3e4;
+@program-progress-bar-fill-color: #95a2ac;
+@program-mined-icon-color: #81be55;
+@program-payments-income-color: #67aa3b;
+@program-payments-outgoing-color: #e27078;
+@program-transaction-status-inner-color: #b4bcc1;
+@program-transaction-status-pending-inner-color: #57b85f;
+@program-transaction-status-sending-inner-color: #e47661;
+@program-copy-icon-color: fade(@program-exuding-color, 50%);
+@program-divider-color: #f3f5f4;
+@program-selection-bg-color: #e8cca8;
+
+@dashboard-indicator-text-color: #004d73;
+@dashboard-indicator-icon-color: #004d73;
+@dashboard-slider-border-color: #c6d4dc;
+@dashboard-slider-icon-color: #578aa2;
+@dashboard-alias-border-color: #c9d4d9;
+@safes-indicator-color: #3c7592;
+@safes-block-text-color: #8b96a0;
+@safes-block-text-open-color: #1f415d;
+@safes-block-mined-bg-color: #95b5c7;
+@safes-block-mined-icon-color: #ecf1f2;
+@safes-alias-border-color: #adbbbe;
+@safes-alias-border-hover-color: #d5cab9;
+@safes-balance-text-color: #8b96a0;
+@safe-pages-switch-bg-color: white;
+@safe-pages-switch-bg-hover-color: #f1f6f9;
+@safe-pages-switch-border-color: #e9eef2;
+@safe-pages-switch-text-color: #9ab1c4;
+@safe-pages-switch-text-hover-color: #1f415d;
+@safe-balance-indicator-color: #f5b81b;
+@safe-mined-indicator-color: #aab5ba;
+@safe-mined-completed-indicator-color: #539f42;
+@safe-button-border-hover-color: #97835c;
+@safe-alias-icon-color: #87929b;
+@safe-alias-icon-hover-color: #828d97;
+@safe-button-bg-color: fade(white, 80%);
+@market-header-icon-color: #6a9cb6;
+@market-favorite-color: #cd5044;
+@market-detail-divider-color: #ebeeec;
+@escrow-transaction-status-color: #338dd4;
+@history-transaction-blocked-border-color: #e95145;
+@history-transaction-blocked-text-color: #fbe3e2;
+@history-transaction-blocked-status-income-color: #a2be7e;
+@history-transaction-blocked-status-outgoing-color: #c51616;
+@history-transaction-blocked-alias-color: #f2a09b;
+@history-transaction-blocked-hover-color: #e7c48e;
+@contacts-groups-border-color: #e9eef2;
+@contacts-accounts-btn-text-color: #7e858c;
+@export-import-contacts-text-color: #004d73;
+@export-import-contacts-border-color: #e1e8eb;
+@mining-range-text-color: #7190a1;
+@mining-range-border-color: #e0e7ed;
+@bug-report-button-color: white;
+
+@send-money-contacts-hover-color: #f4f0d7;
+@send-money-contacts-icon-hover-color: #97835c;
+@send-money-contacts-address-hover-color: #bca577;
+
+@create-safe-progress-bar-step-color: #95b5c7;
+@create-safe-progress-bar-bg-color: fade(@create-safe-progress-bar-step-color, 25%);
+@create-safe-progress-bar-fill-color: #89b0c6;
+
+@modal-update-text-color: #f4f6e9;
+@modal-update-green-color: #61a75b;
+@modal-update-yellow-color: #cdb912;
+@modal-update-red-color: #e95145;
+
+@datepicker-nav-action-color: #004d73;
+@datepicker-nav-title-color: #142839;
+@datepicker-day-name-color: #a8b2b9;
+@datepicker-day-other-month-color: #5888a1;
+@datepicker-cell-border-color: #83a7b9;
+@datepicker-cell-selected-color: #d5e6f0;
+
+@highcharts-scrollbar-color: #a5adb5;
+@highcharts-axis-line-color: fade(#a5adb5, 75%);

@@ -1,0 +1,8 @@
+@import '~src/assets/scss/base/mixins';
+
+.app-content {
+  display: flex;
+  overflow-x: overlay;
+  overflow-y: hidden;
+  width: 100%;
+}

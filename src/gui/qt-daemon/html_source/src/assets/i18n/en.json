@@ -1,0 +1,174 @@
+{
+  "LOGIN" : {
+    "SETUP_MASTER_PASS": "Setup master password",
+    "SETUP_CONFIRM_PASS": "Confirm the password",
+    "MASTER_PASS": "Master password",
+    "BUTTON_NEXT": "Next"
+  },
+  "COMMON": {
+    "BACK": "Go back"
+  },
+  "BREADCRUMBS": {
+    "ADD_WALLET": "Add new wallet",
+    "CREATE_WALLET": "Create new wallet",
+    "SAVE_PHRASE": "Save your seed phrase",
+    "OPEN_WALLET": "Open existing wallet",
+    "RESTORE_WALLET": "Restore from backup",
+    "WALLET_DETAILS": "Wallet details",
+    "CONTRACTS": "Contracts",
+    "NEW_PURCHASE": "New purchase",
+    "OLD_PURCHASE": "Purchase"
+  },
+  "SIDEBAR": {
+    "TITLE": "Accounts",
+    "ADD_NEW": "+ Add new",
+    "ACCOUNT": {
+      "STAKING": "Staking",
+      "MESSAGES": "New offers/Messages"
+    },
+    "SETTINGS": "Settings",
+    "LOG_OUT": "Log out",
+    "SYNCHRONIZATION": {
+      "OFFLINE": "Offline",
+      "ONLINE": "Online",
+      "ERROR": "System error",
+      "COMPLETE": "Completion",
+      "SYNCING": "Syncing blockchain",
+      "LOADING": "Loading blockchain data"
+    }
+  },
+  "MAIN": {
+    "TITLE": "Create or open the wallet to start using Zano",
+    "BUTTON_NEW_WALLET": "Create new wallet",
+    "BUTTON_OPEN_WALLET": "Open existing wallet",
+    "BUTTON_RESTORE_BACKUP": "Restore from backup",
+    "HELP": "How to create wallet?"
+  },
+  "CREATE_WALLET": {
+    "NAME": "Wallet name",
+    "PASS": "Set wallet password",
+    "CONFIRM": "Confirm wallet password",
+    "BUTTON_SELECT": "Select wallet location",
+    "BUTTON_CREATE": "Create wallet"
+  },
+  "OPEN_WALLET": {
+    "NAME": "Wallet name",
+    "PASS": "Wallet password",
+    "BUTTON": "Open wallet"
+  },
+  "RESTORE_WALLET": {
+    "LABEL_NAME": "Wallet name",
+    "LABEL_PHRASE_KEY": "Seed phrase / private key",
+    "PASS": "Wallet password",
+    "CONFIRM": "Confirm wallet password",
+    "BUTTON_SELECT": "Select wallet location",
+    "BUTTON_CREATE": "Create wallet"
+  },
+  "SEED_PHRASE": {
+    "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your account.",
+    "BUTTON_CREATE_ACCOUNT" : "Create account"
+  },
+  "SETTINGS": {
+    "TITLE": "Settings",
+    "DARK_THEME": "Dark theme",
+    "WHITE_THEME": "White theme",
+    "GRAY_THEME": "Gray theme",
+    "MASTER_PASSWORD": {
+      "TITLE": "Update master password",
+      "OLD": "Old password",
+      "NEW": "New password",
+      "CONFIRM": "New password confirmation",
+      "BUTTON": "Save"
+    }
+  },
+  "WALLET": {
+    "REGISTER_ALIAS": "Register an alias",
+    "DETAILS": "Details",
+    "LOCK": "Lock",
+    "TABS": {
+      "SEND": "Send",
+      "RECEIVE": "Receive",
+      "HISTORY": "History",
+      "CONTRACTS": "Contracts",
+      "MESSAGES": "Messages",
+      "STAKING": "Staking"
+    }
+  },
+  "WALLET_DETAILS": {
+    "LABEL_NAME": "Wallet name",
+    "LABEL_FILE_LOCATION": "Wallet file location",
+    "LABEL_SEED_PHRASE": "Seed phrase",
+    "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
+    "BUTTON_SAVE": "Save",
+    "BUTTON_REMOVE": "Remove wallet"
+  },
+  "SEND": {
+    "ADDRESS": "Address",
+    "AMOUNT": "Amount",
+    "COMMENT": "Comment",
+    "DETAILS": "Additional details",
+    "MIXIN": "Mixin",
+    "FEE": "Fee",
+    "BUTTON": "Send"
+  },
+  "HISTORY": {
+    "STATUS": "Status",
+    "STATUS_TOOLTIP": "Approved {{current}}/{{total}}",
+    "SEND": "Send",
+    "RECEIVED": "Received",
+    "DATE": "Date",
+    "AMOUNT": "Amount",
+    "FEE": "Fee",
+    "ADDRESS": "Address"
+  },
+  "CONTRACTS": {
+    "EMPTY": "No active contracts.",
+    "CONTRACTS": "Contracts",
+    "PURCHASE": "Purchase",
+    "SELL": "Sell",
+    "DATE": "Date",
+    "AMOUNT": "Amount",
+    "STATUS": "Status",
+    "COMMENTS": "Comments",
+    "PURCHASE_BUTTON": "New Purchase",
+    "LISTING_BUTTON": "Create listing",
+    "TIME_LEFT": {
+      "REMAINING_LESS_ONE": "Less than an hour to respond",
+      "REMAINING_ONE": "Remaining {{time}} hour",
+      "REMAINING_MANY": "Remaining {{time}} hours",
+      "REMAINING_MANY_ALT": "Remaining {{time}} hours",
+      "REMAINING_ONE_RESPONSE": "Remaining {{time}} hour for response",
+      "REMAINING_MANY_RESPONSE": "Remaining {{time}} hours for response",
+      "REMAINING_MANY_ALT_RESPONSE": "Remaining {{time}} hours for response",
+      "REMAINING_ONE_WAITING": "Remaining {{time}} hour waiting",
+      "REMAINING_MANY_WAITING": "Remaining {{time}} hours waiting",
+      "REMAINING_MANY_ALT_WAITING": "Remaining {{time}} hours waiting"
+    }
+  },
+  "PURCHASE": {
+    "DESCRIPTION": "Description",
+    "SELLER": "Seller",
+    "AMOUNT": "Amount",
+    "YOUR_DEPOSIT": "Your deposit",
+    "SELLER_DEPOSIT": "Seller deposit",
+    "COMMENT": "Comment",
+    "DETAILS": "Additional details",
+    "SEND_BUTTON": "Send",
+    "CANCEL_BUTTON": "Cancel and return deposits",
+    "TERMINATE_BUTTON": "Terminate and burn deposits",
+    "COMPLETE_BUTTON": "Complete and release deposits",
+    "PROGRESS_NEW": "New purchase",
+    "PROGRESS_WAIT": "Awaiting reply",
+    "PROGRESS_RECEIVE": "Reply received",
+    "PROGRESS_COMPLETE": "Completed",
+    "FEE": "Fee",
+    "PAYMENT": "Payment ID"
+
+  },
+  "MESSAGES": {
+    "ADDRESS": "Address",
+    "MESSAGE": "Message",
+    "SEND_PLACEHOLDER": "Type a message...",
+    "SEND_BUTTON": "Send"
+  }
+}

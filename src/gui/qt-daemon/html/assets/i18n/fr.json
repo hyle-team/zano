@@ -1,0 +1,15 @@
+{
+  "SIDEBAR": {
+    "TITLE": "Accounts2",
+    "ADD_NEW": "+ Add new2",
+    "SETTINGS": "Settings2",
+    "LOG_OUT": "Log out2"
+  },
+  "MAIN": {
+    "TITLE": "Create or open the wallet to start using Zano2",
+    "BUTTON_NEW_WALLET": "Create new wallet2",
+    "BUTTON_OPEN_WALLET": "Open existing wallet2",
+    "BUTTON_RESTORE_BACKUP": "Restore from backup2",
+    "HELP": "How to create wallet?2"
+  }
+}

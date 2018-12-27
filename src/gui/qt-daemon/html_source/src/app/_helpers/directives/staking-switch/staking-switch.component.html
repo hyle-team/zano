@@ -1,0 +1,5 @@
+<div class="switch" (click)="toggleStaking()">
+  <span class="option" *ngIf="staking">ON</span>
+  <span class="circle" [class.on]="staking" [class.off]="!staking"></span>
+  <span class="option" *ngIf="!staking">OFF</span>
+</div>

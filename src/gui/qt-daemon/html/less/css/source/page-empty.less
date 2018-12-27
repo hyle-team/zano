@@ -1,0 +1,125 @@
+@import "../variables";
+@import "mixins";
+
+.page-empty {
+  .flex-container;
+  .flex-container-alignment(center, center);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: -1;
+  color: @program-exuding-color;
+  text-align: center;
+  min-height: 150rem;
+
+  .one-block {
+    display: inline-block;
+    width: 112rem;
+
+    &.wider-block {
+      width: 140rem;
+    }
+
+    h1 {
+      font-size: 10.75rem;
+      font-weight: 200;
+      margin-top:6.5rem;
+    }
+
+    span {
+      font-size: 6.25rem;
+      margin-top: 5.5rem;
+      font-weight: 200;
+      line-height: 9.5rem;
+      text-align: center;
+    }
+  }
+}
+
+.dashboard-empty {
+  z-index: 0;
+  margin: 18rem 8rem;
+  min-height: 100rem;
+
+  .main-block {
+    display: block;
+    height: 100%;
+    padding: 0 30rem;
+    overflow: hidden;
+
+    .main-block-row {
+      .flex-container;
+      .flex-container-alignment(center, space-between);
+      width: 155rem;
+      height: 100%;
+      transition: transform 0.5s ease-in-out;
+
+      .main-block-col {
+        .flex-container-direction(column);
+        .flex-container-alignment(center, center);
+        position: relative;
+        margin-bottom: 0;
+        width: 55rem;
+        transition: all 0.2s ease-in-out;
+
+        .main-block-icon {
+
+          &.dashboard-create-safe {
+            background: url('../img/createsafe.svg') no-repeat center;
+            background-size: 100%;
+            width: 50rem;
+            height: 16rem;
+          }
+
+          &.dashboard-open-safe {
+            background: url('../img/opensafe.svg') no-repeat center;
+            background-size: 100%;
+            width: 50rem;
+            height: 20rem;
+            margin-top: -4rem;
+          }
+
+          &.dashboard-open-file-safe {
+            background: url('../img/openfilesafe.svg') no-repeat center;
+            background-size: 100%;
+            width: 50rem;
+            height: 16rem;
+            margin-top: -1.5rem;
+            margin-bottom: 1.5rem;
+          }
+
+          &.dashboard-open-smartsafe {
+            background: url('../img/opensmartsafe.svg') no-repeat center;
+            background-size: 100%;
+            width: 50rem;
+            height: 16rem;
+            margin-top: -1.5rem;
+            margin-bottom: 1.5rem;
+          }
+        }
+
+        .main-block-title {
+          font-size: 9.5rem;
+          font-weight: 200;
+          line-height: 24rem;
+          margin-bottom: 3rem;
+          white-space: nowrap;
+
+          &.smaller-size {
+            font-size: 8rem;
+          }
+        }
+
+        &:hover {
+          margin-top: -3rem;
+        }
+      }
+    }
+
+    .slide-up {
+      transform: translateY(-100%);
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "payments": [
+    {
+      "address": "Ha2j2dc3paN7YhAmFpUGdj5aY3gZ1T2kU7SfpXhiyzMGJQBQ2pYhMYGVn23EEmaLViTLG8HBXGf9cBJgKKL7FvLzSKstBtx",
+      "amount": 1000000000000000
+    },
+    {
+      "address": "Hj4eP1xcWbRctxMfnjyAbMeWMJHbPP5sRWrRndNVihWNMaE9gxKivC4Fg51NdwmHMT5c9KhkFejzoKLPtXuToZY1RHhXnjG",
+      "amount": 1000000000000000
+    },
+    {
+      "address": "HcXpSczV121RFaAgQcd2EndZSAh3LPyv7NqJXjwHzjiK2W6HDBc8pfdXRyTFJsvgj7AsgfbFHYdsk8u87oouAGjn3W5hskq",
+      "amount": 1000000000000000
+    },
+
+    {
+      "address": "HeSaB262PK85srNb5MbD677grsdt2hhQm3FSEw6QwfwSUyicTtZ2AKxFyhv8bQb73iS9cWE2Q75VSY2d3uhEmAJZ2rvySfG",
+      "amount": 1000000000000000
+    },
+    {
+      "address": "HiafzT3CaGtfiMqyzJEfx7JYqiXnpUNMEWg1ofya9yUW8pkFGcYmiyUZBPksWL9sLpE7PriFDbcuuPhHcJchAVVsA2ubYMk",
+      "amount": 1000000000000000
+    },
+    {
+      "address": "Hhg7ofR11JsDzjdGJAkhvSXTkE7owTLm4aiiKBDiQoGDY5aJcEFfMaqSm7N3xJ6E5cFUetWSXeR6PGKbrMfyWfVeE7TxLeP",
+      "amount": 1000000000000000
+    },
+    {
+      "address": "HeiGrnLGzN8MHEEVujPU7hVnLdj1j2k54B7np9JrinyfYQx9Gc4jshcCtxxEvXDHKYfvHY56r882XQwUyWV6TV1wGDjfHZ9",
+      "amount": 1000000000000000
+    },
+    {
+      "address": "HiKCgK6573ca47nAodx1Uw9qK3Asx18ED5JuZwMw2LAvcbE2waWHhLT6KDtvF5pST8EjBq57Hsg2PN7cU3kDqDMp7vTW5c2",
+      "amount": 1000000000000000
+    },
+    {
+      "address": "HdXpaaWbXa2D4KszWSxyXkBJYg1TGk2qsGuPMCaq9qGodbxpfWXmVaQ1f1bxuhi9caNtmDcJhU2r9Cc3y9SpRvWx5N6uzi7",
+      "amount": 1000000000000000
+    },
+    {
+      "address": "HceHnVBWxEUDNep86898QAEWZgxbEDMDMUyspS9yW3xtcUQhxsPUBuQCyTfRLgP65BKGyM1a2vY7bLzK4PzGYfe1RWJcLhG",
+      "amount": 1000000000000000
+    },
+    {
+      "address": "HfabuobNypniDVAgGAGorJXNi5jnPy74vMnSwKsFTYpPCDdPLx6mLwU3qcfrbpEAFvLq5GY8ZzsQNHvswLPPBmQ83QH73jJ",
+      "amount": 300000000000000
+    }
+  ],
+  "proof_string": "2EC6F962FC3D460897C2CEFE51D3097AA66C000B"
+}

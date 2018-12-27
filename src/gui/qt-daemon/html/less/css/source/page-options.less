@@ -1,0 +1,118 @@
+@import "../variables";
+@import "mixins";
+
+.main-options-wrapper {
+
+  .page-title {
+    color: @program-dark-color;
+    font-size: 8rem;
+    font-weight: 300;
+    line-height: 9rem;
+    margin: 0;
+  }
+
+  .back-btn {
+    .flex-container;
+    .flex-container-alignment(center, center);
+    background: transparent;
+    border: none;
+    color: @program-dark-color;
+    font-size: 3.75rem;
+    padding: 0;
+    margin: 0;
+
+    .base-icon {
+      .icon-sizing(3rem, 2rem, -4.5rem, -6rem);
+      margin-right: 2rem;
+      margin-bottom: -0.5rem;
+    }
+  }
+
+  .main-options-btn {
+    .general-button(auto, 8.25rem);
+    color: @program-button-text-color;
+    font-size: 4.25rem;
+    min-width: 45rem;
+
+    &.disabled {
+      color: @program-light-color;
+      cursor: default;
+
+      &:hover {
+        background: fade(white, 55%);
+      }
+
+      &:active {
+        background: fade(white, 55%);
+      }
+    }
+  }
+
+  .main-options-btn-group {
+    .flex-container-direction(row);
+    border-radius: 10rem;
+
+    .main-options-btn {
+      border-radius: 0;
+      min-width: 33rem;
+
+      &.button-in-group {
+        border-right: 1px solid @program-button-divider-color;
+
+        &:first-child {
+          border-top-left-radius: 10rem;
+          border-bottom-left-radius: 10rem;
+        }
+
+        &:last-child {
+          border-top-right-radius: 10rem;
+          border-bottom-right-radius: 10rem;
+          margin-right: 0;
+        }
+      }
+
+      &.button-in-dropdown {
+        border-top-right-radius: 10rem;
+        border-bottom-right-radius: 10rem;
+
+        .base-icon {
+          .icon-sizing(2rem, 2rem, -4rem, -5rem);
+          margin-top: 0.5rem;
+          margin-left: 2rem;
+          font-size: 12rem;
+        }
+      }
+    }
+
+    .dropdown.open {
+
+      .button-in-dropdown {
+        background: rgba(255, 255, 255, 0.55)!important;
+      }
+    }
+
+    .dropdown-menu {
+      .menu-list(10.5rem, inherit, -0.75rem, 47rem);
+      border-radius: 3rem;
+
+      li {
+        height: auto;
+
+        button {
+          font-size: 3.75rem;
+          padding: 1.5rem 4rem;
+        }
+
+        &:first-child {
+          border-top-left-radius: 3rem;
+          border-top-right-radius: 3rem;
+        }
+
+        &:last-child {
+          border-bottom-left-radius: 3rem;
+          border-bottom-right-radius: 3rem;
+        }
+      }
+    }
+  }
+}

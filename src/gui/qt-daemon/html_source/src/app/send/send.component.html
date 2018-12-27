@@ -1,0 +1,60 @@
+<form class="form-send" [formGroup]="sendForm" (ngSubmit)="onSend()">
+
+  <div class="input-block">
+    <label for="send-address">{{ 'SEND.ADDRESS' | translate }}</label>
+    <input type="text" id="send-address" formControlName="address" (blur)="checkAddressValidation()" (contextmenu)="variablesService.onContextMenu($event)">
+  </div>
+
+  <div class="error-block" *ngIf="sendForm.controls['address'].invalid && (sendForm.controls['address'].dirty || sendForm.controls['address'].touched)">
+    <div *ngIf="sendForm.controls['address'].errors['required']">
+      Address is required.
+    </div>
+    <div *ngIf="sendForm.controls['address'].errors['address_not_valid']">
+      Address not valid.
+    </div>
+  </div>
+
+  <div class="input-blocks-row">
+    <div class="input-block">
+      <label for="send-amount">{{ 'SEND.AMOUNT' | translate }}</label>
+      <input type="text" id="send-amount" formControlName="amount" appInputValidate="money" maxlength="21" (contextmenu)="variablesService.onContextMenu($event)">
+    </div>
+
+    <div class="error-block" *ngIf="sendForm.controls['amount'].invalid && (sendForm.controls['amount'].dirty || sendForm.controls['amount'].touched)">
+      <div *ngIf="sendForm.controls['amount'].errors['required']">
+        Amount is required.
+      </div>
+    </div>
+
+    <div class="input-block">
+      <label for="send-comment">{{ 'SEND.COMMENT' | translate }}</label>
+      <input type="text" id="send-comment" formControlName="comment" (contextmenu)="variablesService.onContextMenu($event)">
+    </div>
+  </div>
+
+  <button type="button" class="send-select" (click)="toggleOptions()">
+    <span>{{ 'SEND.DETAILS' | translate }}</span><i class="icon arrow" [class.down]="!additionalOptions" [class.up]="additionalOptions"></i>
+  </button>
+
+  <div class="additional-details" *ngIf="additionalOptions">
+    <div class="input-block">
+      <label for="send-mixin">{{ 'SEND.MIXIN' | translate }}</label>
+      <input type="text" id="send-mixin" formControlName="mixin" appInputValidate="integer" (contextmenu)="variablesService.onContextMenu($event)">
+    </div>
+    <div class="error-block" *ngIf="sendForm.controls['mixin'].invalid && (sendForm.controls['mixin'].dirty || sendForm.controls['mixin'].touched)">
+      <div *ngIf="sendForm.controls['mixin'].errors['required']">
+        Amount is required.
+      </div>
+    </div>
+    <div class="input-block">
+      <label for="send-fee">{{ 'SEND.FEE' | translate }}</label>
+      <input type="text" id="send-fee" formControlName="fee" appInputValidate="money" (contextmenu)="variablesService.onContextMenu($event)">
+    </div>
+    <div class="error-block" *ngIf="sendForm.controls['fee'].invalid && (sendForm.controls['fee'].dirty || sendForm.controls['fee'].touched)">
+      <div *ngIf="sendForm.controls['fee'].errors['required']">
+        Amount is required.
+      </div>
+    </div>
+  </div>
+  <button type="submit" class="blue-button" [disabled]="!sendForm.valid || !variablesService.currentWallet.loaded">{{ 'SEND.BUTTON' | translate }}</button>
+</form>

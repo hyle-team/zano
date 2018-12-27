@@ -1,0 +1,382 @@
+button {
+  border: none;
+  font-family: 'Open Sans', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  outline: none;
+  padding: 0 1rem;
+  height: 4.2rem;
+
+  &:disabled:not(.transparent-button) {
+
+    @include themify($themes) {
+      background-color: themed(disabledButtonBackgroundColor);
+      color: themed(alternativeTextColor);
+    }
+
+    &:hover {
+
+      @include themify($themes) {
+        background-color: themed(disabledButtonHoverColor);
+      }
+    }
+  }
+
+  &.blue-button:not(:disabled) {
+
+    @include themify($themes) {
+      background-color: themed(blueButtonBackgroundColor);
+      color: themed(alternativeTextColor);
+    }
+
+    &:hover {
+
+      @include themify($themes) {
+        background-color: themed(blueButtonHoverColor);
+      }
+    }
+  }
+
+  &.green-button:not(:disabled) {
+
+    @include themify($themes) {
+      background-color: themed(greenButtonBackgroundColor);
+      color: themed(alternativeTextColor);
+    }
+
+    &:hover {
+
+      @include themify($themes) {
+        background-color: themed(greenButtonHoverColor);
+      }
+    }
+  }
+
+  &.turquoise-button:not(:disabled) {
+
+    @include themify($themes) {
+      background-color: themed(turquoiseButtonBackgroundColor);
+      color: themed(alternativeTextColor);
+    }
+
+    &:hover {
+
+      @include themify($themes) {
+        background-color: themed(turquoiseButtonHoverColor);
+      }
+    }
+  }
+
+  &.transparent-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    @include themify($themes) {
+      background-color: transparent;
+      border: 0.2rem solid themed(transparentButtonBorderColor);
+      color: themed(mainTextColor);
+    }
+
+    .icon {
+
+      @include themify($themes) {
+        background-color: themed(mainTextColor);
+      }
+
+      margin-right: 1rem;
+      mask: url(~src/assets/icons/complete-testwallet.svg) no-repeat center;
+      width: 1.7rem;
+      height: 1.7rem;
+    }
+  }
+
+}
+
+.input-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 0.4rem;
+  height: 6.6rem;
+
+  .wrap-label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 2.4rem;
+  }
+
+  label {
+    font-size: 1.3rem;
+    line-height: 2.4rem;
+
+    @include themify($themes) {
+      color: themed(optionalTextColor);
+    }
+  }
+
+  input[type='text'], input[type='password'] {
+    border: none;
+    font-size: 1.4rem;
+    outline: none;
+    padding: 0 1rem;
+    width: 100%;
+    height: 100%;
+
+    @include themify($themes) {
+      background-color: themed(inputBackgroundColor);
+      color: themed(mainTextColor);
+    }
+  }
+
+  &.textarea {
+    height: auto;
+
+    textarea {
+      font-family: 'Open Sans', sans-serif;
+      border: none;
+      font-size: 1.4rem;
+      outline: none;
+      padding: 1rem;
+      width: 100%;
+      min-width: 100%;
+      height: 100%;
+      min-height: 7rem;
+      max-height: 7rem;
+      overflow: hidden;
+      resize: none;
+
+      @include themify($themes) {
+        background-color: themed(inputBackgroundColor);
+        color: themed(mainTextColor);
+      }
+    }
+  }
+}
+
+input[type='radio'].style-radio {
+
+  & + label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 400;
+    padding-left: 2.4rem;
+
+    @include themify($themes) {
+      color: themed(optionalTextColor);
+    }
+
+    @include unSelect;
+  }
+
+  &:not(checked) {
+    position: absolute;
+    opacity: 0;
+
+    & + label {
+      position: relative;
+    }
+
+    & + label:before {
+      content: '';
+      position: absolute;
+      top: 0.7rem;
+      left: 0;
+      background: transparent;
+      border-radius: 50%;
+      width: 1.4rem;
+      height: 1.4rem;
+
+      @include themify($themes) {
+        border: 0.1rem solid themed(blueTextColor);
+      }
+    }
+
+    & + label:after {
+      content: '';
+      position: absolute;
+      top: 1rem;
+      left: 0.3rem;
+      border-radius: 50%;
+      opacity: 0;
+      width: 0.8rem;
+      height: 0.8rem;
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+      }
+    }
+  }
+
+  &:checked {
+
+    & + label:after {
+      opacity: 1;
+    }
+  }
+}
+
+input[type='checkbox'].style-checkbox {
+
+  & + label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 400;
+    padding-left: 3.6rem;
+
+    @include themify($themes) {
+      color: themed(optionalTextColor);
+    }
+
+    @include unSelect;
+  }
+
+  &:not(checked) {
+    position: absolute;
+    top: 50%;
+    left: 1.6rem;
+    transform: translateY(-50%);
+    visibility: hidden;
+
+    & + label {
+      position: relative;
+    }
+
+    & + label:before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 1.6rem;
+      transform: translateY(-50%);
+      background: transparent;
+      width: 1.4rem;
+      height: 1.4rem;
+
+      @include themify($themes) {
+        border: 0.1rem solid themed(blueTextColor);
+      }
+    }
+  }
+
+  &:checked {
+
+    & + label:before {
+      background: url(~src/assets/icons/complete-testwallet.svg);
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+      }
+    }
+  }
+}
+
+.error-block {
+  font-size: 1.2rem;
+  text-align: right;
+
+  @include themify($themes) {
+    color: themed(redTextColor);
+  }
+}
+
+.history-tooltip {
+  font-size: 1.3rem;
+  padding: 1rem 2rem;
+
+  @include themify($themes) {
+    background: themed(tooltipBackgroundColor);
+    box-shadow: themed(tooltipShadow);
+    color: themed(mainTextColor);
+  }
+
+  &.ng-tooltip-top {
+    margin-top: -1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      bottom: -1rem;
+      left: 0.7rem;
+      border-width: 1rem 1rem 0 0;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: themed(tooltipBackgroundColor) transparent transparent transparent;
+      }
+    }
+  }
+
+  &.ng-tooltip-bottom {
+    margin-top: 1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      top: -1rem;
+      left: 0.7rem;
+      border-width: 1rem 0 0 1rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: transparent transparent transparent themed(tooltipBackgroundColor);
+      }
+    }
+  }
+
+  &.ng-tooltip-left {
+    margin-left: -1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: -1rem;
+      border-width: 1rem 1rem 0 0;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: themed(tooltipBackgroundColor) transparent transparent transparent;
+      }
+    }
+  }
+
+  &.ng-tooltip-right {
+    margin-left: 1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -1rem;
+      border-width: 1rem 0 0 1rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: themed(tooltipBackgroundColor) transparent transparent transparent;
+      }
+    }
+  }
+}
+
+.modal {
+
+  @include themify($themes) {
+    background: themed(tooltipBackgroundColor);
+    color: themed(mainTextColor);
+  }
+
+  .content {
+
+  }
+
+  .action-button {
+
+    @include themify($themes) {
+      background-color: themed(blueTextColor);
+      color: themed(alternativeTextColor);
+    }
+  }
+}

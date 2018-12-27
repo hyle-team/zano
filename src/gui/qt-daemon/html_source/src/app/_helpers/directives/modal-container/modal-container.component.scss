@@ -1,0 +1,56 @@
+:host {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.25);
+}
+.modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  width: 34rem;
+  background: #1a1a1a;
+
+  .content {
+    display: flex;
+    margin: 1.2rem 0;
+
+    .icon {
+      width: 4.4rem;
+      height: 4.4rem;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      margin-left: 2rem;
+    }
+  }
+
+  .action-button {
+    background: #2c95f1;
+    margin: 1.2rem auto 0.6rem;
+    width: 10rem;
+    height: 2.4rem;
+  }
+
+  .close-button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    margin: 0;
+    padding: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}

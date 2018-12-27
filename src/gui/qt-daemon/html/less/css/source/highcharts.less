@@ -1,0 +1,83 @@
+@import "../variables";
+
+.highcharts-container{
+  width: 100%!important;
+}
+
+.highcharts-background {
+  fill-opacity: 0;
+}
+
+.highcharts-tooltip {
+
+  span {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+
+    b {
+      text-align: center;
+    }
+  }
+}
+
+.highcharts-input-group {
+  display: none;
+}
+
+.highcharts-range-selector-buttons {
+  visibility: hidden;
+}
+
+.highcharts-scrollbar-thumb{
+  opacity: 1;
+  stroke: @highcharts-scrollbar-color;
+}
+
+.highcharts-scrollbar-arrow{
+  display: none;
+}
+
+.highcharts-scrollbar-rifles{
+  stroke: @highcharts-scrollbar-color;
+}
+
+.highcharts-axis.highcharts-xaxis {
+  stroke: @highcharts-axis-line-color;
+
+  .highcharts-tick {
+    stroke: @highcharts-axis-line-color;
+  }
+
+  .highcharts-axis-line {
+    stroke: @highcharts-axis-line-color;
+  }
+}
+
+.highcharts-grid.highcharts-xaxis-grid.highcharts-navigator-xaxis{
+  stroke-opacity: 0;
+}
+
+.highcharts-label-box.highcharts-tooltip-box {
+  filter: url("#dropShadow");
+
+  &:nth-child(1) {
+    fill-opacity: 0;
+    stroke-opacity: 0;
+  }
+
+  &:nth-child(2) {
+    fill-opacity: 0;
+    stroke-opacity: 0;
+  }
+
+  &:nth-child(3) {
+    fill-opacity: 0;
+    stroke-opacity: 0;
+  }
+}
+
+feFlood {
+  flood-color: #1f360b;
+}

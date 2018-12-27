@@ -1,0 +1,2348 @@
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" href="styles/boost.css" type="text/css">
+<link rel="stylesheet" href="styles/style.css" type="text/css">
+<title>Serialization - Portable Binary Archives Tutorial</title>
+
+<script type="text/javascript" src="scripts/jquery-1.4.min.js"></script>
+<script type="text/javascript">
+function toggleDiv(divId) {
+   $("#"+divId).toggle();
+}
+window.onload=function()
+{
+document.getElementById('tutorial_pba_0_cpp').style.display='none';
+document.getElementById('tutorial_pba_1_cpp').style.display='none';
+document.getElementById('tutorial_pba_2_cpp').style.display='none';
+document.getElementById('tutorial_pba_3_cpp').style.display='none';
+document.getElementById('tutorial_pba_4_cpp').style.display='none';
+document.getElementById('tutorial_pba_5_cpp').style.display='none';
+document.getElementById('tutorial_pba_6_cpp').style.display='none';
+document.getElementById('tutorial_pba_7_cpp').style.display='none';
+document.getElementById('tutorial_pba_8_cpp').style.display='none';
+document.getElementById('tutorial_pba_9_cpp').style.display='none';
+document.getElementById('tutorial_pba_10_cpp').style.display='none';
+document.getElementById('tutorial_pba_11_cpp').style.display='none';
+}
+</script>
+</head>
+
+<!--------------------------------------------------------------------------------->
+
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<a name="top"></a>
+
+<table cellpadding="2" width="100%">
+  <tr> 
+    <td valign="top" width="300"> 
+      <h3><a href="../../../index.htm">
+          <img height="86" width="277" alt="Boost" src="./images/boost.png" border="0"></a></h3>
+    </td>
+
+    <td valign="top"> 
+      <h1 align="center">Boost/Serialization &dash; Portable Binary Archives (PBA)</h1>
+      <h2 align="center">Tutorial</h2>
+	  <p>NOTE: Naming differs from the source code! This tutorial reflects our hope to get 
+	     the eos portable archives an official part of the boost serialization library.
+		 Work is in progress :-)
+	  </p>
+    </td>
+  </tr>
+</table>
+ 
+<!--------------------------------------------------------------------------------->
+<hr>
+<dl class="index">
+  <dt><a href="#Quick_start">Quick start</a><br>
+    <ul>
+      <li><a href="#Quick_start:store_1">How to store some simple data in a <i>portable binary output archive</i></a></li>
+      <li><a href="#Quick_start:load_1">How to load some simple data from a <i>portable binary input archive</i></a></li>
+    </ul>
+  </dt>
+
+  <dt><a href="#Format">Format</a>
+  </dt>
+
+  <dt><a href="#Samples">Examples</a><br>
+    <ul>
+      <li><a href="#Samples:1">Handling special floating point values</a></li>
+      <li><a href="#Samples:2">Forbidding the serialization of non finite float values</a></li>
+      <li><a href="#Samples:3">Serializing integer numbers</a></li>
+      <li><a href="#Samples:4">Using PBA serialization with a memory buffer</a></li>
+      <li><a href="#Samples:5">An alternative to PBA using text or XML archives made portable</a></li>
+      <li><a href="#Samples:6">Using PBA serialization associated with on-the-fly (de)compressed file streams</a></li>
+      <li><a href="#Samples:7">A simple PBA versus text archive benchmark test</a></li>
+    </ul>
+  </dt>
+</dl>
+
+<p>
+</p>
+<hr>
+<!--------------------------------------------------------------------------------->
+<h2><a name="Quick_start"></a>Quick start</h2>
+
+Are you impatient to enjoy the Boost Portable Binary Archives (PBA) ? 
+If so, this section is for you.
+
+<h3><a name="Quick_start:store_1"></a>How to store some simple data in a <i>portable binary output archive</i></h2>
+
+<p>
+The <tt class="fs">tutorial_pba_0.cpp</tt> sample
+program uses a <tt class="code">boost::archive::portable_binary_oarchive</tt> object
+attached  to  a standard  output  file stream  to  store  a couple  of
+variables of primitive  types (<tt class="code">bool</tt>, 
+<tt class="code">char</tt>, integer
+numbers, floating numbers) and even a <tt class="code">std::string</tt>.
+</p>
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_0.cpp</tt> source code <a href="./code/tutorial_pba_0.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_0_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_0_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_0.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This quick start example shows how to store some variables
+ * of basic types (bool, integer, floating point numbers, STL string) 
+ * using the portable binary archive format associated to a 
+ * standard output file stream.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;fstream&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/cstdint.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_oarchive.hpp&gt;</FONT></B>
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  <I><FONT COLOR="#B22222">// The name for the example data file :  
+</FONT></I>  <B><FONT COLOR="#5F9EA0">std</FONT></B>::string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_0.data&quot;</FONT></B>; 
+
+  <I><FONT COLOR="#B22222">// Some variables of various primitive types :
+</FONT></I>  <B><FONT COLOR="#228B22">bool</FONT></B>        b              = true;
+  <B><FONT COLOR="#228B22">char</FONT></B>        c              = <B><FONT COLOR="#BC8F8F">'B'</FONT></B>;
+  uint32_t    answer         = 42;
+  <B><FONT COLOR="#228B22">float</FONT></B>       computing_time = 7.5e6;
+  <B><FONT COLOR="#228B22">double</FONT></B>      e              = 2.71828182845905;
+  <B><FONT COLOR="#5F9EA0">std</FONT></B>::string slogan         = <B><FONT COLOR="#BC8F8F">&quot;DON'T PANIC&quot;</FONT></B>;
+  
+  <I><FONT COLOR="#B22222">// Open an output file stream in binary mode :
+</FONT></I>  <B><FONT COLOR="#5F9EA0">std</FONT></B>::ofstream fout (filename.c_str (), std::ios_base::binary);
+  
+  {
+    <I><FONT COLOR="#B22222">// Create an output portable binary archive attached to the output file :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_oarchive opba (fout);
+    
+    <I><FONT COLOR="#B22222">// Store (serializing) variables :
+</FONT></I>    opba &amp; b &amp; c &amp; answer &amp; computing_time &amp; e &amp; slogan;
+  }
+
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;   
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_0.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>
+The  compiled executable  creates the  <tt class="fs">pba_0.data</tt>  file which
+contains the following bytes:
+<pre class="byte">127   1   9   1  84   1  66   1  42   4 192 225 228  74   8 116
+ 87  20 139  10 191   5  64   1  11  68  79  78  39  84  32  80
+ 65  78  73  67
+</pre>
+This format is explained in details below.
+
+
+<p>Note:
+<ul>
+<li> the  output of the  byte content in the <tt class="fs">pba_0.data</tt> file
+can   be  obtained   invoking  some   command  like
+ <tt style="font-size: 12px; font-weight: bold; color: #ffffff; background-color: black;" >&nbsp;od   -t  u1 pba_0.data&nbsp;</tt> 
+on a GNU/Linux system.<br>
+<li> one   should  notice   that   this   program   makes  use   of
+the         <i>typedef-ed</i>        integer         types        from
+the <tt class="fs">boost/cstdint.hpp</tt> header  (<tt class="code">uint32_t</tt>...). It is a
+strong  recommendation to  ensure cross-environment  portability while
+(de)serializing        integer         numbers        (see        also
+the <a href="#Samples">Examples section</a>).
+</ul>
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+
+<h3><a name="Quick_start:load_1"></a>How to load some simple data from a <i>portable binary input archive</i></h2>
+
+<p>
+The <tt class="fs">tutorial_pba_1.cpp</tt>    sample   program   uses
+a  <tt  class="code">boost::archive::portable_binary_iarchive</tt> object
+attached  to  a  standard input  file  stream  in  order to  load  the
+data previously           stored           by
+the      <tt class="fs">tutorial_pba_0.cpp</tt>     program      in
+the <tt class="fs">pba_0.data</tt> file.
+</p>
+
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_1.cpp</tt> source code <a href="./code/tutorial_pba_1.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_1_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_1_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_1.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization package. 
+ *
+ * This quick start example shows how to load some variables
+ * of basic types (bool, integer, floating point numbers, STL string) 
+ * using the portable binary archive format associated to a 
+ * standard input file stream. 
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;iostream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;fstream&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/cstdint.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_iarchive.hpp&gt;</FONT></B>
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  using namespace std;
+
+  <I><FONT COLOR="#B22222">// The name for the example data file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_0.data&quot;</FONT></B>; 
+
+  <I><FONT COLOR="#B22222">// Some variables of various types :
+</FONT></I>  <B><FONT COLOR="#228B22">bool</FONT></B>     b;
+  <B><FONT COLOR="#228B22">char</FONT></B>     c;
+  uint32_t answer;
+  <B><FONT COLOR="#228B22">float</FONT></B>    computing_time;
+  <B><FONT COLOR="#228B22">double</FONT></B>   e;
+  string   slogan;
+   
+  <I><FONT COLOR="#B22222">// Open an input file stream in binary mode :
+</FONT></I>  ifstream fin (filename.c_str (), ios_base::binary);
+  
+  {
+    <I><FONT COLOR="#B22222">// Create an input portable binary archive attached to the input file :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_iarchive ipba (fin);
+    
+    <I><FONT COLOR="#B22222">// Loading (de-serializing) variables using the same 
+</FONT></I>    <I><FONT COLOR="#B22222">// order than for serialization (see tutorial_pba_0.cpp) :
+</FONT></I>    ipba &amp; b &amp; c &amp; answer &amp; computing_time &amp; e &amp; slogan;
+  }
+
+  cout.precision (15);
+  cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Variable 'b' is              : &quot;</FONT></B> &lt;&lt; b &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; &quot;</FONT></B> &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;(bool)&quot;</FONT></B> &lt;&lt; endl;
+  cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Variable 'c' is              : '&quot;</FONT></B> &lt;&lt; c &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;' &quot;</FONT></B> &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; &quot;</FONT></B> &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;(char)&quot;</FONT></B> &lt;&lt; endl;
+  cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Variable 'answer' is         : &quot;</FONT></B> &lt;&lt; answer  &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; &quot;</FONT></B> &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;(unsigned 32-bit integer)&quot;</FONT></B> &lt;&lt; endl;
+  cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Variable 'computing_time' is : &quot;</FONT></B> &lt;&lt; computing_time  &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; &quot;</FONT></B> &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;(single precision 32-bit float)&quot;</FONT></B> &lt;&lt; endl;
+  cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Variable 'e' is              : &quot;</FONT></B> &lt;&lt; e  &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; &quot;</FONT></B> &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;(double precision 64-bit float)&quot;</FONT></B> &lt;&lt; endl;
+  cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Variable 'slogan' is         : \&quot;&quot;</FONT></B> &lt;&lt; slogan  &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;\&quot; &quot;</FONT></B> &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;(std::string)&quot;</FONT></B> &lt;&lt; endl;
+
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;   
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_1.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>
+The executable reads the  <tt class="fs">pba_0.data</tt> file and deserializes its
+contents in  the same  order it  has been stored. It then  prints the
+restored values of the variables:
+<pre>Variable 'b' is              : 1 (bool)
+Variable 'c' is              : 'B'  (char)
+Variable 'answer' is         : 42 (unsigned 32-bit integer)
+Variable 'computing_time' is : 7500000 (single precision 32-bit float)
+Variable 'e' is              : 2.71828182845905 (double precision 64-bit float)
+Variable 'slogan' is         : "DON'T PANIC" (std::string)
+</pre>
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+
+<!--------------------------------------------------------------------------------->
+<hr>
+<h2><a name="Format"></a>Format</h2>
+
+<p>
+This  section aims to  give some  details about  the binary  format of
+portable binary archives  (PBA). We will analyse the  byte contents of
+the sample  binary archive  <tt class="fs">pba_0.data</tt> file 
+created  by the <tt class="fs">tutorial_pba_0.cpp</tt> 
+program (see <a href="#Quick_start:store_1">the previous section</a>).
+</p>
+
+<p>
+Like any other archive format within Boost/Serialization, a PBA starts
+with a  header (this is  the default behaviour  but it is  possible to
+deactivate  the   use  of  this   header  using  a  special   flag  at
+construction,  see   <a  href="#Samples:1">this  example</a>).   This
+header is made of two informations :
+<ul>
+  <li>
+    a <em>magic byte</em> with the conventionnal decimal value :
+      <pre class="byte">127</pre>
+  <li>
+    the Boost  library version number  which is encoded as  an integer
+    number.
+    <p>The PBA  encoding of integer  numbers uses the following
+      scheme:
+      <tt>&lt;size&gt; &lt;content&gt;</tt>,
+      where first the <i>size</i> stores  the minimal
+      number   of  non  zero   bytes needed   to  store   the  binary
+      representation of  the integer value; then the  bytes corresponding to the <i>content</i> are stored
+      starting    from     the    less    significant     ones    (see
+      also  <a href="#Samples:3">this  example</a>).  For  the library
+      version number we have here:
+      <pre class="byte">1 9</pre>
+      where  <tt class="byte">1</tt> is  the number  of  byte needed  to store  the
+      value <tt class="byte">9</tt> which comes  with the Serialization library for
+      Boost version <tt>1.47.0</tt>. Here, the <tt>9</tt> value being less than <tt>256</tt>,
+      one unique byte is enough to store this number.
+</ul>
+</p>
+</p>
+
+<p>
+Now we are done with the header, let's have a look on the serialized data !
+</p>
+
+<ul>
+<li>
+The first variable  is of boolean type with  value <tt>true</tt>. Here
+the  PBA  conventionnaly  encodes  the <tt>true</tt>  value  with  the
+character <tt class="code_string">'T'</tt>  which is stored using  the corresponding ASCII
+integer   value  (<tt class="byte">84</tt>).   As  <tt>84</tt>   is  less
+than <tt>256</tt>, this uses only <tt class="byte">1</tt> byte:
+<pre class="byte">1  84</pre>
+</p>
+
+<li>The next variable  uses <tt class="byte">1</tt> byte to  store a 8-bit
+character  (<tt>char</tt>) taking value  <tt class="code_string">'B'</tt>.  Again  the PBA
+scheme    encodes     it    using    its     ASCII    integer    value
+(<tt class="byte">66</tt>). This gives:
+<pre class="byte">1  66</pre>
+</p>
+
+<li>Then    we    have     an    unsigned    32-bit    integer    with
+value    <tt  class="byte">42</tt>    (a   fondamental    constant   from
+the <i>H2G2</i>).  As the natural binary 32-bit encoding of this value
+(&lt;256) only needs
+<tt class="byte">1</tt>  non-zero byte, the PBA stores :
+<pre class="byte">1  42</pre>
+This scheme results in saving 2 bytes compared to the size of the transient value.
+</p>
+
+<li>The   next   variable   is   a  single   precision   number   with
+value <tt>7.5&times;10<sup>6</sup></tt>.   Following the IEEE 754 standard  one thus uses
+32   bits   to   encode   the   <font   color="red">sign   bit</font>,
+the       <font      color="blue">8-bit       exponent</font>      and
+the   <font    color="green">23-bit   significant</font>   (mantissa).
+As          <tt>7.5&times;10<sup>6</sup></tt>          can          be          rewritten
+in <tt><font color="red">+</font><font color="magenta">1</font>.<font color="green">78813934</font>&times;2<sup><font  color="blue">22</font></sup></tt>,  we have  the
+following bits contents:<br>
+<br>
+<tt><font color="red">0</font><font color="blue">10010101</font><font color="magenta">1</font><font color="green">11001001110000111000000</font></tt><br><br>
+where  the  <i>phantom  bit</i>  (not  stored)  is  conventionaly  set
+at  <font color="magenta">1</font>  and the  exponent is  stored after
+being shifted conventionaly by <tt>2<sup>7</sup>-1=127</tt>, thus
+<tt>(<font color="blue">10010101</font>)<sub>2</sub>=(149)<sub>10</sub></tt> 
+(subscripts indicate the number base) and <tt>149-127=<font color="blue">22</font></tt>.<br>
+
+<br>
+Packing these bits using  <tt class="byte">4</tt>
+bytes, we get:<br><br>
+<table border="1">
+<tr align="center">
+<td><tt><font color="red">0</font><font color="blue">1001010</font></tt></td>
+<td><tt><font color="blue">1</font><font color="green">1100100</font></tt></td>
+<td><tt><font color="green">11100001</font></tt></td>
+<td><tt><font color="green">11000000</font></tt></td>
+</tr>
+<tr align="center">
+<td><tt class="byte">74</tt></td>
+<td><tt class="byte">228</tt></td>
+<td><tt class="byte">225</tt></td>
+<td><tt class="byte">192</tt></td>
+</tr>
+</table>
+<br>
+
+Thus the PBA streams the following 5 bytes (first the <i>size</i> then the <i>content</i> 
+from the least significant byte to the most significant byte), giving :
+<pre class="byte">4 192 225 228 74</pre>
+
+<li>The next floating number 2.71828182845905 = 
+<tt><font color="red">+</font><font color="magenta">1</font>.<font color="green">35914091422952</font>&times;2<sup>(<font color="blue">1024</font>-1023)</sup></tt>,  
+is stored using the double precision IEEE 754  64-bit pattern (using the conventionnal exponent shift <tt>2<sup>10</sup>-1=1023</tt>):
+<br><br>
+<table border="1">
+<tr align="center">
+<td><tt><font color="red">0</font><font color="blue">1000000</font></tt></td>
+<td><tt><font color="blue">0000</font><font color="green">0101</font></tt></td>
+<td><tt><font color="green">11011111</font></tt></td>
+<td><tt><font color="green">00001010</font></tt></td>
+<td><tt><font color="green">10001011</font></tt></td>
+<td><tt><font color="green">00010100</font></tt></td>
+<td><tt><font color="green">01010111</font></tt></td>
+<td><tt><font color="green">01110100</font></tt></td>
+</tr>
+<tr align="center">
+<td><tt class="byte">64</tt></td>
+<td><tt class="byte">5</tt></td>
+<td><tt class="byte">191</tt></td>
+<td><tt class="byte">10</tt></td>
+<td><tt class="byte">139</tt></td>
+<td><tt class="byte">20</tt></td>
+<td><tt class="byte">87</tt></td>
+<td><tt class="byte">116</tt></td>
+</tr>
+</table>
+<br>
+
+Thus the PBA uses the following 9 bytes, the first one for the <i>size</i> (<tt class="byte">8</tt>) and the other ones
+for the <i>content</i> (starting with the LSB):
+<pre class="byte">8 116 87 20 139 10 191 5 64</pre>
+
+<li>Finally the string <tt class="code_string">"DON'T PANIC"</tt> is stored:
+  <ul>
+    <li>
+      first is  given the number  of characters using  the PBA
+      integer encoding scheme; here
+      <tt    class="byte">1</tt> byte   is     enough     to    store     the
+      value <tt class="byte">11</tt>: <br>
+      <pre class="byte">1  11</pre>
+    <li>  then  the  array  of   11  characters  is  given  using  the
+      corresponding ASCII codes:
+<br><br>
+<table border="1">
+<tr align="center">
+<td><tt class="code_string">D</td>
+<td><tt class="code_string">O</td>
+<td><tt class="code_string">N</td>
+<td><tt class="code_string">'</td>
+<td><tt class="code_string">T</td>
+<td><tt class="code_string"> </td>
+<td><tt class="code_string">P</td>
+<td><tt class="code_string">A</td>
+<td><tt class="code_string">N</td>
+<td><tt class="code_string">I</td>
+<td><tt class="code_string">C</td>
+ </tr>
+<tr align="center">
+<td><tt class="byte">68</td>
+<td><tt class="byte">79</td>
+<td><tt class="byte">78</td>
+<td><tt class="byte">39</td>
+<td><tt class="byte">84</td>
+<td><tt class="byte">32</td>
+<td><tt class="byte">80</td>
+<td><tt class="byte">65</td>
+<td><tt class="byte">78</td>
+<td><tt class="byte">73</td>
+<td><tt class="byte">67</td>
+</tr>
+</table>
+<br>
+<pre class="byte">68  79  78  39  84  32  80 65  78  73  67 </pre>
+  </ul>
+
+</ul>
+
+</p>
+
+<p>
+Now  the  contents  of  the  <tt class="fs">pba_0.data</tt>  file  can  be  fully
+understood :
+<pre class="byte">127   1   9   1  84   1  66   1  42   4 192 225 228  74   8 116
+ 87  20 139  10 191   5  64   1  11  68  79  78  39  84  32  80
+ 65  78  73  67
+</pre> 
+
+More  details about  the  format (non  finite  floating point  values,
+negative      integer     numbers)      will      be     given      in
+the <a href="#Samples">sample codes</a> below.
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+
+<!--------------------------------------------------------------------------------->
+<hr>
+<h2><a name="Samples"></a>Examples</h2>
+ 
+
+<!------------------------------------------------------------->
+<h3><a name="Samples:1"></a>Handling special floating point values</h3>
+
+<p>
+The PBA  has been  designed in  the aims to  handle single  and double
+precision floating point numbers, including non-finite and special  values:
+<ul>
+<li>&pm;infinity
+<li>NaN (<i>not a number</i>)
+<li>denormalized numbers (i.e. floating point numbers with non-guaranteed roundoff precision)
+</ul>
+</p>
+
+<p>
+The <tt class="fs">tutorial_pba_2.cpp</tt> sample program
+illustrates the use of such special cases while serializing single precision
+floating point numbers:
+</p>
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_2.cpp</tt> source code <a href="./code/tutorial_pba_2.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_2_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_2_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_2.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This sample program shows how to use a portable binary archive 
+ * to store/load floating point numbers including non-finite and 
+ * special (denormalized) values.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;fstream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;limits&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_oarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_iarchive.hpp&gt;</FONT></B>
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  using namespace std;
+
+  <I><FONT COLOR="#B22222">// The name for the example data file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_2.data&quot;</FONT></B>; 
+
+  {
+    <I><FONT COLOR="#B22222">// A normal single precision floating point number :
+</FONT></I>    <B><FONT COLOR="#228B22">float</FONT></B> pi = 3.14159265; 
+
+    <I><FONT COLOR="#B22222">// Single precision zeroed floating point number :
+</FONT></I>    <B><FONT COLOR="#228B22">float</FONT></B> zero = 0.0;
+
+    <I><FONT COLOR="#B22222">// A denormalized single precision floating point number :
+</FONT></I>    <B><FONT COLOR="#228B22">float</FONT></B> tiny = 1.e-40;
+    
+    <I><FONT COLOR="#B22222">// A single precision floating point number with `+Infinity' value :
+</FONT></I>    <B><FONT COLOR="#228B22">float</FONT></B> plus_infinity = numeric_limits&lt;<B><FONT COLOR="#228B22">float</FONT></B>&gt;::infinity ();
+    
+    <I><FONT COLOR="#B22222">// A single precision floating point number with `-Infinity' value :
+</FONT></I>    <B><FONT COLOR="#228B22">float</FONT></B> minus_infinity = -numeric_limits&lt;<B><FONT COLOR="#228B22">float</FONT></B>&gt;::infinity ();
+    
+    <I><FONT COLOR="#B22222">// A single precision `Not-a-Number' (NaN):
+</FONT></I>    <B><FONT COLOR="#228B22">float</FONT></B> nan = numeric_limits&lt;<B><FONT COLOR="#228B22">float</FONT></B>&gt;::quiet_NaN ();
+    
+    <I><FONT COLOR="#B22222">// Open an output file stream in binary mode :
+</FONT></I>    ofstream fout (filename.c_str (), ios_base::binary);
+    
+    {
+      <I><FONT COLOR="#B22222">// Create an output portable binary archive attached to the output file :
+</FONT></I>      <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_oarchive opba (fout);
+      
+      <I><FONT COLOR="#B22222">// Store (serialize) variables :
+</FONT></I>      opba &amp; pi &amp; zero &amp; tiny &amp; plus_infinity &amp; minus_infinity &amp; nan;
+    }
+  }
+
+  { 
+    <I><FONT COLOR="#B22222">// Single precision floating point numbers to be loaded :
+</FONT></I>    <B><FONT COLOR="#228B22">float</FONT></B> x[6];
+
+    <I><FONT COLOR="#B22222">// Open an input file stream in binary mode :
+</FONT></I>    ifstream fin (filename.c_str (), ios_base::binary);
+  
+    {
+      <I><FONT COLOR="#B22222">// Create an input portable binary archive attached to the input file :
+</FONT></I>      <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_iarchive ipba (fin);
+      
+      <I><FONT COLOR="#B22222">// Load (de-serialize) variables using the same 
+</FONT></I>      <I><FONT COLOR="#B22222">// order than for serialization :
+</FONT></I>      <B><FONT COLOR="#A020F0">for</FONT></B> (<B><FONT COLOR="#228B22">int</FONT></B> i = 0; i &lt; 6; ++i)
+	{
+	  ipba &amp; x[i];
+	}
+    }
+
+    <I><FONT COLOR="#B22222">// Print :
+</FONT></I>    <B><FONT COLOR="#A020F0">for</FONT></B> (<B><FONT COLOR="#228B22">int</FONT></B> i = 0; i &lt; 6; ++i)
+      {
+	cout.precision (8);
+	cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Loaded x[&quot;</FONT></B> &lt;&lt; i &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;] = &quot;</FONT></B> &lt;&lt; x[i];
+	<B><FONT COLOR="#A020F0">switch</FONT></B> (fp::fpclassify(x[i]))
+	  {
+	  <B><FONT COLOR="#A020F0">case</FONT></B> <B><FONT COLOR="#5F9EA0">FP_NAN</FONT></B>: cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (NaN)&quot;</FONT></B>; <B><FONT COLOR="#A020F0">break</FONT></B>;
+	  <B><FONT COLOR="#A020F0">case</FONT></B> <B><FONT COLOR="#5F9EA0">FP_INFINITE</FONT></B>: cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (infinite)&quot;</FONT></B>; <B><FONT COLOR="#A020F0">break</FONT></B>;
+	  <B><FONT COLOR="#A020F0">case</FONT></B> <B><FONT COLOR="#5F9EA0">FP_SUBNORMAL</FONT></B>: cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (denormalized)&quot;</FONT></B>; <B><FONT COLOR="#A020F0">break</FONT></B>;
+	  <B><FONT COLOR="#A020F0">case</FONT></B> <B><FONT COLOR="#5F9EA0">FP_NORMAL</FONT></B>:  cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (normalized)&quot;</FONT></B>; <B><FONT COLOR="#A020F0">break</FONT></B>;
+	  }
+	cout &lt;&lt; endl;
+      }
+  }
+
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;   
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_2.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>
+The <tt class="fs">pba_2.data</tt> output data file thus contains the following bytes:
+<pre class="byte">127   1   9   4 219  15  73  64   0   3 194  22   1   4   0   0
+128 127   4   0   0 128 255   4 255 255 255 127
+</pre>
+where:
+<ul>
+  
+  <li><tt class="byte">127   1   9</tt> is the standard archive header
+    
+  <li>5 bytes  are used to encode the  value of &pi; : one byte for the <i>size</i>=<tt class="byte">4</tt> and 4 bytes for the <i>content</i>
+  (reversed order):
+    <br><br>
+    <table border="1">
+      <tr align="center">
+	<td><tt class="byte">64</tt></td>
+	<td><tt class="byte">73</tt></td>
+	<td><tt class="byte">15</tt></td>
+	<td><tt class="byte">219</tt></td>
+      </tr>
+      <tr align="center">
+	<td><tt><font color="red">0</font><font color="blue">1000000</font></tt></td>
+	<td><tt><font color="blue">0</font><font color="green">1001001</font></tt></td>
+	<td><tt><font color="green">00001111</font></tt></td>
+	<td><tt><font color="green">11011011</font></tt></td>
+      </tr>
+    </table>
+    <br>
+    and &pi; = <tt><font color="red">+</font><font color="magenta">1</font>.<font color="green">5707963</font>&times;2<sup>(<font color="blue">128</font>-127)</sup></tt> = <tt>3.14159265</tt>.
+    
+  <li>the     value    <i>zero</i>     is     stored    using     only
+  one <tt class="byte">0</tt> byte (this is called <i>zero optimization</i> and this save bytes for storage).
+    
+  <li>a denormalized value then comes with only <tt class="byte">3</tt> bytes (note that the MSB byte is zero so it is omitted)
+    <br><br> 
+    <table border="1">
+      <tr align="center" background="#EEEEEE">
+	<td><tt></tt></td>
+	<td><tt class="byte">1</tt></td>
+	<td><tt class="byte">22</tt></td>
+	<td><tt class="byte">194</tt></td>
+      </tr>
+      <tr align="center">
+	<td><tt><font color="red">0</font><font color="blue">0000000</font></tt></td>
+	<td><tt><font color="blue">0</font><font color="green">0000001</font></tt></td>
+	<td><tt><font color="green">00010110</font></tt></td>
+	<td><tt><font color="green">11000010</font></tt></td>
+      </tr>
+    </table>
+    <br>
+    Here                           the                           value
+      is <tt><font color="red">+</font><font color="magenta">0</font>.<font color="green">017014027</font>&times;2<sup>(<font    color="blue">0</font>-127)</sup></tt>
+      =  <tt>0.9999946&times;10<sup>-40</sup></tt>  which,  as expected  for
+      denormalized       numbers,      misses       the      requested
+      value  <tt>10<sup>-40</sup></tt>   by  the  relative   error  of
+      magnitude <tt>5.4&times;10<sup>-6</sup></tt>, which is larger than the machine
+      roundoff precision (~<tt>10<sup>-7</sup></tt> for the single precision scheme).
+    
+  <li>the +&#8734; value is stored using one byte for the <i>size</i> 
+    plus <tt class="byte">4</tt> content bytes, fulfilling the IEEE 754 standard,
+    i.e. maximal exponent and zero mantissa :
+    <br><br> 
+    <table border="1">
+      <tr align="center" background="#EEEEEE">
+	<td><tt class="byte">127</tt></td>
+	<td><tt class="byte">128</tt></td>
+	<td><tt class="byte">0</tt></td>
+	<td><tt class="byte">0</tt></td>
+      </tr>
+      <tr align="center">
+	<td><tt><font color="red">0</font><font color="blue">1111111</font></tt></td>
+	<td><tt><font color="blue">1</font><font color="green">0000000</font></tt></td>
+	<td><tt><font color="green">00000000</font></tt></td>
+	<td><tt><font color="green">00000000</font></tt></td>
+      </tr>
+    </table>
+    <br>
+
+  <li>the -&#8734; value is stored using the same scheme as above, but the <font color="red">sign bit</font> :
+    <br><br> 
+    <table border="1">
+      <tr align="center" background="#EEEEEE">
+	<td><tt class="byte">255</tt></td>
+	<td><tt class="byte">128</tt></td>
+	<td><tt class="byte">0</tt></td>
+	<td><tt class="byte">0</tt></td>
+      </tr>
+      <tr align="center">
+	<td><tt><font color="red">1</font><font color="blue">1111111</font></tt></td>
+	<td><tt><font color="blue">1</font><font color="green">0000000</font></tt></td>
+	<td><tt><font color="green">00000000</font></tt></td>
+	<td><tt><font color="green">00000000</font></tt></td>
+      </tr>
+    </table>
+    <br>
+
+  <li>the final NaN value is stored also using one <i>size</i> byte plus <tt class="byte">4</tt> <i>content</i> bytes with maximal exponent and non-zero mantissa :
+    <br><br> 
+    <table border="1">
+      <tr align="center" background="#EEEEEE">
+	<td><tt class="byte">127</tt></td>
+	<td><tt class="byte">255</tt></td>
+	<td><tt class="byte">255</tt></td>
+	<td><tt class="byte">255</tt></td>
+      </tr>
+      <tr align="center">
+	<td><tt><font color="red">0</font><font color="blue">1111111</font></tt></td>
+	<td><tt><font color="blue">1</font><font color="green">1111111</font></tt></td>
+	<td><tt><font color="green">11111111</font></tt></td>
+	<td><tt><font color="green">11111111</font></tt></td>
+      </tr>
+    </table>
+    <br>
+  See <a href="http://en.wikipedia.org/wiki/IEEE_754-1985" target="_window">this link</a> for an explanation of the IEEE 754 standard.
+
+</ul>
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+
+<!------------------------------------------------------------->
+<h3><a name="Samples:2"></a>Forbidding the serialization of non finite float values</h3>
+
+<p>
+One  can ask  a PBA  to  reject non-finite  values.  This  is done  by
+passing the <tt class="code">boost::archive::no_infnan</tt> flag to the constructor
+of the output archive. Note that in this case, denormalized values are
+still accepted, but infinite and NaNs aren't.
+</p>
+
+<p>
+The <tt class="fs">tutorial_pba_3.cpp</tt> sample
+program that illustrates this special case:
+</p> 
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_3.cpp</tt> source code <a href="./code/tutorial_pba_3.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_3_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_3_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_3.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This sample program shows how to use a portable binary archive 
+ * and prevent the serialization of non-finite floating numbers.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;fstream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;limits&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_oarchive.hpp&gt;</FONT></B>
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  using namespace std;
+
+  <I><FONT COLOR="#B22222">// The name for the example data file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_3.data&quot;</FONT></B>; 
+
+  <B><FONT COLOR="#A020F0">try</FONT></B> 
+    {
+      <I><FONT COLOR="#B22222">// An array of single precision floating numbers:
+</FONT></I>      <B><FONT COLOR="#228B22">float</FONT></B> x[5]; 
+      x[0] = 3.14159;  <I><FONT COLOR="#B22222">// Pi
+</FONT></I>      x[1] = 6.022e22; <I><FONT COLOR="#B22222">// Avogadro constant
+</FONT></I>      x[2] = 1.6e-19;  <I><FONT COLOR="#B22222">// Electron charge magnitude
+</FONT></I>      x[3] = 1.e-40;   <I><FONT COLOR="#B22222">// A tiny (denormalized) value
+</FONT></I>      x[4] = numeric_limits&lt;<B><FONT COLOR="#228B22">float</FONT></B>&gt;::infinity (); <I><FONT COLOR="#B22222">// This will fail while serializing...
+</FONT></I>
+      <I><FONT COLOR="#B22222">// Open an output file stream in binary mode :
+</FONT></I>      ofstream fout (filename.c_str (), ios_base::binary);
+    
+      {
+	<I><FONT COLOR="#B22222">// Create an output portable binary archive attached to the output file,
+</FONT></I>	<I><FONT COLOR="#B22222">// using the special 'boost::archive::no_infnan' flag :
+</FONT></I>	<B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_oarchive opba (fout, boost::archive::no_infnan);
+	
+	<I><FONT COLOR="#B22222">// Store (serialize) variables :
+</FONT></I>	<B><FONT COLOR="#A020F0">for</FONT></B> (<B><FONT COLOR="#228B22">int</FONT></B> i = 0; i &lt; 5; ++i)
+	  {
+	    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Serializing value : &quot;</FONT></B> &lt;&lt; x[i] &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; ... &quot;</FONT></B>;
+	    opba &amp; x[i];
+	    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Ok !&quot;</FONT></B> &lt;&lt; endl;
+	  }
+      }
+    }
+  <B><FONT COLOR="#A020F0">catch</FONT></B> (exception &amp; x)
+    {
+      cerr &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;ERROR: &quot;</FONT></B> &lt;&lt; x.what () &lt;&lt; endl;
+      <B><FONT COLOR="#A020F0">return</FONT></B> 1;
+    }
+
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;   
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_3.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>
+We  can check  that the  PBA now  throws an  exception as  soon  as it
+encounters a non finite  floating point value during the serialization
+process:
+<pre>
+Serializing value : 3.14159 ... Ok !
+Serializing value : 6.022e+22 ... Ok !
+Serializing value : 1.6e-19 ... Ok !
+Serializing value : 9.99995e-41 ... Ok !
+Serializing value : inf ... ERROR: serialization of illegal floating point value: inf
+
+</pre>
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+
+<!------------------------------------------------------------->
+<h3><a name="Samples:3"></a>Serializing integer numbers</h3>
+
+<p>
+The PBA obviously handles  integer numbers.  Unfortunately, C/C++ does
+not garantee the portable size  of its primitive integer types (short,
+int,  long...   and  their  unsigned  versions).  It  depends  on  the
+architecture (32-bit/64-bit) and  the compiler.  
+</p>
+<p>The Boost library
+addresses  this  issue through  a  collection  of <i>typedefs</i>  for
+integer types  of common sizes.   This technique is supposed  to allow
+the manipulation of  integer variables in a portable  way, typically with
+text or XML archives.  So, we are generally
+ encouraged to use  the <tt class="fs">boost/cstdint.hpp</tt> header file and
+the <i>typedefs</i> defined therein.   
+</p>
+<p>Due to its encoding scheme
+of integer numbers, the PBA does not strictly need such technique to ensure
+a correct behaviour while (de)serializing integer numbers. 
+This is because the little endian encoding approach allows to only store the non-zero bytes.
+It is thus possible to serialize a value using one integer type (<tt class="code">short int</tt>) and then 
+deserialize it using another integer type (<tt class="code">long long</tt>).
+</p>
+<p>
+However, for a strict and safe portable behaviour
+of PBA, we recommend that, in most cases, the user should  systematically use such typedefs for all
+serializable integer values. This  applies particularly for member attributes
+in <i>structs</i> and <i>classes</i> and should allows the transparent switching
+to another kind of archive (text, XML) thanks to the <tt class="code">serialize</tt> template method.
+</p>
+
+<p>
+The <tt class="fs">tutorial_pba_4.cpp</tt> sample
+program   illustrates  the  serialization/deserialization   of  8-bit,
+16-bit, 32-bit and 64-bit integer numbers:
+</p> 
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_4.cpp</tt> source code <a href="./code/tutorial_pba_4.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_4_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_4_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_4.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This sample program shows how to use a portable binary archive 
+ * to store/load integer numbers of various sizes using the Boost 
+ * portable integer typedefs.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;fstream&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/cstdint.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_oarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_iarchive.hpp&gt;</FONT></B>
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  using namespace std;
+
+  <I><FONT COLOR="#B22222">// The name for the example data file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_4.data&quot;</FONT></B>; 
+
+  {
+    <I><FONT COLOR="#B22222">// Some integer numbers :
+</FONT></I>    <B><FONT COLOR="#228B22">bool</FONT></B> t = true;
+    <B><FONT COLOR="#228B22">char</FONT></B> c = <B><FONT COLOR="#BC8F8F">'c'</FONT></B>;
+    <B><FONT COLOR="#228B22">unsigned</FONT></B> <B><FONT COLOR="#228B22">char</FONT></B> u = <B><FONT COLOR="#BC8F8F">'u'</FONT></B>;
+    int8_t   b = -3; <I><FONT COLOR="#B22222">// char
+</FONT></I>    uint8_t  B = +6; <I><FONT COLOR="#B22222">// unsigned char 
+</FONT></I>    int16_t  s = -16;
+    uint16_t S = +32;
+    int32_t  l = -128;
+    uint32_t L = +127;
+    int64_t  ll = -1024;
+    uint64_t LL = +2048;
+
+    <I><FONT COLOR="#B22222">// Open an output file stream in binary mode :
+</FONT></I>    ofstream fout (filename.c_str (), ios_base::binary);
+    
+    {
+      <I><FONT COLOR="#B22222">// Create an output portable binary archive attached to the output file :
+</FONT></I>      <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_oarchive opba (fout);
+      
+      <I><FONT COLOR="#B22222">// Store (serialize) variables :
+</FONT></I>      opba &amp; t &amp; c &amp; u &amp; b &amp; B &amp; s &amp; S &amp; l &amp; L &amp; ll &amp; LL;
+    }
+  }
+
+  { 
+    <I><FONT COLOR="#B22222">// Single precision floating numbers to be loaded :
+</FONT></I>    <I><FONT COLOR="#B22222">// Some integer numbers :
+</FONT></I>    <B><FONT COLOR="#228B22">bool</FONT></B> t;
+    <B><FONT COLOR="#228B22">char</FONT></B> c;
+    <B><FONT COLOR="#228B22">unsigned</FONT></B> <B><FONT COLOR="#228B22">char</FONT></B> u;
+    int8_t   b;
+    uint8_t  B;
+    int16_t  s;
+    uint16_t S;
+    int32_t  l;
+    uint32_t L;
+    int64_t  ll;
+    uint64_t LL;
+
+    <I><FONT COLOR="#B22222">// Open an input file stream in binary mode :
+</FONT></I>    ifstream fin (filename.c_str (), ios_base::binary);
+  
+    {
+      <I><FONT COLOR="#B22222">// Create an input portable binary archive attached to the input file :
+</FONT></I>      <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_iarchive ipba (fin);
+      
+      <I><FONT COLOR="#B22222">// Load (de-serialize) variables using the same 
+</FONT></I>      <I><FONT COLOR="#B22222">// order than for serialization :
+</FONT></I>      ipba &amp; t &amp; c &amp; u &amp; b &amp; B &amp; s &amp; S &amp; l &amp; L &amp; ll &amp; LL;
+    }
+
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;t  = &quot;</FONT></B> &lt;&lt; t &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (bool)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;c  = '&quot;</FONT></B> &lt;&lt; c &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;' (char)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;u  = '&quot;</FONT></B> &lt;&lt; u &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;' (unsigned char)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;b  = &quot;</FONT></B> &lt;&lt; (<B><FONT COLOR="#228B22">int</FONT></B>) b &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (int8_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;B  = &quot;</FONT></B> &lt;&lt; (<B><FONT COLOR="#228B22">int</FONT></B>) B &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (uint8_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;s  = &quot;</FONT></B> &lt;&lt; s &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (int16_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;S  = &quot;</FONT></B> &lt;&lt; S &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (uint16_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;l  = &quot;</FONT></B> &lt;&lt; l &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (int32_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;L  = &quot;</FONT></B> &lt;&lt; L &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (uint32_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;ll = &quot;</FONT></B> &lt;&lt; ll &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (int64_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;LL = &quot;</FONT></B> &lt;&lt; LL &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (uint64_t)&quot;</FONT></B> &lt;&lt; endl;
+  }
+
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;   
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_4.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>
+The resulting PBA file is:
+<pre class="byte">127   1   9   1  84   1  99   1 117 255 253   1   6 255 240   1
+ 32 255 128   1 127 254   0 252   2   0   8
+</pre>
+
+where:
+<ul>
+
+<li> <tt class="byte">127   1   9</tt> is the archive header.
+
+<li>  <tt class="byte">1  84</tt>  indicates <tt class="byte">1</tt> byte  to
+store     the    <tt>true</tt>     boolean    value     (ASCII    code
+is <tt class="byte">84</tt>).
+
+<li>  <tt class="byte">1  99</tt>  indicates <tt class="byte">1</tt> byte  to
+store the ASCII code of character <tt>'c'</tt> (<tt class="byte">99</tt>).
+
+<li>  <tt class="byte">1  117</tt> indicates  <tt class="byte">1</tt>  byte to
+store     the     ASCII     code     of     character     <tt>'u'</tt>
+(<tt class="byte">117</tt>).
+
+<li> <tt class="byte">255  253</tt> corresponds to the special  case for a
+negative integer:
+ <tt class="byte">255</tt> is  the  binary coding  for value  <tt>-1</tt>
+which  means that  the integer  is  negative and  needs 1  byte to  be
+stored, <tt class="byte">253</tt>, i.e.   the 8-bit encoding of the signed
+decimal value <tt>-3</tt>.
+
+<li> <tt class="byte">1 6</tt> indicates <tt class="byte">1</tt> byte to store
+value <tt class="byte">6</tt>.
+
+<li>  <tt class="byte">255  240</tt>  corresponds  again  to  a  negative
+integer:
+ <tt class="byte">255</tt>  is  the  byte coding  for  value  <tt>-1</tt>
+(negative     integer     encoded     using     1     single     byte)
+and   <tt class="byte">240</tt>   is  the   8-bit  encoding   of  decimal
+value <tt>-16</tt>.
+
+<li> the same scheme is used for all remaining values in the archive : 
+  the verification is let as an exercise.
+
+</ul>
+
+</p>
+
+<p>Note  that this  coding  scheme optimizes  the  number of  streamed
+bytes.  Particularly,  it discards  the  leading <i>zero-ed</i>  bytes
+(MSB) of  the binary encoding  of any integer  value in order  to save
+storage.  Also we recall  that the exact <tt>0</tt> value (<i>zero</i>
+or  <tt>false</tt> for  a <i>boolean</i> data)  is always  encoded  using a
+unique <tt>0</tt> byte (zero optimization). Note this approach is also 
+used for floating point numbers.
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+
+<!------------------------------------------------------------->
+<h3><a name="Samples:4"></a>Using PBA serialization with a memory buffer</h3>
+
+<p>
+In  some  case,  we don't  want  to  serialize  some  data in  a  file
+(<tt class="code">std::ofstream</tt>), but we simply plan to stream it in a memory buffer.
+</p>
+ 
+<p>
+The <tt class="fs">tutorial_pba_5.cpp</tt> sample
+program makes use of a memory  buffer implemented with a STL vector of
+characters. The PBA  is associated to this buffer  thanks to a special
+streaming   interface  mechanism   provided  by   the  Boost/Iostreams
+library.  With such technique  one can  stream serializable  data in
+some memory buffer in place of a file :
+</p> 
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_5.cpp</tt> source code <a href="./code/tutorial_pba_5.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_5_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_5_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_5.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This sample program shows how to use a portable binary archive 
+ * to store/load data in a memory buffer.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;vector&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/iostreams/stream.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/iostreams/device/back_inserter.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/iostreams/device/array.hpp&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/cstdint.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_oarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_iarchive.hpp&gt;</FONT></B>
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  using namespace std;
+
+  <I><FONT COLOR="#B22222">// The memory buffer is implemented using a STL vector :
+</FONT></I>  <B><FONT COLOR="#228B22">typedef</FONT></B> std::vector&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt; buffer_type;
+  buffer_type buffer; 
+
+  {
+    <I><FONT COLOR="#B22222">// Some data to be stored :
+</FONT></I>    <B><FONT COLOR="#228B22">bool</FONT></B>    t = true;
+    <B><FONT COLOR="#228B22">char</FONT></B>    c = <B><FONT COLOR="#BC8F8F">'c'</FONT></B>;
+    int16_t s = +16;
+    int32_t l = -128;
+    int64_t ll = +10000000000;
+    <B><FONT COLOR="#228B22">float</FONT></B>   pi = 3.14159;
+    <B><FONT COLOR="#228B22">double</FONT></B>  nan = numeric_limits&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt;::quiet_NaN ();
+    string  hello = <B><FONT COLOR="#BC8F8F">&quot;World !&quot;</FONT></B>;
+
+    buffer.reserve (1024); <I><FONT COLOR="#B22222">// pre-allocate some memory
+</FONT></I>
+    <I><FONT COLOR="#B22222">// The output stream interface to the buffer :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::iostreams::stream&lt;boost::iostreams::back_insert_device&lt;buffer_type&gt; &gt; output_stream (buffer);
+
+    {    
+      <I><FONT COLOR="#B22222">// Create an output portable binary archive attached to the output file :
+</FONT></I>      <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_oarchive opba (output_stream);
+      
+      <I><FONT COLOR="#B22222">// Store (serialize) variables :
+</FONT></I>      opba &amp; t &amp; c &amp; s &amp; l &amp; ll &amp; pi &amp; nan &amp; hello;
+    }
+
+  }
+
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Buffer content is &quot;</FONT></B> &lt;&lt; buffer.size () &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; bytes : &quot;</FONT></B> &lt;&lt; endl &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  &quot;</FONT></B>;
+  <B><FONT COLOR="#A020F0">for</FONT></B> (<B><FONT COLOR="#228B22">int</FONT></B> i = 0; i &lt; buffer.size (); ++i)
+    {
+      clog &lt;&lt; (<B><FONT COLOR="#228B22">int</FONT></B>) ((<B><FONT COLOR="#228B22">unsigned</FONT></B> <B><FONT COLOR="#228B22">char</FONT></B>) buffer[i]) &lt;&lt; <B><FONT COLOR="#BC8F8F">' '</FONT></B>; 
+      <B><FONT COLOR="#A020F0">if</FONT></B> ((i + 1) % 20 == 0) clog &lt;&lt; endl &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  &quot;</FONT></B>;
+    }
+  clog &lt;&lt; endl;
+
+  { 
+    <I><FONT COLOR="#B22222">// Some data to be loaded :
+</FONT></I>    <B><FONT COLOR="#228B22">bool</FONT></B>    t;
+    <B><FONT COLOR="#228B22">char</FONT></B>    c;
+    int16_t s;
+    int32_t l;
+    int64_t ll;
+    <B><FONT COLOR="#228B22">float</FONT></B>   pi;
+    <B><FONT COLOR="#228B22">double</FONT></B>  nan;
+    string  hello;
+
+    <I><FONT COLOR="#B22222">// The input stream interface to the buffer :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::iostreams::stream&lt;boost::iostreams::array_source&gt; input_stream (&amp;buffer[0], 
+									   buffer.size ());
+
+    {
+      <I><FONT COLOR="#B22222">// Create an input portable binary archive attached to the input file :
+</FONT></I>      <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_iarchive ipba (input_stream);
+      
+      <I><FONT COLOR="#B22222">// Load (de-serialize) variables :
+</FONT></I>      ipba &amp; t &amp; c &amp; s &amp; l &amp; ll &amp; pi &amp; nan &amp; hello;
+    }
+
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Loaded values from the buffer are: &quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  t  = &quot;</FONT></B> &lt;&lt; t &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (bool)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  c  = '&quot;</FONT></B> &lt;&lt; c &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;' (char)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  s  = &quot;</FONT></B> &lt;&lt; s &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (int16_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  l  = &quot;</FONT></B> &lt;&lt; l &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (int32_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  ll = &quot;</FONT></B> &lt;&lt; ll &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (int64_t)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  pi = &quot;</FONT></B> &lt;&lt; pi &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (float)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  nan = &quot;</FONT></B> &lt;&lt; nan &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (double)&quot;</FONT></B> &lt;&lt; endl;
+    clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  hello = \&quot;&quot;</FONT></B> &lt;&lt; hello &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;\&quot; (std::string)&quot;</FONT></B> &lt;&lt; endl;
+  }
+
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;   
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_5.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>
+After the storing of data in the archive, the content of the buffer of
+characters is printed:
+<pre>
+Buffer content is 40 bytes : 
+  127 1 9 1 84 1 99 1 16 255 128 5 0 228 11 84 2 4 208 15 
+  73 64 8 255 255 255 255 255 255 255 127 1 7 87 111 114 108 100 32 33 
+  
+Loaded values from the buffer are: 
+  t  = 1 (bool)
+  c  = 'c' (char)
+  s  = 16 (int16_t)
+  l  = -128 (int32_t)
+  ll = 10000000000 (int64_t)
+  pi = 3.14159 (float)
+  nan = nan (double)
+  hello = "World !" (std::string)
+
+</pre>
+Again the PBA encoding scheme  can be easily interpreted.  This is let
+as an exercise.
+</p>
+
+<h4>Extra:</h4>
+<p>
+You  may  have  a  look  on  the  <tt class="fs">tutorial_pba_6.cpp</tt>  program  that shows  a  possible &mdash;  and
+provocative  &mdash;  combined usage  of  the Boost/Serialization  concepts,  the
+Boost/Iostreams facilities and the PBA; it enables the copy of an object
+of a non-copyable class.
+</p>
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_6.cpp</tt> source code <a href="./code/tutorial_pba_6.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_6_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_6_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_6.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of
+ * the Boost/Serialization library.
+ *
+ * This sample program shows how to use a portable binary archive
+ * associated to a memory buffer to copy a non-copyable object.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;iostream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;sstream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;vector&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/utility.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/iostreams/stream.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/iostreams/device/back_inserter.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/iostreams/device/array.hpp&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/cstdint.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_oarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_iarchive.hpp&gt;</FONT></B>
+
+using namespace std;
+
+<I><FONT COLOR="#B22222">/* A foo noncopyable class */</FONT></I>
+<B><FONT COLOR="#228B22">struct</FONT></B> foo : boost::noncopyable
+{
+  uint32_t status;
+  <B><FONT COLOR="#228B22">double</FONT></B>   value;
+  <B><FONT COLOR="#228B22">double</FONT></B>   special;
+
+  string to_string () <B><FONT COLOR="#228B22">const</FONT></B>
+  {
+    ostringstream sout;
+    sout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;foo={status=&quot;</FONT></B> &lt;&lt; status &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;; value=&quot;</FONT></B> &lt;&lt; value  &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;; special=&quot;</FONT></B> &lt;&lt; special&lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;}&quot;</FONT></B>;
+    <B><FONT COLOR="#A020F0">return</FONT></B> sout.str();
+  }
+
+  <B><FONT COLOR="#228B22">template</FONT></B>&lt;<B><FONT COLOR="#228B22">class</FONT></B> Archive&gt;
+  <B><FONT COLOR="#228B22">void</FONT></B> serialize (Archive &amp; ar, <B><FONT COLOR="#228B22">const</FONT></B> <B><FONT COLOR="#228B22">unsigned</FONT></B> <B><FONT COLOR="#228B22">int</FONT></B> version)
+  {
+    ar &amp; status;
+    ar &amp; value;
+    ar &amp; special;
+    <B><FONT COLOR="#A020F0">return</FONT></B>;
+  }
+
+};
+
+<I><FONT COLOR="#B22222">// A templatized copy function for Boost/Serialization equipped classes.
+</FONT></I><I><FONT COLOR="#B22222">// Here we use PBAs associated to a memory buffer :
+</FONT></I><B><FONT COLOR="#228B22">template</FONT></B> &lt;<B><FONT COLOR="#228B22">class</FONT></B> Serializable&gt;
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">copy</FONT></B> (<B><FONT COLOR="#228B22">const</FONT></B> Serializable &amp; source, Serializable &amp; target)
+{
+  namespace io = boost::iostreams;
+  namespace ba = boost::archive;
+  <B><FONT COLOR="#A020F0">if</FONT></B> (&amp;source == &amp;target) <B><FONT COLOR="#A020F0">return</FONT></B>; <I><FONT COLOR="#B22222">// self-copy guard
+</FONT></I>  <B><FONT COLOR="#228B22">typedef</FONT></B> std::vector&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt; buffer_type;
+  buffer_type buffer;
+  buffer.reserve (1024);
+  {
+    <B><FONT COLOR="#5F9EA0">io</FONT></B>::stream&lt;io::back_insert_device&lt;buffer_type&gt; &gt; output_stream (buffer);
+    <B><FONT COLOR="#5F9EA0">ba</FONT></B>::portable_binary_oarchive opba (output_stream);
+    opba &amp; source;
+  }
+  {
+    <B><FONT COLOR="#5F9EA0">io</FONT></B>::stream&lt;io::array_source&gt; input_stream (&amp;buffer[0], buffer.size ());
+    <B><FONT COLOR="#5F9EA0">ba</FONT></B>::portable_binary_iarchive ipba (input_stream);
+    ipba &amp; target;
+  }
+  <B><FONT COLOR="#A020F0">return</FONT></B>;
+}
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  <I><FONT COLOR="#B22222">// Some instance of the 'foo' class :
+</FONT></I>  foo dummy;
+  dummy.status = 1;
+  dummy.value = 3.14159;
+  dummy.special = numeric_limits&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt;::quiet_NaN ();
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;dummy is : &quot;</FONT></B> &lt;&lt; dummy.to_string () &lt;&lt; endl;
+
+  <I><FONT COLOR="#B22222">// Another instance of the 'foo' class :
+</FONT></I>  foo clone;
+
+  <I><FONT COLOR="#B22222">/* The following instruction is forbidden because foo 
+     inherits 'boost::noncopyable' :
+   
+   clone = dummy; // this ends in a compilation error.
+   
+   */</FONT></I>
+
+  <I><FONT COLOR="#B22222">// Anyway, we can use this workaround :
+</FONT></I>  copy (dummy, clone);
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;clone is : &quot;</FONT></B> &lt;&lt; clone.to_string () &lt;&lt; endl;
+
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_6.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p> <b>Remark</b> : if a class has been made <i>non-copyable</i> at design,
+it is likely for a good reason; so it is not recommended to workaround
+this trait using such a trick, unless you know what you are doing 
+and all the consequences !
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+
+<!------------------------------------------------------------->
+<h3><a name="Samples:5"></a>An alternative to PBA using text or XML archives made portable</h3>
+
+<p>
+In some circonstances,  it may be useful to  use the Boost <i>text</i>
+and <i>XML</i> archives in somewhat  portable way. For example, we may
+want  to  benefit  of  the  XML archive's  human-friendly  format  for
+debugging purpose  before to  switch to the  PBA for  production runs.
+However, the <i>text</i> and <i>XML</i> archives provided by the Boost
+serialization library are  not strictly portable, particularly because
+they does  not support the serialization of  non-finite floating point
+numbers.  This is because  the serialization of floating point numbers
+depends  on some formatting  features of  standard I/O  streams. See the
+<tt class="fs">tutorial_pba_7.cpp</tt> sample program below : 
+</p>
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_7.cpp</tt> source code <a href="./code/tutorial_pba_7.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_7_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_7_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_7.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This example shows how the default behaviour of standard 
+ * I/O streams does not support the read/write operations of 
+ * non-finite floating point values in a portable way.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;iostream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;sstream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;limits&gt;</FONT></B>
+
+using namespace std;
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  {
+    <B><FONT COLOR="#228B22">float</FONT></B> x = numeric_limits&lt;<B><FONT COLOR="#228B22">float</FONT></B>&gt;::infinity ();
+    <B><FONT COLOR="#228B22">double</FONT></B> y = numeric_limits&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt;::quiet_NaN ();
+    cout.precision (8);
+    cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;x = &quot;</FONT></B> &lt;&lt; x &lt;&lt; endl;
+    cout.precision (16);
+    cout &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;y = &quot;</FONT></B> &lt;&lt; y &lt;&lt; endl;
+  }
+
+  {
+    string input (<B><FONT COLOR="#BC8F8F">&quot;inf nan&quot;</FONT></B>);
+    istringstream iss (input);
+    <B><FONT COLOR="#228B22">float</FONT></B> x; 
+    <B><FONT COLOR="#228B22">double</FONT></B> y;
+    iss &gt;&gt; x &gt;&gt; y;
+    <B><FONT COLOR="#A020F0">if</FONT></B> (! iss)
+      {
+	cerr &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Cannot read 'x' or 'y' : non finite values are not supported !&quot;</FONT></B> &lt;&lt; endl;
+      }
+  }
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_7.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>
+Depending on the system, one can get some various representation 
+respectively for the <i>infinity</i> and <i>NaN</i> values :
+<ul>
+<li>typically on Windows :
+<pre>
+1.#INF
+</pre>
+and
+<pre>
+-1.#IND
+</pre>
+<li>and on Linux :
+<pre>
+inf
+</pre>
+and 
+<pre>
+nan
+</pre>
+
+</ul>
+Usually  one can  print such  non finite  values in  an  output stream
+(using such  a non  portable representation), but  parsing it  from an
+input stream fails !
+</p>
+
+<p>
+Hopefully this issue can be solved by configuring the I/O streams with
+some    special    <i>locale</i>    features   provided    by    Boost
+(see <a href="http://www.boost.org/doc/libs/1_47_0/libs/serialization/doc/implementation.html#charencoding">this
+link</a>).
+</p>
+
+<p>
+The <tt class="fs">tutorial_pba_8.cpp</tt> program
+shows how this can be achieved through the use of special resources
+from the <tt class="fs">boost/archive/codecvt_null.hpp</tt> and 
+<tt class="fs">boost/math/special_functions/nonfinite_num_facets.hpp</tt> headers :
+</p>
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_8.cpp</tt> source code <a href="./code/tutorial_pba_8.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_8_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_8_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_8.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This example shows how to store some variables
+ * of basic types (bool, integer, floating point numbers, STL string) 
+ * using the text or XML archive format associated to a 
+ * standard output file stream supporting portable non-finite
+ * floating point values.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;fstream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;limits&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;locale&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/cstdint.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/xml_oarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/text_oarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/serialization/nvp.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/codecvt_null.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/math/special_functions/nonfinite_num_facets.hpp&gt;</FONT></B>
+
+using namespace std;
+
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">do_text_out</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  <I><FONT COLOR="#B22222">// The name for the example data text file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_8.txt&quot;</FONT></B>; 
+
+  <I><FONT COLOR="#B22222">// Some variables of various primitive types :
+</FONT></I>  <B><FONT COLOR="#228B22">bool</FONT></B>        b         = true;
+  <B><FONT COLOR="#228B22">char</FONT></B>        c         = <B><FONT COLOR="#BC8F8F">'B'</FONT></B>;
+  uint32_t    answer    = 42;
+  <B><FONT COLOR="#228B22">float</FONT></B>       value     = numeric_limits&lt;<B><FONT COLOR="#228B22">float</FONT></B>&gt;::infinity ();
+  <B><FONT COLOR="#228B22">double</FONT></B>      precision = numeric_limits&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt;::quiet_NaN ();
+  string      question  = <B><FONT COLOR="#BC8F8F">&quot;What makes you think she's a witch?&quot;</FONT></B>;
+  
+  <I><FONT COLOR="#B22222">// Open an output file stream :
+</FONT></I>  ofstream fout (filename.c_str ());
+
+  <I><FONT COLOR="#B22222">// Prepare the output file stream for inf/NaN support :
+</FONT></I>  locale default_locale (locale::classic (),
+			 <B><FONT COLOR="#A020F0">new</FONT></B> boost::archive::codecvt_null&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt;);
+  locale infnan_locale (default_locale,
+			<B><FONT COLOR="#A020F0">new</FONT></B> boost::math::nonfinite_num_put&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt;);
+  fout.imbue (infnan_locale);
+  
+  {
+    <I><FONT COLOR="#B22222">// Create an output text archive attached to the output file :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::text_oarchive ota (fout, boost::archive::no_codecvt);
+    
+    <I><FONT COLOR="#B22222">// Store (serializing) variables :
+</FONT></I>    ota &amp; b &amp; c &amp; answer &amp; value &amp; precision &amp; question;
+  }
+
+  <B><FONT COLOR="#A020F0">return</FONT></B>;   
+}
+
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">do_xml_out</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  <I><FONT COLOR="#B22222">// The name for the example data XML file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_8.xml&quot;</FONT></B>; 
+
+  <I><FONT COLOR="#B22222">// Some variables of various primitive types :
+</FONT></I>  <B><FONT COLOR="#228B22">bool</FONT></B>        b         = true;
+  <B><FONT COLOR="#228B22">char</FONT></B>        c         = <B><FONT COLOR="#BC8F8F">'B'</FONT></B>;
+  uint32_t    answer    = 42;
+  <B><FONT COLOR="#228B22">float</FONT></B>       value     = numeric_limits&lt;<B><FONT COLOR="#228B22">float</FONT></B>&gt;::infinity ();
+  <B><FONT COLOR="#228B22">double</FONT></B>      precision = numeric_limits&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt;::quiet_NaN ();
+  string      question  = <B><FONT COLOR="#BC8F8F">&quot;What makes you think she's a witch?&quot;</FONT></B>;
+  
+  <I><FONT COLOR="#B22222">// Open an output file stream :
+</FONT></I>  ofstream fout (filename.c_str ());
+
+  <I><FONT COLOR="#B22222">// Prepare the output file stream for inf/NaN support :
+</FONT></I>  locale default_locale (locale::classic (),
+			 <B><FONT COLOR="#A020F0">new</FONT></B> boost::archive::codecvt_null&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt;);
+  locale infnan_locale (default_locale,
+			<B><FONT COLOR="#A020F0">new</FONT></B> boost::math::nonfinite_num_put&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt;);
+  fout.imbue (infnan_locale);
+   
+  {
+    <I><FONT COLOR="#B22222">// Create an output text archive attached to the output file :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::xml_oarchive oxa (fout, boost::archive::no_codecvt);
+    
+    <I><FONT COLOR="#B22222">// Store (serializing) variables :
+</FONT></I>    oxa &amp; BOOST_SERIALIZATION_NVP(b)
+      &amp; BOOST_SERIALIZATION_NVP(c)
+      &amp; BOOST_SERIALIZATION_NVP(answer)
+      &amp; BOOST_SERIALIZATION_NVP(value)
+      &amp; BOOST_SERIALIZATION_NVP(precision) 
+      &amp; BOOST_SERIALIZATION_NVP(question);
+  }
+
+  <B><FONT COLOR="#A020F0">return</FONT></B>;   
+}
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  do_text_out ();
+  do_xml_out ();
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_8.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>
+The program creates two output files :
+<ul>
+<li> <tt class="fs">pba_8.txt</tt> stores a text archive with
+  non finite floating point values :
+<pre>
+22 serialization::archive 9 1 66 42 inf nan 35 What makes you think she's a witch?
+
+</pre>
+<li> <tt class="fs">pba_8.xml</tt> which stored the equivalent content 
+  using the XML archive format :
+<!--pre-->
+<PRE>
+<B><FONT COLOR="#A020F0">&lt;?xml version=</FONT></B><B><FONT COLOR="#BC8F8F">&quot;1.0&quot;</FONT></B><B><FONT COLOR="#A020F0"> encoding=</FONT></B><B><FONT COLOR="#BC8F8F">&quot;UTF-8&quot;</FONT></B><B><FONT COLOR="#A020F0"> standalone=</FONT></B><B><FONT COLOR="#BC8F8F">&quot;yes&quot;</FONT></B><B><FONT COLOR="#A020F0"> ?&gt;</FONT></B>
+<B><FONT COLOR="#A020F0">&lt;!DOCTYPE boost_serialization&gt;</FONT></B>
+<B><FONT COLOR="#A020F0">&lt;boost_serialization signature=</FONT></B><B><FONT COLOR="#BC8F8F">&quot;serialization::archive&quot;</FONT></B><B><FONT COLOR="#A020F0"> version=</FONT></B><B><FONT COLOR="#BC8F8F">&quot;9&quot;</FONT></B><B><FONT COLOR="#A020F0">&gt;</FONT></B>
+<B><FONT COLOR="#A020F0">&lt;b&gt;</FONT></B>1<B><FONT COLOR="#A020F0">&lt;/b&gt;</FONT></B>
+<B><FONT COLOR="#A020F0">&lt;c&gt;</FONT></B>66<B><FONT COLOR="#A020F0">&lt;/c&gt;</FONT></B>
+<B><FONT COLOR="#A020F0">&lt;answer&gt;</FONT></B>42<B><FONT COLOR="#A020F0">&lt;/answer&gt;</FONT></B>
+<B><FONT COLOR="#A020F0">&lt;value&gt;</FONT></B>inf<B><FONT COLOR="#A020F0">&lt;/value&gt;</FONT></B>
+<B><FONT COLOR="#A020F0">&lt;precision&gt;</FONT></B>nan<B><FONT COLOR="#A020F0">&lt;/precision&gt;</FONT></B>
+<B><FONT COLOR="#A020F0">&lt;question&gt;</FONT></B>What makes you think she<B><FONT COLOR="#A020F0">&amp;apos;</FONT></B>s a witch?<B><FONT COLOR="#A020F0">&lt;/question&gt;</FONT></B>
+<B><FONT COLOR="#A020F0">&lt;/boost_serialization&gt;</FONT></B>
+
+</PRE>
+
+<!--/pre-->
+</ul>
+</p>
+
+<p>
+The <tt class="fs">tutorial_pba_9.cpp</tt> program
+deserializes the data from the text and XML archive files (respectively 
+<tt class="fs">pba_8.txt</tt> and <tt class="fs">pba_8.xml</tt>) and prints the restored variables :
+<pre>
+Loaded values from text archive are: 
+  b         = 1
+  c         = 'B'
+  answer    = 42
+  value     = inf
+  precision = nan
+  question  = "What makes you think she's a witch?"
+Loaded values from XML archive are: 
+  b         = 1
+  c         = 'B'
+  answer    = 42
+  value     = inf
+  precision = nan
+  question  = "What makes you think she's a witch?"
+
+</pre>
+</p>
+
+<p>
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_9.cpp</tt> source code <a href="./code/tutorial_pba_9.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_9_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_9_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_9.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This example shows how to load some variables of basic 
+ * types (bool, char, integer, floating point numbers, STL string) 
+ * using the text or XML archive format associated to a 
+ * standard file input stream supporting portable non-finite
+ * floating point values.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;fstream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;limits&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;locale&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/cstdint.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/xml_iarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/text_iarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/serialization/nvp.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/scoped_ptr.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/codecvt_null.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/math/special_functions/nonfinite_num_facets.hpp&gt;</FONT></B>
+
+using namespace std;
+
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">do_text_in</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  <I><FONT COLOR="#B22222">// The name for the example data text file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_8.txt&quot;</FONT></B>; 
+  <I><FONT COLOR="#B22222">// Some variables of various primitive types :
+</FONT></I>  <B><FONT COLOR="#228B22">bool</FONT></B>        b;
+  <B><FONT COLOR="#228B22">char</FONT></B>        c;
+  uint32_t    answer;
+  <B><FONT COLOR="#228B22">float</FONT></B>       value;
+  <B><FONT COLOR="#228B22">double</FONT></B>      precision;
+  string      question;
+  
+  <I><FONT COLOR="#B22222">// Open an input file stream :
+</FONT></I>  ifstream fin (filename.c_str ());
+
+  <I><FONT COLOR="#B22222">// Prepare the input file stream for inf/NaN support :
+</FONT></I>  locale default_locale (locale::classic (),
+			 <B><FONT COLOR="#A020F0">new</FONT></B> boost::archive::codecvt_null&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt;);
+  locale infnan_locale (default_locale,
+			<B><FONT COLOR="#A020F0">new</FONT></B> boost::math::nonfinite_num_get&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt;);
+  fin.imbue (infnan_locale);
+ 
+  {
+    <I><FONT COLOR="#B22222">// Create an input text archive attached to the input file :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::text_iarchive ita (fin, boost::archive::no_codecvt);
+    
+    <I><FONT COLOR="#B22222">// Store (serializing) variables :
+</FONT></I>    ita &amp; b &amp; c &amp; answer &amp; value &amp; precision &amp; question;
+  }
+
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Loaded values from text archive are: &quot;</FONT></B> &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  b         = &quot;</FONT></B> &lt;&lt; b &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  c         = '&quot;</FONT></B> &lt;&lt; c &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;'&quot;</FONT></B> &lt;&lt;  endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  answer    = &quot;</FONT></B> &lt;&lt; answer &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  value     = &quot;</FONT></B> &lt;&lt; value &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  precision = &quot;</FONT></B> &lt;&lt; precision &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  question  = \&quot;&quot;</FONT></B> &lt;&lt; question &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;\&quot;&quot;</FONT></B> &lt;&lt; endl;
+
+  <B><FONT COLOR="#A020F0">return</FONT></B>;   
+}
+
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">do_xml_in</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  <I><FONT COLOR="#B22222">// The name for the example data text file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_8.xml&quot;</FONT></B>; 
+
+  <I><FONT COLOR="#B22222">// Some variables of various primitive types :
+</FONT></I>  <B><FONT COLOR="#228B22">bool</FONT></B>        b;
+  <B><FONT COLOR="#228B22">char</FONT></B>        c;
+  uint32_t    answer;
+  <B><FONT COLOR="#228B22">float</FONT></B>       value;
+  <B><FONT COLOR="#228B22">double</FONT></B>      precision;
+  string      question;
+  
+  <I><FONT COLOR="#B22222">// Open an input file stream :
+</FONT></I>  ifstream fin (filename.c_str ());
+
+  <I><FONT COLOR="#B22222">// Prepare the input file stream for inf/NaN support :
+</FONT></I>  locale default_locale (locale::classic (),
+			 <B><FONT COLOR="#A020F0">new</FONT></B> boost::archive::codecvt_null&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt;);
+  locale infnan_locale (default_locale,
+			<B><FONT COLOR="#A020F0">new</FONT></B> boost::math::nonfinite_num_get&lt;<B><FONT COLOR="#228B22">char</FONT></B>&gt;);
+  fin.imbue (infnan_locale);
+
+  {
+    <I><FONT COLOR="#B22222">// Create an output text archive attached to the output file :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::xml_iarchive ixa (fin, boost::archive::no_codecvt);
+    
+    <I><FONT COLOR="#B22222">// Store (serializing) variables :
+</FONT></I>    ixa &amp; BOOST_SERIALIZATION_NVP(b)
+      &amp; BOOST_SERIALIZATION_NVP(c)
+      &amp; BOOST_SERIALIZATION_NVP(answer)
+      &amp; BOOST_SERIALIZATION_NVP(value)
+      &amp; BOOST_SERIALIZATION_NVP(precision) 
+      &amp; BOOST_SERIALIZATION_NVP(question);
+  }
+
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Loaded values from XML archive are: &quot;</FONT></B> &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  b         = &quot;</FONT></B> &lt;&lt; b &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  c         = '&quot;</FONT></B> &lt;&lt; c &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;'&quot;</FONT></B> &lt;&lt;  endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  answer    = &quot;</FONT></B> &lt;&lt; answer &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  value     = &quot;</FONT></B> &lt;&lt; value &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  precision = &quot;</FONT></B> &lt;&lt; precision &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;  question  = \&quot;&quot;</FONT></B> &lt;&lt; question &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;\&quot;&quot;</FONT></B> &lt;&lt; endl;
+
+  <B><FONT COLOR="#A020F0">return</FONT></B>;   
+}
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  do_text_in ();
+  do_xml_in ();
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_9.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+
+<!------------------------------------------------------------->
+<h3><a name="Samples:6"></a>Using PBA serialization associated with on-the-fly (de)compressed file streams</h3>
+
+<p>
+The <tt class="fs">tutorial_pba_10.cpp</tt> program
+illustrates how to serialize, then deserialize, a class from a PBA associated
+to a GZIP compressed file stream, thanks to a technique
+provided by the Boost/Iostreams library. The class contains a large 
+STL vector of double precision floating point numbers with arbitrary values: 
+</p>
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_10.cpp</tt> source code <a href="./code/tutorial_pba_10.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_10_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_10_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_10.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This example shows how use PBAs combined with on-the-fly 
+ * compressed I/O streams.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;fstream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;limits&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;vector&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/cstdint.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_oarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_iarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/iostreams/filtering_stream.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/iostreams/filter/gzip.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/serialization/access.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/serialization/vector.hpp&gt;</FONT></B>
+
+using namespace std;
+
+<B><FONT COLOR="#228B22">class</FONT></B> data_type
+{
+<B><FONT COLOR="#228B22">private</FONT></B>:
+  <B><FONT COLOR="#228B22">friend</FONT></B> <B><FONT COLOR="#228B22">class</FONT></B> boost::serialization::access;
+  <B><FONT COLOR="#228B22">template</FONT></B>&lt;<B><FONT COLOR="#228B22">class</FONT></B> Archive&gt;
+  <B><FONT COLOR="#228B22">void</FONT></B> serialize (Archive &amp; ar, <B><FONT COLOR="#228B22">const</FONT></B> <B><FONT COLOR="#228B22">unsigned</FONT></B> <B><FONT COLOR="#228B22">int</FONT></B> version);
+<B><FONT COLOR="#228B22">public</FONT></B>:
+  <B><FONT COLOR="#228B22">void</FONT></B> print (ostream &amp; out, <B><FONT COLOR="#228B22">const</FONT></B> string &amp; title) <B><FONT COLOR="#228B22">const</FONT></B>;
+<B><FONT COLOR="#228B22">public</FONT></B>:
+  vector&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt; values;
+  data_type ();
+};
+
+<B><FONT COLOR="#0000FF">data_type::data_type</FONT></B> () : values ()
+{
+  <B><FONT COLOR="#A020F0">return</FONT></B>;
+}
+
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">data_type::print</FONT></B> (ostream &amp; out, <B><FONT COLOR="#228B22">const</FONT></B> string &amp; title) <B><FONT COLOR="#228B22">const</FONT></B>
+{
+  out &lt;&lt; endl;
+  out &lt;&lt; title &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; :&quot;</FONT></B> &lt;&lt; endl;
+  <B><FONT COLOR="#A020F0">for</FONT></B> (<B><FONT COLOR="#228B22">int</FONT></B> i = 0; i &lt; <B><FONT COLOR="#A020F0">this</FONT></B>-&gt;values.size (); ++i)
+    {
+      out.precision (16);
+      out.width (18);
+      out &lt;&lt; <B><FONT COLOR="#A020F0">this</FONT></B>-&gt;values [i] &lt;&lt; <B><FONT COLOR="#BC8F8F">' '</FONT></B> ;
+      <B><FONT COLOR="#A020F0">if</FONT></B> ((i%4) == 3) clog &lt;&lt; endl;
+    }
+  out &lt;&lt; endl;
+  <B><FONT COLOR="#A020F0">return</FONT></B>;
+}
+  
+<B><FONT COLOR="#228B22">template</FONT></B>&lt;<B><FONT COLOR="#228B22">class</FONT></B> Archive&gt;
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">data_type::serialize</FONT></B> (Archive &amp; ar, <B><FONT COLOR="#228B22">const</FONT></B> <B><FONT COLOR="#228B22">unsigned</FONT></B> <B><FONT COLOR="#228B22">int</FONT></B> version)
+{
+  ar &amp; values;
+  <B><FONT COLOR="#A020F0">return</FONT></B>;
+}
+
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">do_gzipped_out</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  <I><FONT COLOR="#B22222">// The name for the output data file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_10.data.gz&quot;</FONT></B>; 
+
+  <I><FONT COLOR="#B22222">// A data structure to be stored :
+</FONT></I>  data_type my_data;
+
+  <I><FONT COLOR="#B22222">// Fill the vector with arbitrary (possibly non-finite) values :
+</FONT></I>  size_t dim = 1000;
+  my_data.values.reserve (dim);
+  <B><FONT COLOR="#A020F0">for</FONT></B> (<B><FONT COLOR="#228B22">int</FONT></B> i = 0; i &lt; dim; ++i)
+    {      
+      <B><FONT COLOR="#228B22">double</FONT></B> val = (i + 1) * (1.0 + 3 * numeric_limits&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt;::epsilon ());
+      <B><FONT COLOR="#A020F0">if</FONT></B> (i == 4) val = numeric_limits&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt;::quiet_NaN ();
+      <B><FONT COLOR="#A020F0">if</FONT></B> (i == 23) val = numeric_limits&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt;::infinity ();
+      <B><FONT COLOR="#A020F0">if</FONT></B> (i == 73) val = -numeric_limits&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt;::infinity ();
+      <B><FONT COLOR="#A020F0">if</FONT></B> (i == 90) val = 0.0;
+      my_data.values.push_back (val);
+    }
+
+  <I><FONT COLOR="#B22222">// Print:
+</FONT></I>  my_data.print (clog, <B><FONT COLOR="#BC8F8F">&quot;Stored data&quot;</FONT></B>);
+
+  <I><FONT COLOR="#B22222">// Create an output filtering stream :
+</FONT></I>  <B><FONT COLOR="#5F9EA0">boost</FONT></B>::iostreams::filtering_ostream zout;
+  zout.push (boost::iostreams::gzip_compressor ());
+  
+  <I><FONT COLOR="#B22222">// Open an output file stream in binary mode :
+</FONT></I>  ofstream fout (filename.c_str (), ios_base::binary);
+  zout.push (fout);
+
+  <I><FONT COLOR="#B22222">// Save to PBA :
+</FONT></I>  {
+    <I><FONT COLOR="#B22222">// Create an output portable binary archive attached to the output file :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_oarchive opba (zout);
+    
+    <I><FONT COLOR="#B22222">// Store (serializing) the data :
+</FONT></I>    opba &amp; my_data;
+  }
+
+  <I><FONT COLOR="#B22222">// Clean termination of the streams :
+</FONT></I>  zout.flush ();
+  zout.reset ();
+
+  <B><FONT COLOR="#A020F0">return</FONT></B>;   
+}
+
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">do_gzipped_in</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  <I><FONT COLOR="#B22222">// The name for the input data file :  
+</FONT></I>  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_10.data.gz&quot;</FONT></B>; 
+
+  <I><FONT COLOR="#B22222">// A data structure to be loaded :
+</FONT></I>  data_type my_data;
+
+  <I><FONT COLOR="#B22222">// Create an input filtering stream :
+</FONT></I>  <B><FONT COLOR="#5F9EA0">boost</FONT></B>::iostreams::filtering_istream zin;
+  zin.push (boost::iostreams::gzip_decompressor ());
+  
+  <I><FONT COLOR="#B22222">// Open an input file stream in binary mode :
+</FONT></I>  ifstream fin (filename.c_str (), ios_base::binary);
+  zin.push (fin);
+
+  <I><FONT COLOR="#B22222">// Load from PBA :
+</FONT></I>  {
+    <I><FONT COLOR="#B22222">// Create an input portable binary archive attached to the input file :
+</FONT></I>    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_iarchive ipba (zin);
+    
+    <I><FONT COLOR="#B22222">// Load (deserializing) the data :
+</FONT></I>    ipba &amp; my_data;
+  }
+
+  <I><FONT COLOR="#B22222">// Print:
+</FONT></I>  my_data.print (clog, <B><FONT COLOR="#BC8F8F">&quot;Loaded data&quot;</FONT></B>);
+
+  <B><FONT COLOR="#A020F0">return</FONT></B>;   
+}
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  do_gzipped_out (); 
+  do_gzipped_in ();
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_10.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>The resulting compressed <tt class="fs">pba_10.data.gz</tt> file contains 1,574 bytes.
+This has to be compared with the size of the plain (uncompressed) 
+binary archive which equals 9,001 bytes:
+
+<pre class="byte">127   1   9   0   0   2 232   3   0   8   3   0   0   0   0   0
+240  63   8   3   0   0   0   0   0   0  64   8   4   0   0   0
+  0   0   8  64   8   3   0   0   0   0   0  16  64   8 255 255
+255 255 255 255 255 127   8   4   0   0   0   0   0  24  64   8
+...
+</pre>
+
+which can be interpreted as :
+<ul>
+<li> 3  bytes for  the usual archive  header : <tt  class="byte">127 1
+9</tt>,
+<li>   2   <i>zero-optimized</i>  bytes   to   store   the  class   ID
+  and  the       class       version :<tt  class="byte">0 0</tt>,
+<li> 3  bytes to  store the size  of the  vector (1000) using  the PBA
+representation of integers (<tt class="byte">2 232 3</tt>),
+<li> 1  <i>zero-optimized</i> byte to  store the class version  of the
+objects      stored       in      the      STL       vector      (here
+the primitive <tt class="code">double</tt> type) : <tt class="byte">0</tt>,
+<li> 999 non-zero double precision floating point values (including non-finite values) each using 9 bytes (1 byte for
+the <i>size</i> and 8 bytes for the <i>content</i>) : <tt class="byte">8 ? ? ? ? ?
+? ? ?</tt>,
+<li>  1 zero  floating point  value that  uses only  one <i>zero-optimized</i>  byte : <tt class="byte">0</tt>.
+</ul>
+Thus one here achieves a very interesting <i>compression</i> level.
+</p>
+<p>
+It is also possible to use BZIP2 in a similar fashion
+(using ressources from the <tt class="fs">boost/iostreams/filter/bzip2.hpp</tt> header
+in place of <tt class="fs">boost/iostreams/filter/gzip.hpp</tt>).
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+<!------------------------------------------------------------->
+<h3><a name="Samples:7"></a>A simple PBA versus text archive benchmark test</h3>
+
+<p>
+The <tt class="fs">tutorial_pba_11.cpp</tt> program
+runs a benchmark test in the aim to compare the relative fastness of PBA and text archives
+both for read and write operations. It stores then loads a vector of many (10<sup>7</sup>) 
+random <tt class="code">double</tt> values and prints the associated (de)serialization time for both kinds of archives:
+</p>
+
+<div style="background-color: #ccc; padding: 4px 2px; border: 1px" >
+<img src="images/c++-source-code.png" height="20pt" style="float:left" />&nbsp;The <tt class="fs">tutorial_pba_11.cpp</tt> source code <a href="./code/tutorial_pba_11.cpp" class="button" >Download</a> 
+&nbsp; <a href="javascript:toggleDiv('tutorial_pba_11_cpp');" class="button" >Show/hide</a>
+<div id="tutorial_pba_11_cpp" ><PRE>
+<I><FONT COLOR="#B22222">/** tutorial_pba_11.cpp
+ *
+ * (C) Copyright 2011 Fran&ccedil;ois Mauger, Christian Pfligersdorffer
+ *
+ * Use, modification and distribution is subject to the Boost Software
+ * License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+ * http://www.boost.org/LICENSE_1_0.txt)
+ *
+ */</FONT></I>
+
+<I><FONT COLOR="#B22222">/**
+ * The intent of this program is to serve as a tutorial for
+ * users of the portable binary archive in the framework of 
+ * the Boost/Serialization library. 
+ *
+ * This example program compares the times needed to serialize
+ * and deserialize some large amount of data using PBA and 
+ * text archives.
+ *
+ */</FONT></I>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;string&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;fstream&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;vector&gt;</FONT></B>
+
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_oarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/portable_binary_iarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/text_oarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/archive/text_iarchive.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/serialization/access.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/serialization/vector.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/random/mersenne_twister.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/random/uniform_real_distribution.hpp&gt;</FONT></B>
+#<B><FONT COLOR="#5F9EA0">include</FONT></B> <B><FONT COLOR="#BC8F8F">&lt;boost/timer.hpp&gt;</FONT></B>
+
+using namespace std;
+
+<B><FONT COLOR="#228B22">class</FONT></B> data_type
+{
+<B><FONT COLOR="#228B22">private</FONT></B>:
+  <B><FONT COLOR="#228B22">friend</FONT></B> <B><FONT COLOR="#228B22">class</FONT></B> boost::serialization::access;
+  <B><FONT COLOR="#228B22">template</FONT></B>&lt;<B><FONT COLOR="#228B22">class</FONT></B> Archive&gt;
+  <B><FONT COLOR="#228B22">void</FONT></B> serialize (Archive &amp; ar, <B><FONT COLOR="#228B22">const</FONT></B> <B><FONT COLOR="#228B22">unsigned</FONT></B> <B><FONT COLOR="#228B22">int</FONT></B> version);
+<B><FONT COLOR="#228B22">public</FONT></B>:
+  <B><FONT COLOR="#228B22">void</FONT></B> print (ostream &amp; out, <B><FONT COLOR="#228B22">const</FONT></B> string &amp; title) <B><FONT COLOR="#228B22">const</FONT></B>;
+<B><FONT COLOR="#228B22">public</FONT></B>:
+  vector&lt;<B><FONT COLOR="#228B22">double</FONT></B>&gt; values;
+  data_type ();
+};
+
+<B><FONT COLOR="#0000FF">data_type::data_type</FONT></B> () : values ()
+{
+  <B><FONT COLOR="#A020F0">return</FONT></B>;
+}
+
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">data_type::print</FONT></B> (ostream &amp; out, <B><FONT COLOR="#228B22">const</FONT></B> string &amp; title) <B><FONT COLOR="#228B22">const</FONT></B>
+{
+  out &lt;&lt; endl;
+  out &lt;&lt; title &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; :&quot;</FONT></B> &lt;&lt; endl;
+  <B><FONT COLOR="#228B22">bool</FONT></B> skip = false;
+  <B><FONT COLOR="#A020F0">for</FONT></B> (<B><FONT COLOR="#228B22">int</FONT></B> i = 0; i &lt; <B><FONT COLOR="#A020F0">this</FONT></B>-&gt;values.size (); ++i)
+    {
+      <B><FONT COLOR="#A020F0">if</FONT></B> ((i &gt;= 12) &amp;&amp; (i &lt; (<B><FONT COLOR="#228B22">int</FONT></B>) <B><FONT COLOR="#A020F0">this</FONT></B>-&gt;values.size () - 8)) 
+	{
+	  <B><FONT COLOR="#A020F0">if</FONT></B> (! skip) out &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; ...&quot;</FONT></B> &lt;&lt; endl;
+	  skip = true;
+	  <B><FONT COLOR="#A020F0">continue</FONT></B>;
+	}
+      out.precision (16);
+      out.width (18);
+      out &lt;&lt; <B><FONT COLOR="#A020F0">this</FONT></B>-&gt;values [i] &lt;&lt; <B><FONT COLOR="#BC8F8F">' '</FONT></B> ;
+      <B><FONT COLOR="#A020F0">if</FONT></B> ((i%4) == 3) clog &lt;&lt; endl;
+    }
+  out &lt;&lt; endl;
+  <B><FONT COLOR="#A020F0">return</FONT></B>;
+}
+  
+<B><FONT COLOR="#228B22">template</FONT></B>&lt;<B><FONT COLOR="#228B22">class</FONT></B> Archive&gt;
+<B><FONT COLOR="#228B22">void</FONT></B> <B><FONT COLOR="#0000FF">data_type::serialize</FONT></B> (Archive &amp; ar, <B><FONT COLOR="#228B22">const</FONT></B> <B><FONT COLOR="#228B22">unsigned</FONT></B> <B><FONT COLOR="#228B22">int</FONT></B> version)
+{
+  ar &amp; values;
+  <B><FONT COLOR="#A020F0">return</FONT></B>;
+}
+
+<B><FONT COLOR="#228B22">double</FONT></B> <B><FONT COLOR="#0000FF">do_pba_out</FONT></B> (<B><FONT COLOR="#228B22">const</FONT></B> data_type &amp; a_data)
+{
+  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_11.data&quot;</FONT></B>; 
+  ofstream fout (filename.c_str (), ios_base::binary);
+  <B><FONT COLOR="#5F9EA0">boost</FONT></B>::timer io_timer;    
+  {
+    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_oarchive opba (fout);
+    opba &amp; a_data;
+  }
+  <B><FONT COLOR="#A020F0">return</FONT></B> io_timer.elapsed ();
+}
+
+<B><FONT COLOR="#228B22">double</FONT></B> <B><FONT COLOR="#0000FF">do_pba_in</FONT></B> (data_type &amp; a_data)
+{
+  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_11.data&quot;</FONT></B>; 
+  ifstream fin (filename.c_str (), ios_base::binary);
+  <B><FONT COLOR="#5F9EA0">boost</FONT></B>::timer io_timer;    
+  {
+    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::portable_binary_iarchive ipba (fin);
+    ipba &amp; a_data;
+  }
+  <B><FONT COLOR="#A020F0">return</FONT></B> io_timer.elapsed ();
+}
+
+<B><FONT COLOR="#228B22">double</FONT></B> <B><FONT COLOR="#0000FF">do_text_out</FONT></B> (<B><FONT COLOR="#228B22">const</FONT></B> data_type &amp; a_data)
+{
+  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_11.txt&quot;</FONT></B>; 
+  ofstream fout (filename.c_str ());
+  <B><FONT COLOR="#5F9EA0">boost</FONT></B>::timer io_timer;    
+  {
+    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::text_oarchive ota (fout);
+    ota &amp; a_data;
+  }
+  <B><FONT COLOR="#A020F0">return</FONT></B> io_timer.elapsed ();
+}
+
+<B><FONT COLOR="#228B22">double</FONT></B> <B><FONT COLOR="#0000FF">do_text_in</FONT></B> (data_type &amp; a_data)
+{
+  string filename = <B><FONT COLOR="#BC8F8F">&quot;pba_11.txt&quot;</FONT></B>; 
+  ifstream fin (filename.c_str ());
+  <B><FONT COLOR="#5F9EA0">boost</FONT></B>::timer io_timer;    
+  {
+    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::archive::text_iarchive ita (fin);
+    ita &amp; a_data;
+  }
+  <B><FONT COLOR="#A020F0">return</FONT></B> io_timer.elapsed ();
+}
+
+<B><FONT COLOR="#228B22">int</FONT></B> <B><FONT COLOR="#0000FF">main</FONT></B> (<B><FONT COLOR="#228B22">void</FONT></B>)
+{
+  <B><FONT COLOR="#228B22">double</FONT></B> elapsed_time_pba_out; 
+  <B><FONT COLOR="#228B22">double</FONT></B> elapsed_time_text_out; 
+  <B><FONT COLOR="#228B22">double</FONT></B> elapsed_time_pba_in; 
+  <B><FONT COLOR="#228B22">double</FONT></B> elapsed_time_text_in; 
+  data_type my_data; <I><FONT COLOR="#B22222">// A data structure to be stored then loaded.
+</FONT></I>
+  {
+    <I><FONT COLOR="#B22222">// Fill the vector with random values :
+</FONT></I>    size_t dim = 10000000;
+    my_data.values.reserve (dim);
+    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::random::mt19937 rng;
+    <B><FONT COLOR="#5F9EA0">boost</FONT></B>::random::uniform_real_distribution&lt;&gt; flat (0.0, 100.0);
+    <B><FONT COLOR="#A020F0">for</FONT></B> (<B><FONT COLOR="#228B22">int</FONT></B> i = 0; i &lt; dim; ++i)
+      {      
+	<B><FONT COLOR="#228B22">double</FONT></B> val = flat (rng);
+	my_data.values.push_back (val);
+      }
+    my_data.print (clog, <B><FONT COLOR="#BC8F8F">&quot;Stored data in PBA and text archive&quot;</FONT></B>);
+  }
+
+  {
+    <I><FONT COLOR="#B22222">// Store in PBA :
+</FONT></I>    elapsed_time_pba_out = do_pba_out (my_data);
+  }
+
+  {
+    <I><FONT COLOR="#B22222">// Store in text archive :
+</FONT></I>    elapsed_time_text_out = do_text_out (my_data);
+  }     
+
+  {
+    my_data.values.clear ();
+    <I><FONT COLOR="#B22222">// Load from PBA :
+</FONT></I>    elapsed_time_pba_in = do_pba_in (my_data);
+    my_data.print (clog, <B><FONT COLOR="#BC8F8F">&quot;Loaded data from PBA&quot;</FONT></B>);
+  }
+
+  {
+    my_data.values.clear ();
+    <I><FONT COLOR="#B22222">// Load from text archive :
+</FONT></I>    elapsed_time_text_in = do_text_in (my_data);
+    my_data.print (clog, <B><FONT COLOR="#BC8F8F">&quot;Loaded data from text archive&quot;</FONT></B>);
+  }
+  
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;PBA  store I/O elapsed time : &quot;</FONT></B> &lt;&lt; elapsed_time_pba_out  &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (second)&quot;</FONT></B> &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Text store I/O elapsed time : &quot;</FONT></B> &lt;&lt; elapsed_time_text_out &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (second)&quot;</FONT></B> &lt;&lt; endl;  
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;PBA  load  I/O elapsed time : &quot;</FONT></B> &lt;&lt; elapsed_time_pba_in   &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (second)&quot;</FONT></B> &lt;&lt; endl;
+  clog &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot;Text load  I/O elapsed time : &quot;</FONT></B> &lt;&lt; elapsed_time_text_in  &lt;&lt; <B><FONT COLOR="#BC8F8F">&quot; (second)&quot;</FONT></B> &lt;&lt; endl;
+
+  <B><FONT COLOR="#A020F0">return</FONT></B> 0;
+}
+
+<I><FONT COLOR="#B22222">// end of tutorial_pba_11.cpp
+</FONT></I>
+</PRE>
+</div><br></div>
+
+
+<p>On a 1.60 GHz processor running gcc 4.5.2 on Linux 2.6.38, the result is the following:
+<pre>PBA  store I/O elapsed time : 1.86 (second)
+Text store I/O elapsed time : 22.66 (second)
+PBA  load  I/O elapsed time : 1.53 (second)
+Text load  I/O elapsed time : 19.71 (second)
+</pre>
+It this simple case, the use of portable binary archives is faster by at least a factor 10
+compared to the traditional Boost text archives. This is a 	
+significant saving in time. These performances are highly desirable in the typical framework
+of scientific/computing activities where large amounts of data are accessed through files.
+The PBA concept is thus a valuable candidate for such applications.
+</p>
+
+<p>
+One can also consider the sizes of the resulting archive files:
+<ul>
+<li><tt class="fs">pba_11.data</tt> (PBA) : 90,000,010 bytes
+<li><tt class="fs">pba_11.txt</tt> (text archive) : 189,000,040 bytes
+</ul>
+The PBA allows to save a typical factor 2 in storage space compared to text archive.
+This is another strong argument for using PBA.
+</p>
+
+<!--div style="background-color: #ccc; padding: 4px 2px; border: 1px" -->
+<!--img src="images/c++-source-code.png" height="20pt" style="float:left" /-->
+<div>
+<a href="#top" class="button" >To top</a> 
+<!--div id="_cpp" ></div--><br>
+</div>
+
+
+<!--------------------------------------------------------------------------------->
+<hr>
+<p>Revised 2011-11-07 
+<p><i>&copy; Copyright <a href="mailto:mauger@lpccaen.in2p3.fr">François Mauger</a>, 
+<a href="mailto:Christian.Pfligersdorffer@eos.info">Christian Pfligersdorffer</a> 2011.<br>
+Distributed under the Boost Software License, Version 1.0.<br> 
+(See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+</i>
+</p>
+
+</body>
+
+</html>
+<!-- end of tutorial.html -->

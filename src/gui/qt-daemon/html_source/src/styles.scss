@@ -1,0 +1,77 @@
+// BASE
+@import 'assets/scss/base/mixins';
+@import 'assets/scss/base/null';
+@import 'assets/scss/base/theme';
+@import 'assets/scss/base/base';
+
+// LAYOUT
+@import 'assets/scss/layout/main';
+@import 'assets/scss/layout/settings';
+@import 'assets/scss/layout/sidebar';
+@import 'assets/scss/layout/wallet';
+
+// MODULES
+@import 'assets/scss/modules/head';
+@import 'assets/scss/modules/scroll';
+@import 'assets/scss/modules/table';
+
+
+html {
+  font-family: 'Open Sans', sans-serif;
+  font-size: 10px;
+}
+
+body {
+  font-family: 'Open Sans', sans-serif;
+  font-size: 1.6rem;
+  width: 100vw;
+  height: 100vh;
+
+  &.theme-dark {
+    background: #131921 url("assets/images/background-dark.png") no-repeat center;
+    background-size: cover;
+  }
+
+  &.theme-gray {
+    background: #101417 url("assets/images/background-gray.png") no-repeat center;
+    background-size: cover;
+  }
+
+  &.theme-white {
+    background: #eeeeee url("assets/images/background-white.png") no-repeat center;
+    background-size: cover;
+  }
+
+  app-root {
+    display: flex;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+
+
+
+.ngx-contextmenu .dropdown-menu {
+  border: solid 1px chartreuse;
+  background-color: darkgreen;
+  padding: 0;
+}
+.ngx-contextmenu li {
+  display: block;
+  border-top: solid 1px chartreuse;
+  text-transform: uppercase;
+  text-align: center;
+}
+.ngx-contextmenu li:first-child {
+  border-top:none;
+}
+.ngx-contextmenu a {
+  color:chartreuse;
+  display: block;
+  padding: 0.5em 1em;
+}
+.ngx-contextmenu a:hover {
+  color:darkgreen;
+  background-color:chartreuse;
+}

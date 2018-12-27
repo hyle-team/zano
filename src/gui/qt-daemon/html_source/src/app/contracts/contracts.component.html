@@ -1,0 +1,46 @@
+<div class="empty-contracts" *ngIf="!variablesService.currentWallet.contracts.length">
+  <span>{{ 'CONTRACTS.EMPTY' | translate }}</span>
+</div>
+
+<div class="wrap-table scrolled-content" *ngIf="variablesService.currentWallet.contracts.length">
+  <table class="contracts-table">
+    <thead>
+    <tr>
+      <th>{{ 'CONTRACTS.CONTRACTS' | translate }}</th>
+      <th>{{ 'CONTRACTS.DATE' | translate }}</th>
+      <th>{{ 'CONTRACTS.AMOUNT' | translate }}</th>
+      <th>{{ 'CONTRACTS.STATUS' | translate }}</th>
+      <th>{{ 'CONTRACTS.COMMENTS' | translate }}</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr *ngFor="let item of variablesService.currentWallet.contracts" [routerLink]="'/wallet/' + walletId + '/purchase/' + item.contract_id">
+      <td>
+        <div class="contract">
+          <i class="icon alert" *ngIf="!item.is_new"></i>
+          <i class="icon new" *ngIf="item.is_new"></i>
+          <i class="icon" [class.purchase]="item.is_a" [class.sell]="!item.is_a"></i>
+          <span>{{item.private_detailes.t}}</span>
+        </div>
+      </td>
+      <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>
+      <td>{{item.private_detailes.to_pay | intToMoney}} {{variablesService.defaultCurrency}}</td>
+      <td>
+        <div class="status">
+          {{item | contractStatusMessages}}
+        </div>
+      </td>
+      <td>
+        <div class="comment">
+          {{item.private_detailes.c}}
+        </div>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="contracts-buttons">
+  <button type="button" class="blue-button" [routerLink]="'/wallet/' + walletId + '/purchase'">{{ 'CONTRACTS.PURCHASE_BUTTON' | translate }}</button>
+  <button type="button" class="blue-button" disabled>{{ 'CONTRACTS.LISTING_BUTTON' | translate }}</button>
+</div>

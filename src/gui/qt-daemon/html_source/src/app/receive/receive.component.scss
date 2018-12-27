@@ -1,0 +1,27 @@
+:host {
+  width: 100%;
+}
+
+.wrap-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  img {
+    margin: 4rem 0;
+  }
+
+  .wrap-address {
+    display: flex;
+    align-items: center;
+    font-size: 1.4rem;
+    line-height: 2.7rem;
+
+    .btn-copy-address {
+      mask: url(../../assets/icons/copy.svg) no-repeat center;
+      margin-left: 1.2rem;
+      width: 1.7rem;
+      height: 1.7rem;
+    }
+  }
+}

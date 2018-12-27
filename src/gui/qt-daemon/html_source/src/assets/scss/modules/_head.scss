@@ -1,0 +1,62 @@
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  font-size: 1.3rem;
+  padding: 0 3rem;
+  width: 100%;
+  height: 3rem;
+
+  @include themify($themes) {
+    color: themed(blueTextColor);
+  }
+
+  .breadcrumbs {
+
+    > span, a {
+
+      &:not(:last-child) {
+        position: relative;
+        margin-right: 20px;
+
+        &:after {
+
+          @include pseudo;
+          top: 0.5rem;
+          right: -1.5rem;
+          width: 0.9rem;
+          height: 0.9rem;
+          mask: url(~src/assets/icons/arrow-right.svg) no-repeat center;
+          mask-size: cover;
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+        }
+      }
+    }
+  }
+
+  .back-btn {
+    display: flex;
+    align-items: center;
+    background-color: transparent;
+    color: #4db1ff;
+    font-size: inherit;
+    font-weight: 400;
+    line-height: 1.3rem;
+    padding: 0;
+    height: auto;
+
+    .icon {
+      margin-right: 0.7rem;
+      mask: url(~src/assets/icons/back.svg) no-repeat center;
+      width: 0.9rem;
+      height: 0.9rem;
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+      }
+    }
+  }
+}

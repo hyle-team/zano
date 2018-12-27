@@ -1,0 +1,85 @@
+@import "../variables";
+@import "mixins";
+
+.general-tabs {
+  .flex-container;
+  margin: 7.5rem auto 5rem;
+  padding: 0;
+
+  .general-tab {
+    .flex-container;
+    .flex-container-alignment(center, space-between);
+    flex: 1 0 0;
+    background-color: @program-tab-bg-color;
+    border: 1px solid @program-tab-border-color;
+    font-size: 6rem;
+    font-weight: 200;
+    line-height: 10rem;
+
+    button {
+      .flex-container;
+      .flex-container-alignment(center, center);
+      background-color: transparent;
+      border: none;
+      color: @program-tab-text-color;
+      height: 17rem;
+      line-height: 6rem;
+      margin: 0;
+      padding: 0 2rem;
+      width: 100%;
+
+      .base-icon {
+        .icon-sizing(8rem, 8rem, -2rem, -3rem);
+        margin-right: 2rem;
+
+        &.bigger-indent {
+          margin-right: 3rem;
+        }
+
+        &.wider-icon {
+          .icon-sizing(8rem, 10rem, -2rem, -2rem);
+        }
+      }
+
+      .indicator-number {
+        font-weight: 400;
+        margin-top: 1rem;
+        margin-left: 2.5rem;
+      }
+
+      &:hover, &:active {
+        background-color: @program-tab-hover-bg-color;
+        color: @program-dark-color;
+        cursor: pointer;
+      }
+    }
+
+    &:first-child {
+      border-radius: 2rem 0 0 2rem;
+
+      button {
+        border-radius: 1.75rem 0 0 1.75rem;
+      }
+    }
+
+    &:not(:last-child) {
+      border-right: none;
+    }
+
+    &:last-child {
+      border-radius: 0 2rem 2rem 0;
+
+      button {
+        border-radius: 0 1.75rem 1.75rem 0;
+      }
+    }
+
+    &.tab-active {
+
+      button {
+        background-color: @program-tab-hover-bg-color;
+        color: @program-dark-color;
+      }
+    }
+  }
+}

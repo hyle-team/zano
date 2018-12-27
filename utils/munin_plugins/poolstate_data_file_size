@@ -1,0 +1,16 @@
+#!/bin/bash
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title poolstate_data_file_size
+graph_vlabel poolstate_data_file_size
+graph_category daemon
+poolstate_data_file_size.label poolstate_data_file_size 
+EOM
+        exit 0;;
+esac
+
+printf "poolstate_data_file_size.value "
+#sudo ls -l /tmp/ttt | cut -d" " -f5
+sudo ls -l /root/.Zano/poolstate/data.mdb | cut -d" " -f5
