@@ -312,6 +312,7 @@ namespace currency
   crypto::hash get_block_longhash(uint64_t h, const crypto::hash& block_long_ash, uint64_t nonce);
   void get_block_longhash(const block& b, crypto::hash& res);
   crypto::hash get_block_longhash(const block& b);
+
   bool unserialize_block_complete_entry(const COMMAND_RPC_GET_BLOCKS_FAST::response& serialized,
     COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized);
 
