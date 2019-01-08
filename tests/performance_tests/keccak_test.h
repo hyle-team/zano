@@ -121,32 +121,32 @@ protected:
   std::vector<crypto::hash> m_scratchpad_vec;
 };
 
-
-template<int scratchpad_size>
-class test_wild_keccak2 : public test_keccak_base
-{
-public:
-  bool init()
-  {
-    m_scratchpad_vec.resize(scratchpad_size / sizeof(crypto::hash));
-    for (auto& h : m_scratchpad_vec)
-      h = crypto::rand<crypto::hash>();
-
-    return test_keccak_base::init();
-  }
-
-  bool test()
-  {
-    pretest();
-
-    crypto::hash h2;
-    crypto::wild_keccak_dbl_opt(reinterpret_cast<const uint8_t*>(&m_buff[0]), m_buff.size(), reinterpret_cast<uint8_t*>(&h2), sizeof(h2), (const UINT64*)&m_scratchpad_vec[0], m_scratchpad_vec.size() * 4);
-    LOG_PRINT_L4("HASH:" << h2);
-    return true;
-  }
-protected:
-  std::vector<crypto::hash> m_scratchpad_vec;
-};
+// 
+// template<int scratchpad_size>
+// class test_wild_keccak2 : public test_keccak_base
+// {
+// public:
+//   bool init()
+//   {
+//     m_scratchpad_vec.resize(scratchpad_size / sizeof(crypto::hash));
+//     for (auto& h : m_scratchpad_vec)
+//       h = crypto::rand<crypto::hash>();
+// 
+//     return test_keccak_base::init();
+//   }
+// 
+//   bool test()
+//   {
+//     pretest();
+// 
+//     crypto::hash h2;
+//     crypto::wild_keccak_dbl_opt(reinterpret_cast<const uint8_t*>(&m_buff[0]), m_buff.size(), reinterpret_cast<uint8_t*>(&h2), sizeof(h2), (const UINT64*)&m_scratchpad_vec[0], m_scratchpad_vec.size() * 4);
+//     LOG_PRINT_L4("HASH:" << h2);
+//     return true;
+//   }
+// protected:
+//   std::vector<crypto::hash> m_scratchpad_vec;
+// };
 
 #ifdef _DEBUG
   #define max_measere_scratchpad 100000
