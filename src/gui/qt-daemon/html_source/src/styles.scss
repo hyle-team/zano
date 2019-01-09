@@ -15,14 +15,44 @@
 @import 'assets/scss/modules/scroll';
 @import 'assets/scss/modules/table';
 
+@font-face {
+  font-family: OpenSans;
+  src: url(~src/assets/fonts/OpenSans-Light.ttf);
+  font-weight: 300;
+}
+
+@font-face {
+  font-family: OpenSans;
+  src: url(~src/assets/fonts/OpenSans-Regular.ttf);
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: OpenSans;
+  src: url(~src/assets/fonts/OpenSans-SemiBold.ttf);
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: OpenSans;
+  src: url(~src/assets/fonts/OpenSans-Bold.ttf);
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: OpenSans;
+  src: url(~src/assets/fonts/OpenSans-ExtraBold.ttf);
+  font-weight: 800;
+}
+
 
 html {
-  font-family: 'Open Sans', sans-serif;
+  font-family: OpenSans, sans-serif;
   font-size: 10px;
 }
 
 body {
-  font-family: 'Open Sans', sans-serif;
+  font-family: OpenSans, sans-serif;
   font-size: 1.6rem;
   width: 100vw;
   height: 100vh;
@@ -47,31 +77,4 @@ body {
     width: 100%;
     height: 100%;
   }
-}
-
-
-
-
-.ngx-contextmenu .dropdown-menu {
-  border: solid 1px chartreuse;
-  background-color: darkgreen;
-  padding: 0;
-}
-.ngx-contextmenu li {
-  display: block;
-  border-top: solid 1px chartreuse;
-  text-transform: uppercase;
-  text-align: center;
-}
-.ngx-contextmenu li:first-child {
-  border-top:none;
-}
-.ngx-contextmenu a {
-  color:chartreuse;
-  display: block;
-  padding: 0.5em 1em;
-}
-.ngx-contextmenu a:hover {
-  color:darkgreen;
-  background-color:chartreuse;
 }

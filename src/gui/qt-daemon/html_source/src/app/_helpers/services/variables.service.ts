@@ -82,7 +82,7 @@ export class VariablesService {
   }
 
   startCountdown() {
-    this.idle.restart();
+    this.idle.start();
   }
 
   stopCountdown() {

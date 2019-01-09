@@ -3,7 +3,9 @@ import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {Router} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {ModalService} from '../_helpers/services/modal.service';
 import {Wallet} from '../_helpers/models/wallet.model';
+import {TranslateService} from '@ngx-translate/core';
 
 @Component({
   selector: 'app-restore-wallet',
@@ -38,7 +40,9 @@ export class RestoreWalletComponent implements OnInit {
     private router: Router,
     private backend: BackendService,
     private variablesService: VariablesService,
-    private ngZone: NgZone
+    private modalService: ModalService,
+    private ngZone: NgZone,
+    private translate: TranslateService
   ) {
   }
 
@@ -59,7 +63,7 @@ export class RestoreWalletComponent implements OnInit {
             this.restoreForm.get('key').setErrors({key_not_valid: true});
           });
         } else {
-          this.backend.saveFileDialog('Save the wallet file.', '*', this.variablesService.settings.default_path, (save_status, save_data) => {
+          this.backend.saveFileDialog(this.translate.instant('RESTORE_WALLET.CHOOSE_PATH'), '*', this.variablesService.settings.default_path, (save_status, save_data) => {
             if (save_status) {
               this.variablesService.settings.default_path = save_data.path.substr(0, save_data.path.lastIndexOf('/'));
               this.backend.restoreWallet(save_data.path, this.restoreForm.get('password').value, this.restoreForm.get('key').value, (restore_status, restore_data) => {
@@ -90,7 +94,7 @@ export class RestoreWalletComponent implements OnInit {
                     this.walletSaved = true;
                   });
                 } else {
-                  alert('SAFES.NOT_CORRECT_FILE_OR_PASSWORD');
+                  this.modalService.prepareModal('error', 'RESTORE_WALLET.NOT_CORRECT_FILE_OR_PASSWORD');
                 }
               });
             }

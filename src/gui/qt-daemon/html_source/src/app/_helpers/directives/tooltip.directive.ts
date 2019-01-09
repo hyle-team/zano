@@ -1,28 +1,36 @@
-import {Directive, Input, ElementRef, HostListener, Renderer2} from '@angular/core';
+import {Directive, Input, ElementRef, HostListener, Renderer2, HostBinding} from '@angular/core';
 
 @Directive({
-  selector: '[tooltip]',
-  host: {
-    '[style.cursor]': '"pointer"'
-  }
+  selector: '[tooltip]'
 })
 
 export class TooltipDirective {
+
+  @HostBinding('style.cursor') cursor = 'pointer';
+
   @Input('tooltip') tooltipTitle: string;
   @Input() placement: string;
   @Input() tooltipClass: string;
   @Input() delay: number;
   tooltip: HTMLElement;
-  offset = 10;
 
-  constructor(private el: ElementRef, private renderer: Renderer2) {}
+  removeTooltipTimeout;
+
+  constructor(private el: ElementRef, private renderer: Renderer2) {
+  }
 
   @HostListener('mouseenter') onMouseEnter() {
-    if (!this.tooltip) { this.show(); }
+    if (!this.tooltip) {
+      this.show();
+    } else {
+      this.cancelHide();
+    }
   }
 
   @HostListener('mouseleave') onMouseLeave() {
-    if (this.tooltip) { this.hide(); }
+    if (this.tooltip) {
+      this.hide();
+    }
   }
 
   show() {
@@ -32,10 +40,15 @@ export class TooltipDirective {
 
   hide() {
     this.renderer.setStyle(this.tooltip, 'opacity', '0');
-    window.setTimeout(() => {
+    this.removeTooltipTimeout = setTimeout(() => {
       this.renderer.removeChild(document.body, this.tooltip);
       this.tooltip = null;
     }, this.delay);
+  }
+
+  cancelHide() {
+    clearTimeout(this.removeTooltipTimeout);
+    this.renderer.setStyle(this.tooltip, 'opacity', '1');
   }
 
   create() {
@@ -76,8 +89,15 @@ export class TooltipDirective {
     }
 
     if (this.placement === 'bottom') {
-      this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
-      this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+      if (window.innerHeight < hostPos.bottom + this.tooltip.offsetHeight + parseInt(getComputedStyle(this.tooltip).marginTop, 10)) {
+        this.renderer.removeClass(this.tooltip, 'ng-tooltip-bottom');
+        this.renderer.addClass(this.tooltip, 'ng-tooltip-top');
+        this.renderer.setStyle(this.tooltip, 'top', hostPos.top - tooltipPos.height + 'px');
+        this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+      } else {
+        this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
+        this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+      }
     }
 
     if (this.placement === 'left') {

@@ -3,7 +3,7 @@
     <h3>{{ 'SIDEBAR.TITLE' | translate }}</h3><button [routerLink]="['main']">{{ 'SIDEBAR.ADD_NEW' | translate }}</button>
   </div>
   <div class="sidebar-accounts-list scrolled-content">
-    <div class="sidebar-account" *ngFor="let wallet of variablesService.wallets" [class.active]="wallet?.wallet_id === walletActive" [routerLink]="['/wallet/' + wallet.wallet_id + '/' + walletActiveSubDirectory]">
+    <div class="sidebar-account" *ngFor="let wallet of variablesService.wallets" [class.active]="wallet?.wallet_id === walletActive" [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">
       <div class="sidebar-account-row account-title-balance">
         <span class="title">{{wallet.name}}</span>
         <span class="balance">{{wallet.unlocked_balance | intToMoney}} {{variablesService.defaultCurrency}}</span>
@@ -21,7 +21,7 @@
         <span class="indicator">{{wallet.new_contracts}}</span>
       </div>
       <div class="sidebar-account-row account-synchronization" *ngIf="!wallet.loaded && variablesService.daemon_state === 2">
-        <span class="status">{{ 'SIDEBAR.SYNCHRONIZATION.SYNCING' | translate }}</span>
+        <span class="status">{{ 'SIDEBAR.ACCOUNT.SYNCING' | translate }}</span>
         <div class="progress-bar-container">
           <div class="progress-bar">
             <div class="fill" [style.width]="wallet.progress + '%'"></div>

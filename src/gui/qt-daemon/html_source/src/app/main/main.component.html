@@ -6,7 +6,7 @@
       <button type="button" class="blue-button" (click)="openWallet()">{{ 'MAIN.BUTTON_OPEN_WALLET' | translate }}</button>
       <button type="button" class="blue-button" [routerLink]="['/restore']">{{ 'MAIN.BUTTON_RESTORE_BACKUP' | translate }}</button>
     </div>
-    <div class="add-wallet-help">
+    <div class="add-wallet-help" (click)="openInBrowser()">
       <i class="icon"></i><span>{{ 'MAIN.HELP' | translate }}</span>
     </div>
   </div>

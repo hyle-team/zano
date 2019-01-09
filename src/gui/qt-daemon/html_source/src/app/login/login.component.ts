@@ -1,8 +1,9 @@
-import {Component, NgZone, OnInit} from '@angular/core';
+import {Component, NgZone, OnInit, OnDestroy} from '@angular/core';
 import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {ModalService} from '../_helpers/services/modal.service';
 import {Wallet} from '../_helpers/models/wallet.model';
 
 @Component({
@@ -10,7 +11,9 @@ import {Wallet} from '../_helpers/models/wallet.model';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss']
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent implements OnInit, OnDestroy {
+
+  queryRouting;
 
   regForm = new FormGroup({
     password: new FormControl('', Validators.required),
@@ -30,12 +33,13 @@ export class LoginComponent implements OnInit {
     private router: Router,
     private backend: BackendService,
     private variablesService: VariablesService,
+    private modalService: ModalService,
     private ngZone: NgZone
   ) {
   }
 
   ngOnInit() {
-    this.route.queryParams.subscribe(params => {
+    this.queryRouting = this.route.queryParams.subscribe(params => {
       if (params.type) {
         this.type = params.type;
       }
@@ -51,7 +55,6 @@ export class LoginComponent implements OnInit {
             this.router.navigate(['/']);
           });
         } else {
-          // TODO error sign in
           console.log(data['error_code']);
         }
       });
@@ -62,10 +65,7 @@ export class LoginComponent implements OnInit {
     if (this.authForm.valid) {
       const appPass = this.authForm.get('password').value;
       this.backend.getSecureAppData({pass: appPass}, (status, data) => {
-        if (data.error_code && data.error_code === 'WRONG_PASSWORD') {
-          // TODO error log in informer.error('MESSAGE.INCORRECT_PASSWORD');
-          console.log('WRONG_PASSWORD');
-        } else {
+        if (!data.error_code) {
           this.variablesService.startCountdown();
           this.variablesService.appPass = appPass;
           if (this.variablesService.wallets.length) {
@@ -139,4 +139,10 @@ export class LoginComponent implements OnInit {
       });
     }
   }
+
+
+  ngOnDestroy() {
+    this.queryRouting.unsubscribe();
+  }
+
 }

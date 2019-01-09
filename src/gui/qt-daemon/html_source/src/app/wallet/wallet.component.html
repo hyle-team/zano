@@ -1,7 +1,7 @@
 <div class="header">
   <div>
     <h3>{{variablesService.currentWallet.name}}</h3>
-    <button>
+    <button (click)="openInBrowser()">
       <i class="icon account"></i>
       <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>
     </button>

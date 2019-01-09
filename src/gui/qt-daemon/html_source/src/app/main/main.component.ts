@@ -2,6 +2,7 @@ import {Component, NgZone, OnInit} from '@angular/core';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {Router} from '@angular/router';
+import {TranslateService} from '@ngx-translate/core';
 
 @Component({
   selector: 'app-main',
@@ -14,13 +15,14 @@ export class MainComponent implements OnInit {
     private router: Router,
     private backend: BackendService,
     private variablesService: VariablesService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private translate: TranslateService
   ) {}
 
   ngOnInit() {}
 
   openWallet() {
-    this.backend.openFileDialog('Open the wallet file.', '*', this.variablesService.settings.default_path, (file_status, file_data) => {
+    this.backend.openFileDialog(this.translate.instant('MAIN.CHOOSE_PATH'), '*', this.variablesService.settings.default_path, (file_status, file_data) => {
       if (file_status) {
         this.variablesService.settings.default_path = file_data.path.substr(0, file_data.path.lastIndexOf('/'));
         this.ngZone.run(() => {
@@ -30,6 +32,10 @@ export class MainComponent implements OnInit {
         console.log(file_data['error_code']);
       }
     });
+  }
+
+  openInBrowser() {
+    this.backend.openUrlInBrowser('zano.org');
   }
 
 }

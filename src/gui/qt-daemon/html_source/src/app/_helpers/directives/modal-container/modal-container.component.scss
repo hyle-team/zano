@@ -13,28 +13,53 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  background-position: center;
+  background-size: 200%;
   padding: 2rem;
   width: 34rem;
-  background: #1a1a1a;
 
   .content {
     display: flex;
     margin: 1.2rem 0;
 
     .icon {
+      flex: 0 0 auto;
       width: 4.4rem;
       height: 4.4rem;
+
+      &.error {
+        mask: url(~src/assets/icons/modal-alert.svg) no-repeat center;
+      }
+
+      &.success {
+        mask: url(~src/assets/icons/modal-success.svg) no-repeat center;
+      }
+
+      &.info {
+        mask: url(~src/assets/icons/modal-info.svg) no-repeat center;
+      }
     }
 
-    .message {
+    .message-container {
       display: flex;
       flex-direction: column;
       margin-left: 2rem;
+
+      .title {
+        font-size: 1.8rem;
+        font-weight: 600;
+        line-height: 2.2rem;
+      }
+
+      .message {
+        font-size: 1.3rem;
+        line-height: 1.8rem;
+        margin-top: 0.4rem;
+      }
     }
   }
 
   .action-button {
-    background: #2c95f1;
     margin: 1.2rem auto 0.6rem;
     width: 10rem;
     height: 2.4rem;
@@ -42,15 +67,21 @@
 
   .close-button {
     position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
+    top: 0;
+    right: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
     margin: 0;
     padding: 0;
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 2.4rem;
+    height: 2.4rem;
+
+    .icon {
+      mask: url(~src/assets/icons/close.svg) no-repeat center;
+      width: 2.4rem;
+      height: 2.4rem;
+    }
   }
 }

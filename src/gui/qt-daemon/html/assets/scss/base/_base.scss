@@ -1,6 +1,6 @@
 button {
   border: none;
-  font-family: 'Open Sans', sans-serif;
+  font-family: OpenSans, sans-serif;
   font-size: 1.5rem;
   font-weight: 600;
   outline: none;
@@ -116,7 +116,7 @@ button {
     }
   }
 
-  input[type='text'], input[type='password'] {
+  input[type='text'], input[type='password'], select {
     border: none;
     font-size: 1.4rem;
     outline: none;
@@ -134,7 +134,7 @@ button {
     height: auto;
 
     textarea {
-      font-family: 'Open Sans', sans-serif;
+      font-family: OpenSans, sans-serif;
       border: none;
       font-size: 1.4rem;
       outline: none;
@@ -273,6 +273,30 @@ input[type='checkbox'].style-checkbox {
   }
 }
 
+.switch {
+
+  @include themify($themes) {
+    background-color: themed(switchBackgroundColor);
+  }
+
+  .circle {
+
+    &.on {
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+      }
+    }
+
+    &.off {
+
+      @include themify($themes) {
+        background-color: themed(optionalTextColor);
+      }
+    }
+  }
+}
+
 .error-block {
   font-size: 1.2rem;
   text-align: right;
@@ -364,12 +388,32 @@ input[type='checkbox'].style-checkbox {
 .modal {
 
   @include themify($themes) {
-    background: themed(tooltipBackgroundColor);
+    background: themed(modalBackground);
     color: themed(mainTextColor);
   }
 
   .content {
 
+    .icon.error {
+
+      @include themify($themes) {
+        background-color: themed(redTextColor);
+      }
+    }
+
+    .icon.success {
+
+      @include themify($themes) {
+        background-color: themed(greenTextColor);
+      }
+    }
+
+    .icon.info {
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+      }
+    }
   }
 
   .action-button {
@@ -377,6 +421,54 @@ input[type='checkbox'].style-checkbox {
     @include themify($themes) {
       background-color: themed(blueTextColor);
       color: themed(alternativeTextColor);
+    }
+  }
+
+  .close-button {
+
+    .icon {
+
+      @include themify($themes) {
+        background-color: themed(closeButtonColor);
+      }
+    }
+  }
+}
+
+.ngx-contextmenu {
+
+  .dropdown-menu {
+    border: none;
+    padding: 0;
+
+    @include themify($themes) {
+      background-color: themed(chartOptionsBackgroundColor);
+      box-shadow: themed(tooltipShadow);
+    }
+  }
+
+  li {
+    display: block;
+    font-family: OpenSans, sans-serif;
+    font-size: 1.3rem;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  a {
+    display: block;
+    padding: 0.5em 1em;
+
+    @include themify($themes) {
+      color: themed(mainTextColor);
+    }
+
+    &:hover {
+
+      @include themify($themes) {
+        background-color: themed(chartOptionsHoverColor);
+        color: themed(mainTextColor);
+      }
     }
   }
 }
