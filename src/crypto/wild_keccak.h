@@ -293,30 +293,30 @@ namespace crypto
     return h;
   }
   //------------------------------------------------------------------
-  template<typename callback_t>
-  bool get_wild_keccak2_over_accessor(const std::string& bd, crypto::hash& res, uint64_t height, callback_t accessor)
-  {
-    crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st, crypto::mixin_t& mix)
-    {
-      if (!height)
-      {
-        memset(&mix, 0, sizeof(mix));
-        return;
-      }
-
-#define GET_M(index) accessor(mix[index])
-
-      for (size_t i = 0; i != 6; i++)
-      {
-        *(crypto::hash*)&mix[i * 4] = XOR_4(GET_H(i * 4), GET_H(i * 4 + 1), GET_H(i * 4 + 2), GET_H(i * 4 + 3));
-      }
-      for (size_t i = 0; i != 6; i++)
-      {
-        *(crypto::hash*)&mix[(5-i) * 4] = XOR_4(GET_M(i * 4), GET_M(i * 4 + 1), GET_M(i * 4 + 2), GET_M(i * 4 + 3));
-      }
-    });
-    return true;
-  }
+//   template<typename callback_t>
+//   bool get_wild_keccak2_over_accessor(const std::string& bd, crypto::hash& res, uint64_t height, callback_t accessor)
+//   {
+//     crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st, crypto::mixin_t& mix)
+//     {
+//       if (!height)
+//       {
+//         memset(&mix, 0, sizeof(mix));
+//         return;
+//       }
+// 
+// #define GET_M(index) accessor(mix[index])
+// 
+//       for (size_t i = 0; i != 6; i++)
+//       {
+//         *(crypto::hash*)&mix[i * 4] = XOR_4(GET_H(i * 4), GET_H(i * 4 + 1), GET_H(i * 4 + 2), GET_H(i * 4 + 3));
+//       }
+//       for (size_t i = 0; i != 6; i++)
+//       {
+//         //*(crypto::hash*)&mix[(5-i) * 4] = XOR_4(GET_M(i * 4), GET_M(i * 4 + 1), GET_M(i * 4 + 2), GET_M(i * 4 + 3));
+//       }
+//     });
+//     return true;
+//   }
 
   //------------------------------------------------------------------
   inline
@@ -333,14 +333,28 @@ namespace crypto
 #define OPT_GET_H(index) scratchpad[st[index]%sz]
 #define OPT_GET_M(index) scratchpad[mix[index]%sz]
 
-      for (size_t i = 0; i != 6; i++)
-      {
-        OPT_XOR_4_RES(OPT_GET_H(i * 4), OPT_GET_H(i * 4 + 1), OPT_GET_H(i * 4 + 2), OPT_GET_H(i * 4 + 3), (*(crypto::hash*)&mix[i * 4]));
-      }
-      for (size_t i = 0; i != 6; i++)
-      {
-        OPT_XOR_4_RES(OPT_GET_M(i * 4), OPT_GET_M(i * 4 + 1), OPT_GET_M(i * 4 + 2), OPT_GET_M(i * 4 + 3), (*(crypto::hash*)&mix[ (5-i) * 4]));
-      }
+      const uint64_t* int_array_ptr = (const uint64_t*)&scratchpad[0];
+      size_t int64_sz = sz * 4;
+
+ //     for (size_t i = 0; i != 6; i++)
+ //     {
+  //      OPT_XOR_4_RES(OPT_GET_H(i * 4), OPT_GET_H(i * 4 + 1), OPT_GET_H(i * 4 + 2), OPT_GET_H(i * 4 + 3), (*(crypto::hash*)&mix[i * 4]));
+  //    }
+//      for (size_t count = 0; count != 4; count++)
+//      {
+        for (size_t i = 0; i != sizeof(st) / sizeof(st[0]); i++)
+        {
+          if (i == 0)
+          {
+            st[i] ^= int_array_ptr[ int_array_ptr[ int_array_ptr[st[sizeof(mix) / sizeof(st[0]) -1] % int64_sz] % int64_sz] % int64_sz];
+          }
+          else
+          {
+            st[i] ^= int_array_ptr[int_array_ptr[int_array_ptr[st[i - 1] % int64_sz] % int64_sz] % int64_sz];
+          }
+          //OPT_XOR_4_RES(OPT_GET_M(i * 4), OPT_GET_M(i * 4 + 1), OPT_GET_M(i * 4 + 2), OPT_GET_M(i * 4 + 3), (*(crypto::hash*)&mix[ (5-i) * 4]));
+        }
+//      }
     });
     return true;
   }
@@ -367,16 +381,16 @@ namespace crypto
     return true;
   }
   //------------------------------------------------------------------
-  inline
-    crypto::hash get_wild_keccak2_over_scratchpad(const std::string& bd, uint64_t height, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
-  {
-    crypto::hash h = { 0 };
-    get_wild_keccak2_over_accessor(bd, h, height, [&](uint64_t index) -> const crypto::hash&
-    {
-      return scratchpad[index%sz];
-    });
-    return h;
-  }
+//   inline
+//     crypto::hash get_wild_keccak2_over_scratchpad(const std::string& bd, uint64_t height, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
+//   {
+//     crypto::hash h = { 0 };
+//     get_wild_keccak2_over_accessor(bd, h, height, [&](uint64_t index) -> const crypto::hash&
+//     {
+//       return scratchpad[index%sz];
+//     });
+//     return h;
+//   }
 
 }
 
