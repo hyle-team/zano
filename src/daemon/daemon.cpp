@@ -83,11 +83,7 @@ int main(int argc, char* argv[])
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
-#ifdef USE_OPENCL
-  currency::gpu_miner::init_options(desc_cmd_sett);
-#else
   currency::miner::init_options(desc_cmd_sett);
-#endif
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
 
 
@@ -105,10 +101,6 @@ int main(int argc, char* argv[])
       std::cout << desc_options << std::endl;
       return false;
     }
-#ifdef USE_OPENCL
-    if (currency::gpu_miner::handle_cli_info_commands(vm))
-      return false;
-#endif
 
     std::string data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
     std::string config = command_line::get_arg(vm, command_line::arg_config_file);

@@ -102,6 +102,5 @@ POP_WARNINGS
 //
 // contrib
 //
-#include "ethereum/libethash/internal.h"
 #include "eos_portable_archive/eos/portable_archive.hpp"
 #include "db/liblmdb/lmdb.h"

@@ -15,11 +15,7 @@
 #include "storages/portable_storage_template_helper.h"
 #include "tx_pool.h"
 #include "blockchain_storage.h"
-#ifdef USE_OPENCL
-#include "gpu_miner.h"
-#else
 #include "miner.h"
-#endif
 #include "connection_context.h"
 #include "currency_core/currency_stat_info.h"
 #include "warnings.h"
@@ -57,11 +53,7 @@ namespace currency
      virtual bool handle_block_found(const block& b, block_verification_context* p_verification_result = nullptr);
      virtual bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
 
-#ifdef USE_OPENCL
-     gpu_miner& get_miner(){return m_miner;}
-#else
      miner& get_miner(){ return m_miner; }
-#endif
      static void init_options(boost::program_options::options_description& desc);
      bool init(const boost::program_options::variables_map& vm);
      bool set_genesis_block(const block& b);
@@ -145,11 +137,7 @@ namespace currency
      tx_memory_pool m_mempool;
      i_currency_protocol* m_pprotocol;
      critical_section m_incoming_tx_lock;
-#ifdef USE_OPENCL
-     gpu_miner m_miner;
-#else
      miner m_miner;
-#endif
      account_public_address m_miner_address;
      std::string m_config_folder;
      currency_protocol_stub m_protocol_stub;
