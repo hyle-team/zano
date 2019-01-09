@@ -17,6 +17,7 @@
 
       &:not(:last-child) {
         position: relative;
+        cursor: pointer;
         margin-right: 20px;
 
         &:after {
