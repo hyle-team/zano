@@ -13,11 +13,9 @@ export class StakingSwitchComponent implements OnInit {
   @Input() staking: boolean;
   @Output() stakingChange = new EventEmitter<boolean>();
 
-  constructor(private backend: BackendService, private variablesService: VariablesService) {
-  }
+  constructor(private backend: BackendService, private variablesService: VariablesService) {}
 
-  ngOnInit() {
-  }
+  ngOnInit() {}
 
   toggleStaking() {
     const wallet = this.variablesService.getWallet(this.wallet_id);

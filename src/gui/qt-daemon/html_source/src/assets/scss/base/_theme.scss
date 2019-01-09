@@ -10,7 +10,8 @@ $themes: (
     alternativeTextColor: #111921,
     optionalTextColor: #556576,
     blueTextColor: #4db1ff,
-    redTextColor: #ff5252,
+    greenTextColor: #5cda9d,
+    redTextColor: #fe5252,
     blueButtonBackgroundColor: #4db1ff,
     blueButtonHoverColor: #60b9ff,
     disabledButtonBackgroundColor: #90a4ae,
@@ -38,7 +39,9 @@ $themes: (
     chartOptionsBackgroundColor: #2b3644,
     chartOptionsHoverColor: #556576,
     tooltipBackgroundColor: #42505f,
-    tooltipShadow: 0 0 1rem rgba(0, 0, 0, 0.5)
+    tooltipShadow: 0 0 1rem rgba(0, 0, 0, 0.5),
+    modalBackground: url(~src/assets/images/background-dark.png),
+    closeButtonColor: #556576
   ),
   gray: (
     bodyBackgroundColor: #101417,
@@ -51,7 +54,8 @@ $themes: (
     alternativeTextColor: #1a1a1a,
     optionalTextColor: #565c62,
     blueTextColor: #42a5f5,
-    redTextColor: #ff5252,
+    greenTextColor: #47cf8d,
+    redTextColor: #fe5252,
     blueButtonBackgroundColor: #42a5f5,
     blueButtonHoverColor: #4dafff,
     disabledButtonBackgroundColor: #79848f,
@@ -79,7 +83,9 @@ $themes: (
     chartOptionsBackgroundColor: #292d31,
     chartOptionsHoverColor: #515960,
     tooltipBackgroundColor: #3e464c,
-    tooltipShadow: 0 0 1rem rgba(0, 0, 0, 0.5)
+    tooltipShadow: 0 0 1rem rgba(0, 0, 0, 0.5),
+    modalBackground: url(~src/assets/images/background-gray.png),
+    closeButtonColor: #515960
   ),
   white: (
     bodyBackgroundColor: #eeeeee,
@@ -92,6 +98,7 @@ $themes: (
     alternativeTextColor: #fefefe,
     optionalTextColor: #a0a5ab,
     blueTextColor: #2c95f1,
+    greenTextColor: #46c172,
     redTextColor: #ff5252,
     blueButtonBackgroundColor: #2c95f1,
     blueButtonHoverColor: #379ffa,
@@ -120,7 +127,9 @@ $themes: (
     chartOptionsBackgroundColor: #e0e0e0,
     chartOptionsHoverColor: #ffffff,
     tooltipBackgroundColor: #ffffff,
-    tooltipShadow: 0 0 1rem rgba(120, 120, 120, 0.5)
+    tooltipShadow: 0 0 1rem rgba(120, 120, 120, 0.5),
+    modalBackground: url(~src/assets/images/background-white.png),
+    closeButtonColor: #43454b
   )
 );
 

@@ -8,7 +8,6 @@ import {VariablesService} from '../_helpers/services/variables.service';
   styleUrls: ['./sidebar.component.scss']
 })
 export class SidebarComponent implements OnInit, OnDestroy {
-  walletActiveSubDirectory = '';
   walletSubRouting;
 
   walletActive: number;
@@ -26,9 +25,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
       if (localPathArr.length >= 3) {
         this.walletActive = parseInt(localPathArr[2], 10);
       }
-      if (localPathArr.length >= 4) {
-        this.walletActiveSubDirectory = localPathArr[3];
-      }
     } else if (this.router.url.indexOf('/details') !== -1) {
       this.walletActive = this.variablesService.currentWallet.wallet_id;
     } else {
@@ -41,12 +37,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
           const localPathArr = event.url.split('/');
           if (localPathArr.length >= 3) {
             this.walletActive = parseInt(localPathArr[2], 10);
-          }
-          if (localPathArr.length >= 4) {
-            this.walletActiveSubDirectory = localPathArr[3];
-            if (this.walletActiveSubDirectory === 'purchase') {
-              this.walletActiveSubDirectory = 'contracts';
-            }
           }
         } else if (event.url.indexOf('/details') !== -1) {
           this.walletActive = this.variablesService.currentWallet.wallet_id;

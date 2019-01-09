@@ -1,6 +1,8 @@
 import {Injectable} from '@angular/core';
 import {Observable} from 'rxjs';
+import {TranslateService} from '@ngx-translate/core';
 import {VariablesService} from './variables.service';
+import {ModalService} from './modal.service';
 import {MoneyToIntPipe} from '../pipes/money-to-int.pipe';
 
 @Injectable()
@@ -9,9 +11,7 @@ export class BackendService {
   backendObject: any;
   backendLoaded = false;
 
-  constructor(private variablesService: VariablesService, private moneyToIntPipe: MoneyToIntPipe) {
-  }
-
+  constructor(private translate: TranslateService, private variablesService: VariablesService, private modalService: ModalService, private moneyToIntPipe: MoneyToIntPipe) {}
 
   private Debug(type, message) {
     switch (type) {
@@ -35,11 +35,11 @@ export class BackendService {
 
     switch (error) {
       case 'NOT_ENOUGH_MONEY':
-        error_translate = 'ERROR.NOT_ENOUGH_MONEY';
+        error_translate = 'ERRORS.NOT_ENOUGH_MONEY';
         break;
       case 'CORE_BUSY':
         if (command !== 'get_all_aliases') {
-          error_translate = 'INFORMER.CORE_BUSY';
+          error_translate = 'ERRORS.CORE_BUSY';
         }
         break;
       case 'OVERFLOW':
@@ -48,62 +48,62 @@ export class BackendService {
         }
         break;
       case 'INTERNAL_ERROR:daemon is busy':
-        error_translate = 'INFORMER.DAEMON_BUSY';
+        error_translate = 'ERRORS.DAEMON_BUSY';
         break;
       case 'INTERNAL_ERROR:not enough money':
       case 'INTERNAL_ERROR:NOT_ENOUGH_MONEY':
         if (command === 'cancel_offer') {
-          // error_translate = $filter('translate')('INFORMER.NO_MONEY_REMOVE_OFFER', {
-          //   'fee': CONFIG.standart_fee,
-          //   'currency': CONFIG.currency_symbol
-          // });
+          error_translate = this.translate.instant('ERRORS.NO_MONEY_REMOVE_OFFER', {
+            'fee': '0.01',
+            'currency': 'ZAN'
+          });
         } else {
           error_translate = 'INFORMER.NO_MONEY';
         }
         break;
       case 'INTERNAL_ERROR:not enough outputs to mix':
-        error_translate = 'MESSAGE.NOT_ENOUGH_OUTPUTS_TO_MIX';
+        error_translate = 'ERRORS.NOT_ENOUGH_OUTPUTS_TO_MIX';
         break;
       case 'INTERNAL_ERROR:transaction is too big':
-        error_translate = 'MESSAGE.TRANSACTION_IS_TO_BIG';
+        error_translate = 'ERRORS.TRANSACTION_IS_TO_BIG';
         break;
       case 'INTERNAL_ERROR:Transfer attempt while daemon offline':
-        error_translate = 'MESSAGE.TRANSFER_ATTEMPT';
+        error_translate = 'ERRORS.TRANSFER_ATTEMPT';
         break;
       case 'ACCESS_DENIED':
-        error_translate = 'INFORMER.ACCESS_DENIED';
+        error_translate = 'ERRORS.ACCESS_DENIED';
         break;
       case 'INTERNAL_ERROR:transaction was rejected by daemon':
-        if (command === 'request_alias_registration') {
-          error_translate = 'INFORMER.ALIAS_IN_REGISTER';
-        } else {
-          error_translate = 'INFORMER.TRANSACTION_ERROR';
-        }
+        // if (command === 'request_alias_registration') {
+        // error_translate = 'INFORMER.ALIAS_IN_REGISTER';
+        // } else {
+        error_translate = 'ERRORS.TRANSACTION_ERROR';
+        // }
         break;
       case 'INTERNAL_ERROR':
-        error_translate = 'INFORMER.TRANSACTION_ERROR';
+        error_translate = 'ERRORS.TRANSACTION_ERROR';
         break;
       case 'BAD_ARG':
-        error_translate = 'INFORMER.BAD_ARG';
+        error_translate = 'ERRORS.BAD_ARG';
         break;
       case 'WALLET_WRONG_ID':
-        error_translate = 'INFORMER.WALLET_WRONG_ID';
+        error_translate = 'ERRORS.WALLET_WRONG_ID';
         break;
       case 'WRONG_PASSWORD':
       case 'WRONG_PASSWORD:invalid password':
         params = JSON.parse(params);
         if (!params.testEmpty) {
-          error_translate = 'INFORMER.WRONG_PASSWORD';
+          error_translate = 'ERRORS.WRONG_PASSWORD';
         }
         break;
       case 'FILE_RESTORED':
         if (command === 'open_wallet') {
-          // error_translate = $filter('translate')('INFORMER.FILE_RESTORED');
+          error_translate = 'ERRORS.FILE_RESTORED';
         }
         break;
       case 'FILE_NOT_FOUND':
         if (command !== 'open_wallet' && command !== 'get_alias_info_by_name' && command !== 'get_alias_info_by_address') {
-          // error_translate = $filter('translate')('INFORMER.FILE_NOT_FOUND');
+          error_translate = this.translate.instant('ERRORS.FILE_NOT_FOUND');
           params = JSON.parse(params);
           if (params.path) {
             error_translate += ': ' + params.path;
@@ -119,16 +119,16 @@ export class BackendService {
         }
         break;
       case 'ALREADY_EXISTS':
-        error_translate = 'INFORMER.FILE_EXIST';
+        error_translate = 'ERRORS.FILE_EXIST';
         break;
       default:
         error_translate = error;
     }
     if (error.indexOf('FAIL:failed to save file') > -1) {
-      error_translate = 'INFORMER.FILE_NOT_SAVED';
+      error_translate = 'ERRORS.FILE_NOT_SAVED';
     }
     if (error_translate !== '') {
-      alert(error_translate);
+      this.modalService.prepareModal('error', error_translate);
     }
   }
 
@@ -272,7 +272,7 @@ export class BackendService {
   }
 
   storeSecureAppData(callback) {
-    if ( this.variablesService.appPass === '' ) {
+    if (this.variablesService.appPass === '') {
       return callback(false);
     }
     const wallets = [];
@@ -459,6 +459,10 @@ export class BackendService {
 
   stopPosMining(wallet_id, callback?) {
     this.runCommand('stop_pos_mining', {wallet_id: parseInt(wallet_id, 10)}, callback);
+  }
+
+  openUrlInBrowser(url, callback?) {
+    this.runCommand('open_url_in_browser', url, callback);
   }
 
 }
@@ -653,9 +657,7 @@ export class BackendService {
         return this.runCommand('print_log', {msg: msg, log_level: log_level});
       },
 
-      openUrlInBrowser: function (url, callback) {
-        return this.runCommand('open_url_in_browser', url, callback);
-      },
+
 
 
 
