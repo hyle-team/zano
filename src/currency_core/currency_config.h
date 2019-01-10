@@ -47,6 +47,8 @@
 #define BASE_REWARD_DUST_THRESHOLD                      ((uint64_t)1000000) // pow(10, 6) - change this will cause hard-fork!
 #define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)//((uint64_t)100000) // pow(10, 5)
 
+#define CURRENCY_SCRATCHPAD_BASE_SIZE                   16777216 //count in crypto::hash, to get size in bytes x32
+
 #define TX_DEFAULT_FEE                                  ((uint64_t)100000) // pow(10, 5)
 #define TX_MINIMUM_FEE                                  ((uint64_t)100000) // pow(10, 5)
 

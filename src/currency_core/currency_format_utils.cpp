@@ -2580,6 +2580,12 @@ namespace currency
     return reward;
   }
   //-----------------------------------------------------------------------------------------------
+  uint64_t get_scratchpad_size_by_height(uint64_t h)
+  {
+    //let's have ~256MB/year if block interval is 2 minutes
+    return CURRENCY_SCRATCHPAD_BASE_SIZE + h*32;
+  }
+  //-----------------------------------------------------------------------------------------------
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, uint64_t already_generated_coins, uint64_t &reward, uint64_t height)
   {
     uint64_t base_reward = get_base_block_reward(is_pos, already_generated_coins, height);

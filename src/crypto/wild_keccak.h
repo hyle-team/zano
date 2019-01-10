@@ -24,41 +24,11 @@ extern "C" {
 #define ROTL64(x, y) (((x) << (y)) | ((x) >> (64 - (y))))
 #endif
 
-// compute a keccak hash (md) of given byte length from "in"
 
 #define KK_MIXIN_SIZE 24
 
 namespace crypto
 {
-
-//inline
-//   void wild_keccak_dbl_opt(const uint8_t *in, size_t inlen, uint8_t *md, size_t mdlen, const UINT64* pscr, UINT64 scr_sz)
-//     {      
-//       Hash(256, in, inlen*8, md, pscr, scr_sz);
-//       Hash(256, md, mdlen*8, md, pscr, scr_sz);
-//     }
-
-
-  //template<typename pod_operand_a, typename pod_operand_b>
-  inline
-  crypto::hash xor_pod(const crypto::hash& a, const crypto::hash& b)
-  {
-    //static_assert(sizeof(pod_operand_a) == sizeof(pod_operand_b), "invalid xor_h usage: different sizes");
-    //static_assert(sizeof(pod_operand_a)%8 == 0, "invalid xor_h usage: wrong size");
-
-    hash r;
-    for(size_t i = 0; i != 4; i++)
-    {
-      ((uint64_t*)&r)[i] = ((const uint64_t*)&a)[i] ^ ((const uint64_t*)&b)[i];
-    }
-    return r;
-  }
-
-#define XOR_2(A, B) crypto::xor_pod(A, B)
-#define XOR_3(A, B, C) crypto::xor_pod(A, XOR_2(B, C))
-#define XOR_4(A, B, C, D) crypto::xor_pod(A, XOR_3(B, C, D))
-
-
 #define OPT_XOR_4_RES(A_, B_, C_, D_, Res) \
   crypto::hash A = A_;crypto::hash B = B_;crypto::hash C = C_; crypto::hash D = D_; \
   ((uint64_t*)&Res)[0] = ((const uint64_t*)&A)[0] ^ ((const uint64_t*)&B)[0] ^ ((const uint64_t*)&C)[0] ^ ((const uint64_t*)&D)[0]; \
@@ -249,42 +219,12 @@ namespace crypto
   };
 
   //------------------------------------------------------------------
-  template<typename callback_t>
-  bool get_blob_longhash(const std::string& bd, crypto::hash& res, uint64_t height, callback_t accessor)
-  {
-    crypto::wild_keccak_dbl<crypto::mul_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st, crypto::mixin_t& mix)
-    {
-      if (!height)
-      {
-        memset(&mix, 0, sizeof(mix));
-        return;
-      }
-#define GET_H(index) accessor(st[index])
-      for (size_t i = 0; i != 6; i++)
-      {
-        *(crypto::hash*)&mix[i * 4] = XOR_4(GET_H(i * 4), GET_H(i * 4 + 1), GET_H(i * 4 + 2), GET_H(i * 4 + 3));
-      }
-    });
-    return true;
-  }
-  //------------------------------------------------------------------
-  inline
-    crypto::hash get_blob_longhash(const std::string& bd, uint64_t height, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
-  {
-    crypto::hash h = { 0 };
-    get_blob_longhash(bd, h, height, [&](uint64_t index) -> const crypto::hash&
-    {
-      return scratchpad[index%sz];
-    });
-    return h;
-  }
-  //------------------------------------------------------------------
   inline
   bool get_wild_keccak2(const std::string& bd, crypto::hash& res, uint64_t height, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
   {
     crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st)
     {
-      if (!height || !sz)
+      if (!sz)
       {
         return;
       }
@@ -331,16 +271,8 @@ namespace crypto
     return true;
   }
   //------------------------------------------------------------------
-//   inline
-//     crypto::hash get_wild_keccak2_over_scratchpad(const std::string& bd, uint64_t height, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
-//   {
-//     crypto::hash h = { 0 };
-//     get_wild_keccak2_over_accessor(bd, h, height, [&](uint64_t index) -> const crypto::hash&
-//     {
-//       return scratchpad[index%sz];
-//     });
-//     return h;
-//   }
+  bool generate_scratchpad(const std::vector<crypto::hash>& source_data, std::vector<crypto::hash>& result_data, uint64_t target_size);
+
 
 }
 
