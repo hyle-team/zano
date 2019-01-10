@@ -193,16 +193,8 @@ namespace crypto
 
       for (int keccak_round = 0; keccak_round != KECCAK_ROUNDS; keccak_round++)
       {
-        if (keccak_round != 0)
-        {//skip first round
-          mixin_t mix_in;
-          cb(st, mix_in);
-          for (size_t k = 0; k < KK_MIXIN_SIZE; k++)
-            st[k] ^= mix_in[k];
-        }
-        //print_state(&st[0], "before_permut", ll);
         f_traits::keccakf(st, keccak_round);
-        //print_state(&st[0], "after_permut", ll);
+        cb(st);
       }
     }
 
@@ -217,14 +209,8 @@ namespace crypto
 
     for (int keccak_round = 0; keccak_round != KECCAK_ROUNDS; keccak_round++)
     {
-      if (keccak_round != 0)
-      {//skip first state with
-        mixin_t mix_in;
-        cb(st, mix_in);
-        for (size_t k = 0; k < KK_MIXIN_SIZE; k++)
-          st[k] ^= mix_in[k];
-      }
       f_traits::keccakf(st, keccak_round);
+      cb(st);
     }
 
     memcpy(md, st, mdlen);
@@ -293,68 +279,32 @@ namespace crypto
     return h;
   }
   //------------------------------------------------------------------
-//   template<typename callback_t>
-//   bool get_wild_keccak2_over_accessor(const std::string& bd, crypto::hash& res, uint64_t height, callback_t accessor)
-//   {
-//     crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st, crypto::mixin_t& mix)
-//     {
-//       if (!height)
-//       {
-//         memset(&mix, 0, sizeof(mix));
-//         return;
-//       }
-// 
-// #define GET_M(index) accessor(mix[index])
-// 
-//       for (size_t i = 0; i != 6; i++)
-//       {
-//         *(crypto::hash*)&mix[i * 4] = XOR_4(GET_H(i * 4), GET_H(i * 4 + 1), GET_H(i * 4 + 2), GET_H(i * 4 + 3));
-//       }
-//       for (size_t i = 0; i != 6; i++)
-//       {
-//         //*(crypto::hash*)&mix[(5-i) * 4] = XOR_4(GET_M(i * 4), GET_M(i * 4 + 1), GET_M(i * 4 + 2), GET_M(i * 4 + 3));
-//       }
-//     });
-//     return true;
-//   }
-
-  //------------------------------------------------------------------
   inline
   bool get_wild_keccak2(const std::string& bd, crypto::hash& res, uint64_t height, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
   {
-    crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st, crypto::mixin_t& mix)
+    crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st)
     {
-      if (!height)
+      if (!height || !sz)
       {
-        memset(&mix, 0, sizeof(mix));
         return;
       }
-
-#define OPT_GET_H(index) scratchpad[st[index]%sz]
-#define OPT_GET_M(index) scratchpad[mix[index]%sz]
 
       const uint64_t* int_array_ptr = (const uint64_t*)&scratchpad[0];
       size_t int64_sz = sz * 4;
 
- //     for (size_t i = 0; i != 6; i++)
- //     {
-  //      OPT_XOR_4_RES(OPT_GET_H(i * 4), OPT_GET_H(i * 4 + 1), OPT_GET_H(i * 4 + 2), OPT_GET_H(i * 4 + 3), (*(crypto::hash*)&mix[i * 4]));
-  //    }
-//      for (size_t count = 0; count != 4; count++)
-//      {
         for (size_t i = 0; i != sizeof(st) / sizeof(st[0]); i++)
         {
+          size_t depend_index = 0;
           if (i == 0)
           {
-            st[i] ^= int_array_ptr[ int_array_ptr[ int_array_ptr[st[sizeof(mix) / sizeof(st[0]) -1] % int64_sz] % int64_sz] % int64_sz];
+            depend_index = sizeof(st) / sizeof(st[0]) - 1;
           }
           else
           {
-            st[i] ^= int_array_ptr[int_array_ptr[int_array_ptr[st[i - 1] % int64_sz] % int64_sz] % int64_sz];
+            depend_index = i - 1;
           }
-          //OPT_XOR_4_RES(OPT_GET_M(i * 4), OPT_GET_M(i * 4 + 1), OPT_GET_M(i * 4 + 2), OPT_GET_M(i * 4 + 3), (*(crypto::hash*)&mix[ (5-i) * 4]));
+          st[i] ^= int_array_ptr[ int_array_ptr[ int_array_ptr[st[depend_index] % int64_sz] % int64_sz] % int64_sz];
         }
-//      }
     });
     return true;
   }
