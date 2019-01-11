@@ -220,7 +220,7 @@ namespace crypto
 
   //------------------------------------------------------------------
   inline
-  bool get_wild_keccak2(const std::string& bd, crypto::hash& res, uint64_t height, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
+  bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
   {
     crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st)
     {
@@ -247,6 +247,12 @@ namespace crypto
         }
     });
     return true;
+  }
+  //------------------------------------------------------------------
+  inline
+    bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad)
+  {
+    return get_wild_keccak2(bd, res, scratchpad, scratchpad.size());
   }
   //------------------------------------------------------------------
   inline

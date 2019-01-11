@@ -4541,6 +4541,12 @@ void blockchain_storage::on_block_added(const block_extended_info& bei, const cr
 {
   update_next_comulative_size_limit();
   m_timestamps_median_cache.clear();
+  if (get_scratchpad_size_by_height(bei.height) != m_scratchpad.size())
+  {
+    std::vector<crypto::hash> seed;
+
+    m_scratchpad.update(bei.height);
+  }
 
   m_tx_pool.on_blockchain_inc(bei.height, id);
   TIME_MEASURE_START_PD(raise_block_core_event);
@@ -5283,6 +5289,14 @@ bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx
   // case b4
   LOG_ERROR("ms outout " << input.multisig_out_id << " was not found neither in main chain, nor in alt chain");
   return false;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::get_seed_for_scratchpad(uint64_t height, std::vector<crypto::hash>& seed)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  CHECK_AND_ASSERT_THROW_MES(m_db_blocks.size() > height, "Internal error: m_db_blocks.size()=" << m_db_blocks.size() << " > height=" << height);
+  uint64_t last_upd_h = get_scratchpad_last_update_rebuild_height(height);
+
 }
 //------------------------------------------------------------------
 bool blockchain_storage::get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height /* = 0 */) const

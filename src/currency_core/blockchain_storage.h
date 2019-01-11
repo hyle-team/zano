@@ -39,6 +39,7 @@
 #include "dispatch_core_events.h"
 #include "bc_attachments_service_manager.h"
 #include "common/median_db_cache.h"
+#include "scratchpad_helper.h"
 
 
 MARK_AS_POD_C11(crypto::key_image);
@@ -508,6 +509,7 @@ namespace currency
     mutable uint64_t m_current_fee_median;
     mutable uint64_t m_current_fee_median_effective_index;
     bool m_is_reorganize_in_process;
+    scratchpad_keeper m_scratchpad;
 
 
     bool init_tx_fee_median();
@@ -535,6 +537,7 @@ namespace currency
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
+    bool get_seed_for_scratchpad(uint64_t height, std::vector<crypto::hash>& seed);
 
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
     bool validate_transaction(const block& b, uint64_t height, const transaction& tx)const;

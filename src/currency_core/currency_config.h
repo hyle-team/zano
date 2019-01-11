@@ -48,6 +48,7 @@
 #define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)//((uint64_t)100000) // pow(10, 5)
 
 #define CURRENCY_SCRATCHPAD_BASE_SIZE                   16777216 //count in crypto::hash, to get size in bytes x32
+#define CURRENCY_SCRATCHPAD_REBUILD_INTERVAL            720 //once a day if block goes once in 2 minute
 
 #define TX_DEFAULT_FEE                                  ((uint64_t)100000) // pow(10, 5)
 #define TX_MINIMUM_FEE                                  ((uint64_t)100000) // pow(10, 5)
