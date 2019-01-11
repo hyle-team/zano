@@ -415,7 +415,7 @@ namespace currency
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, uint64_t already_generated_coins, uint64_t &reward, uint64_t height);
   uint64_t get_base_block_reward(bool is_pos, uint64_t already_generated_coins, uint64_t height);
   uint64_t get_scratchpad_last_update_rebuild_height(uint64_t h);
-  uint64_t get_scratchpad_size_by_height(uint64_t h);
+  uint64_t get_scratchpad_size_for_height(uint64_t h);
   bool is_payment_id_size_ok(const std::string& payment_id);
   std::string get_account_address_as_str(const account_public_address& addr);
   std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const std::string& payment_id);

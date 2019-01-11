@@ -538,6 +538,7 @@ namespace currency
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
     bool get_seed_for_scratchpad(uint64_t height, std::vector<crypto::hash>& seed);
+    bool check_scratchpad();
 
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
     bool validate_transaction(const block& b, uint64_t height, const transaction& tx)const;

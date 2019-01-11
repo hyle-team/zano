@@ -264,7 +264,6 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     if (m_db_storage_minor_compatibility_version < 1)
       need_reinit_medians = true;
   }
-
   if (need_reinit)
   {
     clear();
@@ -4226,9 +4225,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       << "expected: " << get_top_block_id());
     return false;
   }
-#ifdef _DEBUG
+
   uint64_t h = get_block_height(bl);
-#endif// _DEBUG
 
   if(!check_block_timestamp_main(bl))
   {
@@ -4273,7 +4271,12 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   }
   else
   {
-    proof_hash = get_block_longhash(bl);
+    //++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    //precaution(do we really need this check?)
+    check_scratchpad();
+    //++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+    proof_hash = m_scratchpad.get_pow_hash(bl);
 
     if (!check_hash(proof_hash, current_diffic))
     {
@@ -4541,23 +4544,29 @@ void blockchain_storage::on_block_added(const block_extended_info& bei, const cr
 {
   update_next_comulative_size_limit();
   m_timestamps_median_cache.clear();
-  if (get_scratchpad_size_by_height(bei.height) != m_scratchpad.size())
-  {
-    std::vector<crypto::hash> seed;
-
-    m_scratchpad.update(bei.height);
-  }
-
+  check_scratchpad();
   m_tx_pool.on_blockchain_inc(bei.height, id);
   TIME_MEASURE_START_PD(raise_block_core_event);
   rise_core_event(CORE_EVENT_BLOCK_ADDED, void_struct());
   TIME_MEASURE_FINISH_PD(raise_block_core_event);
 }
 //------------------------------------------------------------------
+bool blockchain_storage::check_scratchpad()
+{
+  if (get_scratchpad_size_for_height(m_db_blocks.size()) != m_scratchpad.size())
+  {
+    std::vector<crypto::hash> seed;
+    get_seed_for_scratchpad(m_db_blocks.size(), seed);
+    m_scratchpad.update(seed, m_db_blocks.size());
+  }
+  return true;
+}
+//------------------------------------------------------------------
 void blockchain_storage::on_block_removed(const block_extended_info& bei)
 {
   m_tx_pool.on_blockchain_dec(m_db_blocks.size() - 1, get_top_block_id());
   m_timestamps_median_cache.clear();
+  check_scratchpad();
   LOG_PRINT_L2("block at height " << bei.height << " was removed from the blockchain");
 }
 //------------------------------------------------------------------
@@ -5296,7 +5305,31 @@ bool blockchain_storage::get_seed_for_scratchpad(uint64_t height, std::vector<cr
   CRITICAL_REGION_LOCAL(m_read_lock);
   CHECK_AND_ASSERT_THROW_MES(m_db_blocks.size() > height, "Internal error: m_db_blocks.size()=" << m_db_blocks.size() << " > height=" << height);
   uint64_t last_upd_h = get_scratchpad_last_update_rebuild_height(height);
+  if (last_upd_h == 0)
+  {
+    crypto::hash genesis_seed = null_hash;
+    bool r = epee::string_tools::hex_to_pod(CURRENCY_SCRATCHPAD_GENESIS_SEED, genesis_seed);
+    CHECK_AND_ASSERT_THROW_MES(r, "Unable to parse CURRENCY_SCRATCHPAD_GENESIS_SEED " << CURRENCY_SCRATCHPAD_GENESIS_SEED);
+    LOG_PRINT_MAGENTA("[SCRATCHPAD] GENESIS SEED SELECTED: " << genesis_seed, LOG_LEVEL_1);
+    seed.push_back(genesis_seed);
+    return true;
+  }
+  uint64_t low_bound_window = 0;
+  CHECK_AND_ASSERT_THROW_MES(last_upd_h >= CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW, "Internal error: last_upd_h(" << last_upd_h <<") < CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW(" << CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW << ")");
+  low_bound_window = last_upd_h - CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW;
 
+  crypto::hash selector_id = get_block_hash(m_db_blocks[last_upd_h - CURRENCY_SCRATCHPAD_BASE_INDEX_ID_OFFSET]->bl);
+
+  const uint64_t* pselectors = (const uint64_t*)&selector_id;
+  std::stringstream ss;
+  for (size_t i = 0; i != 4; i++)
+  {
+    seed.push_back(get_block_hash(m_db_blocks[low_bound_window + pselectors[i] % CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW]->bl));
+    ss << "[" << std::setw(8) << std::hex << pselectors[i] << "->" << low_bound_window + pselectors[i] % CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW << "]"<<seed.back() << ENDL;
+  }
+  LOG_PRINT_MAGENTA("[SCRATCHPAD] SEED SELECTED: h = " << last_upd_h << ", selector: " << selector_id << ENDL << ss.str(), LOG_LEVEL_1);
+
+  return true;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height /* = 0 */) const

@@ -114,7 +114,7 @@ namespace currency
   {
 
 
-    context.m_priv.m_remote_version = hshd.client_version;
+    context.m_remote_version = hshd.client_version;
 
     if(context.m_state == currency_connection_context::state_befor_handshake && !is_inital)
       return true;

@@ -2585,7 +2585,7 @@ namespace currency
     return h - (h%CURRENCY_SCRATCHPAD_REBUILD_INTERVAL);
   }
   //-----------------------------------------------------------------------------------------------
-  uint64_t get_scratchpad_size_by_height(uint64_t h)
+  uint64_t get_scratchpad_size_for_height(uint64_t h)
   {
     //let's have ~256MB/year if block interval is 2 minutes
     return CURRENCY_SCRATCHPAD_BASE_SIZE + get_scratchpad_last_update_rebuild_height(h)*32;

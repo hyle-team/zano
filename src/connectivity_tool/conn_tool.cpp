@@ -104,6 +104,7 @@ struct response_schema
           "\"time_started\": "  << ce.time_started << ", "
           "\"last_recv\": "     << ce.last_recv << ", "
           "\"last_send\": "     << ce.last_send << ", "
+          "\"version\": "       << ce.version << ", "
           "\"is_income\": "     << ce.is_income << "}";
         if(rs.ns_rsp.v.connections_list.size()-1 != i)
           ss << ",";
