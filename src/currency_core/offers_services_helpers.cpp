@@ -254,10 +254,10 @@ namespace bc_services
     }
 
     //now cut what not needed
-    auto it = std::next(offers.begin(), std::min(filter.offset, offers.size()));
+    auto it = std::next(offers.begin(), std::min(filter.offset, static_cast<uint64_t>(offers.size())));
     offers.erase(offers.begin(), it);
     // cut limit
-    it = std::next(offers.begin(), std::min(filter.limit, offers.size()));
+    it = std::next(offers.begin(), std::min(filter.limit, static_cast<uint64_t>(offers.size())));
     offers.erase(it, offers.end());
 
     return true;
