@@ -311,9 +311,9 @@ namespace currency
 
 
   
-  crypto::hash get_block_longhash(uint64_t h, const crypto::hash& block_long_ash, uint64_t nonce);
-  void get_block_longhash(const block& b, crypto::hash& res);
-  crypto::hash get_block_longhash(const block& b);
+//  crypto::hash get_block_longhash(uint64_t h, const crypto::hash& block_long_ash, uint64_t nonce);
+//   void get_block_longhash(const block& b, crypto::hash& res);
+//   crypto::hash get_block_longhash(const block& b);
 
   bool unserialize_block_complete_entry(const COMMAND_RPC_GET_BLOCKS_FAST::response& serialized,
     COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized);
@@ -633,9 +633,41 @@ namespace currency
     }
     return false;
   }
+  //---------------------------------------------------------------
+  template<class block_chain_accessor_t>
+  bool get_seed_for_scratchpad_cb(uint64_t height, crypto::hash& seed, block_chain_accessor_t cb)
+  {
+    //CHECK_AND_ASSERT_THROW_MES(m_db_blocks.size() > height, "Internal error: m_db_blocks.size()=" << m_db_blocks.size() << " > height=" << height);
+    uint64_t last_upd_h = get_scratchpad_last_update_rebuild_height(height);
+    std::vector<crypto::hash> seed_data;
+    if (last_upd_h == 0)
+    {
+      crypto::hash genesis_seed = null_hash;
+      bool r = epee::string_tools::hex_to_pod(CURRENCY_SCRATCHPAD_GENESIS_SEED, genesis_seed);
+      CHECK_AND_ASSERT_THROW_MES(r, "Unable to parse CURRENCY_SCRATCHPAD_GENESIS_SEED " << CURRENCY_SCRATCHPAD_GENESIS_SEED);
+      LOG_PRINT_MAGENTA("[SCRATCHPAD] GENESIS SEED SELECTED: " << genesis_seed, LOG_LEVEL_1);
+      seed = genesis_seed;
+      return true;
+    }
+    uint64_t low_bound_window = 0;
+    CHECK_AND_ASSERT_THROW_MES(last_upd_h >= CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW, "Internal error: last_upd_h(" << last_upd_h << ") < CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW(" << CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW << ")");
+    low_bound_window = last_upd_h - CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW;
 
+    crypto::hash selector_id = cb(last_upd_h - CURRENCY_SCRATCHPAD_BASE_INDEX_ID_OFFSET);
 
+    const uint64_t* pselectors = (const uint64_t*)&selector_id;
+    std::stringstream ss;
+    for (size_t i = 0; i != 4; i++)
+    {
+      seed_data.push_back(cb(low_bound_window + pselectors[i] % CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW));
+      ss << "[" << std::setw(8) << std::hex << pselectors[i] << "->" << low_bound_window + pselectors[i] % CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW << "]" << seed_data.back() << ENDL;
+    }
+    seed = crypto::cn_fast_hash(&seed_data[0], sizeof(seed_data[0]) * seed_data.size());
 
+    LOG_PRINT_MAGENTA("[SCRATCHPAD] SEED SELECTED: h = " << last_upd_h << ", selector: " << selector_id << ENDL << ss.str() << "SEED: " << seed, LOG_LEVEL_1);
+
+    return true;
+  }
   //---------------------------------------------------------------
   template<class t_object>
   bool get_object_hash(const t_object& o, crypto::hash& res)

@@ -152,7 +152,8 @@ namespace currency
       std::map<uint64_t, std::vector<crypto::public_key> > outputs_pub_keys;
     };
     typedef std::unordered_map<crypto::hash, alt_block_extended_info> alt_chain_container;
-    typedef std::list<alt_chain_container::iterator> alt_chain_type;
+    //typedef std::list<alt_chain_container::iterator> alt_chain_type;
+    typedef std::vector<alt_chain_container::iterator> alt_chain_type;
 
     typedef std::unordered_map<crypto::hash, block_extended_info> blocks_ext_by_hash;
 
@@ -229,8 +230,8 @@ namespace currency
     wide_difficulty_type get_cached_next_difficulty(bool pos) const;
 
     typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, uint64_t already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
-    bool create_block_template(block& b, const account_public_address& miner_address, const account_public_address& stakeholder_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func = nullptr) const;
-    bool create_block_template(block& b, const account_public_address& miner_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce) const;
+    bool create_block_template(block& b, crypto::hash& seed, const account_public_address& miner_address, const account_public_address& stakeholder_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func = nullptr) const;
+    bool create_block_template(block& b, crypto::hash& seed, const account_public_address& miner_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce) const;
 
     bool have_block(const crypto::hash& id) const;
     size_t get_total_transactions()const;
@@ -509,7 +510,8 @@ namespace currency
     mutable uint64_t m_current_fee_median;
     mutable uint64_t m_current_fee_median_effective_index;
     bool m_is_reorganize_in_process;
-    scratchpad_keeper m_scratchpad;
+    mutable scratchpad_keeper m_scratchpad;
+    crypto::hash m_current_scratchpad_seed;
 
 
     bool init_tx_fee_median();
@@ -537,7 +539,9 @@ namespace currency
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
-    bool get_seed_for_scratchpad(uint64_t height, std::vector<crypto::hash>& seed);
+    bool get_seed_for_scratchpad(uint64_t height, crypto::hash& seed)const ;
+    bool get_seed_for_scratchpad_alt_chain(uint64_t height, crypto::hash& seed, const alt_chain_type& alt_chain) const ;
+    
     bool check_scratchpad();
 
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;

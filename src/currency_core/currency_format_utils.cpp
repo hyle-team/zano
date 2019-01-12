@@ -1712,24 +1712,24 @@ namespace currency
     }
     return true;
   }
-  //--------------------------------------------------------------
-  crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_long_ash, uint64_t nonce)
-  {
-    //TODO: add wild keccak 2
-    return null_hash;//TODO;
-  }
-  //---------------------------------------------------------------
-  void get_block_longhash(const block& b, crypto::hash& res)
-  {
-    //TODO: add wild keccak 2
-  }
-  //---------------------------------------------------------------
-  crypto::hash get_block_longhash(const block& b)
-  {
-    crypto::hash p = null_hash;
-    get_block_longhash(b, p);
-    return p;
-  }
+//   //--------------------------------------------------------------
+//   crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_long_ash, uint64_t nonce)
+//   {
+//     //TODO: add wild keccak 2
+//     return null_hash;//TODO;
+//   }
+//   //---------------------------------------------------------------
+//   void get_block_longhash(const block& b, crypto::hash& res)
+//   {
+//     //TODO: add wild keccak 2
+//   }
+//   //---------------------------------------------------------------
+//   crypto::hash get_block_longhash(const block& b)
+//   {
+//     crypto::hash p = null_hash;
+//     get_block_longhash(b, p);
+//     return p;
+//   }
   //---------------------------------------------------------------
   uint64_t get_alias_coast_from_fee(const std::string& alias, uint64_t median_fee)
   {

@@ -683,19 +683,19 @@ bool gen_no_attchments_in_coinbase::c1(currency::core& c, size_t ev_index, const
   test_core_time::adjust(blk_0r.timestamp + DIFFICULTY_TOTAL_TARGET);
 
   block blk_a;
-  r = mine_next_pow_block_in_playtime(m_miner_acc.get_public_address(), c, &blk_a);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_miner_acc.get_public_address(), c, &blk_a);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   test_core_time::adjust(blk_a.timestamp + DIFFICULTY_TOTAL_TARGET);
 
   block blk_b;
-  r = mine_next_pow_block_in_playtime(m_miner_acc.get_public_address(), c, &blk_b);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_miner_acc.get_public_address(), c, &blk_b);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   test_core_time::adjust(blk_b.timestamp + DIFFICULTY_TOTAL_TARGET);
 
   block blk_c;
-  r = mine_next_pow_block_in_playtime(m_miner_acc.get_public_address(), c, &blk_c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_miner_acc.get_public_address(), c, &blk_c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   // make sure the checkpoint zone is successfully left behind
