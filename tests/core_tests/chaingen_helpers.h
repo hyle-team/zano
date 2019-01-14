@@ -11,13 +11,14 @@
 
 // chaingen-independent helpers that may be used outside of core_tests (for ex. in functional_tests)
 
-inline bool mine_next_pow_block_in_playtime(const currency::account_public_address& miner_addr, currency::core& c, currency::block* output = nullptr)
+inline bool mine_next_pow_block_in_playtime(currency::scratchpad_keeper& scr_keeper, const currency::account_public_address& miner_addr, currency::core& c, currency::block* output = nullptr)
 {
   currency::block b = AUTO_VAL_INIT(b);
   currency::wide_difficulty_type diff;
   uint64_t height;
   currency::blobdata extra = AUTO_VAL_INIT(extra);
-  bool r = c.get_block_template(b, miner_addr, miner_addr, diff, height, extra);
+  crypto::hash seed = currency::null_hash;
+  bool r = c.get_block_template(b, seed, miner_addr, miner_addr, diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
   // adjust block's timestamp to keep difficulty low
@@ -27,7 +28,7 @@ inline bool mine_next_pow_block_in_playtime(const currency::account_public_addre
   // keep global time up with blocks' timestamps
   test_core_time::adjust(b.timestamp);
 
-  r = currency::miner::find_nonce_for_given_block(b, diff, height);
+  r = currency::miner::find_nonce_for_given_block(b, diff, height, seed, scr_keeper);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -40,7 +41,7 @@ inline bool mine_next_pow_block_in_playtime(const currency::account_public_addre
   return true;
 }
 
-inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::account_public_address& miner_addr, currency::core& c, const std::vector<currency::transaction>& txs, const crypto::hash& prev_id, uint64_t height, currency::block* output = nullptr)
+inline bool mine_next_pow_block_in_playtime_with_given_txs(currency::scratchpad_keeper& scr_keeper, const currency::account_public_address& miner_addr, currency::core& c, const std::vector<currency::transaction>& txs, const crypto::hash& prev_id, uint64_t height, currency::block* output = nullptr)
 {
   struct loc_helper
   {
@@ -72,11 +73,12 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
   uint64_t height_from_template = 0;
   currency::blobdata extra = AUTO_VAL_INIT(extra);
   currency::pos_entry pe = AUTO_VAL_INIT(pe);
+  crypto::hash seed;
   bool r = false;
   {
     CRITICAL_REGION_LOCAL(s_locker);
     loc_helper::txs_accessor() = &txs;
-    r = c.get_blockchain_storage().create_block_template(b, miner_addr, miner_addr, diff, height_from_template, extra, false, pe, loc_helper::fill_block_template_func);
+    r = c.get_blockchain_storage().create_block_template(b, seed, miner_addr, miner_addr, diff, height_from_template, extra, false, pe, loc_helper::fill_block_template_func);
   }
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
@@ -104,7 +106,7 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
     height = height_from_template;
   }
 
-  r = currency::miner::find_nonce_for_given_block(b, diff, height);
+  r = currency::miner::find_nonce_for_given_block(b, diff, height, seed, scr_keeper);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -117,15 +119,15 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
   return true;
 }
 
-inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::account_public_address& miner_addr, currency::core& c, const std::vector<currency::transaction>& txs, currency::block* output = nullptr)
+inline bool mine_next_pow_block_in_playtime_with_given_txs(currency::scratchpad_keeper& scr_keeper, const currency::account_public_address& miner_addr, currency::core& c, const std::vector<currency::transaction>& txs, currency::block* output = nullptr)
 {
-  return mine_next_pow_block_in_playtime_with_given_txs(miner_addr, c, txs, currency::null_hash, SIZE_MAX, output);
+  return mine_next_pow_block_in_playtime_with_given_txs(scr_keeper, miner_addr, c, txs, currency::null_hash, SIZE_MAX, output);
 }
 
-inline bool mine_next_pow_blocks_in_playtime(const currency::account_public_address& miner_addr, currency::core& c, size_t blocks_count)
+inline bool mine_next_pow_blocks_in_playtime(currency::scratchpad_keeper& scr_keeper, const currency::account_public_address& miner_addr, currency::core& c, size_t blocks_count)
 {
   for (size_t i = 0; i != blocks_count; i++)
-    if (!mine_next_pow_block_in_playtime(miner_addr, c))
+    if (!mine_next_pow_block_in_playtime(scr_keeper,  miner_addr, c))
       return false;
 
   return true;

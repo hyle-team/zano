@@ -17,6 +17,7 @@
 #include "is_out_to_acc.h"
 #include "core_market_performance_test.h"
 #include "serialization_performance_test.h"
+#include "keccak_test.h"
 
 int main(int argc, char** argv)
 {
@@ -24,7 +25,7 @@ int main(int argc, char** argv)
   epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
   epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
 
-  run_serialization_performance_test();
+  //run_serialization_performance_test();
   //return 1;
   //run_core_market_performance_tests(100000);
 
@@ -33,6 +34,8 @@ int main(int argc, char** argv)
 
   performance_timer timer;
   timer.start();
+
+  measure_keccak_over_scratchpad();
 
   /*
   TEST_PERFORMANCE2(test_construct_tx, 1, 1);
@@ -61,11 +64,11 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE1(test_check_ring_signature, 10);
   TEST_PERFORMANCE1(test_check_ring_signature, 100);
   */
-  TEST_PERFORMANCE0(test_is_out_to_acc);
+  //TEST_PERFORMANCE0(test_is_out_to_acc);
   //TEST_PERFORMANCE0(test_generate_key_image_helper);
-  TEST_PERFORMANCE0(test_generate_key_derivation);
+  //TEST_PERFORMANCE0(test_generate_key_derivation);
   //TEST_PERFORMANCE0(test_generate_key_image);
-  TEST_PERFORMANCE0(test_derive_public_key);
+  //TEST_PERFORMANCE0(test_derive_public_key);
   //TEST_PERFORMANCE0(test_derive_secret_key);
   
   std::cout << "Tests finished. Elapsed time: " << timer.elapsed_ms() / 1000 << " sec" << std::endl;

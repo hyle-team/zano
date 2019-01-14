@@ -381,7 +381,8 @@ bool gen_alias_tests::check_too_many_aliases_registration(currency::core& c, siz
   wide_difficulty_type diff;
   uint64_t height;
   blobdata extra = AUTO_VAL_INIT(extra);
-  bool r = c.get_block_template(b, ai.m_address, ai.m_address, diff, height, extra);
+  crypto::hash seed = currency::null_hash;
+  bool r = c.get_block_template(b, seed, ai.m_address, ai.m_address, diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
   CHECK_AND_ASSERT_MES(b.tx_hashes.empty(), false, "block template has some txs, expected--none");
   
@@ -412,7 +413,7 @@ bool gen_alias_tests::check_too_many_aliases_registration(currency::core& c, siz
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == total_alias_to_gen, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count() << ", expected: " << total_alias_to_gen);
 
   // complete block template and try to process it
-  r = miner::find_nonce_for_given_block(b, diff, height);
+  r = miner::find_nonce_for_given_block(b, diff, height, seed, m_scratchpad_keeper);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -1288,11 +1289,12 @@ bool gen_alias_switch_and_check_block_template::add_block_from_template(currency
   currency::block b;
   wide_difficulty_type diff;
   uint64_t height;
+  crypto::hash seed = currency::null_hash;
   blobdata extra = AUTO_VAL_INIT(extra);
-  bool r = c.get_block_template(b, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
+  bool r = c.get_block_template(b, seed, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
-  r = miner::find_nonce_for_given_block(b, diff, height);
+  r = miner::find_nonce_for_given_block(b, diff, height, seed, m_scratchpad_keeper);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -1407,11 +1409,12 @@ bool gen_alias_too_many_regs_in_block_template::add_block_from_template(currency
   currency::block b;
   wide_difficulty_type diff;
   uint64_t height;
+  crypto::hash seed = currency::null_hash;
   blobdata extra = AUTO_VAL_INIT(extra);
-  bool r = c.get_block_template(b, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
+  bool r = c.get_block_template(b, seed, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
-  r = miner::find_nonce_for_given_block(b, diff, height);
+  r = miner::find_nonce_for_given_block(b, diff, height, seed, m_scratchpad_keeper);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -1421,7 +1424,6 @@ bool gen_alias_too_many_regs_in_block_template::add_block_from_template(currency
 
   return true;
 }
-
 //------------------------------------------------------------------------------
 
 bool gen_alias_update_for_free::generate(std::vector<test_event_entry>& events) const

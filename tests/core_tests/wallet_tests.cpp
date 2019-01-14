@@ -1179,7 +1179,7 @@ bool gen_wallet_oversized_payment_id::c1(currency::core& c, size_t ev_index, con
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
@@ -1215,7 +1215,7 @@ bool gen_wallet_oversized_payment_id::c1(currency::core& c, size_t ev_index, con
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
@@ -1769,7 +1769,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  bool r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  bool r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -1790,7 +1790,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(l->m_result, false, "Wrong wti received via callback");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == 2 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 2, false, "Incorrect blockchain size");
@@ -1803,7 +1803,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
   alice_wlt->request_alias_update(ai, res_tx, TX_DEFAULT_FEE, 0);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == 2 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 3, false, "Incorrect blockchain size");
@@ -2072,7 +2072,7 @@ bool gen_wallet_offers_basic::c1(currency::core& c, size_t ev_index, const std::
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool");
 
-  bool r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  bool r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -2123,7 +2123,7 @@ bool gen_wallet_offers_basic::c1(currency::core& c, size_t ev_index, const std::
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -2154,7 +2154,7 @@ bool gen_wallet_offers_basic::c1(currency::core& c, size_t ev_index, const std::
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -2274,7 +2274,7 @@ bool gen_wallet_offers_size_limit::c1(currency::core& c, size_t ev_index, const 
   log_space::get_set_log_detalisation_level(true, log_level); // restore
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect numbers of blocks fetched");
@@ -2373,7 +2373,7 @@ bool gen_wallet_dust_to_account::c1(currency::core& c, size_t ev_index, const st
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  bool r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  bool r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
@@ -2473,7 +2473,7 @@ bool gen_wallet_selecting_pos_entries::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3 + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE - 1, false, "Incorrect current blockchain height");
 
   // this block should unlock the money and PoS-entries should become available
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
 
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect number of blocks fetched");
@@ -2497,7 +2497,7 @@ bool gen_wallet_selecting_pos_entries::c1(currency::core& c, size_t ev_index, co
   alice_wlt->transfer(dst, 0, 0, TX_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>());
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
 
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect number of blocks fetched");
@@ -2571,7 +2571,7 @@ bool gen_wallet_spending_coinstake_after_minting::c1(currency::core& c, size_t e
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
 
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect number of blocks fetched");
@@ -2878,7 +2878,7 @@ bool mined_balance_wallet_test::c1(currency::core& c, size_t ev_index, const std
   std::list<currency::block> blocks;
 
   size_t n = CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
-  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, n);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, n);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
   r = bcs.get_blocks(bcs.get_current_blockchain_size() - n, n, blocks);
   CHECK_AND_ASSERT_MES(r, false, "get_blocks failed");
@@ -2994,11 +2994,11 @@ bool wallet_outputs_with_same_key_image::c1(currency::core& c, size_t ev_index, 
   bool r = refresh_wallet_and_check_balance("before tx_1 and tx_2 added", "Alice", alice_wlt, MK_TEST_COINS(3) * 2, true, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2, 0);
   CHECK_AND_ASSERT_MES(r, false, "");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "there are txs in the pool!");
 
-  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   // only one tx_1 output is counted as the tx_2 output has the very same key image
@@ -3017,7 +3017,7 @@ bool wallet_outputs_with_same_key_image::c1(currency::core& c, size_t ev_index, 
   }
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "wrong tx count in the pool: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "there are txs in the pool!");
 
@@ -3097,7 +3097,7 @@ bool wallet_unconfirmed_tx_expiration::c1(currency::core& c, size_t ev_index, co
   // mine a few block with no tx, so Alice's tx is expired in the pool
   for (size_t i = 0; i < 5; ++i)
   {
-    r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
+    r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
   }
 
@@ -3114,7 +3114,7 @@ bool wallet_unconfirmed_tx_expiration::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid txs count in the pool: " << c.get_pool_transactions_count());
 
   // mine one more block to trigger wallet's on_idle() and outdated tx clearing
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   // make sure all Alice's money are unlocked and no coins were actually spent
