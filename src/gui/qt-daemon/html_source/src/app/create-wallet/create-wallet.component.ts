@@ -2,8 +2,10 @@ import {Component, NgZone, OnInit} from '@angular/core';
 import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {ModalService} from '../_helpers/services/modal.service';
 import {Router} from '@angular/router';
 import {Wallet} from '../_helpers/models/wallet.model';
+import {TranslateService} from '@ngx-translate/core';
 
 @Component({
   selector: 'app-create-wallet',
@@ -37,7 +39,9 @@ export class CreateWalletComponent implements OnInit {
     private router: Router,
     private backend: BackendService,
     private variablesService: VariablesService,
-    private ngZone: NgZone
+    private modalService: ModalService,
+    private ngZone: NgZone,
+    private translate: TranslateService
   ) {
   }
 
@@ -50,7 +54,7 @@ export class CreateWalletComponent implements OnInit {
 
   saveWallet() {
     if (this.createForm.valid) {
-      this.backend.saveFileDialog('Save the wallet file.', '*', this.variablesService.settings.default_path, (file_status, file_data) => {
+      this.backend.saveFileDialog(this.translate.instant('CREATE_WALLET.TITLE_SAVE'), '*', this.variablesService.settings.default_path, (file_status, file_data) => {
         if (file_status) {
           this.variablesService.settings.default_path = file_data.path.substr(0, file_data.path.lastIndexOf('/'));
           this.backend.generateWallet(file_data.path, this.createForm.get('password').value, (generate_status, generate_data, errorCode) => {
@@ -72,9 +76,9 @@ export class CreateWalletComponent implements OnInit {
               });
             } else {
               if (errorCode && errorCode === 'ALREADY_EXISTS') {
-                alert('You cannot record a file on top of another file');
+                this.modalService.prepareModal('error', 'CREATE_WALLET.ERROR_CANNOT_SAVE_TOP');
               } else {
-                alert('You cannot save a safe file to the system partition');
+                this.modalService.prepareModal('error', 'CREATE_WALLET.ERROR_CANNOT_SAVE_SYSTEM');
               }
             }
           });

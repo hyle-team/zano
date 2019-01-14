@@ -1,6 +1,4 @@
 import {Component, OnInit, OnDestroy} from '@angular/core';
-import {ActivatedRoute} from '@angular/router';
-import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 
 @Component({
@@ -9,19 +7,11 @@ import {VariablesService} from '../_helpers/services/variables.service';
   styleUrls: ['./history.component.scss']
 })
 export class HistoryComponent implements OnInit, OnDestroy {
-  parentRouting;
 
-  constructor(
-    private route: ActivatedRoute,
-    private backend: BackendService,
-    private variablesService: VariablesService
-  ) {
+  constructor(private variablesService: VariablesService) {
   }
 
   ngOnInit() {
-    this.parentRouting = this.route.parent.params.subscribe(() => {
-      console.log(this.variablesService.currentWallet.history);
-    });
   }
 
   getHeight(item) {
@@ -37,7 +27,6 @@ export class HistoryComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.parentRouting.unsubscribe();
   }
 
 }

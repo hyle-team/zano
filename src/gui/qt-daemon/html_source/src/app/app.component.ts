@@ -385,7 +385,6 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getMoneyEquivalent() {
-    // todo now start only once, need check daemon state and re-init
     this.http.get('https://api.coinmarketcap.com/v2/ticker/2').subscribe(
       result => {
         if (result.hasOwnProperty('data')) {
@@ -393,6 +392,9 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       },
       error => {
+        setTimeout(() => {
+          this.getMoneyEquivalent();
+        }, 60000);
         console.warn('Error coinmarketcap', error);
       }
     );

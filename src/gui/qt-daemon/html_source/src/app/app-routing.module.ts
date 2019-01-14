@@ -75,7 +75,7 @@ const routes: Routes = [
       },
       {
         path: '',
-        redirectTo: 'send',
+        redirectTo: 'history',
         pathMatch: 'full'
       }
     ]

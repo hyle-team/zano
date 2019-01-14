@@ -3,7 +3,8 @@
     "SETUP_MASTER_PASS": "Setup master password",
     "SETUP_CONFIRM_PASS": "Confirm the password",
     "MASTER_PASS": "Master password",
-    "BUTTON_NEXT": "Next"
+    "BUTTON_NEXT": "Next",
+    "INCORRECT_PASSWORD": "Invalid password"
   },
   "COMMON": {
     "BACK": "Go back"
@@ -24,7 +25,8 @@
     "ADD_NEW": "+ Add new",
     "ACCOUNT": {
       "STAKING": "Staking",
-      "MESSAGES": "New offers/Messages"
+      "MESSAGES": "New offers/Messages",
+      "SYNCING": "Syncing wallet"
     },
     "SETTINGS": "Settings",
     "LOG_OUT": "Log out",
@@ -42,19 +44,26 @@
     "BUTTON_NEW_WALLET": "Create new wallet",
     "BUTTON_OPEN_WALLET": "Open existing wallet",
     "BUTTON_RESTORE_BACKUP": "Restore from backup",
-    "HELP": "How to create wallet?"
+    "HELP": "How to create wallet?",
+    "CHOOSE_PATH": "Please choose a path"
   },
   "CREATE_WALLET": {
     "NAME": "Wallet name",
     "PASS": "Set wallet password",
     "CONFIRM": "Confirm wallet password",
     "BUTTON_SELECT": "Select wallet location",
-    "BUTTON_CREATE": "Create wallet"
+    "BUTTON_CREATE": "Create wallet",
+    "TITLE_SAVE": "Save the wallet file.",
+    "ERROR_CANNOT_SAVE_TOP": "You cannot record a file on top of another file",
+    "ERROR_CANNOT_SAVE_SYSTEM": "You cannot save a safe file to the system partition"
   },
   "OPEN_WALLET": {
     "NAME": "Wallet name",
     "PASS": "Wallet password",
-    "BUTTON": "Open wallet"
+    "BUTTON": "Open wallet",
+    "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this account is already open",
+    "SAFE_FILE_NOT_FOUND1": "Safe file not found",
+    "SAFE_FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open safe\" button."
   },
   "RESTORE_WALLET": {
     "LABEL_NAME": "Wallet name",
@@ -62,7 +71,9 @@
     "PASS": "Wallet password",
     "CONFIRM": "Confirm wallet password",
     "BUTTON_SELECT": "Select wallet location",
-    "BUTTON_CREATE": "Create wallet"
+    "BUTTON_CREATE": "Create wallet",
+    "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid safe file or password does not match",
+    "CHOOSE_PATH": "Please choose a path"
   },
   "SEED_PHRASE": {
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your account.",
@@ -109,7 +120,8 @@
     "DETAILS": "Additional details",
     "MIXIN": "Mixin",
     "FEE": "Fee",
-    "BUTTON": "Send"
+    "BUTTON": "Send",
+    "SUCCESS_SENT": "The payment will be received within 20 minutes"
   },
   "HISTORY": {
     "STATUS": "Status",
@@ -162,13 +174,38 @@
     "PROGRESS_RECEIVE": "Reply received",
     "PROGRESS_COMPLETE": "Completed",
     "FEE": "Fee",
-    "PAYMENT": "Payment ID"
-
+    "PAYMENT": "Payment ID",
+    "ACCEPT_STATE_WAIT_BIG": "You have accepted the contract proposal. Please wait for the pledges to be made",
+    "IGNORED_ACCEPT": "You have ignored the contract proposal",
+    "BURN_PROPOSAL": "The pledges have been nullified.",
+    "SUCCESS_FINISH_PROPOSAL": "The contract is complete. The payment has been sent.",
+    "SEND_CANCEL_PROPOSAL": "Proposal to cancel contract sent to seller",
+    "IGNORED_CANCEL": "You have ignored the proposal to cancel the contract",
+    "DEALS_CANCELED_WAIT": "The contract is being cancelled. Please wait for the pledge to be returned",
+    "WAITING_TIME": "Time until response"
   },
   "MESSAGES": {
     "ADDRESS": "Address",
     "MESSAGE": "Message",
     "SEND_PLACEHOLDER": "Type a message...",
     "SEND_BUTTON": "Send"
+  },
+  "ERRORS": {
+    "NOT_ENOUGH_MONEY": "Insufficient funds in account",
+    "CORE_BUSY": "Internal error (core is busy)",
+    "DAEMON_BUSY": "Internal error: deamon is busy",
+    "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your safe",
+    "NOT_ENOUGH_OUTPUTS_TO_MIX": "For the sake of security, mixed transaction will take several days",
+    "TRANSACTION_IS_TO_BIG": "This transaction is large and was therefore denied by the network. Try sending the required amount in parts.",
+    "TRANSFER_ATTEMPT": "There is no connection to the Zano network",
+    "ACCESS_DENIED": "Access denied",
+    "TRANSACTION_ERROR": "Error. Payment not completed.",
+    "BAD_ARG": "Invalid argument",
+    "WALLET_WRONG_ID": "Invalid wallet ID",
+    "WRONG_PASSWORD": "Invalid password",
+    "FILE_RESTORED": "The safe file was corrupted somehow. We have recovered the keys and safe from the blockchain.",
+    "FILE_NOT_FOUND": "File not found",
+    "FILE_EXIST": "A file with that name already exists. Enter another name to save the file under",
+    "FILE_NOT_SAVED": "You cannot save a safe file in this folder. Please choose another folder."
   }
 }

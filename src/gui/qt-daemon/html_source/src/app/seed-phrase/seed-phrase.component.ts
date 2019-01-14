@@ -1,4 +1,4 @@
-import {Component, NgZone, OnInit} from '@angular/core';
+import {Component, NgZone, OnDestroy, OnInit} from '@angular/core';
 import {BackendService} from '../_helpers/services/backend.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
@@ -8,8 +8,9 @@ import {VariablesService} from '../_helpers/services/variables.service';
   templateUrl: './seed-phrase.component.html',
   styleUrls: ['./seed-phrase.component.scss']
 })
-export class SeedPhraseComponent implements OnInit {
+export class SeedPhraseComponent implements OnInit, OnDestroy {
 
+  queryRouting;
   seedPhrase = '';
   wallet_id: number;
 
@@ -22,7 +23,7 @@ export class SeedPhraseComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.route.queryParams.subscribe(params => {
+    this.queryRouting = this.route.queryParams.subscribe(params => {
       if (params.wallet_id) {
         this.wallet_id = params.wallet_id;
         this.backend.getSmartSafeInfo(params.wallet_id, (status, data) => {
@@ -56,9 +57,6 @@ export class SeedPhraseComponent implements OnInit {
         } else {
           console.log(run_data['error_code']);
         }
-        // $rootScope.reloadCounters();
-        // $rootScope.$broadcast('NEED_REFRESH_HISTORY');
-        // $rootScope.saveSecureData();
       });
     } else {
       this.variablesService.opening_wallet = null;
@@ -69,6 +67,10 @@ export class SeedPhraseComponent implements OnInit {
         });
       });
     }
+  }
+
+  ngOnDestroy() {
+    this.queryRouting.unsubscribe();
   }
 
 }

@@ -3,8 +3,10 @@ import {ActivatedRoute} from '@angular/router';
 import {FormControl, FormGroup, Validators} from '@angular/forms';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {ModalService} from '../_helpers/services/modal.service';
 import {Location} from '@angular/common';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
+import {TranslateService} from '@ngx-translate/core';
 
 @Component({
   selector: 'app-purchase',
@@ -15,6 +17,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
   currentWalletId;
   newPurchase = false;
   parentRouting;
+  subRouting;
   historyBlock;
 
   purchaseForm = new FormGroup({
@@ -26,19 +29,24 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     sameAmount: new FormControl(false),
     comment: new FormControl(''),
     fee: new FormControl('0.01'),
+    time: new FormControl({value: '12', disabled: false}),
+    timeCancel: new FormControl('12'),
     payment: new FormControl('')
   });
 
   additionalOptions = false;
   currentContract = null;
+  heightAppEvent;
 
   constructor(
     private route: ActivatedRoute,
     private backend: BackendService,
     private variablesService: VariablesService,
+    private modalService: ModalService,
     private ngZone: NgZone,
     private location: Location,
-    private intToMoneyPipe: IntToMoneyPipe
+    private intToMoneyPipe: IntToMoneyPipe,
+    private translate: TranslateService
   ) {
   }
 
@@ -54,7 +62,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     this.parentRouting = this.route.parent.params.subscribe(params => {
       this.currentWalletId = params['id'];
     });
-    this.route.params.subscribe(params => {
+    this.subRouting = this.route.params.subscribe(params => {
       if (params.hasOwnProperty('id')) {
         this.currentContract = this.variablesService.currentWallet.getContract(params['id']);
         this.purchaseForm.setValue({
@@ -66,22 +74,11 @@ export class PurchaseComponent implements OnInit, OnDestroy {
           sameAmount: false,
           comment: this.currentContract.private_detailes.c,
           fee: '0.01',
+          time: '12',
+          timeCancel: '12',
           payment: this.currentContract.payment_id
         });
         this.newPurchase = false;
-
-
-        // todo original code watch height_v
-        if (this.currentContract.state === 201 && this.currentContract.height !== 0 && (this.variablesService.height_app - this.currentContract.height) >= 10) {
-          this.currentContract.state = 2;
-          this.currentContract.is_new = true;
-          this.variablesService.currentWallet.recountNewContracts();
-        } else if (this.currentContract.state === 601 && this.currentContract.height !== 0 && (this.variablesService.height_app - this.currentContract.height) >= 10) {
-          this.currentContract.state = 6;
-          this.currentContract.is_new = true;
-          this.variablesService.currentWallet.recountNewContracts();
-        }
-
 
         if (this.currentContract.is_new) {
           if (this.currentContract.is_a && this.currentContract.state === 2) {
@@ -109,17 +106,25 @@ export class PurchaseComponent implements OnInit, OnDestroy {
           }
           this.currentContract.is_new = false;
 
-          // todo need remove timeout
           setTimeout(() => {
             this.variablesService.currentWallet.recountNewContracts();
           }, 0);
-
-          this.checkAndChangeHistory();
-
         }
+        this.checkAndChangeHistory();
 
       } else {
         this.newPurchase = true;
+      }
+    });
+    this.heightAppEvent = this.variablesService.getHeightAppEvent.subscribe((newHeight: number) => {
+      if (this.currentContract && this.currentContract.state === 201 && this.currentContract.height !== 0 && (newHeight - this.currentContract.height) >= 10) {
+        this.currentContract.state = 2;
+        this.currentContract.is_new = true;
+        this.variablesService.currentWallet.recountNewContracts();
+      } else if (this.currentContract && this.currentContract.state === 601 && this.currentContract.height !== 0 && (newHeight - this.currentContract.height) >= 10) {
+        this.currentContract.state = 6;
+        this.currentContract.is_new = true;
+        this.variablesService.currentWallet.recountNewContracts();
       }
     });
   }
@@ -129,11 +134,17 @@ export class PurchaseComponent implements OnInit, OnDestroy {
   }
 
   getProgressBarWidth() {
-    if (this.newPurchase) {
-      return '9rem';
-    } else {
-      return '50%';
+    let progress = '9rem';
+    if (!this.newPurchase) {
+      if (this.currentContract) {
+        if ([110, 3, 4, 6, 140].indexOf(this.currentContract.state) !== -1) {
+          progress = '100%';
+        } else {
+          progress = '50%';
+        }
+      }
     }
+    return progress;
   }
 
   sameAmountChange() {
@@ -172,10 +183,12 @@ export class PurchaseComponent implements OnInit, OnDestroy {
         this.purchaseForm.get('amount').value,
         this.purchaseForm.get('yourDeposit').value,
         this.purchaseForm.get('sellerDeposit').value,
-        12,
+        this.purchaseForm.get('time').value,
         this.purchaseForm.get('payment').value,
-        () => {
-          this.back();
+        (create_status) => {
+          if (create_status) {
+            this.back();
+          }
         });
     }
   }
@@ -187,7 +200,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
   acceptState() {
     this.backend.acceptProposal(this.currentWalletId, this.currentContract.contract_id, (accept_status) => {
       if (accept_status) {
-        alert('You have accepted the contract proposal. Please wait for the pledges to be made');
+        this.modalService.prepareModal('info', 'PURCHASE.ACCEPT_STATE_WAIT_BIG');
         this.back();
       }
     });
@@ -217,7 +230,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     this.currentContract.time = this.currentContract.expiration_time;
 
     this.variablesService.currentWallet.recountNewContracts();
-    alert('You have ignored the contract proposal');
+    this.modalService.prepareModal('info', 'PURCHASE.IGNORED_ACCEPT');
     this.back();
   }
 
@@ -225,7 +238,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
   productNotGot() {
     this.backend.releaseProposal(this.currentWalletId, this.currentContract.contract_id, 'REL_B', (release_status) => {
       if (release_status) {
-        alert('The pledges have been nullified.');
+        this.modalService.prepareModal('info', 'PURCHASE.BURN_PROPOSAL');
         this.back();
       }
     });
@@ -234,16 +247,16 @@ export class PurchaseComponent implements OnInit, OnDestroy {
   dealsDetailsFinish() {
     this.backend.releaseProposal(this.currentWalletId, this.currentContract.contract_id, 'REL_N', (release_status) => {
       if (release_status) {
-        alert('The contract is complete. The payment has been sent.');
+        this.modalService.prepareModal('success', 'PURCHASE.SUCCESS_FINISH_PROPOSAL');
         this.back();
       }
     });
   }
 
   dealsDetailsCancel() {
-    this.backend.requestCancelContract(this.currentWalletId, this.currentContract.contract_id, 12, (cancel_status) => {
+    this.backend.requestCancelContract(this.currentWalletId, this.currentContract.contract_id, this.purchaseForm.get('timeCancel').value, (cancel_status) => {
       if (cancel_status) {
-        alert('Proposal to cancel contract sent to seller');
+        this.modalService.prepareModal('info', 'PURCHASE.SEND_CANCEL_PROPOSAL');
         this.back();
       }
     });
@@ -273,14 +286,14 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     this.currentContract.time = this.currentContract.cancel_expiration_time;
 
     this.variablesService.currentWallet.recountNewContracts();
-    alert('You have ignored the proposal to cancel the contract');
+    this.modalService.prepareModal('info', 'PURCHASE.IGNORED_CANCEL');
     this.back();
   }
 
   dealsDetailsSellerCancel() {
     this.backend.acceptCancelContract(this.currentWalletId, this.currentContract.contract_id, (accept_status) => {
       if (accept_status) {
-        alert('The contract is being cancelled. Please wait for the pledge to be returned');
+        this.modalService.prepareModal('info', 'PURCHASE.DEALS_CANCELED_WAIT');
         this.back();
       }
     });
@@ -288,6 +301,8 @@ export class PurchaseComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.parentRouting.unsubscribe();
+    this.subRouting.unsubscribe();
+    this.heightAppEvent.unsubscribe();
   }
 
 }

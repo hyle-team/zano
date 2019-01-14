@@ -1,7 +1,7 @@
 <div class="content">
   <div class="head">
     <div class="breadcrumbs">
-      <span>{{variablesService.currentWallet.name}}</span>
+      <span (click)="back()">{{variablesService.currentWallet.name}}</span>
       <span>{{ 'BREADCRUMBS.WALLET_DETAILS' | translate }}</span>
     </div>
     <button type="button" class="back-btn" (click)="back()">

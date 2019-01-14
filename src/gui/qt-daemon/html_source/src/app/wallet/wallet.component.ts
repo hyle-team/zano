@@ -13,23 +13,23 @@ export class WalletComponent implements OnInit, OnDestroy {
   walletID;
   tabs = [
     {
+      title: 'WALLET.TABS.HISTORY',
+      icon: 'history',
+      link: '/history',
+      indicator: false,
+      active: true
+    },
+    {
       title: 'WALLET.TABS.SEND',
       icon: 'send',
       link: '/send',
       indicator: false,
-      active: true
+      active: false
     },
     {
       title: 'WALLET.TABS.RECEIVE',
       icon: 'receive',
       link: '/receive',
-      indicator: false,
-      active: false
-    },
-    {
-      title: 'WALLET.TABS.HISTORY',
-      icon: 'history',
-      link: '/history',
       indicator: false,
       active: false
     },
@@ -40,13 +40,13 @@ export class WalletComponent implements OnInit, OnDestroy {
       indicator: 1,
       active: false
     },
-    {
+    /*{
       title: 'WALLET.TABS.MESSAGES',
       icon: 'messages',
       link: '/messages',
       indicator: 32,
       active: false
-    },
+    },*/
     {
       title: 'WALLET.TABS.STAKING',
       icon: 'staking',
@@ -90,20 +90,9 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.backend.setClipboard(this.variablesService.currentWallet.address);
   }
 
-  /*closeWallet() {
-    this.backend.closeWallet(this.walletID, () => {
-      for (let i = this.variablesService.wallets.length - 1; i >= 0; i--) {
-        if (this.variablesService.wallets[i].wallet_id === this.walletID) {
-          this.variablesService.wallets.splice(i, 1);
-        }
-      }
-      this.backend.storeSecureAppData(() => {
-        this.ngZone.run(() => {
-          this.router.navigate(['/']);
-        });
-      });
-    });
-  }*/
+  openInBrowser() {
+    this.backend.openUrlInBrowser('zano.org');
+  }
 
   ngOnDestroy() {
     this.subRouting.unsubscribe();

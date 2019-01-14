@@ -3,6 +3,7 @@ import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {ActivatedRoute} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {ModalService} from '../_helpers/services/modal.service';
 
 @Component({
   selector: 'app-send',
@@ -26,6 +27,7 @@ export class SendComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private backend: BackendService,
     private variablesService: VariablesService,
+    private modalService: ModalService,
     private ngZone: NgZone
   ) {}
 
@@ -65,7 +67,7 @@ export class SendComponent implements OnInit, OnDestroy {
             this.sendForm.get('comment').value,
             (send_status, send_data) => {
               if (send_status) {
-                alert('SEND_MONEY.SUCCESS_SENT');
+                this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
                 this.sendForm.reset({address: '', amount: null, comment: '', mixin: 0, fee: '0.01'});
               }
             });
