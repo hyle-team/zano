@@ -1291,7 +1291,7 @@ bool gen_alias_switch_and_check_block_template::add_block_from_template(currency
   uint64_t height;
   crypto::hash seed = currency::null_hash;
   blobdata extra = AUTO_VAL_INIT(extra);
-  bool r = c.get_block_template(b, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
+  bool r = c.get_block_template(b, seed, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
   r = miner::find_nonce_for_given_block(b, diff, height, seed, m_scratchpad_keeper);

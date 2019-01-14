@@ -165,6 +165,7 @@ namespace currency
     //---------------------------------------------------------------------------------
 
     blockchain_storage(tx_memory_pool& tx_pool);
+    ~blockchain_storage();
 
 
     bool init(const boost::program_options::variables_map& vm) { return init(tools::get_default_data_dir(), vm); }
@@ -512,6 +513,7 @@ namespace currency
     bool m_is_reorganize_in_process;
     mutable scratchpad_keeper m_scratchpad;
     crypto::hash m_current_scratchpad_seed;
+    mutable std::atomic<bool> m_deinit_is_done;
 
 
     bool init_tx_fee_median();

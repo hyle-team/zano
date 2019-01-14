@@ -98,12 +98,19 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(std::share
                                                                  m_interprocess_locker_file(0), 
                                                                  m_current_fee_median(0), 
                                                                  m_current_fee_median_effective_index(0), 
-                                                                 m_is_reorganize_in_process(false)
+                                                                 m_is_reorganize_in_process(false), 
+                                                                 m_deinit_is_done(false)
 
 
 {
   m_services_mgr.set_core_runtime_config(m_core_runtime_config);
   m_performance_data.epic_failure_happend = false;
+}
+blockchain_storage::~blockchain_storage()
+{
+  if (!m_deinit_is_done)
+    deinit();
+
 }
 //------------------------------------------------------------------
 bool blockchain_storage::have_tx(const crypto::hash &id) const
@@ -315,6 +322,7 @@ bool blockchain_storage::deinit()
 {
   m_db.close();
   epee::file_io_utils::unlock_and_close_file(m_interprocess_locker_file);
+  m_deinit_is_done = true;
   return true;
 }
 //------------------------------------------------------------------

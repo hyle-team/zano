@@ -1625,7 +1625,7 @@ multisig_and_checkpoints::multisig_and_checkpoints()
 bool multisig_and_checkpoints::set_cp(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   currency::checkpoints checkpoints;
-  checkpoints.add_checkpoint(15, "79a45b39dbac12bfc2e432734e64db45d1af83509cfd20f4f73e14968192ea80");
+  checkpoints.add_checkpoint(15, "06338cf7c4bae725af8fa4424c9ab75ef5cbe1dc93a6ba606add664f2a23cbf6");
   c.set_checkpoints(std::move(checkpoints));
 
   return true;
