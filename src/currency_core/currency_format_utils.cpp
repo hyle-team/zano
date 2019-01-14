@@ -2562,22 +2562,8 @@ namespace currency
   {
     if (!height)
       return PREMINE_AMOUNT;
-
-    if (height <= CURRENCY_FIXED_REWARD_ZONE_HEIGHT)
-      return CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT;
-
-    uint64_t reward = 0;
-    if (is_pos)
-      reward = already_generated_coins / EMISSION_POS_REWARD_DEVIDER;
-    else
-      reward = already_generated_coins / EMISSION_POW_REWARD_DEVIDER;
-
-    //crop dust if it make sense 
-    if (reward <= BASE_REWARD_DUST_THRESHOLD)
-      return reward;
-
-    reward = reward - reward%BASE_REWARD_DUST_THRESHOLD;
-    return reward;
+  
+    return CURRENCY_TESTNET_CONST_REWARD;
   }
   //-----------------------------------------------------------------------------------------------
   uint64_t get_scratchpad_last_update_rebuild_height(uint64_t h)

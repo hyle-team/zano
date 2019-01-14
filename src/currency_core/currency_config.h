@@ -8,7 +8,7 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      74
+#define CURRENCY_FORMATION_VERSION                      75
                                                         
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -40,10 +40,10 @@
 #define CURRENCY_COINBASE_BLOB_RESERVED_SIZE            1100
 #define CURRENCY_MAX_TRANSACTION_BLOB_SIZE              (CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE - CURRENCY_COINBASE_BLOB_RESERVED_SIZE*2) 
 #define CURRENCY_FREE_TX_MAX_BLOB_SIZE                  1024 // soft txpool-based limit for free-of-charge txs (such as BC_OFFERS_SERVICE_INSTRUCTION_DEL)
-#define CURRENCY_DISPLAY_DECIMAL_POINT                  8
+#define CURRENCY_DISPLAY_DECIMAL_POINT                  12
 
 // COIN - number of smallest units in one coin
-#define COIN                                            ((uint64_t)100000000) // pow(10, CURRENCY_DISPLAY_DECIMAL_POINT)
+#define COIN                                            ((uint64_t)1000000000000) // pow(10, CURRENCY_DISPLAY_DECIMAL_POINT)
 #define BASE_REWARD_DUST_THRESHOLD                      ((uint64_t)1000000) // pow(10, 6) - change this will cause hard-fork!
 #define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)//((uint64_t)100000) // pow(10, 5)
 
@@ -57,9 +57,12 @@
 #define TX_DEFAULT_FEE                                  ((uint64_t)100000) // pow(10, 5)
 #define TX_MINIMUM_FEE                                  ((uint64_t)100000) // pow(10, 5)
 
-#define CURRENCY_FIXED_REWARD_ZONE_HEIGHT               300                   // blocks will have fixed reward up to this height (including) 
-#define CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT        ((uint64_t)100000000) // should be TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER
-#define CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER       1000                  // reward in minimum fees for a block in the zone
+// #define CURRENCY_FIXED_REWARD_ZONE_HEIGHT               300                   // blocks will have fixed reward up to this height (including) 
+// #define CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT        ((uint64_t)100000000) // should be TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER
+// #define CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER       1000                  // reward in minimum fees for a block in the zone
+
+#define CURRENCY_TESTNET_CONST_REWARD                   1000000000
+
 
 #define WALLET_MAX_ALLOWED_OUTPUT_AMOUNT                ((uint64_t)0xffffffffffffffffLL)
 #define CURRENCY_MINER_TX_MAX_OUTS                      CURRENCY_TX_MAX_ALLOWED_OUTS
@@ -174,7 +177,7 @@
 #endif
 
 //premine
-#define PREMINE_AMOUNT                                  (500000000000000)
+#define PREMINE_AMOUNT                                  (2000000000000000000)
 
 //alias registration wallet
 #define ALIAS_REWARDS_ACCOUNT_SPEND_PUB_KEY             "0000000000000000000000000000000000000000000000000000000000000000" //burn alias money
@@ -221,4 +224,4 @@
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");
 static_assert(PREMINE_AMOUNT / WALLET_MAX_ALLOWED_OUTPUT_AMOUNT < CURRENCY_MINER_TX_MAX_OUTS, "Premine can't be divided into reasonable number of outs");
-static_assert(CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT == TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER, "CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT is incorrect with regard to TX_MINIMUM_FEE");
+//static_assert(CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT == TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER, "CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT is incorrect with regard to TX_MINIMUM_FEE");
