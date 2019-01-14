@@ -44,6 +44,20 @@
 
 //------
 bool parse_hash256(const std::string str_hash, crypto::hash& hash);
+template <class T>
+std::ostream &print256(std::ostream &o, const T &v) {
+  return o << "<" << epee::string_tools::pod_to_hex(v) << ">";
+}
+
+template <class T>
+std::ostream &print16(std::ostream &o, const T &v) {
+  return o << "<" << epee::string_tools::pod_to_hex(v).substr(0, 5) << "..>";
+}
+
+template <class T>
+std::string print16(const T &v) {
+  return std::string("<") + epee::string_tools::pod_to_hex(v).substr(0, 5) + "..>";
+}
 
 namespace crypto {
   inline std::ostream &operator <<(std::ostream &o, const crypto::public_key &v) { return print256(o, v); }
@@ -862,36 +876,5 @@ namespace currency
 
 } // namespace currency
 
-template <class T>
-std::ostream &print256(std::ostream &o, const T &v) {
-  return o << "<" << epee::string_tools::pod_to_hex(v) << ">";
-}
 
-template <class T>
-std::ostream &print16(std::ostream &o, const T &v) {
-  return o << "<" << epee::string_tools::pod_to_hex(v).substr(0, 5) << "..>";
-}
-
-template <class T>
-std::string print16(const T &v) {
-  return std::string("<") + epee::string_tools::pod_to_hex(v).substr(0, 5) + "..>";
-}
-
-
-//POD_MAKE_COMPARABLE(currency, extra_attachment_info)
-
-
-// namespace std
-// {
-//   inline
-//   bool operator ==(const currency::transaction& a, const currency::transaction& b)
-//   {
-//     return currency::get_transaction_hash(a) == currency::get_transaction_hash(b);
-//   }
-//   inline
-//   bool operator ==(const currency::block& a, const currency::block& b)
-//   {
-//     return currency::get_block_hash(a) == currency::get_block_hash(b);
-//   }
-// }
 
