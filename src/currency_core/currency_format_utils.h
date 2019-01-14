@@ -43,6 +43,16 @@
 
 
 //------
+bool parse_hash256(const std::string str_hash, crypto::hash& hash);
+
+namespace crypto {
+  inline std::ostream &operator <<(std::ostream &o, const crypto::public_key &v) { return print256(o, v); }
+  inline std::ostream &operator <<(std::ostream &o, const crypto::secret_key &v) { return print256(o, v); }
+  inline std::ostream &operator <<(std::ostream &o, const crypto::key_derivation &v) { return print256(o, v); }
+  inline std::ostream &operator <<(std::ostream &o, const crypto::key_image &v) { return print256(o, v); }
+  inline std::ostream &operator <<(std::ostream &o, const crypto::signature &v) { return print256(o, v); }
+  inline std::ostream &operator <<(std::ostream &o, const crypto::hash &v) { return print256(o, v); }
+}
 
 namespace currency
 {
@@ -885,13 +895,3 @@ std::string print16(const T &v) {
 //   }
 // }
 
-bool parse_hash256(const std::string str_hash, crypto::hash& hash);
-
-namespace crypto {
-  inline std::ostream &operator <<(std::ostream &o, const crypto::public_key &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::secret_key &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::key_derivation &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::key_image &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::signature &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::hash &v) { return print256(o, v); }
-}
