@@ -96,13 +96,11 @@ cp $QT_PREFIX_PATH/plugins/platforms/libqxcb.so ./Zano/lib/platforms
 mkdir ./Zano/xcbglintegrations
 cp $QT_PREFIX_PATH/plugins/xcbglintegrations/libqxcb-glx-integration.so ./Zano/xcbglintegrations
 
-cp -Rv src/Zanod src/Zano src/simplewallet  src/connectivity_tool ./Zano
-
-cp -v ../../build_sm/release/src/Zanod ./Zano/Zanod_sm
+cp -Rv src/zanod src/Zano src/simplewallet  src/connectivity_tool ./Zano
 
 package_filename=zano-linux-x64-$version_str.tar.bz2
 
-rm ./$package_filename
+rm -f ./$package_filename
 tar -cjvf $package_filename Zano
 if [ $? -ne 0 ]; then
     echo "Failed to pack"
