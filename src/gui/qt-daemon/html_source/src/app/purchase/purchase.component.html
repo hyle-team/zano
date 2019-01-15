@@ -38,7 +38,7 @@
 
     <div class="input-block">
       <label for="purchase-amount">{{ 'PURCHASE.AMOUNT' | translate }}</label>
-      <input type="text" id="purchase-amount" formControlName="amount" appInputValidate="money" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="purchase-amount" formControlName="amount" appInputValidate="money" maxlength="20" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
     </div>
     <div class="error-block" *ngIf="purchaseForm.controls['amount'].invalid && (purchaseForm.controls['amount'].dirty || purchaseForm.controls['amount'].touched)">
       <div *ngIf="purchaseForm.controls['amount'].errors['required']">
@@ -50,7 +50,7 @@
   <div class="input-blocks-row">
     <div class="input-block">
       <label for="purchase-your-deposit">{{ 'PURCHASE.YOUR_DEPOSIT' | translate }}</label>
-      <input type="text" id="purchase-your-deposit" formControlName="yourDeposit" appInputValidate="money" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="purchase-your-deposit" formControlName="yourDeposit" appInputValidate="money" maxlength="20" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
     </div>
     <div class="error-block" *ngIf="purchaseForm.controls['yourDeposit'].invalid && (purchaseForm.controls['yourDeposit'].dirty || purchaseForm.controls['yourDeposit'].touched)">
       <div *ngIf="purchaseForm.controls['yourDeposit'].errors['required']">
@@ -67,7 +67,7 @@
         </div>
       </div>
       <input type="text" readonly *ngIf="purchaseForm.controls['sameAmount'].value" [value]="purchaseForm.controls['amount'].value">
-      <input type="text" id="purchase-seller-deposit" *ngIf="!purchaseForm.controls['sameAmount'].value" formControlName="sellerDeposit" appInputValidate="money" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="purchase-seller-deposit" *ngIf="!purchaseForm.controls['sameAmount'].value" formControlName="sellerDeposit" appInputValidate="money" maxlength="20" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
     </div>
     <div class="error-block" *ngIf="purchaseForm.controls['sellerDeposit'].invalid && (purchaseForm.controls['sellerDeposit'].dirty || purchaseForm.controls['sellerDeposit'].touched)">
       <div *ngIf="purchaseForm.controls['sellerDeposit'].errors['required']">

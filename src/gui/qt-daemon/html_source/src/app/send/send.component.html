@@ -17,7 +17,7 @@
   <div class="input-blocks-row">
     <div class="input-block">
       <label for="send-amount">{{ 'SEND.AMOUNT' | translate }}</label>
-      <input type="text" id="send-amount" formControlName="amount" appInputValidate="money" maxlength="21" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="send-amount" formControlName="amount" appInputValidate="money" maxlength="20" (contextmenu)="variablesService.onContextMenu($event)">
     </div>
 
     <div class="error-block" *ngIf="sendForm.controls['amount'].invalid && (sendForm.controls['amount'].dirty || sendForm.controls['amount'].touched)">

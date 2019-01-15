@@ -10,6 +10,7 @@ import {ContextMenuComponent, ContextMenuService} from 'ngx-contextmenu';
 })
 export class VariablesService {
 
+  public digits = 12;
   public appPass = '';
   public moneyEquivalent = 0;
   public defaultTheme = 'dark';
