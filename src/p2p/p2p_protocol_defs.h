@@ -41,6 +41,7 @@ namespace nodetool
     uint64_t time_started;
     uint64_t last_recv;
     uint64_t last_send;
+    std::string version;
   };
 
 #pragma pack(pop)

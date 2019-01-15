@@ -14,6 +14,7 @@
 #include "wallet/wallet2.h"
 #include "test_core_time.h"
 #include "chaingen_helpers.h"
+#include "currency_core/scratchpad_helper.h"
 
 #define TESTS_DEFAULT_FEE                   ((uint64_t)TX_DEFAULT_FEE)
 #define MK_TEST_COINS(amount)               (static_cast<uint64_t>(amount) * TESTS_DEFAULT_FEE)
@@ -305,7 +306,7 @@ protected:
     uint64_t height;
     crypto::hash hash;
   };
-
+  currency::scratchpad_keeper m_scratchpad_keeper;
   size_t m_invalid_block_index;
   size_t m_invalid_tx_index;
   size_t m_orphan_block_index;
@@ -506,6 +507,7 @@ private:
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;
   static test_gentime_settings m_test_gentime_settings_default;
+  mutable currency::scratchpad_keeper m_scratchpad;
 };
 
 extern const crypto::signature invalid_signature; // invalid non-null signature for test purpose

@@ -37,7 +37,6 @@ if(TESTNET)
 endif()
 
 set(BUILD_GUI FALSE CACHE BOOL "Build qt-daemon")
-set(USE_OPENCL FALSE CACHE BOOL "Build with opencl miner")
 
 
 set(STATIC ${MSVC} CACHE BOOL "Link libraries statically")
@@ -170,18 +169,6 @@ if(BUILD_GUI)
   cmake_minimum_required(VERSION 2.8.11)
   find_package(Qt5Widgets REQUIRED)  
 endif()
-
-if(USE_OPENCL)
-  find_package( OpenCL )
-  if(NOT OpenCL_FOUND)
-	# add some Opencl
-  endif()
-
-  include_directories( ${OpenCL_INCLUDE_DIRS} ) 
-  include_directories( ${OpenCL_INCLUDE_DIR} ) 
-  add_definitions(-DUSE_OPENCL)
-endif()
-
 
 set(COMMIT_ID_IN_VERSION ON CACHE BOOL "Include commit ID in version")
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/version")

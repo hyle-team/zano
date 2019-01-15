@@ -80,7 +80,7 @@ bool escrow_wallet_test::prepare_proposal_accepted_test(currency::core& c, const
   miner_wlt->transfer(AMOUNT_TO_TRANSFER_ESCROW + TX_DEFAULT_FEE * 2, accunt_seller.get_public_address());
   LOG_PRINT_MAGENTA("Transaction sent to seller_account: " << AMOUNT_TO_TRANSFER_ESCROW + TX_DEFAULT_FEE * 2, LOG_LEVEL_0);
 
-  bool r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  bool r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
 
@@ -121,7 +121,7 @@ bool escrow_wallet_test::prepare_proposal_accepted_test(currency::core& c, const
   LOG_PRINT_MAGENTA("Escrow proposal sent bseller_account:  escrow_proposal_tx id: " << currency::get_transaction_hash(escrow_proposal_tx) << ", multisig_id: " << multisig_id, LOG_LEVEL_0);
 
 
-  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, 2);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, 2);
 
   wallet_buyer->refresh();
   wallet_seller->refresh();
@@ -147,7 +147,7 @@ bool escrow_wallet_test::prepare_proposal_accepted_test(currency::core& c, const
   //----------------------
   wallet_seller->accept_proposal(multisig_id, TX_DEFAULT_FEE);
 
-  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   wallet_buyer->refresh();
   wallet_seller->refresh();
@@ -197,7 +197,7 @@ bool escrow_wallet_test::exec_test_with_specific_release_type(currency::core& c,
 
   tools::wallet2::escrow_contracts_container contracts_buyer, contracts_seller;
   wallet_buyer->finish_contract(multisig_id, release_instruction);
-  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, 2);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, 2);
   wallet_buyer->refresh();
   wallet_seller->refresh();
   wallet_buyer->get_contracts(contracts_buyer);
@@ -230,11 +230,11 @@ bool escrow_wallet_test::exec_test_with_cancel_release_type(currency::core& c, c
   wallet_miner = init_playtime_test_wallet(events, c, m_mining_accunt);
   wallet_miner->refresh();
   wallet_miner->transfer(TX_DEFAULT_FEE, wallet_buyer->get_account().get_public_address());
-  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, 10);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, 10);
   wallet_buyer->refresh();
   tools::wallet2::escrow_contracts_container contracts_buyer, contracts_seller;
   wallet_buyer->request_cancel_contract(multisig_id, TX_DEFAULT_FEE, 60 * 60);
-  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, 2);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, 2);
   wallet_buyer->refresh();
   wallet_seller->refresh();
   wallet_buyer->get_contracts(contracts_buyer);
@@ -252,7 +252,7 @@ bool escrow_wallet_test::exec_test_with_cancel_release_type(currency::core& c, c
   //cancel contract
   wallet_seller->accept_cancel_contract(multisig_id);
 
-  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, 2);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, 2);
   wallet_buyer->refresh();
   wallet_seller->refresh();
   wallet_buyer->get_contracts(contracts_buyer);
@@ -396,7 +396,7 @@ bool escrow_w_and_fake_outputs::c1(currency::core& c, size_t ev_index, const std
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -406,7 +406,7 @@ bool escrow_w_and_fake_outputs::c1(currency::core& c, size_t ev_index, const std
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -416,7 +416,7 @@ bool escrow_w_and_fake_outputs::c1(currency::core& c, size_t ev_index, const std
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -441,7 +441,7 @@ bool escrow_w_and_fake_outputs::c1(currency::core& c, size_t ev_index, const std
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -651,7 +651,7 @@ bool escrow_incorrect_proposal::check_normal_proposal(currency::core& c, size_t 
   alice_wlt->accept_proposal(contract_id, TX_DEFAULT_FEE);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -661,7 +661,7 @@ bool escrow_incorrect_proposal::check_normal_proposal(currency::core& c, size_t 
   miner_wlt->finish_contract(contract_id, BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_NORMAL);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
@@ -788,7 +788,7 @@ bool escrow_proposal_expiration::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
   // mine a block with proposal transport tx
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -797,7 +797,7 @@ bool escrow_proposal_expiration::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
 
   // mine few block to shift the timestamp median far enough
-  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   // check Alice's balance
@@ -866,7 +866,7 @@ bool escrow_proposal_expiration::c2(currency::core& c, size_t ev_index, const st
   // mine a few blocks with no txs
   for (size_t i = 0; i < TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1; ++i)
   {
-    r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
+    r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   }
 
@@ -896,7 +896,7 @@ bool escrow_proposal_expiration::c2(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_MES(r, false, "Bob tried to accept an expired proposal, but wallet exception was not caught");
 
   // mine a block with proposal transport tx
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   // check it has left tx pool
@@ -1022,7 +1022,7 @@ bool escrow_proposal_and_accept_expiration::c1(currency::core& c, size_t ev_inde
   // mine a few blocks with no txs
   for (size_t i = 0; i < TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1; ++i)
   {
-    r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
+    r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   }
 
@@ -1057,7 +1057,7 @@ bool escrow_proposal_and_accept_expiration::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(r, false, "Bob tried to accept an expired proposal, but wallet exception was not caught");
 
   LOG_PRINT_CYAN("%%%%% mine a block with proposal transport tx", LOG_LEVEL_0);
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   // check it has left tx pool
@@ -1336,7 +1336,7 @@ bool escrow_incorrect_proposal_acceptance::check_normal_acceptance(currency::cor
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -1673,7 +1673,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
   CHECK_AND_ASSERT_MES(check_wallet_balance_blocked_for_escrow(*alice_wlt.get(), "Alice", cd.cpd.amount_a_pledge + cd.cpd.amount_to_pay), false, "");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
@@ -1712,7 +1712,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     false, "");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
@@ -1751,7 +1751,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", bob_expected_balance, 0, INVALID_BALANCE_VAL, 0, 0), false, ""); // should not change
 
     CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-    r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+    r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
     CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
@@ -1795,7 +1795,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", bob_expected_balance, 0, INVALID_BALANCE_VAL, cd.is_release_normal() ? cd.cpd.amount_b_pledge + cd.cpd.amount_to_pay : 0, cd.is_release_normal() ? 0 : ms_amount - cd.b_release_fee), false, "");
 
     CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-    r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+    r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
     CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
@@ -1842,7 +1842,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", bob_expected_balance, 0, INVALID_BALANCE_VAL, bob_expected_aw_in_balance, 0), false, "");
 
     CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-    r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+    r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
     CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
@@ -2096,7 +2096,7 @@ bool escrow_incorrect_cancel_proposal::check_normal_cancel_proposal(currency::co
   bob_wlt->accept_cancel_contract(ms_id);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
@@ -2273,7 +2273,7 @@ bool escrow_proposal_not_enough_money::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", MK_TEST_COINS(30), 0, MK_TEST_COINS(30), 0, 0), false, "");
 
   // mine few blocks to make sure there's no problem
-  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 5);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, 5);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   // and check balance again
@@ -2359,7 +2359,7 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
 
   // mine a block, containing escrow proposal tx
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2377,7 +2377,7 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
 
   // mine a block containing contract acceptance
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2437,8 +2437,8 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, false, "Bob has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   // mine a block containing only cancel_request_acceptance_tx (this should trigger contracts' states swtiching into contract_released_cancelled) 
-  LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime_with_given_txs(cancel_request_acceptance_tx)", LOG_LEVEL_0);
-  r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({cancel_request_acceptance_tx}));
+  LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, cancel_request_acceptance_tx)", LOG_LEVEL_0);
+  r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({cancel_request_acceptance_tx}));
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2458,8 +2458,8 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
 
 
   // mine a block containing only cancel_request_tx (this SHOULD NOT trigger contracts' states swtiching into contract_cancel_proposal_sent or anything) 
-  LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime_with_given_txs(cancel_request_tx)", LOG_LEVEL_0);
-  r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({cancel_request_tx}));
+  LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, cancel_request_tx)", LOG_LEVEL_0);
+  r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({cancel_request_tx}));
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2563,7 +2563,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
 
   // mine a block, containing escrow proposal tx
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2584,7 +2584,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   
   // mine a block containing contract acceptance
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2621,7 +2621,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   // mine a few blocks with no txs to shift expiration median
   for(size_t i = 0; i < 7; ++i)
   {
-    r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
+    r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
   }
   // cancellation request is still in the pool
@@ -2649,8 +2649,8 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 7), false, "");
 
   // mine a block containing cancel_request_tx (already expired) -- should be okay
-  LOG_PRINT_GREEN("\n\n\n" "mine_next_pow_block_in_playtime() -- including expires contract cancellation request" "\n\n", LOG_LEVEL_0);
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  LOG_PRINT_GREEN("\n\n\n" "mine_next_pow_block_in_playtime(m_scratchpad_keeper, ) -- including expires contract cancellation request" "\n\n", LOG_LEVEL_0);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2684,8 +2684,8 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 0), false, "");
 
   // mine a block containing cancel_request_tx
-  LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime()", LOG_LEVEL_0);
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime(m_scratchpad_keeper, )", LOG_LEVEL_0);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2694,8 +2694,8 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 1), false, "");
 
   // mine one more block (it's necessary for triggering expiration checks in wallets and shifting an expiration ts median)
-  LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime()", LOG_LEVEL_0);
-  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 7);
+  LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime(m_scratchpad_keeper, )", LOG_LEVEL_0);
+  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, 7);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2810,7 +2810,7 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
 
   // mine a block, containing escrow proposal tx
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2825,7 +2825,7 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   
   // mine a block containing contract acceptance
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -2838,7 +2838,7 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   
   // confirm cancellation request in blockchain
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // contract state in wallets should be cancel_proposal_sent for both parties
@@ -2862,7 +2862,7 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   // mine a few blocks with no txs to shift expiration median, cancellation acceptance is still in the pool
   for(size_t i = 0; i < 7; ++i)
   {
-    r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
+    r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>());
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
   }
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -2886,7 +2886,7 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // mine a block with cancel_accept_tx (already expired). It should be rejected
-  r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ cancel_accept_tx }));
+  r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ cancel_accept_tx }));
   CHECK_AND_ASSERT_MES(!r, false, "mine_next_pow_block_in_playtime_with_given_txs should have been failed as block contains expired tx");
 
   // no changes with contract state expected
@@ -2968,6 +2968,6 @@ bool escrow_proposal_acceptance_in_alt_chain::generate(std::vector<test_event_en
 bool escrow_proposal_acceptance_in_alt_chain::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
 
-  //mine_next_pow_block_in_playtime()
+  //mine_next_pow_block_in_playtime(m_scratchpad_keeper, )
   return true;
 }

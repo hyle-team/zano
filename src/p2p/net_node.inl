@@ -1061,6 +1061,7 @@ namespace nodetool
       ce.time_started = cntxt.m_started;
       ce.last_recv = cntxt.m_last_recv;
       ce.last_send = cntxt.m_last_send;
+      ce.version = cntxt.m_remote_version;
       rsp.connections_list.push_back(ce);
       return true;
     });

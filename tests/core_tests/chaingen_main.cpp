@@ -104,6 +104,7 @@ bool generate_and_play(const char* const genclass_name)
   else
   {
     std::cout << concolor::magenta << "#TEST# Failed " << genclass_name << concolor::normal << std::endl;
+    LOG_PRINT_RED_L0("#TEST# Failed " << genclass_name);
     result = false;
   }
   std::cout << std::endl;
@@ -217,7 +218,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if(run_single_test.empty() || run_single_test == #genclass)                                              \
+  if(!postponed_tests.count(#genclass) && (run_single_test.empty() || run_single_test == #genclass))                                              \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -678,6 +679,23 @@ int main(int argc, char* argv[])
     }
 
     //CALL_TEST("check_hash_and_difficulty_monte_carlo_test", check_hash_and_difficulty_monte_carlo_test); // it's rather an experiment with unclean results than a solid test, for further research...
+    std::set<std::string> postponed_tests;
+
+    // Postponed tests - tests that may fail for the time being (believed that it's a serious issue and should be fixed later for some reason).
+    // In a perfect world this list is empty.
+#define MARK_TEST_AS_POSTPONED(genclass) postponed_tests.insert(#genclass)
+    MARK_TEST_AS_POSTPONED(gen_checkpoints_reorganize);
+    MARK_TEST_AS_POSTPONED(gen_alias_update_after_addr_changed);
+    MARK_TEST_AS_POSTPONED(gen_alias_blocking_reg_by_invalid_tx);
+    MARK_TEST_AS_POSTPONED(gen_alias_blocking_update_by_invalid_tx);
+    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_randomness);
+    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_not_enough);
+    MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
+    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
+    MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
+
+#undef MARK_TEST_AS_POSTPONED
+
 
     GENERATE_AND_PLAY(multisig_wallet_test);
     GENERATE_AND_PLAY(multisig_wallet_test_many_dst);
@@ -918,22 +936,6 @@ int main(int argc, char* argv[])
     //GENERATE_AND_PLAY(gen_block_reward); */
 
 
-    std::set<std::string> postponed_tests;
-
-    // Postponed tests - tests that may fail for the time being (believed that it's a serious issue and should be fixed later for some reason).
-    // In a perfect world this list is empty.
-#define MARK_TEST_AS_POSTPONED(genclass) postponed_tests.insert(#genclass)
-    MARK_TEST_AS_POSTPONED(gen_checkpoints_reorganize);
-    MARK_TEST_AS_POSTPONED(gen_alias_update_after_addr_changed);
-    MARK_TEST_AS_POSTPONED(gen_alias_blocking_reg_by_invalid_tx);
-    MARK_TEST_AS_POSTPONED(gen_alias_blocking_update_by_invalid_tx);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_randomness);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_not_enough);
-    MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
-    MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
-    
-#undef MARK_TEST_AS_POSTPONED
 
 
     size_t failed_postponed_tests_count = 0;

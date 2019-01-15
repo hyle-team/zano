@@ -66,9 +66,10 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
       currency::block b = AUTO_VAL_INIT(b);
       blobdata extra = AUTO_VAL_INIT(extra);
       uint64_t height_from_template = 0;
-      r = c.get_block_template(b, m_miner_acc.get_public_address(), m_miner_acc.get_public_address(), difficulty, height_from_template, extra);
+      crypto::hash seed = currency::null_hash;
+      r = c.get_block_template(b, seed, m_miner_acc.get_public_address(), m_miner_acc.get_public_address(), difficulty, height_from_template, extra);
       CHECK_AND_ASSERT_MES(r || height_from_template != height, false, "get_block_template failed");
-      r = miner::find_nonce_for_given_block(b, difficulty, height);
+      r = miner::find_nonce_for_given_block(b, difficulty, height, seed, m_scratchpad_keeper);
       CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
       c.handle_incoming_block(t_serializable_object_to_blob(b), bvc);
       CHECK_AND_NO_ASSERT_MES(!bvc.m_verification_failed && !bvc.m_marked_as_orphaned && !bvc.m_already_exists, false, "block verification context check failed");
@@ -240,7 +241,7 @@ bool pos_emission_test::c1(currency::core& c, size_t ev_index, const std::vector
     if (ts < ideal_next_pow_block_ts)
       ts = ideal_next_pow_block_ts; // "wait" until ideal_next_pow_block_ts if it was not already happened (fast forward but don't wayback the time)
     test_core_time::adjust(ts);
-    r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+    r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
     CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "invalid number of txs in tx pool: " << c.get_pool_transactions_count());
 
@@ -354,7 +355,7 @@ bool pos_emission_test::c2(currency::core& c, size_t ev_index, const std::vector
     if (ts < ideal_next_pow_block_ts)
       ts = ideal_next_pow_block_ts; // "wait" until ideal_next_pow_block_ts if it was not already happened (fast forward but don't wayback the time)
     test_core_time::adjust(ts);
-    r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+    r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
     CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "invalid number of txs in tx pool: " << c.get_pool_transactions_count());
 
@@ -500,7 +501,7 @@ bool pos_emission_test::c3(currency::core& c, size_t ev_index, const std::vector
       ts = ideal_next_pow_block_ts; // "wait" until ideal_next_pow_block_ts if it was not already happened (fast forward but don't wayback the time)
     test_core_time::adjust(ts);
     size_t tx_count_before = c.get_pool_transactions_count();
-    r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+    r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
     CHECK_AND_ASSERT_MES(tx_count_before == 0 || c.get_pool_transactions_count() < tx_count_before, false, "invalid number of txs in tx pool: " << c.get_pool_transactions_count() << ", was: " << tx_count_before);
     //uint64_t pow_blocks_interval = ts - last_pow_block_ts;

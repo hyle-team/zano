@@ -72,6 +72,7 @@ namespace currency
     m_height = height;
     ++m_template_no;
     m_starter_nonce = crypto::rand<uint32_t>();
+    m_scratchpad.generate(m_seed, height);
     return true;
   }
   //-----------------------------------------------------------------------------------------------------
@@ -94,7 +95,7 @@ namespace currency
     {
       extra_nonce += std::string("|") + m_extra_messages[m_config.current_extra_message_index];
     }
-    if(!m_phandler->get_block_template(bl, m_mine_address, m_mine_address, di, height, extra_nonce))
+    if(!m_phandler->get_block_template(bl, m_seed, m_mine_address, m_mine_address, di, height, extra_nonce))
     {
       LOG_ERROR("Failed to get_block_template()");
       return false;
@@ -305,6 +306,8 @@ namespace currency
     uint64_t nonce = m_starter_nonce + th_local_index;
     wide_difficulty_type local_diff = 0;
     uint32_t local_template_ver = 0;
+    blobdata local_blob_data;
+
     //uint64_t local_template_height = 0;
     block b;
 
@@ -325,6 +328,7 @@ namespace currency
         //local_template_height = get_block_height(b);
         local_template_ver = m_template_no;
         nonce = m_starter_nonce + th_local_index;
+        local_blob_data = get_block_hashing_blob(b);
       }
 
       if(!local_template_ver)//no any set_block_template call
@@ -334,7 +338,8 @@ namespace currency
         continue;
       }
       b.nonce = nonce;
-      crypto::hash h = get_block_longhash(b);
+      access_nonce_in_block_blob(local_blob_data) = b.nonce;
+      crypto::hash h = m_scratchpad.get_pow_hash(local_blob_data, m_height, m_seed);
 
       if(check_hash(h, local_diff))
       {

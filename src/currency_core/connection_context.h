@@ -32,7 +32,6 @@ namespace currency
     //members that supposed to be accessed only from one thread
     std::list<block_context_info> m_needed_objects;
     std::unordered_set<crypto::hash> m_requested_objects;
-    std::string m_remote_version;
     std::atomic<uint32_t> m_callback_request_count; //in debug purpose: problem with double callback rise
 
   };
@@ -51,6 +50,7 @@ namespace currency
     uint64_t m_remote_blockchain_height;
     uint64_t m_last_response_height;
     int64_t m_time_delta;
+    std::string m_remote_version;
   private:
     template<class t_core> friend class t_currency_protocol_handler;
     uncopybale_currency_context m_priv;

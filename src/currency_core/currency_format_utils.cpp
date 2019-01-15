@@ -1712,24 +1712,24 @@ namespace currency
     }
     return true;
   }
-  //--------------------------------------------------------------
-  crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_long_ash, uint64_t nonce)
-  {
-    //TODO: add wild keccak 2
-    return null_hash;//TODO;
-  }
-  //---------------------------------------------------------------
-  void get_block_longhash(const block& b, crypto::hash& res)
-  {
-    //TODO: add wild keccak 2
-  }
-  //---------------------------------------------------------------
-  crypto::hash get_block_longhash(const block& b)
-  {
-    crypto::hash p = null_hash;
-    get_block_longhash(b, p);
-    return p;
-  }
+//   //--------------------------------------------------------------
+//   crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_long_ash, uint64_t nonce)
+//   {
+//     //TODO: add wild keccak 2
+//     return null_hash;//TODO;
+//   }
+//   //---------------------------------------------------------------
+//   void get_block_longhash(const block& b, crypto::hash& res)
+//   {
+//     //TODO: add wild keccak 2
+//   }
+//   //---------------------------------------------------------------
+//   crypto::hash get_block_longhash(const block& b)
+//   {
+//     crypto::hash p = null_hash;
+//     get_block_longhash(b, p);
+//     return p;
+//   }
   //---------------------------------------------------------------
   uint64_t get_alias_coast_from_fee(const std::string& alias, uint64_t median_fee)
   {
@@ -2562,22 +2562,19 @@ namespace currency
   {
     if (!height)
       return PREMINE_AMOUNT;
-
-    if (height <= CURRENCY_FIXED_REWARD_ZONE_HEIGHT)
-      return CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT;
-
-    uint64_t reward = 0;
-    if (is_pos)
-      reward = already_generated_coins / EMISSION_POS_REWARD_DEVIDER;
-    else
-      reward = already_generated_coins / EMISSION_POW_REWARD_DEVIDER;
-
-    //crop dust if it make sense 
-    if (reward <= BASE_REWARD_DUST_THRESHOLD)
-      return reward;
-
-    reward = reward - reward%BASE_REWARD_DUST_THRESHOLD;
-    return reward;
+  
+    return CURRENCY_TESTNET_CONST_REWARD;
+  }
+  //-----------------------------------------------------------------------------------------------
+  uint64_t get_scratchpad_last_update_rebuild_height(uint64_t h)
+  {
+    return h - (h%CURRENCY_SCRATCHPAD_REBUILD_INTERVAL);
+  }
+  //-----------------------------------------------------------------------------------------------
+  uint64_t get_scratchpad_size_for_height(uint64_t h)
+  {
+    //let's have ~256MB/year if block interval is 2 minutes
+    return CURRENCY_SCRATCHPAD_BASE_SIZE + get_scratchpad_last_update_rebuild_height(h)*32;
   }
   //-----------------------------------------------------------------------------------------------
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, uint64_t already_generated_coins, uint64_t &reward, uint64_t height)
