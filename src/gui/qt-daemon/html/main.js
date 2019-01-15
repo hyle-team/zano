@@ -1580,6 +1580,17 @@ var BackendService = /** @class */ (function () {
     BackendService.prototype.openUrlInBrowser = function (url, callback) {
         this.runCommand('open_url_in_browser', url, callback);
     };
+    BackendService.prototype.is_remnotenode_mode_preconfigured = function (callback) {
+        this.runCommand('is_remnotenode_mode_preconfigured', {}, callback);
+    };
+    BackendService.prototype.start_backend = function (node, host, port, callback) {
+        var params = {
+            configure_for_remote_node: node,
+            remote_node_host: host,
+            remote_node_port: parseInt(port, 10)
+        };
+        this.runCommand('start_backend', params, callback);
+    };
     BackendService = __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Injectable"])(),
         __metadata("design:paramtypes", [_ngx_translate_core__WEBPACK_IMPORTED_MODULE_2__["TranslateService"], _variables_service__WEBPACK_IMPORTED_MODULE_3__["VariablesService"], _modal_service__WEBPACK_IMPORTED_MODULE_4__["ModalService"], _pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__["MoneyToIntPipe"]])
@@ -2235,6 +2246,14 @@ var AppComponent = /** @class */ (function () {
         this.backend.initService().subscribe(function (initMessage) {
             console.log('Init message: ', initMessage);
             _this.backend.webkitLaunchedScript();
+            _this.backend.is_remnotenode_mode_preconfigured(function (status, data) {
+                // if (data === 'FALSE') {
+                // } else {
+                // }
+                _this.backend.start_backend(false, '127.0.0.1', 11512, function (st2, dd2) {
+                    console.log(st2, dd2);
+                });
+            });
             _this.backend.eventSubscribe('quit_requested', function () {
                 if (!_this.onQuitRequest) {
                     _this.backend.storeSecureAppData(function () {
