@@ -395,7 +395,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getMoneyEquivalent() {
-    this.http.get('https://api.coinmarketcap.com/v2/ticker/2').subscribe(
+    this.http.get('https://api.coinmarketcap.com/v2/ticker/406').subscribe(
       result => {
         if (result.hasOwnProperty('data')) {
           this.variablesService.moneyEquivalent = result['data']['quotes']['USD']['price'];
