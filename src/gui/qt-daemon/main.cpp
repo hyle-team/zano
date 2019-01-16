@@ -44,6 +44,12 @@ int main(int argc, char *argv[])
 
     epee::string_tools::set_module_name_and_folder(argv[0]);
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+#ifdef _MSC_VER
+#if _MSC_VER >= 1910
+    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps); //HiDPI pixmaps
+    qputenv("QT_SCALE_FACTOR", "0.75");
+#endif
+#endif
 
     QApplication app(argc, argv);
     MainWindow viewer;
