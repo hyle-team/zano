@@ -44,6 +44,7 @@ int main(int argc, char *argv[])
 
     epee::string_tools::set_module_name_and_folder(argv[0]);
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+
     QApplication app(argc, argv);
     MainWindow viewer;
     if (!viewer.init_backend(argc, argv))
