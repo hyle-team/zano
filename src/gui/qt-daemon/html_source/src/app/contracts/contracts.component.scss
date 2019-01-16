@@ -10,60 +10,71 @@
   margin: -3rem -3rem 0 -3rem;
   overflow-x: auto;
 
-  .contract {
-    position: relative;
-    display: flex;
-    align-items: center;
+  table {
 
-    .icon {
-      flex-shrink: 0;
+    tbody {
 
-      &.new, &.alert {
-        position: absolute;
-        top: 0;
-      }
+      tr {
+        cursor: pointer;
+        outline: none !important;
 
-      &.new {
-        left: -2.3rem;
-        mask: url(../../assets/icons/new.svg) no-repeat center;
-        width: 1.7rem;
-        height: 1.7rem;
-      }
+        .contract {
+          position: relative;
+          display: flex;
+          align-items: center;
 
-      &.alert {
-        top: 0.2rem;
-        left: -2.1rem;
-        mask: url(../../assets/icons/alert.svg) no-repeat center;
-        width: 1.2rem;
-        height: 1.2rem;
-      }
+          .icon {
+            flex-shrink: 0;
 
-      &.purchase, &.sell {
-        margin-right: 1rem;
-        width: 1.5rem;
-        height: 1.5rem;
-      }
+            &.new, &.alert {
+              position: absolute;
+              top: 0;
+            }
 
-      &.purchase {
-        mask: url(../../assets/icons/purchase.svg) no-repeat center;
-      }
+            &.new {
+              left: -2.3rem;
+              mask: url(../../assets/icons/new.svg) no-repeat center;
+              width: 1.7rem;
+              height: 1.7rem;
+            }
 
-      &.sell {
-        mask: url(../../assets/icons/sell.svg) no-repeat center;
+            &.alert {
+              top: 0.2rem;
+              left: -2.1rem;
+              mask: url(../../assets/icons/alert.svg) no-repeat center;
+              width: 1.2rem;
+              height: 1.2rem;
+            }
+
+            &.purchase, &.sell {
+              margin-right: 1rem;
+              width: 1.5rem;
+              height: 1.5rem;
+            }
+
+            &.purchase {
+              mask: url(../../assets/icons/purchase.svg) no-repeat center;
+            }
+
+            &.sell {
+              mask: url(../../assets/icons/sell.svg) no-repeat center;
+            }
+          }
+
+          span {
+            text-overflow: ellipsis;
+            overflow: hidden;
+            max-width: 20vw;
+          }
+        }
+
+        .status, .comment {
+          text-overflow: ellipsis;
+          overflow: hidden;
+          max-width: 20vw;
+        }
       }
     }
-
-    span {
-      text-overflow: ellipsis;
-      overflow: hidden;
-      max-width: 20vw;
-    }
-  }
-
-  .status, .comment {
-    text-overflow: ellipsis;
-    overflow: hidden;
-    max-width: 20vw;
   }
 }
 

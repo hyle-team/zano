@@ -781,7 +781,7 @@ namespace currency
     //pe.keyimage key image will be set in the wallet
     //pe.wallet_index is not included in serialization map, TODO: refactoring here
 
-    if (!m_core.get_block_template(b, miner_address, stakeholder_address, dt, res.height, req.extra_text, req.pos_block, pe))
+    if (!m_core.get_block_template(b, res.seed, miner_address, stakeholder_address, dt, res.height, req.extra_text, req.pos_block, pe))
     {
       error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
       error_resp.message = "Internal error: failed to create block template";

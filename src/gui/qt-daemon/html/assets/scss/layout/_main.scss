@@ -81,27 +81,3 @@ app-settings {
 app-login {
   min-width: inherit;
 }
-
-.switch {
-
-  @include themify($themes) {
-    background-color: themed(switchBackgroundColor);
-  }
-
-  .circle {
-
-    &.on {
-
-      @include themify($themes) {
-        background-color: themed(blueTextColor);
-      }
-    }
-
-    &.off {
-
-      @include themify($themes) {
-        background-color: themed(optionalTextColor);
-      }
-    }
-  }
-}

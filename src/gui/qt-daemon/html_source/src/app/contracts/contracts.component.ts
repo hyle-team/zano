@@ -16,7 +16,8 @@ export class ContractsComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private variablesService: VariablesService
-  ) {}
+  ) {
+  }
 
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(params => {

@@ -1,17 +1,20 @@
-import {Component, NgZone, OnInit} from '@angular/core';
+import {Component, NgZone, OnDestroy, OnInit} from '@angular/core';
 import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {ModalService} from '../_helpers/services/modal.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {Wallet} from '../_helpers/models/wallet.model';
+import {TranslateService} from '@ngx-translate/core';
 
 @Component({
   selector: 'app-open-wallet',
   templateUrl: './open-wallet.component.html',
   styleUrls: ['./open-wallet.component.scss']
 })
-export class OpenWalletComponent implements OnInit {
+export class OpenWalletComponent implements OnInit, OnDestroy {
 
+  queryRouting;
   filePath: string;
 
   openForm = new FormGroup({
@@ -31,12 +34,14 @@ export class OpenWalletComponent implements OnInit {
     private router: Router,
     private backend: BackendService,
     private variablesService: VariablesService,
-    private ngZone: NgZone
+    private modalService: ModalService,
+    private ngZone: NgZone,
+    private translate: TranslateService
   ) {
   }
 
   ngOnInit() {
-    this.route.queryParams.subscribe(params => {
+    this.queryRouting = this.route.queryParams.subscribe(params => {
       if (params.path) {
         this.filePath = params.path;
         let filename = '';
@@ -57,11 +62,11 @@ export class OpenWalletComponent implements OnInit {
     if (this.openForm.valid) {
       this.backend.openWallet(this.filePath, this.openForm.get('password').value, false, (open_status, open_data, open_error) => {
         if (open_error && open_error === 'FILE_NOT_FOUND') {
-          // var error_translate = $filter('translate')('INFORMER.SAFE_FILE_NOT_FOUND1');
+          let error_translate = this.translate.instant('OPEN_WALLET.SAFE_FILE_NOT_FOUND1');
           // error_translate += ':<br>' + $scope.safe.path;
-          // error_translate += $filter('translate')('INFORMER.SAFE_FILE_NOT_FOUND2');
-          // informer.fileNotFound(error_translate);
-          alert('FILE_NOT_FOUND');
+          error_translate += ':<br>' + this.filePath;
+          error_translate += this.translate.instant('OPEN_WALLET.SAFE_FILE_NOT_FOUND2');
+          this.modalService.prepareModal('error', error_translate);
         } else {
           if (open_status || open_error === 'FILE_RESTORED') {
 
@@ -73,9 +78,8 @@ export class OpenWalletComponent implements OnInit {
             });
 
             if (exists) {
-              alert('SAFES.WITH_ADDRESS_ALREADY_OPEN');
+              this.modalService.prepareModal('error', 'OPEN_WALLET.WITH_ADDRESS_ALREADY_OPEN');
               this.backend.closeWallet(open_data.wallet_id, (close_status, close_data) => {
-                console.log(close_status, close_data);
                 this.ngZone.run(() => {
                   this.router.navigate(['/']);
                 });
@@ -120,6 +124,10 @@ export class OpenWalletComponent implements OnInit {
         }
       });
     }
+  }
+
+  ngOnDestroy() {
+    this.queryRouting.unsubscribe();
   }
 
 }

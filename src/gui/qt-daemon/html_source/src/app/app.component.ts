@@ -36,6 +36,16 @@ export class AppComponent implements OnInit, OnDestroy {
 
       this.backend.webkitLaunchedScript();
 
+
+      this.backend.is_remnotenode_mode_preconfigured((status, data) => {
+        // if (data === 'FALSE') {
+        // } else {
+        // }
+        this.backend.start_backend(false, '127.0.0.1', 11512, (st2, dd2) => {
+          console.log(st2, dd2);
+        });
+      });
+
       this.backend.eventSubscribe('quit_requested', () => {
         if (!this.onQuitRequest) {
           this.backend.storeSecureAppData(() => {
@@ -385,14 +395,16 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getMoneyEquivalent() {
-    // todo now start only once, need check daemon state and re-init
-    this.http.get('https://api.coinmarketcap.com/v2/ticker/2').subscribe(
+    this.http.get('https://api.coinmarketcap.com/v2/ticker/406').subscribe(
       result => {
         if (result.hasOwnProperty('data')) {
           this.variablesService.moneyEquivalent = result['data']['quotes']['USD']['price'];
         }
       },
       error => {
+        setTimeout(() => {
+          this.getMoneyEquivalent();
+        }, 60000);
         console.warn('Error coinmarketcap', error);
       }
     );

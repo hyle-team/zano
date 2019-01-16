@@ -29,6 +29,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { TypingMessageComponent } from './typing-message/typing-message.component';
 
 import { BackendService } from './_helpers/services/backend.service';
+import { ModalService } from './_helpers/services/modal.service';
 import { MoneyToIntPipe } from './_helpers/pipes/money-to-int.pipe';
 import { IntToMoneyPipe } from './_helpers/pipes/int-to-money.pipe';
 import { StakingSwitchComponent } from './_helpers/directives/staking-switch/staking-switch.component';
@@ -105,9 +106,13 @@ Highcharts.setOptions({
   ],
   providers: [
     BackendService,
+    ModalService,
     MoneyToIntPipe,
     IntToMoneyPipe,
     // {provide: HIGHCHARTS_MODULES, useFactory: () => [ highstock, more, exporting ] }
+  ],
+  entryComponents: [
+    ModalContainerComponent
   ],
   bootstrap: [AppComponent]
 })

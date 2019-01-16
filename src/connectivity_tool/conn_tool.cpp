@@ -104,6 +104,7 @@ struct response_schema
           "\"time_started\": "  << ce.time_started << ", "
           "\"last_recv\": "     << ce.last_recv << ", "
           "\"last_send\": "     << ce.last_send << ", "
+          "\"version\": "       << ce.version << ", "
           "\"is_income\": "     << ce.is_income << "}";
         if(rs.ns_rsp.v.connections_list.size()-1 != i)
           ss << ",";
@@ -373,19 +374,19 @@ bool generate_genesis(const std::string& path_config, uint64_t premine_split_amo
 
   uint64_t total_this = 0;
   double total_usd_eq = 0;
-
+#define COLUMN_INTERVAL_LAYOUT 30
   std::stringstream ss;
   ss.precision(10);
-  ss << std::setw(15) << std::left << "NAME" << std::setw(15) << std::left << "AMOUNT" << std::setw(15) << std::left << "AMOUNT THIS" << std::setw(15) << std::left << "USD EQ" << ENDL;
+  ss << std::setw(COLUMN_INTERVAL_LAYOUT) << std::left << "NAME" << std::setw(COLUMN_INTERVAL_LAYOUT) << std::left << "AMOUNT" << std::setw(COLUMN_INTERVAL_LAYOUT) << std::left << "AMOUNT THIS" << std::setw(COLUMN_INTERVAL_LAYOUT) << std::left << "USD EQ" << ENDL;
   for (auto& se : payments_stat)
   {
-    ss << std::setw(15) << std::left  << se.first << std::setw(15) << std::fixed << std::left << se.second.amount_total << std::setw(15) << std::fixed << std::left << print_money(se.second.amount_paid_this)  << std::setw(15) << std::fixed << std::left << se.second.amount_usd_eq << ENDL;
+    ss << std::setw(COLUMN_INTERVAL_LAYOUT) << std::left  << se.first << std::setw(COLUMN_INTERVAL_LAYOUT) << std::fixed << std::left << se.second.amount_total << std::setw(COLUMN_INTERVAL_LAYOUT) << std::fixed << std::left << print_money(se.second.amount_paid_this)  << std::setw(COLUMN_INTERVAL_LAYOUT) << std::fixed << std::left << se.second.amount_usd_eq << ENDL;
     total_this += se.second.amount_paid_this;
     total_usd_eq += se.second.amount_usd_eq;
   }
-  ss << ENDL << std::setw(15) << std::left << "TOTAL" << std::setw(15) << std::fixed << std::left << " " << std::setw(15) << std::fixed << std::left << print_money(total_this) << std::setw(15) << std::fixed << std::left << total_usd_eq << ENDL;
+  ss << ENDL << std::setw(COLUMN_INTERVAL_LAYOUT) << std::left << "TOTAL" << std::setw(COLUMN_INTERVAL_LAYOUT) << std::fixed << std::left << " " << std::setw(COLUMN_INTERVAL_LAYOUT) << std::fixed << std::left << print_money(total_this) << std::setw(COLUMN_INTERVAL_LAYOUT) << std::fixed << std::left << total_usd_eq << ENDL;
   
-  ss << ENDL << std::setw(15) << std::left << "PREMINE_AMOUNT" << std::setw(15) << std::fixed << std::left << " " << std::setw(15) << std::fixed << std::left << total_this << "(" << print_money(total_this) <<"THIS)" << ENDL;
+  ss << ENDL << std::setw(COLUMN_INTERVAL_LAYOUT) << std::left << "PREMINE_AMOUNT" << std::setw(COLUMN_INTERVAL_LAYOUT) << std::fixed << std::left << " " << std::setw(COLUMN_INTERVAL_LAYOUT) << std::fixed << std::left << total_this << "(" << print_money(total_this) <<"THIS)" << ENDL;
 
   epee::log_space::set_console_color(epee::log_space::console_colors::console_color_magenta, true);
   std::cout << "GENESIS STAT: " << ENDL << ss.str();
@@ -450,6 +451,7 @@ bool generate_genesis(const std::string& path_config, uint64_t premine_split_amo
 
   return true;
 }
+#undef COLUMN_INTERVAL_LAYOUT
 //---------------------------------------------------------------------------------------------------------------
 bool handle_get_aliases(po::variables_map& vm)
 {
