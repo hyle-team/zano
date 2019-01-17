@@ -1733,6 +1733,9 @@ bool blockchain_storage::get_main_block_rpc_details(uint64_t i, block_rpc_extend
   CRITICAL_REGION_LOCAL(m_read_lock);
   auto core_bei_ptr = m_db_blocks[i];
   crypto::hash id = get_block_hash(core_bei_ptr->bl);
+  crypto::hash pow_seed = null_hash;
+  get_seed_for_scratchpad(i, pow_seed);
+  bei.pow_seed = epee::string_tools::pod_to_hex(pow_seed);
   bei.is_orphan = false;
   bei.total_fee = 0;
   bei.total_txs_size = 0;
