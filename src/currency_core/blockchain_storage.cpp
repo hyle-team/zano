@@ -4306,7 +4306,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     if (!check_hash(proof_hash, current_diffic))
     {
       LOG_ERROR("Block with id: " << id << ENDL
-        << "	: " << proof_hash << ENDL
+        << "PoW hash: " << proof_hash << ENDL
+        << "PoW seed: " << m_current_scratchpad_seed << ENDL
         << "unexpected difficulty: " << current_diffic);
       bvc.m_verification_failed = true;
       return false;
@@ -5326,6 +5327,7 @@ bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx
 bool blockchain_storage::get_seed_for_scratchpad(uint64_t height, crypto::hash& seed)const 
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+  LOG_PRINT_MAGENTA("Get seed for scratchpad [main_chain] on height " << height, LOG_LEVEL_0);
   return get_seed_for_scratchpad_cb(height, seed, [&](uint64_t index) -> crypto::hash
   {
     return get_block_hash(m_db_blocks[index]->bl);

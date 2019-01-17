@@ -669,7 +669,7 @@ namespace currency
       crypto::hash genesis_seed = null_hash;
       bool r = epee::string_tools::hex_to_pod(CURRENCY_SCRATCHPAD_GENESIS_SEED, genesis_seed);
       CHECK_AND_ASSERT_THROW_MES(r, "Unable to parse CURRENCY_SCRATCHPAD_GENESIS_SEED " << CURRENCY_SCRATCHPAD_GENESIS_SEED);
-      LOG_PRINT_MAGENTA("[SCRATCHPAD] GENESIS SEED SELECTED: " << genesis_seed, LOG_LEVEL_1);
+      LOG_PRINT_MAGENTA("[SCRATCHPAD] GENESIS SEED SELECTED: " << genesis_seed, LOG_LEVEL_0);
       seed = genesis_seed;
       return true;
     }
@@ -688,7 +688,7 @@ namespace currency
     }
     seed = crypto::cn_fast_hash(&seed_data[0], sizeof(seed_data[0]) * seed_data.size());
 
-    LOG_PRINT_MAGENTA("[SCRATCHPAD] SEED SELECTED: h = " << last_upd_h << ", selector: " << selector_id << ENDL << ss.str() << "SEED: " << seed, LOG_LEVEL_1);
+    LOG_PRINT_MAGENTA("[SCRATCHPAD] SEED SELECTED: h = " << last_upd_h << ", selector: " << selector_id << ENDL << ss.str() << "SEED: " << seed, LOG_LEVEL_0);
 
     return true;
   }
