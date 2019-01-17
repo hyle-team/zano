@@ -103,7 +103,7 @@ var InputValidateDirective = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"modal\">\r\n  <div class=\"content\">\r\n    <i class=\"icon\" [class.error]=\"type === 'error'\" [class.success]=\"type === 'success'\" [class.info]=\"type === 'info'\"></i>\r\n    <div class=\"message-container\">\r\n      <span class=\"title\">{{title}}</span>\r\n      <span class=\"message\">{{message}}</span>\r\n    </div>\r\n  </div>\r\n  <button type=\"button\" class=\"action-button\" (click)=\"onClose()\" #btn>OK</button>\r\n  <button type=\"button\" class=\"close-button\" (click)=\"onClose()\"><i class=\"icon close\"></i></button>\r\n</div>\r\n"
+module.exports = "<div class=\"modal\">\r\n  <div class=\"content\">\r\n    <i class=\"icon\" [class.error]=\"type === 'error'\" [class.success]=\"type === 'success'\" [class.info]=\"type === 'info'\"></i>\r\n    <div class=\"message-container\">\r\n      <span class=\"title\">{{title}}</span>\r\n      <span class=\"message\" [innerHTML]=\"message\"></span>\r\n    </div>\r\n  </div>\r\n  <button type=\"button\" class=\"action-button\" (click)=\"onClose()\" #btn>OK</button>\r\n  <button type=\"button\" class=\"close-button\" (click)=\"onClose()\"><i class=\"icon close\"></i></button>\r\n</div>\r\n"
 
 /***/ }),
 
@@ -313,6 +313,8 @@ var TooltipDirective = /** @class */ (function () {
         this.el = el;
         this.renderer = renderer;
         this.cursor = 'pointer';
+        this.timeout = 0;
+        this.delay = 0;
     }
     TooltipDirective.prototype.onMouseEnter = function () {
         if (!this.tooltip) {
@@ -333,11 +335,13 @@ var TooltipDirective = /** @class */ (function () {
     };
     TooltipDirective.prototype.hide = function () {
         var _this = this;
-        this.renderer.setStyle(this.tooltip, 'opacity', '0');
         this.removeTooltipTimeout = setTimeout(function () {
-            _this.renderer.removeChild(document.body, _this.tooltip);
-            _this.tooltip = null;
-        }, this.delay);
+            _this.renderer.setStyle(_this.tooltip, 'opacity', '0');
+            window.setTimeout(function () {
+                _this.renderer.removeChild(document.body, _this.tooltip);
+                _this.tooltip = null;
+            }, _this.delay);
+        }, this.timeout);
     };
     TooltipDirective.prototype.cancelHide = function () {
         clearTimeout(this.removeTooltipTimeout);
@@ -345,8 +349,13 @@ var TooltipDirective = /** @class */ (function () {
     };
     TooltipDirective.prototype.create = function () {
         var _this = this;
-        this.tooltip = this.renderer.createElement('span');
-        this.renderer.appendChild(this.tooltip, this.renderer.createText(this.tooltipTitle));
+        if (typeof this.tooltipInner === 'string') {
+            this.tooltip = this.renderer.createElement('div');
+            this.tooltip.innerHTML = this.tooltipInner;
+        }
+        else {
+            this.tooltip = this.tooltipInner;
+        }
         this.renderer.appendChild(document.body, this.tooltip);
         this.renderer.setStyle(document.body, 'position', 'relative');
         this.renderer.setStyle(this.tooltip, 'position', 'absolute');
@@ -360,16 +369,14 @@ var TooltipDirective = /** @class */ (function () {
             this.placement = 'top';
             this.renderer.addClass(this.tooltip, 'ng-tooltip-top');
         }
-        if (this.delay !== null) {
-            this.renderer.setStyle(this.tooltip, 'opacity', '0');
-            this.renderer.setStyle(this.tooltip, '-webkit-transition', "opacity " + this.delay + "ms");
-            this.renderer.setStyle(this.tooltip, '-moz-transition', "opacity " + this.delay + "ms");
-            this.renderer.setStyle(this.tooltip, '-o-transition', "opacity " + this.delay + "ms");
-            this.renderer.setStyle(this.tooltip, 'transition', "opacity " + this.delay + "ms");
-            window.setTimeout(function () {
-                _this.renderer.setStyle(_this.tooltip, 'opacity', '1');
-            }, 0);
-        }
+        this.renderer.setStyle(this.tooltip, 'opacity', '0');
+        this.renderer.setStyle(this.tooltip, '-webkit-transition', "opacity " + this.delay + "ms");
+        this.renderer.setStyle(this.tooltip, '-moz-transition', "opacity " + this.delay + "ms");
+        this.renderer.setStyle(this.tooltip, '-o-transition', "opacity " + this.delay + "ms");
+        this.renderer.setStyle(this.tooltip, 'transition', "opacity " + this.delay + "ms");
+        window.setTimeout(function () {
+            _this.renderer.setStyle(_this.tooltip, 'opacity', '1');
+        }, 0);
     };
     TooltipDirective.prototype.setPosition = function () {
         var hostPos = this.el.nativeElement.getBoundingClientRect();
@@ -406,8 +413,8 @@ var TooltipDirective = /** @class */ (function () {
     ], TooltipDirective.prototype, "cursor", void 0);
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Input"])('tooltip'),
-        __metadata("design:type", String)
-    ], TooltipDirective.prototype, "tooltipTitle", void 0);
+        __metadata("design:type", Object)
+    ], TooltipDirective.prototype, "tooltipInner", void 0);
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Input"])(),
         __metadata("design:type", String)
@@ -418,7 +425,11 @@ var TooltipDirective = /** @class */ (function () {
     ], TooltipDirective.prototype, "tooltipClass", void 0);
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Input"])(),
-        __metadata("design:type", Number)
+        __metadata("design:type", Object)
+    ], TooltipDirective.prototype, "timeout", void 0);
+    __decorate([
+        Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Input"])(),
+        __metadata("design:type", Object)
     ], TooltipDirective.prototype, "delay", void 0);
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["HostListener"])('mouseenter'),
@@ -3065,7 +3076,7 @@ var CreateWalletComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"wrap-table\">\r\n  <table class=\"history-table\">\r\n    <thead>\r\n    <tr>\r\n      <th>{{ 'HISTORY.STATUS' | translate }}</th>\r\n      <th>{{ 'HISTORY.DATE' | translate }}</th>\r\n      <th>{{ 'HISTORY.AMOUNT' | translate }}</th>\r\n      <th>{{ 'HISTORY.FEE' | translate }}</th>\r\n      <th>{{ 'HISTORY.ADDRESS' | translate }}</th>\r\n    </tr>\r\n    </thead>\r\n    <tbody>\r\n    <tr *ngFor=\"let item of variablesService.currentWallet.history\">\r\n      <td>\r\n        <div class=\"status\" [class.send]=\"!item.is_income\" [class.received]=\"item.is_income\">\r\n          <ng-container *ngIf=\"variablesService.height_app - item.height <= 10 || item.height === 0 || (item.is_mining && item.height === 0)\">\r\n            <div class=\"confirmation\" tooltip=\"{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}\" placement=\"bottom\" tooltipClass=\"history-tooltip\" delay=\"500\">\r\n              <div class=\"fill\" [style.height]=\"getHeight(item) + '%'\"></div>\r\n            </div>\r\n          </ng-container>\r\n          <i class=\"icon\"></i>\r\n          <span>{{ (item.is_income ? 'HISTORY.RECEIVED' : 'HISTORY.SEND') | translate }}</span>\r\n        </div>\r\n      </td>\r\n      <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>\r\n      <td>\r\n        <span *ngIf=\"item.sortAmount\">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n      </td>\r\n      <td>\r\n        <span *ngIf=\"item.sortFee\">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n      </td>\r\n      <td class=\"remote-address\">\r\n        <span>{{item | historyTypeMessages}}</span>\r\n      </td>\r\n    </tr>\r\n    </tbody>\r\n  </table>\r\n</div>\r\n"
+module.exports = "<div class=\"wrap-table\">\r\n  <table class=\"history-table\">\r\n    <thead>\r\n    <tr>\r\n      <th>{{ 'HISTORY.STATUS' | translate }}</th>\r\n      <th>{{ 'HISTORY.DATE' | translate }}</th>\r\n      <th>{{ 'HISTORY.AMOUNT' | translate }}</th>\r\n      <th>{{ 'HISTORY.FEE' | translate }}</th>\r\n      <th>{{ 'HISTORY.ADDRESS' | translate }}</th>\r\n    </tr>\r\n    </thead>\r\n    <tbody>\r\n    <tr *ngFor=\"let item of variablesService.currentWallet.history\">\r\n      <td>\r\n        <div class=\"status\" [class.send]=\"!item.is_income\" [class.received]=\"item.is_income\">\r\n          <ng-container *ngIf=\"variablesService.height_app - item.height < 10 || item.height === 0 || (item.is_mining && item.height === 0)\">\r\n            <div class=\"confirmation\" tooltip=\"{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}\" placement=\"bottom\" tooltipClass=\"history-tooltip\" [delay]=\"500\">\r\n              <div class=\"fill\" [style.height]=\"getHeight(item) + '%'\"></div>\r\n            </div>\r\n          </ng-container>\r\n          <i class=\"icon\"></i>\r\n          <span>{{ (item.is_income ? 'HISTORY.RECEIVED' : 'HISTORY.SEND') | translate }}</span>\r\n        </div>\r\n      </td>\r\n      <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>\r\n      <td>\r\n        <span *ngIf=\"item.sortAmount\">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n      </td>\r\n      <td>\r\n        <span *ngIf=\"item.sortFee\">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n      </td>\r\n      <td class=\"remote-address\">\r\n        <span>{{item | historyTypeMessages}}</span>\r\n      </td>\r\n    </tr>\r\n    </tbody>\r\n  </table>\r\n</div>\r\n"
 
 /***/ }),
 
@@ -5324,7 +5335,7 @@ var WalletDetailsComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"header\">\r\n  <div>\r\n    <h3>{{variablesService.currentWallet.name}}</h3>\r\n    <button (click)=\"openInBrowser()\">\r\n      <i class=\"icon account\"></i>\r\n      <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>\r\n    </button>\r\n  </div>\r\n  <div>\r\n    <button [routerLink]=\"['/details']\" routerLinkActive=\"active\">\r\n      <i class=\"icon details\"></i>\r\n      <span>{{ 'WALLET.DETAILS' | translate }}</span>\r\n    </button>\r\n    <!--<button (click)=\"closeWallet()\">\r\n      <i class=\"icon lock\"></i>\r\n      <span>{{ 'WALLET.LOCK' | translate }}</span>\r\n    </button>-->\r\n  </div>\r\n</div>\r\n<div class=\"address\">\r\n  <span>{{variablesService.currentWallet.address}}</span>\r\n  <i class=\"icon copy\" (click)=\"copyAddress()\"></i>\r\n</div>\r\n<div class=\"balance\">\r\n  <span>{{variablesService.currentWallet.unlocked_balance | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n  <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n</div>\r\n<div class=\"tabs\">\r\n  <div class=\"tabs-header\">\r\n    <ng-container *ngFor=\"let tab of tabs; let index = index\">\r\n      <div class=\"tab\" [class.active]=\"tab.active\" [class.disabled]=\"(tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2\" (click)=\"changeTab(index)\">\r\n        <i class=\"icon\" [ngClass]=\"tab.icon\"></i>\r\n        <span>{{ tab.title | translate }}</span>\r\n        <span class=\"indicator\" *ngIf=\"tab.indicator\">{{variablesService.currentWallet.new_contracts}}</span>\r\n      </div>\r\n    </ng-container>\r\n  </div>\r\n  <div class=\"tabs-content scrolled-content\">\r\n    <router-outlet></router-outlet>\r\n  </div>\r\n</div>\r\n\r\n"
+module.exports = "<div class=\"header\">\r\n  <div>\r\n    <h3>{{variablesService.currentWallet.name}}</h3>\r\n    <button (click)=\"openInBrowser('zano.org')\">\r\n      <i class=\"icon account\"></i>\r\n      <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>\r\n    </button>\r\n  </div>\r\n  <div>\r\n    <button [routerLink]=\"['/details']\" routerLinkActive=\"active\">\r\n      <i class=\"icon details\"></i>\r\n      <span>{{ 'WALLET.DETAILS' | translate }}</span>\r\n    </button>\r\n    <!--<button (click)=\"closeWallet()\">\r\n      <i class=\"icon lock\"></i>\r\n      <span>{{ 'WALLET.LOCK' | translate }}</span>\r\n    </button>-->\r\n  </div>\r\n</div>\r\n<div class=\"address\">\r\n  <span>{{variablesService.currentWallet.address}}</span>\r\n  <i class=\"icon copy\" (click)=\"copyAddress()\"></i>\r\n</div>\r\n<div class=\"balance\">\r\n  <span [tooltip]=\"getTooltip()\" [placement]=\"'bottom'\" [tooltipClass]=\"'balance-tooltip'\" [delay]=\"500\" [timeout]=\"1000\">{{variablesService.currentWallet.balance | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n  <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n</div>\r\n<div class=\"tabs\">\r\n  <div class=\"tabs-header\">\r\n    <ng-container *ngFor=\"let tab of tabs; let index = index\">\r\n      <div class=\"tab\" [class.active]=\"tab.active\" [class.disabled]=\"(tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2\" (click)=\"changeTab(index)\">\r\n        <i class=\"icon\" [ngClass]=\"tab.icon\"></i>\r\n        <span>{{ tab.title | translate }}</span>\r\n        <span class=\"indicator\" *ngIf=\"tab.indicator\">{{variablesService.currentWallet.new_contracts}}</span>\r\n      </div>\r\n    </ng-container>\r\n  </div>\r\n  <div class=\"tabs-content scrolled-content\">\r\n    <router-outlet></router-outlet>\r\n  </div>\r\n</div>\r\n\r\n"
 
 /***/ }),
 
@@ -5353,6 +5364,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
 /* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
 /* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
+/* harmony import */ var _ngx_translate_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @ngx-translate/core */ "./node_modules/@ngx-translate/core/fesm5/ngx-translate-core.js");
+/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -5366,13 +5379,17 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 
 
 
+
+
 var WalletComponent = /** @class */ (function () {
-    function WalletComponent(route, router, backend, variablesService, ngZone) {
+    function WalletComponent(route, router, backend, variablesService, ngZone, translate, intToMoneyPipe) {
         this.route = route;
         this.router = router;
         this.backend = backend;
         this.variablesService = variablesService;
         this.ngZone = ngZone;
+        this.translate = translate;
+        this.intToMoneyPipe = intToMoneyPipe;
         this.tabs = [
             {
                 title: 'WALLET.TABS.HISTORY',
@@ -5441,8 +5458,28 @@ var WalletComponent = /** @class */ (function () {
     WalletComponent.prototype.copyAddress = function () {
         this.backend.setClipboard(this.variablesService.currentWallet.address);
     };
-    WalletComponent.prototype.openInBrowser = function () {
-        this.backend.openUrlInBrowser('zano.org');
+    WalletComponent.prototype.getTooltip = function () {
+        var _this = this;
+        var tooltip = document.createElement('div');
+        var available = document.createElement('span');
+        available.setAttribute('class', 'available');
+        available.innerHTML = this.translate.instant('WALLET.AVAILABLE_BALANCE', { available: this.intToMoneyPipe.transform(this.variablesService.currentWallet.unlocked_balance), currency: this.variablesService.defaultCurrency });
+        tooltip.appendChild(available);
+        var locked = document.createElement('span');
+        locked.setAttribute('class', 'locked');
+        locked.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE', { locked: this.intToMoneyPipe.transform(this.variablesService.currentWallet.balance - this.variablesService.currentWallet.unlocked_balance), currency: this.variablesService.defaultCurrency });
+        tooltip.appendChild(locked);
+        var link = document.createElement('span');
+        link.setAttribute('class', 'link');
+        link.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE_LINK');
+        link.addEventListener('click', function () {
+            _this.openInBrowser('docs.zano.org/docs/locked-balance');
+        });
+        tooltip.appendChild(link);
+        return tooltip;
+    };
+    WalletComponent.prototype.openInBrowser = function (link) {
+        this.backend.openUrlInBrowser(link);
     };
     WalletComponent.prototype.ngOnDestroy = function () {
         this.subRouting.unsubscribe();
@@ -5457,7 +5494,9 @@ var WalletComponent = /** @class */ (function () {
             _angular_router__WEBPACK_IMPORTED_MODULE_1__["Router"],
             _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__["BackendService"],
             _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_2__["VariablesService"],
-            _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"]])
+            _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"],
+            _ngx_translate_core__WEBPACK_IMPORTED_MODULE_4__["TranslateService"],
+            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_5__["IntToMoneyPipe"]])
     ], WalletComponent);
     return WalletComponent;
 }());

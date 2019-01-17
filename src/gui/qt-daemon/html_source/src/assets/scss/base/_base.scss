@@ -385,6 +385,59 @@ input[type='checkbox'].style-checkbox {
   }
 }
 
+.balance-tooltip {
+  display: flex;
+  flex-direction: column;
+  font-size: 1.3rem;
+  padding: 1.3rem;
+
+  @include themify($themes) {
+    background: themed(tooltipBackgroundColor);
+    box-shadow: themed(tooltipShadow);
+    color: themed(mainTextColor);
+  }
+
+  &.ng-tooltip-top {
+    margin-top: -1rem;
+  }
+
+  &.ng-tooltip-bottom {
+    margin-top: 1rem;
+  }
+
+  &.ng-tooltip-left {
+    margin-left: -1rem;
+  }
+
+  &.ng-tooltip-right {
+    margin-left: 1rem;
+  }
+
+  .available {
+    margin-bottom: 1.7rem;
+
+    b {
+      font-weight: 600;
+    }
+  }
+
+  .locked {
+    margin-bottom: 0.7rem;
+
+    b {
+      font-weight: 600;
+    }
+  }
+
+  .link {
+    cursor: pointer;
+
+    @include themify($themes) {
+      color: themed(blueTextColor);
+    }
+  }
+}
+
 .modal {
 
   @include themify($themes) {
