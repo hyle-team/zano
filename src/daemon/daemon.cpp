@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
   ccore.set_currency_protocol(&cprotocol);
   daemon_cmmands_handler dch(p2psrv, rpc_server);
   tools::miniupnp_helper upnp_helper;
-  ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
+  //ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
 
   if (command_line::get_arg(vm, command_line::arg_show_rpc_autodoc))
   {

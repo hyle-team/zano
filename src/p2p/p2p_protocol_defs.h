@@ -33,6 +33,8 @@ namespace nodetool
     time_t last_seen;
   };
 
+#define P2P_CONNECTION_ENTRY_VERSION_MAX_SIZE 50
+
   struct connection_entry
   {
     net_address adr;
@@ -41,7 +43,7 @@ namespace nodetool
     uint64_t time_started;
     uint64_t last_recv;
     uint64_t last_send;
-    std::string version;
+    char version[P2P_CONNECTION_ENTRY_VERSION_MAX_SIZE];
   };
 
 #pragma pack(pop)

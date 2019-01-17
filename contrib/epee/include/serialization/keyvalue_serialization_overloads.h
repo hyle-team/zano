@@ -125,6 +125,7 @@ namespace epee
     template<class stl_container, class t_storage>
     static bool serialize_stl_container_pod_val_as_blob(const stl_container& container, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
+      static_assert(std::is_trivial<stl_container::value_type>::value, "Item supposed to be 'trivial'(trivially copyable)");
       if(!container.size()) return true;
       std::string mb;
       mb.resize(sizeof(typename stl_container::value_type)*container.size());
@@ -140,6 +141,7 @@ namespace epee
     template<class stl_container, class t_storage>
     static bool unserialize_stl_container_pod_val_as_blob(stl_container& container, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
+      static_assert(std::is_trivial<stl_container::value_type>::value, "Item supposed to be 'trivial'(trivially copyable)");
       container.clear();
       std::string buff;
       bool res = stg.get_value(pname, buff, hparent_section);
