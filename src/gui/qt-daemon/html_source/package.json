@@ -6,10 +6,10 @@
     "start": "ng serve",
     "build": "ng build",
     "build --watch": "ng build --output-path \"C:\\Program Files\\Zano\\html/\" --watch",
+    "build --html": "ng build --output-path \"../html/\"",
     "test": "ng test",
     "lint": "ng lint",
-    "e2e": "ng e2e",
-    "copy": "copyfiles -u 1 dist/**/* \"C:\\Program Files\\Zano\\html/\""
+    "e2e": "ng e2e"
   },
   "private": true,
   "dependencies": {
@@ -26,7 +26,6 @@
     "@ngx-translate/core": "^11.0.0",
     "@ngx-translate/http-loader": "^4.0.0",
     "angular-highcharts": "^7.0.2",
-    "copyfiles": "^2.1.0",
     "core-js": "^2.5.4",
     "highcharts": "^6.2.0",
     "idlejs": "^2.0.1",

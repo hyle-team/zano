@@ -96,6 +96,9 @@
     "REGISTER_ALIAS": "Register an alias",
     "DETAILS": "Details",
     "LOCK": "Lock",
+    "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
+    "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
+    "LOCKED_BALANCE_LINK": "What does that mean?",
     "TABS": {
       "SEND": "Send",
       "RECEIVE": "Receive",

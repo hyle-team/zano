@@ -1,7 +1,7 @@
 <div class="header">
   <div>
     <h3>{{variablesService.currentWallet.name}}</h3>
-    <button (click)="openInBrowser()">
+    <button (click)="openInBrowser('zano.org')">
       <i class="icon account"></i>
       <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>
     </button>
@@ -22,7 +22,7 @@
   <i class="icon copy" (click)="copyAddress()"></i>
 </div>
 <div class="balance">
-  <span>{{variablesService.currentWallet.unlocked_balance | intToMoney}} {{variablesService.defaultCurrency}}</span>
+  <span [tooltip]="getTooltip()" [placement]="'bottom'" [tooltipClass]="'balance-tooltip'" [delay]="500" [timeout]="1000">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>
   <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>
 </div>
 <div class="tabs">
