@@ -1733,6 +1733,9 @@ bool blockchain_storage::get_main_block_rpc_details(uint64_t i, block_rpc_extend
   CRITICAL_REGION_LOCAL(m_read_lock);
   auto core_bei_ptr = m_db_blocks[i];
   crypto::hash id = get_block_hash(core_bei_ptr->bl);
+  crypto::hash pow_seed = null_hash;
+  get_seed_for_scratchpad(i, pow_seed);
+  bei.pow_seed = epee::string_tools::pod_to_hex(pow_seed);
   bei.is_orphan = false;
   bei.total_fee = 0;
   bei.total_txs_size = 0;
@@ -4303,7 +4306,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     if (!check_hash(proof_hash, current_diffic))
     {
       LOG_ERROR("Block with id: " << id << ENDL
-        << "	: " << proof_hash << ENDL
+        << "PoW hash: " << proof_hash << ENDL
+        << "PoW seed: " << m_current_scratchpad_seed << ENDL
         << "unexpected difficulty: " << current_diffic);
       bvc.m_verification_failed = true;
       return false;
@@ -5323,6 +5327,7 @@ bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx
 bool blockchain_storage::get_seed_for_scratchpad(uint64_t height, crypto::hash& seed)const 
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+  LOG_PRINT_MAGENTA("Get seed for scratchpad [main_chain] on height " << height, LOG_LEVEL_0);
   return get_seed_for_scratchpad_cb(height, seed, [&](uint64_t index) -> crypto::hash
   {
     return get_block_hash(m_db_blocks[index]->bl);

@@ -203,7 +203,7 @@ namespace tools
         if (txe.count == 0 || (txe.read_only && txe.count == 1))
         {
           mdb_txn_abort(txe.ptx);
-          if (!txe.read_only && txe.count)
+          if (!txe.read_only && !txe.count)
           {
             CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
             LOG_PRINT_CYAN("[DB " << m_path << "] WRITE UNLOCKED(ABORTED)", LOG_LEVEL_3);
