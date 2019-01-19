@@ -64,12 +64,13 @@ namespace currency
     stop();
   }
   //-----------------------------------------------------------------------------------------------------
-  bool miner::set_block_template(const block& bl, const wide_difficulty_type& di, uint64_t height)
+  bool miner::set_block_template(const block& bl, const wide_difficulty_type& di, uint64_t height, const crypto::hash& seed)
   {
     CRITICAL_REGION_LOCAL(m_template_lock);
     m_template = bl;
     m_diffic = di;
     m_height = height;
+    m_seed = seed;
     ++m_template_no;
     m_starter_nonce = crypto::rand<uint32_t>();
     m_scratchpad.generate(m_seed, height);
@@ -95,12 +96,13 @@ namespace currency
     {
       extra_nonce += std::string("|") + m_extra_messages[m_config.current_extra_message_index];
     }
-    if(!m_phandler->get_block_template(bl, m_seed, m_mine_address, m_mine_address, di, height, extra_nonce))
+    crypto::hash seed = null_hash;
+    if(!m_phandler->get_block_template(bl, seed, m_mine_address, m_mine_address, di, height, extra_nonce))
     {
       LOG_ERROR("Failed to get_block_template()");
       return false;
     }
-    set_block_template(bl, di, height);
+    set_block_template(bl, di, height, seed);
     return true;
   }
   //-----------------------------------------------------------------------------------------------------
@@ -307,6 +309,8 @@ namespace currency
     wide_difficulty_type local_diff = 0;
     uint32_t local_template_ver = 0;
     blobdata local_blob_data;
+    crypto::hash local_seed = null_hash;
+    uint64_t local_height = 0;
 
     //uint64_t local_template_height = 0;
     block b;
@@ -324,6 +328,8 @@ namespace currency
         CRITICAL_REGION_BEGIN(m_template_lock);
         b = m_template;
         local_diff = m_diffic;
+        local_seed = m_seed;
+        local_height = m_height;
         CRITICAL_REGION_END();
         //local_template_height = get_block_height(b);
         local_template_ver = m_template_no;
@@ -339,7 +345,7 @@ namespace currency
       }
       b.nonce = nonce;
       access_nonce_in_block_blob(local_blob_data) = b.nonce;
-      crypto::hash h = m_scratchpad.get_pow_hash(local_blob_data, m_height, m_seed);
+      crypto::hash h = m_scratchpad.get_pow_hash(local_blob_data, local_height, local_seed);
 
       if(check_hash(h, local_diff))
       {
