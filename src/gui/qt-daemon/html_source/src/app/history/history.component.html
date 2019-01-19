@@ -13,7 +13,7 @@
     <tr *ngFor="let item of variablesService.currentWallet.history">
       <td>
         <div class="status" [class.send]="!item.is_income" [class.received]="item.is_income">
-          <ng-container *ngIf="variablesService.height_app - item.height < 10 || (item.height === 0 && item.timestamp > 0) || (item.is_mining && item.height === 0)">
+          <ng-container *ngIf="variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0">
             <div class="confirmation" tooltip="{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}" placement="bottom" tooltipClass="history-tooltip" [delay]="500">
               <div class="fill" [style.height]="getHeight(item) + '%'"></div>
             </div>
@@ -24,10 +24,10 @@
       </td>
       <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>
       <td>
-        <span *ngIf="item.sortAmount">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>
+        <span *ngIf="item.sortAmount && item.sortAmount.toString() !== '0'">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>
       </td>
       <td>
-        <span *ngIf="item.sortFee">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>
+        <span *ngIf="item.sortFee && item.sortFee.toString() !== '0'">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>
       </td>
       <td class="remote-address">
         <span>{{item | historyTypeMessages}}</span>

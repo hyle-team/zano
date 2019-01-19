@@ -48,6 +48,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
       this.backend.eventSubscribe('quit_requested', () => {
         if (!this.onQuitRequest) {
+          this.ngZone.run(() => {
+            this.router.navigate(['/']);
+          });
           this.backend.storeSecureAppData(() => {
             this.backend.storeAppData(() => {
               const recursionCloseWallets = () => {
@@ -253,7 +256,7 @@ export class AppComponent implements OnInit, OnDestroy {
               const searchResult = this.variablesService.settings.viewedContracts.some(elem => elem.state === contract.state && elem.is_a === contract.is_a && elem.contract_id === contract.contract_id);
               contract.is_new = !searchResult;
 
-              contract['private_detailes'].a_pledge += contract['private_detailes'].to_pay;
+              contract['private_detailes'].a_pledge = contract['private_detailes'].a_pledge.plus(contract['private_detailes'].to_pay);
 
               let findContract = false;
               for (let i = 0; i < safe.contracts.length; i++) {
@@ -363,7 +366,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
       this.backend.getAppData((status, data) => {
         if (data && Object.keys(data).length > 0) {
-          this.variablesService.settings = data;
+          for (const key in data) {
+            if (data.hasOwnProperty(key) && this.variablesService.settings.hasOwnProperty(key)) {
+              this.variablesService.settings[key] = data[key];
+            }
+          }
           if (this.variablesService.settings.hasOwnProperty('theme') && ['dark', 'white', 'gray'].indexOf(this.variablesService.settings.theme) !== -1) {
             this.renderer.addClass(document.body, 'theme-' + this.variablesService.settings.theme);
           } else {

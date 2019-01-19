@@ -1,4 +1,5 @@
 import {Contract} from './contract.model';
+import {BigNumber} from 'bignumber.js';
 
 export class Wallet {
   wallet_id: number;
@@ -6,8 +7,8 @@ export class Wallet {
   pass: string;
   path: string;
   address: string;
-  balance: number;
-  unlocked_balance: number;
+  balance: BigNumber;
+  unlocked_balance: BigNumber;
   mined_total: number;
   tracking_hey: string;
 
@@ -24,7 +25,7 @@ export class Wallet {
   progress?: number;
   loaded?: boolean;
 
-  constructor(id, name, pass, path, address, balance = 0, unlocked_balance = 0, mined = 0, tracking = '') {
+  constructor(id, name, pass, path, address, balance, unlocked_balance, mined = 0, tracking = '') {
     this.wallet_id = id;
     this.name = name;
     this.pass = pass;
@@ -48,7 +49,7 @@ export class Wallet {
   }
 
   getMoneyEquivalent(equivalent) {
-    return this.balance * equivalent;
+    return this.balance.multipliedBy(equivalent).toFixed(0);
   }
 
   havePass(): boolean {
@@ -61,17 +62,17 @@ export class Wallet {
 
   prepareHistoryItem(item: any): any {
     if (item.tx_type === 4) {
-      item.sortFee = -(item.amount + item.fee);
+      item.sortFee = item.amount.plus(item.fee).negated();
       item.sortAmount = 0;
     } else if (item.tx_type === 3) {
       item.sortFee = 0;
     } else if ((item.hasOwnProperty('contract') && (item.contract[0].state === 3 || item.contract[0].state === 6 || item.contract[0].state === 601) && !item.contract[0].is_a)) {
-      item.sortFee = -item.fee;
-      item.sortAmount = item.amount;
+      item.sortFee = item.fee.negated();
+      item.sortAmount = item.amount.negated();
     } else {
       if (!item.is_income) {
-        item.sortFee = -item.fee;
-        item.sortAmount = -item.amount;
+        item.sortFee = item.fee.negated();
+        item.sortAmount = item.amount.negated();
       } else {
         item.sortAmount = item.amount;
       }
@@ -191,7 +192,8 @@ export class Wallet {
       }
       const searchResult = viewedContracts.some(elem => elem.state === contract.state && elem.is_a === contract.is_a && elem.contract_id === contract.contract_id);
       contract.is_new = !searchResult;
-      contract['private_detailes'].a_pledge += contract['private_detailes'].to_pay;
+
+      contract['private_detailes'].a_pledge = contract['private_detailes'].a_pledge.plus(contract['private_detailes'].to_pay);
 
       safe.contracts.push(contract);
     }
