@@ -108,7 +108,7 @@
 
   <div class="purchase-states" *ngIf="!newPurchase">
 
-    <ng-container *ngIf="currentContract.state == 1 && !currentContract.is_a && (currentContract.private_detailes.b_pledge + ('0.01' | moneyToInt) + ('0.01' | moneyToInt)) > variablesService.currentWallet.unlocked_balance">
+    <ng-container *ngIf="currentContract.state == 1 && !currentContract.is_a && currentContract.private_detailes.b_pledge.plus(('0.01' | moneyToInt)).plus(('0.01' | moneyToInt)).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
       <span>{{ 'There are insufficient funds in the safe. Add funds to the safe to continue' | translate }}</span>
     </ng-container>
 
@@ -177,7 +177,7 @@
     <ng-container *ngIf="currentContract.state == 201 || currentContract.state == 601">
       <span *ngIf="currentContract.height === 0">0/10</span>
       <span *ngIf="currentContract.height !== 0 && (variablesService.height_app - currentContract.height) < 10">{{variablesService.height_app - currentContract.height}}/10</span>
-      <span *ngIf="historyBlock && historyBlock.sortAmount">{{(historyBlock.is_income ? '+' : '') + (historyBlock.sortAmount | intToMoney)}} {{variablesService.defaultCurrency}}</span>
+      <span *ngIf="historyBlock && historyBlock.sortAmount && historyBlock.sortAmount.toString() !== '0'">{{(historyBlock.is_income ? '+' : '') + (historyBlock.sortAmount | intToMoney)}} {{variablesService.defaultCurrency}}</span>
     </ng-container>
 
   </div>
@@ -188,7 +188,7 @@
     <!--<button type="button" class="green-button">{{ 'PURCHASE.COMPLETE_BUTTON' | translate }}</button>-->
 
     <ng-container *ngIf="!currentContract.is_a && currentContract.state == 1">
-      <button type="button" class="blue-button" (click)="acceptState();" [disabled]="(currentContract.private_detailes.b_pledge + ('0.01' | moneyToInt) + ('0.01' | moneyToInt)) > variablesService.currentWallet.unlocked_balance">
+      <button type="button" class="blue-button" (click)="acceptState();" [disabled]="currentContract.private_detailes.b_pledge.plus(('0.01' | moneyToInt)).plus(('0.01' | moneyToInt)).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
         {{'Accept (Make pledge)' | translate}}
       </button>
       <button type="button" class="turquoise-button" (click)="ignoredContract();">{{'Ignore' | translate}}</button>

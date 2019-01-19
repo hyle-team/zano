@@ -4,6 +4,7 @@ import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
 import {TranslateService} from '@ngx-translate/core';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
+import {BigNumber} from 'bignumber.js';
 
 @Component({
   selector: 'app-wallet',
@@ -95,16 +96,16 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   getTooltip() {
-    let tooltip = document.createElement('div');
-    let available = document.createElement('span');
+    const tooltip = document.createElement('div');
+    const available = document.createElement('span');
     available.setAttribute('class', 'available');
     available.innerHTML = this.translate.instant('WALLET.AVAILABLE_BALANCE', {available: this.intToMoneyPipe.transform(this.variablesService.currentWallet.unlocked_balance), currency: this.variablesService.defaultCurrency});
     tooltip.appendChild(available);
-    let locked = document.createElement('span');
+    const locked = document.createElement('span');
     locked.setAttribute('class', 'locked');
-    locked.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE', {locked: this.intToMoneyPipe.transform(this.variablesService.currentWallet.balance - this.variablesService.currentWallet.unlocked_balance), currency: this.variablesService.defaultCurrency});
+    locked.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE', {locked: this.intToMoneyPipe.transform(this.variablesService.currentWallet.balance.minus(this.variablesService.currentWallet.unlocked_balance)), currency: this.variablesService.defaultCurrency});
     tooltip.appendChild(locked);
-    let link = document.createElement('span');
+    const link = document.createElement('span');
     link.setAttribute('class', 'link');
     link.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE_LINK');
     link.addEventListener('click', () => {
