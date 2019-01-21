@@ -8,11 +8,11 @@ import {VariablesService} from '../_helpers/services/variables.service';
 })
 export class HistoryComponent implements OnInit, OnDestroy {
 
-  constructor(private variablesService: VariablesService) {
-  }
+  openedDetails = false;
 
-  ngOnInit() {
-  }
+  constructor(private variablesService: VariablesService) {}
+
+  ngOnInit() {}
 
   getHeight(item) {
     if ((this.variablesService.height_app - item.height >= 10 && item.height !== 0) || (item.is_mining === true && item.height === 0)) {
@@ -26,7 +26,14 @@ export class HistoryComponent implements OnInit, OnDestroy {
     }
   }
 
-  ngOnDestroy() {
+  openDetails(index) {
+    if (index === this.openedDetails) {
+      this.openedDetails = false;
+    } else {
+      this.openedDetails = index;
+    }
   }
+
+  ngOnDestroy() {}
 
 }

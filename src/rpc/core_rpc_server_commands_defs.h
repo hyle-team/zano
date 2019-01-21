@@ -1225,6 +1225,7 @@ namespace currency
     std::string cumulative_diff_precise;
     std::string difficulty;
     std::string prev_id;
+    std::string pow_seed;
     uint64_t type;
     bool is_orphan;
     uint64_t already_generated_coins;
@@ -1249,6 +1250,7 @@ namespace currency
       KV_SERIALIZE(penalty)
       KV_SERIALIZE(id)
       KV_SERIALIZE(prev_id)
+      KV_SERIALIZE(pow_seed)
       KV_SERIALIZE(cumulative_diff_adjusted)
       KV_SERIALIZE(cumulative_diff_precise)
       KV_SERIALIZE(difficulty)

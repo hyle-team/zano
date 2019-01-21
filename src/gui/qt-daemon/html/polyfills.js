@@ -3256,10 +3256,10 @@ Zone.__load_patch('ZoneAwarePromise', function (global, Zone, api) {
                 reject = rej;
             });
             function onResolve(value) {
-                promise && (promise = null || resolve(value));
+                promise && (promise =  false || resolve(value));
             }
             function onReject(error) {
-                promise && (promise = null || reject(error));
+                promise && (promise =  false || reject(error));
             }
             for (var _i = 0, values_1 = values; _i < values_1.length; _i++) {
                 var value = values_1[_i];

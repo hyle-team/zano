@@ -568,7 +568,7 @@ QString MainWindow::start_backend(const QString& params)
       return MAKE_RESPONSE(ar);
     }
   }
-  
+
   bool r = m_backend.start();
   if (!r)
   {

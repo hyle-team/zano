@@ -8,10 +8,11 @@ export class TooltipDirective {
 
   @HostBinding('style.cursor') cursor = 'pointer';
 
-  @Input('tooltip') tooltipTitle: string;
+  @Input('tooltip') tooltipInner: any;
   @Input() placement: string;
   @Input() tooltipClass: string;
-  @Input() delay: number;
+  @Input() timeout = 0;
+  @Input() delay = 0;
   tooltip: HTMLElement;
 
   removeTooltipTimeout;
@@ -39,11 +40,13 @@ export class TooltipDirective {
   }
 
   hide() {
-    this.renderer.setStyle(this.tooltip, 'opacity', '0');
-    this.removeTooltipTimeout = setTimeout(() => {
-      this.renderer.removeChild(document.body, this.tooltip);
-      this.tooltip = null;
-    }, this.delay);
+    this.removeTooltipTimeout = setTimeout( () => {
+      this.renderer.setStyle(this.tooltip, 'opacity', '0');
+      window.setTimeout(() => {
+        this.renderer.removeChild(document.body, this.tooltip);
+        this.tooltip = null;
+      }, this.delay);
+    }, this.timeout);
   }
 
   cancelHide() {
@@ -52,8 +55,12 @@ export class TooltipDirective {
   }
 
   create() {
-    this.tooltip = this.renderer.createElement('span');
-    this.renderer.appendChild(this.tooltip, this.renderer.createText(this.tooltipTitle));
+    if (typeof this.tooltipInner === 'string') {
+      this.tooltip = this.renderer.createElement('div');
+      this.tooltip.innerHTML = this.tooltipInner;
+    } else {
+      this.tooltip = this.tooltipInner;
+    }
     this.renderer.appendChild(document.body, this.tooltip);
     this.renderer.setStyle(document.body, 'position', 'relative');
     this.renderer.setStyle(this.tooltip, 'position', 'absolute');
@@ -66,16 +73,14 @@ export class TooltipDirective {
       this.placement = 'top';
       this.renderer.addClass(this.tooltip, 'ng-tooltip-top');
     }
-    if (this.delay !== null) {
-      this.renderer.setStyle(this.tooltip, 'opacity', '0');
-      this.renderer.setStyle(this.tooltip, '-webkit-transition', `opacity ${this.delay}ms`);
-      this.renderer.setStyle(this.tooltip, '-moz-transition', `opacity ${this.delay}ms`);
-      this.renderer.setStyle(this.tooltip, '-o-transition', `opacity ${this.delay}ms`);
-      this.renderer.setStyle(this.tooltip, 'transition', `opacity ${this.delay}ms`);
-      window.setTimeout(() => {
-        this.renderer.setStyle(this.tooltip, 'opacity', '1');
-      }, 0);
-    }
+    this.renderer.setStyle(this.tooltip, 'opacity', '0');
+    this.renderer.setStyle(this.tooltip, '-webkit-transition', `opacity ${this.delay}ms`);
+    this.renderer.setStyle(this.tooltip, '-moz-transition', `opacity ${this.delay}ms`);
+    this.renderer.setStyle(this.tooltip, '-o-transition', `opacity ${this.delay}ms`);
+    this.renderer.setStyle(this.tooltip, 'transition', `opacity ${this.delay}ms`);
+    window.setTimeout(() => {
+      this.renderer.setStyle(this.tooltip, 'opacity', '1');
+    }, 0);
   }
 
   setPosition() {

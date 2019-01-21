@@ -385,52 +385,55 @@ input[type='checkbox'].style-checkbox {
   }
 }
 
-.modal {
+.balance-tooltip {
+  display: flex;
+  flex-direction: column;
+  font-size: 1.3rem;
+  padding: 1.3rem;
 
   @include themify($themes) {
-    background: themed(modalBackground);
+    background: themed(tooltipBackgroundColor);
+    box-shadow: themed(tooltipShadow);
     color: themed(mainTextColor);
   }
 
-  .content {
+  &.ng-tooltip-top {
+    margin-top: -1rem;
+  }
 
-    .icon.error {
+  &.ng-tooltip-bottom {
+    margin-top: 1rem;
+  }
 
-      @include themify($themes) {
-        background-color: themed(redTextColor);
-      }
-    }
+  &.ng-tooltip-left {
+    margin-left: -1rem;
+  }
 
-    .icon.success {
+  &.ng-tooltip-right {
+    margin-left: 1rem;
+  }
 
-      @include themify($themes) {
-        background-color: themed(greenTextColor);
-      }
-    }
+  .available {
+    margin-bottom: 1.7rem;
 
-    .icon.info {
-
-      @include themify($themes) {
-        background-color: themed(blueTextColor);
-      }
+    b {
+      font-weight: 600;
     }
   }
 
-  .action-button {
+  .locked {
+    margin-bottom: 0.7rem;
+
+    b {
+      font-weight: 600;
+    }
+  }
+
+  .link {
+    cursor: pointer;
 
     @include themify($themes) {
-      background-color: themed(blueTextColor);
-      color: themed(alternativeTextColor);
-    }
-  }
-
-  .close-button {
-
-    .icon {
-
-      @include themify($themes) {
-        background-color: themed(closeButtonColor);
-      }
+      color: themed(blueTextColor);
     }
   }
 }
@@ -468,6 +471,96 @@ input[type='checkbox'].style-checkbox {
       @include themify($themes) {
         background-color: themed(chartOptionsHoverColor);
         color: themed(mainTextColor);
+      }
+    }
+  }
+}
+
+app-modal-container {
+
+  .modal {
+
+    @include themify($themes) {
+      background: themed(modalBackground);
+      color: themed(mainTextColor);
+    }
+
+    .content {
+
+      .icon.error {
+
+        @include themify($themes) {
+          background-color: themed(redTextColor);
+        }
+      }
+
+      .icon.success {
+
+        @include themify($themes) {
+          background-color: themed(greenTextColor);
+        }
+      }
+
+      .icon.info {
+
+        @include themify($themes) {
+          background-color: themed(blueTextColor);
+        }
+      }
+    }
+
+    .action-button {
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+        color: themed(alternativeTextColor);
+      }
+    }
+
+    .close-button {
+
+      .icon {
+
+        @include themify($themes) {
+          background-color: themed(closeButtonColor);
+        }
+      }
+    }
+  }
+}
+
+app-transaction-details {
+
+  .table {
+
+    @include themify($themes) {
+      border-top: 0.2rem solid themed(transparentButtonBorderColor);
+    }
+
+    .row {
+
+      .cell {
+
+        &.label {
+
+          @include themify($themes) {
+            color: themed(optionalTextColor);
+          }
+        }
+
+        &.value {
+
+          @include themify($themes) {
+            color: themed(mainTextColor);
+          }
+        }
+
+        &.key-value {
+
+          @include themify($themes) {
+            color: themed(blueTextColor);
+          }
+        }
       }
     }
   }

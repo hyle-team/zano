@@ -39,6 +39,7 @@ public:
     m_cmd_binder.set_handler("print_market", boost::bind(&daemon_cmmands_handler::print_market, this, _1));
     m_cmd_binder.set_handler("print_bc_outs_stat", boost::bind(&daemon_cmmands_handler::print_bc_outs_stat, this, _1));    
     m_cmd_binder.set_handler("print_block", boost::bind(&daemon_cmmands_handler::print_block, this, _1), "Print block, print_block <block_hash> | <block_height>");
+    m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_cmmands_handler::print_block_info, this, _1), "Print block info, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_cmmands_handler::print_tx, this, _1), "Print transaction, print_tx <transaction_hash>");
     m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_cmmands_handler::start_mining, this, _1), "Start mining for specified address, start_mining <addr> [threads=1]");
     m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_cmmands_handler::stop_mining, this, _1), "Stop mining");
@@ -390,6 +391,23 @@ private:
     return true;
   }
   //--------------------------------------------------------------------------------
+  bool print_block_info_by_height(uint64_t height)
+  {
+    std::list<currency::block_rpc_extended_info> blocks;
+    bool r = m_srv.get_payload_object().get_core().get_blockchain_storage().get_main_blocks_rpc_details(height, 1, false, blocks);
+    if (r && blocks.size())
+    {
+      currency::block_rpc_extended_info& rbei = blocks.back();
+      LOG_PRINT_GREEN("------------------ block_id: " << rbei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(rbei), LOG_LEVEL_0);
+    }
+    else
+    {
+      LOG_PRINT_GREEN("block wasn't found: " << height, LOG_LEVEL_0);
+      return false;
+    }
+    return true;
+  }
+  //--------------------------------------------------------------------------------
   bool print_block_by_hash(const std::string& arg)
   {
     crypto::hash block_hash;
@@ -426,6 +444,28 @@ private:
     if (args.empty())
     {
       std::cout << "expected: print_block (<block_hash> | <block_height>)" << std::endl;
+      return true;
+    }
+
+    const std::string& arg = args.front();
+    try
+    {
+      uint64_t height = boost::lexical_cast<uint64_t>(arg);
+      print_block_by_height(height);
+    }
+    catch (boost::bad_lexical_cast&)
+    {
+      print_block_by_hash(arg);
+    }
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_block_info(const std::vector<std::string>& args)
+  {
+    if (args.empty())
+    {
+      std::cout << "expected: print_block_info (<block_hash> | <block_height>)" << std::endl;
       return true;
     }
 

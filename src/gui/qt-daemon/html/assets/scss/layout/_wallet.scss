@@ -123,6 +123,34 @@ app-history {
 
       tr {
 
+        &:nth-child(4n+1) {
+
+          @include themify($themes) {
+            background-color: themed(tableBackgroundColor);
+          }
+        }
+
+        &:nth-child(4n+2) {
+
+          @include themify($themes) {
+            background-color: themed(tableBackgroundColor);
+          }
+        }
+
+        &:nth-child(4n+3) {
+
+          @include themify($themes) {
+            background-color: transparent;
+          }
+        }
+
+        &:nth-child(4n+4) {
+
+          @include themify($themes) {
+            background-color: transparent;
+          }
+        }
+
         .status {
 
           .confirmation {

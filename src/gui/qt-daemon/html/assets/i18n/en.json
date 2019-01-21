@@ -21,7 +21,7 @@
     "OLD_PURCHASE": "Purchase"
   },
   "SIDEBAR": {
-    "TITLE": "Accounts",
+    "TITLE": "Wallets",
     "ADD_NEW": "+ Add new",
     "ACCOUNT": {
       "STAKING": "Staking",
@@ -54,16 +54,16 @@
     "BUTTON_SELECT": "Select wallet location",
     "BUTTON_CREATE": "Create wallet",
     "TITLE_SAVE": "Save the wallet file.",
-    "ERROR_CANNOT_SAVE_TOP": "You cannot record a file on top of another file",
-    "ERROR_CANNOT_SAVE_SYSTEM": "You cannot save a safe file to the system partition"
+    "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
+    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition"
   },
   "OPEN_WALLET": {
     "NAME": "Wallet name",
     "PASS": "Wallet password",
     "BUTTON": "Open wallet",
-    "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this account is already open",
-    "SAFE_FILE_NOT_FOUND1": "Safe file not found",
-    "SAFE_FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open safe\" button."
+    "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this address is already open",
+    "SAFE_FILE_NOT_FOUND1": "Wallet file not found",
+    "SAFE_FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button."
   },
   "RESTORE_WALLET": {
     "LABEL_NAME": "Wallet name",
@@ -72,18 +72,18 @@
     "CONFIRM": "Confirm wallet password",
     "BUTTON_SELECT": "Select wallet location",
     "BUTTON_CREATE": "Create wallet",
-    "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid safe file or password does not match",
+    "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
     "CHOOSE_PATH": "Please choose a path"
   },
   "SEED_PHRASE": {
-    "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your account.",
-    "BUTTON_CREATE_ACCOUNT" : "Create account"
+    "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
+    "BUTTON_CREATE_ACCOUNT" : "Create wallet"
   },
   "SETTINGS": {
     "TITLE": "Settings",
     "DARK_THEME": "Dark theme",
     "WHITE_THEME": "White theme",
-    "GRAY_THEME": "Gray theme",
+    "GRAY_THEME": "Grey theme",
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
       "OLD": "Old password",
@@ -96,6 +96,9 @@
     "REGISTER_ALIAS": "Register an alias",
     "DETAILS": "Details",
     "LOCK": "Lock",
+    "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
+    "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
+    "LOCKED_BALANCE_LINK": "What does that mean?",
     "TABS": {
       "SEND": "Send",
       "RECEIVE": "Receive",
@@ -121,7 +124,7 @@
     "MIXIN": "Mixin",
     "FEE": "Fee",
     "BUTTON": "Send",
-    "SUCCESS_SENT": "The payment will be received within 20 minutes"
+    "SUCCESS_SENT": "Transaction sent"
   },
   "HISTORY": {
     "STATUS": "Status",
@@ -131,7 +134,16 @@
     "DATE": "Date",
     "AMOUNT": "Amount",
     "FEE": "Fee",
-    "ADDRESS": "Address"
+    "ADDRESS": "Address",
+    "DETAILS": {
+      "ID": "Transaction ID",
+      "SIZE": "Transaction size",
+      "SIZE_VALUE": "{{value}} bytes",
+      "HEIGHT": "Height",
+      "CONFIRMATION": "Confirmation",
+      "INPUTS": "Inputs",
+      "OUTPUTS": "Outputs"
+    }
   },
   "CONTRACTS": {
     "EMPTY": "No active contracts.",
@@ -175,13 +187,13 @@
     "PROGRESS_COMPLETE": "Completed",
     "FEE": "Fee",
     "PAYMENT": "Payment ID",
-    "ACCEPT_STATE_WAIT_BIG": "You have accepted the contract proposal. Please wait for the pledges to be made",
+    "ACCEPT_STATE_WAIT_BIG": "You have accepted the contract proposal. Please wait for the deposits to be made",
     "IGNORED_ACCEPT": "You have ignored the contract proposal",
-    "BURN_PROPOSAL": "The pledges have been nullified.",
+    "BURN_PROPOSAL": "The deposits have been voided.",
     "SUCCESS_FINISH_PROPOSAL": "The contract is complete. The payment has been sent.",
     "SEND_CANCEL_PROPOSAL": "Proposal to cancel contract sent to seller",
     "IGNORED_CANCEL": "You have ignored the proposal to cancel the contract",
-    "DEALS_CANCELED_WAIT": "The contract is being cancelled. Please wait for the pledge to be returned",
+    "DEALS_CANCELED_WAIT": "The contract is being cancelled. Please wait for the deposit to be returned",
     "WAITING_TIME": "Time until response"
   },
   "MESSAGES": {
@@ -194,18 +206,18 @@
     "NOT_ENOUGH_MONEY": "Insufficient funds in account",
     "CORE_BUSY": "Internal error (core is busy)",
     "DAEMON_BUSY": "Internal error: deamon is busy",
-    "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your safe",
+    "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "For the sake of security, mixed transaction will take several days",
-    "TRANSACTION_IS_TO_BIG": "This transaction is large and was therefore denied by the network. Try sending the required amount in parts.",
-    "TRANSFER_ATTEMPT": "There is no connection to the Zano network",
+    "TRANSACTION_IS_TO_BIG": "Transaction exceeds network limit, send required amount with multiple transactions",
+    "TRANSFER_ATTEMPT": "There is no connection to Zano network",
     "ACCESS_DENIED": "Access denied",
-    "TRANSACTION_ERROR": "Error. Payment not completed.",
+    "TRANSACTION_ERROR": "Error. Transaction not completed.",
     "BAD_ARG": "Invalid argument",
     "WALLET_WRONG_ID": "Invalid wallet ID",
     "WRONG_PASSWORD": "Invalid password",
-    "FILE_RESTORED": "The safe file was corrupted somehow. We have recovered the keys and safe from the blockchain.",
+    "FILE_RESTORED": "The wallet file was corrupted. We have recovered the keys and the wallet from the blockchain",
     "FILE_NOT_FOUND": "File not found",
     "FILE_EXIST": "A file with that name already exists. Enter another name to save the file under",
-    "FILE_NOT_SAVED": "You cannot save a safe file in this folder. Please choose another folder."
+    "FILE_NOT_SAVED": "You cannot save a wallet file in this folder. Please choose another folder."
   }
 }

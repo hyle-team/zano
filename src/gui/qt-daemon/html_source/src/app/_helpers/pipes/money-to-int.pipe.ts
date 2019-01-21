@@ -1,5 +1,6 @@
 import {Pipe, PipeTransform} from '@angular/core';
 import {VariablesService} from '../services/variables.service';
+import {BigNumber} from 'bignumber.js';
 
 @Pipe({
   name: 'moneyToInt'
@@ -36,7 +37,7 @@ export class MoneyToIntPipe implements PipeTransform {
           am_str = am_str + '0';
         }
       }
-      result = parseInt(am_str, 10);
+      result = (new BigNumber(am_str)).integerValue();
     }
     return result;
   }

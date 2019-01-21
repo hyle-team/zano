@@ -1,0 +1,20 @@
+<div class="table">
+  <div class="row">
+    <span class="cell label" [style.flex-basis]="cellSizes['1']">{{ 'HISTORY.DETAILS.ID' | translate }}</span>
+    <span class="cell key-value" [style.flex-basis]="cellSizes['2']">{{transaction.tx_hash}}</span>
+    <span class="cell label" [style.flex-basis]="cellSizes['3']">{{ 'HISTORY.DETAILS.SIZE' | translate }}</span>
+    <span class="cell value" [style.flex-basis]="cellSizes['4']">{{ 'HISTORY.DETAILS.SIZE_VALUE' | translate : {value: transaction.tx_blob_size} }}</span>
+  </div>
+  <div class="row">
+    <span class="cell label" [style.flex-basis]="cellSizes['1']">{{ 'HISTORY.DETAILS.HEIGHT' | translate }}</span>
+    <span class="cell value" [style.flex-basis]="cellSizes['2']">{{transaction.height}}</span>
+    <span class="cell label" [style.flex-basis]="cellSizes['3']">{{ 'HISTORY.DETAILS.CONFIRMATION' | translate }}</span>
+    <span class="cell value" [style.flex-basis]="cellSizes['4']">{{variablesService.height_app - transaction.height}}</span>
+  </div>
+  <div class="row">
+    <span class="cell label" [style.flex-basis]="cellSizes['1']">{{ 'HISTORY.DETAILS.INPUTS' | translate }}</span>
+    <span class="cell value" [style.flex-basis]="cellSizes['2']">{{transaction.td['rcv']?.length || 0}}</span>
+    <span class="cell label" [style.flex-basis]="cellSizes['3']">{{ 'HISTORY.DETAILS.OUTPUTS' | translate }}</span>
+    <span class="cell value" [style.flex-basis]="cellSizes['4']">{{transaction.td['spn']?.length || 0}}</span>
+  </div>
+</div>

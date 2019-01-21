@@ -4,6 +4,8 @@ import {TranslateService} from '@ngx-translate/core';
 import {VariablesService} from './variables.service';
 import {ModalService} from './modal.service';
 import {MoneyToIntPipe} from '../pipes/money-to-int.pipe';
+import JSONBigNumber from 'json-bignumber';
+import {BigNumber} from 'bignumber.js';
 
 @Injectable()
 export class BackendService {
@@ -132,6 +134,17 @@ export class BackendService {
     }
   }
 
+  private bigNumberParser(key, val) {
+    if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge'].indexOf(key) === -1) {
+      return val.toNumber();
+    }
+    if (key === 'rcv' || key === 'spn') {
+      for (let i = 0; i < val.length; i++) {
+        val[i] = new BigNumber(val[i]);
+      }
+    }
+    return val;
+  }
 
   private commandDebug(command, params, result) {
     this.Debug(2, '----------------- ' + command + ' -----------------');
@@ -141,7 +154,7 @@ export class BackendService {
     };
     this.Debug(2, debug);
     try {
-      this.Debug(2, JSON.parse(result));
+      this.Debug(2, JSONBigNumber.parse(result, this.bigNumberParser));
     } catch (e) {
       this.Debug(2, {response_data: result, error_code: 'OK'});
     }
@@ -158,7 +171,7 @@ export class BackendService {
         Result = {};
       } else {
         try {
-          Result = JSON.parse(resultStr);
+          Result = JSONBigNumber.parse(resultStr, this.bigNumberParser);
         } catch (e) {
           Result = {response_data: resultStr, error_code: 'OK'};
         }
@@ -202,7 +215,7 @@ export class BackendService {
         this.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
       } else {
         const that = this;
-        params = (typeof params === 'string') ? params : JSON.stringify(params);
+        params = (typeof params === 'string') ? params : JSONBigNumber.stringify(params);
         if (params === undefined || params === '{}') {
           Action(function (resultStr) {
             that.commandDebug(command, params, resultStr);
@@ -224,7 +237,7 @@ export class BackendService {
       this.backendObject[command].connect(callback);
     } else {
       this.backendObject[command].connect((str) => {
-        callback(JSON.parse(str));
+        callback(JSONBigNumber.parse(str, this.bigNumberParser));
       });
     }
   }
@@ -390,7 +403,7 @@ export class BackendService {
         a_addr: a_addr,
         b_addr: b_addr,
         to_pay: this.moneyToIntPipe.transform(to_pay),
-        a_pledge: this.moneyToIntPipe.transform(a_pledge) - this.moneyToIntPipe.transform(to_pay),
+        a_pledge: this.moneyToIntPipe.transform((new BigNumber(a_pledge)).minus(to_pay).toString()),
         b_pledge: this.moneyToIntPipe.transform(b_pledge)
       },
       payment_id: payment_id,
