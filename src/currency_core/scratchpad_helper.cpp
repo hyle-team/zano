@@ -28,7 +28,7 @@ namespace currency
   crypto::hash scratchpad_keeper::get_pow_hash(const blobdata& bd, uint64_t height, const crypto::hash& scr_seed)
   {
     crypto::hash res_hash = null_hash;
-    if (scr_seed != m_seed)
+    if (scr_seed != m_seed || get_scratchpad_size_for_height(height) != this->size())
     {
       bool r = generate(scr_seed, height);
       CHECK_AND_ASSERT_THROW_MES(r, "Unable to generate scratchpad");

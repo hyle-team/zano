@@ -84,7 +84,7 @@ namespace currency
     }
 
   private:
-    bool set_block_template(const block& bl, const wide_difficulty_type& diffic, uint64_t height);
+    bool set_block_template(const block& bl, const wide_difficulty_type& diffic, uint64_t height, const crypto::hash& seed);
     bool worker_thread();
     bool request_block_template();
     void  merge_hr();
