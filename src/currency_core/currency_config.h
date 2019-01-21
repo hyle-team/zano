@@ -99,7 +99,7 @@
 #define BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT          2000      //by default, blocks ids count in synchronizing
 #define BLOCKS_SYNCHRONIZING_DEFAULT_COUNT              200       //by default, blocks count in blocks downloading
 #define BLOCKS_SYNCHRONIZING_DEFAULT_SIZE               2000000   //by default keep synchronizing packets not bigger then 2MB
-#define CURRENCY_PROTOCOL_HOP_RELAX_COUNT               3         //value of hop, after which we use only announce of new block
+#define CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT      500         
 
 
 #define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week
