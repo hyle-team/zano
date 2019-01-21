@@ -10,29 +10,36 @@
     </tr>
     </thead>
     <tbody>
-    <tr *ngFor="let item of variablesService.currentWallet.history">
-      <td>
-        <div class="status" [class.send]="!item.is_income" [class.received]="item.is_income">
-          <ng-container *ngIf="variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0">
-            <div class="confirmation" tooltip="{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}" placement="bottom" tooltipClass="history-tooltip" [delay]="500">
-              <div class="fill" [style.height]="getHeight(item) + '%'"></div>
-            </div>
-          </ng-container>
-          <i class="icon"></i>
-          <span>{{ (item.is_income ? 'HISTORY.RECEIVED' : 'HISTORY.SEND') | translate }}</span>
-        </div>
-      </td>
-      <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>
-      <td>
-        <span *ngIf="item.sortAmount && item.sortAmount.toString() !== '0'">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>
-      </td>
-      <td>
-        <span *ngIf="item.sortFee && item.sortFee.toString() !== '0'">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>
-      </td>
-      <td class="remote-address">
-        <span>{{item | historyTypeMessages}}</span>
-      </td>
-    </tr>
+    <ng-container *ngFor="let item of variablesService.currentWallet.history; let index = index">
+      <tr (click)="openDetails(index)">
+        <td>
+          <div class="status" [class.send]="!item.is_income" [class.received]="item.is_income">
+            <ng-container *ngIf="variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0">
+              <div class="confirmation" tooltip="{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}" placement="bottom" tooltipClass="history-tooltip" [delay]="500">
+                <div class="fill" [style.height]="getHeight(item) + '%'"></div>
+              </div>
+            </ng-container>
+            <i class="icon"></i>
+            <span>{{ (item.is_income ? 'HISTORY.RECEIVED' : 'HISTORY.SEND') | translate }}</span>
+          </div>
+        </td>
+        <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>
+        <td>
+          <span *ngIf="item.sortAmount && item.sortAmount.toString() !== '0'">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>
+        </td>
+        <td>
+          <span *ngIf="item.sortFee && item.sortFee.toString() !== '0'">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>
+        </td>
+        <td class="remote-address">
+          <span>{{item | historyTypeMessages}}</span>
+        </td>
+      </tr>
+      <tr class="transaction-details" [class.open]="index === openedDetails">
+        <td colspan="5">
+          <app-transaction-details *ngIf="index === openedDetails" [transaction]="item"></app-transaction-details>
+        </td>
+      </tr>
+    </ng-container>
     </tbody>
   </table>
 </div>

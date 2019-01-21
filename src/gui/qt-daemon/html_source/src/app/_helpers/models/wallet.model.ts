@@ -1,4 +1,5 @@
 import {Contract} from './contract.model';
+import {Transaction} from './transaction.model';
 import {BigNumber} from 'bignumber.js';
 
 export class Wallet {
@@ -17,8 +18,8 @@ export class Wallet {
   new_messages?: number;
   new_contracts?: number;
 
-  history: any[];
-  excluded_history: any[];
+  history: Array<Transaction> = [];
+  excluded_history: Array<Transaction> = [];
 
   contracts: Array<Contract> = [];
 
@@ -60,12 +61,12 @@ export class Wallet {
     return this.wallet_id === id;
   }
 
-  prepareHistoryItem(item: any): any {
+  prepareHistoryItem(item: Transaction): any {
     if (item.tx_type === 4) {
       item.sortFee = item.amount.plus(item.fee).negated();
-      item.sortAmount = 0;
+      item.sortAmount = new BigNumber(0);
     } else if (item.tx_type === 3) {
-      item.sortFee = 0;
+      item.sortFee = new BigNumber(0);
     } else if ((item.hasOwnProperty('contract') && (item.contract[0].state === 3 || item.contract[0].state === 6 || item.contract[0].state === 601) && !item.contract[0].is_a)) {
       item.sortFee = item.fee.negated();
       item.sortAmount = item.amount.negated();
@@ -80,9 +81,9 @@ export class Wallet {
     return item;
   }
 
-  prepareHistory(items: any[]): void {
+  prepareHistory(items: Transaction[]): void {
     for (let i = 0; i < items.length; i++) {
-      if ((items[i].tx_type === 7 && items[i].is_income) || (items[i].tx_type === 11 && items[i].is_income) || (items[i].amount === 0 && items[i].fee === 0)) {
+      if ((items[i].tx_type === 7 && items[i].is_income) || (items[i].tx_type === 11 && items[i].is_income) || (items[i].amount.eq(0) && items[i].fee.eq(0))) {
         let exists = false;
         for (let j = 0; j < this.excluded_history.length; j++) {
           if (this.excluded_history[j].tx_hash === items[i].tx_hash) {

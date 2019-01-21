@@ -134,7 +134,16 @@
     "DATE": "Date",
     "AMOUNT": "Amount",
     "FEE": "Fee",
-    "ADDRESS": "Address"
+    "ADDRESS": "Address",
+    "DETAILS": {
+      "ID": "Transaction ID",
+      "SIZE": "Transaction size",
+      "SIZE_VALUE": "{{value}} bytes",
+      "HEIGHT": "Height",
+      "CONFIRMATION": "Confirmation",
+      "INPUTS": "Inputs",
+      "OUTPUTS": "Outputs"
+    }
   },
   "CONTRACTS": {
     "EMPTY": "No active contracts.",

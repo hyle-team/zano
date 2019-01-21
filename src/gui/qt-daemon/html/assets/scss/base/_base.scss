@@ -438,56 +438,6 @@ input[type='checkbox'].style-checkbox {
   }
 }
 
-.modal {
-
-  @include themify($themes) {
-    background: themed(modalBackground);
-    color: themed(mainTextColor);
-  }
-
-  .content {
-
-    .icon.error {
-
-      @include themify($themes) {
-        background-color: themed(redTextColor);
-      }
-    }
-
-    .icon.success {
-
-      @include themify($themes) {
-        background-color: themed(greenTextColor);
-      }
-    }
-
-    .icon.info {
-
-      @include themify($themes) {
-        background-color: themed(blueTextColor);
-      }
-    }
-  }
-
-  .action-button {
-
-    @include themify($themes) {
-      background-color: themed(blueTextColor);
-      color: themed(alternativeTextColor);
-    }
-  }
-
-  .close-button {
-
-    .icon {
-
-      @include themify($themes) {
-        background-color: themed(closeButtonColor);
-      }
-    }
-  }
-}
-
 .ngx-contextmenu {
 
   .dropdown-menu {
@@ -521,6 +471,96 @@ input[type='checkbox'].style-checkbox {
       @include themify($themes) {
         background-color: themed(chartOptionsHoverColor);
         color: themed(mainTextColor);
+      }
+    }
+  }
+}
+
+app-modal-container {
+
+  .modal {
+
+    @include themify($themes) {
+      background: themed(modalBackground);
+      color: themed(mainTextColor);
+    }
+
+    .content {
+
+      .icon.error {
+
+        @include themify($themes) {
+          background-color: themed(redTextColor);
+        }
+      }
+
+      .icon.success {
+
+        @include themify($themes) {
+          background-color: themed(greenTextColor);
+        }
+      }
+
+      .icon.info {
+
+        @include themify($themes) {
+          background-color: themed(blueTextColor);
+        }
+      }
+    }
+
+    .action-button {
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+        color: themed(alternativeTextColor);
+      }
+    }
+
+    .close-button {
+
+      .icon {
+
+        @include themify($themes) {
+          background-color: themed(closeButtonColor);
+        }
+      }
+    }
+  }
+}
+
+app-transaction-details {
+
+  .table {
+
+    @include themify($themes) {
+      border-top: 0.2rem solid themed(transparentButtonBorderColor);
+    }
+
+    .row {
+
+      .cell {
+
+        &.label {
+
+          @include themify($themes) {
+            color: themed(optionalTextColor);
+          }
+        }
+
+        &.value {
+
+          @include themify($themes) {
+            color: themed(mainTextColor);
+          }
+        }
+
+        &.key-value {
+
+          @include themify($themes) {
+            color: themed(blueTextColor);
+          }
+        }
       }
     }
   }

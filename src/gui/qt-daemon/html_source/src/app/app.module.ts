@@ -47,6 +47,7 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
 import { ChartModule, HIGHCHARTS_MODULES, Highcharts} from 'angular-highcharts';
 import { InputValidateDirective } from './_helpers/directives/input-validate/input-validate.directive';
 import { ModalContainerComponent } from './_helpers/directives/modal-container/modal-container.component';
+import { TransactionDetailsComponent } from './_helpers/directives/transaction-details/transaction-details.component';
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
@@ -86,7 +87,8 @@ Highcharts.setOptions({
     ContractTimeLeftPipe,
     TooltipDirective,
     InputValidateDirective,
-    ModalContainerComponent
+    ModalContainerComponent,
+    TransactionDetailsComponent
   ],
   imports: [
     BrowserModule,
