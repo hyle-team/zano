@@ -1,7 +1,7 @@
 <div class="wrap-table">
   <table class="history-table">
     <thead>
-    <tr>
+    <tr #head (window:resize)="calculateWidth()">
       <th>{{ 'HISTORY.STATUS' | translate }}</th>
       <th>{{ 'HISTORY.DATE' | translate }}</th>
       <th>{{ 'HISTORY.AMOUNT' | translate }}</th>
@@ -36,7 +36,7 @@
       </tr>
       <tr class="transaction-details" [class.open]="index === openedDetails">
         <td colspan="5">
-          <app-transaction-details *ngIf="index === openedDetails" [transaction]="item"></app-transaction-details>
+          <app-transaction-details *ngIf="index === openedDetails" [transaction]="item" [sizes]="calculatedWidth"></app-transaction-details>
         </td>
       </tr>
     </ng-container>

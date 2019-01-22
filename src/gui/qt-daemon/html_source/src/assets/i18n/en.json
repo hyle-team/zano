@@ -62,8 +62,8 @@
     "PASS": "Wallet password",
     "BUTTON": "Open wallet",
     "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this address is already open",
-    "SAFE_FILE_NOT_FOUND1": "Wallet file not found",
-    "SAFE_FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button."
+    "FILE_NOT_FOUND1": "Wallet file not found",
+    "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button."
   },
   "RESTORE_WALLET": {
     "LABEL_NAME": "Wallet name",

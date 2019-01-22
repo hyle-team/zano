@@ -10,12 +10,7 @@ import {VariablesService} from "../../services/variables.service";
 export class TransactionDetailsComponent implements OnInit {
 
   @Input() transaction: Transaction;
-  cellSizes = {
-    1: '25%',
-    2: '25%',
-    3: '25%',
-    4: '25%'
-  };
+  @Input() sizes: Array<number>;
 
   constructor(private variablesService: VariablesService) {}
 

@@ -22,7 +22,7 @@ EOM
         exit 0;;
 esac
 
-CONN_TOOL_OUT="$(connectivity_tool --ip=127.0.0.1 --rpc_port=$ZANO_RPC_PORT --timeout=1000  --getinfo_flags_hex=0x0000000000008000 --rpc_get_daemon_info)"
+CONN_TOOL_OUT="$(connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000  --getinfo-flags-hex=0x0000000000008000 --rpc-get-daemon-info)"
 # printf "$CONN_TOOL_OUT"
 
 printf "outs_0_001.value "

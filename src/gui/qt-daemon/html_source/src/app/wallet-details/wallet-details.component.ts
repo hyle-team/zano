@@ -39,7 +39,7 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
     this.showSeed = false;
     this.detailsForm.get('name').setValue(this.variablesService.currentWallet.name);
     this.detailsForm.get('path').setValue(this.variablesService.currentWallet.path);
-    this.backend.getSmartSafeInfo(this.variablesService.currentWallet.wallet_id, (status, data) => {
+    this.backend.getSmartWalletInfo(this.variablesService.currentWallet.wallet_id, (status, data) => {
       if (data.hasOwnProperty('restore_key')) {
         this.ngZone.run(() => {
           this.seedPhrase = data['restore_key'].trim();

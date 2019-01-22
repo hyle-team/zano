@@ -120,15 +120,15 @@ export class Wallet {
   }
 
   prepareContractsAfterOpen(items: any[], exp_med_ts, height_app, viewedContracts, notViewedContracts): void {
-    const safe = this;
+    const wallet = this;
     for (let i = 0; i < items.length; i++) {
       const contract = items[i];
       let contractTransactionExist = false;
-      if (safe && safe.history) {
-        contractTransactionExist = safe.history.some(elem => elem.contract && elem.contract.length && elem.contract[0].contract_id === contract.contract_id);
+      if (wallet && wallet.history) {
+        contractTransactionExist = wallet.history.some(elem => elem.contract && elem.contract.length && elem.contract[0].contract_id === contract.contract_id);
       }
-      if (!contractTransactionExist && safe && safe.excluded_history) {
-        contractTransactionExist = safe.excluded_history.some(elem => elem.contract && elem.contract.length && elem.contract[0].contract_id === contract.contract_id);
+      if (!contractTransactionExist && wallet && wallet.excluded_history) {
+        contractTransactionExist = wallet.excluded_history.some(elem => elem.contract && elem.contract.length && elem.contract[0].contract_id === contract.contract_id);
       }
 
       if (!contractTransactionExist) {
@@ -196,7 +196,7 @@ export class Wallet {
 
       contract['private_detailes'].a_pledge = contract['private_detailes'].a_pledge.plus(contract['private_detailes'].to_pay);
 
-      safe.contracts.push(contract);
+      wallet.contracts.push(contract);
     }
     this.recountNewContracts();
   }

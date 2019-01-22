@@ -89,7 +89,7 @@ export class AppComponent implements OnInit, OnDestroy {
               wallet.loaded = true;
             }
             if (wallet_state === 3) { // error
-              // safe.error = true;
+              // wallet.error = true;
             }
             wallet.balance = data.balance;
             wallet.unlocked_balance = data.unlocked_balance;
@@ -156,27 +156,27 @@ export class AppComponent implements OnInit, OnDestroy {
         const wallet_id = data.wallet_id;
         const tr_info = data.ti;
 
-        const safe = this.variablesService.getWallet(wallet_id);
+        const wallet = this.variablesService.getWallet(wallet_id);
 
-        if (safe) {
+        if (wallet) {
           this.ngZone.run(() => {
 
-            if (!safe.loaded) {
-              safe.balance = data.balance;
-              safe.unlocked_balance = data.unlocked_balance;
+            if (!wallet.loaded) {
+              wallet.balance = data.balance;
+              wallet.unlocked_balance = data.unlocked_balance;
             } else {
-              safe.balance = data.balance;
-              safe.unlocked_balance = data.unlocked_balance;
+              wallet.balance = data.balance;
+              wallet.unlocked_balance = data.unlocked_balance;
             }
 
             if (tr_info.tx_type === 6) {
               this.variablesService.setRefreshStacking(wallet_id);
             }
 
-            let tr_exists = safe.excluded_history.some(elem => elem.tx_hash === tr_info.tx_hash);
-            tr_exists = (!tr_exists) ? safe.history.some(elem => elem.tx_hash === tr_info.tx_hash) : tr_exists;
+            let tr_exists = wallet.excluded_history.some(elem => elem.tx_hash === tr_info.tx_hash);
+            tr_exists = (!tr_exists) ? wallet.history.some(elem => elem.tx_hash === tr_info.tx_hash) : tr_exists;
 
-            safe.prepareHistory([tr_info]);
+            wallet.prepareHistory([tr_info]);
 
             if (tr_info.hasOwnProperty('contract')) {
               const exp_med_ts = this.variablesService.exp_med_ts;
@@ -185,12 +185,12 @@ export class AppComponent implements OnInit, OnDestroy {
               const contract = tr_info.contract[0];
 
               if (tr_exists) {
-                for (let i = 0; i < safe.contracts.length; i++) {
-                  if (safe.contracts[i].contract_id === contract.contract_id && safe.contracts[i].is_a === contract.is_a) {
-                    safe.contracts[i].cancel_expiration_time = contract.cancel_expiration_time;
-                    safe.contracts[i].expiration_time = contract.expiration_time;
-                    safe.contracts[i].height = contract.height;
-                    safe.contracts[i].timestamp = contract.timestamp;
+                for (let i = 0; i < wallet.contracts.length; i++) {
+                  if (wallet.contracts[i].contract_id === contract.contract_id && wallet.contracts[i].is_a === contract.is_a) {
+                    wallet.contracts[i].cancel_expiration_time = contract.cancel_expiration_time;
+                    wallet.contracts[i].expiration_time = contract.expiration_time;
+                    wallet.contracts[i].height = contract.height;
+                    wallet.contracts[i].timestamp = contract.timestamp;
                     break;
                   }
                 }
@@ -259,11 +259,11 @@ export class AppComponent implements OnInit, OnDestroy {
               contract['private_detailes'].a_pledge = contract['private_detailes'].a_pledge.plus(contract['private_detailes'].to_pay);
 
               let findContract = false;
-              for (let i = 0; i < safe.contracts.length; i++) {
-                if (safe.contracts[i].contract_id === contract.contract_id && safe.contracts[i].is_a === contract.is_a) {
+              for (let i = 0; i < wallet.contracts.length; i++) {
+                if (wallet.contracts[i].contract_id === contract.contract_id && wallet.contracts[i].is_a === contract.is_a) {
                   for (const prop in contract) {
                     if (contract.hasOwnProperty(prop)) {
-                      safe.contracts[i][prop] = contract[prop];
+                      wallet.contracts[i][prop] = contract[prop];
                     }
                   }
                   findContract = true;
@@ -271,9 +271,9 @@ export class AppComponent implements OnInit, OnDestroy {
                 }
               }
               if (findContract === false) {
-                safe.contracts.push(contract);
+                wallet.contracts.push(contract);
               }
-              safe.recountNewContracts();
+              wallet.recountNewContracts();
             }
 
           });
@@ -291,8 +291,8 @@ export class AppComponent implements OnInit, OnDestroy {
         //
         // var wallet_id = data.wallet_id;
         // var tr_info = data.ti;
-        // var safe = $rootScope.getSafeById(wallet_id);
-        // if (safe) {
+        // var wallet = $rootScope.getWalletById(wallet_id);
+        // if (wallet) {
         //   if ( tr_info.hasOwnProperty("contract") ){
         //     for (var i = 0; i < $rootScope.contracts.length; i++) {
         //       if ($rootScope.contracts[i].contract_id === tr_info.contract[0].contract_id && $rootScope.contracts[i].is_a === tr_info.contract[0].is_a) {
@@ -305,9 +305,9 @@ export class AppComponent implements OnInit, OnDestroy {
         //       }
         //     }
         //   }
-        //   angular.forEach(safe.history, function (tr_item, key) {
+        //   angular.forEach(wallet.history, function (tr_item, key) {
         //     if (tr_item.tx_hash === tr_info.tx_hash) {
-        //       safe.history.splice(key, 1);
+        //       wallet.history.splice(key, 1);
         //     }
         //   });
         //
@@ -315,7 +315,7 @@ export class AppComponent implements OnInit, OnDestroy {
         //   switch (tr_info.tx_type) {
         //     case 0:
         //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL') + '<br>' +
-        //         tr_info.tx_hash + '<br>' + safe.name + '<br>' + safe.address + '<br>' +
+        //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
         //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_TO') + ' ' + $rootScope.moneyParse(tr_info.amount) + ' ' +
         //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_END');
         //       informer.error(error_tr);
@@ -331,13 +331,13 @@ export class AppComponent implements OnInit, OnDestroy {
         //       break;
         //     case 4:
         //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS') + '<br>' +
-        //         tr_info.tx_hash + '<br>' + safe.name + '<br>' + safe.address + '<br>' +
+        //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
         //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
         //       informer.error(error_tr);
         //       break;
         //     case 5:
         //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_UPDATE_ALIAS') + '<br>' +
-        //         tr_info.tx_hash + '<br>' + safe.name + '<br>' + safe.address + '<br>' +
+        //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
         //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
         //       informer.error(error_tr);
         //       break;

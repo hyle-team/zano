@@ -109,7 +109,7 @@
   <div class="purchase-states" *ngIf="!newPurchase">
 
     <ng-container *ngIf="currentContract.state == 1 && !currentContract.is_a && currentContract.private_detailes.b_pledge.plus(('0.01' | moneyToInt)).plus(('0.01' | moneyToInt)).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
-      <span>{{ 'There are insufficient funds in the safe. Add funds to the safe to continue' | translate }}</span>
+      <span>{{ 'There are insufficient funds in the wallet. Add funds to the wallet to continue' | translate }}</span>
     </ng-container>
 
     <ng-container *ngIf="currentContract.is_a">

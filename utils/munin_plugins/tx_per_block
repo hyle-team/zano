@@ -12,6 +12,6 @@ EOM
 esac
 
 printf "tx_per_block.value "
-connectivity_tool --ip=127.0.0.1 --rpc_port=$ZANO_RPC_PORT --timeout=1000 --rpc_get_daemon_info --getinfo_flags_hex="0x0000000000001000" | grep tx_count_in_last_block| cut -d ' ' -f2
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000001000" | grep tx_count_in_last_block| cut -d ' ' -f2
 
 
