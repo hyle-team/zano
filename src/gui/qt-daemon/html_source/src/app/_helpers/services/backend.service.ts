@@ -342,7 +342,7 @@ export class BackendService {
     this.runCommand('close_wallet', {wallet_id: wallet_id}, callback);
   }
 
-  getSmartSafeInfo(wallet_id, callback) {
+  getSmartWalletInfo(wallet_id, callback) {
     this.runCommand('get_smart_safe_info', {wallet_id: +wallet_id}, callback);
   }
 

@@ -26,7 +26,7 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
     this.queryRouting = this.route.queryParams.subscribe(params => {
       if (params.wallet_id) {
         this.wallet_id = params.wallet_id;
-        this.backend.getSmartSafeInfo(params.wallet_id, (status, data) => {
+        this.backend.getSmartWalletInfo(params.wallet_id, (status, data) => {
           if (data.hasOwnProperty('restore_key')) {
             this.ngZone.run(() => {
               this.seedPhrase = data['restore_key'].trim();

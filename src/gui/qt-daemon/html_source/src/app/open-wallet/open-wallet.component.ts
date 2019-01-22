@@ -62,10 +62,9 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
     if (this.openForm.valid) {
       this.backend.openWallet(this.filePath, this.openForm.get('password').value, false, (open_status, open_data, open_error) => {
         if (open_error && open_error === 'FILE_NOT_FOUND') {
-          let error_translate = this.translate.instant('OPEN_WALLET.SAFE_FILE_NOT_FOUND1');
-          // error_translate += ':<br>' + $scope.safe.path;
+          let error_translate = this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
           error_translate += ':<br>' + this.filePath;
-          error_translate += this.translate.instant('OPEN_WALLET.SAFE_FILE_NOT_FOUND2');
+          error_translate += this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND2');
           this.modalService.prepareModal('error', error_translate);
         } else {
           if (open_status || open_error === 'FILE_RESTORED') {
