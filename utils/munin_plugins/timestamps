@@ -14,6 +14,6 @@ EOM
 esac
 
 printf "last_pos_timestamp.value "
-connectivity_tool --ip=127.0.0.1 --rpc_port=$ZANO_RPC_PORT --timeout=1000 --rpc_get_daemon_info --getinfo_flags_hex="0x0000000000000100" | grep last_pos_timestamp | cut -d ' ' -f2
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000100" | grep last_pos_timestamp | cut -d ' ' -f2
 printf "last_pow_timestamp.value "
-connectivity_tool --ip=127.0.0.1 --rpc_port=$ZANO_RPC_PORT --timeout=1000 --rpc_get_daemon_info --getinfo_flags_hex="0x0000000000000200" | grep last_pow_timestamp | cut -d ' ' -f2
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000200" | grep last_pow_timestamp | cut -d ' ' -f2

@@ -12,4 +12,4 @@ EOM
 esac
 
 printf "tx_daily_volume.value "
-connectivity_tool --ip=127.0.0.1 --rpc_port=$ZANO_RPC_PORT --timeout=1000 --rpc_get_daemon_info --getinfo_flags_hex="0x0000000000000080" | grep transactions_volume_per_day | cut -d ' ' -f2
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000080" | grep transactions_volume_per_day | cut -d ' ' -f2

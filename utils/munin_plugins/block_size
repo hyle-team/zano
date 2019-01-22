@@ -13,6 +13,6 @@ EOM
 esac
 
 printf "last_block_size.value "
-connectivity_tool --ip=127.0.0.1 --rpc_port=$ZANO_RPC_PORT --timeout=1000 --rpc_get_daemon_info --getinfo_flags_hex="0x0000000000000800" | grep last_block_size| cut -d ' ' -f2
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000800" | grep last_block_size| cut -d ' ' -f2
 printf "current_max_allowed_block_size.value "
-connectivity_tool --ip=127.0.0.1 --rpc_port=$ZANO_RPC_PORT --timeout=1000 --rpc_get_daemon_info --getinfo_flags_hex="0x0000000000000000" | grep current_max_allowed_block_size| cut -d ' ' -f2
+connectivity_tool --ip=127.0.0.1 --rpc-port=$ZANO_RPC_PORT --timeout=1000 --rpc-get-daemon-info --getinfo-flags-hex="0x0000000000000000" | grep current_max_allowed_block_size| cut -d ' ' -f2
