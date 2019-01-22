@@ -30,12 +30,10 @@ extern "C" {
 namespace crypto
 {
 #define OPT_XOR_4_RES(A_, B_, C_, D_, Res) \
-  crypto::hash A = A_;crypto::hash B = B_;crypto::hash C = C_; crypto::hash D = D_; \
-  ((uint64_t*)&Res)[0] = ((const uint64_t*)&A)[0] ^ ((const uint64_t*)&B)[0] ^ ((const uint64_t*)&C)[0] ^ ((const uint64_t*)&D)[0]; \
-  ((uint64_t*)&Res)[1] = ((const uint64_t*)&A)[1] ^ ((const uint64_t*)&B)[1] ^ ((const uint64_t*)&C)[1] ^ ((const uint64_t*)&D)[1]; \
-  ((uint64_t*)&Res)[2] = ((const uint64_t*)&A)[2] ^ ((const uint64_t*)&B)[2] ^ ((const uint64_t*)&C)[2] ^ ((const uint64_t*)&D)[2]; \
-  ((uint64_t*)&Res)[3] = ((const uint64_t*)&A)[3] ^ ((const uint64_t*)&B)[3] ^ ((const uint64_t*)&C)[3] ^ ((const uint64_t*)&D)[3];
-
+  ((uint64_t*)&Res)[0] = ((const uint64_t*)&A_)[0] ^ ((const uint64_t*)&B_)[0] ^ ((const uint64_t*)&C_)[0] ^ ((const uint64_t*)&D_)[0]; \
+  ((uint64_t*)&Res)[1] = ((const uint64_t*)&A_)[1] ^ ((const uint64_t*)&B_)[1] ^ ((const uint64_t*)&C_)[1] ^ ((const uint64_t*)&D_)[1]; \
+  ((uint64_t*)&Res)[2] = ((const uint64_t*)&A_)[2] ^ ((const uint64_t*)&B_)[2] ^ ((const uint64_t*)&C_)[2] ^ ((const uint64_t*)&D_)[2]; \
+  ((uint64_t*)&Res)[3] = ((const uint64_t*)&A_)[3] ^ ((const uint64_t*)&B_)[3] ^ ((const uint64_t*)&C_)[3] ^ ((const uint64_t*)&D_)[3];
 
   typedef uint64_t state_t_m[25];
   typedef uint64_t mixin_t[KK_MIXIN_SIZE];
