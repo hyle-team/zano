@@ -27,13 +27,13 @@ namespace currency
   }
   crypto::hash scratchpad_keeper::get_pow_hash(const blobdata& bd, uint64_t height, const crypto::hash& scr_seed)
   {
+    CRITICAL_REGION_BEGIN(m_lock);
     crypto::hash res_hash = null_hash;
     if (scr_seed != m_seed || get_scratchpad_size_for_height(height) != this->size())
     {
       bool r = generate(scr_seed, height);
       CHECK_AND_ASSERT_THROW_MES(r, "Unable to generate scratchpad");
     }
-    CRITICAL_REGION_BEGIN(m_lock);
     CHECK_AND_ASSERT_THROW_MES(get_scratchpad_size_for_height(height) == this->size(), "Fatal error on hash calculation: scratchpad_size=" << m_scratchpad.size() << " at height=" << height << ", scr_seed=" << scr_seed << ", m_seed=" << m_seed);
     CHECK_AND_ASSERT_THROW_MES(scr_seed == m_seed, "Fatal error on hash calculation: scratchpad_seed missmatch scr_seed=" << scr_seed << ", m_seed=" << m_seed);
 
