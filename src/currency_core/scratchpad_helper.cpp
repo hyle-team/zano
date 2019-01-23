@@ -27,7 +27,7 @@ namespace currency
   }
   crypto::hash scratchpad_keeper::get_pow_hash(const blobdata& bd, uint64_t height, const crypto::hash& scr_seed)
   {
-    CRITICAL_REGION_BEGIN(m_lock);
+    CRITICAL_REGION_LOCAL(m_lock);
     crypto::hash res_hash = null_hash;
     if (scr_seed != m_seed || get_scratchpad_size_for_height(height) != this->size())
     {
@@ -39,7 +39,6 @@ namespace currency
 
     bool res = get_wild_keccak2(bd, res_hash, m_scratchpad);
     CHECK_AND_ASSERT_THROW_MES(res, "Fatal error on hash calculation: scratchpad_size=" << m_scratchpad.size());
-    CRITICAL_REGION_END();
     return res_hash;
   }
   crypto::hash scratchpad_keeper::get_pow_hash(const block& b, const crypto::hash& scr_seed)
