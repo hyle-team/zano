@@ -167,6 +167,13 @@ app-sidebar {
           background-color: themed(onlineColor);
         }
       }
+
+      .testnet {
+
+        @include themify($themes) {
+          color: themed(mainTextColor);
+        }
+      }
     }
 
     .progress-bar-container {

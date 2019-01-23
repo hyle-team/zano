@@ -44,12 +44,12 @@
 </div>
 <div class="sidebar-synchronization-status">
   <div class="status-container">
-    <span class="offline" *ngIf="variablesService.daemon_state === 0">{{ 'SIDEBAR.SYNCHRONIZATION.OFFLINE' | translate }}</span>
-    <span class="syncing" *ngIf="variablesService.daemon_state === 1">{{ 'SIDEBAR.SYNCHRONIZATION.SYNCING' | translate }}</span>
-    <span class="online" *ngIf="variablesService.daemon_state === 2">{{ 'SIDEBAR.SYNCHRONIZATION.ONLINE' | translate }}</span>
+    <span class="offline" *ngIf="variablesService.daemon_state === 0">{{ 'SIDEBAR.SYNCHRONIZATION.OFFLINE' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span></span>
+    <span class="syncing" *ngIf="variablesService.daemon_state === 1">{{ 'SIDEBAR.SYNCHRONIZATION.SYNCING' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span></span>
+    <span class="online" *ngIf="variablesService.daemon_state === 2">{{ 'SIDEBAR.SYNCHRONIZATION.ONLINE' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span></span>
     <span class="loading" *ngIf="variablesService.daemon_state === 3">{{ 'SIDEBAR.SYNCHRONIZATION.LOADING' | translate }}</span>
-    <span class="offline" *ngIf="variablesService.daemon_state === 4">{{ 'SIDEBAR.SYNCHRONIZATION.ERROR' | translate }}</span>
-    <span class="online" *ngIf="variablesService.daemon_state === 5">{{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }}</span>
+    <span class="offline" *ngIf="variablesService.daemon_state === 4">{{ 'SIDEBAR.SYNCHRONIZATION.ERROR' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span></span>
+    <span class="online" *ngIf="variablesService.daemon_state === 5">{{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span></span>
   </div>
   <div class="progress-bar-container">
     <div class="syncing" *ngIf="variablesService.daemon_state === 1">
