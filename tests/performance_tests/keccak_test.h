@@ -111,7 +111,7 @@ public:
 #define SCR_I(i) m_scratchpad_vec[st[i]%m_scratchpad_vec.size()]
       for (size_t i = 0; i != 6; i++)
       {
-        *(crypto::hash*)&mix[i * 4] = XOR_4(SCR_I(i * 4), SCR_I(i * 4 + 1), SCR_I(i * 4 + 2), SCR_I(i * 4 + 3));
+        OPT_XOR_4_RES(SCR_I(i * 4), SCR_I(i * 4 + 1), SCR_I(i * 4 + 2), SCR_I(i * 4 + 3), *(crypto::hash*)&mix[i * 4]);
       }
     });
 
@@ -177,7 +177,7 @@ void measure_keccak_over_scratchpad()
   crypto::hash res_to_test = { 0 };
   crypto::hash res_etalon = { 0 };
   OPT_XOR_4_RES(scratchpad_vec[0], scratchpad_vec[1], scratchpad_vec[2], scratchpad_vec[3], res_to_test);
-  res_etalon = XOR_4(scratchpad_vec[0], scratchpad_vec[1], scratchpad_vec[2], scratchpad_vec[3]);
+  OPT_XOR_4_RES(scratchpad_vec[0], scratchpad_vec[1], scratchpad_vec[2], scratchpad_vec[3], res_etalon);
 
 
 // 
@@ -222,7 +222,7 @@ void measure_keccak_over_scratchpad()
     uint64_t ticks_d = epee::misc_utils::get_tick_count();
     for (size_t r = 0; r != measere_rounds; r++)
     {
-      crypto::get_wild_keccak2(has_str, res_h, 1, scratchpad_vec, i);
+      crypto::get_wild_keccak2(has_str, res_h, scratchpad_vec, i);
     }
 
     uint64_t ticks_e = epee::misc_utils::get_tick_count();

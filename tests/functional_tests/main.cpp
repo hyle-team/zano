@@ -17,6 +17,7 @@ using namespace epee;
 #include "currency_core/currency_format_utils.h"
 #include "generate_test_genesis.h"
 #include "deadlock_guard_test.h"
+#include "difficulty_analysis.h"
 
 namespace po = boost::program_options;
 
@@ -51,6 +52,7 @@ namespace
   const command_line::arg_descriptor<size_t> arg_blocks            = {"blocks",            "number of blocks to generate", 250};
   const command_line::arg_descriptor<size_t> arg_generate_test_genesis_json = { "generate-test-genesis-json",            "generates test genesis json, specify amount of accounts", 0, true };
   const command_line::arg_descriptor<bool>   arg_deadlock_guard    = { "test-deadlock-guard",            "Do deadlock guard test", false, true };
+  const command_line::arg_descriptor<std::string>   arg_difficulty_analysis = { "difficulty-analysis", "Do difficulty analysis", "", true };
 
 }
 
@@ -101,6 +103,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_generate_test_genesis_json);
   command_line::add_arg(desc_options, arg_max_tx_in_pool);
   command_line::add_arg(desc_options, arg_deadlock_guard);
+  command_line::add_arg(desc_options, arg_difficulty_analysis);
+  
   
   
   
@@ -173,7 +177,12 @@ int main(int argc, char* argv[])
     return 0;
   }else if(command_line::has_arg(vm, arg_generate_test_genesis_json))
   {
-	generate_test_genesis(command_line::get_arg(vm, arg_generate_test_genesis_json));
+	  generate_test_genesis(command_line::get_arg(vm, arg_generate_test_genesis_json));
+    return 0;
+  }
+  else if (command_line::has_arg(vm, arg_difficulty_analysis))
+  {
+    run_difficulty_analysis(command_line::get_arg(vm, arg_difficulty_analysis));
     return 0;
   }
   else if (command_line::get_arg(vm, arg_deadlock_guard) )
