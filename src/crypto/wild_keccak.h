@@ -29,13 +29,16 @@ extern "C" {
 
 namespace crypto
 {
-#define OPT_XOR_4_RES(A_, B_, C_, D_, Res) \
-  crypto::hash A = A_;crypto::hash B = B_;crypto::hash C = C_; crypto::hash D = D_; \
-  ((uint64_t*)&Res)[0] = ((const uint64_t*)&A)[0] ^ ((const uint64_t*)&B)[0] ^ ((const uint64_t*)&C)[0] ^ ((const uint64_t*)&D)[0]; \
-  ((uint64_t*)&Res)[1] = ((const uint64_t*)&A)[1] ^ ((const uint64_t*)&B)[1] ^ ((const uint64_t*)&C)[1] ^ ((const uint64_t*)&D)[1]; \
-  ((uint64_t*)&Res)[2] = ((const uint64_t*)&A)[2] ^ ((const uint64_t*)&B)[2] ^ ((const uint64_t*)&C)[2] ^ ((const uint64_t*)&D)[2]; \
-  ((uint64_t*)&Res)[3] = ((const uint64_t*)&A)[3] ^ ((const uint64_t*)&B)[3] ^ ((const uint64_t*)&C)[3] ^ ((const uint64_t*)&D)[3];
+#define CONCAT_IMPL(x, y) x##y
+#define CONCAT(x, y) CONCAT_IMPL(x, y)
+#define UNIQUE(x) CONCAT(x, __LINE__)
 
+#define OPT_XOR_4_RES(A_, B_, C_, D_, Res) \
+  crypto::hash UNIQUE(A) = A_;crypto::hash UNIQUE(B) = B_;crypto::hash UNIQUE(C) = C_; crypto::hash UNIQUE(D) = D_; \
+  ((uint64_t*)&Res)[0] = ((const uint64_t*)&UNIQUE(A))[0] ^ ((const uint64_t*)&UNIQUE(B))[0] ^ ((const uint64_t*)&UNIQUE(C))[0] ^ ((const uint64_t*)&UNIQUE(D))[0]; \
+  ((uint64_t*)&Res)[1] = ((const uint64_t*)&UNIQUE(A))[1] ^ ((const uint64_t*)&UNIQUE(B))[1] ^ ((const uint64_t*)&UNIQUE(C))[1] ^ ((const uint64_t*)&UNIQUE(D))[1]; \
+  ((uint64_t*)&Res)[2] = ((const uint64_t*)&UNIQUE(A))[2] ^ ((const uint64_t*)&UNIQUE(B))[2] ^ ((const uint64_t*)&UNIQUE(C))[2] ^ ((const uint64_t*)&UNIQUE(D))[2]; \
+  ((uint64_t*)&Res)[3] = ((const uint64_t*)&UNIQUE(A))[3] ^ ((const uint64_t*)&UNIQUE(B))[3] ^ ((const uint64_t*)&UNIQUE(C))[3] ^ ((const uint64_t*)&UNIQUE(D))[3];
 
   typedef uint64_t state_t_m[25];
   typedef uint64_t mixin_t[KK_MIXIN_SIZE];
