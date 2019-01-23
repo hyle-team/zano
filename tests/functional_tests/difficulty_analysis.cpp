@@ -16,7 +16,7 @@ using namespace epee;
 
 void run_difficulty_analysis(const std::string& path)
 {
-  std::istringstream fstr(path);
+  std::ifstream fstr(path);
   if (!fstr.good())
   {
     LOG_ERROR("unable to open " << path);
@@ -41,4 +41,3 @@ void run_difficulty_analysis(const std::string& path)
 
   return;
 }
-

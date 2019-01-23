@@ -103,6 +103,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_generate_test_genesis_json);
   command_line::add_arg(desc_options, arg_max_tx_in_pool);
   command_line::add_arg(desc_options, arg_deadlock_guard);
+  command_line::add_arg(desc_options, arg_difficulty_analysis);
+  
   
   
   
