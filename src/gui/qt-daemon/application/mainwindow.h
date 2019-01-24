@@ -126,7 +126,7 @@ public:
   QString get_log_level(const QString& param);
 //  QString dump_all_offers();
   QString webkit_launched_script();
-  QString get_smart_safe_info(const QString& param);
+  QString get_smart_wallet_info(const QString& param);
   QString restore_wallet(const QString& param);
   QString is_pos_allowed();
   QString store_to_file(const QString& path, const QString& buff);

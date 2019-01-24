@@ -1465,7 +1465,7 @@ QString MainWindow::stop_pos_mining(const QString& param)
   return MAKE_RESPONSE(default_ar);
 }
 
-QString MainWindow::get_smart_safe_info(const QString& param)
+QString MainWindow::get_smart_wallet_info(const QString& param)
 {
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::wallet_id_obj, wo);
