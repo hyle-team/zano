@@ -11,6 +11,10 @@
 
       tr {
 
+        td {
+          min-width: 10rem;
+        }
+
         .status {
           position: relative;
           display: flex;
@@ -69,7 +73,7 @@
           height: 0;
 
           &.open {
-            height: 10.2rem;
+            height: 13.2rem;
           }
 
           td {
