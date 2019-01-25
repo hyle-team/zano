@@ -129,6 +129,7 @@ module.exports = ":host {\n  position: fixed;\n  top: 0;\n  bottom: 0;\n  left: 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ModalContainerComponent", function() { return ModalContainerComponent; });
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _ngx_translate_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @ngx-translate/core */ "./node_modules/@ngx-translate/core/fesm5/ngx-translate-core.js");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -139,24 +140,23 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 
+
 var ModalContainerComponent = /** @class */ (function () {
-    function ModalContainerComponent() {
+    function ModalContainerComponent(translate) {
+        this.translate = translate;
         this.close = new _angular_core__WEBPACK_IMPORTED_MODULE_0__["EventEmitter"]();
     }
     ModalContainerComponent.prototype.ngOnInit = function () {
         this.button.nativeElement.focus();
         switch (this.type) {
             case 'error':
-                this.title = 'Wrong';
+                this.title = this.translate.instant("MODALS.ERROR");
                 break;
             case 'success':
-                this.title = 'Success';
+                this.title = this.translate.instant("MODALS.SUCCESS");
                 break;
             case 'info':
-                this.title = 'Information';
-                break;
-            default:
-                this.title = 'Unexpected';
+                this.title = this.translate.instant("MODALS.INFO");
                 break;
         }
     };
@@ -185,7 +185,7 @@ var ModalContainerComponent = /** @class */ (function () {
             template: __webpack_require__(/*! ./modal-container.component.html */ "./src/app/_helpers/directives/modal-container/modal-container.component.html"),
             styles: [__webpack_require__(/*! ./modal-container.component.scss */ "./src/app/_helpers/directives/modal-container/modal-container.component.scss")]
         }),
-        __metadata("design:paramtypes", [])
+        __metadata("design:paramtypes", [_ngx_translate_core__WEBPACK_IMPORTED_MODULE_1__["TranslateService"]])
     ], ModalContainerComponent);
     return ModalContainerComponent;
 }());

@@ -204,6 +204,11 @@
     "SEND_PLACEHOLDER": "Type a message...",
     "SEND_BUTTON": "Send"
   },
+  "MODALS": {
+    "ERROR": "Error",
+    "SUCCESS": "Success",
+    "INFO": "Information"
+  },
   "ERRORS": {
     "NOT_ENOUGH_MONEY": "Insufficient funds in account",
     "CORE_BUSY": "Internal error (core is busy)",
