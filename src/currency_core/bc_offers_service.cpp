@@ -25,7 +25,7 @@ namespace bc_services
     , m_core_runtime_config(currency::get_default_core_runtime_config())
     , m_last_seen_block_id(currency::null_hash)
     , m_deinitialized(false)
-    , m_disabled(false)
+    , m_disabled(true)
 
   {}
   //------------------------------------------------------------------
