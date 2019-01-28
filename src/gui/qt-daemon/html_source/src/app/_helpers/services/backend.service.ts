@@ -57,7 +57,7 @@ export class BackendService {
         if (command === 'cancel_offer') {
           error_translate = this.translate.instant('ERRORS.NO_MONEY_REMOVE_OFFER', {
             'fee': '0.01',
-            'currency': 'ZAN'
+            'currency': this.variablesService.defaultCurrency
           });
         } else {
           error_translate = 'INFORMER.NO_MONEY';

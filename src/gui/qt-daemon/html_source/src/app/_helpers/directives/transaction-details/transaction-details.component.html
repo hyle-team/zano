@@ -1,7 +1,7 @@
 <div class="table">
   <div class="row">
     <span class="cell label" [style.flex-basis]="sizes[0] + 'px'">{{ 'HISTORY.DETAILS.ID' | translate }}</span>
-    <span class="cell key-value" [style.flex-basis]="sizes[1] + 'px'" (click)="openInBrowser(transaction.tx_hash)">{{transaction.tx_hash}}</span>
+    <span class="cell key-value" [style.flex-basis]="sizes[1] + 'px'" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, transaction.tx_hash)" (click)="openInBrowser(transaction.tx_hash)">{{transaction.tx_hash}}</span>
     <span class="cell label" [style.flex-basis]="sizes[2] + 'px'">{{ 'HISTORY.DETAILS.SIZE' | translate }}</span>
     <span class="cell value" [style.flex-basis]="sizes[3] + 'px'">{{ 'HISTORY.DETAILS.SIZE_VALUE' | translate : {value: transaction.tx_blob_size} }}</span>
   </div>

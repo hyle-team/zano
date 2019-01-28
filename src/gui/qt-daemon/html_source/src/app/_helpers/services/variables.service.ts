@@ -1,4 +1,4 @@
-import {Injectable, Input, NgZone} from '@angular/core';
+import {Injectable, NgZone} from '@angular/core';
 import {Wallet} from '../models/wallet.model';
 import {BehaviorSubject} from 'rxjs';
 import {Idle} from 'idlejs/dist';
@@ -50,7 +50,8 @@ export class VariablesService {
       });
     });
 
-  @Input() contextMenu: ContextMenuComponent;
+  public allContextMenu: ContextMenuComponent;
+  public onlyCopyContextMenu: ContextMenuComponent;
 
   constructor(private router: Router, private ngZone: NgZone, private contextMenuService: ContextMenuService) {
   }
@@ -96,13 +97,23 @@ export class VariablesService {
     $event.target['contextSelectionEnd'] = $event.target['selectionEnd'];
     if ($event.target && ($event.target['nodeName'].toUpperCase() === 'TEXTAREA' || $event.target['nodeName'].toUpperCase() === 'INPUT') && !$event.target['readOnly']) {
       this.contextMenuService.show.next({
-        contextMenu: this.contextMenu,
+        contextMenu: this.allContextMenu,
         event: $event,
         item: $event.target,
       });
       $event.preventDefault();
       $event.stopPropagation();
     }
+  }
+
+  public onContextMenuOnlyCopy($event: MouseEvent, copyText?: string): void {
+    this.contextMenuService.show.next({
+      contextMenu: this.onlyCopyContextMenu,
+      event: $event,
+      item: copyText
+    });
+    $event.preventDefault();
+    $event.stopPropagation();
   }
 
 }

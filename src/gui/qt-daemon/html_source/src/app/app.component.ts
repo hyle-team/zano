@@ -1,9 +1,10 @@
-import {Component, OnInit, NgZone, Renderer2, OnDestroy} from '@angular/core';
+import {Component, OnInit, NgZone, Renderer2, OnDestroy, ViewChild} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {TranslateService} from '@ngx-translate/core';
 import {BackendService} from './_helpers/services/backend.service';
 import {Router} from '@angular/router';
 import {VariablesService} from './_helpers/services/variables.service';
+import {ContextMenuComponent} from 'ngx-contextmenu';
 
 @Component({
   selector: 'app-root',
@@ -14,6 +15,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   intervalUpdateContractsState;
   onQuitRequest = false;
+
+  @ViewChild('allContextMenu') public allContextMenu: ContextMenuComponent;
+  @ViewChild('onlyCopyContextMenu') public onlyCopyContextMenu: ContextMenuComponent;
 
   constructor(
     private http: HttpClient,
@@ -31,6 +35,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.variablesService.allContextMenu = this.allContextMenu;
+    this.variablesService.onlyCopyContextMenu = this.onlyCopyContextMenu;
+
     this.backend.initService().subscribe(initMessage => {
       console.log('Init message: ', initMessage);
 
@@ -426,6 +433,12 @@ export class AppComponent implements OnInit, OnDestroy {
       const canUseSelection = ((target[start]) || (target[start] === '0'));
       const SelectedText = (canUseSelection) ? target['value'].substring(target[start], target[end]) : target['value'];
       this.backend.setClipboard(String(SelectedText));
+    }
+  }
+
+  contextMenuOnlyCopy(text) {
+    if (text) {
+      this.backend.setClipboard(String(text));
     }
   }
 

@@ -31,7 +31,8 @@
           <span *ngIf="item.sortFee && item.sortFee.toString() !== '0'">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>
         </td>
         <td class="remote-address">
-          <span>{{item | historyTypeMessages}}</span>
+          <span *ngIf="!(item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0])">{{item | historyTypeMessages}}</span>
+          <span *ngIf="item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0]" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, item.remote_addresses[0])">{{item.remote_addresses[0]}}</span>
         </td>
       </tr>
       <tr class="transaction-details" [class.open]="index === openedDetails">
