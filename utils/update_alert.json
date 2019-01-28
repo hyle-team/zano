@@ -1,11 +1,11 @@
 {
-   "maj":0,
-   "min":3,
+   "maj":1,
+   "min":0,
    "rev":0,
-   "build":1663,
+   "build":8,
    "cs":[
       {
-         "build":1662,
+         "build":7,
          "mode":3
       }
    ]
