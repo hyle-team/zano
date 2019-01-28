@@ -18,6 +18,7 @@ export class VariablesService {
   public opening_wallet: Wallet;
   public exp_med_ts = 0;
   public height_app = 0;
+  public last_build_available = '';
   public daemon_state = 0;
   public sync = {
     progress_value: 0,

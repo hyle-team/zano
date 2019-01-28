@@ -91,7 +91,8 @@
       "NEW": "New password",
       "CONFIRM": "New password confirmation",
       "BUTTON": "Save"
-    }
+    },
+    "LAST_BUILD": "Current build: {{value}}"
   },
   "WALLET": {
     "REGISTER_ALIAS": "Register an alias",

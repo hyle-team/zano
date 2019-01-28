@@ -122,6 +122,7 @@ export class AppComponent implements OnInit, OnDestroy {
         console.log('DAEMON:' + data.daemon_network_state);
         console.log(data);
         this.variablesService.exp_med_ts = data['expiration_median_timestamp'] + 600 + 1;
+        this.variablesService.last_build_available = data.last_build_available;
         // this.variablesService.height_app = data.height;
         this.variablesService.setHeightApp(data.height);
 
