@@ -85,20 +85,19 @@ export class TooltipDirective {
 
   setPosition() {
     const hostPos = this.el.nativeElement.getBoundingClientRect();
-    const tooltipPos = this.tooltip.getBoundingClientRect();
     // const scrollPos = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
 
     if (this.placement === 'top') {
-      this.renderer.setStyle(this.tooltip, 'top', hostPos.top - tooltipPos.height + 'px');
       this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+      this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
     }
 
     if (this.placement === 'bottom') {
       if (window.innerHeight < hostPos.bottom + this.tooltip.offsetHeight + parseInt(getComputedStyle(this.tooltip).marginTop, 10)) {
         this.renderer.removeClass(this.tooltip, 'ng-tooltip-bottom');
         this.renderer.addClass(this.tooltip, 'ng-tooltip-top');
-        this.renderer.setStyle(this.tooltip, 'top', hostPos.top - tooltipPos.height + 'px');
         this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+        this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
       } else {
         this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
         this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
@@ -107,7 +106,7 @@ export class TooltipDirective {
 
     if (this.placement === 'left') {
       this.renderer.setStyle(this.tooltip, 'top', hostPos.top + 'px');
-      this.renderer.setStyle(this.tooltip, 'left', hostPos.left - tooltipPos.width + 'px');
+      this.renderer.setStyle(this.tooltip, 'left', hostPos.left - this.tooltip.getBoundingClientRect().width + 'px');
     }
 
     if (this.placement === 'right') {
