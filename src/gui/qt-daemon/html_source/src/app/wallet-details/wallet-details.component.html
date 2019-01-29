@@ -44,7 +44,7 @@
     </div>
 
     <div class="wallet-buttons">
-      <button type="submit" class="blue-button">{{ 'WALLET_DETAILS.BUTTON_SAVE' | translate }}</button>
+      <button type="submit" class="blue-button" [disabled]="!detailsForm.valid">{{ 'WALLET_DETAILS.BUTTON_SAVE' | translate }}</button>
       <button type="button" class="blue-button" (click)="closeWallet()">{{ 'WALLET_DETAILS.BUTTON_REMOVE' | translate }}</button>
     </div>
 

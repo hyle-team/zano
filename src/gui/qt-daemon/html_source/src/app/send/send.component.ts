@@ -4,6 +4,7 @@ import {ActivatedRoute} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {ModalService} from '../_helpers/services/modal.service';
+import {BigNumber} from 'bignumber.js';
 
 @Component({
   selector: 'app-send',
@@ -16,10 +17,20 @@ export class SendComponent implements OnInit, OnDestroy {
   parentRouting;
   sendForm = new FormGroup({
     address: new FormControl('', Validators.required),
-    amount: new FormControl(null, Validators.required),
+    amount: new FormControl(null, [Validators.required, (g: FormControl) => {
+      if (g.value === '0') {
+        return {'zero': true};
+      }
+      return null;
+    }]),
     comment: new FormControl(''),
     mixin: new FormControl(0, Validators.required),
-    fee: new FormControl('0.01', Validators.required)
+    fee: new FormControl(this.variablesService.default_fee, [Validators.required, (g: FormControl) => {
+      if ((new BigNumber(g.value)).isLessThan(this.variablesService.default_fee)) {
+        return {'less_min': true};
+      }
+      return null;
+    }])
   });
   additionalOptions = false;
 
@@ -34,7 +45,7 @@ export class SendComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(params => {
       this.currentWalletId = params['id'];
-      this.sendForm.reset({address: '', amount: null, comment: '', mixin: 0, fee: '0.01'});
+      this.sendForm.reset({address: '', amount: null, comment: '', mixin: 0, fee: this.variablesService.default_fee});
     });
   }
 
@@ -68,7 +79,7 @@ export class SendComponent implements OnInit, OnDestroy {
             (send_status, send_data) => {
               if (send_status) {
                 this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
-                this.sendForm.reset({address: '', amount: null, comment: '', mixin: 0, fee: '0.01'});
+                this.sendForm.reset({address: '', amount: null, comment: '', mixin: 0, fee: this.variablesService.default_fee});
               }
             });
         }

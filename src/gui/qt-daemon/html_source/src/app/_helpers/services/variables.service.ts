@@ -4,6 +4,7 @@ import {BehaviorSubject} from 'rxjs';
 import {Idle} from 'idlejs/dist';
 import {Router} from '@angular/router';
 import {ContextMenuComponent, ContextMenuService} from 'ngx-contextmenu';
+import {BigNumber} from 'bignumber.js';
 
 @Injectable({
   providedIn: 'root'
@@ -24,6 +25,8 @@ export class VariablesService {
     progress_value: 0,
     progress_value_text: '0'
   };
+  public default_fee = '0.010000000000';
+  public default_fee_big = new BigNumber('10000000000');
 
   public settings = {
     theme: '',

@@ -56,7 +56,7 @@ export class BackendService {
       case 'INTERNAL_ERROR:NOT_ENOUGH_MONEY':
         if (command === 'cancel_offer') {
           error_translate = this.translate.instant('ERRORS.NO_MONEY_REMOVE_OFFER', {
-            'fee': '0.01',
+            'fee': this.variablesService.default_fee,
             'currency': this.variablesService.defaultCurrency
           });
         } else {
@@ -408,8 +408,8 @@ export class BackendService {
       },
       payment_id: payment_id,
       expiration_period: parseInt(time, 10) * 60 * 60,
-      fee: this.moneyToIntPipe.transform('0.01'),
-      b_fee: this.moneyToIntPipe.transform('0.01')
+      fee: this.variablesService.default_fee_big,
+      b_fee: this.variablesService.default_fee_big
     };
     this.Debug(1, params);
     this.runCommand('create_proposal', params, callback);
@@ -446,7 +446,7 @@ export class BackendService {
     const params = {
       wallet_id: parseInt(wallet_id, 10),
       contract_id: contract_id,
-      fee: this.moneyToIntPipe.transform('0.01'),
+      fee: this.variablesService.default_fee_big,
       expiration_period: parseInt(time, 10) * 60 * 60
     };
     this.Debug(1, params);
@@ -491,31 +491,25 @@ export class BackendService {
     this.runCommand('start_backend', params, callback);
   }
 
+  getDefaultFee(callback) {
+    this.runCommand('get_default_fee', {}, callback);
+  }
+
+  setBackendLocalization(stringsArray, title, callback?) {
+    const params = {
+      strings: stringsArray,
+      language_title: title
+    };
+    this.runCommand('set_localization_strings', params, callback);
+  }
+
 }
 
 
 /*
 
-    var deferred = null;
-
-    var Service = {
-
-
-
-
-
-
-
-      /!*  API  *!/
-
       toggleAutoStart: function (value) {
         return this.runCommand('toggle_autostart', asVal(value));
-      },
-
-
-
-      getDefaultFee: function (callback) {
-        return this.runCommand('get_default_fee', {}, callback);
       },
 
       getOptions: function (callback) {
@@ -569,10 +563,6 @@ export class BackendService {
         this.runCommand('resync_wallet', {wallet_id: wallet_id}, callback);
       },
 
-
-
-
-
       registerAlias: function (wallet_id, alias, address, fee, comment, reward, callback) {
         var params = {
           "wallet_id": wallet_id,
@@ -616,14 +606,6 @@ export class BackendService {
 
       getPoolInfo: function (callback) {
         this.runCommand('get_tx_pool_info', {}, callback);
-      },
-
-      localization: function (stringsArray, title, callback) {
-        var data = {
-          strings: stringsArray,
-          language_title: title
-        };
-        this.runCommand('set_localization_strings', data, callback);
       },
 
       storeFile: function (path, buff, callback) {
@@ -682,18 +664,6 @@ export class BackendService {
       printLog: function (msg, log_level) {
         return this.runCommand('print_log', {msg: msg, log_level: log_level});
       },
-
-
-
-
-
-      /!*  API END  *!/
-
-    };
-    return Service;
-  }]);
-
-})();
 
 */
 

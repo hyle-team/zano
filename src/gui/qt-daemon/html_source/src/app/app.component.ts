@@ -5,6 +5,8 @@ import {BackendService} from './_helpers/services/backend.service';
 import {Router} from '@angular/router';
 import {VariablesService} from './_helpers/services/variables.service';
 import {ContextMenuComponent} from 'ngx-contextmenu';
+import {IntToMoneyPipe} from './_helpers/pipes/int-to-money.pipe';
+import {BigNumber} from 'bignumber.js';
 
 @Component({
   selector: 'app-root',
@@ -15,6 +17,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   intervalUpdateContractsState;
   onQuitRequest = false;
+  firstOnlineState = false;
 
   @ViewChild('allContextMenu') public allContextMenu: ContextMenuComponent;
   @ViewChild('onlyCopyContextMenu') public onlyCopyContextMenu: ContextMenuComponent;
@@ -26,12 +29,30 @@ export class AppComponent implements OnInit, OnDestroy {
     private backend: BackendService,
     private router: Router,
     private variablesService: VariablesService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private intToMoneyPipe: IntToMoneyPipe
   ) {
     translate.addLangs(['en', 'fr']);
     translate.setDefaultLang('en');
     // const browserLang = translate.getBrowserLang();
     // translate.use(browserLang.match(/en|fr/) ? browserLang : 'en');
+  }
+
+  setBackendLocalization() {
+    const stringsArray = [
+      this.translate.instant('BACKEND_LOCALIZATION.QUIT'),
+      this.translate.instant('BACKEND_LOCALIZATION.IS_RECEIVED'),
+      this.translate.instant('BACKEND_LOCALIZATION.IS_CONFIRMED'),
+      this.translate.instant('BACKEND_LOCALIZATION.INCOME_TRANSFER_UNCONFIRMED'),
+      this.translate.instant('BACKEND_LOCALIZATION.INCOME_TRANSFER_CONFIRMED'),
+      this.translate.instant('BACKEND_LOCALIZATION.MINED'),
+      this.translate.instant('BACKEND_LOCALIZATION.LOCKED'),
+      this.translate.instant('BACKEND_LOCALIZATION.IS_MINIMIZE'),
+      this.translate.instant('BACKEND_LOCALIZATION.RESTORE'),
+      this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_SHOW'),
+      this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_MINIMIZE')
+    ];
+    this.backend.setBackendLocalization(stringsArray, 'en');
   }
 
   ngOnInit() {
@@ -130,7 +151,6 @@ export class AppComponent implements OnInit, OnDestroy {
         console.log(data);
         this.variablesService.exp_med_ts = data['expiration_median_timestamp'] + 600 + 1;
         this.variablesService.last_build_available = data.last_build_available;
-        // this.variablesService.height_app = data.height;
         this.variablesService.setHeightApp(data.height);
 
         this.ngZone.run(() => {
@@ -151,6 +171,13 @@ export class AppComponent implements OnInit, OnDestroy {
             }
           }
         });
+        if (!this.firstOnlineState) {
+          this.backend.getDefaultFee((status_fee, data_fee) => {
+            this.variablesService.default_fee_big = new BigNumber(data_fee);
+            this.variablesService.default_fee = this.intToMoneyPipe.transform(data_fee);
+          });
+          this.firstOnlineState = true;
+        }
       });
 
       this.backend.eventSubscribe('money_transfer', (data) => {
@@ -389,6 +416,8 @@ export class AppComponent implements OnInit, OnDestroy {
           this.renderer.addClass(document.body, 'theme-' + this.variablesService.settings.theme);
         }
 
+        this.setBackendLocalization();
+
         if (this.router.url !== '/login') {
           this.backend.haveSecureAppData((statusPass) => {
             if (statusPass) {
@@ -461,6 +490,7 @@ export class AppComponent implements OnInit, OnDestroy {
             text = text.substr(0, parseInt(target['maxLength'], 10));
           }
           target['value'] = text;
+          target.dispatchEvent(new Event('input'));
           target['focus']();
         }
       });

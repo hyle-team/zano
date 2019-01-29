@@ -33,6 +33,9 @@
         <div *ngIf="purchaseForm.controls['seller'].errors['address_not_valid']">
           {{ 'PURCHASE.FORM_ERRORS.SELLER_NOT_VALID' | translate }}
         </div>
+        <div *ngIf="purchaseForm.controls['seller'].errors['address_same']">
+          {{ 'PURCHASE.FORM_ERRORS.SELLER_SAME' | translate }}
+        </div>
       </div>
     </div>
 
@@ -108,7 +111,7 @@
 
   <div class="purchase-states" *ngIf="!newPurchase">
 
-    <ng-container *ngIf="currentContract.state == 1 && !currentContract.is_a && currentContract.private_detailes.b_pledge.plus(('0.01' | moneyToInt)).plus(('0.01' | moneyToInt)).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
+    <ng-container *ngIf="currentContract.state == 1 && !currentContract.is_a && currentContract.private_detailes.b_pledge.plus(variablesService.default_fee_big).plus(variablesService.default_fee_big).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
       <span>{{ 'There are insufficient funds in the wallet. Add funds to the wallet to continue' | translate }}</span>
     </ng-container>
 
@@ -188,7 +191,7 @@
     <!--<button type="button" class="green-button">{{ 'PURCHASE.COMPLETE_BUTTON' | translate }}</button>-->
 
     <ng-container *ngIf="!currentContract.is_a && currentContract.state == 1">
-      <button type="button" class="blue-button" (click)="acceptState();" [disabled]="currentContract.private_detailes.b_pledge.plus(('0.01' | moneyToInt)).plus(('0.01' | moneyToInt)).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
+      <button type="button" class="blue-button" (click)="acceptState();" [disabled]="currentContract.private_detailes.b_pledge.plus(variablesService.default_fee_big).plus(variablesService.default_fee_big).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
         {{'Accept (Make pledge)' | translate}}
       </button>
       <button type="button" class="turquoise-button" (click)="ignoredContract();">{{'Ignore' | translate}}</button>
