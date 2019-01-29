@@ -15,10 +15,10 @@
   <div class="input-block">
     <label for="purchase-description">{{ 'PURCHASE.DESCRIPTION' | translate }}</label>
     <input type="text" id="purchase-description" formControlName="description" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
-  </div>
-  <div class="error-block" *ngIf="purchaseForm.controls['description'].invalid && (purchaseForm.controls['description'].dirty || purchaseForm.controls['description'].touched)">
-    <div *ngIf="purchaseForm.controls['description'].errors['required']">
-      Description is required.
+    <div class="error-block" *ngIf="purchaseForm.controls['description'].invalid && (purchaseForm.controls['description'].dirty || purchaseForm.controls['description'].touched)">
+      <div *ngIf="purchaseForm.controls['description'].errors['required']">
+        {{ 'PURCHASE.FORM_ERRORS.DESC_REQUIRED' | translate }}
+      </div>
     </div>
   </div>
 
@@ -26,23 +26,23 @@
     <div class="input-block">
       <label for="purchase-seller">{{ 'PURCHASE.SELLER' | translate }}</label>
       <input type="text" id="purchase-seller" formControlName="seller" (blur)="checkAddressValidation()" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
-    </div>
-    <div class="error-block" *ngIf="purchaseForm.controls['seller'].invalid && (purchaseForm.controls['seller'].dirty || purchaseForm.controls['seller'].touched)">
-      <div *ngIf="purchaseForm.controls['seller'].errors['required']">
-        Seller is required.
-      </div>
-      <div *ngIf="purchaseForm.controls['seller'].errors['address_not_valid']">
-        Seller not valid.
+      <div class="error-block" *ngIf="purchaseForm.controls['seller'].invalid && (purchaseForm.controls['seller'].dirty || purchaseForm.controls['seller'].touched)">
+        <div *ngIf="purchaseForm.controls['seller'].errors['required']">
+          {{ 'PURCHASE.FORM_ERRORS.SELLER_REQUIRED' | translate }}
+        </div>
+        <div *ngIf="purchaseForm.controls['seller'].errors['address_not_valid']">
+          {{ 'PURCHASE.FORM_ERRORS.SELLER_NOT_VALID' | translate }}
+        </div>
       </div>
     </div>
 
     <div class="input-block">
       <label for="purchase-amount">{{ 'PURCHASE.AMOUNT' | translate }}</label>
       <input type="text" id="purchase-amount" formControlName="amount" appInputValidate="money" maxlength="20" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
-    </div>
-    <div class="error-block" *ngIf="purchaseForm.controls['amount'].invalid && (purchaseForm.controls['amount'].dirty || purchaseForm.controls['amount'].touched)">
-      <div *ngIf="purchaseForm.controls['amount'].errors['required']">
-        Amount is required.
+      <div class="error-block" *ngIf="purchaseForm.controls['amount'].invalid && (purchaseForm.controls['amount'].dirty || purchaseForm.controls['amount'].touched)">
+        <div *ngIf="purchaseForm.controls['amount'].errors['required']">
+          {{ 'PURCHASE.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}
+        </div>
       </div>
     </div>
   </div>
@@ -51,10 +51,10 @@
     <div class="input-block">
       <label for="purchase-your-deposit">{{ 'PURCHASE.YOUR_DEPOSIT' | translate }}</label>
       <input type="text" id="purchase-your-deposit" formControlName="yourDeposit" appInputValidate="money" maxlength="20" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
-    </div>
-    <div class="error-block" *ngIf="purchaseForm.controls['yourDeposit'].invalid && (purchaseForm.controls['yourDeposit'].dirty || purchaseForm.controls['yourDeposit'].touched)">
-      <div *ngIf="purchaseForm.controls['yourDeposit'].errors['required']">
-        Your deposit is required.
+      <div class="error-block" *ngIf="purchaseForm.controls['yourDeposit'].invalid && (purchaseForm.controls['yourDeposit'].dirty || purchaseForm.controls['yourDeposit'].touched)">
+        <div *ngIf="purchaseForm.controls['yourDeposit'].errors['required']">
+          {{ 'PURCHASE.FORM_ERRORS.YOUR_DEPOSIT_REQUIRED' | translate }}
+        </div>
       </div>
     </div>
 
@@ -63,15 +63,15 @@
         <label for="purchase-seller-deposit">{{ 'PURCHASE.SELLER_DEPOSIT' | translate }}</label>
         <div class="checkbox-block">
           <input type="checkbox" id="purchase-same-amount" class="style-checkbox" formControlName="sameAmount" (change)="sameAmountChange()">
-          <label for="purchase-same-amount">Same amount</label>
+          <label for="purchase-same-amount">{{ 'PURCHASE.SAME_AMOUNT' | translate }}</label>
         </div>
       </div>
       <input type="text" readonly *ngIf="purchaseForm.controls['sameAmount'].value" [value]="purchaseForm.controls['amount'].value">
       <input type="text" id="purchase-seller-deposit" *ngIf="!purchaseForm.controls['sameAmount'].value" formControlName="sellerDeposit" appInputValidate="money" maxlength="20" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
-    </div>
-    <div class="error-block" *ngIf="purchaseForm.controls['sellerDeposit'].invalid && (purchaseForm.controls['sellerDeposit'].dirty || purchaseForm.controls['sellerDeposit'].touched)">
-      <div *ngIf="purchaseForm.controls['sellerDeposit'].errors['required']">
-        Seller deposit is required.
+      <div class="error-block" *ngIf="purchaseForm.controls['sellerDeposit'].invalid && (purchaseForm.controls['sellerDeposit'].dirty || purchaseForm.controls['sellerDeposit'].touched)">
+        <div *ngIf="purchaseForm.controls['sellerDeposit'].errors['required']">
+          {{ 'PURCHASE.FORM_ERRORS.SELLER_DEPOSIT_REQUIRED' | translate }}
+        </div>
       </div>
     </div>
   </div>

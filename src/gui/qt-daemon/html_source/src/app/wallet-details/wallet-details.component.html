@@ -1,4 +1,5 @@
 <div class="content">
+
   <div class="head">
     <div class="breadcrumbs">
       <span (click)="back()">{{variablesService.currentWallet.name}}</span>
@@ -11,17 +12,17 @@
   </div>
 
   <form class="form-details" [formGroup]="detailsForm" (ngSubmit)="onSubmitEdit()">
+
     <div class="input-block">
       <label for="wallet-name">{{ 'WALLET_DETAILS.LABEL_NAME' | translate }}</label>
       <input type="text" id="wallet-name" formControlName="name">
-    </div>
-
-    <div class="error-block" *ngIf="detailsForm.controls['name'].invalid && (detailsForm.controls['name'].dirty || detailsForm.controls['name'].touched)">
-      <div *ngIf="detailsForm.controls['name'].errors['required']">
-        Name is required.
-      </div>
-      <div *ngIf="detailsForm.controls['name'].errors['duplicate']">
-        Name is duplicate.
+      <div class="error-block" *ngIf="detailsForm.controls['name'].invalid && (detailsForm.controls['name'].dirty || detailsForm.controls['name'].touched)">
+        <div *ngIf="detailsForm.controls['name'].errors['required']">
+          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_REQUIRED' | translate }}
+        </div>
+        <div *ngIf="detailsForm.controls['name'].errors['duplicate']">
+          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_DUPLICATE' | translate }}
+        </div>
       </div>
     </div>
 
@@ -29,6 +30,7 @@
       <label for="wallet-location">{{ 'WALLET_DETAILS.LABEL_FILE_LOCATION' | translate }}</label>
       <input type="text" id="wallet-location" formControlName="path" readonly>
     </div>
+
     <div class="input-block textarea">
       <label for="seed-phrase">{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>
       <div class="seed-phrase" id="seed-phrase">
@@ -40,10 +42,12 @@
         </div>
       </div>
     </div>
+
     <div class="wallet-buttons">
       <button type="submit" class="blue-button">{{ 'WALLET_DETAILS.BUTTON_SAVE' | translate }}</button>
       <button type="button" class="blue-button" (click)="closeWallet()">{{ 'WALLET_DETAILS.BUTTON_REMOVE' | translate }}</button>
     </div>
+
   </form>
 
 </div>

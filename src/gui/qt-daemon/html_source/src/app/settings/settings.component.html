@@ -1,4 +1,5 @@
 <div class="content">
+
   <div class="head">
     <button type="button" class="back-btn" (click)="back()">
       <i class="icon back"></i>
@@ -7,6 +8,7 @@
   </div>
 
   <h3 class="settings-title">{{ 'SETTINGS.TITLE' | translate }}</h3>
+
   <div class="theme-selection">
     <div class="radio-block">
       <input class="style-radio" type="radio" id="dark" name="theme" value="dark" [checked]="theme == 'dark'" (change)="setTheme('dark')">
@@ -23,42 +25,49 @@
   </div>
 
   <form class="master-password" [formGroup]="changeForm" (ngSubmit)="onSubmitChangePass()">
+
     <span class="master-password-title">{{ 'SETTINGS.MASTER_PASSWORD.TITLE' | translate }}</span>
+
     <div class="input-block">
       <label for="old-password">{{ 'SETTINGS.MASTER_PASSWORD.OLD' | translate }}</label>
       <input type="password" id="old-password" formControlName="password"/>
-      <div *ngIf="changeForm.controls['password'].invalid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched)">
+      <div class="error-block" *ngIf="changeForm.controls['password'].invalid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched)">
         <div *ngIf="changeForm.controls['password'].errors.required">
-          Password is required.
+          {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}
         </div>
       </div>
-      <div *ngIf="changeForm.invalid && changeForm.controls['password'].valid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched) && changeForm.errors && changeForm.errors.pass_mismatch">
-        Old password not match.
+      <div class="error-block" *ngIf="changeForm.invalid && changeForm.controls['password'].valid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched) && changeForm.errors && changeForm.errors.pass_mismatch">
+        {{ 'SETTINGS.FORM_ERRORS.PASS_NOT_MATCH' | translate }}
       </div>
     </div>
+
     <div class="input-block">
       <label for="new-password">{{ 'SETTINGS.MASTER_PASSWORD.NEW' | translate }}</label>
       <input type="password" id="new-password" formControlName="new_password"/>
-      <div *ngIf="changeForm.controls['new_password'].invalid && (changeForm.controls['new_password'].dirty || changeForm.controls['new_password'].touched)">
+      <div class="error-block" *ngIf="changeForm.controls['new_password'].invalid && (changeForm.controls['new_password'].dirty || changeForm.controls['new_password'].touched)">
         <div *ngIf="changeForm.controls['new_password'].errors.required">
-          Password is required.
+          {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}
         </div>
       </div>
     </div>
+
     <div class="input-block">
       <label for="confirm-password">{{ 'SETTINGS.MASTER_PASSWORD.CONFIRM' | translate }}</label>
       <input type="password" id="confirm-password" formControlName="new_confirmation"/>
-      <div *ngIf="changeForm.controls['new_confirmation'].invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched)">
+      <div class="error-block" *ngIf="changeForm.controls['new_confirmation'].invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched)">
         <div *ngIf="changeForm.controls['new_confirmation'].errors.required">
-          Password is required.
+          {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}
         </div>
       </div>
-      <div *ngIf="changeForm.invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched) && changeForm.errors && changeForm.errors.confirm_mismatch">
-        Confirm password not match.
+      <div class="error-block" *ngIf="changeForm.invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched) && changeForm.errors && changeForm.errors.confirm_mismatch">
+        {{ 'SETTINGS.FORM_ERRORS.CONFIRM_NOT_MATCH' | translate }}
       </div>
     </div>
+
     <button type="submit" class="blue-button">{{ 'SETTINGS.MASTER_PASSWORD.BUTTON' | translate }}</button>
+
   </form>
 
   <div class="last-build">{{ 'SETTINGS.LAST_BUILD' | translate : {value: variablesService.last_build_available} }}</div>
+
 </div>

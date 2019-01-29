@@ -1,4 +1,5 @@
 <div class="content">
+
   <div class="head">
     <div class="breadcrumbs">
       <span [routerLink]="['/main']">{{ 'BREADCRUMBS.ADD_WALLET' | translate }}</span>
@@ -11,16 +12,17 @@
   </div>
 
   <form class="form-restore" [formGroup]="restoreForm">
+
     <div class="input-block half-block">
       <label for="wallet-name">{{ 'RESTORE_WALLET.LABEL_NAME' | translate }}</label>
       <input type="text" id="wallet-name" formControlName="name" [attr.disabled]="walletSaved ? '' : null">
-    </div>
-    <div class="error-block half-block" *ngIf="restoreForm.controls['name'].invalid && (restoreForm.controls['name'].dirty || restoreForm.controls['name'].touched)">
-      <div *ngIf="restoreForm.controls['name'].errors['required']">
-        Name is required.
-      </div>
-      <div *ngIf="restoreForm.controls['name'].errors['duplicate']">
-        Name is duplicate.
+      <div class="error-block" *ngIf="restoreForm.controls['name'].invalid && (restoreForm.controls['name'].dirty || restoreForm.controls['name'].touched)">
+        <div *ngIf="restoreForm.controls['name'].errors['required']">
+          {{ 'RESTORE_WALLET.FORM_ERRORS.NAME_REQUIRED' | translate }}
+        </div>
+        <div *ngIf="restoreForm.controls['name'].errors['duplicate']">
+          {{ 'RESTORE_WALLET.FORM_ERRORS.NAME_DUPLICATE' | translate }}
+        </div>
       </div>
     </div>
 
@@ -28,26 +30,27 @@
       <label for="wallet-password">{{ 'RESTORE_WALLET.PASS' | translate }}</label>
       <input type="password" id="wallet-password" formControlName="password" [attr.disabled]="walletSaved ? '' : null">
     </div>
+
     <div class="input-block half-block">
       <label for="confirm-wallet-password">{{ 'RESTORE_WALLET.CONFIRM' | translate }}</label>
       <input type="password" id="confirm-wallet-password" formControlName="confirm" [attr.disabled]="walletSaved ? '' : null">
-    </div>
-    <div class="error-block half-block" *ngIf="restoreForm.controls['password'].dirty && restoreForm.controls['confirm'].dirty && restoreForm.errors">
-      <div *ngIf="restoreForm.errors['confirm_mismatch']">
-        Confirm password not match.
+      <div class="error-block" *ngIf="restoreForm.controls['password'].dirty && restoreForm.controls['confirm'].dirty && restoreForm.errors">
+        <div *ngIf="restoreForm.errors['confirm_mismatch']">
+          {{ 'RESTORE_WALLET.FORM_ERRORS.CONFIRM_NOT_MATCH' | translate }}
+        </div>
       </div>
     </div>
 
     <div class="input-block">
       <label for="phrase-key">{{ 'RESTORE_WALLET.LABEL_PHRASE_KEY' | translate }}</label>
       <input type="text" id="phrase-key" formControlName="key" [attr.disabled]="walletSaved ? '' : null">
-    </div>
-    <div class="error-block" *ngIf="restoreForm.controls['key'].invalid && (restoreForm.controls['key'].dirty || restoreForm.controls['key'].touched)">
-      <div *ngIf="restoreForm.controls['key'].errors['required']">
-        Key is required.
-      </div>
-      <div *ngIf="restoreForm.controls['key'].errors['key_not_valid']">
-        Key not valid.
+      <div class="error-block" *ngIf="restoreForm.controls['key'].invalid && (restoreForm.controls['key'].dirty || restoreForm.controls['key'].touched)">
+        <div *ngIf="restoreForm.controls['key'].errors['required']">
+          {{ 'RESTORE_WALLET.FORM_ERRORS.KEY_REQUIRED' | translate }}
+        </div>
+        <div *ngIf="restoreForm.controls['key'].errors['key_not_valid']">
+          {{ 'RESTORE_WALLET.FORM_ERRORS.KEY_NOT_VALID' | translate }}
+        </div>
       </div>
     </div>
 
@@ -56,6 +59,7 @@
       <button type="button" class="blue-button select-button" (click)="saveWallet()" [disabled]="!restoreForm.valid" *ngIf="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_SELECT' | translate }}</button>
       <button type="button" class="blue-button create-button" (click)="createWallet()" [disabled]="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_CREATE' | translate }}</button>
     </div>
+
   </form>
 
 </div>

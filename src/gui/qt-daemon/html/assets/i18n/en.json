@@ -4,7 +4,12 @@
     "SETUP_CONFIRM_PASS": "Confirm the password",
     "MASTER_PASS": "Master password",
     "BUTTON_NEXT": "Next",
-    "INCORRECT_PASSWORD": "Invalid password"
+    "INCORRECT_PASSWORD": "Invalid password",
+    "FORM_ERRORS": {
+      "PASS_REQUIRED": "Password is required.",
+      "CONFIRM_REQUIRED": "Confirmation is required.",
+      "MISMATCH": "Mismatch."
+    }
   },
   "COMMON": {
     "BACK": "Go back"
@@ -56,7 +61,12 @@
     "BUTTON_CREATE": "Create wallet",
     "TITLE_SAVE": "Save the wallet file.",
     "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
-    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition"
+    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required.",
+      "NAME_DUPLICATE": "Name is duplicate.",
+      "CONFIRM_NOT_MATCH": "Confirm password not match."
+    }
   },
   "OPEN_WALLET": {
     "NAME": "Wallet name",
@@ -64,7 +74,11 @@
     "BUTTON": "Open wallet",
     "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this address is already open",
     "FILE_NOT_FOUND1": "Wallet file not found",
-    "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button."
+    "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required.",
+      "NAME_DUPLICATE": "Name is duplicate."
+    }
   },
   "RESTORE_WALLET": {
     "LABEL_NAME": "Wallet name",
@@ -74,7 +88,14 @@
     "BUTTON_SELECT": "Select wallet location",
     "BUTTON_CREATE": "Create wallet",
     "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
-    "CHOOSE_PATH": "Please choose a path"
+    "CHOOSE_PATH": "Please choose a path",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required.",
+      "NAME_DUPLICATE": "Name is duplicate.",
+      "CONFIRM_NOT_MATCH": "Confirm password not match.",
+      "KEY_REQUIRED": "Key is required.",
+      "KEY_NOT_VALID": "Key not valid."
+    }
   },
   "SEED_PHRASE": {
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
@@ -91,6 +112,11 @@
       "NEW": "New password",
       "CONFIRM": "New password confirmation",
       "BUTTON": "Save"
+    },
+    "FORM_ERRORS": {
+      "PASS_REQUIRED": "Password is required.",
+      "PASS_NOT_MATCH": "Old password not match.",
+      "CONFIRM_NOT_MATCH": "Confirm password not match."
     },
     "LAST_BUILD": "Current build: {{value}}"
   },
@@ -116,7 +142,11 @@
     "LABEL_SEED_PHRASE": "Seed phrase",
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
     "BUTTON_SAVE": "Save",
-    "BUTTON_REMOVE": "Remove wallet"
+    "BUTTON_REMOVE": "Remove wallet",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required.",
+      "NAME_DUPLICATE": "Name is duplicate."
+    }
   },
   "SEND": {
     "ADDRESS": "Address",
@@ -126,7 +156,12 @@
     "MIXIN": "Mixin",
     "FEE": "Fee",
     "BUTTON": "Send",
-    "SUCCESS_SENT": "Transaction sent"
+    "SUCCESS_SENT": "Transaction sent",
+    "FORM_ERRORS": {
+      "ADDRESS_REQUIRED": "Address is required.",
+      "ADDRESS_NOT_VALID": "Address not valid.",
+      "AMOUNT_REQUIRED": "Amount is required."
+    }
   },
   "HISTORY": {
     "STATUS": "Status",
@@ -178,9 +213,18 @@
     "AMOUNT": "Amount",
     "YOUR_DEPOSIT": "Your deposit",
     "SELLER_DEPOSIT": "Seller deposit",
+    "SAME_AMOUNT": "Same amount",
     "COMMENT": "Comment",
     "DETAILS": "Additional details",
     "SEND_BUTTON": "Send",
+    "FORM_ERRORS": {
+      "DESC_REQUIRED": "Description is required.",
+      "SELLER_REQUIRED": "Seller is required.",
+      "SELLER_NOT_VALID": "Seller not valid.",
+      "AMOUNT_REQUIRED": "Amount is required.",
+      "YOUR_DEPOSIT_REQUIRED": "Your deposit is required.",
+      "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required."
+    },
     "CANCEL_BUTTON": "Cancel and return deposits",
     "TERMINATE_BUTTON": "Terminate and burn deposits",
     "COMPLETE_BUTTON": "Complete and release deposits",
