@@ -145,8 +145,6 @@ namespace currency
       << (0 <= diff ? std::string("behind") : std::string("ahead"))
       << "] " << ENDL << "SYNCHRONIZATION started", (is_inital ? LOG_LEVEL_0 : LOG_LEVEL_1), (is_inital ? epee::log_space::console_color_yellow : epee::log_space::console_color_magenta));
     LOG_PRINT_L1("Remote top block height: " << hshd.current_height << ", id: " << hshd.top_id);
-//    m_synchronized = false;
-    LOG_PRINT_MAGENTA("Synchronized set to FALSE (process_payload_sync_data)", LOG_LEVEL_0);
     /*check if current height is in remote's checkpoints zone*/
     if(hshd.last_checkpoint_height 
       && m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height 
@@ -422,7 +420,7 @@ namespace currency
       total_blocks_parsing_time += block_parsing_time;
 
       //to avoid concurrency in core between connections, suspend connections which delivered block later then first one
-      if(count == 2)
+      if(count = 2)
       { 
         if(m_core.have_block(get_block_hash(b)))
         {
@@ -467,7 +465,7 @@ namespace currency
       m_core.pause_mine();
       misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
         boost::bind(&t_core::resume_mine, &m_core));
-
+      size_t count = 0;
       for (const block_complete_entry& block_entry : arg.blocks)
       {
         CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Blocks processing interrupted, connection dropped");
@@ -495,6 +493,14 @@ namespace currency
         block_verification_context bvc = boost::value_initialized<block_verification_context>();
 
         m_core.handle_incoming_block(block_entry.block, bvc, false);
+        if (count > 2 && bvc.m_already_exists)
+        {
+          context.m_state = currency_connection_context::state_idle;
+          context.m_priv.m_needed_objects.clear();
+          context.m_priv.m_requested_objects.clear();
+          LOG_PRINT_L1("Connection set to idle state.");
+          return 1;
+        }
 
         if(bvc.m_verification_failed)
         {
@@ -513,6 +519,7 @@ namespace currency
 
         TIME_MEASURE_FINISH(block_process_time);
         LOG_PRINT_L2("Block process time: " << block_process_time + transactions_process_time << "(" << transactions_process_time << "/" << block_process_time << ")ms");
+        ++count;
       }
     }
     uint64_t current_size = m_core.get_blockchain_storage().get_current_blockchain_size();
