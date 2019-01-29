@@ -4,8 +4,13 @@
   <router-outlet></router-outlet>
 </div>
 
-<context-menu>
-  <ng-template contextMenuItem (execute)="contextMenuCopy($event.item)">copy</ng-template>
-  <ng-template contextMenuItem (execute)="contextMenuPaste($event.item)">paste</ng-template>
-  <ng-template contextMenuItem (execute)="contextMenuSelect($event.item)">select all</ng-template>
+
+<context-menu #allContextMenu>
+  <ng-template contextMenuItem (execute)="contextMenuCopy($event.item)">{{ 'CONTEXT_MENU.COPY' | translate }}</ng-template>
+  <ng-template contextMenuItem (execute)="contextMenuPaste($event.item)">{{ 'CONTEXT_MENU.PASTE' | translate }}</ng-template>
+  <ng-template contextMenuItem (execute)="contextMenuSelect($event.item)">{{ 'CONTEXT_MENU.SELECT' | translate }}</ng-template>
+</context-menu>
+
+<context-menu #onlyCopyContextMenu>
+  <ng-template contextMenuItem (execute)="contextMenuOnlyCopy($event.item)">{{ 'CONTEXT_MENU.COPY' | translate }}</ng-template>
 </context-menu>

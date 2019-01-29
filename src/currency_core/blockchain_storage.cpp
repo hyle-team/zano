@@ -99,7 +99,8 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(std::share
                                                                  m_current_fee_median(0), 
                                                                  m_current_fee_median_effective_index(0), 
                                                                  m_is_reorganize_in_process(false), 
-                                                                 m_deinit_is_done(false)
+                                                                 m_deinit_is_done(false), 
+                                                                 m_current_scratchpad_seed(currency::null_hash)
 
 
 {
@@ -289,6 +290,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
 
 
   initialize_db_solo_options_values();
+  get_seed_for_scratchpad(m_db_blocks.size(), m_current_scratchpad_seed);
+ 
 
   m_services_mgr.init(config_folder, vm);
 

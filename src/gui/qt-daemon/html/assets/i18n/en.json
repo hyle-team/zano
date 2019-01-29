@@ -4,7 +4,12 @@
     "SETUP_CONFIRM_PASS": "Confirm the password",
     "MASTER_PASS": "Master password",
     "BUTTON_NEXT": "Next",
-    "INCORRECT_PASSWORD": "Invalid password"
+    "INCORRECT_PASSWORD": "Invalid password",
+    "FORM_ERRORS": {
+      "PASS_REQUIRED": "Password is required.",
+      "CONFIRM_REQUIRED": "Confirmation is required.",
+      "MISMATCH": "Mismatch."
+    }
   },
   "COMMON": {
     "BACK": "Go back"
@@ -56,7 +61,12 @@
     "BUTTON_CREATE": "Create wallet",
     "TITLE_SAVE": "Save the wallet file.",
     "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
-    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition"
+    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required.",
+      "NAME_DUPLICATE": "Name is duplicate.",
+      "CONFIRM_NOT_MATCH": "Confirm password not match."
+    }
   },
   "OPEN_WALLET": {
     "NAME": "Wallet name",
@@ -64,7 +74,11 @@
     "BUTTON": "Open wallet",
     "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this address is already open",
     "FILE_NOT_FOUND1": "Wallet file not found",
-    "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button."
+    "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required.",
+      "NAME_DUPLICATE": "Name is duplicate."
+    }
   },
   "RESTORE_WALLET": {
     "LABEL_NAME": "Wallet name",
@@ -74,7 +88,14 @@
     "BUTTON_SELECT": "Select wallet location",
     "BUTTON_CREATE": "Create wallet",
     "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
-    "CHOOSE_PATH": "Please choose a path"
+    "CHOOSE_PATH": "Please choose a path",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required.",
+      "NAME_DUPLICATE": "Name is duplicate.",
+      "CONFIRM_NOT_MATCH": "Confirm password not match.",
+      "KEY_REQUIRED": "Key is required.",
+      "KEY_NOT_VALID": "Key not valid."
+    }
   },
   "SEED_PHRASE": {
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
@@ -91,7 +112,13 @@
       "NEW": "New password",
       "CONFIRM": "New password confirmation",
       "BUTTON": "Save"
-    }
+    },
+    "FORM_ERRORS": {
+      "PASS_REQUIRED": "Password is required.",
+      "PASS_NOT_MATCH": "Old password not match.",
+      "CONFIRM_NOT_MATCH": "Confirm password not match."
+    },
+    "LAST_BUILD": "Current build: {{value}}"
   },
   "WALLET": {
     "REGISTER_ALIAS": "Register an alias",
@@ -115,7 +142,11 @@
     "LABEL_SEED_PHRASE": "Seed phrase",
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
     "BUTTON_SAVE": "Save",
-    "BUTTON_REMOVE": "Remove wallet"
+    "BUTTON_REMOVE": "Remove wallet",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required.",
+      "NAME_DUPLICATE": "Name is duplicate."
+    }
   },
   "SEND": {
     "ADDRESS": "Address",
@@ -125,7 +156,13 @@
     "MIXIN": "Mixin",
     "FEE": "Fee",
     "BUTTON": "Send",
-    "SUCCESS_SENT": "Transaction sent"
+    "SUCCESS_SENT": "Transaction sent",
+    "FORM_ERRORS": {
+      "ADDRESS_REQUIRED": "Address is required.",
+      "ADDRESS_NOT_VALID": "Address not valid.",
+      "AMOUNT_REQUIRED": "Amount is required.",
+      "MINIMUM_FEE": "Minimum fee: {{fee}}"
+    }
   },
   "HISTORY": {
     "STATUS": "Status",
@@ -177,9 +214,19 @@
     "AMOUNT": "Amount",
     "YOUR_DEPOSIT": "Your deposit",
     "SELLER_DEPOSIT": "Seller deposit",
+    "SAME_AMOUNT": "Same amount",
     "COMMENT": "Comment",
     "DETAILS": "Additional details",
     "SEND_BUTTON": "Send",
+    "FORM_ERRORS": {
+      "DESC_REQUIRED": "Description is required.",
+      "SELLER_REQUIRED": "Seller is required.",
+      "SELLER_NOT_VALID": "Seller not valid.",
+      "AMOUNT_REQUIRED": "Amount is required.",
+      "YOUR_DEPOSIT_REQUIRED": "Your deposit is required.",
+      "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required.",
+      "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract."
+    },
     "CANCEL_BUTTON": "Cancel and return deposits",
     "TERMINATE_BUTTON": "Terminate and burn deposits",
     "COMPLETE_BUTTON": "Complete and release deposits",
@@ -204,6 +251,11 @@
     "SEND_PLACEHOLDER": "Type a message...",
     "SEND_BUTTON": "Send"
   },
+  "MODALS": {
+    "ERROR": "Error",
+    "SUCCESS": "Success",
+    "INFO": "Information"
+  },
   "ERRORS": {
     "NOT_ENOUGH_MONEY": "Insufficient funds in account",
     "CORE_BUSY": "Internal error (core is busy)",
@@ -221,5 +273,23 @@
     "FILE_NOT_FOUND": "File not found",
     "FILE_EXIST": "A file with that name already exists. Enter another name to save the file under",
     "FILE_NOT_SAVED": "You cannot save a wallet file in this folder. Please choose another folder."
+  },
+  "CONTEXT_MENU": {
+    "COPY": "copy",
+    "PASTE": "paste",
+    "SELECT": "select all"
+  },
+  "BACKEND_LOCALIZATION": {
+    "QUIT": "Quit",
+    "IS_RECEIVED": "",
+    "IS_CONFIRMED": "",
+    "INCOME_TRANSFER_UNCONFIRMED": "Incoming payment (not confirmed)",
+    "INCOME_TRANSFER_CONFIRMED": "Payment received",
+    "MINED": "Mined",
+    "LOCKED": "Blocked",
+    "IS_MINIMIZE": "Zano application is minimized to the system tray",
+    "RESTORE": "You can recover it by double-clicking or using the context menu",
+    "TRAY_MENU_SHOW": "Resize",
+    "TRAY_MENU_MINIMIZE": "Minimize"
   }
 }

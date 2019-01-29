@@ -12,25 +12,29 @@
   </div>
 
   <form class="form-open" [formGroup]="openForm">
+
     <div class="input-block">
       <label for="wallet-name">{{ 'OPEN_WALLET.NAME' | translate }}</label>
       <input type="text" id="wallet-name" formControlName="name">
-    </div>
-    <div class="error-block" *ngIf="openForm.controls['name'].invalid && (openForm.controls['name'].dirty || openForm.controls['name'].touched)">
-      <div *ngIf="openForm.controls['name'].errors['required']">
-        Name is required.
+      <div class="error-block" *ngIf="openForm.controls['name'].invalid && (openForm.controls['name'].dirty || openForm.controls['name'].touched)">
+        <div *ngIf="openForm.controls['name'].errors['required']">
+          {{ 'OPEN_WALLET.FORM_ERRORS.NAME_REQUIRED' | translate }}
+        </div>
+        <div *ngIf="openForm.controls['name'].errors['duplicate']">
+          {{ 'OPEN_WALLET.FORM_ERRORS.NAME_DUPLICATE' | translate }}
+        </div>
       </div>
-      <div *ngIf="openForm.controls['name'].errors['duplicate']">
-        Name is duplicate.
-      </div>
     </div>
+
     <div class="input-block">
       <label for="wallet-password">{{ 'OPEN_WALLET.PASS' | translate }}</label>
       <input type="password" id="wallet-password" formControlName="password">
     </div>
+
     <div class="wrap-buttons">
       <button type="button" class="blue-button create-button" (click)="openWallet()" [disabled]="!openForm.valid">{{ 'OPEN_WALLET.BUTTON' | translate }}</button>
     </div>
+
   </form>
 
 </div>

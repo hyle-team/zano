@@ -408,6 +408,31 @@ private:
     return true;
   }
   //--------------------------------------------------------------------------------
+  bool print_block_info_by_hash(const std::string& arg)
+  {
+    crypto::hash block_hash;
+    if (!parse_hash256(arg, block_hash))
+    {
+      return false;
+    }
+
+    currency::block_rpc_extended_info bei = AUTO_VAL_INIT(bei);
+    bool r = m_srv.get_payload_object().get_core().get_blockchain_storage().get_main_block_rpc_details(block_hash, bei);
+
+    if (r)
+    {
+      //      currency::block& block = bei.bl;
+      LOG_PRINT_GREEN("------------------ block_id: " << bei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(bei) , LOG_LEVEL_0);
+    }
+    else
+    {
+      LOG_PRINT_GREEN("block wasn't found: " << arg, LOG_LEVEL_0);
+      return false;
+    }
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
   bool print_block_by_hash(const std::string& arg)
   {
     crypto::hash block_hash;
@@ -473,11 +498,11 @@ private:
     try
     {
       uint64_t height = boost::lexical_cast<uint64_t>(arg);
-      print_block_by_height(height);
+      print_block_info_by_height(height);
     }
     catch (boost::bad_lexical_cast&)
     {
-      print_block_by_hash(arg);
+      print_block_info_by_hash(arg);
     }
 
     return true;

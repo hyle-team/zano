@@ -54,6 +54,7 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
           filename = filename.slice(0, 25);
         }
         this.openForm.get('name').setValue(filename);
+        this.openForm.get('name').markAsTouched();
       }
     });
   }

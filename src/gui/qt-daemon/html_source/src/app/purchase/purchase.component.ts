@@ -22,15 +22,20 @@ export class PurchaseComponent implements OnInit, OnDestroy {
 
   purchaseForm = new FormGroup({
     description: new FormControl('', Validators.required),
-    seller: new FormControl('', Validators.required),
+    seller: new FormControl('', [Validators.required, (g: FormControl) => {
+      if (g.value === this.variablesService.currentWallet.address) {
+        return {'address_same': true};
+      }
+      return null;
+    }]),
     amount: new FormControl(null, Validators.required),
     yourDeposit: new FormControl(null, Validators.required),
     sellerDeposit: new FormControl(null, Validators.required),
-    sameAmount: new FormControl(false),
+    sameAmount: new FormControl({value: false, disabled: false}),
     comment: new FormControl(''),
-    fee: new FormControl('0.01'),
+    fee: new FormControl(this.variablesService.default_fee),
     time: new FormControl({value: '12', disabled: false}),
-    timeCancel: new FormControl('12'),
+    timeCancel: new FormControl({value: '12', disabled: false}),
     payment: new FormControl('')
   });
 
@@ -71,13 +76,14 @@ export class PurchaseComponent implements OnInit, OnDestroy {
           amount: this.intToMoneyPipe.transform(this.currentContract.private_detailes.to_pay),
           yourDeposit: this.intToMoneyPipe.transform(this.currentContract.private_detailes.a_pledge),
           sellerDeposit: this.intToMoneyPipe.transform(this.currentContract.private_detailes.b_pledge),
-          sameAmount: false,
+          sameAmount: this.currentContract.private_detailes.to_pay.isEqualTo(this.currentContract.private_detailes.b_pledge),
           comment: this.currentContract.private_detailes.c,
-          fee: '0.01',
+          fee: this.variablesService.default_fee,
           time: '12',
           timeCancel: '12',
           payment: this.currentContract.payment_id
         });
+        this.purchaseForm.get('sameAmount').disable();
         this.newPurchase = false;
 
         if (this.currentContract.is_new) {
@@ -125,6 +131,13 @@ export class PurchaseComponent implements OnInit, OnDestroy {
         this.currentContract.state = 6;
         this.currentContract.is_new = true;
         this.variablesService.currentWallet.recountNewContracts();
+      }
+      if (!this.newPurchase && this.currentContract.is_a && (this.currentContract.state === 201 || this.currentContract.state === 2 || this.currentContract.state === 120 || this.currentContract.state === 130)) {
+        if (this.currentContract.cancel_expiration_time === 0 && (this.currentContract.height === 0 || (this.variablesService.height_app - this.currentContract.height) < 10)) {
+          this.purchaseForm.get('timeCancel').disable();
+        } else {
+          this.purchaseForm.get('timeCancel').enable();
+        }
       }
     });
   }

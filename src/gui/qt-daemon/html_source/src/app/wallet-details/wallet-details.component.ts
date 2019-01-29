@@ -17,8 +17,12 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
   detailsForm = new FormGroup({
     name: new FormControl('', [Validators.required, (g: FormControl) => {
       for (let i = 0; i < this.variablesService.wallets.length; i++) {
-        if (g.value === this.variablesService.wallets[i].name && this.variablesService.wallets[i].wallet_id !== this.variablesService.currentWallet.wallet_id) {
-          return {'duplicate': true};
+        if (g.value === this.variablesService.wallets[i].name) {
+          if (this.variablesService.wallets[i].wallet_id === this.variablesService.currentWallet.wallet_id) {
+            return {'same': true};
+          } else {
+            return {'duplicate': true};
+          }
         }
       }
       return null;

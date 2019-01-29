@@ -1,9 +1,10 @@
-import {Injectable, Input, NgZone} from '@angular/core';
+import {Injectable, NgZone} from '@angular/core';
 import {Wallet} from '../models/wallet.model';
 import {BehaviorSubject} from 'rxjs';
 import {Idle} from 'idlejs/dist';
 import {Router} from '@angular/router';
 import {ContextMenuComponent, ContextMenuService} from 'ngx-contextmenu';
+import {BigNumber} from 'bignumber.js';
 
 @Injectable({
   providedIn: 'root'
@@ -18,11 +19,14 @@ export class VariablesService {
   public opening_wallet: Wallet;
   public exp_med_ts = 0;
   public height_app = 0;
+  public last_build_available = '';
   public daemon_state = 0;
   public sync = {
     progress_value: 0,
     progress_value_text: '0'
   };
+  public default_fee = '0.010000000000';
+  public default_fee_big = new BigNumber('10000000000');
 
   public settings = {
     theme: '',
@@ -49,7 +53,8 @@ export class VariablesService {
       });
     });
 
-  @Input() contextMenu: ContextMenuComponent;
+  public allContextMenu: ContextMenuComponent;
+  public onlyCopyContextMenu: ContextMenuComponent;
 
   constructor(private router: Router, private ngZone: NgZone, private contextMenuService: ContextMenuService) {
   }
@@ -95,13 +100,23 @@ export class VariablesService {
     $event.target['contextSelectionEnd'] = $event.target['selectionEnd'];
     if ($event.target && ($event.target['nodeName'].toUpperCase() === 'TEXTAREA' || $event.target['nodeName'].toUpperCase() === 'INPUT') && !$event.target['readOnly']) {
       this.contextMenuService.show.next({
-        contextMenu: this.contextMenu,
+        contextMenu: this.allContextMenu,
         event: $event,
         item: $event.target,
       });
       $event.preventDefault();
       $event.stopPropagation();
     }
+  }
+
+  public onContextMenuOnlyCopy($event: MouseEvent, copyText?: string): void {
+    this.contextMenuService.show.next({
+      contextMenu: this.onlyCopyContextMenu,
+      event: $event,
+      item: copyText
+    });
+    $event.preventDefault();
+    $event.stopPropagation();
   }
 
 }

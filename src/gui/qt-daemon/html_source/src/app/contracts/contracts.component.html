@@ -3,6 +3,7 @@
 </div>
 
 <div class="wrap-table scrolled-content" *ngIf="variablesService.currentWallet.contracts.length">
+
   <table class="contracts-table">
     <thead>
     <tr>
@@ -26,7 +27,7 @@
       <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>
       <td>{{item.private_detailes.to_pay | intToMoney}} {{variablesService.defaultCurrency}}</td>
       <td>
-        <div class="status">
+        <div class="status" tooltip="{{ item | contractStatusMessages }}" placement="top" tooltipClass="table-tooltip" [delay]="500">
           {{item | contractStatusMessages}}
         </div>
       </td>
@@ -38,6 +39,7 @@
     </tr>
     </tbody>
   </table>
+
 </div>
 
 <div class="contracts-buttons">
