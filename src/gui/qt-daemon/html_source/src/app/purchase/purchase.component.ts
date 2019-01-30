@@ -27,6 +27,25 @@ export class PurchaseComponent implements OnInit, OnDestroy {
         return {'address_same': true};
       }
       return null;
+    }, (g: FormControl) => {
+      if (g.value) {
+        this.backend.validateAddress(g.value, (valid_status) => {
+          this.ngZone.run(() => {
+            if (valid_status === false) {
+              g.setErrors(Object.assign({'address_not_valid': true}, g.errors) );
+            } else {
+              if (g.hasError('address_not_valid')) {
+                delete g.errors['address_not_valid'];
+                if (Object.keys(g.errors).length === 0) {
+                  g.setErrors(null);
+                }
+              }
+            }
+          });
+        });
+        return (g.hasError('address_not_valid')) ? {'address_not_valid': true} : null;
+      }
+      return null;
     }]),
     amount: new FormControl(null, Validators.required),
     yourDeposit: new FormControl(null, Validators.required),
@@ -70,6 +89,8 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     this.subRouting = this.route.params.subscribe(params => {
       if (params.hasOwnProperty('id')) {
         this.currentContract = this.variablesService.currentWallet.getContract(params['id']);
+        this.purchaseForm.controls['seller'].setValidators([]);
+        this.purchaseForm.updateValueAndValidity();
         this.purchaseForm.setValue({
           description: this.currentContract.private_detailes.t,
           seller: this.currentContract.private_detailes.b_addr,
@@ -167,18 +188,6 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     } else {
       this.purchaseForm.get('sellerDeposit').setValidators([Validators.required]);
       this.purchaseForm.get('sellerDeposit').updateValueAndValidity();
-    }
-  }
-
-  checkAddressValidation() {
-    if (this.purchaseForm.get('seller').value) {
-      this.backend.validateAddress(this.purchaseForm.get('seller').value, (valid_status) => {
-        if (valid_status === false) {
-          this.ngZone.run(() => {
-            this.purchaseForm.get('seller').setErrors({address_not_valid: true});
-          });
-        }
-      });
     }
   }
 

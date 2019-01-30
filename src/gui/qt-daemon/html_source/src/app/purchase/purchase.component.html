@@ -14,10 +14,15 @@
 
   <div class="input-block">
     <label for="purchase-description">{{ 'PURCHASE.DESCRIPTION' | translate }}</label>
-    <input type="text" id="purchase-description" formControlName="description" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+    <input type="text" id="purchase-description" formControlName="description" maxlength="100" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
     <div class="error-block" *ngIf="purchaseForm.controls['description'].invalid && (purchaseForm.controls['description'].dirty || purchaseForm.controls['description'].touched)">
       <div *ngIf="purchaseForm.controls['description'].errors['required']">
         {{ 'PURCHASE.FORM_ERRORS.DESC_REQUIRED' | translate }}
+      </div>
+    </div>
+    <div class="error-block" *ngIf="newPurchase && purchaseForm.controls['description'].value.length >= 100">
+      <div>
+        {{ 'PURCHASE.FORM_ERRORS.COMMENT_MAXIMUM' | translate }}
       </div>
     </div>
   </div>
@@ -25,7 +30,7 @@
   <div class="input-blocks-row">
     <div class="input-block">
       <label for="purchase-seller">{{ 'PURCHASE.SELLER' | translate }}</label>
-      <input type="text" id="purchase-seller" formControlName="seller" (blur)="checkAddressValidation()" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="purchase-seller" formControlName="seller" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="purchaseForm.controls['seller'].invalid && (purchaseForm.controls['seller'].dirty || purchaseForm.controls['seller'].touched)">
         <div *ngIf="purchaseForm.controls['seller'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.SELLER_REQUIRED' | translate }}
@@ -41,7 +46,7 @@
 
     <div class="input-block">
       <label for="purchase-amount">{{ 'PURCHASE.AMOUNT' | translate }}</label>
-      <input type="text" id="purchase-amount" formControlName="amount" appInputValidate="money" maxlength="20" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="purchase-amount" formControlName="amount" appInputValidate="money" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="purchaseForm.controls['amount'].invalid && (purchaseForm.controls['amount'].dirty || purchaseForm.controls['amount'].touched)">
         <div *ngIf="purchaseForm.controls['amount'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}
@@ -53,7 +58,7 @@
   <div class="input-blocks-row">
     <div class="input-block">
       <label for="purchase-your-deposit">{{ 'PURCHASE.YOUR_DEPOSIT' | translate }}</label>
-      <input type="text" id="purchase-your-deposit" formControlName="yourDeposit" appInputValidate="money" maxlength="20" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="purchase-your-deposit" formControlName="yourDeposit" appInputValidate="money" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="purchaseForm.controls['yourDeposit'].invalid && (purchaseForm.controls['yourDeposit'].dirty || purchaseForm.controls['yourDeposit'].touched)">
         <div *ngIf="purchaseForm.controls['yourDeposit'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.YOUR_DEPOSIT_REQUIRED' | translate }}
@@ -70,7 +75,7 @@
         </div>
       </div>
       <input type="text" readonly *ngIf="purchaseForm.controls['sameAmount'].value" [value]="purchaseForm.controls['amount'].value">
-      <input type="text" id="purchase-seller-deposit" *ngIf="!purchaseForm.controls['sameAmount'].value" formControlName="sellerDeposit" appInputValidate="money" maxlength="20" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="purchase-seller-deposit" *ngIf="!purchaseForm.controls['sameAmount'].value" formControlName="sellerDeposit" appInputValidate="money" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="purchaseForm.controls['sellerDeposit'].invalid && (purchaseForm.controls['sellerDeposit'].dirty || purchaseForm.controls['sellerDeposit'].touched)">
         <div *ngIf="purchaseForm.controls['sellerDeposit'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.SELLER_DEPOSIT_REQUIRED' | translate }}
@@ -81,8 +86,15 @@
 
   <div class="input-block">
     <label for="purchase-comment">{{ 'PURCHASE.COMMENT' | translate }}</label>
-    <input type="text" id="purchase-comment" formControlName="comment" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+    <input type="text" id="purchase-comment" formControlName="comment" maxlength="100" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+    <div class="error-block" *ngIf="newPurchase && purchaseForm.controls['comment'].value.length >= 100">
+      <div>
+        {{ 'PURCHASE.FORM_ERRORS.COMMENT_MAXIMUM' | translate }}
+      </div>
+    </div>
   </div>
+
+
 
   <button type="button" class="purchase-select" (click)="toggleOptions()">
     <span>{{ 'PURCHASE.DETAILS' | translate }}</span><i class="icon arrow" [class.down]="!additionalOptions" [class.up]="additionalOptions"></i>

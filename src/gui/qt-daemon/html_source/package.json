@@ -30,7 +30,6 @@
     "core-js": "^2.5.4",
     "highcharts": "^6.2.0",
     "idlejs": "^2.0.1",
-    "inputmask": "^4.0.4",
     "json-bignumber": "^1.0.1",
     "ngx-contextmenu": "^5.1.1",
     "qrcode": "^1.3.0",

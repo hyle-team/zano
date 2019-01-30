@@ -16,7 +16,26 @@ export class SendComponent implements OnInit, OnDestroy {
   currentWalletId = null;
   parentRouting;
   sendForm = new FormGroup({
-    address: new FormControl('', Validators.required),
+    address: new FormControl('', [Validators.required, (g: FormControl) => {
+      if (g.value) {
+        this.backend.validateAddress(g.value, (valid_status) => {
+          this.ngZone.run(() => {
+            if (valid_status === false) {
+              g.setErrors(Object.assign({'address_not_valid': true}, g.errors) );
+            } else {
+              if (g.hasError('address_not_valid')) {
+                delete g.errors['address_not_valid'];
+                if (Object.keys(g.errors).length === 0) {
+                  g.setErrors(null);
+                }
+              }
+            }
+          });
+        });
+        return (g.hasError('address_not_valid')) ? {'address_not_valid': true} : null;
+      }
+      return null;
+    }]),
     amount: new FormControl(null, [Validators.required, (g: FormControl) => {
       if (g.value === '0') {
         return {'zero': true};
@@ -47,18 +66,6 @@ export class SendComponent implements OnInit, OnDestroy {
       this.currentWalletId = params['id'];
       this.sendForm.reset({address: '', amount: null, comment: '', mixin: 0, fee: this.variablesService.default_fee});
     });
-  }
-
-  checkAddressValidation() {
-    if (this.sendForm.get('address').value) {
-      this.backend.validateAddress(this.sendForm.get('address').value, (valid_status) => {
-        if (valid_status === false) {
-          this.ngZone.run(() => {
-            this.sendForm.get('address').setErrors({address_not_valid: true});
-          });
-        }
-      });
-    }
   }
 
   onSend() {

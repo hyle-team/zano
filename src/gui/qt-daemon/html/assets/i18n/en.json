@@ -161,7 +161,9 @@
       "ADDRESS_REQUIRED": "Address is required.",
       "ADDRESS_NOT_VALID": "Address not valid.",
       "AMOUNT_REQUIRED": "Amount is required.",
-      "MINIMUM_FEE": "Minimum fee: {{fee}}"
+      "AMOUNT_ZERO": "Amount is zero.",
+      "FEE_REQUIRED": "Fee is required.",
+      "FEE_MINIMUM": "Minimum fee: {{fee}}"
     }
   },
   "HISTORY": {
@@ -220,12 +222,14 @@
     "SEND_BUTTON": "Send",
     "FORM_ERRORS": {
       "DESC_REQUIRED": "Description is required.",
+      "DESC_MAXIMUM": "Maximum field length reached.",
       "SELLER_REQUIRED": "Seller is required.",
       "SELLER_NOT_VALID": "Seller not valid.",
       "AMOUNT_REQUIRED": "Amount is required.",
       "YOUR_DEPOSIT_REQUIRED": "Your deposit is required.",
       "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required.",
-      "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract."
+      "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract.",
+      "COMMENT_MAXIMUM": "Maximum field length reached."
     },
     "CANCEL_BUTTON": "Cancel and return deposits",
     "TERMINATE_BUTTON": "Terminate and burn deposits",

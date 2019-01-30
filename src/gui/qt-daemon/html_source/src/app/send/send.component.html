@@ -2,7 +2,7 @@
 
   <div class="input-block">
     <label for="send-address">{{ 'SEND.ADDRESS' | translate }}</label>
-    <input type="text" id="send-address" formControlName="address" (blur)="checkAddressValidation()" (contextmenu)="variablesService.onContextMenu($event)">
+    <input type="text" id="send-address" formControlName="address" (contextmenu)="variablesService.onContextMenu($event)">
     <div class="error-block" *ngIf="sendForm.controls['address'].invalid && (sendForm.controls['address'].dirty || sendForm.controls['address'].touched)">
       <div *ngIf="sendForm.controls['address'].errors['required']">
         {{ 'SEND.FORM_ERRORS.ADDRESS_REQUIRED' | translate }}
@@ -17,14 +17,14 @@
 
     <div class="input-block">
       <label for="send-amount">{{ 'SEND.AMOUNT' | translate }}</label>
-      <input type="text" id="send-amount" formControlName="amount" appInputValidate="money" maxlength="20" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="send-amount" formControlName="amount" appInputValidate="money" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="sendForm.controls['amount'].invalid && (sendForm.controls['amount'].dirty || sendForm.controls['amount'].touched)">
         <div *ngIf="sendForm.controls['amount'].errors['required']">
           {{ 'SEND.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}
         </div>
-      </div>
-      <div *ngIf="sendForm.controls['amount'].errors['zero']">
-        Amount is zero.
+        <div *ngIf="sendForm.controls['amount'].errors['zero']">
+          {{ 'SEND.FORM_ERRORS.AMOUNT_ZERO' | translate }}
+        </div>
       </div>
     </div>
 
@@ -56,10 +56,10 @@
       <input type="text" id="send-fee" formControlName="fee" appInputValidate="money" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="sendForm.controls['fee'].invalid && (sendForm.controls['fee'].dirty || sendForm.controls['fee'].touched)">
         <div *ngIf="sendForm.controls['fee'].errors['required']">
-          {{ 'SEND.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}
+          {{ 'SEND.FORM_ERRORS.FEE_REQUIRED' | translate }}
         </div>
         <div *ngIf="sendForm.controls['fee'].errors['less_min']">
-          {{ 'SEND.FORM_ERRORS.MINIMUM_FEE' | translate : {fee: variablesService.default_fee} }}
+          {{ 'SEND.FORM_ERRORS.FEE_MINIMUM' | translate : {fee: variablesService.default_fee} }}
         </div>
       </div>
     </div>
