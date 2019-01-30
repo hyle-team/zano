@@ -64,7 +64,7 @@
       </div>
     </div>
 
-    <button type="submit" class="blue-button">{{ 'SETTINGS.MASTER_PASSWORD.BUTTON' | translate }}</button>
+    <button type="submit" class="blue-button" [disabled]="!changeForm.valid">{{ 'SETTINGS.MASTER_PASSWORD.BUTTON' | translate }}</button>
 
   </form>
 
