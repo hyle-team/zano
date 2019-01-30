@@ -16,14 +16,33 @@ export class SendComponent implements OnInit, OnDestroy {
   currentWalletId = null;
   parentRouting;
   sendForm = new FormGroup({
-    address: new FormControl('', Validators.required),
+    address: new FormControl('', [Validators.required, (g: FormControl) => {
+      if (g.value) {
+        this.backend.validateAddress(g.value, (valid_status) => {
+          this.ngZone.run(() => {
+            if (valid_status === false) {
+              g.setErrors(Object.assign({'address_not_valid': true}, g.errors) );
+            } else {
+              if (g.hasError('address_not_valid')) {
+                delete g.errors['address_not_valid'];
+                if (Object.keys(g.errors).length === 0) {
+                  g.setErrors(null);
+                }
+              }
+            }
+          });
+        });
+        return (g.hasError('address_not_valid')) ? {'address_not_valid': true} : null;
+      }
+      return null;
+    }]),
     amount: new FormControl(null, [Validators.required, (g: FormControl) => {
-      if (g.value === '0') {
+      if (new BigNumber(g.value).eq(0)) {
         return {'zero': true};
       }
       return null;
     }]),
-    comment: new FormControl(''),
+    comment: new FormControl(null),
     mixin: new FormControl(0, Validators.required),
     fee: new FormControl(this.variablesService.default_fee, [Validators.required, (g: FormControl) => {
       if ((new BigNumber(g.value)).isLessThan(this.variablesService.default_fee)) {
@@ -45,20 +64,14 @@ export class SendComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(params => {
       this.currentWalletId = params['id'];
-      this.sendForm.reset({address: '', amount: null, comment: '', mixin: 0, fee: this.variablesService.default_fee});
-    });
-  }
-
-  checkAddressValidation() {
-    if (this.sendForm.get('address').value) {
-      this.backend.validateAddress(this.sendForm.get('address').value, (valid_status) => {
-        if (valid_status === false) {
-          this.ngZone.run(() => {
-            this.sendForm.get('address').setErrors({address_not_valid: true});
-          });
-        }
+      this.sendForm.reset({
+        address: this.variablesService.currentWallet.send_data['address'],
+        amount: this.variablesService.currentWallet.send_data['amount'],
+        comment: this.variablesService.currentWallet.send_data['comment'],
+        mixin: this.variablesService.currentWallet.send_data['mixin'] || 0,
+        fee: this.variablesService.currentWallet.send_data['fee'] || this.variablesService.default_fee
       });
-    }
+    });
   }
 
   onSend() {
@@ -79,7 +92,8 @@ export class SendComponent implements OnInit, OnDestroy {
             (send_status, send_data) => {
               if (send_status) {
                 this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
-                this.sendForm.reset({address: '', amount: null, comment: '', mixin: 0, fee: this.variablesService.default_fee});
+                this.variablesService.currentWallet.send_data = {address: null, amount: null, comment: null, mixin: null, fee: null};
+                this.sendForm.reset({address: null, amount: null, comment: null, mixin: 0, fee: this.variablesService.default_fee});
               }
             });
         }
@@ -93,6 +107,13 @@ export class SendComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.parentRouting.unsubscribe();
+    this.variablesService.currentWallet.send_data = {
+      address: this.sendForm.get('address').value,
+      amount: this.sendForm.get('amount').value,
+      comment: this.sendForm.get('comment').value,
+      mixin: this.sendForm.get('mixin').value,
+      fee: this.sendForm.get('fee').value
+    }
   }
 
 }

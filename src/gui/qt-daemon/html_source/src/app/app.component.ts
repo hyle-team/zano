@@ -478,18 +478,15 @@ export class AppComponent implements OnInit, OnDestroy {
         if (typeof clipboard !== 'string' || clipboard.length) {
           const start = (target['contextSelectionStart']) ? 'contextSelectionStart' : 'selectionStart';
           const end = (target['contextSelectionEnd']) ? 'contextSelectionEnd' : 'selectionEnd';
-          const canUseSelection = ((target[start]) || (target[start] === '0'));
-          let _pre = '';
-          let _aft = '';
-          if (canUseSelection) {
-            _pre = target['value'].substring(0, target[start]);
-            _aft = target['value'].substring(target[end], target['value'].length);
-          }
-          let text = (!canUseSelection) ? clipboard : _pre + clipboard + _aft;
+          const _pre = target['value'].substring(0, target[start]);
+          const _aft = target['value'].substring(target[end], target['value'].length);
+          let text = _pre + clipboard + _aft;
+          const cursorPosition = (_pre + clipboard).length;
           if (target['maxLength'] && parseInt(target['maxLength'], 10) > 0) {
             text = text.substr(0, parseInt(target['maxLength'], 10));
           }
           target['value'] = text;
+          target.setSelectionRange(cursorPosition, cursorPosition);
           target.dispatchEvent(new Event('input'));
           target['focus']();
         }

@@ -26,6 +26,14 @@ export class Wallet {
   progress?: number;
   loaded?: boolean;
 
+  send_data?:any = {
+    address: null,
+    amount: null,
+    comment: null,
+    mixin: null,
+    fee: null
+  };
+
   constructor(id, name, pass, path, address, balance, unlocked_balance, mined = 0, tracking = '') {
     this.wallet_id = id;
     this.name = name;
