@@ -4,6 +4,7 @@ import {Chart} from 'angular-highcharts';
 import {BackendService} from '../_helpers/services/backend.service';
 import {ActivatedRoute} from '@angular/router';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
+import {TranslateService} from '@ngx-translate/core';
 
 @Component({
   selector: 'app-staking',
@@ -18,23 +19,28 @@ export class StakingComponent implements OnInit, OnDestroy {
 
   periods = [
     {
-      title: '1 day',
+      title: this.translate.instant('STAKING.DAY'),
+      key: '1 day',
       active: false
     },
     {
-      title: '1 week',
+      title: this.translate.instant('STAKING.WEEK'),
+      key: '1 week',
       active: false
     },
     {
-      title: '1 month',
+      title: this.translate.instant('STAKING.MONTH'),
+      key: '1 month',
       active: false
     },
     {
-      title: '1 year',
+      title: this.translate.instant('STAKING.YEAR'),
+      key: '1 year',
       active: false
     },
     {
-      title: 'All',
+      title: this.translate.instant('STAKING.ALL'),
+      key: 'All',
       active: true
     }
   ];
@@ -59,7 +65,8 @@ export class StakingComponent implements OnInit, OnDestroy {
     private variablesService: VariablesService,
     private backend: BackendService,
     private ngZone: NgZone,
-    private intToMoneyPipe: IntToMoneyPipe
+    private intToMoneyPipe: IntToMoneyPipe,
+    private translate: TranslateService
   ) {
   }
 
@@ -248,7 +255,7 @@ export class StakingComponent implements OnInit, OnDestroy {
     let min = null;
     const newData = [];
 
-    if (period.title === '1 day') {
+    if (period.key === '1 day') {
       this.originalData.forEach((item) => {
         const time = (new Date(item[0])).setUTCMinutes(0, 0, 0);
         const find = newData.find(itemNew => itemNew[0] === time);
@@ -260,7 +267,7 @@ export class StakingComponent implements OnInit, OnDestroy {
       });
       this.chart.ref.series[0].setData(newData, true);
       min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 1, 0, 0, 0, 0);
-    } else if (period.title === '1 week') {
+    } else if (period.key === '1 week') {
       this.originalData.forEach((item) => {
         const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
         const find = newData.find(itemNew => itemNew[0] === time);
@@ -272,7 +279,7 @@ export class StakingComponent implements OnInit, OnDestroy {
       });
       this.chart.ref.series[0].setData(newData, true);
       min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 7, 0, 0, 0, 0);
-    } else if (period.title === '1 month') {
+    } else if (period.key === '1 month') {
       this.originalData.forEach((item) => {
         const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
         const find = newData.find(itemNew => itemNew[0] === time);
@@ -284,7 +291,7 @@ export class StakingComponent implements OnInit, OnDestroy {
       });
       this.chart.ref.series[0].setData(newData, true);
       min = Date.UTC(d.getFullYear(), d.getMonth() - 1, d.getDate(), 0, 0, 0, 0);
-    } else if (period.title === '1 year') {
+    } else if (period.key === '1 year') {
       this.originalData.forEach((item) => {
         const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
         const find = newData.find(itemNew => itemNew[0] === time);

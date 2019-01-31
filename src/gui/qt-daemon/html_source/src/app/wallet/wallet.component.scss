@@ -74,6 +74,14 @@
 
     &.copy {
       mask: url(../../assets/icons/copy.svg) no-repeat center;
+
+      &:hover {
+        opacity: 0.75;
+      }
+    }
+
+    &.copied {
+      mask: url(../../assets/icons/complete-testwallet.svg) no-repeat center;
     }
   }
 }

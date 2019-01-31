@@ -26,7 +26,7 @@ export class Wallet {
   progress?: number;
   loaded?: boolean;
 
-  send_data?:any = {
+  send_data?: any = {
     address: null,
     amount: null,
     comment: null,

@@ -124,69 +124,69 @@
   <div class="purchase-states" *ngIf="!newPurchase">
 
     <ng-container *ngIf="currentContract.state == 1 && !currentContract.is_a && currentContract.private_detailes.b_pledge.plus(variablesService.default_fee_big).plus(variablesService.default_fee_big).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
-      <span>{{ 'There are insufficient funds in the wallet. Add funds to the wallet to continue' | translate }}</span>
+      <span>{{ 'PURCHASE.NEED_MONEY' | translate }}</span>
     </ng-container>
 
     <ng-container *ngIf="currentContract.is_a">
-      <span *ngIf="currentContract.state == 1">{{ 'Waiting for seller respond to contract proposal' | translate }}</span>
+      <span *ngIf="currentContract.state == 1">{{ 'PURCHASE.WAITING_SELLER' | translate }}</span>
       <!--<span *ngIf="currentContract.state == 1" ng-bind="'(' + (currentContract.expiration_time | buyingTime : 0) + ')'"></span>-->
 
-      <span *ngIf="currentContract.state == 110">{{ 'The seller ignored your contract proposal' | translate }}</span>
-      <span *ngIf="currentContract.state == 110">{{ 'Pledge amount unblocked' | translate }}</span>
+      <span *ngIf="currentContract.state == 110">{{ 'PURCHASE.IGNORED_SELLER' | translate }}</span>
+      <span *ngIf="currentContract.state == 110">{{ 'PURCHASE.PLEDGE_UNBLOCKED' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 120">{{ 'Waiting for seller to ship item' | translate }}</span>
+      <span *ngIf="currentContract.state == 120">{{ 'PURCHASE.WAITING_SHIP' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 130">{{ 'The seller ignored your proposal to cancel the contract' | translate }}</span>
+      <span *ngIf="currentContract.state == 130">{{ 'PURCHASE.IGNORED_CANCEL_SELLER' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 140">{{ 'The contract proposal has expired' | translate }}</span>
+      <span *ngIf="currentContract.state == 140">{{ 'PURCHASE.EXPIRED' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 201">{{ 'Please wait for the pledges to be made' | translate }}</span>
+      <span *ngIf="currentContract.state == 201">{{ 'PURCHASE.WAIT' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 2">{{ 'Waiting for seller to ship item' | translate }}</span>
+      <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.WAITING_SELLER' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 3">{{ 'Contract completed successfully' | translate }}</span>
-      <span *ngIf="currentContract.state == 3">{{ 'Item received, payment transferred, pledges returned' | translate }}</span>
+      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.COMPLETED' | translate }}</span>
+      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.RECEIVED' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 4">{{ 'Item not received' | translate }}</span>
-      <span *ngIf="currentContract.state == 4">{{ 'All pledges nullified' | translate }}</span>
+      <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NOT_RECEIVED' | translate }}</span>
+      <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 5">{{ 'You have made a proposal to cancel the contract' | translate }}</span>
+      <span *ngIf="currentContract.state == 5">{{ 'PURCHASE.PROPOSAL_CANCEL_SELLER' | translate }}</span>
       <!--<span *ngIf="currentContract.state == 5" ng-bind="'(' + (contract.cancel_expiration_time | buyingTime : 2) + ')'"></span>-->
 
-      <span *ngIf="currentContract.state == 601">{{ 'The contract is being cancelled. Please wait for the pledge to be returned' | translate }}</span>
+      <span *ngIf="currentContract.state == 601">{{ 'PURCHASE.BEING_CANCELLED' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 6">{{ 'Contract canceled' | translate }}</span>
-      <span *ngIf="currentContract.state == 6">{{ 'Pledges returned' | translate }}</span>
+      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.CANCELLED' | translate }}</span>
+      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.PLEDGES_RETURNED' | translate }}</span>
     </ng-container>
 
     <ng-container *ngIf="!currentContract.is_a">
-      <span *ngIf="currentContract.state == 1">{{ 'The buyer is proposing a contract' | translate }}</span>
+      <span *ngIf="currentContract.state == 1">{{ 'PURCHASE.WAITING_BUYER' | translate }}</span>
       <!--<span *ngIf="currentContract.state == 1" ng-bind="'(' + (contract.expiration_time | buyingTime : 1) + ')'"></span>-->
 
-      <span *ngIf="currentContract.state == 110">{{ 'You ignored the contract proposal' | translate }}</span>
+      <span *ngIf="currentContract.state == 110">{{ 'PURCHASE.IGNORED_BUYER' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 130">{{ 'You ignored the proposal to cancel the contract' | translate }}</span>
+      <span *ngIf="currentContract.state == 130">{{ 'PURCHASE.IGNORED_CANCEL_BUYER' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 140">{{ 'The contract proposal has expired' | translate }}</span>
+      <span *ngIf="currentContract.state == 140">{{ 'PURCHASE.EXPIRED' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 201">{{ 'Please wait for the pledges to be made' | translate }}</span>
+      <span *ngIf="currentContract.state == 201">{{ 'PURCHASE.WAIT' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 2">{{ 'The buyer is waiting for the item to be delivered' | translate }}</span>
-      <span *ngIf="currentContract.state == 2">{{ 'Pledges made' | translate }}</span>
+      <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.BUYER_WAIT' | translate }}</span>
+      <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.PLEDGES_MADE' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 3">{{ 'Contract completed successfully' | translate }}</span>
-      <span *ngIf="currentContract.state == 3">{{ 'Item received, payment transferred, pledges returned' | translate }}</span>
+      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.COMPLETED' | translate }}</span>
+      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.RECEIVED' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 4">{{ 'Item not received' | translate }}</span>
-      <span *ngIf="currentContract.state == 4">{{ 'All pledges nullified' | translate }}</span>
+      <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NOT_RECEIVED' | translate }}</span>
+      <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 5">{{ 'The buyer is offering to cancel the contract and return the pledge' | translate }}</span>
+      <span *ngIf="currentContract.state == 5">{{ 'PURCHASE.PROPOSAL_CANCEL_BUYER' | translate }}</span>
       <!--<span *ngIf="currentContract.state == 5" ng-bind="'(' + (contract.cancel_expiration_time | buyingTime : 1) + ')'"></span>-->
 
-      <span *ngIf="currentContract.state == 601">{{ 'The contract is being cancelled. Please wait for the pledge to be returned' | translate }}</span>
+      <span *ngIf="currentContract.state == 601">{{ 'PURCHASE.BEING_CANCELLED' | translate }}</span>
 
-      <span *ngIf="currentContract.state == 6">{{ 'Contract canceled' | translate }}</span>
-      <span *ngIf="currentContract.state == 6">{{ 'Pledges returned' | translate }}</span>
+      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.CANCELLED' | translate }}</span>
+      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.PLEDGES_RETURNED' | translate }}</span>
     </ng-container>
 
     <ng-container *ngIf="currentContract.state == 201 || currentContract.state == 601">
@@ -198,32 +198,29 @@
   </div>
 
   <div class="purchase-buttons" *ngIf="!newPurchase">
-    <!--<button type="button" class="blue-button">{{ 'PURCHASE.CANCEL_BUTTON' | translate }}</button>-->
-    <!--<button type="button" class="turquoise-button">{{ 'PURCHASE.TERMINATE_BUTTON' | translate }}</button>-->
-    <!--<button type="button" class="green-button">{{ 'PURCHASE.COMPLETE_BUTTON' | translate }}</button>-->
 
     <ng-container *ngIf="!currentContract.is_a && currentContract.state == 1">
       <button type="button" class="blue-button" (click)="acceptState();" [disabled]="currentContract.private_detailes.b_pledge.plus(variablesService.default_fee_big).plus(variablesService.default_fee_big).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
-        {{'Accept (Make pledge)' | translate}}
+        {{'PURCHASE.BUTTON_MAKE_PLEDGE' | translate}}
       </button>
-      <button type="button" class="turquoise-button" (click)="ignoredContract();">{{'Ignore' | translate}}</button>
+      <button type="button" class="turquoise-button" (click)="ignoredContract();">{{'PURCHASE.BUTTON_IGNORE' | translate}}</button>
     </ng-container>
 
     <ng-container *ngIf="currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
       <button type="button" class="blue-button" (click)="productNotGot();" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
-        {{'Item not received (Nullify pledges)' | translate}}
+        {{'PURCHASE.BUTTON_NULLIFY' | translate}}
       </button>
       <button type="button" class="turquoise-button" (click)="dealsDetailsFinish();" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
-        {{'Item received (Transfer payment and return pledge to seller)' | translate}}
+        {{'PURCHASE.BUTTON_RECEIVED' | translate}}
       </button>
       <button type="button" class="green-button" (click)="dealsDetailsCancel();" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
-        {{'Cancel contract (Return pledge)' | translate}}
+        {{'PURCHASE.BUTTON_CANCEL_BUYER' | translate}}
       </button>
     </ng-container>
 
     <ng-container *ngIf="!currentContract.is_a && currentContract.state == 5">
-      <button type="button" class="blue-button" (click)="dealsDetailsDontCanceling();">{{'Do not cancel (Item shipped)' | translate}}</button>
-      <button type="button" class="turquoise-button" (click)="dealsDetailsSellerCancel();">{{'Cancel contract (Return pledge)' | translate}}</button>
+      <button type="button" class="blue-button" (click)="dealsDetailsDontCanceling();">{{'PURCHASE.BUTTON_NOT_CANCEL' | translate}}</button>
+      <button type="button" class="turquoise-button" (click)="dealsDetailsSellerCancel();">{{'PURCHASE.BUTTON_CANCEL_SELLER' | translate}}</button>
     </ng-container>
 
   </div>
