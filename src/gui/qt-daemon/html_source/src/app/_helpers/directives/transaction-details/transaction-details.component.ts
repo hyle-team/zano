@@ -1,6 +1,6 @@
 import {Component, OnInit, OnDestroy, Input} from '@angular/core';
 import {Transaction} from '../../models/transaction.model';
-import {VariablesService} from "../../services/variables.service";
+import {VariablesService} from '../../services/variables.service';
 import {BackendService} from '../../services/backend.service';
 import {IntToMoneyPipe} from '../../pipes/int-to-money.pipe';
 
@@ -19,12 +19,12 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   constructor(private variablesService: VariablesService, private backendService: BackendService, private intToMoneyPipe: IntToMoneyPipe) {}
 
   ngOnInit() {
-    for (let input in this.transaction.td['rcv']) {
+    for (const input in this.transaction.td['rcv']) {
       if (this.transaction.td['rcv'].hasOwnProperty(input)) {
         this.inputs.push(this.intToMoneyPipe.transform(this.transaction.td['rcv'][input]));
       }
     }
-    for (let output in this.transaction.td['spn']) {
+    for (const output in this.transaction.td['spn']) {
       if (this.transaction.td['spn'].hasOwnProperty(output)) {
         this.outputs.push(this.intToMoneyPipe.transform(this.transaction.td['spn'][output]));
       }
@@ -32,8 +32,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   }
 
   openInBrowser(tr) {
-    let link = 'explorer.zano.org/transaction/' + tr;
-    this.backendService.openUrlInBrowser(link);
+    this.backendService.openUrlInBrowser('explorer.zano.org/transaction/' + tr);
   }
 
   ngOnDestroy() {}

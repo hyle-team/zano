@@ -184,6 +184,18 @@
       "INPUTS": "Inputs",
       "OUTPUTS": "Outputs",
       "COMMENT": "Comment"
+    },
+    "TYPE_MESSAGES": {
+      "HIDDEN": "hidden",
+      "UNDEFINED": "Undefined",
+      "COMPLETE_BUYER": "Successfully complete contract, return remaining pledge",
+      "COMPLETE_SELLER": "Successfully complete contract, receive payment on contract, and return pledge",
+      "MINED": "Mined funds",
+      "CREATE_CONTRACT": "Send contract offer",
+      "PLEDGE_CONTRACT": "Make pledge on offer",
+      "NULLIFY_CONTRACT": "Nullify pledges for contract",
+      "PROPOSAL_CANCEL_CONTRACT": "Send proposal to cancel contract",
+      "CANCEL_CONTRACT": "Cancel contract, return pledges"
     }
   },
   "CONTRACTS": {
@@ -208,6 +220,46 @@
       "REMAINING_ONE_WAITING": "Remaining {{time}} hour waiting",
       "REMAINING_MANY_WAITING": "Remaining {{time}} hours waiting",
       "REMAINING_MANY_ALT_WAITING": "Remaining {{time}} hours waiting"
+    },
+    "STATUS_MESSAGES": {
+      "SELLER": {
+        "NEW_CONTRACT": "New contract proposal",
+        "IGNORED": "You ignored the contract proposal",
+        "ACCEPTED": "You have accepted the contract proposal",
+        "WAIT": "Please wait for the pledges to be made",
+        "BUYER_WAIT": "The buyer is waiting for the item to be delivered",
+        "PLEDGES_MADE": "Pledges made",
+        "COMPLETED": "Contract completed successfully",
+        "RECEIVED": "Item received, payment transferred, pledges returned",
+        "NOT_RECEIVED": "Item not received",
+        "NULLIFIED": "All pledges nullified",
+        "PROPOSAL_CANCEL": "New proposal to cancel contract and return pledges",
+        "BEING_CANCELLED": "The contract is being cancelled. Please wait for the pledge to be returned",
+        "CANCELLED": "Contract canceled",
+        "PLEDGES_RETURNED": "Pledges returned",
+        "IGNORED_CANCEL": "You ignored the proposal to cancel the contract",
+        "EXPIRED": "The contract proposal has expired"
+      },
+      "BUYER": {
+        "WAITING": "Waiting for seller respond to contract proposal",
+        "PLEDGE_RESERVED": "Pledge amount reserved",
+        "IGNORED": "The seller ignored your contract proposal",
+        "PLEDGE_UNBLOCKED": "Pledge amount unblocked",
+        "ACCEPTED": "The seller accepted your contract proposal",
+        "WAIT": "Please wait for the pledges to be made",
+        "PLEDGES_MADE": "Pledges made",
+        "WAITING_SELLER": "Waiting for seller to ship item",
+        "COMPLETED": "Contract completed successfully",
+        "RECEIVED": "Item received, payment transferred, pledges returned",
+        "NOT_RECEIVED": "Item not received",
+        "NULLIFIED": "All pledges nullified",
+        "WAITING_CANCEL": "Waiting for seller to respond to proposal to cancel contract and return pledges",
+        "BEING_CANCELLED": "The contract is being cancelled. Please wait for the pledge to be returned",
+        "CANCELLED": "Contract canceled",
+        "PLEDGES_RETURNED": "Pledges returned",
+        "IGNORED_CANCEL": "The seller ignored your proposal to cancel the contract",
+        "EXPIRED": "The contract proposal has expired"
+      }
     }
   },
   "PURCHASE": {
@@ -231,9 +283,6 @@
       "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract.",
       "COMMENT_MAXIMUM": "Maximum field length reached."
     },
-    "CANCEL_BUTTON": "Cancel and return deposits",
-    "TERMINATE_BUTTON": "Terminate and burn deposits",
-    "COMPLETE_BUTTON": "Complete and release deposits",
     "PROGRESS_NEW": "New purchase",
     "PROGRESS_WAIT": "Awaiting reply",
     "PROGRESS_RECEIVE": "Reply received",
@@ -247,7 +296,36 @@
     "SEND_CANCEL_PROPOSAL": "Proposal to cancel contract sent to seller",
     "IGNORED_CANCEL": "You have ignored the proposal to cancel the contract",
     "DEALS_CANCELED_WAIT": "The contract is being cancelled. Please wait for the deposit to be returned",
-    "WAITING_TIME": "Time until response"
+    "WAITING_TIME": "Time until response",
+    "NEED_MONEY": "There are insufficient funds in the wallet. Add funds to the wallet to continue",
+    "WAITING_SELLER": "Waiting for seller respond to contract proposal",
+    "IGNORED_SELLER": "The seller ignored your contract proposal",
+    "PLEDGE_UNBLOCKED": "Pledge amount unblocked",
+    "WAITING_SHIP": "Waiting for seller to ship item",
+    "IGNORED_CANCEL_SELLER": "The seller ignored your proposal to cancel the contract",
+    "EXPIRED": "The contract proposal has expired",
+    "WAIT": "Please wait for the pledges to be made",
+    "COMPLETED": "Contract completed successfully",
+    "RECEIVED": "Item received, payment transferred, pledges returned",
+    "NOT_RECEIVED": "Item not received",
+    "NULLIFIED": "All pledges nullified",
+    "PROPOSAL_CANCEL_SELLER": "You have made a proposal to cancel the contract",
+    "BEING_CANCELLED": "The contract is being cancelled. Please wait for the pledge to be returned",
+    "CANCELLED": "Contract canceled",
+    "PLEDGES_RETURNED": "Pledges returned",
+    "WAITING_BUYER": "The buyer is proposing a contract",
+    "IGNORED_BUYER": "You ignored the contract proposal",
+    "IGNORED_CANCEL_BUYER": "You ignored the proposal to cancel the contract",
+    "BUYER_WAIT": "The buyer is waiting for the item to be delivered",
+    "PLEDGES_MADE": "Pledges made",
+    "PROPOSAL_CANCEL_BUYER": "The buyer is offering to cancel the contract and return the pledge",
+    "BUTTON_MAKE_PLEDGE": "Accept (Make pledge)",
+    "BUTTON_IGNORE": "Ignore",
+    "BUTTON_NULLIFY": "Item not received (Nullify pledges)",
+    "BUTTON_RECEIVED": "Item received (Transfer payment and return pledge to seller)",
+    "BUTTON_CANCEL_BUYER": "Cancel contract (Return pledge)",
+    "BUTTON_NOT_CANCEL": "Do not cancel (Item shipped)",
+    "BUTTON_CANCEL_SELLER": "Cancel contract (Return pledge)"
   },
   "MESSAGES": {
     "ADDRESS": "Address",
@@ -258,7 +336,23 @@
   "MODALS": {
     "ERROR": "Error",
     "SUCCESS": "Success",
-    "INFO": "Information"
+    "INFO": "Information",
+    "OK": "OK"
+  },
+  "STAKING": {
+    "TITLE": "Staking",
+    "TITLE_PENDING": "Pending",
+    "TITLE_TOTAL": "Total",
+    "TITLE_PERIOD": "Time period:",
+    "DAY": "1 day",
+    "WEEK": "1 week",
+    "MONTH": "1 month",
+    "YEAR": "1 year",
+    "ALL": "All",
+    "SWITCH": {
+      "ON": "ON",
+      "OFF": "OFF"
+    }
   },
   "ERRORS": {
     "NOT_ENOUGH_MONEY": "Insufficient funds in account",

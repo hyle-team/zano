@@ -1,9 +1,12 @@
 import {Pipe, PipeTransform} from '@angular/core';
+import {TranslateService} from '@ngx-translate/core';
 
 @Pipe({
   name: 'historyTypeMessages'
 })
 export class HistoryTypeMessagesPipe implements PipeTransform {
+
+  constructor(private translate: TranslateService) {}
 
   transform(item: any, args?: any): any {
 
@@ -12,53 +15,51 @@ export class HistoryTypeMessagesPipe implements PipeTransform {
         return item.remote_addresses[0];
       } else {
         if (item.is_income) {
-          return 'hidden';
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.HIDDEN');
         } else {
-          return 'Undefined';
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.UNDEFINED');
         }
       }
     } else if (item.tx_type === 6 && item.height === 0) {
       return 'unknown';
     } else if (item.tx_type === 9) {
       if (item.hasOwnProperty('contract') && item.contract[0].is_a) {
-        return 'Successfully complete contract, return remaining pledge';
+        return this.translate.instant('HISTORY.TYPE_MESSAGES.COMPLETE_BUYER');
       } else {
-        return 'Successfully complete contract, receive payment on contract, and return pledge';
+        return this.translate.instant('HISTORY.TYPE_MESSAGES.COMPLETE_SELLER');
       }
     } else {
       switch (item.tx_type) {
         // case 0:
-        //   return $filter('translate')('GUI_TX_TYPE_NORMAL');
-        //   break;
+        //   return '';
         // case 1:
-        //   return $filter('translate')('GUI_TX_TYPE_PUSH_OFFER');
+        //   return '';
         // case 2:
-        //   return $filter('translate')('GUI_TX_TYPE_UPDATE_OFFER');
+        //   return '';
         // case 3:
-        //   return $filter('translate')('GUI_TX_TYPE_CANCEL_OFFER');
+        //   return '';
         // case 4:
-        //   return $filter('translate')('GUI_TX_TYPE_NEW_ALIAS');
+        //   return '';
         // case 5:
-        //   return $filter('translate')('GUI_TX_TYPE_UPDATE_ALIAS');
+        //   return '';
         case 6:
-          return 'Mined funds';
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.MINED');
         case 7:
-          return 'Send contract offer';
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.CREATE_CONTRACT');
         case 8:
-          return 'Make pledge on offer';
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.PLEDGE_CONTRACT');
         // case 9:
-        //    return $filter('translate')('GUI_TX_TYPE_ESCROW_RELEASE_NORMAL');
-        //    break;
+        //   return '';
         case 10:
-          return 'Nullify pledges for contract';
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.NULLIFY_CONTRACT');
         case 11:
-          return 'Send proposal to cancel contract';
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.PROPOSAL_CANCEL_CONTRACT');
         case 12:
-          return 'Cancel contract, return pledges';
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.CANCEL_CONTRACT');
       }
     }
 
-    return 'Undefined';
+    return this.translate.instant('HISTORY.TYPE_MESSAGES.UNDEFINED');
   }
 
 }

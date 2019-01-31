@@ -19,9 +19,9 @@ export class ModalContainerComponent implements OnInit {
   ngOnInit() {
     this.button.nativeElement.focus();
     switch (this.type) {
-      case 'error': this.title = this.translate.instant("MODALS.ERROR"); break;
-      case 'success': this.title = this.translate.instant("MODALS.SUCCESS"); break;
-      case 'info': this.title = this.translate.instant("MODALS.INFO"); break;
+      case 'error': this.title = this.translate.instant('MODALS.ERROR'); break;
+      case 'success': this.title = this.translate.instant('MODALS.SUCCESS'); break;
+      case 'info': this.title = this.translate.instant('MODALS.INFO'); break;
     }
   }
 

@@ -1,17 +1,17 @@
 <div class="chart-header">
   <div class="general">
     <div>
-      <span class="label">Staking</span>
+      <span class="label">{{ 'STAKING.TITLE' | translate }}</span>
       <span class="value">
         <app-staking-switch [(wallet_id)]="variablesService.currentWallet.wallet_id" [(staking)]="variablesService.currentWallet.staking"></app-staking-switch>
       </span>
     </div>
     <div>
-      <span class="label">Pending</span>
+      <span class="label">{{ 'STAKING.TITLE_PENDING' | translate }}</span>
       <span class="value">{{pending.total | intToMoney}} {{variablesService.defaultCurrency}}</span>
     </div>
     <div>
-      <span class="label">Total</span>
+      <span class="label">{{ 'STAKING.TITLE_TOTAL' | translate }}</span>
       <span class="value">{{total | intToMoney}} {{variablesService.defaultCurrency}}</span>
     </div>
   </div>
@@ -22,14 +22,12 @@
 </div>
 
 <div class="chart">
-
   <div [chart]="chart"></div>
-
 </div>
 
 <div class="chart-options">
   <div class="title">
-    Time period:
+    {{ 'STAKING.TITLE_PERIOD' | translate }}
   </div>
   <div class="options">
     <ng-container *ngFor="let period of periods">
