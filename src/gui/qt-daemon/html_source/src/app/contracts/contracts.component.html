@@ -21,18 +21,22 @@
           <i class="icon alert" *ngIf="!item.is_new"></i>
           <i class="icon new" *ngIf="item.is_new"></i>
           <i class="icon" [class.purchase]="item.is_a" [class.sell]="!item.is_a"></i>
-          <span>{{item.private_detailes.t}}</span>
+          <span tooltip="{{ item.private_detailes.t }}" placement="top" tooltipClass="table-tooltip" [delay]="500">{{item.private_detailes.t}}</span>
         </div>
       </td>
-      <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>
-      <td>{{item.private_detailes.to_pay | intToMoney}} {{variablesService.defaultCurrency}}</td>
+      <td>
+        <div>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</div>
+      </td>
+      <td>
+        <div>{{item.private_detailes.to_pay | intToMoney}} {{variablesService.defaultCurrency}}</div>
+      </td>
       <td>
         <div class="status" tooltip="{{ item | contractStatusMessages }}" placement="top" tooltipClass="table-tooltip" [delay]="500">
           {{item | contractStatusMessages}}
         </div>
       </td>
       <td>
-        <div class="comment">
+        <div class="comment" tooltip="{{ item.private_detailes.c }}" placement="top" tooltipClass="table-tooltip" [delay]="500">
           {{item.private_detailes.c}}
         </div>
       </td>
