@@ -19,7 +19,7 @@
 </div>
 <div class="address">
   <span>{{variablesService.currentWallet.address}}</span>
-  <i class="icon copy" (click)="copyAddress()"></i>
+  <i #copyIcon class="icon copy" (click)="copyAddress()"></i>
 </div>
 <div class="balance">
   <span [tooltip]="getTooltip()" [placement]="'bottom'" [tooltipClass]="'balance-tooltip'" [delay]="500" [timeout]="1000">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>

@@ -1,4 +1,4 @@
-import {Component, OnInit, OnDestroy, NgZone} from '@angular/core';
+import {Component, OnInit, OnDestroy, NgZone, ViewChild, ElementRef, Renderer2} from '@angular/core';
 import {ActivatedRoute, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
@@ -14,6 +14,7 @@ import {BigNumber} from 'bignumber.js';
 export class WalletComponent implements OnInit, OnDestroy {
   subRouting;
   walletID;
+  @ViewChild('copyIcon') copy: ElementRef;
   tabs = [
     {
       title: 'WALLET.TABS.HISTORY',
@@ -62,6 +63,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
+    private renderer: Renderer2,
     private backend: BackendService,
     private variablesService: VariablesService,
     private ngZone: NgZone,
@@ -93,6 +95,12 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   copyAddress() {
     this.backend.setClipboard(this.variablesService.currentWallet.address);
+    this.renderer.removeClass(this.copy.nativeElement, 'copy');
+    this.renderer.addClass(this.copy.nativeElement, 'copied');
+    window.setTimeout(() => {
+      this.renderer.removeClass(this.copy.nativeElement, 'copied');
+      this.renderer.addClass(this.copy.nativeElement, 'copy');
+    }, 2000);
   }
 
   getTooltip() {

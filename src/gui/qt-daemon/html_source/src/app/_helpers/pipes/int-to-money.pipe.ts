@@ -18,7 +18,6 @@ export class IntToMoneyPipe implements PipeTransform {
       maxFraction = parseInt(args, 10);
     }
     const power = Math.pow(10, this.variablesService.digits);
-    // let str = (value / power).toFixed(maxFraction);
     let str = (new BigNumber(value)).div(power).toFixed(maxFraction);
 
     for (let i = str.length - 1; i >= 0; i--) {

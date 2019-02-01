@@ -1,5 +1,5 @@
 <div class="switch" (click)="toggleStaking(); $event.stopPropagation()">
-  <span class="option" *ngIf="staking">ON</span>
+  <span class="option" *ngIf="staking">{{ 'STAKING.SWITCH.ON' | translate }}</span>
   <span class="circle" [class.on]="staking" [class.off]="!staking"></span>
-  <span class="option" *ngIf="!staking">OFF</span>
+  <span class="option" *ngIf="!staking">{{ 'STAKING.SWITCH.OFF' | translate }}</span>
 </div>
