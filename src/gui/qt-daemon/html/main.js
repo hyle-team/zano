@@ -397,7 +397,10 @@ var TooltipDirective = /** @class */ (function () {
         this.renderer.setStyle(document.body, 'position', 'relative');
         this.renderer.setStyle(this.tooltip, 'position', 'absolute');
         if (this.tooltipClass !== null) {
-            this.renderer.addClass(this.tooltip, this.tooltipClass);
+            var classes = this.tooltipClass.split(' ');
+            for (var i = 0; i < classes.length; i++) {
+                this.renderer.addClass(this.tooltip, classes[i]);
+            }
         }
         if (this.placement !== null) {
             this.renderer.addClass(this.tooltip, 'ng-tooltip-' + this.placement);
@@ -1466,6 +1469,15 @@ var BackendService = /** @class */ (function () {
                     }
                 }
                 break;
+            case 'NOT_FOUND':
+                if (command !== 'open_wallet' && command !== 'get_alias_info_by_name' && command !== 'get_alias_info_by_address') {
+                    error_translate = this.translate.instant('ERRORS.FILE_NOT_FOUND');
+                    params = JSON.parse(params);
+                    if (params.path) {
+                        error_translate += ': ' + params.path;
+                    }
+                }
+                break;
             case 'CANCELED':
             case '':
                 break;
@@ -1488,7 +1500,7 @@ var BackendService = /** @class */ (function () {
         }
     };
     BackendService.prototype.bigNumberParser = function (key, val) {
-        if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge'].indexOf(key) === -1) {
+        if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge', 'coast'].indexOf(key) === -1) {
             return val.toNumber();
         }
         if (key === 'rcv' || key === 'spn') {
@@ -1815,6 +1827,45 @@ var BackendService = /** @class */ (function () {
         };
         this.runCommand('set_localization_strings', params, callback);
     };
+    BackendService.prototype.registerAlias = function (wallet_id, alias, address, fee, comment, reward, callback) {
+        var params = {
+            wallet_id: wallet_id,
+            alias: {
+                alias: alias,
+                address: address,
+                tracking_key: "",
+                comment: comment
+            },
+            fee: this.moneyToIntPipe.transform(fee),
+            reward: this.moneyToIntPipe.transform(reward)
+        };
+        this.runCommand('request_alias_registration', params, callback);
+    };
+    BackendService.prototype.updateAlias = function (wallet_id, alias, fee, callback) {
+        var params = {
+            wallet_id: wallet_id,
+            alias: {
+                alias: alias.name.replace("@", ""),
+                address: alias.address,
+                tracking_key: "",
+                comment: alias.comment
+            },
+            fee: this.moneyToIntPipe.transform(fee)
+        };
+        this.runCommand('request_alias_update', params, callback);
+    };
+    BackendService.prototype.getAllAliases = function (callback) {
+        this.runCommand('get_all_aliases', {}, callback);
+    };
+    BackendService.prototype.getAliasByName = function (value, callback) {
+        return this.runCommand('get_alias_info_by_name', value, callback);
+    };
+    BackendService.prototype.getAliasByAddress = function (value, callback) {
+        return this.runCommand('get_alias_info_by_address', value, callback);
+    };
+    BackendService.prototype.getAliasCoast = function (alias, callback) {
+        this.runCommand('get_alias_coast', { v: alias }, callback);
+    };
     BackendService = __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Injectable"])(),
         __metadata("design:paramtypes", [_ngx_translate_core__WEBPACK_IMPORTED_MODULE_2__["TranslateService"], _variables_service__WEBPACK_IMPORTED_MODULE_3__["VariablesService"], _modal_service__WEBPACK_IMPORTED_MODULE_4__["ModalService"], _pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__["MoneyToIntPipe"]])
@@ -1836,8 +1887,6 @@ var BackendService = /** @class */ (function () {
         return this.runCommand('is_file_exist', path, callback);
       },
 
-
-
       isAutoStartEnabled: function (callback) {
         this.runCommand('is_autostart_enabled', {}, function (status, data) {
           if (angular.isFunction(callback)) {
@@ -1845,8 +1894,6 @@ var BackendService = /** @class */ (function () {
           }
         });
       },
-
-
 
       setLogLevel: function (level) {
         return this.runCommand('set_log_level', asVal(level))
@@ -1874,50 +1921,8 @@ var BackendService = /** @class */ (function () {
         })
       },
 
-
       resync_wallet: function (wallet_id, callback) {
         this.runCommand('resync_wallet', {wallet_id: wallet_id}, callback);
-      },
-
-      registerAlias: function (wallet_id, alias, address, fee, comment, reward, callback) {
-        var params = {
-          "wallet_id": wallet_id,
-          "alias": {
-            "alias": alias,
-            "address": address,
-            "tracking_key": "",
-            "comment": comment
-          },
-          "fee": $filter('money_to_int')(fee),
-          "reward": $filter('money_to_int')(reward)
-        };
-        this.runCommand('request_alias_registration', params, callback);
-      },
-
-      updateAlias: function (wallet_id, alias, fee, callback) {
-        var params = {
-          wallet_id: wallet_id,
-          alias: {
-            "alias": alias.name.replace("@", ""),
-            "address": alias.address,
-            "tracking_key": "",
-            "comment": alias.comment
-          },
-          fee: $filter('money_to_int')(fee)
-        };
-        this.runCommand('request_alias_update', params, callback);
-      },
-
-      getAllAliases: function (callback) {
-        this.runCommand('get_all_aliases', {}, callback);
-      },
-
-      getAliasByName: function (value, callback) {
-        return this.runCommand('get_alias_info_by_name', value, callback);
-      },
-
-      getAliasByAddress: function (value, callback) {
-        return this.runCommand('get_alias_info_by_address', value, callback);
       },
 
       getPoolInfo: function (callback) {
@@ -1929,10 +1934,6 @@ var BackendService = /** @class */ (function () {
           backendCallback(data, {}, callback, 'store_to_file');
         });
       },
-
-
-
-
 
       getMiningEstimate: function (amount_coins, time, callback) {
         var params = {
@@ -1950,28 +1951,14 @@ var BackendService = /** @class */ (function () {
         this.runCommand('backup_wallet_keys', params, callback);
       },
 
-
-      getAliasCoast: function (alias, callback) {
-        this.runCommand('get_alias_coast', asVal(alias), callback);
-      },
-
-
-
-
       setBlockedIcon: function (enabled, callback) {
         var mode = (enabled) ? "blocked" : "normal";
         Service.runCommand('bool_toggle_icon', mode, callback);
       },
 
-
-
-
-
       getWalletInfo: function (wallet_id, callback) {
         this.runCommand('get_wallet_info', {wallet_id: wallet_id}, callback);
       },
-
-
 
       printText: function (content) {
         return this.runCommand('print_text', {html_text: content});
@@ -2234,6 +2221,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _restore_wallet_restore_wallet_component__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ./restore-wallet/restore-wallet.component */ "./src/app/restore-wallet/restore-wallet.component.ts");
 /* harmony import */ var _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ./seed-phrase/seed-phrase.component */ "./src/app/seed-phrase/seed-phrase.component.ts");
 /* harmony import */ var _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ./wallet-details/wallet-details.component */ "./src/app/wallet-details/wallet-details.component.ts");
+/* harmony import */ var _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ./assign-alias/assign-alias.component */ "./src/app/assign-alias/assign-alias.component.ts");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -2243,6 +2231,7 @@ var __decorate = (undefined && undefined.__decorate) || function (decorators, ta
 
 
 // Components
+
 
 
 
@@ -2339,6 +2328,10 @@ var routes = [
     {
         path: 'details',
         component: _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_18__["WalletDetailsComponent"]
+    },
+    {
+        path: 'assign-alias',
+        component: _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_19__["AssignAliasComponent"]
     },
     {
         path: 'settings',
@@ -2935,33 +2928,34 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _restore_wallet_restore_wallet_component__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./restore-wallet/restore-wallet.component */ "./src/app/restore-wallet/restore-wallet.component.ts");
 /* harmony import */ var _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./seed-phrase/seed-phrase.component */ "./src/app/seed-phrase/seed-phrase.component.ts");
 /* harmony import */ var _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ./wallet-details/wallet-details.component */ "./src/app/wallet-details/wallet-details.component.ts");
-/* harmony import */ var _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ./wallet/wallet.component */ "./src/app/wallet/wallet.component.ts");
-/* harmony import */ var _send_send_component__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ./send/send.component */ "./src/app/send/send.component.ts");
-/* harmony import */ var _receive_receive_component__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ./receive/receive.component */ "./src/app/receive/receive.component.ts");
-/* harmony import */ var _history_history_component__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ./history/history.component */ "./src/app/history/history.component.ts");
-/* harmony import */ var _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ./contracts/contracts.component */ "./src/app/contracts/contracts.component.ts");
-/* harmony import */ var _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ./purchase/purchase.component */ "./src/app/purchase/purchase.component.ts");
-/* harmony import */ var _messages_messages_component__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ./messages/messages.component */ "./src/app/messages/messages.component.ts");
-/* harmony import */ var _staking_staking_component__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ./staking/staking.component */ "./src/app/staking/staking.component.ts");
-/* harmony import */ var _angular_common_http__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! @angular/common/http */ "./node_modules/@angular/common/fesm5/http.js");
-/* harmony import */ var _ngx_translate_core__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! @ngx-translate/core */ "./node_modules/@ngx-translate/core/fesm5/ngx-translate-core.js");
-/* harmony import */ var _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! @ngx-translate/http-loader */ "./node_modules/@ngx-translate/http-loader/fesm5/ngx-translate-http-loader.js");
-/* harmony import */ var _angular_forms__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! @angular/forms */ "./node_modules/@angular/forms/fesm5/forms.js");
-/* harmony import */ var _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! ./typing-message/typing-message.component */ "./src/app/typing-message/typing-message.component.ts");
-/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! ./_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
-/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! ./_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
-/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! ./_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
-/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! ./_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
-/* harmony import */ var _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! ./_helpers/directives/staking-switch/staking-switch.component */ "./src/app/_helpers/directives/staking-switch/staking-switch.component.ts");
-/* harmony import */ var _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! ./_helpers/directives/tooltip.directive */ "./src/app/_helpers/directives/tooltip.directive.ts");
-/* harmony import */ var _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! ./_helpers/pipes/history-type-messages.pipe */ "./src/app/_helpers/pipes/history-type-messages.pipe.ts");
-/* harmony import */ var _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! ./_helpers/pipes/contract-status-messages.pipe */ "./src/app/_helpers/pipes/contract-status-messages.pipe.ts");
-/* harmony import */ var _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! ./_helpers/pipes/contract-time-left.pipe */ "./src/app/_helpers/pipes/contract-time-left.pipe.ts");
-/* harmony import */ var ngx_contextmenu__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! ngx-contextmenu */ "./node_modules/ngx-contextmenu/fesm5/ngx-contextmenu.js");
-/* harmony import */ var angular_highcharts__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! angular-highcharts */ "./node_modules/angular-highcharts/fesm5/angular-highcharts.js");
-/* harmony import */ var _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_37__ = __webpack_require__(/*! ./_helpers/directives/input-validate/input-validate.directive */ "./src/app/_helpers/directives/input-validate/input-validate.directive.ts");
-/* harmony import */ var _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_38__ = __webpack_require__(/*! ./_helpers/directives/modal-container/modal-container.component */ "./src/app/_helpers/directives/modal-container/modal-container.component.ts");
-/* harmony import */ var _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_39__ = __webpack_require__(/*! ./_helpers/directives/transaction-details/transaction-details.component */ "./src/app/_helpers/directives/transaction-details/transaction-details.component.ts");
+/* harmony import */ var _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ./assign-alias/assign-alias.component */ "./src/app/assign-alias/assign-alias.component.ts");
+/* harmony import */ var _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ./wallet/wallet.component */ "./src/app/wallet/wallet.component.ts");
+/* harmony import */ var _send_send_component__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ./send/send.component */ "./src/app/send/send.component.ts");
+/* harmony import */ var _receive_receive_component__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ./receive/receive.component */ "./src/app/receive/receive.component.ts");
+/* harmony import */ var _history_history_component__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ./history/history.component */ "./src/app/history/history.component.ts");
+/* harmony import */ var _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ./contracts/contracts.component */ "./src/app/contracts/contracts.component.ts");
+/* harmony import */ var _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ./purchase/purchase.component */ "./src/app/purchase/purchase.component.ts");
+/* harmony import */ var _messages_messages_component__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ./messages/messages.component */ "./src/app/messages/messages.component.ts");
+/* harmony import */ var _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ./typing-message/typing-message.component */ "./src/app/typing-message/typing-message.component.ts");
+/* harmony import */ var _staking_staking_component__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ./staking/staking.component */ "./src/app/staking/staking.component.ts");
+/* harmony import */ var _angular_common_http__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! @angular/common/http */ "./node_modules/@angular/common/fesm5/http.js");
+/* harmony import */ var _ngx_translate_core__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! @ngx-translate/core */ "./node_modules/@ngx-translate/core/fesm5/ngx-translate-core.js");
+/* harmony import */ var _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! @ngx-translate/http-loader */ "./node_modules/@ngx-translate/http-loader/fesm5/ngx-translate-http-loader.js");
+/* harmony import */ var _angular_forms__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! @angular/forms */ "./node_modules/@angular/forms/fesm5/forms.js");
+/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! ./_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! ./_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
+/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! ./_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
+/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! ./_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
+/* harmony import */ var _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! ./_helpers/pipes/history-type-messages.pipe */ "./src/app/_helpers/pipes/history-type-messages.pipe.ts");
+/* harmony import */ var _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! ./_helpers/pipes/contract-status-messages.pipe */ "./src/app/_helpers/pipes/contract-status-messages.pipe.ts");
+/* harmony import */ var _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! ./_helpers/pipes/contract-time-left.pipe */ "./src/app/_helpers/pipes/contract-time-left.pipe.ts");
+/* harmony import */ var _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! ./_helpers/directives/tooltip.directive */ "./src/app/_helpers/directives/tooltip.directive.ts");
+/* harmony import */ var _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! ./_helpers/directives/input-validate/input-validate.directive */ "./src/app/_helpers/directives/input-validate/input-validate.directive.ts");
+/* harmony import */ var _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! ./_helpers/directives/staking-switch/staking-switch.component */ "./src/app/_helpers/directives/staking-switch/staking-switch.component.ts");
+/* harmony import */ var _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_37__ = __webpack_require__(/*! ./_helpers/directives/modal-container/modal-container.component */ "./src/app/_helpers/directives/modal-container/modal-container.component.ts");
+/* harmony import */ var _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_38__ = __webpack_require__(/*! ./_helpers/directives/transaction-details/transaction-details.component */ "./src/app/_helpers/directives/transaction-details/transaction-details.component.ts");
+/* harmony import */ var ngx_contextmenu__WEBPACK_IMPORTED_MODULE_39__ = __webpack_require__(/*! ngx-contextmenu */ "./node_modules/ngx-contextmenu/fesm5/ngx-contextmenu.js");
+/* harmony import */ var angular_highcharts__WEBPACK_IMPORTED_MODULE_40__ = __webpack_require__(/*! angular-highcharts */ "./node_modules/angular-highcharts/fesm5/angular-highcharts.js");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -3004,17 +2998,18 @@ var __decorate = (undefined && undefined.__decorate) || function (decorators, ta
 
 
 
+
+
+
+
 function HttpLoaderFactory(httpClient) {
-    return new _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_23__["TranslateHttpLoader"](httpClient, './assets/i18n/', '.json');
+    return new _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_25__["TranslateHttpLoader"](httpClient, './assets/i18n/', '.json');
 }
-
-
-
 
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
-angular_highcharts__WEBPACK_IMPORTED_MODULE_36__["Highcharts"].setOptions({
+angular_highcharts__WEBPACK_IMPORTED_MODULE_40__["Highcharts"].setOptions({
 // global: {
 //   useUTC: false
 // }
@@ -3035,55 +3030,213 @@ var AppModule = /** @class */ (function () {
                 _restore_wallet_restore_wallet_component__WEBPACK_IMPORTED_MODULE_10__["RestoreWalletComponent"],
                 _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_11__["SeedPhraseComponent"],
                 _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_12__["WalletDetailsComponent"],
-                _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_13__["WalletComponent"],
-                _send_send_component__WEBPACK_IMPORTED_MODULE_14__["SendComponent"],
-                _receive_receive_component__WEBPACK_IMPORTED_MODULE_15__["ReceiveComponent"],
-                _history_history_component__WEBPACK_IMPORTED_MODULE_16__["HistoryComponent"],
-                _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_17__["ContractsComponent"],
-                _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_18__["PurchaseComponent"],
-                _messages_messages_component__WEBPACK_IMPORTED_MODULE_19__["MessagesComponent"],
-                _staking_staking_component__WEBPACK_IMPORTED_MODULE_20__["StakingComponent"],
-                _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_25__["TypingMessageComponent"],
-                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_28__["MoneyToIntPipe"],
-                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_29__["IntToMoneyPipe"],
-                _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_30__["StakingSwitchComponent"],
-                _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_32__["HistoryTypeMessagesPipe"],
-                _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_33__["ContractStatusMessagesPipe"],
-                _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_34__["ContractTimeLeftPipe"],
-                _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_31__["TooltipDirective"],
-                _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_37__["InputValidateDirective"],
-                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_38__["ModalContainerComponent"],
-                _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_39__["TransactionDetailsComponent"]
+                _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_13__["AssignAliasComponent"],
+                _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_14__["WalletComponent"],
+                _send_send_component__WEBPACK_IMPORTED_MODULE_15__["SendComponent"],
+                _receive_receive_component__WEBPACK_IMPORTED_MODULE_16__["ReceiveComponent"],
+                _history_history_component__WEBPACK_IMPORTED_MODULE_17__["HistoryComponent"],
+                _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_18__["ContractsComponent"],
+                _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_19__["PurchaseComponent"],
+                _messages_messages_component__WEBPACK_IMPORTED_MODULE_20__["MessagesComponent"],
+                _staking_staking_component__WEBPACK_IMPORTED_MODULE_22__["StakingComponent"],
+                _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_21__["TypingMessageComponent"],
+                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_29__["MoneyToIntPipe"],
+                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_30__["IntToMoneyPipe"],
+                _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_36__["StakingSwitchComponent"],
+                _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_31__["HistoryTypeMessagesPipe"],
+                _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_32__["ContractStatusMessagesPipe"],
+                _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_33__["ContractTimeLeftPipe"],
+                _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_34__["TooltipDirective"],
+                _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_35__["InputValidateDirective"],
+                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_37__["ModalContainerComponent"],
+                _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_38__["TransactionDetailsComponent"]
             ],
             imports: [
                 _angular_platform_browser__WEBPACK_IMPORTED_MODULE_0__["BrowserModule"],
                 _app_routing_module__WEBPACK_IMPORTED_MODULE_2__["AppRoutingModule"],
-                _angular_common_http__WEBPACK_IMPORTED_MODULE_21__["HttpClientModule"],
-                _ngx_translate_core__WEBPACK_IMPORTED_MODULE_22__["TranslateModule"].forRoot({
+                _angular_common_http__WEBPACK_IMPORTED_MODULE_23__["HttpClientModule"],
+                _ngx_translate_core__WEBPACK_IMPORTED_MODULE_24__["TranslateModule"].forRoot({
                     loader: {
-                        provide: _ngx_translate_core__WEBPACK_IMPORTED_MODULE_22__["TranslateLoader"],
+                        provide: _ngx_translate_core__WEBPACK_IMPORTED_MODULE_24__["TranslateLoader"],
                         useFactory: HttpLoaderFactory,
-                        deps: [_angular_common_http__WEBPACK_IMPORTED_MODULE_21__["HttpClient"]]
+                        deps: [_angular_common_http__WEBPACK_IMPORTED_MODULE_23__["HttpClient"]]
                     }
                 }),
-                _angular_forms__WEBPACK_IMPORTED_MODULE_24__["FormsModule"],
-                _angular_forms__WEBPACK_IMPORTED_MODULE_24__["ReactiveFormsModule"],
-                angular_highcharts__WEBPACK_IMPORTED_MODULE_36__["ChartModule"],
-                ngx_contextmenu__WEBPACK_IMPORTED_MODULE_35__["ContextMenuModule"].forRoot()
+                _angular_forms__WEBPACK_IMPORTED_MODULE_26__["FormsModule"],
+                _angular_forms__WEBPACK_IMPORTED_MODULE_26__["ReactiveFormsModule"],
+                angular_highcharts__WEBPACK_IMPORTED_MODULE_40__["ChartModule"],
+                ngx_contextmenu__WEBPACK_IMPORTED_MODULE_39__["ContextMenuModule"].forRoot()
             ],
             providers: [
-                _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_26__["BackendService"],
-                _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_27__["ModalService"],
-                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_28__["MoneyToIntPipe"],
-                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_29__["IntToMoneyPipe"],
+                _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_27__["BackendService"],
+                _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_28__["ModalService"],
+                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_29__["MoneyToIntPipe"],
+                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_30__["IntToMoneyPipe"],
             ],
             entryComponents: [
-                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_38__["ModalContainerComponent"]
+                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_37__["ModalContainerComponent"]
             ],
             bootstrap: [_app_component__WEBPACK_IMPORTED_MODULE_3__["AppComponent"]]
         })
     ], AppModule);
     return AppModule;
+}());
+
+
+
+/***/ }),
+
+/***/ "./src/app/assign-alias/assign-alias.component.html":
+/*!**********************************************************!*\
+  !*** ./src/app/assign-alias/assign-alias.component.html ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = "<div class=\"content\">\n\n  <div class=\"head\">\n    <div class=\"breadcrumbs\">\n      <span [routerLink]=\"['/wallet/' + wallet.wallet_id + '/history']\">{{ wallet.name }}</span>\n      <span>{{ 'BREADCRUMBS.ASSIGN_ALIAS' | translate }}</span>\n    </div>\n    <button class=\"back-btn\" (click)=\"back()\">\n      <i class=\"icon back\"></i>\n      <span>{{ 'COMMON.BACK' | translate }}</span>\n    </button>\n  </div>\n\n  <form class=\"form-assign\" [formGroup]=\"assignForm\">\n\n    <div class=\"input-block alias-name\">\n      <label for=\"alias-name\" tooltip=\"{{ 'ASSIGN_ALIAS.NAME.TOOLTIP' | translate }}\" placement=\"bottom\" tooltipClass=\"table-tooltip assign-alias-tooltip\" [delay]=\"500\">\n        {{ 'ASSIGN_ALIAS.NAME.LABEL' | translate }}\n      </label>\n      <input type=\"text\" id=\"alias-name\" formControlName=\"name\" placeholder=\"{{ 'ASSIGN_ALIAS.NAME.PLACEHOLDER' | translate }}\">\n      <div class=\"error-block\" *ngIf=\"assignForm.controls['name'].invalid && (assignForm.controls['name'].dirty || assignForm.controls['name'].touched)\">\n        <div *ngIf=\"assignForm.controls['name'].errors['required']\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_REQUIRED' | translate }}\n        </div>\n        <div *ngIf=\"assignForm.controls['name'].errors['pattern'] && assignForm.get('name').value.length > 6 && assignForm.get('name').value.length <= 25\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_WRONG' | translate }}\n        </div>\n        <div *ngIf=\"assignForm.get('name').value.length <= 6 || assignForm.get('name').value.length > 25\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_LENGTH' | translate }}\n        </div>\n        <div *ngIf=\"alias.exists\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_EXISTS' | translate }}\n        </div>\n      </div>\n    </div>\n\n    <div class=\"input-block textarea\">\n      <label for=\"alias-comment\" tooltip=\"{{ 'ASSIGN_ALIAS.COMMENT.TOOLTIP' | translate }}\" placement=\"bottom\" tooltipClass=\"table-tooltip assign-alias-tooltip\" [delay]=\"500\">\n        {{ 'ASSIGN_ALIAS.COMMENT.LABEL' | translate }}\n      </label>\n      <textarea id=\"alias-comment\" formControlName=\"comment\" placeholder=\"{{ 'ASSIGN_ALIAS.COMMENT.PLACEHOLDER' | translate }}\"></textarea>\n    </div>\n\n    <div class=\"alias-cost\">{{ \"ASSIGN_ALIAS.COST\" | translate : {value: alias.price | intToMoney, currency: variablesService.defaultCurrency} }}</div>\n\n    <div class=\"wrap-buttons\">\n      <button type=\"button\" class=\"blue-button\" (click)=\"assignAlias()\" [disabled]=\"!assignForm.valid || !canRegister || notEnoughMoney\">{{ 'ASSIGN_ALIAS.BUTTON_ASSIGN' | translate }}</button>\n      <button type=\"button\" class=\"blue-button\" (click)=\"back()\">{{ 'ASSIGN_ALIAS.BUTTON_CANCEL' | translate }}</button>\n    </div>\n\n  </form>\n\n</div>\n\n"
+
+/***/ }),
+
+/***/ "./src/app/assign-alias/assign-alias.component.scss":
+/*!**********************************************************!*\
+  !*** ./src/app/assign-alias/assign-alias.component.scss ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = ".form-assign {\n  margin: 2.4rem 0; }\n  .form-assign .alias-name {\n    width: 50%; }\n  .form-assign .alias-cost {\n    font-size: 1.3rem;\n    margin-top: 2rem; }\n  .form-assign .wrap-buttons {\n    display: flex;\n    justify-content: space-between;\n    margin: 2.5rem -0.7rem; }\n  .form-assign .wrap-buttons button {\n      margin: 0 0.7rem;\n      width: 15rem; }\n  .assign-alias-tooltip {\n  font-size: 1.3rem;\n  line-height: 2rem;\n  padding: 1rem 1.5rem;\n  max-width: 46rem; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvYXNzaWduLWFsaWFzL0Q6XFxQcm9qZWN0c1xcWmFub1xcc3JjXFxndWlcXHF0LWRhZW1vblxcaHRtbF9zb3VyY2Uvc3JjXFxhcHBcXGFzc2lnbi1hbGlhc1xcYXNzaWduLWFsaWFzLmNvbXBvbmVudC5zY3NzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBO0VBQ0UsZ0JBQWdCLEVBQUE7RUFEbEI7SUFJSSxVQUFVLEVBQUE7RUFKZDtJQVFJLGlCQUFpQjtJQUNqQixnQkFBZ0IsRUFBQTtFQVRwQjtJQWFJLGFBQWE7SUFDYiw4QkFBOEI7SUFDOUIsc0JBQXNCLEVBQUE7RUFmMUI7TUFrQk0sZ0JBQWdCO01BQ2hCLFlBQVksRUFBQTtFQUtsQjtFQUNFLGlCQUFpQjtFQUNqQixpQkFBaUI7RUFDakIsb0JBQW9CO0VBQ3BCLGdCQUFnQixFQUFBIiwiZmlsZSI6InNyYy9hcHAvYXNzaWduLWFsaWFzL2Fzc2lnbi1hbGlhcy5jb21wb25lbnQuc2NzcyIsInNvdXJjZXNDb250ZW50IjpbIi5mb3JtLWFzc2lnbiB7XHJcbiAgbWFyZ2luOiAyLjRyZW0gMDtcclxuXHJcbiAgLmFsaWFzLW5hbWUge1xyXG4gICAgd2lkdGg6IDUwJTtcclxuICB9XHJcblxyXG4gIC5hbGlhcy1jb3N0IHtcclxuICAgIGZvbnQtc2l6ZTogMS4zcmVtO1xyXG4gICAgbWFyZ2luLXRvcDogMnJlbTtcclxuICB9XHJcblxyXG4gIC53cmFwLWJ1dHRvbnMge1xyXG4gICAgZGlzcGxheTogZmxleDtcclxuICAgIGp1c3RpZnktY29udGVudDogc3BhY2UtYmV0d2VlbjtcclxuICAgIG1hcmdpbjogMi41cmVtIC0wLjdyZW07XHJcblxyXG4gICAgYnV0dG9uIHtcclxuICAgICAgbWFyZ2luOiAwIDAuN3JlbTtcclxuICAgICAgd2lkdGg6IDE1cmVtO1xyXG4gICAgfVxyXG4gIH1cclxufVxyXG5cclxuLmFzc2lnbi1hbGlhcy10b29sdGlwIHtcclxuICBmb250LXNpemU6IDEuM3JlbTtcclxuICBsaW5lLWhlaWdodDogMnJlbTtcclxuICBwYWRkaW5nOiAxcmVtIDEuNXJlbTtcclxuICBtYXgtd2lkdGg6IDQ2cmVtO1xyXG59XHJcbiJdfQ== */"
+
+/***/ }),
+
+/***/ "./src/app/assign-alias/assign-alias.component.ts":
+/*!********************************************************!*\
+  !*** ./src/app/assign-alias/assign-alias.component.ts ***!
+  \********************************************************/
+/*! exports provided: AssignAliasComponent */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AssignAliasComponent", function() { return AssignAliasComponent; });
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_forms__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/forms */ "./node_modules/@angular/forms/fesm5/forms.js");
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
+/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
+/* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
+/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
+/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
+/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! bignumber.js */ "./node_modules/bignumber.js/bignumber.js");
+/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(bignumber_js__WEBPACK_IMPORTED_MODULE_7__);
+var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (undefined && undefined.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+
+
+
+
+
+
+
+
+var AssignAliasComponent = /** @class */ (function () {
+    function AssignAliasComponent(ngZone, location, backend, variablesService, moneyToInt, intToMoney) {
+        this.ngZone = ngZone;
+        this.location = location;
+        this.backend = backend;
+        this.variablesService = variablesService;
+        this.moneyToInt = moneyToInt;
+        this.intToMoney = intToMoney;
+        this.assignForm = new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormGroup"]({
+            name: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"]('', [_angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required, _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].pattern(/^@?[a-z0-9\.\-]{6,25}$/)]),
+            comment: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"]('')
+        });
+        this.alias = {
+            name: '',
+            fee: this.variablesService.default_fee,
+            price: new bignumber_js__WEBPACK_IMPORTED_MODULE_7___default.a(0),
+            reward: '0',
+            rewardOriginal: '0',
+            comment: '',
+            exists: false
+        };
+        this.canRegister = false;
+        this.notEnoughMoney = false;
+    }
+    AssignAliasComponent.prototype.ngOnInit = function () {
+        var _this = this;
+        this.wallet = this.variablesService.currentWallet;
+        this.assignForm.get('name').valueChanges.subscribe(function (value) {
+            _this.canRegister = false;
+            var newName = value.toLowerCase().replace('@', '');
+            if (!(_this.assignForm.controls['name'].errors && _this.assignForm.controls['name'].errors.hasOwnProperty('pattern')) && newName.length >= 6 && newName.length <= 25) {
+                _this.backend.getAliasByName(newName, function (status) {
+                    _this.alias.exists = status;
+                    if (!_this.alias.exists) {
+                        _this.alias.price = new bignumber_js__WEBPACK_IMPORTED_MODULE_7___default.a(0);
+                        _this.backend.getAliasCoast(newName, function (statusPrice, dataPrice) {
+                            _this.ngZone.run(function () {
+                                if (statusPrice) {
+                                    _this.alias.price = bignumber_js__WEBPACK_IMPORTED_MODULE_7___default.a.sum(dataPrice['coast'], _this.variablesService.default_fee_big);
+                                }
+                                _this.notEnoughMoney = _this.alias.price.isGreaterThan(_this.wallet.unlocked_balance);
+                                _this.alias.reward = _this.intToMoney.transform(_this.alias.price, false);
+                                _this.alias.rewardOriginal = _this.intToMoney.transform(dataPrice['coast'], false);
+                                _this.canRegister = !_this.notEnoughMoney;
+                            });
+                        });
+                    }
+                    else {
+                        _this.notEnoughMoney = false;
+                        _this.alias.reward = '0';
+                        _this.alias.rewardOriginal = '0';
+                    }
+                });
+            }
+            else {
+                _this.notEnoughMoney = false;
+                _this.alias.reward = '0';
+                _this.alias.rewardOriginal = '0';
+            }
+            _this.alias.name = newName;
+        });
+    };
+    AssignAliasComponent.prototype.assignAlias = function () {
+        /*let alias = getWalletAlias(wallet.address);
+        if (alias.hasOwnProperty('name')) {
+          informer.warning('INFORMER.ONE_ALIAS');
+        } else {
+          backend.registerAlias(wallet.wallet_id, this.alias.name, wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, function (status, data) {
+            if (status) {
+              service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
+              wallet.wakeAlias = true;
+              informer.success('INFORMER.REQUEST_ADD_REG');
+            }
+          });
+        }*/
+    };
+    AssignAliasComponent.prototype.back = function () {
+        this.location.back();
+    };
+    AssignAliasComponent = __decorate([
+        Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"])({
+            selector: 'app-assign-alias',
+            template: __webpack_require__(/*! ./assign-alias.component.html */ "./src/app/assign-alias/assign-alias.component.html"),
+            styles: [__webpack_require__(/*! ./assign-alias.component.scss */ "./src/app/assign-alias/assign-alias.component.scss")]
+        }),
+        __metadata("design:paramtypes", [_angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"],
+            _angular_common__WEBPACK_IMPORTED_MODULE_2__["Location"],
+            _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__["BackendService"],
+            _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__["VariablesService"],
+            _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__["MoneyToIntPipe"],
+            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_6__["IntToMoneyPipe"]])
+    ], AssignAliasComponent);
+    return AssignAliasComponent;
 }());
 
 
@@ -5684,7 +5837,7 @@ var WalletDetailsComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"header\">\r\n  <div>\r\n    <h3>{{variablesService.currentWallet.name}}</h3>\r\n    <button (click)=\"openInBrowser('docs.zano.org/docs/how-to-get-alias')\">\r\n      <i class=\"icon account\"></i>\r\n      <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>\r\n    </button>\r\n  </div>\r\n  <div>\r\n    <button [routerLink]=\"['/details']\" routerLinkActive=\"active\">\r\n      <i class=\"icon details\"></i>\r\n      <span>{{ 'WALLET.DETAILS' | translate }}</span>\r\n    </button>\r\n    <!--<button (click)=\"closeWallet()\">\r\n      <i class=\"icon lock\"></i>\r\n      <span>{{ 'WALLET.LOCK' | translate }}</span>\r\n    </button>-->\r\n  </div>\r\n</div>\r\n<div class=\"address\">\r\n  <span>{{variablesService.currentWallet.address}}</span>\r\n  <i #copyIcon class=\"icon copy\" (click)=\"copyAddress()\"></i>\r\n</div>\r\n<div class=\"balance\">\r\n  <span [tooltip]=\"getTooltip()\" [placement]=\"'bottom'\" [tooltipClass]=\"'balance-tooltip'\" [delay]=\"500\" [timeout]=\"1000\">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>\r\n  <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n</div>\r\n<div class=\"tabs\">\r\n  <div class=\"tabs-header\">\r\n    <ng-container *ngFor=\"let tab of tabs; let index = index\">\r\n      <div class=\"tab\" [class.active]=\"tab.active\" [class.disabled]=\"(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2\" (click)=\"changeTab(index)\">\r\n        <i class=\"icon\" [ngClass]=\"tab.icon\"></i>\r\n        <span>{{ tab.title | translate }}</span>\r\n        <span class=\"indicator\" *ngIf=\"tab.indicator\">{{variablesService.currentWallet.new_contracts}}</span>\r\n      </div>\r\n    </ng-container>\r\n  </div>\r\n  <div class=\"tabs-content scrolled-content\">\r\n    <router-outlet></router-outlet>\r\n  </div>\r\n</div>\r\n\r\n"
+module.exports = "<div class=\"header\">\r\n  <div>\r\n    <h3>{{variablesService.currentWallet.name}}</h3>\r\n    <!--<button (click)=\"openInBrowser('docs.zano.org/docs/how-to-get-alias')\">-->\r\n    <button [routerLink]=\"['/assign-alias']\">\r\n      <i class=\"icon account\"></i>\r\n      <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>\r\n    </button>\r\n  </div>\r\n  <div>\r\n    <button [routerLink]=\"['/details']\" routerLinkActive=\"active\">\r\n      <i class=\"icon details\"></i>\r\n      <span>{{ 'WALLET.DETAILS' | translate }}</span>\r\n    </button>\r\n    <!--<button (click)=\"closeWallet()\">\r\n      <i class=\"icon lock\"></i>\r\n      <span>{{ 'WALLET.LOCK' | translate }}</span>\r\n    </button>-->\r\n  </div>\r\n</div>\r\n<div class=\"address\">\r\n  <span>{{variablesService.currentWallet.address}}</span>\r\n  <i #copyIcon class=\"icon copy\" (click)=\"copyAddress()\"></i>\r\n</div>\r\n<div class=\"balance\">\r\n  <span [tooltip]=\"getTooltip()\" [placement]=\"'bottom'\" [tooltipClass]=\"'balance-tooltip'\" [delay]=\"500\" [timeout]=\"1000\">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>\r\n  <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n</div>\r\n<div class=\"tabs\">\r\n  <div class=\"tabs-header\">\r\n    <ng-container *ngFor=\"let tab of tabs; let index = index\">\r\n      <div class=\"tab\" [class.active]=\"tab.active\" [class.disabled]=\"(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2\" (click)=\"changeTab(index)\">\r\n        <i class=\"icon\" [ngClass]=\"tab.icon\"></i>\r\n        <span>{{ tab.title | translate }}</span>\r\n        <span class=\"indicator\" *ngIf=\"tab.indicator\">{{variablesService.currentWallet.new_contracts}}</span>\r\n      </div>\r\n    </ng-container>\r\n  </div>\r\n  <div class=\"tabs-content scrolled-content\">\r\n    <router-outlet></router-outlet>\r\n  </div>\r\n</div>\r\n\r\n"
 
 /***/ }),
 

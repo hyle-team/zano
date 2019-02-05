@@ -112,6 +112,14 @@ export class BackendService {
           }
         }
         break;
+      case 'NOT_FOUND': if (command !== 'open_wallet' && command !== 'get_alias_info_by_name' && command !== 'get_alias_info_by_address') {
+        error_translate = this.translate.instant('ERRORS.FILE_NOT_FOUND');
+        params = JSON.parse(params);
+        if (params.path) {
+          error_translate += ': ' + params.path;
+        }
+      }
+        break;
       case 'CANCELED':
       case '':
         break;
@@ -135,7 +143,7 @@ export class BackendService {
   }
 
   private bigNumberParser(key, val) {
-    if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge'].indexOf(key) === -1) {
+    if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge', 'coast'].indexOf(key) === -1) {
       return val.toNumber();
     }
     if (key === 'rcv' || key === 'spn') {
@@ -503,6 +511,50 @@ export class BackendService {
     this.runCommand('set_localization_strings', params, callback);
   }
 
+  registerAlias (wallet_id, alias, address, fee, comment, reward, callback) {
+    let params = {
+      wallet_id: wallet_id,
+      alias: {
+        alias: alias,
+        address: address,
+        tracking_key: "",
+        comment: comment
+      },
+      fee: this.moneyToIntPipe.transform(fee),
+      reward: this.moneyToIntPipe.transform(reward)
+    };
+    this.runCommand('request_alias_registration', params, callback);
+  }
+
+  updateAlias (wallet_id, alias, fee, callback) {
+    let params = {
+      wallet_id: wallet_id,
+      alias: {
+        alias: alias.name.replace("@", ""),
+        address: alias.address,
+        tracking_key: "",
+        comment: alias.comment
+      },
+      fee: this.moneyToIntPipe.transform(fee)
+    };
+    this.runCommand('request_alias_update', params, callback);
+  }
+
+  getAllAliases (callback) {
+    this.runCommand('get_all_aliases', {}, callback);
+  }
+
+  getAliasByName (value, callback) {
+    return this.runCommand('get_alias_info_by_name', value, callback);
+  }
+
+  getAliasByAddress (value, callback) {
+    return this.runCommand('get_alias_info_by_address', value, callback);
+  }
+
+  getAliasCoast (alias, callback) {
+    this.runCommand('get_alias_coast', {v: alias}, callback);
+  }
 }
 
 
@@ -520,8 +572,6 @@ export class BackendService {
         return this.runCommand('is_file_exist', path, callback);
       },
 
-
-
       isAutoStartEnabled: function (callback) {
         this.runCommand('is_autostart_enabled', {}, function (status, data) {
           if (angular.isFunction(callback)) {
@@ -529,8 +579,6 @@ export class BackendService {
           }
         });
       },
-
-
 
       setLogLevel: function (level) {
         return this.runCommand('set_log_level', asVal(level))
@@ -558,50 +606,8 @@ export class BackendService {
         })
       },
 
-
       resync_wallet: function (wallet_id, callback) {
         this.runCommand('resync_wallet', {wallet_id: wallet_id}, callback);
-      },
-
-      registerAlias: function (wallet_id, alias, address, fee, comment, reward, callback) {
-        var params = {
-          "wallet_id": wallet_id,
-          "alias": {
-            "alias": alias,
-            "address": address,
-            "tracking_key": "",
-            "comment": comment
-          },
-          "fee": $filter('money_to_int')(fee),
-          "reward": $filter('money_to_int')(reward)
-        };
-        this.runCommand('request_alias_registration', params, callback);
-      },
-
-      updateAlias: function (wallet_id, alias, fee, callback) {
-        var params = {
-          wallet_id: wallet_id,
-          alias: {
-            "alias": alias.name.replace("@", ""),
-            "address": alias.address,
-            "tracking_key": "",
-            "comment": alias.comment
-          },
-          fee: $filter('money_to_int')(fee)
-        };
-        this.runCommand('request_alias_update', params, callback);
-      },
-
-      getAllAliases: function (callback) {
-        this.runCommand('get_all_aliases', {}, callback);
-      },
-
-      getAliasByName: function (value, callback) {
-        return this.runCommand('get_alias_info_by_name', value, callback);
-      },
-
-      getAliasByAddress: function (value, callback) {
-        return this.runCommand('get_alias_info_by_address', value, callback);
       },
 
       getPoolInfo: function (callback) {
@@ -613,10 +619,6 @@ export class BackendService {
           backendCallback(data, {}, callback, 'store_to_file');
         });
       },
-
-
-
-
 
       getMiningEstimate: function (amount_coins, time, callback) {
         var params = {
@@ -634,28 +636,14 @@ export class BackendService {
         this.runCommand('backup_wallet_keys', params, callback);
       },
 
-
-      getAliasCoast: function (alias, callback) {
-        this.runCommand('get_alias_coast', asVal(alias), callback);
-      },
-
-
-
-
       setBlockedIcon: function (enabled, callback) {
         var mode = (enabled) ? "blocked" : "normal";
         Service.runCommand('bool_toggle_icon', mode, callback);
       },
 
-
-
-
-
       getWalletInfo: function (wallet_id, callback) {
         this.runCommand('get_wallet_info', {wallet_id: wallet_id}, callback);
       },
-
-
 
       printText: function (content) {
         return this.runCommand('print_text', {html_text: content});
