@@ -3,6 +3,7 @@ import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {Location} from "@angular/common";
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {ModalService} from "../_helpers/services/modal.service";
 import {Wallet} from "../_helpers/models/wallet.model";
 import {MoneyToIntPipe} from "../_helpers/pipes/money-to-int.pipe";
 import {IntToMoneyPipe} from "../_helpers/pipes/int-to-money.pipe";
@@ -37,6 +38,7 @@ export class AssignAliasComponent implements OnInit {
     private location: Location,
     private backend: BackendService,
     private variablesService: VariablesService,
+    private modalService: ModalService,
     private moneyToInt: MoneyToIntPipe,
     private intToMoney: IntToMoneyPipe
   ) {
@@ -46,11 +48,14 @@ export class AssignAliasComponent implements OnInit {
     this.wallet = this.variablesService.currentWallet;
     this.assignForm.get('name').valueChanges.subscribe(value => {
       this.canRegister = false;
+      this.alias.exists = false;
       let newName = value.toLowerCase().replace('@', '');
       if (!(this.assignForm.controls['name'].errors && this.assignForm.controls['name'].errors.hasOwnProperty('pattern')) && newName.length >= 6 && newName.length <= 25) {
         this.backend.getAliasByName(newName, status => {
-          this.alias.exists = status;
-          if (!this.alias.exists) {
+          this.ngZone.run(() => {
+            this.alias.exists = status;
+          });
+          if (!status) {
             this.alias.price = new BigNumber(0);
             this.backend.getAliasCoast(newName, (statusPrice, dataPrice) => {
               this.ngZone.run(() => {
@@ -79,18 +84,19 @@ export class AssignAliasComponent implements OnInit {
   }
 
   assignAlias() {
-    /*let alias = getWalletAlias(wallet.address);
+    let alias = this.backend.getWalletAlias(this.wallet.address);
     if (alias.hasOwnProperty('name')) {
-      informer.warning('INFORMER.ONE_ALIAS');
+      this.modalService.prepareModal('info', 'ASSIGN_ALIAS.ONE_ALIAS');
     } else {
-      backend.registerAlias(wallet.wallet_id, this.alias.name, wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, function (status, data) {
+      this.alias.comment = this.assignForm.get('comment').value;
+      this.backend.registerAlias(this.wallet.wallet_id, this.alias.name, this.wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, (status, data) => {
         if (status) {
-          service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
-          wallet.wakeAlias = true;
-          informer.success('INFORMER.REQUEST_ADD_REG');
+          //service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
+          //wallet.wakeAlias = true;
+          this.modalService.prepareModal('info', 'ASSIGN_ALIAS.REQUEST_ADD_REG');
         }
       });
-    }*/
+    }
   }
 
   back() {

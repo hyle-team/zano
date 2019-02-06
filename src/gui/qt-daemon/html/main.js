@@ -1866,6 +1866,34 @@ var BackendService = /** @class */ (function () {
     BackendService.prototype.getAliasCoast = function (alias, callback) {
         this.runCommand('get_alias_coast', { v: alias }, callback);
     };
+    BackendService.prototype.getWalletAlias = function (address) {
+        var _this = this;
+        if (address != null) {
+            if (this.variablesService.aliasesChecked[address] == null) {
+                this.variablesService.aliasesChecked[address] = {};
+                if (this.variablesService.aliases.length) {
+                    for (var i = 0, length_1 = this.variablesService.aliases.length; i < length_1; i++) {
+                        if (i in this.variablesService.aliases && this.variablesService.aliases[i]['address'] === address) {
+                            this.variablesService.aliasesChecked[address]['name'] = this.variablesService.aliases[i].name;
+                            this.variablesService.aliasesChecked[address]['address'] = this.variablesService.aliases[i].address;
+                            this.variablesService.aliasesChecked[address]['comment'] = this.variablesService.aliases[i].comment;
+                            return this.variablesService.aliasesChecked[address];
+                        }
+                    }
+                }
+                this.getAliasByAddress(address, function (status, data) {
+                    if (status) {
+                        _this.variablesService.aliasesChecked[data.address]['name'] = '@' + data.alias;
+                        _this.variablesService.aliasesChecked[data.address]['address'] = data.address;
+                        _this.variablesService.aliasesChecked[data.address]['comment'] = data.comment;
+                    }
+                });
+            }
+            return this.variablesService.aliasesChecked[address];
+        }
+        return {};
+    };
+    ;
     BackendService = __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Injectable"])(),
         __metadata("design:paramtypes", [_ngx_translate_core__WEBPACK_IMPORTED_MODULE_2__["TranslateService"], _variables_service__WEBPACK_IMPORTED_MODULE_3__["VariablesService"], _modal_service__WEBPACK_IMPORTED_MODULE_4__["ModalService"], _pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__["MoneyToIntPipe"]])
@@ -2113,6 +2141,8 @@ var VariablesService = /** @class */ (function () {
             notViewedContracts: []
         };
         this.wallets = [];
+        this.aliases = [];
+        this.aliasesChecked = {};
         this.getHeightAppEvent = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
         this.getRefreshStackingEvent = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
         this.idle = new idlejs_dist__WEBPACK_IMPORTED_MODULE_2__["Idle"]()
@@ -2539,10 +2569,10 @@ var AppComponent = /** @class */ (function () {
                 _this.variablesService.last_build_available = data.last_build_available;
                 _this.variablesService.setHeightApp(data.height);
                 _this.ngZone.run(function () {
-                    _this.variablesService.daemon_state = data.daemon_network_state;
-                    if (data.daemon_network_state === 1) {
-                        var max = data.max_net_seen_height - data.synchronization_start_height;
-                        var current = data.height - data.synchronization_start_height;
+                    _this.variablesService.daemon_state = data['daemon_network_state'];
+                    if (data['daemon_network_state'] === 1) {
+                        var max = data['max_net_seen_height'] - data['synchronization_start_height'];
+                        var current = data.height - data['synchronization_start_height'];
                         var return_val = Math.floor((current * 100 / max) * 100) / 100;
                         if (max === 0 || return_val < 0) {
                             _this.variablesService.sync.progress_value = 0;
@@ -2558,7 +2588,8 @@ var AppComponent = /** @class */ (function () {
                         }
                     }
                 });
-                if (!_this.firstOnlineState) {
+                if (!_this.firstOnlineState && data['daemon_network_state'] === 2) {
+                    _this.getAliases();
                     _this.backend.getDefaultFee(function (status_fee, data_fee) {
                         _this.variablesService.default_fee_big = new bignumber_js__WEBPACK_IMPORTED_MODULE_8__["BigNumber"](data_fee);
                         _this.variablesService.default_fee = _this.intToMoneyPipe.transform(data_fee);
@@ -2823,6 +2854,49 @@ var AppComponent = /** @class */ (function () {
                 _this.getMoneyEquivalent();
             }, 60000);
             console.warn('Error coinmarketcap', error);
+        });
+    };
+    AppComponent.prototype.getAliases = function () {
+        var _this = this;
+        this.backend.getAllAliases(function (status, data, error) {
+            if (error == 'CORE_BUSY') {
+                window.setTimeout(function () {
+                    _this.getAliases();
+                }, 10000);
+            }
+            else if (error == 'OVERFLOW') {
+                _this.variablesService.aliases = [];
+                //EnableAliasSearch = false;
+            }
+            else {
+                //EnableAliasSearch = true;
+                if (data.aliases && data.aliases.length) {
+                    _this.variablesService.aliases = [];
+                    data.aliases.forEach(function (alias) {
+                        var newAlias = {
+                            name: '@' + alias.alias,
+                            address: alias.address,
+                            comment: alias.comment
+                        };
+                        _this.variablesService.aliases.push(newAlias);
+                    });
+                    _this.variablesService.wallets.forEach(function (wallet) {
+                        wallet.alias = _this.backend.getWalletAlias(wallet.address);
+                    });
+                    _this.variablesService.aliases = _this.variablesService.aliases.sort(function (a, b) {
+                        if (a.name.length > b.name.length)
+                            return 1;
+                        if (a.name.length < b.name.length)
+                            return -1;
+                        if (a.name > b.name)
+                            return 1;
+                        if (a.name < b.name)
+                            return -1;
+                        return 0;
+                    });
+                    //broadcast('alias_changed');
+                }
+            }
         });
     };
     AppComponent.prototype.contextMenuCopy = function (target) {
@@ -3093,7 +3167,7 @@ var AppModule = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"content\">\n\n  <div class=\"head\">\n    <div class=\"breadcrumbs\">\n      <span [routerLink]=\"['/wallet/' + wallet.wallet_id + '/history']\">{{ wallet.name }}</span>\n      <span>{{ 'BREADCRUMBS.ASSIGN_ALIAS' | translate }}</span>\n    </div>\n    <button class=\"back-btn\" (click)=\"back()\">\n      <i class=\"icon back\"></i>\n      <span>{{ 'COMMON.BACK' | translate }}</span>\n    </button>\n  </div>\n\n  <form class=\"form-assign\" [formGroup]=\"assignForm\">\n\n    <div class=\"input-block alias-name\">\n      <label for=\"alias-name\" tooltip=\"{{ 'ASSIGN_ALIAS.NAME.TOOLTIP' | translate }}\" placement=\"bottom\" tooltipClass=\"table-tooltip assign-alias-tooltip\" [delay]=\"500\">\n        {{ 'ASSIGN_ALIAS.NAME.LABEL' | translate }}\n      </label>\n      <input type=\"text\" id=\"alias-name\" formControlName=\"name\" placeholder=\"{{ 'ASSIGN_ALIAS.NAME.PLACEHOLDER' | translate }}\">\n      <div class=\"error-block\" *ngIf=\"assignForm.controls['name'].invalid && (assignForm.controls['name'].dirty || assignForm.controls['name'].touched)\">\n        <div *ngIf=\"assignForm.controls['name'].errors['required']\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_REQUIRED' | translate }}\n        </div>\n        <div *ngIf=\"assignForm.controls['name'].errors['pattern'] && assignForm.get('name').value.length > 6 && assignForm.get('name').value.length <= 25\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_WRONG' | translate }}\n        </div>\n        <div *ngIf=\"assignForm.get('name').value.length <= 6 || assignForm.get('name').value.length > 25\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_LENGTH' | translate }}\n        </div>\n        <div *ngIf=\"alias.exists\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_EXISTS' | translate }}\n        </div>\n      </div>\n    </div>\n\n    <div class=\"input-block textarea\">\n      <label for=\"alias-comment\" tooltip=\"{{ 'ASSIGN_ALIAS.COMMENT.TOOLTIP' | translate }}\" placement=\"bottom\" tooltipClass=\"table-tooltip assign-alias-tooltip\" [delay]=\"500\">\n        {{ 'ASSIGN_ALIAS.COMMENT.LABEL' | translate }}\n      </label>\n      <textarea id=\"alias-comment\" formControlName=\"comment\" placeholder=\"{{ 'ASSIGN_ALIAS.COMMENT.PLACEHOLDER' | translate }}\"></textarea>\n    </div>\n\n    <div class=\"alias-cost\">{{ \"ASSIGN_ALIAS.COST\" | translate : {value: alias.price | intToMoney, currency: variablesService.defaultCurrency} }}</div>\n\n    <div class=\"wrap-buttons\">\n      <button type=\"button\" class=\"blue-button\" (click)=\"assignAlias()\" [disabled]=\"!assignForm.valid || !canRegister || notEnoughMoney\">{{ 'ASSIGN_ALIAS.BUTTON_ASSIGN' | translate }}</button>\n      <button type=\"button\" class=\"blue-button\" (click)=\"back()\">{{ 'ASSIGN_ALIAS.BUTTON_CANCEL' | translate }}</button>\n    </div>\n\n  </form>\n\n</div>\n\n"
+module.exports = "<div class=\"content\">\n\n  <div class=\"head\">\n    <div class=\"breadcrumbs\">\n      <span [routerLink]=\"['/wallet/' + wallet.wallet_id + '/history']\">{{ wallet.name }}</span>\n      <span>{{ 'BREADCRUMBS.ASSIGN_ALIAS' | translate }}</span>\n    </div>\n    <button class=\"back-btn\" (click)=\"back()\">\n      <i class=\"icon back\"></i>\n      <span>{{ 'COMMON.BACK' | translate }}</span>\n    </button>\n  </div>\n\n  <form class=\"form-assign\" [formGroup]=\"assignForm\">\n\n    <div class=\"input-block alias-name\">\n      <label for=\"alias-name\" tooltip=\"{{ 'ASSIGN_ALIAS.NAME.TOOLTIP' | translate }}\" placement=\"bottom\" tooltipClass=\"table-tooltip assign-alias-tooltip\" [delay]=\"500\">\n        {{ 'ASSIGN_ALIAS.NAME.LABEL' | translate }}\n      </label>\n      <input type=\"text\" id=\"alias-name\" formControlName=\"name\" placeholder=\"{{ 'ASSIGN_ALIAS.NAME.PLACEHOLDER' | translate }}\">\n      <div class=\"error-block\" *ngIf=\"assignForm.controls['name'].invalid && (assignForm.controls['name'].dirty || assignForm.controls['name'].touched)\">\n        <div *ngIf=\"assignForm.controls['name'].errors['required']\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_REQUIRED' | translate }}\n        </div>\n        <div *ngIf=\"assignForm.controls['name'].errors['pattern'] && assignForm.get('name').value.length > 6 && assignForm.get('name').value.length <= 25\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_WRONG' | translate }}\n        </div>\n        <div *ngIf=\"assignForm.get('name').value.length <= 6 || assignForm.get('name').value.length > 25\">\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_LENGTH' | translate }}\n        </div>\n      </div>\n      <div class=\"error-block\" *ngIf=\"alias.exists\">\n        <div>\n          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_EXISTS' | translate }}\n        </div>\n      </div>\n    </div>\n\n    <div class=\"input-block textarea\">\n      <label for=\"alias-comment\" tooltip=\"{{ 'ASSIGN_ALIAS.COMMENT.TOOLTIP' | translate }}\" placement=\"bottom\" tooltipClass=\"table-tooltip assign-alias-tooltip\" [delay]=\"500\">\n        {{ 'ASSIGN_ALIAS.COMMENT.LABEL' | translate }}\n      </label>\n      <textarea id=\"alias-comment\" formControlName=\"comment\" placeholder=\"{{ 'ASSIGN_ALIAS.COMMENT.PLACEHOLDER' | translate }}\"></textarea>\n    </div>\n\n    <div class=\"alias-cost\">{{ \"ASSIGN_ALIAS.COST\" | translate : {value: alias.price | intToMoney, currency: variablesService.defaultCurrency} }}</div>\n\n    <div class=\"wrap-buttons\">\n      <button type=\"button\" class=\"blue-button\" (click)=\"assignAlias()\" [disabled]=\"!assignForm.valid || !canRegister || notEnoughMoney\">{{ 'ASSIGN_ALIAS.BUTTON_ASSIGN' | translate }}</button>\n      <button type=\"button\" class=\"blue-button\" (click)=\"back()\">{{ 'ASSIGN_ALIAS.BUTTON_CANCEL' | translate }}</button>\n    </div>\n\n  </form>\n\n</div>\n\n"
 
 /***/ }),
 
@@ -3123,10 +3197,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
 /* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
 /* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
-/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
-/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
-/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! bignumber.js */ "./node_modules/bignumber.js/bignumber.js");
-/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(bignumber_js__WEBPACK_IMPORTED_MODULE_7__);
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
+/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
+/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
+/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! bignumber.js */ "./node_modules/bignumber.js/bignumber.js");
+/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(bignumber_js__WEBPACK_IMPORTED_MODULE_8__);
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -3144,12 +3219,14 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 
 
 
+
 var AssignAliasComponent = /** @class */ (function () {
-    function AssignAliasComponent(ngZone, location, backend, variablesService, moneyToInt, intToMoney) {
+    function AssignAliasComponent(ngZone, location, backend, variablesService, modalService, moneyToInt, intToMoney) {
         this.ngZone = ngZone;
         this.location = location;
         this.backend = backend;
         this.variablesService = variablesService;
+        this.modalService = modalService;
         this.moneyToInt = moneyToInt;
         this.intToMoney = intToMoney;
         this.assignForm = new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormGroup"]({
@@ -3159,7 +3236,7 @@ var AssignAliasComponent = /** @class */ (function () {
         this.alias = {
             name: '',
             fee: this.variablesService.default_fee,
-            price: new bignumber_js__WEBPACK_IMPORTED_MODULE_7___default.a(0),
+            price: new bignumber_js__WEBPACK_IMPORTED_MODULE_8___default.a(0),
             reward: '0',
             rewardOriginal: '0',
             comment: '',
@@ -3173,16 +3250,19 @@ var AssignAliasComponent = /** @class */ (function () {
         this.wallet = this.variablesService.currentWallet;
         this.assignForm.get('name').valueChanges.subscribe(function (value) {
             _this.canRegister = false;
+            _this.alias.exists = false;
             var newName = value.toLowerCase().replace('@', '');
             if (!(_this.assignForm.controls['name'].errors && _this.assignForm.controls['name'].errors.hasOwnProperty('pattern')) && newName.length >= 6 && newName.length <= 25) {
                 _this.backend.getAliasByName(newName, function (status) {
-                    _this.alias.exists = status;
-                    if (!_this.alias.exists) {
-                        _this.alias.price = new bignumber_js__WEBPACK_IMPORTED_MODULE_7___default.a(0);
+                    _this.ngZone.run(function () {
+                        _this.alias.exists = status;
+                    });
+                    if (!status) {
+                        _this.alias.price = new bignumber_js__WEBPACK_IMPORTED_MODULE_8___default.a(0);
                         _this.backend.getAliasCoast(newName, function (statusPrice, dataPrice) {
                             _this.ngZone.run(function () {
                                 if (statusPrice) {
-                                    _this.alias.price = bignumber_js__WEBPACK_IMPORTED_MODULE_7___default.a.sum(dataPrice['coast'], _this.variablesService.default_fee_big);
+                                    _this.alias.price = bignumber_js__WEBPACK_IMPORTED_MODULE_8___default.a.sum(dataPrice['coast'], _this.variablesService.default_fee_big);
                                 }
                                 _this.notEnoughMoney = _this.alias.price.isGreaterThan(_this.wallet.unlocked_balance);
                                 _this.alias.reward = _this.intToMoney.transform(_this.alias.price, false);
@@ -3207,18 +3287,21 @@ var AssignAliasComponent = /** @class */ (function () {
         });
     };
     AssignAliasComponent.prototype.assignAlias = function () {
-        /*let alias = getWalletAlias(wallet.address);
+        var _this = this;
+        var alias = this.backend.getWalletAlias(this.wallet.address);
         if (alias.hasOwnProperty('name')) {
-          informer.warning('INFORMER.ONE_ALIAS');
-        } else {
-          backend.registerAlias(wallet.wallet_id, this.alias.name, wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, function (status, data) {
-            if (status) {
-              service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
-              wallet.wakeAlias = true;
-              informer.success('INFORMER.REQUEST_ADD_REG');
-            }
-          });
-        }*/
+            this.modalService.prepareModal('info', 'ASSIGN_ALIAS.ONE_ALIAS');
+        }
+        else {
+            this.alias.comment = this.assignForm.get('comment').value;
+            this.backend.registerAlias(this.wallet.wallet_id, this.alias.name, this.wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, function (status, data) {
+                if (status) {
+                    //service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
+                    //wallet.wakeAlias = true;
+                    _this.modalService.prepareModal('info', 'ASSIGN_ALIAS.REQUEST_ADD_REG');
+                }
+            });
+        }
     };
     AssignAliasComponent.prototype.back = function () {
         this.location.back();
@@ -3233,8 +3316,9 @@ var AssignAliasComponent = /** @class */ (function () {
             _angular_common__WEBPACK_IMPORTED_MODULE_2__["Location"],
             _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__["BackendService"],
             _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__["VariablesService"],
-            _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__["MoneyToIntPipe"],
-            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_6__["IntToMoneyPipe"]])
+            _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__["ModalService"],
+            _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_6__["MoneyToIntPipe"],
+            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__["IntToMoneyPipe"]])
     ], AssignAliasComponent);
     return AssignAliasComponent;
 }());
@@ -3688,6 +3772,7 @@ var LoginComponent = /** @class */ (function () {
                                             runWallets_1++;
                                             _this.ngZone.run(function () {
                                                 var new_wallet = new _helpers_models_wallet_model__WEBPACK_IMPORTED_MODULE_6__["Wallet"](open_data.wallet_id, wallet.name, wallet.pass, open_data['wi'].path, open_data['wi'].address, open_data['wi'].balance, open_data['wi'].unlocked_balance, open_data['wi'].mined_total, open_data['wi'].tracking_hey);
+                                                new_wallet.alias = _this.backend.getWalletAlias(new_wallet.address);
                                                 if (open_data.recent_history && open_data.recent_history.history) {
                                                     new_wallet.prepareHistory(open_data.recent_history.history);
                                                 }
@@ -5154,7 +5239,7 @@ var SettingsComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"sidebar-accounts\">\r\n  <div class=\"sidebar-accounts-header\">\r\n    <h3>{{ 'SIDEBAR.TITLE' | translate }}</h3><button [routerLink]=\"['main']\">{{ 'SIDEBAR.ADD_NEW' | translate }}</button>\r\n  </div>\r\n  <div class=\"sidebar-accounts-list scrolled-content\">\r\n    <div class=\"sidebar-account\" *ngFor=\"let wallet of variablesService.wallets\" [class.active]=\"wallet?.wallet_id === walletActive\" [routerLink]=\"['/wallet/' + wallet.wallet_id + '/history']\">\r\n      <div class=\"sidebar-account-row account-title-balance\">\r\n        <span class=\"title\">{{wallet.name}}</span>\r\n        <span class=\"balance\">{{wallet.balance | intToMoney : '3' }} {{variablesService.defaultCurrency}}</span>\r\n      </div>\r\n      <div class=\"sidebar-account-row account-alias\">\r\n        <span>{{wallet.alias}}</span>\r\n        <span>$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n      </div>\r\n      <div class=\"sidebar-account-row account-staking\" *ngIf=\"!(!wallet.loaded && variablesService.daemon_state === 2)\">\r\n        <span class=\"text\">{{ 'SIDEBAR.ACCOUNT.STAKING' | translate }}</span>\r\n        <app-staking-switch [(wallet_id)]=\"wallet.wallet_id\" [(staking)]=\"wallet.staking\"></app-staking-switch>\r\n      </div>\r\n      <div class=\"sidebar-account-row account-messages\" *ngIf=\"!(!wallet.loaded && variablesService.daemon_state === 2)\">\r\n        <span class=\"text\">{{ 'SIDEBAR.ACCOUNT.MESSAGES' | translate }}</span>\r\n        <span class=\"indicator\">{{wallet.new_contracts}}</span>\r\n      </div>\r\n      <div class=\"sidebar-account-row account-synchronization\" *ngIf=\"!wallet.loaded && variablesService.daemon_state === 2\">\r\n        <span class=\"status\">{{ 'SIDEBAR.ACCOUNT.SYNCING' | translate }}</span>\r\n        <div class=\"progress-bar-container\">\r\n          <div class=\"progress-bar\">\r\n            <div class=\"fill\" [style.width]=\"wallet.progress + '%'\"></div>\r\n          </div>\r\n          <div class=\"progress-percent\">{{ wallet.progress }}%</div>\r\n        </div>\r\n      </div>\r\n    </div>\r\n  </div>\r\n</div>\r\n<div class=\"sidebar-settings\">\r\n  <button [routerLink]=\"['/settings']\" routerLinkActive=\"active\">\r\n    <i class=\"icon settings\"></i>\r\n    <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>\r\n  </button>\r\n  <button (click)=\"logOut()\">\r\n    <i class=\"icon logout\"></i>\r\n    <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>\r\n  </button>\r\n</div>\r\n<div class=\"sidebar-synchronization-status\">\r\n  <div class=\"status-container\">\r\n    <span class=\"offline\" *ngIf=\"variablesService.daemon_state === 0\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.OFFLINE' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n    <span class=\"syncing\" *ngIf=\"variablesService.daemon_state === 1\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.SYNCING' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n    <span class=\"online\" *ngIf=\"variablesService.daemon_state === 2\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.ONLINE' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n    <span class=\"loading\" *ngIf=\"variablesService.daemon_state === 3\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.LOADING' | translate }}\r\n    </span>\r\n    <span class=\"offline\" *ngIf=\"variablesService.daemon_state === 4\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.ERROR' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n    <span class=\"online\" *ngIf=\"variablesService.daemon_state === 5\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n  </div>\r\n  <div class=\"progress-bar-container\">\r\n    <div class=\"syncing\" *ngIf=\"variablesService.daemon_state === 1\">\r\n      <div class=\"progress-bar\">\r\n        <div class=\"fill\" [style.width]=\"variablesService.sync.progress_value + '%'\"></div>\r\n      </div>\r\n      <div class=\"progress-percent\">{{ variablesService.sync.progress_value_text }}%</div>\r\n    </div>\r\n    <div class=\"loading\" *ngIf=\"variablesService.daemon_state === 3\"></div>\r\n  </div>\r\n</div>\r\n"
+module.exports = "<div class=\"sidebar-accounts\">\r\n  <div class=\"sidebar-accounts-header\">\r\n    <h3>{{ 'SIDEBAR.TITLE' | translate }}</h3><button [routerLink]=\"['main']\">{{ 'SIDEBAR.ADD_NEW' | translate }}</button>\r\n  </div>\r\n  <div class=\"sidebar-accounts-list scrolled-content\">\r\n    <div class=\"sidebar-account\" *ngFor=\"let wallet of variablesService.wallets\" [class.active]=\"wallet?.wallet_id === walletActive\" [routerLink]=\"['/wallet/' + wallet.wallet_id + '/history']\">\r\n      <div class=\"sidebar-account-row account-title-balance\">\r\n        <span class=\"title\">{{wallet.name}}</span>\r\n        <span class=\"balance\">{{wallet.balance | intToMoney : '3' }} {{variablesService.defaultCurrency}}</span>\r\n      </div>\r\n      <div class=\"sidebar-account-row account-alias\">\r\n        <span>{{wallet.alias['name']}}</span>\r\n        <span>$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n      </div>\r\n      <div class=\"sidebar-account-row account-staking\" *ngIf=\"!(!wallet.loaded && variablesService.daemon_state === 2)\">\r\n        <span class=\"text\">{{ 'SIDEBAR.ACCOUNT.STAKING' | translate }}</span>\r\n        <app-staking-switch [(wallet_id)]=\"wallet.wallet_id\" [(staking)]=\"wallet.staking\"></app-staking-switch>\r\n      </div>\r\n      <div class=\"sidebar-account-row account-messages\" *ngIf=\"!(!wallet.loaded && variablesService.daemon_state === 2)\">\r\n        <span class=\"text\">{{ 'SIDEBAR.ACCOUNT.MESSAGES' | translate }}</span>\r\n        <span class=\"indicator\">{{wallet.new_contracts}}</span>\r\n      </div>\r\n      <div class=\"sidebar-account-row account-synchronization\" *ngIf=\"!wallet.loaded && variablesService.daemon_state === 2\">\r\n        <span class=\"status\">{{ 'SIDEBAR.ACCOUNT.SYNCING' | translate }}</span>\r\n        <div class=\"progress-bar-container\">\r\n          <div class=\"progress-bar\">\r\n            <div class=\"fill\" [style.width]=\"wallet.progress + '%'\"></div>\r\n          </div>\r\n          <div class=\"progress-percent\">{{ wallet.progress }}%</div>\r\n        </div>\r\n      </div>\r\n    </div>\r\n  </div>\r\n</div>\r\n<div class=\"sidebar-settings\">\r\n  <button [routerLink]=\"['/settings']\" routerLinkActive=\"active\">\r\n    <i class=\"icon settings\"></i>\r\n    <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>\r\n  </button>\r\n  <button (click)=\"logOut()\">\r\n    <i class=\"icon logout\"></i>\r\n    <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>\r\n  </button>\r\n</div>\r\n<div class=\"sidebar-synchronization-status\">\r\n  <div class=\"status-container\">\r\n    <span class=\"offline\" *ngIf=\"variablesService.daemon_state === 0\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.OFFLINE' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n    <span class=\"syncing\" *ngIf=\"variablesService.daemon_state === 1\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.SYNCING' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n    <span class=\"online\" *ngIf=\"variablesService.daemon_state === 2\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.ONLINE' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n    <span class=\"loading\" *ngIf=\"variablesService.daemon_state === 3\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.LOADING' | translate }}\r\n    </span>\r\n    <span class=\"offline\" *ngIf=\"variablesService.daemon_state === 4\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.ERROR' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n    <span class=\"online\" *ngIf=\"variablesService.daemon_state === 5\">\r\n      {{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }} <span class=\"testnet\">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>\r\n    </span>\r\n  </div>\r\n  <div class=\"progress-bar-container\">\r\n    <div class=\"syncing\" *ngIf=\"variablesService.daemon_state === 1\">\r\n      <div class=\"progress-bar\">\r\n        <div class=\"fill\" [style.width]=\"variablesService.sync.progress_value + '%'\"></div>\r\n      </div>\r\n      <div class=\"progress-percent\">{{ variablesService.sync.progress_value_text }}%</div>\r\n    </div>\r\n    <div class=\"loading\" *ngIf=\"variablesService.daemon_state === 3\"></div>\r\n  </div>\r\n</div>\r\n"
 
 /***/ }),
 

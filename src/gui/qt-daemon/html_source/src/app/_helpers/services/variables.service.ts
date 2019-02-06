@@ -38,6 +38,8 @@ export class VariablesService {
 
   public wallets: Array<Wallet> = [];
   public currentWallet: Wallet;
+  public aliases: any = [];
+  public aliasesChecked: any = {};
 
   getHeightAppEvent = new BehaviorSubject(null);
   getRefreshStackingEvent = new BehaviorSubject(null);

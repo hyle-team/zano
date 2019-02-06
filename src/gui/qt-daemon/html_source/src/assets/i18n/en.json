@@ -168,7 +168,9 @@
       "NAME_WRONG": "Alias has wrong name.",
       "NAME_LENGTH": "The alias must be 6-25 characters long.",
       "NAME_EXISTS": "Alias name already exists."
-    }
+    },
+    "ONE_ALIAS": "You can create only one alias per wallet",
+    "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
   },
   "SEND": {
     "ADDRESS": "Address",

@@ -371,7 +371,6 @@ export class BackendService {
     this.runCommand('restore_wallet', params, callback);
   }
 
-
   sendMoney(from_wallet_id, to_address, amount, fee, mixin, comment, callback) {
     const params = {
       wallet_id: parseInt(from_wallet_id, 10),
@@ -555,6 +554,33 @@ export class BackendService {
   getAliasCoast (alias, callback) {
     this.runCommand('get_alias_coast', {v: alias}, callback);
   }
+
+  getWalletAlias(address) {
+    if (address != null) {
+      if (this.variablesService.aliasesChecked[address] == null) {
+        this.variablesService.aliasesChecked[address] = {};
+        if (this.variablesService.aliases.length) {
+          for (let i = 0, length = this.variablesService.aliases.length; i < length; i++) {
+            if (i in this.variablesService.aliases && this.variablesService.aliases[i]['address'] === address) {
+              this.variablesService.aliasesChecked[address]['name'] = this.variablesService.aliases[i].name;
+              this.variablesService.aliasesChecked[address]['address'] = this.variablesService.aliases[i].address;
+              this.variablesService.aliasesChecked[address]['comment'] = this.variablesService.aliases[i].comment;
+              return this.variablesService.aliasesChecked[address];
+            }
+          }
+        }
+        this.getAliasByAddress(address, (status, data) => {
+          if (status) {
+            this.variablesService.aliasesChecked[data.address]['name'] = '@' + data.alias;
+            this.variablesService.aliasesChecked[data.address]['address'] = data.address;
+            this.variablesService.aliasesChecked[data.address]['comment'] = data.comment;
+          }
+        });
+      }
+      return this.variablesService.aliasesChecked[address];
+    }
+    return {};
+  };
 }
 
 
