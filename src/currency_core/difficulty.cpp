@@ -184,7 +184,9 @@ namespace currency {
     return (low + time_span - 1) / time_span;
   }
 
-  wide_difficulty_type next_difficulty(vector<uint64_t> timestamps, vector<wide_difficulty_type> cumulative_difficulties, size_t target_seconds) {
+  wide_difficulty_type next_difficulty(vector<uint64_t>& timestamps, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds) 
+  {
+    // timestamps  - first is latest, back - is oldest timestamps
     //cutoff DIFFICULTY_LAG
     if(timestamps.size() > DIFFICULTY_WINDOW)
     {
@@ -210,7 +212,7 @@ namespace currency {
       cut_begin = (length - (DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT) + 1) / 2;
       cut_end = cut_begin + (DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT);
     }
-    assert(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length);
+    CHECK_AND_ASSERT_THROW_MES(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length, "validation in next_difficulty is failed");
     uint64_t time_span = timestamps[cut_begin] - timestamps[cut_end - 1];
     if (time_span == 0) {
       time_span = 1;

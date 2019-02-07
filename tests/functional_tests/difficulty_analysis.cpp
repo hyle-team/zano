@@ -13,6 +13,10 @@ using namespace epee;
 #include "wallet/wallet2.h"
 #include "currency_core/blockchain_storage.h"
 
+ 
+using std::size_t;
+using std::uint64_t;
+using std::vector;
 
 bool parse_file(const std::string& path, std::vector<std::vector<uint64_t>>& blocks, uint64_t reserve_size)
 {
@@ -41,11 +45,214 @@ bool parse_file(const std::string& path, std::vector<std::vector<uint64_t>>& blo
 }
 
 
-void run_difficulty_analysis(const std::string& path)
-{
-  //hash_rate_analysis(path);
-  run_emulation(path);
+#define BBR_DIFFICULTY_TARGET                               120 // seconds
+#define BBR_DIFFICULTY_WINDOW                               720 // blocks
+#define BBR_DIFFICULTY_LAG                                  15  // !!!
+#define BBR_DIFFICULTY_CUT                                  60  // timestamps to cut after sorting
+#define BBR_DIFFICULTY_STARTER                              1
 
+#define NEW_DIFFICULTY_WINDOW                                   360
+#define NEW_DIFFICULTY_CUT_OLD                                  60  // timestamps to cut after sorting on the oldest timestamps
+#define NEW_DIFFICULTY_CUT_LAST                                 0  // timestamps to cut after sorting on the most recent timestamps
+
+const boost::multiprecision::uint256_t max128bit(std::numeric_limits<boost::multiprecision::uint128_t>::max());
+currency::wide_difficulty_type bbr_next_difficulty(std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
+{
+  // timestamps  - first is latest, back - is oldest timestamps
+  //cutoff DIFFICULTY_LAG
+  if (timestamps.size() > BBR_DIFFICULTY_WINDOW)
+  {
+    timestamps.resize(BBR_DIFFICULTY_WINDOW);
+    cumulative_difficulties.resize(BBR_DIFFICULTY_WINDOW);
+  }
+
+
+  size_t length = timestamps.size();
+  CHECK_AND_ASSERT_MES(length == cumulative_difficulties.size(), 0, "Check \"length == cumulative_difficulties.size()\" failed");
+  if (length <= 1) {
+    return BBR_DIFFICULTY_STARTER;
+  }
+  static_assert(BBR_DIFFICULTY_WINDOW >= 2, "Window is too small");
+  CHECK_AND_ASSERT_MES(length <= BBR_DIFFICULTY_WINDOW, 0, "length <= BBR_DIFFICULTY_WINDOW check failed, length=" << length);
+  sort(timestamps.begin(), timestamps.end(), std::greater<uint64_t>());
+  size_t cut_begin, cut_end;
+  static_assert(2 * BBR_DIFFICULTY_CUT <= BBR_DIFFICULTY_WINDOW - 2, "Cut length is too large");
+  if (length <= BBR_DIFFICULTY_WINDOW - 2 * BBR_DIFFICULTY_CUT) {
+    cut_begin = 0;
+    cut_end = length;
+  }
+  else {
+    cut_begin = (length - (BBR_DIFFICULTY_WINDOW - 2 * BBR_DIFFICULTY_CUT) + 1) / 2;
+    cut_end = cut_begin + (BBR_DIFFICULTY_WINDOW - 2 * BBR_DIFFICULTY_CUT);
+  }
+  CHECK_AND_ASSERT_THROW_MES(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length, "validation in next_difficulty is failed");
+  uint64_t time_span = timestamps[cut_begin] - timestamps[cut_end - 1];
+  if (time_span == 0) {
+    time_span = 1;
+  }
+  currency::wide_difficulty_type total_work = cumulative_difficulties[cut_begin] - cumulative_difficulties[cut_end - 1];
+  boost::multiprecision::uint256_t res = (boost::multiprecision::uint256_t(total_work) * target_seconds + time_span - 1) / time_span;
+  if (res > max128bit)
+    return 0; // to behave like previous implementation, may be better return max128bit?
+  return res.convert_to<currency::wide_difficulty_type>();
+}
+
+
+void get_cut_location_from_len(size_t length, size_t& cut_begin, size_t& cut_end, size_t REDEF_DIFFICULTY_WINDOW, size_t REDEF_DIFFICULTY_CUT_OLD, size_t REDEF_DIFFICULTY_CUT_LAST)
+{
+  if (length <= REDEF_DIFFICULTY_WINDOW)
+  {
+    cut_begin = 0;
+    cut_end = length;
+  }
+  else
+  {
+    cut_begin = REDEF_DIFFICULTY_WINDOW - REDEF_DIFFICULTY_CUT_LAST + 1;
+    cut_end = cut_begin + (REDEF_DIFFICULTY_WINDOW - (REDEF_DIFFICULTY_CUT_OLD + REDEF_DIFFICULTY_CUT_LAST));
+  }
+}
+
+currency::wide_difficulty_type bbr_next_difficulty_configurable(std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds, size_t REDEF_DIFFICULTY_WINDOW, size_t REDEF_DIFFICULTY_CUT_OLD, size_t REDEF_DIFFICULTY_CUT_LAST)
+{
+  // timestamps  - first is latest, back - is oldest timestamps
+  //cutoff DIFFICULTY_LAG
+  if (timestamps.size() > REDEF_DIFFICULTY_WINDOW)
+  {
+    timestamps.resize(REDEF_DIFFICULTY_WINDOW);
+    cumulative_difficulties.resize(REDEF_DIFFICULTY_WINDOW);
+  }
+
+
+  size_t length = timestamps.size();
+  CHECK_AND_ASSERT_MES(length == cumulative_difficulties.size(), 0, "Check \"length == cumulative_difficulties.size()\" failed");
+  if (length <= 1) {
+    return BBR_DIFFICULTY_STARTER;
+  }
+  CHECK_AND_ASSERT_THROW_MES(REDEF_DIFFICULTY_WINDOW >= 2, "Window is too small");
+  CHECK_AND_ASSERT_MES(length <= REDEF_DIFFICULTY_WINDOW, 0, "length <= REDEF_DIFFICULTY_WINDOW check failed, length=" << length);
+  sort(timestamps.begin(), timestamps.end(), std::greater<uint64_t>());
+  size_t cut_begin, cut_end;
+  CHECK_AND_ASSERT_THROW_MES( (REDEF_DIFFICULTY_CUT_OLD + REDEF_DIFFICULTY_CUT_LAST) <= REDEF_DIFFICULTY_WINDOW - 2, "Cut length is too large");
+  get_cut_location_from_len(length, cut_begin, cut_end, REDEF_DIFFICULTY_WINDOW, REDEF_DIFFICULTY_CUT_OLD, REDEF_DIFFICULTY_CUT_LAST);
+
+  CHECK_AND_ASSERT_THROW_MES(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length, "validation in next_difficulty is failed");
+  uint64_t time_span = timestamps[cut_begin] - timestamps[cut_end - 1];
+  if (time_span == 0) {
+    time_span = 1;
+  }
+  currency::wide_difficulty_type total_work = cumulative_difficulties[cut_begin] - cumulative_difficulties[cut_end - 1];
+  boost::multiprecision::uint256_t res = (boost::multiprecision::uint256_t(total_work) * target_seconds + time_span - 1) / time_span;
+  if (res > max128bit)
+    return 0; // to behave like previous implementation, may be better return max128bit?
+  return res.convert_to<currency::wide_difficulty_type>();
+}
+
+currency::wide_difficulty_type bbr_next_difficulty_composit(std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds, size_t REDEF_DIFFICULTY_WINDOW, size_t REDEF_DIFFICULTY_CUT_OLD, size_t REDEF_DIFFICULTY_CUT_LAST)
+{
+  sort(timestamps.begin(), timestamps.end(), std::greater<uint64_t>());
+  std::vector<uint64_t> timestamps_local = timestamps;
+  currency::wide_difficulty_type dif = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, REDEF_DIFFICULTY_WINDOW, REDEF_DIFFICULTY_CUT_OLD, REDEF_DIFFICULTY_CUT_LAST);
+  currency::wide_difficulty_type dif2 = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, 300, 20, 5);
+  if (dif < dif2)
+    return dif;
+  else
+    return dif2;
+}
+
+currency::wide_difficulty_type bbr_next_difficulty2(std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
+{
+  return bbr_next_difficulty_configurable(timestamps, cumulative_difficulties, target_seconds, NEW_DIFFICULTY_WINDOW, NEW_DIFFICULTY_CUT_OLD, NEW_DIFFICULTY_CUT_LAST);
+}
+
+uint64_t get_next_timestamp_by_difficulty_and_hashrate(uint64_t last_timestamp, currency::wide_difficulty_type difficulty, uint64_t hashrate)
+{
+  uint64_t seconds = (difficulty / hashrate).convert_to<uint64_t>();
+  return last_timestamp + seconds;
+}
+
+void print_blocks(const std::vector<std::vector<uint64_t>>& blocks, const std::string& res_path)
+{
+  std::stringstream ss;
+  for (size_t i = 0; i != blocks.size(); i++)
+  {
+    ss << std::left << std::setw(10) << i << std::left << std::setw(15) << blocks[i][0];
+    for (size_t j = 1; j != blocks[i].size()-1; j++)
+    {
+      ss << std::left << std::setw(15) << blocks[i][j];
+    }
+    ss << std::left << std::setw(20) << blocks[i][blocks[i].size() - 1] << ENDL;
+  }
+  file_io_utils::save_string_to_file(res_path, ss.str());
+  LOG_PRINT_L0("Done, saved to file " << res_path);
+}
+
+uint64_t get_hashrate_by_timestamp(const std::map<uint64_t, uint64_t> timestamp_to_hashrate, uint64_t timestamp)
+{
+  auto it = timestamp_to_hashrate.lower_bound(timestamp);
+  if (it == timestamp_to_hashrate.end())
+  {
+    return 0;
+  }
+  if(it->first == timestamp)
+    return it->second;
+
+  if (it == timestamp_to_hashrate.begin())
+  {
+    LOG_ERROR("Internal error, lower_bound returned begin for timestamp " << timestamp);
+    return 0;
+  }
+
+  return (--it)->second;
+}
+
+
+template<typename cb_t>
+void perform_simulation_for_function(const std::map<uint64_t, uint64_t>& timestamp_to_hashrate, uint64_t index_in_result, const std::vector<std::vector<uint64_t>>& blocks, std::vector<std::vector<uint64_t>>& result_blocks, cb_t cb)
+{
+  std::vector<uint64_t> timestamps;
+  std::vector<currency::wide_difficulty_type> cumul_difficulties;
+  timestamps.reserve(4010);
+  cumul_difficulties.reserve(4010);
+  timestamps.push_back(blocks[0][0]);
+  cumul_difficulties.push_back(blocks[0][1] * 120);
+  currency::wide_difficulty_type curren_difficulty = 0;
+
+  size_t index_in_result_blocks = 0;
+  while (true)
+  {
+    uint64_t hr = 0;
+    for (size_t i = 0; i != 10; i++)
+    {
+      if (timestamps.size() < BBR_DIFFICULTY_WINDOW)
+      {
+        curren_difficulty = blocks[index_in_result_blocks][1] * 120;
+      }
+      else
+      {
+        std::vector<uint64_t> backward_timestamps;
+        backward_timestamps.reserve(BBR_DIFFICULTY_WINDOW);
+        std::copy(timestamps.rbegin(), timestamps.rbegin() + BBR_DIFFICULTY_WINDOW - 1, std::back_inserter(backward_timestamps));
+        std::vector<currency::wide_difficulty_type> backward_cumul_difficulties;
+        backward_cumul_difficulties.reserve(BBR_DIFFICULTY_WINDOW);
+        std::copy(cumul_difficulties.rbegin(), cumul_difficulties.rbegin() + BBR_DIFFICULTY_WINDOW - 1, std::back_inserter(backward_cumul_difficulties));
+        uint64_t ts = timestamps.back();
+        curren_difficulty = cb(backward_timestamps, backward_cumul_difficulties, BBR_DIFFICULTY_TARGET);
+      }
+      cumul_difficulties.push_back(cumul_difficulties.back() + curren_difficulty);
+      hr = get_hashrate_by_timestamp(timestamp_to_hashrate, timestamps.back());
+      if (!hr)
+        break;
+      timestamps.push_back(get_next_timestamp_by_difficulty_and_hashrate(timestamps.back(), curren_difficulty, hr));
+    }
+    if (!hr)
+      break;
+
+    result_blocks[index_in_result_blocks][index_in_result] = timestamps.back();
+    result_blocks[index_in_result_blocks][index_in_result + 1] = curren_difficulty.convert_to<uint64_t>() / 120;
+    index_in_result_blocks++;
+    std::cout << index_in_result_blocks << "\r";
+  }
+  std::cout << "\n";
 }
 
 void run_emulation(const std::string& path)
@@ -53,9 +260,54 @@ void run_emulation(const std::string& path)
   //0 - timestamp, 1 - difficulty/120, 2 net hashrate (h/s)
 
   std::vector<std::vector<uint64_t>> blocks;
+  std::vector<std::vector<uint64_t>> result_blocks;
+  blocks.reserve(401);
+  result_blocks.reserve(401);
+  //   std::vector<uint64_t> timestamps, timestamps_new;
+  //   std::vector<currency::wide_difficulty_type> cumul_difficulties, cumul_difficulties_new;
+  //   timestamps.reserve(4010);
+  //   cumul_difficulties.reserve(4010);
+  //   timestamps_new.reserve(4010);
+  //   cumul_difficulties_new.reserve(4010);
+
+
   parse_file(path, blocks, 500);
+  result_blocks.resize(blocks.size() * 2);
+  for (auto& b : result_blocks) {b.resize(20);}
+  
+  std::map<uint64_t, uint64_t> timestamp_to_hashrate;
+  for (uint64_t b_no = 0; b_no != blocks.size(); b_no++)
+  {
+    auto& b_line = blocks[b_no];
+    timestamp_to_hashrate[b_line[0]] = b_line[2];
+    result_blocks[b_no][0] = b_line[0];
+    result_blocks[b_no][1] = b_line[2];
+  }
+
+  uint64_t current_index = 2;
+
+#define PERFORME_SIMULATION_FOR_FUNCTION(func_name, window_size, cut_old, cut_new ) \
+  perform_simulation_for_function(timestamp_to_hashrate, current_index, blocks, result_blocks, \
+    [&](std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds) \
+  { \
+    return func_name(timestamps, cumulative_difficulties, target_seconds, window_size, cut_old, cut_new); \
+  }); \
+  current_index+=2;
+
+  PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, BBR_DIFFICULTY_WINDOW, BBR_DIFFICULTY_CUT, BBR_DIFFICULTY_CUT);
+  PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, 500, 60, 60);
+  PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, 300, 60, 60);
+  PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_composit, 720, 60, 60);
+
+  print_blocks(result_blocks, path + "result.txt");
+  LOG_PRINT_L0("Done");
+}
 
 
+void run_difficulty_analysis(const std::string& path)
+{
+  //hash_rate_analysis(path);
+  run_emulation(path);
 
 }
 
