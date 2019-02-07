@@ -147,6 +147,18 @@ currency::wide_difficulty_type bbr_next_difficulty_configurable(std::vector<uint
   return res.convert_to<currency::wide_difficulty_type>();
 }
 
+currency::wide_difficulty_type bbr_next_difficulty_composit(std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds, size_t REDEF_DIFFICULTY_WINDOW, size_t REDEF_DIFFICULTY_CUT_OLD, size_t REDEF_DIFFICULTY_CUT_LAST)
+{
+  sort(timestamps.begin(), timestamps.end(), std::greater<uint64_t>());
+  std::vector<uint64_t> timestamps_local = timestamps;
+  currency::wide_difficulty_type dif = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, REDEF_DIFFICULTY_WINDOW, REDEF_DIFFICULTY_CUT_OLD, REDEF_DIFFICULTY_CUT_LAST);
+  currency::wide_difficulty_type dif2 = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, 300, 20, 5);
+  if (dif < dif2)
+    return dif;
+  else
+    return dif2;
+}
+
 currency::wide_difficulty_type bbr_next_difficulty2(std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
 {
   return bbr_next_difficulty_configurable(timestamps, cumulative_difficulties, target_seconds, NEW_DIFFICULTY_WINDOW, NEW_DIFFICULTY_CUT_OLD, NEW_DIFFICULTY_CUT_LAST);
@@ -166,12 +178,81 @@ void print_blocks(const std::vector<std::vector<uint64_t>>& blocks, const std::s
     ss << std::left << std::setw(10) << i << std::left << std::setw(15) << blocks[i][0];
     for (size_t j = 1; j != blocks[i].size()-1; j++)
     {
-      ss << std::left << std::setw(15) << blocks[i][j] / 120;
+      ss << std::left << std::setw(15) << blocks[i][j];
     }
     ss << std::left << std::setw(20) << blocks[i][blocks[i].size() - 1] << ENDL;
   }
   file_io_utils::save_string_to_file(res_path, ss.str());
   LOG_PRINT_L0("Done, saved to file " << res_path);
+}
+
+uint64_t get_hashrate_by_timestamp(const std::map<uint64_t, uint64_t> timestamp_to_hashrate, uint64_t timestamp)
+{
+  auto it = timestamp_to_hashrate.lower_bound(timestamp);
+  if (it == timestamp_to_hashrate.end())
+  {
+    return 0;
+  }
+  if(it->first == timestamp)
+    return it->second;
+
+  if (it == timestamp_to_hashrate.begin())
+  {
+    LOG_ERROR("Internal error, lower_bound returned begin for timestamp " << timestamp);
+    return 0;
+  }
+
+  return (--it)->second;
+}
+
+
+template<typename cb_t>
+void perform_simulation_for_function(const std::map<uint64_t, uint64_t>& timestamp_to_hashrate, uint64_t index_in_result, const std::vector<std::vector<uint64_t>>& blocks, std::vector<std::vector<uint64_t>>& result_blocks, cb_t cb)
+{
+  std::vector<uint64_t> timestamps;
+  std::vector<currency::wide_difficulty_type> cumul_difficulties;
+  timestamps.reserve(4010);
+  cumul_difficulties.reserve(4010);
+  timestamps.push_back(blocks[0][0]);
+  cumul_difficulties.push_back(blocks[0][1] * 120);
+  currency::wide_difficulty_type curren_difficulty = 0;
+
+  size_t index_in_result_blocks = 0;
+  while (true)
+  {
+    uint64_t hr = 0;
+    for (size_t i = 0; i != 10; i++)
+    {
+      if (timestamps.size() < BBR_DIFFICULTY_WINDOW)
+      {
+        curren_difficulty = blocks[index_in_result_blocks][1] * 120;
+      }
+      else
+      {
+        std::vector<uint64_t> backward_timestamps;
+        backward_timestamps.reserve(BBR_DIFFICULTY_WINDOW);
+        std::copy(timestamps.rbegin(), timestamps.rbegin() + BBR_DIFFICULTY_WINDOW - 1, std::back_inserter(backward_timestamps));
+        std::vector<currency::wide_difficulty_type> backward_cumul_difficulties;
+        backward_cumul_difficulties.reserve(BBR_DIFFICULTY_WINDOW);
+        std::copy(cumul_difficulties.rbegin(), cumul_difficulties.rbegin() + BBR_DIFFICULTY_WINDOW - 1, std::back_inserter(backward_cumul_difficulties));
+        uint64_t ts = timestamps.back();
+        curren_difficulty = cb(backward_timestamps, backward_cumul_difficulties, BBR_DIFFICULTY_TARGET);
+      }
+      cumul_difficulties.push_back(cumul_difficulties.back() + curren_difficulty);
+      hr = get_hashrate_by_timestamp(timestamp_to_hashrate, timestamps.back());
+      if (!hr)
+        break;
+      timestamps.push_back(get_next_timestamp_by_difficulty_and_hashrate(timestamps.back(), curren_difficulty, hr));
+    }
+    if (!hr)
+      break;
+
+    result_blocks[index_in_result_blocks][index_in_result] = timestamps.back();
+    result_blocks[index_in_result_blocks][index_in_result + 1] = curren_difficulty.convert_to<uint64_t>() / 120;
+    index_in_result_blocks++;
+    std::cout << index_in_result_blocks << "\r";
+  }
+  std::cout << "\n";
 }
 
 void run_emulation(const std::string& path)
@@ -182,78 +263,42 @@ void run_emulation(const std::string& path)
   std::vector<std::vector<uint64_t>> result_blocks;
   blocks.reserve(401);
   result_blocks.reserve(401);
-//   std::vector<uint64_t> timestamps, timestamps_new;
-//   std::vector<currency::wide_difficulty_type> cumul_difficulties, cumul_difficulties_new;
-//   timestamps.reserve(4010);
-//   cumul_difficulties.reserve(4010);
-//   timestamps_new.reserve(4010);
-//   cumul_difficulties_new.reserve(4010);
+  //   std::vector<uint64_t> timestamps, timestamps_new;
+  //   std::vector<currency::wide_difficulty_type> cumul_difficulties, cumul_difficulties_new;
+  //   timestamps.reserve(4010);
+  //   cumul_difficulties.reserve(4010);
+  //   timestamps_new.reserve(4010);
+  //   cumul_difficulties_new.reserve(4010);
 
 
   parse_file(path, blocks, 500);
-
-#define DEFINE_DIFFICULTY_SIMULATION(sim_name) \
-  std::vector<uint64_t> timestamps_##sim_name; \
-  std::vector<currency::wide_difficulty_type> cumul_difficulties_##sim_name; \
-  timestamps_##sim_name.reserve(4010); \
-  cumul_difficulties_##sim_name.reserve(4010); \
-  timestamps_##sim_name.push_back(blocks[0][0]); \
-  cumul_difficulties_##sim_name.push_back(blocks[0][1]); \
-  currency::wide_difficulty_type curren_difficulty_##sim_name = 0;
-
-  DEFINE_DIFFICULTY_SIMULATION(original);
-  DEFINE_DIFFICULTY_SIMULATION(new_720_5_60);
-  DEFINE_DIFFICULTY_SIMULATION(new_300_5_60);
-  DEFINE_DIFFICULTY_SIMULATION(new_200_5_5);
-
+  result_blocks.resize(blocks.size() * 2);
+  for (auto& b : result_blocks) {b.resize(20);}
+  
+  std::map<uint64_t, uint64_t> timestamp_to_hashrate;
   for (uint64_t b_no = 0; b_no != blocks.size(); b_no++)
   {
     auto& b_line = blocks[b_no];
-
-
-    for (size_t i = 0; i != 10; i++)
-    {
-#define PROCESS_DIFFICULTY_SIMULATION(sim_name, func_name, window_size, cut_old, cut_new) \
-      if (timestamps_##sim_name.size() < BBR_DIFFICULTY_WINDOW) \
-      { \
-        curren_difficulty_##sim_name = b_line[1] * 120; \
-      } \
-      else \
-      { \
-        std::vector<uint64_t> backward_timestamps; \
-        backward_timestamps.reserve(BBR_DIFFICULTY_WINDOW); \
-        std::copy(timestamps_##sim_name.rbegin(), timestamps_##sim_name.rbegin() + BBR_DIFFICULTY_WINDOW - 1, std::back_inserter(backward_timestamps)); \
-        std::vector<currency::wide_difficulty_type> backward_cumul_difficulties; \
-        backward_cumul_difficulties.reserve(BBR_DIFFICULTY_WINDOW); \
-        std::copy(cumul_difficulties_##sim_name.rbegin(), cumul_difficulties_##sim_name.rbegin() + BBR_DIFFICULTY_WINDOW - 1, std::back_inserter(backward_cumul_difficulties)); \
-        curren_difficulty_##sim_name = func_name(backward_timestamps, backward_cumul_difficulties, BBR_DIFFICULTY_TARGET, window_size, cut_old, cut_new); \
-      } \
-      cumul_difficulties_##sim_name.push_back(cumul_difficulties_##sim_name.back() + curren_difficulty_##sim_name); \
-      timestamps_##sim_name.push_back(get_next_timestamp_by_difficulty_and_hashrate(timestamps_##sim_name.back(), curren_difficulty_##sim_name, b_line[2]));        
-
-      PROCESS_DIFFICULTY_SIMULATION(original, bbr_next_difficulty_configurable, BBR_DIFFICULTY_WINDOW, BBR_DIFFICULTY_CUT, BBR_DIFFICULTY_CUT);
-      PROCESS_DIFFICULTY_SIMULATION(new_720_5_60, bbr_next_difficulty_configurable, NEW_DIFFICULTY_WINDOW, NEW_DIFFICULTY_CUT_OLD, NEW_DIFFICULTY_CUT_LAST);
-      PROCESS_DIFFICULTY_SIMULATION(new_300_5_60, bbr_next_difficulty_configurable, 300, 5, 60);
-      PROCESS_DIFFICULTY_SIMULATION(new_200_5_5, bbr_next_difficulty_configurable, 200, 5, 5);
-
-      std::cout << b_no << "\r";
-    }
-    result_blocks.push_back(std::vector<uint64_t>());
-    result_blocks.back().resize(20);
-    size_t index = 0;
-
-#define SAVE_DIFFICULTY_SIMULATION_ENTRY(sim_name) \
-    result_blocks.back()[index] = timestamps_##sim_name.back(); \
-    result_blocks.back()[index+1] = curren_difficulty_##sim_name.convert_to<uint64_t>(); \
-    index +=2;
-
-    SAVE_DIFFICULTY_SIMULATION_ENTRY(original);
-    SAVE_DIFFICULTY_SIMULATION_ENTRY(new_720_5_60);
-    SAVE_DIFFICULTY_SIMULATION_ENTRY(new_300_5_60);
-    SAVE_DIFFICULTY_SIMULATION_ENTRY(new_200_5_5);
-
-    result_blocks.back()[index] = b_line[2];
+    timestamp_to_hashrate[b_line[0]] = b_line[2];
+    result_blocks[b_no][0] = b_line[0];
+    result_blocks[b_no][1] = b_line[2];
   }
+
+  uint64_t current_index = 2;
+
+#define PERFORME_SIMULATION_FOR_FUNCTION(func_name, window_size, cut_old, cut_new ) \
+  perform_simulation_for_function(timestamp_to_hashrate, current_index, blocks, result_blocks, \
+    [&](std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds) \
+  { \
+    return func_name(timestamps, cumulative_difficulties, target_seconds, window_size, cut_old, cut_new); \
+  }); \
+  current_index+=2;
+
+  PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, BBR_DIFFICULTY_WINDOW, BBR_DIFFICULTY_CUT, BBR_DIFFICULTY_CUT);
+  PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, 500, 60, 60);
+  PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, 300, 60, 60);
+  PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_composit, 720, 60, 60);
+
   print_blocks(result_blocks, path + "result.txt");
   LOG_PRINT_L0("Done");
 }
