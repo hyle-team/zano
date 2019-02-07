@@ -9,7 +9,7 @@
         <span class="balance">{{wallet.balance | intToMoney : '3' }} {{variablesService.defaultCurrency}}</span>
       </div>
       <div class="sidebar-account-row account-alias">
-        <span>{{wallet.alias}}</span>
+        <span>{{wallet.alias['name']}}</span>
         <span>$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>
       </div>
       <div class="sidebar-account-row account-staking" *ngIf="!(!wallet.loaded && variablesService.daemon_state === 2)">

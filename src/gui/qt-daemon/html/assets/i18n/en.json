@@ -21,6 +21,7 @@
     "OPEN_WALLET": "Open existing wallet",
     "RESTORE_WALLET": "Restore from backup",
     "WALLET_DETAILS": "Wallet details",
+    "ASSIGN_ALIAS": "Assign alias",
     "CONTRACTS": "Contracts",
     "NEW_PURCHASE": "New purchase",
     "OLD_PURCHASE": "Purchase"
@@ -148,6 +149,29 @@
       "NAME_DUPLICATE": "Name is duplicate."
     }
   },
+  "ASSIGN_ALIAS": {
+    "NAME": {
+      "LABEL": "Unique name",
+      "PLACEHOLDER": "@ Enter alias",
+      "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
+    },
+    "COMMENT": {
+      "LABEL": "Comment",
+      "PLACEHOLDER": "Enter comment",
+      "TOOLTIP": "The comment will be visible to anyone who wants to make a payment to your alias. You can provide details about your business, contacts, or include any text. Comments can be edited later."
+    },
+    "COST": "Cost to create alias {{value}} {{currency}}",
+    "BUTTON_ASSIGN": "Assign",
+    "BUTTON_CANCEL": "Cancel",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required.",
+      "NAME_WRONG": "Alias has wrong name.",
+      "NAME_LENGTH": "The alias must be 6-25 characters long.",
+      "NAME_EXISTS": "Alias name already exists."
+    },
+    "ONE_ALIAS": "You can create only one alias per wallet",
+    "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
+  },
   "SEND": {
     "ADDRESS": "Address",
     "AMOUNT": "Amount",
@@ -190,6 +214,8 @@
       "UNDEFINED": "Undefined",
       "COMPLETE_BUYER": "Successfully complete contract, return remaining pledge",
       "COMPLETE_SELLER": "Successfully complete contract, receive payment on contract, and return pledge",
+      "CREATE_ALIAS": "Fee for assigning alias",
+      "UPDATE_ALIAS": "Fee for editing alias",
       "MINED": "Mined funds",
       "CREATE_CONTRACT": "Send contract offer",
       "PLEDGE_CONTRACT": "Make pledge on offer",

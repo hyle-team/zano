@@ -65,7 +65,10 @@ export class TooltipDirective {
     this.renderer.setStyle(document.body, 'position', 'relative');
     this.renderer.setStyle(this.tooltip, 'position', 'absolute');
     if (this.tooltipClass !== null) {
-      this.renderer.addClass(this.tooltip, this.tooltipClass);
+      let classes = this.tooltipClass.split(' ');
+      for (let i = 0; i < classes.length; i++) {
+        this.renderer.addClass(this.tooltip, classes[i]);
+      }
     }
     if (this.placement !== null) {
       this.renderer.addClass(this.tooltip, 'ng-tooltip-' + this.placement);

@@ -64,7 +64,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
       this.backend.webkitLaunchedScript();
 
-
       this.backend.is_remnotenode_mode_preconfigured((status, data) => {
         // if (data === 'FALSE') {
         // } else {
@@ -99,7 +98,6 @@ export class AppComponent implements OnInit, OnDestroy {
         this.onQuitRequest = true;
       });
 
-
       this.backend.eventSubscribe('update_wallet_status', (data) => {
         console.log('----------------- update_wallet_status -----------------');
         console.log(data);
@@ -126,7 +124,6 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       });
 
-
       this.backend.eventSubscribe('wallet_sync_progress', (data) => {
         console.log('----------------- wallet_sync_progress -----------------');
         console.log(data);
@@ -144,7 +141,6 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       });
 
-
       this.backend.eventSubscribe('update_daemon_state', (data) => {
         console.log('----------------- update_daemon_state -----------------');
         console.log('DAEMON:' + data.daemon_network_state);
@@ -154,10 +150,10 @@ export class AppComponent implements OnInit, OnDestroy {
         this.variablesService.setHeightApp(data.height);
 
         this.ngZone.run(() => {
-          this.variablesService.daemon_state = data.daemon_network_state;
-          if (data.daemon_network_state === 1) {
-            const max = data.max_net_seen_height - data.synchronization_start_height;
-            const current = data.height - data.synchronization_start_height;
+          this.variablesService.daemon_state = data['daemon_network_state'];
+          if (data['daemon_network_state'] === 1) {
+            const max = data['max_net_seen_height'] - data['synchronization_start_height'];
+            const current = data.height - data['synchronization_start_height'];
             const return_val = Math.floor((current * 100 / max) * 100) / 100;
             if (max === 0 || return_val < 0) {
               this.variablesService.sync.progress_value = 0;
@@ -171,7 +167,8 @@ export class AppComponent implements OnInit, OnDestroy {
             }
           }
         });
-        if (!this.firstOnlineState) {
+        if (!this.firstOnlineState && data['daemon_network_state'] === 2) {
+          this.getAliases();
           this.backend.getDefaultFee((status_fee, data_fee) => {
             this.variablesService.default_fee_big = new BigNumber(data_fee);
             this.variablesService.default_fee = this.intToMoneyPipe.transform(data_fee);
@@ -315,7 +312,6 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       });
 
-
       this.backend.eventSubscribe('money_transfer_cancel', (data) => {
         console.log('----------------- money_transfer_cancel -----------------');
         console.log(data);
@@ -381,6 +377,75 @@ export class AppComponent implements OnInit, OnDestroy {
         //       break;
         //   }
         // }
+      });
+
+      this.backend.eventSubscribe('on_core_event', (data) => {
+        console.log('----------------- on_core_event -----------------');
+        console.log(data);
+
+        data = JSON.parse(data);
+
+        if (data.events != null) {
+          for (let i = 0, length = data.events.length; i < length; i++) {
+
+            switch (data.events[i].method) {
+              case 'CORE_EVENT_BLOCK_ADDED': break;
+              case 'CORE_EVENT_ADD_ALIAS':
+                if (this.variablesService.aliasesChecked[data.events[i].details.address] != null) {
+                  this.variablesService.aliasesChecked[data.events[i].details.address]['name'] = '@' + data.events[i].details.alias;
+                  this.variablesService.aliasesChecked[data.events[i].details.address]['address'] = data.events[i].details.address;
+                  this.variablesService.aliasesChecked[data.events[i].details.address]['comment'] = data.events[i].details.comment;
+                }
+                if (this.variablesService.enableAliasSearch) {
+                  const newAlias = {
+                    name: '@' + data.events[i].details.alias,
+                    address: data.events[i].details.address,
+                    comment: data.events[i].details.comment
+                  };
+                  this.variablesService.aliases = this.variablesService.aliases.concat(newAlias);
+                  // this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
+                  //   if (a.name.length > b.name.length) return 1;
+                  //   if (a.name.length < b.name.length) return -1;
+                  //   if (a.name > b.name) return 1;
+                  //   if (a.name < b.name) return -1;
+                  //   return 0;
+                  // });
+                  this.variablesService.changeAliases();
+                }
+                break;
+              case 'CORE_EVENT_UPDATE_ALIAS':
+                for (const address in this.variablesService.aliasesChecked) {
+                  if (this.variablesService.aliasesChecked.hasOwnProperty(address)) {
+                    if (this.variablesService.aliasesChecked[address].name === '@' + data.events[i].details.alias) {
+                      if (this.variablesService.aliasesChecked[address].address !== data.events[i].details.details.address) {
+                        delete this.variablesService.aliasesChecked[address]['name'];
+                        delete this.variablesService.aliasesChecked[address]['address'];
+                        delete this.variablesService.aliasesChecked[address]['comment'];
+                      } else {
+                        this.variablesService.aliasesChecked[address].comment = data.events[i].details.details.comment;
+                      }
+                      break;
+                    }
+                  }
+                }
+                if (this.variablesService.aliasesChecked[data.events[i].details.details.address] != null) {
+                  this.variablesService.aliasesChecked[data.events[i].details.details.address]['name'] = '@' + data.events[i].details.alias;
+                  this.variablesService.aliasesChecked[data.events[i].details.details.address]['address'] = data.events[i].details.details.address;
+                  this.variablesService.aliasesChecked[data.events[i].details.details.address]['comment'] = data.events[i].details.details.comment;
+                }
+                if (this.variablesService.enableAliasSearch) {
+                  const CurrentAlias = this.variablesService.aliases.find((element) => element.name === '@' + data.events[i].details.alias);
+                  if (CurrentAlias) {
+                    CurrentAlias.address = data.events[i].details.details.address;
+                    CurrentAlias.comment = data.events[i].details.details.comment;
+                  }
+                }
+                this.variablesService.changeAliases();
+                break;
+              default: break;
+            }
+          }
+        }
       });
 
       this.intervalUpdateContractsState = setInterval(() => {
@@ -454,6 +519,42 @@ export class AppComponent implements OnInit, OnDestroy {
     );
   }
 
+  getAliases() {
+    this.backend.getAllAliases((status, data, error) => {
+      if (error === 'CORE_BUSY') {
+        window.setTimeout(() => {
+          this.getAliases();
+        }, 10000);
+      } else if (error === 'OVERFLOW') {
+        this.variablesService.aliases = [];
+        this.variablesService.enableAliasSearch = false;
+      } else {
+        this.variablesService.enableAliasSearch = true;
+        if (data.aliases && data.aliases.length) {
+          this.variablesService.aliases = [];
+          data.aliases.forEach(alias => {
+            const newAlias = {
+              name: '@' + alias.alias,
+              address: alias.address,
+              comment: alias.comment
+            };
+            this.variablesService.aliases.push(newAlias);
+          });
+          this.variablesService.wallets.forEach(wallet => {
+            wallet.alias = this.backend.getWalletAlias(wallet.address);
+          });
+          this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
+            if (a.name.length > b.name.length) return 1;
+            if (a.name.length < b.name.length) return -1;
+            if (a.name > b.name) return 1;
+            if (a.name < b.name) return -1;
+            return 0;
+          });
+          this.variablesService.changeAliases();
+        }
+      }
+    });
+  }
 
   contextMenuCopy(target) {
     if (target && (target['nodeName'].toUpperCase() === 'TEXTAREA' || target['nodeName'].toUpperCase() === 'INPUT')) {

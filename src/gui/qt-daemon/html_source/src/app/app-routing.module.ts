@@ -19,6 +19,7 @@ import { OpenWalletComponent } from './open-wallet/open-wallet.component';
 import { RestoreWalletComponent } from './restore-wallet/restore-wallet.component';
 import { SeedPhraseComponent } from './seed-phrase/seed-phrase.component';
 import { WalletDetailsComponent } from './wallet-details/wallet-details.component';
+import { AssignAliasComponent } from './assign-alias/assign-alias.component';
 
 const routes: Routes = [
   {
@@ -99,6 +100,10 @@ const routes: Routes = [
   {
     path: 'details',
     component: WalletDetailsComponent
+  },
+  {
+    path: 'assign-alias',
+    component: AssignAliasComponent
   },
   {
     path: 'settings',
