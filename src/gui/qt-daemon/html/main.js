@@ -2143,8 +2143,10 @@ var VariablesService = /** @class */ (function () {
         this.wallets = [];
         this.aliases = [];
         this.aliasesChecked = {};
+        this.enableAliasSearch = false;
         this.getHeightAppEvent = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
         this.getRefreshStackingEvent = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
+        this.getAliasChangedEvent = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
         this.idle = new idlejs_dist__WEBPACK_IMPORTED_MODULE_2__["Idle"]()
             .whenNotInteractive()
             .within(15)
@@ -2164,6 +2166,9 @@ var VariablesService = /** @class */ (function () {
     };
     VariablesService.prototype.setRefreshStacking = function (wallet_id) {
         this.getHeightAppEvent.next(wallet_id);
+    };
+    VariablesService.prototype.changeAliases = function () {
+        this.getAliasChangedEvent.next(true);
     };
     VariablesService.prototype.setCurrentWallet = function (id) {
         var _this = this;
@@ -2789,6 +2794,84 @@ var AppComponent = /** @class */ (function () {
                 //   }
                 // }
             });
+            _this.backend.eventSubscribe('on_core_event', function (data) {
+                console.log('----------------- on_core_event -----------------');
+                console.log(data);
+                data = JSON.parse(data);
+                if (data.events != null) {
+                    for (var i = 0, length_1 = data.events.length; i < length_1; i++) {
+                        switch (data.events[i].method) {
+                            case 'CORE_EVENT_BLOCK_ADDED': break;
+                            case 'CORE_EVENT_ADD_ALIAS':
+                                if (_this.variablesService.aliasesChecked[data.events[i].details.address] != null) {
+                                    _this.variablesService.aliasesChecked[data.events[i].details.address]['name'] = '@' + data.events[i].details.alias;
+                                    _this.variablesService.aliasesChecked[data.events[i].details.address]['address'] = data.events[i].details.address;
+                                    _this.variablesService.aliasesChecked[data.events[i].details.address]['comment'] = data.events[i].details.comment;
+                                }
+                                if (_this.variablesService.enableAliasSearch) {
+                                    var newAlias = {
+                                        name: '@' + data.events[i].details.alias,
+                                        address: data.events[i].details.address,
+                                        comment: data.events[i].details.comment
+                                    };
+                                    _this.variablesService.aliases = _this.variablesService.aliases.concat(newAlias);
+                                    _this.variablesService.aliases = _this.variablesService.aliases.sort(function (a, b) {
+                                        if (a.name.length > b.name.length)
+                                            return 1;
+                                        if (a.name.length < b.name.length)
+                                            return -1;
+                                        if (a.name > b.name)
+                                            return 1;
+                                        if (a.name < b.name)
+                                            return -1;
+                                        return 0;
+                                    });
+                                    _this.variablesService.changeAliases();
+                                }
+                                break;
+                            case 'CORE_EVENT_UPDATE_ALIAS':
+                                for (var address in _this.variablesService.aliasesChecked) {
+                                    if (_this.variablesService.aliasesChecked.hasOwnProperty(address)) {
+                                        if (_this.variablesService.aliasesChecked[address].name === "@" + data.events[i].details.alias) {
+                                            if (_this.variablesService.aliasesChecked[address].address != data.events[i].details.details.address) {
+                                                delete _this.variablesService.aliasesChecked[address]['name'];
+                                                delete _this.variablesService.aliasesChecked[address]['address'];
+                                                delete _this.variablesService.aliasesChecked[address]['comment'];
+                                            }
+                                            else {
+                                                _this.variablesService.aliasesChecked[address].comment = data.events[i].details.details.comment;
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (_this.variablesService.aliasesChecked[data.events[i].details.details.address] != null) {
+                                    _this.variablesService.aliasesChecked[data.events[i].details.details.address]['name'] = '@' + data.events[i].details.alias;
+                                    _this.variablesService.aliasesChecked[data.events[i].details.details.address]['address'] = data.events[i].details.details.address;
+                                    _this.variablesService.aliasesChecked[data.events[i].details.details.address]['comment'] = data.events[i].details.details.comment;
+                                }
+                                if (_this.variablesService.enableAliasSearch) {
+                                    var currentAlias = void 0;
+                                    for (var i_1 = 0, length_2 = _this.variablesService.aliases.length; i_1 < length_2; i_1++) {
+                                        if (i_1 in _this.variablesService.aliases) {
+                                            var element = _this.variablesService.aliases[i_1];
+                                            if ('name' in element && element['name'] === '@' + data.events[i_1].details.alias) {
+                                                currentAlias = _this.variablesService.aliases[i_1];
+                                            }
+                                        }
+                                    }
+                                    if (currentAlias) {
+                                        currentAlias.address = data.events[i].details.details.address;
+                                        currentAlias.comment = data.events[i].details.details.comment;
+                                    }
+                                }
+                                _this.variablesService.changeAliases();
+                                break;
+                            default: break;
+                        }
+                    }
+                }
+            });
             _this.intervalUpdateContractsState = setInterval(function () {
                 _this.variablesService.wallets.forEach(function (wallet) {
                     wallet.contracts.forEach(function (contract) {
@@ -2866,10 +2949,10 @@ var AppComponent = /** @class */ (function () {
             }
             else if (error == 'OVERFLOW') {
                 _this.variablesService.aliases = [];
-                //EnableAliasSearch = false;
+                _this.variablesService.enableAliasSearch = false;
             }
             else {
-                //EnableAliasSearch = true;
+                _this.variablesService.enableAliasSearch = true;
                 if (data.aliases && data.aliases.length) {
                     _this.variablesService.aliases = [];
                     data.aliases.forEach(function (alias) {
@@ -2894,7 +2977,7 @@ var AppComponent = /** @class */ (function () {
                             return -1;
                         return 0;
                     });
-                    //broadcast('alias_changed');
+                    _this.variablesService.changeAliases();
                 }
             }
         });
@@ -3195,13 +3278,14 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
 /* harmony import */ var _angular_forms__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/forms */ "./node_modules/@angular/forms/fesm5/forms.js");
 /* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
-/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
-/* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
-/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
-/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
-/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
-/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! bignumber.js */ "./node_modules/bignumber.js/bignumber.js");
-/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(bignumber_js__WEBPACK_IMPORTED_MODULE_8__);
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
+/* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
+/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
+/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
+/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! bignumber.js */ "./node_modules/bignumber.js/bignumber.js");
+/* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_9___default = /*#__PURE__*/__webpack_require__.n(bignumber_js__WEBPACK_IMPORTED_MODULE_9__);
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -3220,10 +3304,12 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 
 
 
+
 var AssignAliasComponent = /** @class */ (function () {
-    function AssignAliasComponent(ngZone, location, backend, variablesService, modalService, moneyToInt, intToMoney) {
+    function AssignAliasComponent(ngZone, location, router, backend, variablesService, modalService, moneyToInt, intToMoney) {
         this.ngZone = ngZone;
         this.location = location;
+        this.router = router;
         this.backend = backend;
         this.variablesService = variablesService;
         this.modalService = modalService;
@@ -3236,7 +3322,7 @@ var AssignAliasComponent = /** @class */ (function () {
         this.alias = {
             name: '',
             fee: this.variablesService.default_fee,
-            price: new bignumber_js__WEBPACK_IMPORTED_MODULE_8___default.a(0),
+            price: new bignumber_js__WEBPACK_IMPORTED_MODULE_9___default.a(0),
             reward: '0',
             rewardOriginal: '0',
             comment: '',
@@ -3258,11 +3344,11 @@ var AssignAliasComponent = /** @class */ (function () {
                         _this.alias.exists = status;
                     });
                     if (!status) {
-                        _this.alias.price = new bignumber_js__WEBPACK_IMPORTED_MODULE_8___default.a(0);
+                        _this.alias.price = new bignumber_js__WEBPACK_IMPORTED_MODULE_9___default.a(0);
                         _this.backend.getAliasCoast(newName, function (statusPrice, dataPrice) {
                             _this.ngZone.run(function () {
                                 if (statusPrice) {
-                                    _this.alias.price = bignumber_js__WEBPACK_IMPORTED_MODULE_8___default.a.sum(dataPrice['coast'], _this.variablesService.default_fee_big);
+                                    _this.alias.price = bignumber_js__WEBPACK_IMPORTED_MODULE_9___default.a.sum(dataPrice['coast'], _this.variablesService.default_fee_big);
                                 }
                                 _this.notEnoughMoney = _this.alias.price.isGreaterThan(_this.wallet.unlocked_balance);
                                 _this.alias.reward = _this.intToMoney.transform(_this.alias.price, false);
@@ -3299,6 +3385,7 @@ var AssignAliasComponent = /** @class */ (function () {
                     //service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
                     //wallet.wakeAlias = true;
                     _this.modalService.prepareModal('info', 'ASSIGN_ALIAS.REQUEST_ADD_REG');
+                    _this.router.navigate(['/wallet/' + _this.wallet.wallet_id]);
                 }
             });
         }
@@ -3314,11 +3401,12 @@ var AssignAliasComponent = /** @class */ (function () {
         }),
         __metadata("design:paramtypes", [_angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"],
             _angular_common__WEBPACK_IMPORTED_MODULE_2__["Location"],
-            _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__["BackendService"],
-            _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__["VariablesService"],
-            _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__["ModalService"],
-            _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_6__["MoneyToIntPipe"],
-            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__["IntToMoneyPipe"]])
+            _angular_router__WEBPACK_IMPORTED_MODULE_3__["Router"],
+            _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_4__["BackendService"],
+            _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_5__["VariablesService"],
+            _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_6__["ModalService"],
+            _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_7__["MoneyToIntPipe"],
+            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_8__["IntToMoneyPipe"]])
     ], AssignAliasComponent);
     return AssignAliasComponent;
 }());

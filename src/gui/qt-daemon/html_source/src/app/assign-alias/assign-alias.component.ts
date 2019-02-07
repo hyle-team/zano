@@ -1,6 +1,7 @@
 import {Component, OnInit, NgZone} from '@angular/core';
 import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {Location} from "@angular/common";
+import {Router} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {ModalService} from "../_helpers/services/modal.service";
@@ -36,6 +37,7 @@ export class AssignAliasComponent implements OnInit {
   constructor(
     private ngZone: NgZone,
     private location: Location,
+    private router: Router,
     private backend: BackendService,
     private variablesService: VariablesService,
     private modalService: ModalService,
@@ -94,6 +96,7 @@ export class AssignAliasComponent implements OnInit {
           //service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
           //wallet.wakeAlias = true;
           this.modalService.prepareModal('info', 'ASSIGN_ALIAS.REQUEST_ADD_REG');
+          this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
         }
       });
     }

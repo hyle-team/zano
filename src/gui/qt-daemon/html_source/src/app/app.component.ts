@@ -64,7 +64,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
       this.backend.webkitLaunchedScript();
 
-
       this.backend.is_remnotenode_mode_preconfigured((status, data) => {
         // if (data === 'FALSE') {
         // } else {
@@ -99,7 +98,6 @@ export class AppComponent implements OnInit, OnDestroy {
         this.onQuitRequest = true;
       });
 
-
       this.backend.eventSubscribe('update_wallet_status', (data) => {
         console.log('----------------- update_wallet_status -----------------');
         console.log(data);
@@ -126,7 +124,6 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       });
 
-
       this.backend.eventSubscribe('wallet_sync_progress', (data) => {
         console.log('----------------- wallet_sync_progress -----------------');
         console.log(data);
@@ -143,7 +140,6 @@ export class AppComponent implements OnInit, OnDestroy {
           });
         }
       });
-
 
       this.backend.eventSubscribe('update_daemon_state', (data) => {
         console.log('----------------- update_daemon_state -----------------');
@@ -316,7 +312,6 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       });
 
-
       this.backend.eventSubscribe('money_transfer_cancel', (data) => {
         console.log('----------------- money_transfer_cancel -----------------');
         console.log(data);
@@ -382,6 +377,83 @@ export class AppComponent implements OnInit, OnDestroy {
         //       break;
         //   }
         // }
+      });
+
+      this.backend.eventSubscribe('on_core_event', (data) => {
+        console.log('----------------- on_core_event -----------------');
+        console.log(data);
+
+        data = JSON.parse(data);
+
+        if (data.events != null) {
+          for (let i = 0, length = data.events.length; i < length; i++) {
+
+            switch (data.events[i].method) {
+              case 'CORE_EVENT_BLOCK_ADDED': break;
+              case 'CORE_EVENT_ADD_ALIAS':
+                if (this.variablesService.aliasesChecked[data.events[i].details.address] != null) {
+                  this.variablesService.aliasesChecked[data.events[i].details.address]['name'] = '@' + data.events[i].details.alias;
+                  this.variablesService.aliasesChecked[data.events[i].details.address]['address'] = data.events[i].details.address;
+                  this.variablesService.aliasesChecked[data.events[i].details.address]['comment'] = data.events[i].details.comment;
+                }
+                if (this.variablesService.enableAliasSearch) {
+                  let newAlias = {
+                    name: '@' + data.events[i].details.alias,
+                    address: data.events[i].details.address,
+                    comment: data.events[i].details.comment
+                  };
+                  this.variablesService.aliases = this.variablesService.aliases.concat(newAlias);
+                  this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
+                    if (a.name.length > b.name.length) return 1;
+                    if (a.name.length < b.name.length) return -1;
+                    if (a.name > b.name) return 1;
+                    if (a.name < b.name) return -1;
+                    return 0;
+                  });
+                  this.variablesService.changeAliases();
+                }
+                break;
+              case 'CORE_EVENT_UPDATE_ALIAS':
+                for (let address in this.variablesService.aliasesChecked) {
+                  if (this.variablesService.aliasesChecked.hasOwnProperty(address)) {
+                    if (this.variablesService.aliasesChecked[address].name === "@" + data.events[i].details.alias) {
+                      if (this.variablesService.aliasesChecked[address].address != data.events[i].details.details.address) {
+                        delete this.variablesService.aliasesChecked[address]['name'];
+                        delete this.variablesService.aliasesChecked[address]['address'];
+                        delete this.variablesService.aliasesChecked[address]['comment'];
+                      } else {
+                        this.variablesService.aliasesChecked[address].comment = data.events[i].details.details.comment;
+                      }
+                      break;
+                    }
+                  }
+                }
+                if (this.variablesService.aliasesChecked[data.events[i].details.details.address] != null) {
+                  this.variablesService.aliasesChecked[data.events[i].details.details.address]['name'] = '@' + data.events[i].details.alias;
+                  this.variablesService.aliasesChecked[data.events[i].details.details.address]['address'] = data.events[i].details.details.address;
+                  this.variablesService.aliasesChecked[data.events[i].details.details.address]['comment'] = data.events[i].details.details.comment;
+                }
+                if (this.variablesService.enableAliasSearch) {
+                  let currentAlias;
+                  for (let i = 0, length = this.variablesService.aliases.length; i < length; i++) {
+                    if (i in this.variablesService.aliases) {
+                      let element = this.variablesService.aliases[i];
+                      if ('name' in element && element['name'] === '@' + data.events[i].details.alias) {
+                        currentAlias = this.variablesService.aliases[i];
+                      }
+                    }
+                  }
+                  if (currentAlias) {
+                    currentAlias.address = data.events[i].details.details.address;
+                    currentAlias.comment = data.events[i].details.details.comment;
+                  }
+                }
+                this.variablesService.changeAliases();
+                break;
+              default: break;
+            }
+          }
+        }
       });
 
       this.intervalUpdateContractsState = setInterval(() => {
@@ -463,9 +535,9 @@ export class AppComponent implements OnInit, OnDestroy {
         },10000);
       } else if (error == 'OVERFLOW') {
         this.variablesService.aliases = [];
-        //EnableAliasSearch = false;
+        this.variablesService.enableAliasSearch = false;
       } else {
-        //EnableAliasSearch = true;
+        this.variablesService.enableAliasSearch = true;
         if (data.aliases && data.aliases.length) {
           this.variablesService.aliases = [];
           data.aliases.forEach(alias => {
@@ -486,7 +558,7 @@ export class AppComponent implements OnInit, OnDestroy {
             if (a.name < b.name) return -1;
             return 0;
           });
-          //broadcast('alias_changed');
+          this.variablesService.changeAliases();
         }
       }
     });
