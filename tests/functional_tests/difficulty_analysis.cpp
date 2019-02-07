@@ -152,11 +152,8 @@ currency::wide_difficulty_type bbr_next_difficulty_composit(std::vector<uint64_t
   sort(timestamps.begin(), timestamps.end(), std::greater<uint64_t>());
   std::vector<uint64_t> timestamps_local = timestamps;
   currency::wide_difficulty_type dif = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, REDEF_DIFFICULTY_WINDOW, REDEF_DIFFICULTY_CUT_OLD, REDEF_DIFFICULTY_CUT_LAST);
-  currency::wide_difficulty_type dif2 = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, 300, 20, 5);
-  if (dif < dif2)
-    return dif;
-  else
-    return dif2;
+  currency::wide_difficulty_type dif2 = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, 200, 5, 5);
+  return (dif2 + dif) / 2;
 }
 
 currency::wide_difficulty_type bbr_next_difficulty2(std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
@@ -202,7 +199,7 @@ uint64_t get_hashrate_by_timestamp(const std::map<uint64_t, uint64_t> timestamp_
     return 0;
   }
 
-  return (--it)->second;
+  return (--it)->second;;
 }
 
 
@@ -252,6 +249,12 @@ void perform_simulation_for_function(const std::map<uint64_t, uint64_t>& timesta
     index_in_result_blocks++;
     std::cout << index_in_result_blocks << "\r";
   }
+  if (index_in_result_blocks < 410)
+  {
+    for (size_t k = index_in_result_blocks; k != 410; k++)
+      result_blocks[k][index_in_result] = result_blocks[k-1][index_in_result];
+  }
+
   std::cout << "\n";
 }
 
