@@ -2,10 +2,13 @@
   <div>
     <h3>{{variablesService.currentWallet.name}}</h3>
     <!--<button (click)="openInBrowser('docs.zano.org/docs/how-to-get-alias')">-->
-    <button [routerLink]="['/assign-alias']">
+    <button [routerLink]="['/assign-alias']" *ngIf="!variablesService.currentWallet.alias.hasOwnProperty('name')">
       <i class="icon account"></i>
       <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>
     </button>
+    <span style="font-size: 1.3rem;" *ngIf="variablesService.currentWallet.alias.hasOwnProperty('name')">
+      {{variablesService.currentWallet.alias['name']}}
+    </span>
   </div>
   <div>
     <button [routerLink]="['/details']" routerLinkActive="active">
