@@ -1,14 +1,14 @@
 import {Component, OnInit, NgZone} from '@angular/core';
 import {FormGroup, FormControl, Validators} from '@angular/forms';
-import {Location} from "@angular/common";
+import {Location} from '@angular/common';
 import {Router} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
-import {ModalService} from "../_helpers/services/modal.service";
-import {Wallet} from "../_helpers/models/wallet.model";
-import {MoneyToIntPipe} from "../_helpers/pipes/money-to-int.pipe";
-import {IntToMoneyPipe} from "../_helpers/pipes/int-to-money.pipe";
-import BigNumber from "bignumber.js";
+import {ModalService} from '../_helpers/services/modal.service';
+import {Wallet} from '../_helpers/models/wallet.model';
+import {MoneyToIntPipe} from '../_helpers/pipes/money-to-int.pipe';
+import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
+import BigNumber from 'bignumber.js';
 
 @Component({
   selector: 'app-assign-alias',
@@ -51,7 +51,7 @@ export class AssignAliasComponent implements OnInit {
     this.assignForm.get('name').valueChanges.subscribe(value => {
       this.canRegister = false;
       this.alias.exists = false;
-      let newName = value.toLowerCase().replace('@', '');
+      const newName = value.toLowerCase().replace('@', '');
       if (!(this.assignForm.controls['name'].errors && this.assignForm.controls['name'].errors.hasOwnProperty('pattern')) && newName.length >= 6 && newName.length <= 25) {
         this.backend.getAliasByName(newName, status => {
           this.ngZone.run(() => {
@@ -86,15 +86,15 @@ export class AssignAliasComponent implements OnInit {
   }
 
   assignAlias() {
-    let alias = this.backend.getWalletAlias(this.wallet.address);
+    const alias = this.backend.getWalletAlias(this.wallet.address);
     if (alias.hasOwnProperty('name')) {
       this.modalService.prepareModal('info', 'ASSIGN_ALIAS.ONE_ALIAS');
     } else {
       this.alias.comment = this.assignForm.get('comment').value;
-      this.backend.registerAlias(this.wallet.wallet_id, this.alias.name, this.wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, (status, data) => {
+      this.backend.registerAlias(this.wallet.wallet_id, this.alias.name, this.wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, (status) => {
         if (status) {
-          //service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
-          //wallet.wakeAlias = true;
+          // service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
+          // wallet.wakeAlias = true;
           this.modalService.prepareModal('info', 'ASSIGN_ALIAS.REQUEST_ADD_REG');
           this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
         }

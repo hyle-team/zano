@@ -511,12 +511,12 @@ export class BackendService {
   }
 
   registerAlias (wallet_id, alias, address, fee, comment, reward, callback) {
-    let params = {
+    const params = {
       wallet_id: wallet_id,
       alias: {
         alias: alias,
         address: address,
-        tracking_key: "",
+        tracking_key: '',
         comment: comment
       },
       fee: this.moneyToIntPipe.transform(fee),
@@ -526,12 +526,12 @@ export class BackendService {
   }
 
   updateAlias (wallet_id, alias, fee, callback) {
-    let params = {
+    const params = {
       wallet_id: wallet_id,
       alias: {
-        alias: alias.name.replace("@", ""),
+        alias: alias.name.replace('@', ''),
         address: alias.address,
-        tracking_key: "",
+        tracking_key: '',
         comment: alias.comment
       },
       fee: this.moneyToIntPipe.transform(fee)
@@ -556,7 +556,7 @@ export class BackendService {
   }
 
   getWalletAlias(address) {
-    if (address != null) {
+    if (address != null && this.variablesService.daemon_state === 2) {
       if (this.variablesService.aliasesChecked[address] == null) {
         this.variablesService.aliasesChecked[address] = {};
         if (this.variablesService.aliases.length) {
@@ -580,7 +580,8 @@ export class BackendService {
       return this.variablesService.aliasesChecked[address];
     }
     return {};
-  };
+  }
+
 }
 
 

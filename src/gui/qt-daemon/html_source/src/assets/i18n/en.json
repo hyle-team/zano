@@ -214,6 +214,8 @@
       "UNDEFINED": "Undefined",
       "COMPLETE_BUYER": "Successfully complete contract, return remaining pledge",
       "COMPLETE_SELLER": "Successfully complete contract, receive payment on contract, and return pledge",
+      "CREATE_ALIAS": "Fee for assigning alias",
+      "UPDATE_ALIAS": "Fee for editing alias",
       "MINED": "Mined funds",
       "CREATE_CONTRACT": "Send contract offer",
       "PLEDGE_CONTRACT": "Make pledge on offer",

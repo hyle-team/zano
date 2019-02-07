@@ -80,6 +80,7 @@ export class RestoreWalletComponent implements OnInit {
                     restore_data['wi'].mined_total,
                     restore_data['wi'].tracking_hey
                   );
+                  this.variablesService.opening_wallet.alias = this.backend.getWalletAlias(this.variablesService.opening_wallet.address);
                   if (restore_data.recent_history && restore_data.recent_history.history) {
                     this.variablesService.opening_wallet.prepareHistory(restore_data.recent_history.history);
                   }

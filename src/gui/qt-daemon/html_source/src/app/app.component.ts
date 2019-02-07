@@ -397,27 +397,27 @@ export class AppComponent implements OnInit, OnDestroy {
                   this.variablesService.aliasesChecked[data.events[i].details.address]['comment'] = data.events[i].details.comment;
                 }
                 if (this.variablesService.enableAliasSearch) {
-                  let newAlias = {
+                  const newAlias = {
                     name: '@' + data.events[i].details.alias,
                     address: data.events[i].details.address,
                     comment: data.events[i].details.comment
                   };
                   this.variablesService.aliases = this.variablesService.aliases.concat(newAlias);
-                  this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
-                    if (a.name.length > b.name.length) return 1;
-                    if (a.name.length < b.name.length) return -1;
-                    if (a.name > b.name) return 1;
-                    if (a.name < b.name) return -1;
-                    return 0;
-                  });
+                  // this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
+                  //   if (a.name.length > b.name.length) return 1;
+                  //   if (a.name.length < b.name.length) return -1;
+                  //   if (a.name > b.name) return 1;
+                  //   if (a.name < b.name) return -1;
+                  //   return 0;
+                  // });
                   this.variablesService.changeAliases();
                 }
                 break;
               case 'CORE_EVENT_UPDATE_ALIAS':
-                for (let address in this.variablesService.aliasesChecked) {
+                for (const address in this.variablesService.aliasesChecked) {
                   if (this.variablesService.aliasesChecked.hasOwnProperty(address)) {
-                    if (this.variablesService.aliasesChecked[address].name === "@" + data.events[i].details.alias) {
-                      if (this.variablesService.aliasesChecked[address].address != data.events[i].details.details.address) {
+                    if (this.variablesService.aliasesChecked[address].name === '@' + data.events[i].details.alias) {
+                      if (this.variablesService.aliasesChecked[address].address !== data.events[i].details.details.address) {
                         delete this.variablesService.aliasesChecked[address]['name'];
                         delete this.variablesService.aliasesChecked[address]['address'];
                         delete this.variablesService.aliasesChecked[address]['comment'];
@@ -434,18 +434,10 @@ export class AppComponent implements OnInit, OnDestroy {
                   this.variablesService.aliasesChecked[data.events[i].details.details.address]['comment'] = data.events[i].details.details.comment;
                 }
                 if (this.variablesService.enableAliasSearch) {
-                  let currentAlias;
-                  for (let i = 0, length = this.variablesService.aliases.length; i < length; i++) {
-                    if (i in this.variablesService.aliases) {
-                      let element = this.variablesService.aliases[i];
-                      if ('name' in element && element['name'] === '@' + data.events[i].details.alias) {
-                        currentAlias = this.variablesService.aliases[i];
-                      }
-                    }
-                  }
-                  if (currentAlias) {
-                    currentAlias.address = data.events[i].details.details.address;
-                    currentAlias.comment = data.events[i].details.details.comment;
+                  const CurrentAlias = this.variablesService.aliases.find((element) => element.name === '@' + data.events[i].details.alias);
+                  if (CurrentAlias) {
+                    CurrentAlias.address = data.events[i].details.details.address;
+                    CurrentAlias.comment = data.events[i].details.details.comment;
                   }
                 }
                 this.variablesService.changeAliases();
@@ -529,11 +521,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getAliases() {
     this.backend.getAllAliases((status, data, error) => {
-      if (error == 'CORE_BUSY') {
+      if (error === 'CORE_BUSY') {
         window.setTimeout(() => {
           this.getAliases();
-        },10000);
-      } else if (error == 'OVERFLOW') {
+        }, 10000);
+      } else if (error === 'OVERFLOW') {
         this.variablesService.aliases = [];
         this.variablesService.enableAliasSearch = false;
       } else {
@@ -541,7 +533,7 @@ export class AppComponent implements OnInit, OnDestroy {
         if (data.aliases && data.aliases.length) {
           this.variablesService.aliases = [];
           data.aliases.forEach(alias => {
-            let newAlias = {
+            const newAlias = {
               name: '@' + alias.alias,
               address: alias.address,
               comment: alias.comment

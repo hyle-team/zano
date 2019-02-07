@@ -38,10 +38,10 @@ export class HistoryTypeMessagesPipe implements PipeTransform {
         //   return '';
         // case 3:
         //   return '';
-        // case 4:
-        //   return '';
-        // case 5:
-        //   return '';
+        case 4:
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.CREATE_ALIAS');
+        case 5:
+          return this.translate.instant('HISTORY.TYPE_MESSAGES.UPDATE_ALIAS');
         case 6:
           return this.translate.instant('HISTORY.TYPE_MESSAGES.MINED');
         case 7:

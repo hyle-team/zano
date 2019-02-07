@@ -13,7 +13,7 @@ export class Wallet {
   mined_total: number;
   tracking_hey: string;
 
-  alias?: string;
+  alias?: object;
   staking?: boolean;
   new_messages?: number;
   new_contracts?: number;
@@ -45,7 +45,7 @@ export class Wallet {
     this.mined_total = mined;
     this.tracking_hey = tracking;
 
-    this.alias = '';
+    this.alias = {};
     this.staking = false;
     this.new_messages = 0;
     this.new_contracts = 0;
