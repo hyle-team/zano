@@ -147,13 +147,16 @@ currency::wide_difficulty_type bbr_next_difficulty_configurable(std::vector<uint
   return res.convert_to<currency::wide_difficulty_type>();
 }
 
+
+
 currency::wide_difficulty_type bbr_next_difficulty_composit(std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds, size_t REDEF_DIFFICULTY_WINDOW, size_t REDEF_DIFFICULTY_CUT_OLD, size_t REDEF_DIFFICULTY_CUT_LAST)
 {
   sort(timestamps.begin(), timestamps.end(), std::greater<uint64_t>());
   std::vector<uint64_t> timestamps_local = timestamps;
   currency::wide_difficulty_type dif = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, REDEF_DIFFICULTY_WINDOW, REDEF_DIFFICULTY_CUT_OLD, REDEF_DIFFICULTY_CUT_LAST);
   currency::wide_difficulty_type dif2 = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, 200, 5, 5);
-  return (dif2 + dif) / 2;
+  currency::wide_difficulty_type dif3 = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, 40, 1, 1);
+  return (dif3 + dif2 + dif) / 3;
 }
 
 currency::wide_difficulty_type bbr_next_difficulty2(std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
