@@ -420,7 +420,7 @@ namespace currency
       total_blocks_parsing_time += block_parsing_time;
 
       //to avoid concurrency in core between connections, suspend connections which delivered block later then first one
-      if(count = 2)
+      if(count == 2)
       { 
         if(m_core.have_block(get_block_hash(b)))
         {
