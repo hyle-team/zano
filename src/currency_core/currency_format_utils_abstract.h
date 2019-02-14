@@ -13,6 +13,8 @@
 
 #include "include_base_utils.h"
 #include "serialization/keyvalue_serialization.h"
+#include "storages/portable_storage_from_json.h"
+#include "storages/portable_storage_to_json.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "currency_core/currency_basic.h"
