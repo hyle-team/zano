@@ -335,6 +335,7 @@ var StakingSwitchComponent = /** @class */ (function () {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TooltipDirective", function() { return TooltipDirective; });
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -345,10 +346,12 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 
+
 var TooltipDirective = /** @class */ (function () {
-    function TooltipDirective(el, renderer) {
+    function TooltipDirective(el, renderer, route) {
         this.el = el;
         this.renderer = renderer;
+        this.route = route;
         this.cursor = 'pointer';
         this.timeout = 0;
         this.delay = 0;
@@ -374,7 +377,7 @@ var TooltipDirective = /** @class */ (function () {
         var _this = this;
         this.removeTooltipTimeout = setTimeout(function () {
             _this.renderer.setStyle(_this.tooltip, 'opacity', '0');
-            window.setTimeout(function () {
+            _this.removeTooltipTimeoutInner = setTimeout(function () {
                 _this.renderer.removeChild(document.body, _this.tooltip);
                 _this.tooltip = null;
             }, _this.delay);
@@ -382,6 +385,7 @@ var TooltipDirective = /** @class */ (function () {
     };
     TooltipDirective.prototype.cancelHide = function () {
         clearTimeout(this.removeTooltipTimeout);
+        clearTimeout(this.removeTooltipTimeoutInner);
         this.renderer.setStyle(this.tooltip, 'opacity', '1');
     };
     TooltipDirective.prototype.create = function () {
@@ -394,6 +398,14 @@ var TooltipDirective = /** @class */ (function () {
             this.tooltip = this.tooltipInner;
         }
         this.renderer.appendChild(document.body, this.tooltip);
+        this.tooltip.addEventListener('mouseenter', function () {
+            _this.cancelHide();
+        });
+        this.tooltip.addEventListener('mouseleave', function () {
+            if (_this.tooltip) {
+                _this.hide();
+            }
+        });
         this.renderer.setStyle(document.body, 'position', 'relative');
         this.renderer.setStyle(this.tooltip, 'position', 'absolute');
         if (this.tooltipClass !== null) {
@@ -446,6 +458,14 @@ var TooltipDirective = /** @class */ (function () {
             this.renderer.setStyle(this.tooltip, 'left', hostPos.right + 'px');
         }
     };
+    TooltipDirective.prototype.ngOnDestroy = function () {
+        clearTimeout(this.removeTooltipTimeout);
+        clearTimeout(this.removeTooltipTimeoutInner);
+        if (this.tooltip) {
+            this.renderer.removeChild(document.body, this.tooltip);
+            this.tooltip = null;
+        }
+    };
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["HostBinding"])('style.cursor'),
         __metadata("design:type", Object)
@@ -486,7 +506,7 @@ var TooltipDirective = /** @class */ (function () {
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Directive"])({
             selector: '[tooltip]'
         }),
-        __metadata("design:paramtypes", [_angular_core__WEBPACK_IMPORTED_MODULE_0__["ElementRef"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Renderer2"]])
+        __metadata("design:paramtypes", [_angular_core__WEBPACK_IMPORTED_MODULE_0__["ElementRef"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Renderer2"], _angular_router__WEBPACK_IMPORTED_MODULE_1__["ActivatedRoute"]])
     ], TooltipDirective);
     return TooltipDirective;
 }());
@@ -726,6 +746,14 @@ var Wallet = /** @class */ (function () {
                         this.history.push(this.prepareHistoryItem(items[i]));
                     }
                 }
+            }
+        }
+    };
+    Wallet.prototype.removeFromHistory = function (hash) {
+        for (var i = 0; i < this.history.length; i++) {
+            if (this.history[i].tx_hash === hash) {
+                this.history.splice(i, 1);
+                break;
             }
         }
     };
@@ -2435,6 +2463,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
 /* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! bignumber.js */ "./node_modules/bignumber.js/bignumber.js");
 /* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(bignumber_js__WEBPACK_IMPORTED_MODULE_8__);
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -2453,8 +2482,9 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 
 
 
+
 var AppComponent = /** @class */ (function () {
-    function AppComponent(http, renderer, translate, backend, router, variablesService, ngZone, intToMoneyPipe) {
+    function AppComponent(http, renderer, translate, backend, router, variablesService, ngZone, intToMoneyPipe, modalService) {
         this.http = http;
         this.renderer = renderer;
         this.translate = translate;
@@ -2463,6 +2493,7 @@ var AppComponent = /** @class */ (function () {
         this.variablesService = variablesService;
         this.ngZone = ngZone;
         this.intToMoneyPipe = intToMoneyPipe;
+        this.modalService = modalService;
         this.onQuitRequest = false;
         this.firstOnlineState = false;
         translate.addLangs(['en', 'fr']);
@@ -2731,67 +2762,61 @@ var AppComponent = /** @class */ (function () {
             _this.backend.eventSubscribe('money_transfer_cancel', function (data) {
                 console.log('----------------- money_transfer_cancel -----------------');
                 console.log(data);
-                // if (!data.ti) {
-                //   return;
-                // }
-                //
-                // var wallet_id = data.wallet_id;
-                // var tr_info = data.ti;
-                // var wallet = $rootScope.getWalletById(wallet_id);
-                // if (wallet) {
-                //   if ( tr_info.hasOwnProperty("contract") ){
-                //     for (var i = 0; i < $rootScope.contracts.length; i++) {
-                //       if ($rootScope.contracts[i].contract_id === tr_info.contract[0].contract_id && $rootScope.contracts[i].is_a === tr_info.contract[0].is_a) {
-                //         if ($rootScope.contracts[i].state === 1 || $rootScope.contracts[i].state === 110) {
-                //           $rootScope.contracts[i].isNew = true;
-                //           $rootScope.contracts[i].state = 140;
-                //           $rootScope.getContractsRecount(); //escrow_code
-                //         }
-                //         break;
-                //       }
-                //     }
-                //   }
-                //   angular.forEach(wallet.history, function (tr_item, key) {
-                //     if (tr_item.tx_hash === tr_info.tx_hash) {
-                //       wallet.history.splice(key, 1);
-                //     }
-                //   });
-                //
-                //   var error_tr = '';
-                //   switch (tr_info.tx_type) {
-                //     case 0:
-                //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL') + '<br>' +
-                //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-                //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_TO') + ' ' + $rootScope.moneyParse(tr_info.amount) + ' ' +
-                //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_END');
-                //       informer.error(error_tr);
-                //       break;
-                //     case 1:
-                //       informer.error('ERROR_GUI_TX_TYPE_PUSH_OFFER');
-                //       break;
-                //     case 2:
-                //       informer.error('ERROR_GUI_TX_TYPE_UPDATE_OFFER');
-                //       break;
-                //     case 3:
-                //       informer.error('ERROR_GUI_TX_TYPE_CANCEL_OFFER');
-                //       break;
-                //     case 4:
-                //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS') + '<br>' +
-                //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-                //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
-                //       informer.error(error_tr);
-                //       break;
-                //     case 5:
-                //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_UPDATE_ALIAS') + '<br>' +
-                //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-                //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
-                //       informer.error(error_tr);
-                //       break;
-                //     case 6:
-                //       informer.error('ERROR_GUI_TX_TYPE_COIN_BASE');
-                //       break;
-                //   }
-                // }
+                if (!data.ti) {
+                    return;
+                }
+                var wallet_id = data.wallet_id;
+                var tr_info = data.ti;
+                var wallet = _this.variablesService.getWallet(wallet_id);
+                if (wallet) {
+                    if (tr_info.hasOwnProperty('contract')) {
+                        for (var i = 0; i < wallet.contracts.length; i++) {
+                            if (wallet.contracts[i].contract_id === tr_info.contract[0].contract_id && wallet.contracts[i].is_a === tr_info.contract[0].is_a) {
+                                if (wallet.contracts[i].state === 1 || wallet.contracts[i].state === 110) {
+                                    wallet.contracts[i].is_new = true;
+                                    wallet.contracts[i].state = 140;
+                                    wallet.recountNewContracts();
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    wallet.removeFromHistory(tr_info.tx_hash);
+                    var error_tr = '';
+                    switch (tr_info.tx_type) {
+                        case 0:
+                            error_tr = _this.translate.instant('ERRORS.TX_TYPE_NORMAL') + '<br>' +
+                                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                                _this.translate.instant('ERRORS.TX_TYPE_NORMAL_TO') + ' ' + _this.intToMoneyPipe.transform(tr_info.amount) + ' ' +
+                                _this.translate.instant('ERRORS.TX_TYPE_NORMAL_END');
+                            break;
+                        case 1:
+                            // this.translate.instant('ERRORS.TX_TYPE_PUSH_OFFER');
+                            break;
+                        case 2:
+                            // this.translate.instant('ERRORS.TX_TYPE_UPDATE_OFFER');
+                            break;
+                        case 3:
+                            // this.translate.instant('ERRORS.TX_TYPE_CANCEL_OFFER');
+                            break;
+                        case 4:
+                            error_tr = _this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS') + '<br>' +
+                                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                                _this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS_END');
+                            break;
+                        case 5:
+                            error_tr = _this.translate.instant('ERRORS.TX_TYPE_UPDATE_ALIAS') + '<br>' +
+                                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                                _this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS_END');
+                            break;
+                        case 6:
+                            error_tr = _this.translate.instant('ERRORS.TX_TYPE_COIN_BASE');
+                            break;
+                    }
+                    if (error_tr) {
+                        _this.modalService.prepareModal('error', error_tr);
+                    }
+                }
             });
             _this.backend.eventSubscribe('on_core_event', function (data) {
                 console.log('----------------- on_core_event -----------------');
@@ -3042,7 +3067,8 @@ var AppComponent = /** @class */ (function () {
             _angular_router__WEBPACK_IMPORTED_MODULE_4__["Router"],
             _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_5__["VariablesService"],
             _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"],
-            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__["IntToMoneyPipe"]])
+            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__["IntToMoneyPipe"],
+            _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_9__["ModalService"]])
     ], AppComponent);
     return AppComponent;
 }());
@@ -3630,7 +3656,7 @@ var CreateWalletComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"wrap-table\">\r\n\r\n  <table class=\"history-table\">\r\n    <thead>\r\n    <tr #head (window:resize)=\"calculateWidth()\">\r\n      <th>{{ 'HISTORY.STATUS' | translate }}</th>\r\n      <th>{{ 'HISTORY.DATE' | translate }}</th>\r\n      <th>{{ 'HISTORY.AMOUNT' | translate }}</th>\r\n      <th>{{ 'HISTORY.FEE' | translate }}</th>\r\n      <th>{{ 'HISTORY.ADDRESS' | translate }}</th>\r\n    </tr>\r\n    </thead>\r\n    <tbody>\r\n    <ng-container *ngFor=\"let item of variablesService.currentWallet.history; let index = index\">\r\n      <tr (click)=\"openDetails(index)\">\r\n        <td>\r\n          <div class=\"status\" [class.send]=\"!item.is_income\" [class.received]=\"item.is_income\">\r\n            <ng-container *ngIf=\"variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0\">\r\n              <div class=\"confirmation\" tooltip=\"{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}\" placement=\"bottom\" tooltipClass=\"table-tooltip\" [delay]=\"500\">\r\n                <div class=\"fill\" [style.height]=\"getHeight(item) + '%'\"></div>\r\n              </div>\r\n            </ng-container>\r\n            <i class=\"icon\"></i>\r\n            <span>{{ (item.is_income ? 'HISTORY.RECEIVED' : 'HISTORY.SEND') | translate }}</span>\r\n          </div>\r\n        </td>\r\n        <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>\r\n        <td>\r\n          <span *ngIf=\"item.sortAmount && item.sortAmount.toString() !== '0'\">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n        </td>\r\n        <td>\r\n          <span *ngIf=\"item.sortFee && item.sortFee.toString() !== '0'\">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n        </td>\r\n        <td class=\"remote-address\">\r\n          <span *ngIf=\"!(item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0])\">{{item | historyTypeMessages}}</span>\r\n          <span *ngIf=\"item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0]\" (contextmenu)=\"variablesService.onContextMenuOnlyCopy($event, item.remote_addresses[0])\">{{item.remote_addresses[0]}}</span>\r\n        </td>\r\n      </tr>\r\n      <tr class=\"transaction-details\" [class.open]=\"index === openedDetails\">\r\n        <td colspan=\"5\">\r\n          <app-transaction-details *ngIf=\"index === openedDetails\" [transaction]=\"item\" [sizes]=\"calculatedWidth\"></app-transaction-details>\r\n        </td>\r\n      </tr>\r\n    </ng-container>\r\n    </tbody>\r\n  </table>\r\n\r\n</div>\r\n"
+module.exports = "<div class=\"wrap-table\">\r\n\r\n  <table class=\"history-table\">\r\n    <thead>\r\n    <tr #head (window:resize)=\"calculateWidth()\">\r\n      <th>{{ 'HISTORY.STATUS' | translate }}</th>\r\n      <th>{{ 'HISTORY.DATE' | translate }}</th>\r\n      <th>{{ 'HISTORY.AMOUNT' | translate }}</th>\r\n      <th>{{ 'HISTORY.FEE' | translate }}</th>\r\n      <th>{{ 'HISTORY.ADDRESS' | translate }}</th>\r\n    </tr>\r\n    </thead>\r\n    <tbody>\r\n    <ng-container *ngFor=\"let item of variablesService.currentWallet.history; let index = index\">\r\n      <tr (click)=\"openDetails(index)\">\r\n        <td>\r\n          <div class=\"status\" [class.send]=\"!item.is_income\" [class.received]=\"item.is_income\">\r\n            <ng-container *ngIf=\"variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0\">\r\n              <div class=\"confirmation\" tooltip=\"{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}\" placement=\"bottom\" tooltipClass=\"table-tooltip\" [delay]=\"500\">\r\n                <div class=\"fill\" [style.height]=\"getHeight(item) + '%'\"></div>\r\n              </div>\r\n            </ng-container>\r\n            <i class=\"icon\"></i>\r\n            <span>{{ (item.is_income ? 'HISTORY.RECEIVED' : 'HISTORY.SEND') | translate }}</span>\r\n          </div>\r\n        </td>\r\n        <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>\r\n        <td>\r\n          <span *ngIf=\"item.sortAmount && item.sortAmount.toString() !== '0'\">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n        </td>\r\n        <td>\r\n          <span *ngIf=\"item.sortFee && item.sortFee.toString() !== '0'\">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n        </td>\r\n        <td class=\"remote-address\">\r\n          <span *ngIf=\"!(item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0])\">{{item | historyTypeMessages}}</span>\r\n          <span *ngIf=\"item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0]\" (contextmenu)=\"variablesService.onContextMenuOnlyCopy($event, item.remote_addresses[0])\">{{item.remote_addresses[0]}}</span>\r\n        </td>\r\n      </tr>\r\n      <tr class=\"transaction-details\" [class.open]=\"index === openedDetails\">\r\n        <td colspan=\"5\">\r\n          <ng-container *ngIf=\"index === openedDetails\">\r\n            <app-transaction-details [transaction]=\"item\" [sizes]=\"calculatedWidth\"></app-transaction-details>\r\n          </ng-container>\r\n        </td>\r\n      </tr>\r\n    </ng-container>\r\n    </tbody>\r\n  </table>\r\n\r\n</div>\r\n"
 
 /***/ }),
 
@@ -3657,6 +3683,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "HistoryComponent", function() { return HistoryComponent; });
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
 /* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -3668,13 +3695,20 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 };
 
 
+
 var HistoryComponent = /** @class */ (function () {
-    function HistoryComponent(variablesService) {
+    function HistoryComponent(route, variablesService) {
+        this.route = route;
         this.variablesService = variablesService;
         this.openedDetails = false;
         this.calculatedWidth = [];
     }
-    HistoryComponent.prototype.ngOnInit = function () { };
+    HistoryComponent.prototype.ngOnInit = function () {
+        var _this = this;
+        this.parentRouting = this.route.parent.params.subscribe(function () {
+            _this.openedDetails = false;
+        });
+    };
     HistoryComponent.prototype.ngAfterViewChecked = function () {
         this.calculateWidth();
     };
@@ -3706,7 +3740,9 @@ var HistoryComponent = /** @class */ (function () {
         this.calculatedWidth.push(this.head.nativeElement.childNodes[3].clientWidth);
         this.calculatedWidth.push(this.head.nativeElement.childNodes[4].clientWidth);
     };
-    HistoryComponent.prototype.ngOnDestroy = function () { };
+    HistoryComponent.prototype.ngOnDestroy = function () {
+        this.parentRouting.unsubscribe();
+    };
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ViewChild"])('head'),
         __metadata("design:type", _angular_core__WEBPACK_IMPORTED_MODULE_0__["ElementRef"])
@@ -3717,7 +3753,8 @@ var HistoryComponent = /** @class */ (function () {
             template: __webpack_require__(/*! ./history.component.html */ "./src/app/history/history.component.html"),
             styles: [__webpack_require__(/*! ./history.component.scss */ "./src/app/history/history.component.scss")]
         }),
-        __metadata("design:paramtypes", [_helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_1__["VariablesService"]])
+        __metadata("design:paramtypes", [_angular_router__WEBPACK_IMPORTED_MODULE_2__["ActivatedRoute"],
+            _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_1__["VariablesService"]])
     ], HistoryComponent);
     return HistoryComponent;
 }());
@@ -6002,7 +6039,7 @@ var WalletDetailsComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"header\">\r\n  <div>\r\n    <h3>{{variablesService.currentWallet.name}}</h3>\r\n    <!--<button (click)=\"openInBrowser('docs.zano.org/docs/how-to-get-alias')\">-->\r\n    <button [routerLink]=\"['/assign-alias']\" *ngIf=\"!variablesService.currentWallet.alias.hasOwnProperty('name')\">\r\n      <i class=\"icon account\"></i>\r\n      <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>\r\n    </button>\r\n    <span style=\"font-size: 1.3rem;\" *ngIf=\"variablesService.currentWallet.alias.hasOwnProperty('name')\">\r\n      {{variablesService.currentWallet.alias['name']}}\r\n    </span>\r\n  </div>\r\n  <div>\r\n    <button [routerLink]=\"['/details']\" routerLinkActive=\"active\">\r\n      <i class=\"icon details\"></i>\r\n      <span>{{ 'WALLET.DETAILS' | translate }}</span>\r\n    </button>\r\n    <!--<button (click)=\"closeWallet()\">\r\n      <i class=\"icon lock\"></i>\r\n      <span>{{ 'WALLET.LOCK' | translate }}</span>\r\n    </button>-->\r\n  </div>\r\n</div>\r\n<div class=\"address\">\r\n  <span>{{variablesService.currentWallet.address}}</span>\r\n  <i #copyIcon class=\"icon copy\" (click)=\"copyAddress()\"></i>\r\n</div>\r\n<div class=\"balance\">\r\n  <span [tooltip]=\"getTooltip()\" [placement]=\"'bottom'\" [tooltipClass]=\"'balance-tooltip'\" [delay]=\"500\" [timeout]=\"1000\">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>\r\n  <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n</div>\r\n<div class=\"tabs\">\r\n  <div class=\"tabs-header\">\r\n    <ng-container *ngFor=\"let tab of tabs; let index = index\">\r\n      <div class=\"tab\" [class.active]=\"tab.active\" [class.disabled]=\"(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2\" (click)=\"changeTab(index)\">\r\n        <i class=\"icon\" [ngClass]=\"tab.icon\"></i>\r\n        <span>{{ tab.title | translate }}</span>\r\n        <span class=\"indicator\" *ngIf=\"tab.indicator\">{{variablesService.currentWallet.new_contracts}}</span>\r\n      </div>\r\n    </ng-container>\r\n  </div>\r\n  <div class=\"tabs-content scrolled-content\">\r\n    <router-outlet></router-outlet>\r\n  </div>\r\n</div>\r\n\r\n"
+module.exports = "<div class=\"header\">\r\n  <div>\r\n    <h3>{{variablesService.currentWallet.name}}</h3>\r\n    <!--<button (click)=\"openInBrowser('docs.zano.org/docs/how-to-get-alias')\">-->\r\n    <button [routerLink]=\"['/assign-alias']\" *ngIf=\"!variablesService.currentWallet.alias.hasOwnProperty('name')\">\r\n      <i class=\"icon account\"></i>\r\n      <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>\r\n    </button>\r\n    <span style=\"font-size: 1.3rem;\" *ngIf=\"variablesService.currentWallet.alias.hasOwnProperty('name')\">\r\n      {{variablesService.currentWallet.alias['name']}}\r\n    </span>\r\n  </div>\r\n  <div>\r\n    <button [routerLink]=\"['/details']\" routerLinkActive=\"active\">\r\n      <i class=\"icon details\"></i>\r\n      <span>{{ 'WALLET.DETAILS' | translate }}</span>\r\n    </button>\r\n    <!--<button (click)=\"closeWallet()\">\r\n      <i class=\"icon lock\"></i>\r\n      <span>{{ 'WALLET.LOCK' | translate }}</span>\r\n    </button>-->\r\n  </div>\r\n</div>\r\n<div class=\"address\">\r\n  <span>{{variablesService.currentWallet.address}}</span>\r\n  <i #copyIcon class=\"icon copy\" (click)=\"copyAddress()\"></i>\r\n</div>\r\n<div class=\"balance\">\r\n  <span [tooltip]=\"getTooltip()\" [placement]=\"'bottom'\" [tooltipClass]=\"'balance-tooltip'\" [delay]=\"300\" [timeout]=\"0\">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>\r\n  <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n</div>\r\n<div class=\"tabs\">\r\n  <div class=\"tabs-header\">\r\n    <ng-container *ngFor=\"let tab of tabs; let index = index\">\r\n      <div class=\"tab\" [class.active]=\"tab.active\" [class.disabled]=\"(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2\" (click)=\"changeTab(index)\">\r\n        <i class=\"icon\" [ngClass]=\"tab.icon\"></i>\r\n        <span>{{ tab.title | translate }}</span>\r\n        <span class=\"indicator\" *ngIf=\"tab.indicator\">{{variablesService.currentWallet.new_contracts}}</span>\r\n      </div>\r\n    </ng-container>\r\n  </div>\r\n  <div class=\"tabs-content scrolled-content\">\r\n    <router-outlet></router-outlet>\r\n  </div>\r\n</div>\r\n\r\n"
 
 /***/ }),
 

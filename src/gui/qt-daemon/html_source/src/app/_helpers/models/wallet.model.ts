@@ -127,6 +127,15 @@ export class Wallet {
     }
   }
 
+  removeFromHistory(hash: string): void {
+    for (let i = 0; i < this.history.length; i++) {
+      if (this.history[i].tx_hash === hash) {
+        this.history.splice(i, 1);
+        break;
+      }
+    }
+  }
+
   prepareContractsAfterOpen(items: any[], exp_med_ts, height_app, viewedContracts, notViewedContracts): void {
     const wallet = this;
     for (let i = 0; i < items.length; i++) {

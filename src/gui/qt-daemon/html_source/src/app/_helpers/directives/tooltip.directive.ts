@@ -1,10 +1,11 @@
-import {Directive, Input, ElementRef, HostListener, Renderer2, HostBinding} from '@angular/core';
+import {Directive, Input, ElementRef, HostListener, Renderer2, HostBinding, OnDestroy} from '@angular/core';
+import {ActivatedRoute} from '@angular/router';
 
 @Directive({
   selector: '[tooltip]'
 })
 
-export class TooltipDirective {
+export class TooltipDirective implements OnDestroy {
 
   @HostBinding('style.cursor') cursor = 'pointer';
 
@@ -16,8 +17,9 @@ export class TooltipDirective {
   tooltip: HTMLElement;
 
   removeTooltipTimeout;
+  removeTooltipTimeoutInner;
 
-  constructor(private el: ElementRef, private renderer: Renderer2) {
+  constructor(private el: ElementRef, private renderer: Renderer2, private route: ActivatedRoute) {
   }
 
   @HostListener('mouseenter') onMouseEnter() {
@@ -40,9 +42,9 @@ export class TooltipDirective {
   }
 
   hide() {
-    this.removeTooltipTimeout = setTimeout( () => {
+    this.removeTooltipTimeout = setTimeout(() => {
       this.renderer.setStyle(this.tooltip, 'opacity', '0');
-      window.setTimeout(() => {
+      this.removeTooltipTimeoutInner = setTimeout(() => {
         this.renderer.removeChild(document.body, this.tooltip);
         this.tooltip = null;
       }, this.delay);
@@ -51,6 +53,7 @@ export class TooltipDirective {
 
   cancelHide() {
     clearTimeout(this.removeTooltipTimeout);
+    clearTimeout(this.removeTooltipTimeoutInner);
     this.renderer.setStyle(this.tooltip, 'opacity', '1');
   }
 
@@ -62,10 +65,20 @@ export class TooltipDirective {
       this.tooltip = this.tooltipInner;
     }
     this.renderer.appendChild(document.body, this.tooltip);
+
+    this.tooltip.addEventListener('mouseenter', () => {
+      this.cancelHide();
+    });
+    this.tooltip.addEventListener('mouseleave', () => {
+      if (this.tooltip) {
+        this.hide();
+      }
+    });
+
     this.renderer.setStyle(document.body, 'position', 'relative');
     this.renderer.setStyle(this.tooltip, 'position', 'absolute');
     if (this.tooltipClass !== null) {
-      let classes = this.tooltipClass.split(' ');
+      const classes = this.tooltipClass.split(' ');
       for (let i = 0; i < classes.length; i++) {
         this.renderer.addClass(this.tooltip, classes[i]);
       }
@@ -117,4 +130,14 @@ export class TooltipDirective {
       this.renderer.setStyle(this.tooltip, 'left', hostPos.right + 'px');
     }
   }
+
+  ngOnDestroy() {
+    clearTimeout(this.removeTooltipTimeout);
+    clearTimeout(this.removeTooltipTimeoutInner);
+    if (this.tooltip) {
+      this.renderer.removeChild(document.body, this.tooltip);
+      this.tooltip = null;
+    }
+  }
+
 }
