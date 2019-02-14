@@ -11,10 +11,12 @@
 #include <unordered_set>
 #include <unordered_map>
 
-#include "currency_protocol/currency_protocol_defs.h"
-
 #include "account.h"
 #include "include_base_utils.h"
+
+#include "currency_format_utils_abstract.h"
+#include "common/crypto_stream_operators.h"
+#include "currency_protocol/currency_protocol_defs.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "difficulty.h"
@@ -23,6 +25,8 @@
 #include "bc_payments_id_service.h"
 #include "bc_attachments_helpers_basic.h"
 #include "blockchain_storage_basic.h"
+#include "currency_format_utils_blocks.h"
+#include "currency_format_utils_transactions.h"
 
 // ------ get_tx_type_definition -------------
 #define       GUI_TX_TYPE_NORMAL                  0
@@ -42,31 +46,8 @@
 
 
 
-//------
-bool parse_hash256(const std::string str_hash, crypto::hash& hash);
-template <class T>
-std::ostream &print256(std::ostream &o, const T &v) {
-  return o << "<" << epee::string_tools::pod_to_hex(v) << ">";
-}
 
-template <class T>
-std::ostream &print16(std::ostream &o, const T &v) {
-  return o << "<" << epee::string_tools::pod_to_hex(v).substr(0, 5) << "..>";
-}
 
-template <class T>
-std::string print16(const T &v) {
-  return std::string("<") + epee::string_tools::pod_to_hex(v).substr(0, 5) + "..>";
-}
-
-namespace crypto {
-  inline std::ostream &operator <<(std::ostream &o, const crypto::public_key &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::secret_key &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::key_derivation &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::key_image &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::signature &v) { return print256(o, v); }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::hash &v) { return print256(o, v); }
-}
 
 namespace currency
 {
@@ -182,10 +163,6 @@ namespace currency
 
 
   //---------------------------------------------------------------
-  void get_transaction_prefix_hash(const transaction_prefix& tx, crypto::hash& h);
-  crypto::hash get_transaction_prefix_hash(const transaction_prefix& tx);
-  bool parse_and_validate_tx_from_blob(const blobdata& tx_blob, transaction& tx, crypto::hash& tx_hash);
-  bool parse_and_validate_tx_from_blob(const blobdata& tx_blob, transaction& tx);  
   bool construct_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins, 
                                                              size_t current_block_size, 
                                                              uint64_t fee, 
@@ -234,14 +211,6 @@ namespace currency
 
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median);
 
-  template<class t_type>
-  std::string print_t_array(const std::vector<t_type>& vec)
-  {
-    std::stringstream ss;
-    for (auto& v : vec)
-      ss << v << " ";
-    return ss.str();
-  }
 
   uint64_t get_string_uint64_hash(const std::string& str);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
@@ -302,8 +271,6 @@ namespace currency
   bool generate_key_image_helper(const account_keys& ack, const crypto::public_key& tx_public_key, size_t real_output_index, keypair& in_ephemeral, crypto::key_image& ki);
   bool derive_public_key_from_target_address(const account_public_address& destination_addr, const crypto::secret_key& tx_sec_key, size_t index, crypto::public_key& out_eph_public_key, crypto::key_derivation& derivation);
   bool derive_public_key_from_target_address(const account_public_address& destination_addr, const crypto::secret_key& tx_sec_key, size_t index, crypto::public_key& out_eph_public_key);
-  void get_blob_hash(const blobdata& blob, crypto::hash& res);
-  crypto::hash get_blob_hash(const blobdata& blob);
   std::string short_hash_str(const crypto::hash& h);
   bool is_mixattr_applicable_for_fake_outs_counter(uint8_t mix_attr, uint64_t fake_attr_count);
   bool is_tx_spendtime_unlocked(uint64_t unlock_time, uint64_t current_blockchain_size, uint64_t current_time);
@@ -316,13 +283,7 @@ namespace currency
 
   uint64_t get_reward_from_miner_tx(const transaction& tx);
 
-  crypto::hash get_transaction_hash(const transaction& t);
-  bool get_transaction_hash(const transaction& t, crypto::hash& res);
-  bool get_transaction_hash(const transaction& t, crypto::hash& res, uint64_t& blob_size);
   //bool get_transaction_hash(const transaction& t, crypto::hash& res, size_t& blob_size);
-  blobdata get_block_hashing_blob(const block& b);
-  bool get_block_hash(const block& b, crypto::hash& res);
-  crypto::hash get_block_hash(const block& b);
   bool generate_genesis_block(block& bl);
   const crypto::hash& get_genesis_hash(bool need_to_set = false, const crypto::hash& h = null_hash);
   bool parse_and_validate_block_from_blob(const blobdata& b_blob, block& b);
@@ -390,18 +351,6 @@ namespace currency
   bool fill_block_rpc_details(block_rpc_extended_info& pei_rpc, const block_extended_info& bei_chain, const crypto::hash& h);
   void append_per_block_increments_for_tx(const transaction& tx, std::unordered_map<uint64_t, uint32_t>& gindices);
 
-  /************************************************************************/
-  /*                                                                      */
-  /************************************************************************/
-  template<class t_array>
-  struct array_hasher : std::unary_function<t_array&, std::size_t>
-  {
-    std::size_t operator()(const t_array& val) const
-    {
-      return boost::hash_range(&val.data[0], &val.data[sizeof(val.data)]);
-    }
-  };
-
   template<class t_txin_v>
   typename std::conditional<std::is_const<t_txin_v>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type& get_txin_etc_options(t_txin_v& in)
   {
@@ -450,17 +399,6 @@ namespace currency
   bool have_attachment_service_in_container(const std::vector<attachment_v>& av, const std::string& service_id, const std::string& instruction);
   crypto::hash prepare_prefix_hash_for_sign(const transaction& tx, uint64_t in_index, const crypto::hash& tx_id);
 
-  //------------------------------------------------------------------------------------
-  template<class t_pod_type, class result_type>
-  result_type get_pod_checksum(const t_pod_type& bl)
-  {
-    const unsigned char* pbuf = reinterpret_cast<const unsigned char*>(&bl);
-    result_type summ = 0;
-    for (size_t i = 0; i != sizeof(t_pod_type)-1; i++)
-      summ += pbuf[i];
-
-    return summ;
-  }
   //---------------------------------------------------------------
   template<class tx_out_t>
   bool is_out_to_acc(const account_keys& acc, const tx_out_t& out_key, const crypto::public_key& tx_pub_key, size_t output_index)
@@ -468,83 +406,6 @@ namespace currency
     crypto::key_derivation derivation;
     generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
     return is_out_to_acc(acc, out_key, derivation, output_index);
-  }
-  //---------------------------------------------------------------
-  template<typename specic_type_t, typename variant_t_container>
-  bool have_type_in_variant_container(const variant_t_container& av)
-  {
-    for (auto& ai : av)
-    {
-      if (ai.type() == typeid(specic_type_t))
-      {
-        return true;
-      }
-    }
-    return false;
-  }
-  //---------------------------------------------------------------
-  template<typename specic_type_t, typename variant_t_container>
-  size_t count_type_in_variant_container(const variant_t_container& av)
-  {
-    size_t result = 0;
-    for (auto& ai : av)
-    {
-      if (ai.type() == typeid(specic_type_t))
-        ++result;
-    }
-    return result;
-  }
-  //---------------------------------------------------------------
-  template<typename specic_type_t, typename variant_t_container>
-  bool get_type_in_variant_container(const variant_t_container& av, specic_type_t& a)
-  {
-    for (auto& ai : av)
-    {
-      if (ai.type() == typeid(specic_type_t))
-      {
-        a = boost::get<specic_type_t>(ai);
-        return true;
-      }
-    }
-    return false;
-  }
-  //---------------------------------------------------------------
-  template<typename variant_container_t>
-  bool check_allowed_types_in_variant_container(const variant_container_t& container, const std::unordered_set<std::type_index>& allowed_types, bool elements_must_be_unique = true)
-  {
-    for (auto it = container.begin(); it != container.end(); ++it)
-    {
-      if (allowed_types.count(std::type_index(it->type())) == 0)
-        return false;
-
-      if (elements_must_be_unique)
-      {
-        for (auto jt = it + 1; jt != container.end(); ++jt)
-          if (it->type().hash_code() == jt->type().hash_code())
-            return false;
-      }
-    }
-    return true;
-  }
-  //---------------------------------------------------------------
-  template<typename variant_container_t>
-  bool check_allowed_types_in_variant_container(const variant_container_t& container, const variant_container_t& allowed_types_examples, bool elements_must_be_unique = true)
-  {
-    std::unordered_set<std::type_index> allowed_types;
-    for (auto& el : allowed_types_examples)
-      if (!allowed_types.insert(std::type_index(el.type())).second)
-        return false; // invalid allowed_types_examples container
-
-    return check_allowed_types_in_variant_container(container, allowed_types, elements_must_be_unique);
-  }
-  //---------------------------------------------------------------
-  template<typename variant_container_t>
-  std::string stringize_types_in_variant_container(const variant_container_t& container)
-  {
-    std::string result;
-    for (auto it = container.begin(); it != container.end(); ++it)
-      result = (result + it->type().name()) + (it + 1 != container.end() ? ", " : "");
-    return result;
   }
   //----------------------------------------------------------------------------------------------------
   template<class t_container>
@@ -692,51 +553,7 @@ namespace currency
 
     return true;
   }
-  //---------------------------------------------------------------
-  template<class t_object>
-  bool get_object_hash(const t_object& o, crypto::hash& res)
-  {
-    get_blob_hash(t_serializable_object_to_blob(o), res);
-    return true;
-  }
-  //---------------------------------------------------------------
-  template<class t_object>
-  crypto::hash get_object_hash(const t_object& o)
-  {
-    crypto::hash h;
-    get_object_hash(o, h);
-    return h;
-  }
-  //---------------------------------------------------------------
 
-  template<class t_object>
-  size_t get_object_blobsize(const t_object& o)
-  {
-    blobdata b = t_serializable_object_to_blob(o);
-    return b.size();
-  }
-  //---------------------------------------------------------------
-  size_t get_object_blobsize(const transaction& t);
-  size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
-  //---------------------------------------------------------------
-  template<class t_object>
-  bool get_object_hash(const t_object& o, crypto::hash& res, uint64_t& blob_size)
-  {
-    blobdata bl = t_serializable_object_to_blob(o);
-    blob_size = bl.size();
-    get_blob_hash(bl, res);
-    return true;
-  }
-  //---------------------------------------------------------------
-  template <typename T>
-  std::string obj_to_json_str(const T& obj)
-  {
-    std::stringstream ss;
-    json_archive<true> ar(ss, true);
-    bool r = ::serialization::serialize(ar, const_cast<T&>(obj));
-    CHECK_AND_ASSERT_MES(r, "", "obj_to_json_str failed: serialization::serialize returned false");
-    return ss.str();
-  }
   //---------------------------------------------------------------
   // 62387455827 -> 455827 + 7000000 + 80000000 + 300000000 + 2000000000 + 60000000000, where 455827 <= dust_threshold
   template<typename chunk_handler_t, typename dust_handler_t>
@@ -843,18 +660,6 @@ namespace currency
   }
   //---------------------------------------------------------------
 
-  blobdata block_to_blob(const block& b);
-  bool block_to_blob(const block& b, blobdata& b_blob);
-  blobdata tx_to_blob(const transaction& b);
-  bool tx_to_blob(const transaction& b, blobdata& b_blob);
-  void get_tx_tree_hash(const std::vector<crypto::hash>& tx_hashes, crypto::hash& h);
-  crypto::hash get_tx_tree_hash(const std::vector<crypto::hash>& tx_hashes);
-  crypto::hash get_tx_tree_hash(const block& b);
-
-#define CHECKED_GET_SPECIFIC_VARIANT(variant_var, specific_type, variable_name, fail_return_val) \
-  CHECK_AND_ASSERT_MES(variant_var.type() == typeid(specific_type), fail_return_val, "wrong variant type: " << variant_var.type().name() << ", expected " << typeid(specific_type).name()); \
-  specific_type& variable_name = boost::get<specific_type>(variant_var);
-
   struct input_amount_getter : public boost::static_visitor<uint64_t>
   {
     template<class t_input>
@@ -866,7 +671,6 @@ namespace currency
   {
     return boost::apply_visitor(input_amount_getter(), v);
   }
-
   //---------------------------------------------------------------
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r);
   //---------------------------------------------------------------

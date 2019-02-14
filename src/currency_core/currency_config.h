@@ -155,6 +155,10 @@
 #define WALLET_FILE_SIGNATURE                           0x1111012101101011LL  //Bender's nightmare
 #define WALLET_FILE_MAX_BODY_SIZE                       0x88888888L //2GB
 #define WALLET_FILE_MAX_KEYS_SIZE                       10000 //
+#define WALLET_BRAIN_DATE_OFFSET                        1543622400
+#define WALLET_BRAIN_DATE_QUANTUM                       604800 //by last word we encode a number of week since launch of the project, 
+                                                               //which let us to address tools::mnemonic_encoding::NUMWORDS weeks after project launch
+                                                               //which is about 30 years
 
 #define OFFER_MAXIMUM_LIFE_TIME                         (60*60*24*30)  // 30 days
 

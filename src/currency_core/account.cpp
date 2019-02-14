@@ -62,12 +62,15 @@ namespace currency
     return m_seed;
   }
   //-----------------------------------------------------------------
+
   std::string account_base::get_restore_braindata() const 
   {
     std::string restore_buff = get_restore_data();
     std::vector<unsigned char> v;
     v.assign((unsigned char*)restore_buff.data(), (unsigned char*)restore_buff.data() + restore_buff.size());
-    return tools::mnemonic_encoding::binary2text(v);
+    std::string seed_brain_data = tools::mnemonic_encoding::binary2text(v);
+    //m_creation_timestamp
+    return seed_brain_data;
   }
   //-----------------------------------------------------------------
   bool account_base::restore_keys(const std::string& restore_data)

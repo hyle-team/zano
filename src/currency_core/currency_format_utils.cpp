@@ -26,54 +26,18 @@ using namespace epee;
 #include "bc_attachments_helpers.h"
 #include "genesis.h"
 #include "genesis_acc.h"
+#include "common/mnemonic-encoding.h"
+
 namespace currency
 {
-  //---------------------------------------------------------------
-  void get_transaction_prefix_hash(const transaction_prefix& tx, crypto::hash& h)
-  {
-    std::ostringstream s;
-    binary_archive<true> a(s);
-    ::serialization::serialize(a, const_cast<transaction_prefix&>(tx));
-    std::string data = s.str();
-    crypto::cn_fast_hash(data.data(), data.size(), h);
-  }
-  //---------------------------------------------------------------
-  crypto::hash get_transaction_prefix_hash(const transaction_prefix& tx)
-  {
-    crypto::hash h = null_hash;
-    get_transaction_prefix_hash(tx, h);
-    return h;
-  }
-  //---------------------------------------------------------------
-  bool parse_and_validate_tx_from_blob(const blobdata& tx_blob, transaction& tx)
-  {
-    std::stringstream ss;
-    ss << tx_blob;
-    binary_archive<false> ba(ss);
-    bool r = ::serialization::serialize(ba, tx);
-    CHECK_AND_ASSERT_MES(r, false, "Failed to parse transaction from blob");
-    return true;
-  }
+
   //---------------------------------------------------------------
   bool add_tx_extra_alias(transaction& tx, const extra_alias_entry& alinfo)
   {
     tx.extra.push_back(alinfo);
     return true;
   }
-  //---------------------------------------------------------------
-  bool parse_and_validate_tx_from_blob(const blobdata& tx_blob, transaction& tx, crypto::hash& tx_hash)
-  {
-    std::stringstream ss;
-    ss << tx_blob;
-    binary_archive<false> ba(ss);
-    bool r = ::serialization::serialize(ba, tx);
-    CHECK_AND_ASSERT_MES(r, false, "Failed to parse transaction from blob");
-    //TODO: validate tx
 
-    //crypto::cn_fast_hash(tx_blob.data(), tx_blob.size(), tx_hash);
-    get_transaction_prefix_hash(tx, tx_hash);
-    return true;
-  }
   //---------------------------------------------------------------
   /*
   bool construct_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins,
@@ -1246,6 +1210,15 @@ namespace currency
     return reward;
   }
   //---------------------------------------------------------------
+//   std::string get_word_from_timstamp(uint64_t timestamp)
+//   {
+//     uint64_t date_offset = timestamp ? timestamp - WALLET_BRAIN_DATE_OFFSET : 0;
+//     date_offset = date_offset / WALLET_BRAIN_DATE_QUANTUM;
+// 
+//     return tools::mnemonic_encoding::word_by_num(timestamp); 
+//   }
+
+  //---------------------------------------------------------------
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed /* = nullptr */)
   {
 #define LOC_CHK(cond, msg) CHECK_AND_ASSERT_MES(cond, false, msg << ", ms input index: " << ms_input_index << ", tx: " << get_transaction_hash(tx) << ", source tx: " << get_transaction_hash(source_tx))
@@ -1620,11 +1593,7 @@ namespace currency
     att.push_back(tsa);
     return true;
   }
-  //---------------------------------------------------------------
-  void get_blob_hash(const blobdata& blob, crypto::hash& res)
-  {
-    cn_fast_hash(blob.data(), blob.size(), res);
-  }
+
 
   std::string print_fixed_decimal_point(uint64_t amount, size_t decimal_point)
   {
@@ -1646,32 +1615,6 @@ namespace currency
     if (r.size() < CURRENCY_DISPLAY_DECIMAL_POINT)
       r.insert(0, CURRENCY_DISPLAY_DECIMAL_POINT - r.size(), '0');
     return std::to_string(amount) + '.' + r.substr(0, r.find_last_not_of('0') + 1);
-  }
-  //---------------------------------------------------------------
-  crypto::hash get_blob_hash(const blobdata& blob)
-  {
-    crypto::hash h = null_hash;
-    get_blob_hash(blob, h);
-    return h;
-  }
-  //---------------------------------------------------------------
-  crypto::hash get_transaction_hash(const transaction& t)
-  {
-    return get_transaction_prefix_hash(t);
-  }
-  //---------------------------------------------------------------
-  bool get_transaction_hash(const transaction& t, crypto::hash& res)
-  {
-    uint64_t blob_size = 0;
-    return get_object_hash(static_cast<const transaction_prefix&>(t), res, blob_size);
-  }
-  //---------------------------------------------------------------
-  bool get_transaction_hash(const transaction& t, crypto::hash& res, uint64_t& blob_size)
-  {
-    blob_size = 0;
-    bool r = get_object_hash(static_cast<const transaction_prefix&>(t), res, blob_size);
-    blob_size = get_object_blobsize(t, blob_size);
-    return r;
   }
   //---------------------------------------------------------------
   /*bool get_transaction_hash(const transaction& t, crypto::hash& res, size_t& blob_size)
@@ -1926,27 +1869,6 @@ namespace currency
     return ss.str();
   }
   //---------------------------------------------------------------
-  blobdata get_block_hashing_blob(const block& b)
-  {
-    blobdata blob = t_serializable_object_to_blob(static_cast<block_header>(b));
-    crypto::hash tree_root_hash = get_tx_tree_hash(b);
-    blob.append((const char*)&tree_root_hash, sizeof(tree_root_hash));
-    blob.append(tools::get_varint_data(b.tx_hashes.size() + 1));
-    return blob;
-  }
-  //---------------------------------------------------------------
-  bool get_block_hash(const block& b, crypto::hash& res)
-  {
-    return get_object_hash(get_block_hashing_blob(b), res);
-  }
-  //---------------------------------------------------------------
-  crypto::hash get_block_hash(const block& b)
-  {
-    crypto::hash p = null_hash;
-    get_block_hash(b, p);
-    return p;
-  }
-  //---------------------------------------------------------------
   bool generate_genesis_block(block& bl)
   {
     //genesis block
@@ -2052,101 +1974,9 @@ namespace currency
   //---------------------------------------------------------------
   bool parse_and_validate_block_from_blob(const blobdata& b_blob, block& b)
   {
-    return t_unserializable_object_from_blob(b, b_blob);
+    return parse_and_validate_object_from_blob(b_blob, b);
   }
-  //---------------------------------------------------------------
-  size_t get_object_blobsize(const transaction& t)
-  {
-    size_t tx_blob_size = get_object_blobsize(static_cast<const transaction_prefix&>(t));
-    return get_object_blobsize(t, tx_blob_size);
-  }
-  //---------------------------------------------------------------
-  size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size)
-  {
-    size_t tx_blob_size = prefix_blob_size;
 
-    if (is_coinbase(t))
-      return tx_blob_size;
-
-    // for purged tx, with empty signatures and attachments, this function should return the blob size
-    // which the tx would have if the signatures and attachments were correctly filled with actual data
-
-    // 1. signatures
-    bool separately_signed_tx = get_tx_flags(t) & TX_FLAG_SIGNATURE_MODE_SEPARATE;
-
-    tx_blob_size += tools::get_varint_packed_size(t.vin.size()); // size of transaction::signatures (equals to total inputs count)
-
-    for (size_t i = 0; i != t.vin.size(); i++)
-    {
-      size_t sig_count = get_input_expected_signatures_count(t.vin[i]);
-      if (separately_signed_tx && i == t.vin.size() - 1)
-        ++sig_count;                                             // count in one more signature for the last input in a complete separately signed tx
-      tx_blob_size += tools::get_varint_packed_size(sig_count);  // size of transaction::signatures[i]
-      tx_blob_size += sizeof(crypto::signature) * sig_count;     // size of signatures' data itself
-    }
-
-    // 2. attachments (try to find extra_attachment_info in tx prefix and count it in if succeed)
-    extra_attachment_info eai = AUTO_VAL_INIT(eai);
-    bool got_eai = false;
-    if (separately_signed_tx)
-    {
-      // for separately-signed tx, try to obtain extra_attachment_info from the last input's etc_details
-      const std::vector<txin_etc_details_v>* p_etc_details = get_input_etc_details(t.vin.back());
-      got_eai = p_etc_details != nullptr && get_type_in_variant_container(*p_etc_details, eai);
-    }
-    if (!got_eai)
-      got_eai = get_type_in_variant_container(t.extra, eai); // then from the extra
-
-    if (got_eai)
-      tx_blob_size += eai.sz; // sz is a size of whole serialized attachment blob, including attachments vector size
-    else
-      tx_blob_size += tools::get_varint_packed_size(static_cast<size_t>(0)); // no extra_attachment_info found - just add zero vector's size, 'cause it's serialized anyway
-
-    return tx_blob_size;
-  }
-  //---------------------------------------------------------------
-  blobdata block_to_blob(const block& b)
-  {
-    return t_serializable_object_to_blob(b);
-  }
-  //---------------------------------------------------------------
-  bool block_to_blob(const block& b, blobdata& b_blob)
-  {
-    return t_serializable_object_to_blob(b, b_blob);
-  }
-  //---------------------------------------------------------------
-  blobdata tx_to_blob(const transaction& tx)
-  {
-    return t_serializable_object_to_blob(tx);
-  }
-  //---------------------------------------------------------------
-  bool tx_to_blob(const transaction& tx, blobdata& b_blob)
-  {
-    return t_serializable_object_to_blob(tx, b_blob);
-  }
-  //---------------------------------------------------------------
-  void get_tx_tree_hash(const std::vector<crypto::hash>& tx_hashes, crypto::hash& h)
-  {
-    tree_hash(tx_hashes.data(), tx_hashes.size(), h);
-  }
-  //---------------------------------------------------------------
-  crypto::hash get_tx_tree_hash(const std::vector<crypto::hash>& tx_hashes)
-  {
-    crypto::hash h = null_hash;
-    get_tx_tree_hash(tx_hashes, h);
-    return h;
-  }
-  //---------------------------------------------------------------
-  crypto::hash get_tx_tree_hash(const block& b)
-  {
-    std::vector<crypto::hash> txs_ids;
-    crypto::hash h = null_hash;
-    get_transaction_hash(b.miner_tx, h);
-    txs_ids.push_back(h);
-    BOOST_FOREACH(auto& th, b.tx_hashes)
-      txs_ids.push_back(th);
-    return get_tx_tree_hash(txs_ids);
-  }
   //---------------------------------------------------------------
   bool is_service_tx(const transaction& tx)
   {
