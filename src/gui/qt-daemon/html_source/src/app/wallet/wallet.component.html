@@ -6,9 +6,11 @@
       <i class="icon account"></i>
       <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>
     </button>
-    <span style="font-size: 1.3rem;" *ngIf="variablesService.currentWallet.alias.hasOwnProperty('name')">
-      {{variablesService.currentWallet.alias['name']}}
-    </span>
+    <div class="alias" *ngIf="variablesService.currentWallet.alias.hasOwnProperty('name')">
+      <span>{{variablesService.currentWallet.alias['name']}}</span>
+      <i class="icon edit" [routerLink]="['/edit-alias']"></i>
+      <i class="icon transfer" [routerLink]="['/transfer-alias']"></i>
+    </div>
   </div>
   <div>
     <button [routerLink]="['/details']" routerLinkActive="active">

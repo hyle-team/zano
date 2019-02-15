@@ -19,6 +19,16 @@ app-wallet {
         }
       }
     }
+
+    .alias {
+
+      .icon {
+
+        @include themify($themes) {
+          background-color: themed(blueTextColor);
+        }
+      }
+    }
   }
 
   .address {

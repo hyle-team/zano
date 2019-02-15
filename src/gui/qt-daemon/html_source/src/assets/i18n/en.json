@@ -22,6 +22,8 @@
     "RESTORE_WALLET": "Restore from backup",
     "WALLET_DETAILS": "Wallet details",
     "ASSIGN_ALIAS": "Assign alias",
+    "EDIT_ALIAS": "Edit alias",
+    "TRANSFER_ALIAS": "Transfer alias",
     "CONTRACTS": "Contracts",
     "NEW_PURCHASE": "New purchase",
     "OLD_PURCHASE": "Purchase"
@@ -171,6 +173,45 @@
     },
     "ONE_ALIAS": "You can create only one alias per wallet",
     "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
+  },
+  "EDIT_ALIAS": {
+    "NAME": {
+      "LABEL": "Unique name",
+      "PLACEHOLDER": "@ Enter alias"
+    },
+    "COMMENT": {
+      "LABEL": "Comment",
+      "PLACEHOLDER": "Enter comment"
+    },
+    "FORM_ERRORS": {
+      "NO_MONEY": "You do not have enough funds to change the comment to this alias"
+    },
+    "COST": "Cost to edit alias {{value}} {{currency}}",
+    "BUTTON_EDIT": "Edit",
+    "BUTTON_CANCEL": "Cancel"
+  },
+  "TRANSFER_ALIAS": {
+    "NAME": {
+      "LABEL": "Unique name",
+      "PLACEHOLDER": "@ Enter alias"
+    },
+    "COMMENT": {
+      "LABEL": "Comment",
+      "PLACEHOLDER": "Enter comment"
+    },
+    "ADDRESS": {
+      "LABEL": "The account to which the alias will be transferred",
+      "PLACEHOLDER": "Enter account number"
+    },
+    "FORM_ERRORS": {
+      "WRONG_ADDRESS": "No wallet with this account exists",
+      "ALIAS_EXISTS": "This account already has an alias",
+      "NO_MONEY": "You do not have enough funds to transfer this alias"
+    },
+    "COST": "Cost to transfer alias {{value}} {{currency}}",
+    "BUTTON_TRANSFER": "Transfer",
+    "BUTTON_CANCEL": "Cancel",
+    "REQUEST_SEND_REG": "The alias will be transferred within 10 minutes"
   },
   "SEND": {
     "ADDRESS": "Address",

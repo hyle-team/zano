@@ -582,6 +582,10 @@ export class BackendService {
     return {};
   }
 
+  getPoolInfo(callback) {
+    this.runCommand('get_tx_pool_info', {}, callback);
+  }
+
 }
 
 
@@ -635,10 +639,6 @@ export class BackendService {
 
       resync_wallet: function (wallet_id, callback) {
         this.runCommand('resync_wallet', {wallet_id: wallet_id}, callback);
-      },
-
-      getPoolInfo: function (callback) {
-        this.runCommand('get_tx_pool_info', {}, callback);
       },
 
       storeFile: function (path, buff, callback) {

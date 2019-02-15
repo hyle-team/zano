@@ -14,6 +14,8 @@ import { RestoreWalletComponent } from './restore-wallet/restore-wallet.componen
 import { SeedPhraseComponent } from './seed-phrase/seed-phrase.component';
 import { WalletDetailsComponent } from './wallet-details/wallet-details.component';
 import { AssignAliasComponent } from './assign-alias/assign-alias.component';
+import { EditAliasComponent } from './edit-alias/edit-alias.component';
+import { TransferAliasComponent } from './transfer-alias/transfer-alias.component';
 import { WalletComponent } from './wallet/wallet.component';
 import { SendComponent } from './send/send.component';
 import { ReceiveComponent } from './receive/receive.component';
@@ -72,6 +74,8 @@ Highcharts.setOptions({
     SeedPhraseComponent,
     WalletDetailsComponent,
     AssignAliasComponent,
+    EditAliasComponent,
+    TransferAliasComponent,
     WalletComponent,
     SendComponent,
     ReceiveComponent,
