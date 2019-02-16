@@ -526,4 +526,65 @@ std::string get_nix_version_display_string()
 #endif
     return std::error_code(code, std::system_category());
   }
+
+#define REQUEST_LOG_CHUNK_SIZE_MAX (10 * 1024 * 1024)
+
+  bool get_log_chunk_gzipped(uint64_t offset, uint64_t size, std::string& output, std::string& error)
+  {
+    if (size > REQUEST_LOG_CHUNK_SIZE_MAX)
+    {
+      error = std::string("size is exceeding the limit = ") + epee::string_tools::num_to_string_fast(REQUEST_LOG_CHUNK_SIZE_MAX);
+      return false;
+    }
+
+    std::string log_filename = epee::log_space::log_singletone::get_actual_log_file_path();
+    if (std::ifstream log{ log_filename, std::ifstream::ate | std::ifstream::binary })
+    {
+      uint64_t file_size = log.tellg();
+
+      if (offset >= file_size)
+      {
+        error = "offset is out of bounds";
+        return false;
+      }
+
+      if (offset + size > file_size)
+      {
+        error = "offset + size if out of bounds";
+        return false;
+      }
+
+      if (size != 0)
+      {
+        log.seekg(offset);
+        output.resize(size);
+        log.read(&output.front(), size);
+        uint64_t read_bytes = log.gcount();
+        if (read_bytes != size)
+        {
+          error = std::string("read bytes: ") + epee::string_tools::num_to_string_fast(read_bytes);
+          return false;
+        }
+
+        if (!epee::zlib_helper::pack(output))
+        {
+          error = "zlib pack failed";
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    error = std::string("can't open ") + log_filename;
+    return false;
+  }
+
+  uint64_t get_log_file_size()
+  {
+    std::string log_filename = epee::log_space::log_singletone::get_actual_log_file_path();
+    std::ifstream in(log_filename, std::ifstream::ate | std::ifstream::binary);
+    return static_cast<uint64_t>(in.tellg());
+  }
+
 }

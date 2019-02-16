@@ -48,6 +48,8 @@ namespace tools
     return k;
   }
 
+  bool get_log_chunk_gzipped(uint64_t offset, uint64_t size, std::string& output, std::string& error);
+  uint64_t get_log_file_size();
 
   class signal_handler
   {

@@ -328,12 +328,14 @@ namespace nodetool
       std::string version;
       uint64_t connections_count;
       uint64_t incoming_connections_count;
+      uint64_t current_log_size;
       payload_stat_info payload_info;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(version)
         KV_SERIALIZE(connections_count)
         KV_SERIALIZE(incoming_connections_count)
+        KV_SERIALIZE(current_log_size)
         KV_SERIALIZE(payload_info)
       END_KV_SERIALIZE_MAP()    
     };
@@ -397,7 +399,73 @@ namespace nodetool
     };
   };
 
-#endif
+  /************************************************************************/
+  /*                                                                      */
+  /************************************************************************/
+  struct COMMAND_REQUEST_LOG
+  {
+    const static int ID = P2P_COMMANDS_POOL_BASE + 7;
+
+    struct request
+    {
+      proof_of_trust  tr;
+      uint64_t        log_chunk_offset;
+      uint64_t        log_chunk_size;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tr)
+        KV_SERIALIZE(log_chunk_offset)
+        KV_SERIALIZE(log_chunk_size)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      int64_t     current_log_level;
+      uint64_t    current_log_size;
+      std::string error;
+      std::string log_chunk;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(current_log_level)
+        KV_SERIALIZE(current_log_size)
+        KV_SERIALIZE(error)
+        KV_SERIALIZE(log_chunk)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  /************************************************************************/
+  /*                                                                      */
+  /************************************************************************/
+  struct COMMAND_SET_LOG_LEVEL
+  {
+    const static int ID = P2P_COMMANDS_POOL_BASE + 8;
+
+    struct request
+    {
+      proof_of_trust  tr;
+      int64_t         new_log_level;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tr)
+        KV_SERIALIZE(new_log_level)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      int64_t     old_log_level;
+      int64_t     current_log_level;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(old_log_level)
+        KV_SERIALIZE(current_log_level)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+#endif // #ifdef ALLOW_DEBUG_COMMANDS
     
 }
 
