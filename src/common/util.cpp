@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "include_base_utils.h"
+#include "zlib_helper.h"
 using namespace epee;
 
 #include "util.h"
