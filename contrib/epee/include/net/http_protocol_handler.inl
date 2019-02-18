@@ -345,7 +345,7 @@ namespace net_utils
   template<class t_connection_context>
 	bool simple_http_connection_handler<t_connection_context>::handle_invoke_query_line()
 	{ 
-		LOG_FRAME("simple_http_connection_handler<t_connection_context>::handle_recognize_protocol_out(*)", LOG_LEVEL_3);
+		LOG_FRAME("simple_http_connection_handler<t_connection_context>::handle_invoke_query_line(*)", LOG_LEVEL_3);
 
 		STATIC_REGEXP_EXPR_1(rexp_match_command_line, "^(((OPTIONS)|(GET)|(HEAD)|(POST)|(PUT)|(DELETE)|(TRACE)) (\\S+) HTTP/(\\d+).(\\d+))\r?\n", boost::regex::icase | boost::regex::normal);
 		//											                       123         4     5      6      7     8        9        10          11     12    
