@@ -31,7 +31,7 @@
       <label for="alias-transfer">
         {{ 'TRANSFER_ALIAS.ADDRESS.LABEL' | translate }}
       </label>
-      <input type="text" id="alias-transfer" [(ngModel)]="transferAddress" [ngModelOptions]="{standalone: true, updateOn: 'blur'}" (ngModelChange)="changeAddress()" placeholder="{{ 'TRANSFER_ALIAS.ADDRESS.PLACEHOLDER' | translate }}">
+      <input type="text" id="alias-transfer" [(ngModel)]="transferAddress" [ngModelOptions]="{standalone: true}" (ngModelChange)="changeAddress()" placeholder="{{ 'TRANSFER_ALIAS.ADDRESS.PLACEHOLDER' | translate }}">
       <div class="error-block" *ngIf="transferAddress.length > 0 && (transferAddressAlias || !transferAddressValid || (transferAddressValid && !permissionSend) || notEnoughMoney)">
         <div *ngIf="!transferAddressValid">
           {{ 'TRANSFER_ALIAS.FORM_ERRORS.WRONG_ADDRESS' | translate }}

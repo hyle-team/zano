@@ -15,6 +15,7 @@ export class EditAliasComponent implements OnInit {
 
   wallet: Wallet;
   alias: any;
+  oldAliasComment: 'string';
   notEnoughMoney: boolean;
 
   constructor(
@@ -33,11 +34,12 @@ export class EditAliasComponent implements OnInit {
       address: alias.address,
       comment: alias.comment
     };
+    this.oldAliasComment = alias.comment;
     this.notEnoughMoney = this.wallet.unlocked_balance.isLessThan(this.variablesService.default_fee_big);
   }
 
   updateAlias() {
-    if (this.notEnoughMoney) {
+    if (this.notEnoughMoney || this.oldAliasComment === this.alias.comment) {
       return;
     }
     this.backend.updateAlias(this.wallet.wallet_id, this.alias, this.variablesService.default_fee, (status) => {
