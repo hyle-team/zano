@@ -77,27 +77,16 @@ namespace crypto {
     memcpy(&res, tmp, 32);
   }
 
-   void crypto_ops::keys_from_short(unsigned char* a_part, public_key &pub, secret_key &sec)
+   void crypto_ops::keys_from_default(unsigned char* a_part, public_key &pub, secret_key &sec, size_t brain_wallet_seed_size)
    {
      unsigned char tmp[64] = { 0 };
-     static_assert(sizeof tmp >= BRAINWALLET_SHORT_SEED_SIZE, "size mismatch");
-     memcpy(tmp, a_part, BRAINWALLET_SHORT_SEED_SIZE);
 
-     cn_fast_hash(tmp, 16, (char*)&tmp[16]);
-     cn_fast_hash(tmp, 32, (char*)&tmp[32]);
+     if (!(sizeof(tmp) >= brain_wallet_seed_size))
+     {
+       throw std::runtime_error("size mismatch");
+     }
 
-     sc_reduce(tmp);
-     memcpy(&sec, tmp, 32);
-     ge_p3 point;
-     ge_scalarmult_base(&point, &sec);
-     ge_p3_tobytes(&pub, &point);
-   }
-
-   void crypto_ops::keys_from_default(unsigned char* a_part, public_key &pub, secret_key &sec)
-   {
-     unsigned char tmp[64] = { 0 };
-     static_assert(sizeof tmp >= BRAINWALLET_DEFAULT_SEED_SIZE, "size mismatch");
-     memcpy(tmp, a_part, BRAINWALLET_DEFAULT_SEED_SIZE);
+     memcpy(tmp, a_part, brain_wallet_seed_size);
 
      cn_fast_hash(tmp, 32, (char*)&tmp[32]);
 
@@ -108,12 +97,14 @@ namespace crypto {
      ge_p3_tobytes(&pub, &point);
    }
 
-   void crypto_ops::generate_brain_keys(public_key &pub, secret_key &sec, std::string& seed)
+   void crypto_ops::generate_brain_keys(public_key &pub, secret_key &sec, std::string& seed, size_t brain_wallet_seed_size)
   {
-    unsigned char tmp[BRAINWALLET_DEFAULT_SEED_SIZE];
-    generate_random_bytes(BRAINWALLET_DEFAULT_SEED_SIZE, tmp);
-    seed.assign((const char*)tmp, BRAINWALLET_DEFAULT_SEED_SIZE);
-    keys_from_default(tmp, pub, sec);
+    std::vector<unsigned char> tmp_vector;
+    tmp_vector.resize(brain_wallet_seed_size, 0);
+    unsigned char *tmp = &tmp_vector[0];
+    generate_random_bytes(brain_wallet_seed_size, tmp);
+    seed.assign((const char*)tmp, brain_wallet_seed_size);
+    keys_from_default(tmp, pub, sec, brain_wallet_seed_size);
   }
 
   static inline void hash_to_scalar(const void *data, size_t length, ec_scalar &res) 

@@ -1210,14 +1210,23 @@ namespace currency
     return reward;
   }
   //---------------------------------------------------------------
-//   std::string get_word_from_timstamp(uint64_t timestamp)
-//   {
-//     uint64_t date_offset = timestamp ? timestamp - WALLET_BRAIN_DATE_OFFSET : 0;
-//     date_offset = date_offset / WALLET_BRAIN_DATE_QUANTUM;
-// 
-//     return tools::mnemonic_encoding::word_by_num(timestamp); 
-//   }
+  std::string get_word_from_timstamp(uint64_t timestamp)
+  {
+    uint64_t date_offset = timestamp ? timestamp - WALLET_BRAIN_DATE_OFFSET : 0;
+    uint64_t weeks_count = date_offset / WALLET_BRAIN_DATE_QUANTUM;
+    CHECK_AND_ASSERT_THROW_MES(weeks_count < std::numeric_limits<uint32_t>::max(), "internal error: unable to converto to uint32, val = " << weeks_count);
+    uint32_t weeks_count_32 = static_cast<uint32_t>(weeks_count);
 
+    return tools::mnemonic_encoding::word_by_num(weeks_count_32);
+  }
+  //---------------------------------------------------------------
+  uint64_t get_timstamp_from_word(std::string word)
+  {
+    uint64_t count_of_weeks = tools::mnemonic_encoding::num_by_word(word);
+    uint64_t timestamp = count_of_weeks * WALLET_BRAIN_DATE_QUANTUM + WALLET_BRAIN_DATE_OFFSET;
+
+    return timestamp;
+  }
   //---------------------------------------------------------------
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed /* = nullptr */)
   {

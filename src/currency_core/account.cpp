@@ -41,9 +41,8 @@ namespace currency
   }
   //-----------------------------------------------------------------
   void account_base::generate()
-  {
-    //generate_keys(m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key);
-    generate_brain_keys(m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key, m_seed);
+  {   
+    generate_brain_keys(m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key, m_seed, BRAINWALLET_DEFAULT_SEED_SIZE);
     dependent_key(m_keys.m_spend_secret_key, m_keys.m_view_secret_key);
     if (!crypto::secret_key_to_public_key(m_keys.m_view_secret_key, m_keys.m_account_address.m_view_public_key))
       throw std::runtime_error("Failed to create public view key");
@@ -69,7 +68,8 @@ namespace currency
     std::vector<unsigned char> v;
     v.assign((unsigned char*)restore_buff.data(), (unsigned char*)restore_buff.data() + restore_buff.size());
     std::string seed_brain_data = tools::mnemonic_encoding::binary2text(v);
-    //m_creation_timestamp
+    std::string timestamp_word = currency::get_word_from_timstamp(m_creation_timestamp);
+    seed_brain_data = seed_brain_data + timestamp_word;
     return seed_brain_data;
   }
   //-----------------------------------------------------------------
@@ -78,11 +78,7 @@ namespace currency
     //CHECK_AND_ASSERT_MES(restore_data.size() == ACCOUNT_RESTORE_DATA_SIZE, false, "wrong restore data size");
     if (restore_data.size() == BRAINWALLET_DEFAULT_SEED_SIZE)
     {
-      crypto::keys_from_default((unsigned char*)restore_data.data(), m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key);
-    }
-    else if(restore_data.size() == BRAINWALLET_SHORT_SEED_SIZE)
-    {
-      crypto::keys_from_short((unsigned char*)restore_data.data(), m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key);
+      crypto::keys_from_default((unsigned char*)restore_data.data(), m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key, BRAINWALLET_DEFAULT_SEED_SIZE);
     }
     else 
     {
@@ -97,15 +93,27 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
-  bool account_base::restore_keys_from_braindata(const std::string& restore_data)
+  bool account_base::restore_keys_from_braindata(const std::string& restore_data_)
   {
+    //cut the last timestamp word from restore_dats
+    std::list<std::string> words;
+    boost::split(words, restore_data_, boost::is_space());
+    CHECK_AND_ASSERT_THROW_MES(words.size() == BRAINWALLET_DEFAULT_WORDS_COUNT, "Words count missmatch: " << words.size());
+
+    std::string timestamp_word = words.back();
+    words.erase(--words.end());
+
+    std::string restore_data_local = boost::algorithm::join(words, " ");
     
-    std::vector<unsigned char> bin = tools::mnemonic_encoding::text2binary(restore_data);
+    std::vector<unsigned char> bin = tools::mnemonic_encoding::text2binary(restore_data_local);
     if (!bin.size())
       return false;
 
     std::string restore_buff((const char*)&bin[0], bin.size());
-    return restore_keys(restore_buff);
+    bool r = restore_keys(restore_buff);
+    CHECK_AND_ASSERT_MES(r, false, "restore_keys failed");
+    m_creation_timestamp = get_timstamp_from_word(timestamp_word);
+    return true;
   }
   //-----------------------------------------------------------------
   std::string account_base::get_public_address_str()
