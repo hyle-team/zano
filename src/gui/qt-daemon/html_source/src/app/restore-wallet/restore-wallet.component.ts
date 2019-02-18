@@ -51,7 +51,9 @@ export class RestoreWalletComponent implements OnInit {
 
 
   createWallet() {
-    this.router.navigate(['/seed-phrase'], {queryParams: {wallet_id: this.wallet.id}});
+    this.ngZone.run(() => {
+      this.router.navigate(['/seed-phrase'], {queryParams: {wallet_id: this.wallet.id}});
+    });
   }
 
   saveWallet() {

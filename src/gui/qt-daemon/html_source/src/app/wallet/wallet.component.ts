@@ -90,7 +90,9 @@ export class WalletComponent implements OnInit, OnDestroy {
       tab.active = false;
     });
     this.tabs[index].active = true;
-    this.router.navigate(['wallet/' + this.walletID + this.tabs[index].link]);
+    this.ngZone.run( () => {
+      this.router.navigate(['wallet/' + this.walletID + this.tabs[index].link]);
+    });
   }
 
   copyAddress() {

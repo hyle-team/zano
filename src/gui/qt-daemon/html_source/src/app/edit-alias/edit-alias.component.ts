@@ -1,4 +1,4 @@
-import {Component, OnInit} from '@angular/core';
+import {Component, NgZone, OnInit} from '@angular/core';
 import {Location} from '@angular/common';
 import {Router} from '@angular/router';
 import {BackendService} from "../_helpers/services/backend.service";
@@ -17,13 +17,15 @@ export class EditAliasComponent implements OnInit {
   alias: any;
   oldAliasComment: 'string';
   notEnoughMoney: boolean;
+  requestProcessing = false;
 
   constructor(
     private location: Location,
     private router: Router,
     private backend: BackendService,
     private variablesService: VariablesService,
-    private modalService: ModalService
+    private modalService: ModalService,
+    private ngZone: NgZone
   ) {}
 
   ngOnInit() {
@@ -39,15 +41,19 @@ export class EditAliasComponent implements OnInit {
   }
 
   updateAlias() {
-    if (this.notEnoughMoney || this.oldAliasComment === this.alias.comment) {
+    if (this.requestProcessing || this.notEnoughMoney || this.oldAliasComment === this.alias.comment) {
       return;
     }
+    this.requestProcessing = true;
     this.backend.updateAlias(this.wallet.wallet_id, this.alias, this.variablesService.default_fee, (status) => {
       if (status) {
         this.modalService.prepareModal('success', '');
-        this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
         this.wallet.alias['comment'] = this.alias.comment;
+        this.ngZone.run(() => {
+          this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
+        });
       }
+      this.requestProcessing = false;
     });
   }
 

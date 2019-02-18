@@ -20,6 +20,7 @@ export class TransferAliasComponent implements OnInit {
   transferAddressAlias: boolean;
   permissionSend: boolean;
   notEnoughMoney: boolean;
+  processingRequst = false;
 
   constructor(
     private location: Location,
@@ -80,9 +81,10 @@ export class TransferAliasComponent implements OnInit {
   }
 
   transferAlias() {
-    if (!this.permissionSend || !this.transferAddressValid || this.notEnoughMoney) {
+    if (this.processingRequst || !this.permissionSend || !this.transferAddressValid || this.notEnoughMoney) {
       return;
     }
+    this.processingRequst = true;
     const newAlias = {
       name: this.alias.name,
       address: this.transferAddress,
@@ -91,10 +93,13 @@ export class TransferAliasComponent implements OnInit {
     };
     this.backend.updateAlias(this.wallet.wallet_id, newAlias, this.variablesService.default_fee, (status, data) => {
       if (status && data.hasOwnProperty('success') && data.success) {
-        this.modalService.prepareModal('info', 'TRANSFER_ALIAS.REQUEST_SEND_REG')
+        this.modalService.prepareModal('info', 'TRANSFER_ALIAS.REQUEST_SEND_REG');
+        this.ngZone.run(() => {
+          this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
+        });
       }
+      this.processingRequst = false;
     });
-    this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
   }
 
   back() {
