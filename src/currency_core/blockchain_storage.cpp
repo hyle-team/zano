@@ -4254,7 +4254,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
 
-  uint64_t h = get_block_height(bl);
+  get_block_height(bl);
 
   if(!check_block_timestamp_main(bl))
   {

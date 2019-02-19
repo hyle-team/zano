@@ -35,9 +35,13 @@ int test_big_difficulties(const char* dataFile)
             end = n - DIFFICULTY_LAG;
             begin = end - DIFFICULTY_WINDOW;
         }
+	auto stamps = vector<uint64_t>(timestamps.begin() + begin, timestamps.begin() + end);
+	auto cumulative_diffs = vector<currency::wide_difficulty_type>(cumulative_difficulties.begin() + begin, cumulative_difficulties.begin() + end);
         currency::wide_difficulty_type res = currency::next_difficulty(
-            vector<uint64_t>(timestamps.begin() + begin, timestamps.begin() + end),
-            vector<currency::wide_difficulty_type>(cumulative_difficulties.begin() + begin, cumulative_difficulties.begin() + end), DEFAULT_TEST_DIFFICULTY_TARGET);
+            stamps,
+            cumulative_diffs,
+	    DEFAULT_TEST_DIFFICULTY_TARGET
+	);
         if (res != difficulty) {
             cerr << "Wrong wide difficulty for block " << n << endl
                 << "Expected: " << difficulty << endl
@@ -90,9 +94,13 @@ int main(int argc, char *argv[]) {
                 << "Found: " << res << endl;
             return 1;
         }
+	auto stamps = vector<uint64_t>(timestamps.begin() + begin, timestamps.begin() + end);
+	auto cumulative_diffs = vector<currency::wide_difficulty_type>(wide_cumulative_difficulties.begin() + begin, wide_cumulative_difficulties.begin() + end);
         currency::wide_difficulty_type wide_res = currency::next_difficulty(
-            vector<uint64_t>(timestamps.begin() + begin, timestamps.begin() + end),
-            vector<currency::wide_difficulty_type>(wide_cumulative_difficulties.begin() + begin, wide_cumulative_difficulties.begin() + end), DEFAULT_TEST_DIFFICULTY_TARGET);
+            stamps,
+            cumulative_diffs,
+	    DEFAULT_TEST_DIFFICULTY_TARGET
+	);
         if (wide_res.convert_to<uint64_t>() != res) {
             cerr << "Wrong wide difficulty for block " << n << endl
                 << "Expected: " << res << endl
@@ -110,3 +118,4 @@ int main(int argc, char *argv[]) {
 	
     return 0;
 }
+

@@ -10,9 +10,9 @@
 #include "crypto/crypto.h"
 #include "serialization/keyvalue_serialization.h"
 
-
+#define BRAINWALLET_DEFAULT_SEED_SIZE 32 
 #define ACCOUNT_RESTORE_DATA_SIZE     BRAINWALLET_DEFAULT_SEED_SIZE    
-
+#define BRAINWALLET_DEFAULT_WORDS_COUNT 25
 
 
 

@@ -893,12 +893,10 @@ namespace log_space
       FAST_CRITICAL_REGION_END();
       return true;
     }
-
     std::string get_thread_prefix()
     {
       FAST_CRITICAL_REGION_LOCAL(m_critical_sec);
       return m_thr_prefix_strings[misc_utils::get_thread_string_id()];
-
     }
 
     std::string get_default_log_file()
@@ -1160,7 +1158,6 @@ namespace log_space
 
     }
 
-
     static bool add_logger( ibase_log_stream* pstream, int log_level_limit = LOG_LEVEL_4 )
     {
       logger* plogger = get_or_create_instance();
@@ -1234,8 +1231,6 @@ POP_WARNINGS
     }
 
 
-
-
 #ifdef _MSC_VER
 
 
@@ -1290,8 +1285,6 @@ POP_WARNINGS
       return plogger->get_thread_prefix();
     }
 
-
-    
     static std::string get_prefix_entry()
     {
       std::stringstream str_prefix;
@@ -1587,8 +1580,6 @@ POP_WARNINGS
 #endif
 
 
-
-
 #define LOG_PRINT_NO_POSTFIX(mess, level) LOG_PRINT_NO_POSTFIX2(LOG_DEFAULT_TARGET, mess, level)
 #define LOG_PRINT_NO_PREFIX(mess, level)  LOG_PRINT_NO_PREFIX2(LOG_DEFAULT_TARGET, mess, level)
 #define LOG_PRINT_NO_PREFIX_NO_POSTFIX(mess, level) LOG_PRINT_NO_PREFIX_NO_POSTFIX2(LOG_DEFAULT_TARGET, mess, level)
@@ -1693,7 +1684,6 @@ POP_WARNINGS
 #ifndef CHECK_AND_ASSERT_MES2
 #define CHECK_AND_ASSERT_MES2(expr, message)         do{if(!(expr)) {LOG_ERROR(message); };}while(0)
 #endif
-
 
 }
 

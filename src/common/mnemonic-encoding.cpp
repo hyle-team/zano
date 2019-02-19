@@ -34,11 +34,13 @@
 // Copyright (c) 2014-2018 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 
+
 #include <cassert>
 #include <map>
 #include <cstdint>
 #include <boost/algorithm/string.hpp>
 #include "mnemonic-encoding.h"
+#include "include_base_utils.h"
 
 namespace tools
 {
@@ -3371,5 +3373,18 @@ namespace tools
 			}
 			return res;
 		}
+    std::string word_by_num(uint32_t n)
+    {
+      if (n >= NUMWORDS)
+        return "";
+      return wordsArray[n];
+    }
+
+    uint64_t num_by_word(const std::string& w)
+    {
+      auto it = wordsMap.find(w);
+      CHECK_AND_ASSERT_THROW_MES(it!= wordsMap.end(), "unable to find word \"" << w << "\" in mnemonic dictionary");
+      return it->second;
+    }
 	} 
 }  
