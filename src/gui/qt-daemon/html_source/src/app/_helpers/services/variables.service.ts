@@ -40,6 +40,7 @@ export class VariablesService {
   public currentWallet: Wallet;
   public aliases: any = [];
   public aliasesChecked: any = {};
+  public aliasesUnconfirmed: any = [];
   public enableAliasSearch = false;
 
   getHeightAppEvent = new BehaviorSubject(null);

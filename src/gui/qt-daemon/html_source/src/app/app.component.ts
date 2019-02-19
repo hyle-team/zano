@@ -187,6 +187,19 @@ export class AppComponent implements OnInit, OnDestroy {
           return;
         }
 
+        if (this.variablesService.aliasesUnconfirmed.length) {
+          let alias = false;
+          for (let i = 0; i < this.variablesService.aliasesUnconfirmed.length; i++) {
+            if (this.variablesService.aliasesUnconfirmed[i].tx_hash === data.ti.tx_hash) {
+              alias = this.variablesService.aliasesUnconfirmed[i];
+              break;
+            }
+          }
+          if (alias) {
+            this.variablesService.aliasesUnconfirmed.splice(this.variablesService.aliasesUnconfirmed.indexOf(alias), 1);
+          }
+        }
+
         const wallet_id = data.wallet_id;
         const tr_info = data.ti;
 

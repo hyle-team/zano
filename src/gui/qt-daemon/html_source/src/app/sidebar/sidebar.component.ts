@@ -47,10 +47,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy() {
-    this.walletSubRouting.unsubscribe();
-  }
-
   logOut() {
     this.variablesService.stopCountdown();
     this.variablesService.appPass = '';
@@ -59,4 +55,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     });
   }
 
+  ngOnDestroy() {
+    this.walletSubRouting.unsubscribe();
+  }
 }

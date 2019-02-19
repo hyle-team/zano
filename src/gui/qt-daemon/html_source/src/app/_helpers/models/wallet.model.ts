@@ -14,6 +14,7 @@ export class Wallet {
   tracking_hey: string;
 
   alias?: object;
+  wakeAlias?: boolean;
   staking?: boolean;
   new_messages?: number;
   new_contracts?: number;

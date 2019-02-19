@@ -20,7 +20,7 @@ export class TransferAliasComponent implements OnInit {
   transferAddressAlias: boolean;
   permissionSend: boolean;
   notEnoughMoney: boolean;
-  processingRequst = false;
+  requestProcessing = false;
 
   constructor(
     private location: Location,
@@ -81,10 +81,10 @@ export class TransferAliasComponent implements OnInit {
   }
 
   transferAlias() {
-    if (this.processingRequst || !this.permissionSend || !this.transferAddressValid || this.notEnoughMoney) {
+    if (this.requestProcessing || !this.permissionSend || !this.transferAddressValid || this.notEnoughMoney) {
       return;
     }
-    this.processingRequst = true;
+    this.requestProcessing = true;
     const newAlias = {
       name: this.alias.name,
       address: this.transferAddress,
@@ -98,7 +98,7 @@ export class TransferAliasComponent implements OnInit {
           this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
         });
       }
-      this.processingRequst = false;
+      this.requestProcessing = false;
     });
   }
 

@@ -1,4 +1,4 @@
-import {Component, OnInit, NgZone} from '@angular/core';
+import {Component, NgZone, OnInit, OnDestroy} from '@angular/core';
 import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {Location} from '@angular/common';
 import {Router} from '@angular/router';
@@ -9,19 +9,21 @@ import {Wallet} from '../_helpers/models/wallet.model';
 import {MoneyToIntPipe} from '../_helpers/pipes/money-to-int.pipe';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
 import BigNumber from 'bignumber.js';
+import {Subscription} from "rxjs";
 
 @Component({
   selector: 'app-assign-alias',
   templateUrl: './assign-alias.component.html',
   styleUrls: ['./assign-alias.component.scss']
 })
-export class AssignAliasComponent implements OnInit {
+export class AssignAliasComponent implements OnInit, OnDestroy {
 
   wallet: Wallet;
   assignForm = new FormGroup({
     name: new FormControl('', [Validators.required, Validators.pattern(/^@?[a-z0-9\.\-]{6,25}$/)]),
     comment: new FormControl('')
   });
+  assignFormSubscription: Subscription;
   alias = {
     name: '',
     fee: this.variablesService.default_fee,
@@ -43,12 +45,11 @@ export class AssignAliasComponent implements OnInit {
     private modalService: ModalService,
     private moneyToInt: MoneyToIntPipe,
     private intToMoney: IntToMoneyPipe
-  ) {
-  }
+  ) {}
 
   ngOnInit() {
     this.wallet = this.variablesService.currentWallet;
-    this.assignForm.get('name').valueChanges.subscribe(value => {
+    this.assignFormSubscription = this.assignForm.get('name').valueChanges.subscribe(value => {
       this.canRegister = false;
       this.alias.exists = false;
       const newName = value.toLowerCase().replace('@', '');
@@ -91,10 +92,10 @@ export class AssignAliasComponent implements OnInit {
       this.modalService.prepareModal('info', 'ASSIGN_ALIAS.ONE_ALIAS');
     } else {
       this.alias.comment = this.assignForm.get('comment').value;
-      this.backend.registerAlias(this.wallet.wallet_id, this.alias.name, this.wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, (status) => {
+      this.backend.registerAlias(this.wallet.wallet_id, this.alias.name, this.wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, (status, data) => {
         if (status) {
-          // service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
-          // wallet.wakeAlias = true;
+          this.variablesService.aliasesUnconfirmed.push({tx_hash: data.tx_hash, name: this.alias.name});
+          this.wallet.wakeAlias = true;
           this.modalService.prepareModal('info', 'ASSIGN_ALIAS.REQUEST_ADD_REG');
           this.ngZone.run(() => {
             this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
@@ -106,5 +107,9 @@ export class AssignAliasComponent implements OnInit {
 
   back() {
     this.location.back();
+  }
+
+  ngOnDestroy() {
+    this.assignFormSubscription.unsubscribe();
   }
 }
