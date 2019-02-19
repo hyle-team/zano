@@ -35,7 +35,7 @@
       <label for="seed-phrase">{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>
       <div class="seed-phrase" id="seed-phrase">
         <div class="seed-phrase-hint" (click)="showSeedPhrase()" *ngIf="!showSeed">{{ 'WALLET_DETAILS.SEED_PHRASE_HINT' | translate }}</div>
-        <div class="seed-phrase-content" *ngIf="showSeed">
+        <div class="seed-phrase-content" *ngIf="showSeed" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, seedPhrase)">
           <ng-container *ngFor="let word of seedPhrase.split(' '); let index = index">
             <div class="word">{{(index + 1) + '. ' + word}}</div>
           </ng-container>
