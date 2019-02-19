@@ -122,6 +122,7 @@
 // Boost 1.69 (Spirit.X2/X3) has dropped their own FP routines in favor of boost::math
 #elif BOOST_VERSION < 106900
 #include <boost/spirit/home/support/detail/math/fpclassify.hpp>
+#include <boost/spirit/home/support/detail/endian/endian.hpp>
 #else
 #include <boost/spirit/home/support/detail/endian/endian.hpp>
 #endif
