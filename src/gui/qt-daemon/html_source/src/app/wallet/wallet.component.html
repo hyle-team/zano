@@ -25,7 +25,7 @@
 </div>
 <div class="address">
   <span>{{variablesService.currentWallet.address}}</span>
-  <i #copyIcon class="icon copy" (click)="copyAddress()"></i>
+  <i class="icon" [class.copy]="!copyAnimation" [class.copied]="copyAnimation" (click)="copyAddress()"></i>
 </div>
 <div class="balance">
   <span [tooltip]="getTooltip()" [placement]="'bottom'" [tooltipClass]="'balance-tooltip'" [delay]="300" [timeout]="0">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>
@@ -41,7 +41,7 @@
       </div>
     </ng-container>
   </div>
-  <div class="tabs-content scrolled-content">
+  <div #scrolledContent class="tabs-content scrolled-content">
     <router-outlet></router-outlet>
   </div>
 </div>

@@ -53,6 +53,7 @@ export class InputValidateDirective {
       const cursorPosition = (<HTMLInputElement>event.target).selectionEnd;
       (<HTMLInputElement>event.target).value = currentValue;
       (<HTMLInputElement>event.target).setSelectionRange(cursorPosition, cursorPosition);
+      (<HTMLInputElement>event.target).dispatchEvent(new Event('input'));
     }
   }
 
