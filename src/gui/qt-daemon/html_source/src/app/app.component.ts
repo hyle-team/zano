@@ -7,6 +7,7 @@ import {VariablesService} from './_helpers/services/variables.service';
 import {ContextMenuComponent} from 'ngx-contextmenu';
 import {IntToMoneyPipe} from './_helpers/pipes/int-to-money.pipe';
 import {BigNumber} from 'bignumber.js';
+import {ModalService} from './_helpers/services/modal.service';
 
 @Component({
   selector: 'app-root',
@@ -30,7 +31,8 @@ export class AppComponent implements OnInit, OnDestroy {
     private router: Router,
     private variablesService: VariablesService,
     private ngZone: NgZone,
-    private intToMoneyPipe: IntToMoneyPipe
+    private intToMoneyPipe: IntToMoneyPipe,
+    private modalService: ModalService
   ) {
     translate.addLangs(['en', 'fr']);
     translate.setDefaultLang('en');
@@ -63,7 +65,6 @@ export class AppComponent implements OnInit, OnDestroy {
       console.log('Init message: ', initMessage);
 
       this.backend.webkitLaunchedScript();
-
 
       this.backend.is_remnotenode_mode_preconfigured((status, data) => {
         // if (data === 'FALSE') {
@@ -99,7 +100,6 @@ export class AppComponent implements OnInit, OnDestroy {
         this.onQuitRequest = true;
       });
 
-
       this.backend.eventSubscribe('update_wallet_status', (data) => {
         console.log('----------------- update_wallet_status -----------------');
         console.log(data);
@@ -126,7 +126,6 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       });
 
-
       this.backend.eventSubscribe('wallet_sync_progress', (data) => {
         console.log('----------------- wallet_sync_progress -----------------');
         console.log(data);
@@ -144,7 +143,6 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       });
 
-
       this.backend.eventSubscribe('update_daemon_state', (data) => {
         console.log('----------------- update_daemon_state -----------------');
         console.log('DAEMON:' + data.daemon_network_state);
@@ -154,10 +152,10 @@ export class AppComponent implements OnInit, OnDestroy {
         this.variablesService.setHeightApp(data.height);
 
         this.ngZone.run(() => {
-          this.variablesService.daemon_state = data.daemon_network_state;
-          if (data.daemon_network_state === 1) {
-            const max = data.max_net_seen_height - data.synchronization_start_height;
-            const current = data.height - data.synchronization_start_height;
+          this.variablesService.daemon_state = data['daemon_network_state'];
+          if (data['daemon_network_state'] === 1) {
+            const max = data['max_net_seen_height'] - data['synchronization_start_height'];
+            const current = data.height - data['synchronization_start_height'];
             const return_val = Math.floor((current * 100 / max) * 100) / 100;
             if (max === 0 || return_val < 0) {
               this.variablesService.sync.progress_value = 0;
@@ -171,7 +169,8 @@ export class AppComponent implements OnInit, OnDestroy {
             }
           }
         });
-        if (!this.firstOnlineState) {
+        if (!this.firstOnlineState && data['daemon_network_state'] === 2) {
+          this.getAliases();
           this.backend.getDefaultFee((status_fee, data_fee) => {
             this.variablesService.default_fee_big = new BigNumber(data_fee);
             this.variablesService.default_fee = this.intToMoneyPipe.transform(data_fee);
@@ -186,6 +185,19 @@ export class AppComponent implements OnInit, OnDestroy {
 
         if (!data.ti) {
           return;
+        }
+
+        if (this.variablesService.aliasesUnconfirmed.length) {
+          let alias = false;
+          for (let i = 0; i < this.variablesService.aliasesUnconfirmed.length; i++) {
+            if (this.variablesService.aliasesUnconfirmed[i].tx_hash === data.ti.tx_hash) {
+              alias = this.variablesService.aliasesUnconfirmed[i];
+              break;
+            }
+          }
+          if (alias) {
+            this.variablesService.aliasesUnconfirmed.splice(this.variablesService.aliasesUnconfirmed.indexOf(alias), 1);
+          }
         }
 
         const wallet_id = data.wallet_id;
@@ -315,72 +327,138 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       });
 
-
       this.backend.eventSubscribe('money_transfer_cancel', (data) => {
         console.log('----------------- money_transfer_cancel -----------------');
         console.log(data);
 
-        // if (!data.ti) {
-        //   return;
-        // }
-        //
-        // var wallet_id = data.wallet_id;
-        // var tr_info = data.ti;
-        // var wallet = $rootScope.getWalletById(wallet_id);
-        // if (wallet) {
-        //   if ( tr_info.hasOwnProperty("contract") ){
-        //     for (var i = 0; i < $rootScope.contracts.length; i++) {
-        //       if ($rootScope.contracts[i].contract_id === tr_info.contract[0].contract_id && $rootScope.contracts[i].is_a === tr_info.contract[0].is_a) {
-        //         if ($rootScope.contracts[i].state === 1 || $rootScope.contracts[i].state === 110) {
-        //           $rootScope.contracts[i].isNew = true;
-        //           $rootScope.contracts[i].state = 140;
-        //           $rootScope.getContractsRecount(); //escrow_code
-        //         }
-        //         break;
-        //       }
-        //     }
-        //   }
-        //   angular.forEach(wallet.history, function (tr_item, key) {
-        //     if (tr_item.tx_hash === tr_info.tx_hash) {
-        //       wallet.history.splice(key, 1);
-        //     }
-        //   });
-        //
-        //   var error_tr = '';
-        //   switch (tr_info.tx_type) {
-        //     case 0:
-        //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL') + '<br>' +
-        //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-        //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_TO') + ' ' + $rootScope.moneyParse(tr_info.amount) + ' ' +
-        //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_END');
-        //       informer.error(error_tr);
-        //       break;
-        //     case 1:
-        //       informer.error('ERROR_GUI_TX_TYPE_PUSH_OFFER');
-        //       break;
-        //     case 2:
-        //       informer.error('ERROR_GUI_TX_TYPE_UPDATE_OFFER');
-        //       break;
-        //     case 3:
-        //       informer.error('ERROR_GUI_TX_TYPE_CANCEL_OFFER');
-        //       break;
-        //     case 4:
-        //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS') + '<br>' +
-        //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-        //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
-        //       informer.error(error_tr);
-        //       break;
-        //     case 5:
-        //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_UPDATE_ALIAS') + '<br>' +
-        //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-        //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
-        //       informer.error(error_tr);
-        //       break;
-        //     case 6:
-        //       informer.error('ERROR_GUI_TX_TYPE_COIN_BASE');
-        //       break;
-        //   }
-        // }
+        if (!data.ti) {
+          return;
+        }
+
+        const wallet_id = data.wallet_id;
+        const tr_info = data.ti;
+        const wallet = this.variablesService.getWallet(wallet_id);
+
+        if (wallet) {
+          if (tr_info.hasOwnProperty('contract')) {
+            for (let i = 0; i < wallet.contracts.length; i++) {
+              if (wallet.contracts[i].contract_id === tr_info.contract[0].contract_id && wallet.contracts[i].is_a === tr_info.contract[0].is_a) {
+                if (wallet.contracts[i].state === 1 || wallet.contracts[i].state === 110) {
+                  wallet.contracts[i].is_new = true;
+                  wallet.contracts[i].state = 140;
+                  wallet.recountNewContracts();
+                }
+                break;
+              }
+            }
+          }
+
+          wallet.removeFromHistory(tr_info.tx_hash);
+
+          let error_tr = '';
+          switch (tr_info.tx_type) {
+            case 0:
+              error_tr = this.translate.instant('ERRORS.TX_TYPE_NORMAL') + '<br>' +
+                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                this.translate.instant('ERRORS.TX_TYPE_NORMAL_TO') + ' ' + this.intToMoneyPipe.transform(tr_info.amount) + ' ' +
+                this.translate.instant('ERRORS.TX_TYPE_NORMAL_END');
+              break;
+            case 1:
+              // this.translate.instant('ERRORS.TX_TYPE_PUSH_OFFER');
+              break;
+            case 2:
+              // this.translate.instant('ERRORS.TX_TYPE_UPDATE_OFFER');
+              break;
+            case 3:
+              // this.translate.instant('ERRORS.TX_TYPE_CANCEL_OFFER');
+              break;
+            case 4:
+              error_tr = this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS') + '<br>' +
+                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS_END');
+              break;
+            case 5:
+              error_tr = this.translate.instant('ERRORS.TX_TYPE_UPDATE_ALIAS') + '<br>' +
+                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS_END');
+              break;
+            case 6:
+              error_tr = this.translate.instant('ERRORS.TX_TYPE_COIN_BASE');
+              break;
+          }
+          if (error_tr) {
+            this.modalService.prepareModal('error', error_tr);
+          }
+        }
+      });
+
+      this.backend.eventSubscribe('on_core_event', (data) => {
+        console.log('----------------- on_core_event -----------------');
+        console.log(data);
+
+        data = JSON.parse(data);
+
+        if (data.events != null) {
+          for (let i = 0, length = data.events.length; i < length; i++) {
+
+            switch (data.events[i].method) {
+              case 'CORE_EVENT_BLOCK_ADDED': break;
+              case 'CORE_EVENT_ADD_ALIAS':
+                if (this.variablesService.aliasesChecked[data.events[i].details.address] != null) {
+                  this.variablesService.aliasesChecked[data.events[i].details.address]['name'] = '@' + data.events[i].details.alias;
+                  this.variablesService.aliasesChecked[data.events[i].details.address]['address'] = data.events[i].details.address;
+                  this.variablesService.aliasesChecked[data.events[i].details.address]['comment'] = data.events[i].details.comment;
+                }
+                if (this.variablesService.enableAliasSearch) {
+                  const newAlias = {
+                    name: '@' + data.events[i].details.alias,
+                    address: data.events[i].details.address,
+                    comment: data.events[i].details.comment
+                  };
+                  this.variablesService.aliases = this.variablesService.aliases.concat(newAlias);
+                  // this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
+                  //   if (a.name.length > b.name.length) return 1;
+                  //   if (a.name.length < b.name.length) return -1;
+                  //   if (a.name > b.name) return 1;
+                  //   if (a.name < b.name) return -1;
+                  //   return 0;
+                  // });
+                  this.variablesService.changeAliases();
+                }
+                break;
+              case 'CORE_EVENT_UPDATE_ALIAS':
+                for (const address in this.variablesService.aliasesChecked) {
+                  if (this.variablesService.aliasesChecked.hasOwnProperty(address)) {
+                    if (this.variablesService.aliasesChecked[address].name === '@' + data.events[i].details.alias) {
+                      if (this.variablesService.aliasesChecked[address].address !== data.events[i].details.details.address) {
+                        delete this.variablesService.aliasesChecked[address]['name'];
+                        delete this.variablesService.aliasesChecked[address]['address'];
+                        delete this.variablesService.aliasesChecked[address]['comment'];
+                      } else {
+                        this.variablesService.aliasesChecked[address].comment = data.events[i].details.details.comment;
+                      }
+                      break;
+                    }
+                  }
+                }
+                if (this.variablesService.aliasesChecked[data.events[i].details.details.address] != null) {
+                  this.variablesService.aliasesChecked[data.events[i].details.details.address]['name'] = '@' + data.events[i].details.alias;
+                  this.variablesService.aliasesChecked[data.events[i].details.details.address]['address'] = data.events[i].details.details.address;
+                  this.variablesService.aliasesChecked[data.events[i].details.details.address]['comment'] = data.events[i].details.details.comment;
+                }
+                if (this.variablesService.enableAliasSearch) {
+                  const CurrentAlias = this.variablesService.aliases.find((element) => element.name === '@' + data.events[i].details.alias);
+                  if (CurrentAlias) {
+                    CurrentAlias.address = data.events[i].details.details.address;
+                    CurrentAlias.comment = data.events[i].details.details.comment;
+                  }
+                }
+                this.variablesService.changeAliases();
+                break;
+              default: break;
+            }
+          }
+        }
       });
 
       this.intervalUpdateContractsState = setInterval(() => {
@@ -454,6 +532,42 @@ export class AppComponent implements OnInit, OnDestroy {
     );
   }
 
+  getAliases() {
+    this.backend.getAllAliases((status, data, error) => {
+      if (error === 'CORE_BUSY') {
+        window.setTimeout(() => {
+          this.getAliases();
+        }, 10000);
+      } else if (error === 'OVERFLOW') {
+        this.variablesService.aliases = [];
+        this.variablesService.enableAliasSearch = false;
+      } else {
+        this.variablesService.enableAliasSearch = true;
+        if (data.aliases && data.aliases.length) {
+          this.variablesService.aliases = [];
+          data.aliases.forEach(alias => {
+            const newAlias = {
+              name: '@' + alias.alias,
+              address: alias.address,
+              comment: alias.comment
+            };
+            this.variablesService.aliases.push(newAlias);
+          });
+          this.variablesService.wallets.forEach(wallet => {
+            wallet.alias = this.backend.getWalletAlias(wallet.address);
+          });
+          this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
+            if (a.name.length > b.name.length) return 1;
+            if (a.name.length < b.name.length) return -1;
+            if (a.name > b.name) return 1;
+            if (a.name < b.name) return -1;
+            return 0;
+          });
+          this.variablesService.changeAliases();
+        }
+      }
+    });
+  }
 
   contextMenuCopy(target) {
     if (target && (target['nodeName'].toUpperCase() === 'TEXTAREA' || target['nodeName'].toUpperCase() === 'INPUT')) {

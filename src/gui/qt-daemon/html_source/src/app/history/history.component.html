@@ -38,7 +38,9 @@
       </tr>
       <tr class="transaction-details" [class.open]="index === openedDetails">
         <td colspan="5">
-          <app-transaction-details *ngIf="index === openedDetails" [transaction]="item" [sizes]="calculatedWidth"></app-transaction-details>
+          <ng-container *ngIf="index === openedDetails">
+            <app-transaction-details [transaction]="item" [sizes]="calculatedWidth"></app-transaction-details>
+          </ng-container>
         </td>
       </tr>
     </ng-container>

@@ -38,9 +38,14 @@ export class VariablesService {
 
   public wallets: Array<Wallet> = [];
   public currentWallet: Wallet;
+  public aliases: any = [];
+  public aliasesChecked: any = {};
+  public aliasesUnconfirmed: any = [];
+  public enableAliasSearch = false;
 
   getHeightAppEvent = new BehaviorSubject(null);
   getRefreshStackingEvent = new BehaviorSubject(null);
+  getAliasChangedEvent = new BehaviorSubject(null);
 
   public idle = new Idle()
     .whenNotInteractive()
@@ -68,6 +73,10 @@ export class VariablesService {
 
   setRefreshStacking(wallet_id: number) {
     this.getHeightAppEvent.next(wallet_id);
+  }
+
+  changeAliases() {
+    this.getAliasChangedEvent.next(true);
   }
 
   setCurrentWallet(id): void {

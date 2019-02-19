@@ -1,5 +1,6 @@
 import {Component, OnInit, OnDestroy, AfterViewChecked, ViewChild, ElementRef} from '@angular/core';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {ActivatedRoute} from '@angular/router';
 
 @Component({
   selector: 'app-history',
@@ -7,14 +8,21 @@ import {VariablesService} from '../_helpers/services/variables.service';
   styleUrls: ['./history.component.scss']
 })
 export class HistoryComponent implements OnInit, OnDestroy, AfterViewChecked {
-
+  parentRouting;
   openedDetails = false;
   calculatedWidth = [];
   @ViewChild('head') head: ElementRef;
 
-  constructor(private variablesService: VariablesService) {}
+  constructor(
+    private route: ActivatedRoute,
+    private variablesService: VariablesService
+  ) {}
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.parentRouting = this.route.parent.params.subscribe(() => {
+      this.openedDetails = false;
+    });
+  }
 
   ngAfterViewChecked() {
     this.calculateWidth();
@@ -48,6 +56,8 @@ export class HistoryComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.calculatedWidth.push(this.head.nativeElement.childNodes[4].clientWidth);
   }
 
-  ngOnDestroy() {}
+  ngOnDestroy() {
+    this.parentRouting.unsubscribe();
+  }
 
 }

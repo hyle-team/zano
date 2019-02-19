@@ -13,7 +13,7 @@
 
   <h3 class="seed-phrase-title">{{ 'SEED_PHRASE.TITLE' | translate }}</h3>
 
-  <div class="seed-phrase-content">
+  <div class="seed-phrase-content" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, seedPhrase)">
     <ng-container *ngFor="let word of seedPhrase.split(' '); let index = index">
       <div class="word">{{(index + 1) + '. ' + word}}</div>
     </ng-container>

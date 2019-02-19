@@ -13,7 +13,8 @@ export class Wallet {
   mined_total: number;
   tracking_hey: string;
 
-  alias?: string;
+  alias?: object;
+  wakeAlias?: boolean;
   staking?: boolean;
   new_messages?: number;
   new_contracts?: number;
@@ -45,7 +46,7 @@ export class Wallet {
     this.mined_total = mined;
     this.tracking_hey = tracking;
 
-    this.alias = '';
+    this.alias = {};
     this.staking = false;
     this.new_messages = 0;
     this.new_contracts = 0;
@@ -123,6 +124,15 @@ export class Wallet {
             this.history.push(this.prepareHistoryItem(items[i]));
           }
         }
+      }
+    }
+  }
+
+  removeFromHistory(hash: string): void {
+    for (let i = 0; i < this.history.length; i++) {
+      if (this.history[i].tx_hash === hash) {
+        this.history.splice(i, 1);
+        break;
       }
     }
   }

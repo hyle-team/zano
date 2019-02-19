@@ -5,6 +5,7 @@ import {BackendService} from '../_helpers/services/backend.service';
 import {TranslateService} from '@ngx-translate/core';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
 import {BigNumber} from 'bignumber.js';
+import {Subscription} from "rxjs";
 
 @Component({
   selector: 'app-wallet',
@@ -59,6 +60,7 @@ export class WalletComponent implements OnInit, OnDestroy {
       active: false
     }
   ];
+  aliasSubscription: Subscription;
 
   constructor(
     private route: ActivatedRoute,
@@ -69,8 +71,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     private ngZone: NgZone,
     private translate: TranslateService,
     private intToMoneyPipe: IntToMoneyPipe
-  ) {
-  }
+  ) {}
 
   ngOnInit() {
     this.subRouting = this.route.params.subscribe(params => {
@@ -80,6 +81,14 @@ export class WalletComponent implements OnInit, OnDestroy {
         this.tabs[i].active = (this.tabs[i].link === '/' + this.route.snapshot.firstChild.url[0].path);
       }
     });
+    if (this.variablesService.currentWallet.alias.hasOwnProperty('name')) {
+      this.variablesService.currentWallet.wakeAlias = false;
+    }
+    this.aliasSubscription = this.variablesService.getAliasChangedEvent.subscribe(() => {
+      if (this.variablesService.currentWallet.alias.hasOwnProperty('name')) {
+        this.variablesService.currentWallet.wakeAlias = false;
+      }
+    })
   }
 
   changeTab(index) {
@@ -90,7 +99,9 @@ export class WalletComponent implements OnInit, OnDestroy {
       tab.active = false;
     });
     this.tabs[index].active = true;
-    this.router.navigate(['wallet/' + this.walletID + this.tabs[index].link]);
+    this.ngZone.run( () => {
+      this.router.navigate(['wallet/' + this.walletID + this.tabs[index].link]);
+    });
   }
 
   copyAddress() {
@@ -129,6 +140,7 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.subRouting.unsubscribe();
+    this.aliasSubscription.unsubscribe();
   }
 
 }

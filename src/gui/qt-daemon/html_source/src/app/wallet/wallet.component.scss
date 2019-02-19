@@ -57,6 +57,27 @@
       }
     }
   }
+
+  .alias {
+    display: flex;
+    align-items: center;
+    font-size: 1.3rem;
+
+    .icon {
+      cursor: pointer;
+      margin-right: 1.2rem;
+      width: 1.7rem;
+      height: 1.7rem;
+
+      &.edit {
+        mask: url(../../assets/icons/details.svg) no-repeat center;
+      }
+
+      &.transfer {
+        mask: url(../../assets/icons/send.svg) no-repeat center;
+      }
+    }
+  }
 }
 
 .address {

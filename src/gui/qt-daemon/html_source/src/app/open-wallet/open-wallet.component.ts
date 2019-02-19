@@ -98,6 +98,7 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
                     open_data['wi'].mined_total,
                     open_data['wi'].tracking_hey
                   );
+                  new_wallet.alias = this.backend.getWalletAlias(new_wallet.address);
                   if (open_data.recent_history && open_data.recent_history.history) {
                     new_wallet.prepareHistory(open_data.recent_history.history);
                   }
