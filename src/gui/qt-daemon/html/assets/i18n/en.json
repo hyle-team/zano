@@ -22,6 +22,8 @@
     "RESTORE_WALLET": "Restore from backup",
     "WALLET_DETAILS": "Wallet details",
     "ASSIGN_ALIAS": "Assign alias",
+    "EDIT_ALIAS": "Edit alias",
+    "TRANSFER_ALIAS": "Transfer alias",
     "CONTRACTS": "Contracts",
     "NEW_PURCHASE": "New purchase",
     "OLD_PURCHASE": "Purchase"
@@ -171,6 +173,45 @@
     },
     "ONE_ALIAS": "You can create only one alias per wallet",
     "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
+  },
+  "EDIT_ALIAS": {
+    "NAME": {
+      "LABEL": "Unique name",
+      "PLACEHOLDER": "@ Enter alias"
+    },
+    "COMMENT": {
+      "LABEL": "Comment",
+      "PLACEHOLDER": "Enter comment"
+    },
+    "FORM_ERRORS": {
+      "NO_MONEY": "You do not have enough funds to change the comment to this alias"
+    },
+    "COST": "Cost to edit alias {{value}} {{currency}}",
+    "BUTTON_EDIT": "Edit",
+    "BUTTON_CANCEL": "Cancel"
+  },
+  "TRANSFER_ALIAS": {
+    "NAME": {
+      "LABEL": "Unique name",
+      "PLACEHOLDER": "@ Enter alias"
+    },
+    "COMMENT": {
+      "LABEL": "Comment",
+      "PLACEHOLDER": "Enter comment"
+    },
+    "ADDRESS": {
+      "LABEL": "The account to which the alias will be transferred",
+      "PLACEHOLDER": "Enter account number"
+    },
+    "FORM_ERRORS": {
+      "WRONG_ADDRESS": "No wallet with this account exists",
+      "ALIAS_EXISTS": "This account already has an alias",
+      "NO_MONEY": "You do not have enough funds to transfer this alias"
+    },
+    "COST": "Cost to transfer alias {{value}} {{currency}}",
+    "BUTTON_TRANSFER": "Transfer",
+    "BUTTON_CANCEL": "Cancel",
+    "REQUEST_SEND_REG": "The alias will be transferred within 10 minutes"
   },
   "SEND": {
     "ADDRESS": "Address",
@@ -396,7 +437,14 @@
     "FILE_RESTORED": "The wallet file was corrupted. We have recovered the keys and the wallet from the blockchain",
     "FILE_NOT_FOUND": "File not found",
     "FILE_EXIST": "A file with that name already exists. Enter another name to save the file under",
-    "FILE_NOT_SAVED": "You cannot save a wallet file in this folder. Please choose another folder."
+    "FILE_NOT_SAVED": "You cannot save a wallet file in this folder. Please choose another folder.",
+    "TX_TYPE_NORMAL": "Error. The payment from the wallet",
+    "TX_TYPE_NORMAL_TO": "to",
+    "TX_TYPE_NORMAL_END": "was not completed.",
+    "TX_TYPE_NEW_ALIAS": "Error. Failed to register alias to safe",
+    "TX_TYPE_NEW_ALIAS_END": "Please try again.",
+    "TX_TYPE_UPDATE_ALIAS": "Error. Failed to change comment to alias in safe",
+    "TX_TYPE_COIN_BASE": "Error. The payment was not completed."
   },
   "CONTEXT_MENU": {
     "COPY": "copy",

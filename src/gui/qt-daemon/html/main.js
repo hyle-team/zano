@@ -335,6 +335,7 @@ var StakingSwitchComponent = /** @class */ (function () {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TooltipDirective", function() { return TooltipDirective; });
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -345,10 +346,12 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 
+
 var TooltipDirective = /** @class */ (function () {
-    function TooltipDirective(el, renderer) {
+    function TooltipDirective(el, renderer, route) {
         this.el = el;
         this.renderer = renderer;
+        this.route = route;
         this.cursor = 'pointer';
         this.timeout = 0;
         this.delay = 0;
@@ -374,7 +377,7 @@ var TooltipDirective = /** @class */ (function () {
         var _this = this;
         this.removeTooltipTimeout = setTimeout(function () {
             _this.renderer.setStyle(_this.tooltip, 'opacity', '0');
-            window.setTimeout(function () {
+            _this.removeTooltipTimeoutInner = setTimeout(function () {
                 _this.renderer.removeChild(document.body, _this.tooltip);
                 _this.tooltip = null;
             }, _this.delay);
@@ -382,6 +385,7 @@ var TooltipDirective = /** @class */ (function () {
     };
     TooltipDirective.prototype.cancelHide = function () {
         clearTimeout(this.removeTooltipTimeout);
+        clearTimeout(this.removeTooltipTimeoutInner);
         this.renderer.setStyle(this.tooltip, 'opacity', '1');
     };
     TooltipDirective.prototype.create = function () {
@@ -394,6 +398,14 @@ var TooltipDirective = /** @class */ (function () {
             this.tooltip = this.tooltipInner;
         }
         this.renderer.appendChild(document.body, this.tooltip);
+        this.tooltip.addEventListener('mouseenter', function () {
+            _this.cancelHide();
+        });
+        this.tooltip.addEventListener('mouseleave', function () {
+            if (_this.tooltip) {
+                _this.hide();
+            }
+        });
         this.renderer.setStyle(document.body, 'position', 'relative');
         this.renderer.setStyle(this.tooltip, 'position', 'absolute');
         if (this.tooltipClass !== null) {
@@ -446,6 +458,14 @@ var TooltipDirective = /** @class */ (function () {
             this.renderer.setStyle(this.tooltip, 'left', hostPos.right + 'px');
         }
     };
+    TooltipDirective.prototype.ngOnDestroy = function () {
+        clearTimeout(this.removeTooltipTimeout);
+        clearTimeout(this.removeTooltipTimeoutInner);
+        if (this.tooltip) {
+            this.renderer.removeChild(document.body, this.tooltip);
+            this.tooltip = null;
+        }
+    };
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["HostBinding"])('style.cursor'),
         __metadata("design:type", Object)
@@ -486,7 +506,7 @@ var TooltipDirective = /** @class */ (function () {
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Directive"])({
             selector: '[tooltip]'
         }),
-        __metadata("design:paramtypes", [_angular_core__WEBPACK_IMPORTED_MODULE_0__["ElementRef"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Renderer2"]])
+        __metadata("design:paramtypes", [_angular_core__WEBPACK_IMPORTED_MODULE_0__["ElementRef"], _angular_core__WEBPACK_IMPORTED_MODULE_0__["Renderer2"], _angular_router__WEBPACK_IMPORTED_MODULE_1__["ActivatedRoute"]])
     ], TooltipDirective);
     return TooltipDirective;
 }());
@@ -726,6 +746,14 @@ var Wallet = /** @class */ (function () {
                         this.history.push(this.prepareHistoryItem(items[i]));
                     }
                 }
+            }
+        }
+    };
+    Wallet.prototype.removeFromHistory = function (hash) {
+        for (var i = 0; i < this.history.length; i++) {
+            if (this.history[i].tx_hash === hash) {
+                this.history.splice(i, 1);
+                break;
             }
         }
     };
@@ -1893,6 +1921,9 @@ var BackendService = /** @class */ (function () {
         }
         return {};
     };
+    BackendService.prototype.getPoolInfo = function (callback) {
+        this.runCommand('get_tx_pool_info', {}, callback);
+    };
     BackendService = __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Injectable"])(),
         __metadata("design:paramtypes", [_ngx_translate_core__WEBPACK_IMPORTED_MODULE_2__["TranslateService"], _variables_service__WEBPACK_IMPORTED_MODULE_3__["VariablesService"], _modal_service__WEBPACK_IMPORTED_MODULE_4__["ModalService"], _pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__["MoneyToIntPipe"]])
@@ -1950,10 +1981,6 @@ var BackendService = /** @class */ (function () {
 
       resync_wallet: function (wallet_id, callback) {
         this.runCommand('resync_wallet', {wallet_id: wallet_id}, callback);
-      },
-
-      getPoolInfo: function (callback) {
-        this.runCommand('get_tx_pool_info', {}, callback);
       },
 
       storeFile: function (path, buff, callback) {
@@ -2038,7 +2065,7 @@ var ModalService = /** @class */ (function () {
         var _this = this;
         var length = this.components.push(this.componentFactoryResolver.resolveComponentFactory(_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_2__["ModalContainerComponent"]).create(this.injector));
         this.components[length - 1].instance['type'] = type;
-        this.components[length - 1].instance['message'] = this.translate.instant(message);
+        this.components[length - 1].instance['message'] = message.length ? this.translate.instant(message) : '';
         this.components[length - 1].instance['close'].subscribe(function () {
             _this.removeModal(length - 1);
         });
@@ -2256,6 +2283,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ./seed-phrase/seed-phrase.component */ "./src/app/seed-phrase/seed-phrase.component.ts");
 /* harmony import */ var _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ./wallet-details/wallet-details.component */ "./src/app/wallet-details/wallet-details.component.ts");
 /* harmony import */ var _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ./assign-alias/assign-alias.component */ "./src/app/assign-alias/assign-alias.component.ts");
+/* harmony import */ var _edit_alias_edit_alias_component__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ./edit-alias/edit-alias.component */ "./src/app/edit-alias/edit-alias.component.ts");
+/* harmony import */ var _transfer_alias_transfer_alias_component__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ./transfer-alias/transfer-alias.component */ "./src/app/transfer-alias/transfer-alias.component.ts");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -2265,6 +2294,8 @@ var __decorate = (undefined && undefined.__decorate) || function (decorators, ta
 
 
 // Components
+
+
 
 
 
@@ -2368,6 +2399,14 @@ var routes = [
         component: _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_19__["AssignAliasComponent"]
     },
     {
+        path: 'edit-alias',
+        component: _edit_alias_edit_alias_component__WEBPACK_IMPORTED_MODULE_20__["EditAliasComponent"]
+    },
+    {
+        path: 'transfer-alias',
+        component: _transfer_alias_transfer_alias_component__WEBPACK_IMPORTED_MODULE_21__["TransferAliasComponent"]
+    },
+    {
         path: 'settings',
         component: _settings_settings_component__WEBPACK_IMPORTED_MODULE_13__["SettingsComponent"]
     },
@@ -2435,6 +2474,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
 /* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! bignumber.js */ "./node_modules/bignumber.js/bignumber.js");
 /* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(bignumber_js__WEBPACK_IMPORTED_MODULE_8__);
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -2453,8 +2493,9 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 
 
 
+
 var AppComponent = /** @class */ (function () {
-    function AppComponent(http, renderer, translate, backend, router, variablesService, ngZone, intToMoneyPipe) {
+    function AppComponent(http, renderer, translate, backend, router, variablesService, ngZone, intToMoneyPipe, modalService) {
         this.http = http;
         this.renderer = renderer;
         this.translate = translate;
@@ -2463,6 +2504,7 @@ var AppComponent = /** @class */ (function () {
         this.variablesService = variablesService;
         this.ngZone = ngZone;
         this.intToMoneyPipe = intToMoneyPipe;
+        this.modalService = modalService;
         this.onQuitRequest = false;
         this.firstOnlineState = false;
         translate.addLangs(['en', 'fr']);
@@ -2731,67 +2773,61 @@ var AppComponent = /** @class */ (function () {
             _this.backend.eventSubscribe('money_transfer_cancel', function (data) {
                 console.log('----------------- money_transfer_cancel -----------------');
                 console.log(data);
-                // if (!data.ti) {
-                //   return;
-                // }
-                //
-                // var wallet_id = data.wallet_id;
-                // var tr_info = data.ti;
-                // var wallet = $rootScope.getWalletById(wallet_id);
-                // if (wallet) {
-                //   if ( tr_info.hasOwnProperty("contract") ){
-                //     for (var i = 0; i < $rootScope.contracts.length; i++) {
-                //       if ($rootScope.contracts[i].contract_id === tr_info.contract[0].contract_id && $rootScope.contracts[i].is_a === tr_info.contract[0].is_a) {
-                //         if ($rootScope.contracts[i].state === 1 || $rootScope.contracts[i].state === 110) {
-                //           $rootScope.contracts[i].isNew = true;
-                //           $rootScope.contracts[i].state = 140;
-                //           $rootScope.getContractsRecount(); //escrow_code
-                //         }
-                //         break;
-                //       }
-                //     }
-                //   }
-                //   angular.forEach(wallet.history, function (tr_item, key) {
-                //     if (tr_item.tx_hash === tr_info.tx_hash) {
-                //       wallet.history.splice(key, 1);
-                //     }
-                //   });
-                //
-                //   var error_tr = '';
-                //   switch (tr_info.tx_type) {
-                //     case 0:
-                //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL') + '<br>' +
-                //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-                //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_TO') + ' ' + $rootScope.moneyParse(tr_info.amount) + ' ' +
-                //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_END');
-                //       informer.error(error_tr);
-                //       break;
-                //     case 1:
-                //       informer.error('ERROR_GUI_TX_TYPE_PUSH_OFFER');
-                //       break;
-                //     case 2:
-                //       informer.error('ERROR_GUI_TX_TYPE_UPDATE_OFFER');
-                //       break;
-                //     case 3:
-                //       informer.error('ERROR_GUI_TX_TYPE_CANCEL_OFFER');
-                //       break;
-                //     case 4:
-                //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS') + '<br>' +
-                //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-                //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
-                //       informer.error(error_tr);
-                //       break;
-                //     case 5:
-                //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_UPDATE_ALIAS') + '<br>' +
-                //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-                //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
-                //       informer.error(error_tr);
-                //       break;
-                //     case 6:
-                //       informer.error('ERROR_GUI_TX_TYPE_COIN_BASE');
-                //       break;
-                //   }
-                // }
+                if (!data.ti) {
+                    return;
+                }
+                var wallet_id = data.wallet_id;
+                var tr_info = data.ti;
+                var wallet = _this.variablesService.getWallet(wallet_id);
+                if (wallet) {
+                    if (tr_info.hasOwnProperty('contract')) {
+                        for (var i = 0; i < wallet.contracts.length; i++) {
+                            if (wallet.contracts[i].contract_id === tr_info.contract[0].contract_id && wallet.contracts[i].is_a === tr_info.contract[0].is_a) {
+                                if (wallet.contracts[i].state === 1 || wallet.contracts[i].state === 110) {
+                                    wallet.contracts[i].is_new = true;
+                                    wallet.contracts[i].state = 140;
+                                    wallet.recountNewContracts();
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    wallet.removeFromHistory(tr_info.tx_hash);
+                    var error_tr = '';
+                    switch (tr_info.tx_type) {
+                        case 0:
+                            error_tr = _this.translate.instant('ERRORS.TX_TYPE_NORMAL') + '<br>' +
+                                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                                _this.translate.instant('ERRORS.TX_TYPE_NORMAL_TO') + ' ' + _this.intToMoneyPipe.transform(tr_info.amount) + ' ' +
+                                _this.translate.instant('ERRORS.TX_TYPE_NORMAL_END');
+                            break;
+                        case 1:
+                            // this.translate.instant('ERRORS.TX_TYPE_PUSH_OFFER');
+                            break;
+                        case 2:
+                            // this.translate.instant('ERRORS.TX_TYPE_UPDATE_OFFER');
+                            break;
+                        case 3:
+                            // this.translate.instant('ERRORS.TX_TYPE_CANCEL_OFFER');
+                            break;
+                        case 4:
+                            error_tr = _this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS') + '<br>' +
+                                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                                _this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS_END');
+                            break;
+                        case 5:
+                            error_tr = _this.translate.instant('ERRORS.TX_TYPE_UPDATE_ALIAS') + '<br>' +
+                                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                                _this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS_END');
+                            break;
+                        case 6:
+                            error_tr = _this.translate.instant('ERRORS.TX_TYPE_COIN_BASE');
+                            break;
+                    }
+                    if (error_tr) {
+                        _this.modalService.prepareModal('error', error_tr);
+                    }
+                }
             });
             _this.backend.eventSubscribe('on_core_event', function (data) {
                 console.log('----------------- on_core_event -----------------');
@@ -3042,7 +3078,8 @@ var AppComponent = /** @class */ (function () {
             _angular_router__WEBPACK_IMPORTED_MODULE_4__["Router"],
             _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_5__["VariablesService"],
             _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"],
-            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__["IntToMoneyPipe"]])
+            _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_7__["IntToMoneyPipe"],
+            _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_9__["ModalService"]])
     ], AppComponent);
     return AppComponent;
 }());
@@ -3076,33 +3113,35 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./seed-phrase/seed-phrase.component */ "./src/app/seed-phrase/seed-phrase.component.ts");
 /* harmony import */ var _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ./wallet-details/wallet-details.component */ "./src/app/wallet-details/wallet-details.component.ts");
 /* harmony import */ var _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ./assign-alias/assign-alias.component */ "./src/app/assign-alias/assign-alias.component.ts");
-/* harmony import */ var _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ./wallet/wallet.component */ "./src/app/wallet/wallet.component.ts");
-/* harmony import */ var _send_send_component__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ./send/send.component */ "./src/app/send/send.component.ts");
-/* harmony import */ var _receive_receive_component__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ./receive/receive.component */ "./src/app/receive/receive.component.ts");
-/* harmony import */ var _history_history_component__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ./history/history.component */ "./src/app/history/history.component.ts");
-/* harmony import */ var _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ./contracts/contracts.component */ "./src/app/contracts/contracts.component.ts");
-/* harmony import */ var _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ./purchase/purchase.component */ "./src/app/purchase/purchase.component.ts");
-/* harmony import */ var _messages_messages_component__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ./messages/messages.component */ "./src/app/messages/messages.component.ts");
-/* harmony import */ var _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ./typing-message/typing-message.component */ "./src/app/typing-message/typing-message.component.ts");
-/* harmony import */ var _staking_staking_component__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ./staking/staking.component */ "./src/app/staking/staking.component.ts");
-/* harmony import */ var _angular_common_http__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! @angular/common/http */ "./node_modules/@angular/common/fesm5/http.js");
-/* harmony import */ var _ngx_translate_core__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! @ngx-translate/core */ "./node_modules/@ngx-translate/core/fesm5/ngx-translate-core.js");
-/* harmony import */ var _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! @ngx-translate/http-loader */ "./node_modules/@ngx-translate/http-loader/fesm5/ngx-translate-http-loader.js");
-/* harmony import */ var _angular_forms__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! @angular/forms */ "./node_modules/@angular/forms/fesm5/forms.js");
-/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! ./_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
-/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! ./_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
-/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! ./_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
-/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! ./_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
-/* harmony import */ var _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! ./_helpers/pipes/history-type-messages.pipe */ "./src/app/_helpers/pipes/history-type-messages.pipe.ts");
-/* harmony import */ var _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! ./_helpers/pipes/contract-status-messages.pipe */ "./src/app/_helpers/pipes/contract-status-messages.pipe.ts");
-/* harmony import */ var _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! ./_helpers/pipes/contract-time-left.pipe */ "./src/app/_helpers/pipes/contract-time-left.pipe.ts");
-/* harmony import */ var _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! ./_helpers/directives/tooltip.directive */ "./src/app/_helpers/directives/tooltip.directive.ts");
-/* harmony import */ var _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! ./_helpers/directives/input-validate/input-validate.directive */ "./src/app/_helpers/directives/input-validate/input-validate.directive.ts");
-/* harmony import */ var _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! ./_helpers/directives/staking-switch/staking-switch.component */ "./src/app/_helpers/directives/staking-switch/staking-switch.component.ts");
-/* harmony import */ var _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_37__ = __webpack_require__(/*! ./_helpers/directives/modal-container/modal-container.component */ "./src/app/_helpers/directives/modal-container/modal-container.component.ts");
-/* harmony import */ var _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_38__ = __webpack_require__(/*! ./_helpers/directives/transaction-details/transaction-details.component */ "./src/app/_helpers/directives/transaction-details/transaction-details.component.ts");
-/* harmony import */ var ngx_contextmenu__WEBPACK_IMPORTED_MODULE_39__ = __webpack_require__(/*! ngx-contextmenu */ "./node_modules/ngx-contextmenu/fesm5/ngx-contextmenu.js");
-/* harmony import */ var angular_highcharts__WEBPACK_IMPORTED_MODULE_40__ = __webpack_require__(/*! angular-highcharts */ "./node_modules/angular-highcharts/fesm5/angular-highcharts.js");
+/* harmony import */ var _edit_alias_edit_alias_component__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ./edit-alias/edit-alias.component */ "./src/app/edit-alias/edit-alias.component.ts");
+/* harmony import */ var _transfer_alias_transfer_alias_component__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ./transfer-alias/transfer-alias.component */ "./src/app/transfer-alias/transfer-alias.component.ts");
+/* harmony import */ var _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ./wallet/wallet.component */ "./src/app/wallet/wallet.component.ts");
+/* harmony import */ var _send_send_component__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ./send/send.component */ "./src/app/send/send.component.ts");
+/* harmony import */ var _receive_receive_component__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ./receive/receive.component */ "./src/app/receive/receive.component.ts");
+/* harmony import */ var _history_history_component__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ./history/history.component */ "./src/app/history/history.component.ts");
+/* harmony import */ var _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ./contracts/contracts.component */ "./src/app/contracts/contracts.component.ts");
+/* harmony import */ var _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ./purchase/purchase.component */ "./src/app/purchase/purchase.component.ts");
+/* harmony import */ var _messages_messages_component__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ./messages/messages.component */ "./src/app/messages/messages.component.ts");
+/* harmony import */ var _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ./typing-message/typing-message.component */ "./src/app/typing-message/typing-message.component.ts");
+/* harmony import */ var _staking_staking_component__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! ./staking/staking.component */ "./src/app/staking/staking.component.ts");
+/* harmony import */ var _angular_common_http__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! @angular/common/http */ "./node_modules/@angular/common/fesm5/http.js");
+/* harmony import */ var _ngx_translate_core__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! @ngx-translate/core */ "./node_modules/@ngx-translate/core/fesm5/ngx-translate-core.js");
+/* harmony import */ var _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! @ngx-translate/http-loader */ "./node_modules/@ngx-translate/http-loader/fesm5/ngx-translate-http-loader.js");
+/* harmony import */ var _angular_forms__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! @angular/forms */ "./node_modules/@angular/forms/fesm5/forms.js");
+/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! ./_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! ./_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
+/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! ./_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
+/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! ./_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
+/* harmony import */ var _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! ./_helpers/pipes/history-type-messages.pipe */ "./src/app/_helpers/pipes/history-type-messages.pipe.ts");
+/* harmony import */ var _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! ./_helpers/pipes/contract-status-messages.pipe */ "./src/app/_helpers/pipes/contract-status-messages.pipe.ts");
+/* harmony import */ var _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! ./_helpers/pipes/contract-time-left.pipe */ "./src/app/_helpers/pipes/contract-time-left.pipe.ts");
+/* harmony import */ var _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! ./_helpers/directives/tooltip.directive */ "./src/app/_helpers/directives/tooltip.directive.ts");
+/* harmony import */ var _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_37__ = __webpack_require__(/*! ./_helpers/directives/input-validate/input-validate.directive */ "./src/app/_helpers/directives/input-validate/input-validate.directive.ts");
+/* harmony import */ var _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_38__ = __webpack_require__(/*! ./_helpers/directives/staking-switch/staking-switch.component */ "./src/app/_helpers/directives/staking-switch/staking-switch.component.ts");
+/* harmony import */ var _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_39__ = __webpack_require__(/*! ./_helpers/directives/modal-container/modal-container.component */ "./src/app/_helpers/directives/modal-container/modal-container.component.ts");
+/* harmony import */ var _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_40__ = __webpack_require__(/*! ./_helpers/directives/transaction-details/transaction-details.component */ "./src/app/_helpers/directives/transaction-details/transaction-details.component.ts");
+/* harmony import */ var ngx_contextmenu__WEBPACK_IMPORTED_MODULE_41__ = __webpack_require__(/*! ngx-contextmenu */ "./node_modules/ngx-contextmenu/fesm5/ngx-contextmenu.js");
+/* harmony import */ var angular_highcharts__WEBPACK_IMPORTED_MODULE_42__ = __webpack_require__(/*! angular-highcharts */ "./node_modules/angular-highcharts/fesm5/angular-highcharts.js");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -3149,14 +3188,16 @@ var __decorate = (undefined && undefined.__decorate) || function (decorators, ta
 
 
 
+
+
 function HttpLoaderFactory(httpClient) {
-    return new _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_25__["TranslateHttpLoader"](httpClient, './assets/i18n/', '.json');
+    return new _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_27__["TranslateHttpLoader"](httpClient, './assets/i18n/', '.json');
 }
 
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
-angular_highcharts__WEBPACK_IMPORTED_MODULE_40__["Highcharts"].setOptions({
+angular_highcharts__WEBPACK_IMPORTED_MODULE_42__["Highcharts"].setOptions({
 // global: {
 //   useUTC: false
 // }
@@ -3178,50 +3219,52 @@ var AppModule = /** @class */ (function () {
                 _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_11__["SeedPhraseComponent"],
                 _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_12__["WalletDetailsComponent"],
                 _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_13__["AssignAliasComponent"],
-                _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_14__["WalletComponent"],
-                _send_send_component__WEBPACK_IMPORTED_MODULE_15__["SendComponent"],
-                _receive_receive_component__WEBPACK_IMPORTED_MODULE_16__["ReceiveComponent"],
-                _history_history_component__WEBPACK_IMPORTED_MODULE_17__["HistoryComponent"],
-                _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_18__["ContractsComponent"],
-                _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_19__["PurchaseComponent"],
-                _messages_messages_component__WEBPACK_IMPORTED_MODULE_20__["MessagesComponent"],
-                _staking_staking_component__WEBPACK_IMPORTED_MODULE_22__["StakingComponent"],
-                _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_21__["TypingMessageComponent"],
-                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_29__["MoneyToIntPipe"],
-                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_30__["IntToMoneyPipe"],
-                _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_36__["StakingSwitchComponent"],
-                _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_31__["HistoryTypeMessagesPipe"],
-                _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_32__["ContractStatusMessagesPipe"],
-                _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_33__["ContractTimeLeftPipe"],
-                _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_34__["TooltipDirective"],
-                _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_35__["InputValidateDirective"],
-                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_37__["ModalContainerComponent"],
-                _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_38__["TransactionDetailsComponent"]
+                _edit_alias_edit_alias_component__WEBPACK_IMPORTED_MODULE_14__["EditAliasComponent"],
+                _transfer_alias_transfer_alias_component__WEBPACK_IMPORTED_MODULE_15__["TransferAliasComponent"],
+                _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_16__["WalletComponent"],
+                _send_send_component__WEBPACK_IMPORTED_MODULE_17__["SendComponent"],
+                _receive_receive_component__WEBPACK_IMPORTED_MODULE_18__["ReceiveComponent"],
+                _history_history_component__WEBPACK_IMPORTED_MODULE_19__["HistoryComponent"],
+                _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_20__["ContractsComponent"],
+                _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_21__["PurchaseComponent"],
+                _messages_messages_component__WEBPACK_IMPORTED_MODULE_22__["MessagesComponent"],
+                _staking_staking_component__WEBPACK_IMPORTED_MODULE_24__["StakingComponent"],
+                _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_23__["TypingMessageComponent"],
+                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_31__["MoneyToIntPipe"],
+                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_32__["IntToMoneyPipe"],
+                _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_38__["StakingSwitchComponent"],
+                _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_33__["HistoryTypeMessagesPipe"],
+                _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_34__["ContractStatusMessagesPipe"],
+                _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_35__["ContractTimeLeftPipe"],
+                _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_36__["TooltipDirective"],
+                _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_37__["InputValidateDirective"],
+                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_39__["ModalContainerComponent"],
+                _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_40__["TransactionDetailsComponent"]
             ],
             imports: [
                 _angular_platform_browser__WEBPACK_IMPORTED_MODULE_0__["BrowserModule"],
                 _app_routing_module__WEBPACK_IMPORTED_MODULE_2__["AppRoutingModule"],
-                _angular_common_http__WEBPACK_IMPORTED_MODULE_23__["HttpClientModule"],
-                _ngx_translate_core__WEBPACK_IMPORTED_MODULE_24__["TranslateModule"].forRoot({
+                _angular_common_http__WEBPACK_IMPORTED_MODULE_25__["HttpClientModule"],
+                _ngx_translate_core__WEBPACK_IMPORTED_MODULE_26__["TranslateModule"].forRoot({
                     loader: {
-                        provide: _ngx_translate_core__WEBPACK_IMPORTED_MODULE_24__["TranslateLoader"],
+                        provide: _ngx_translate_core__WEBPACK_IMPORTED_MODULE_26__["TranslateLoader"],
                         useFactory: HttpLoaderFactory,
-                        deps: [_angular_common_http__WEBPACK_IMPORTED_MODULE_23__["HttpClient"]]
+                        deps: [_angular_common_http__WEBPACK_IMPORTED_MODULE_25__["HttpClient"]]
                     }
                 }),
-                _angular_forms__WEBPACK_IMPORTED_MODULE_26__["FormsModule"],
-                _angular_forms__WEBPACK_IMPORTED_MODULE_26__["ReactiveFormsModule"],
-                angular_highcharts__WEBPACK_IMPORTED_MODULE_40__["ChartModule"],
-                ngx_contextmenu__WEBPACK_IMPORTED_MODULE_39__["ContextMenuModule"].forRoot()
+                _angular_forms__WEBPACK_IMPORTED_MODULE_28__["FormsModule"],
+                _angular_forms__WEBPACK_IMPORTED_MODULE_28__["ReactiveFormsModule"],
+                angular_highcharts__WEBPACK_IMPORTED_MODULE_42__["ChartModule"],
+                ngx_contextmenu__WEBPACK_IMPORTED_MODULE_41__["ContextMenuModule"].forRoot()
             ],
             providers: [
-                _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_27__["BackendService"],
-                _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_28__["ModalService"],
-                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_29__["MoneyToIntPipe"],
-                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_30__["IntToMoneyPipe"],
+                _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_29__["BackendService"],
+                _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_30__["ModalService"],
+                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_31__["MoneyToIntPipe"],
+                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_32__["IntToMoneyPipe"],
             ],
             entryComponents: [
-                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_37__["ModalContainerComponent"]
+                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_39__["ModalContainerComponent"]
             ],
             bootstrap: [_app_component__WEBPACK_IMPORTED_MODULE_3__["AppComponent"]]
         })
@@ -3375,7 +3418,9 @@ var AssignAliasComponent = /** @class */ (function () {
                     // service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
                     // wallet.wakeAlias = true;
                     _this.modalService.prepareModal('info', 'ASSIGN_ALIAS.REQUEST_ADD_REG');
-                    _this.router.navigate(['/wallet/' + _this.wallet.wallet_id]);
+                    _this.ngZone.run(function () {
+                        _this.router.navigate(['/wallet/' + _this.wallet.wallet_id]);
+                    });
                 }
             });
         }
@@ -3574,7 +3619,10 @@ var CreateWalletComponent = /** @class */ (function () {
     CreateWalletComponent.prototype.ngOnInit = function () {
     };
     CreateWalletComponent.prototype.createWallet = function () {
-        this.router.navigate(['/seed-phrase'], { queryParams: { wallet_id: this.wallet.id } });
+        var _this = this;
+        this.ngZone.run(function () {
+            _this.router.navigate(['/seed-phrase'], { queryParams: { wallet_id: _this.wallet.id } });
+        });
     };
     CreateWalletComponent.prototype.saveWallet = function () {
         var _this = this;
@@ -3623,6 +3671,120 @@ var CreateWalletComponent = /** @class */ (function () {
 
 /***/ }),
 
+/***/ "./src/app/edit-alias/edit-alias.component.html":
+/*!******************************************************!*\
+  !*** ./src/app/edit-alias/edit-alias.component.html ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"head\">\r\n    <div class=\"breadcrumbs\">\r\n      <span [routerLink]=\"['/wallet/' + wallet.wallet_id + '/history']\">{{ wallet.name }}</span>\r\n      <span>{{ 'BREADCRUMBS.EDIT_ALIAS' | translate }}</span>\r\n    </div>\r\n    <button class=\"back-btn\" (click)=\"back()\">\r\n      <i class=\"icon back\"></i>\r\n      <span>{{ 'COMMON.BACK' | translate }}</span>\r\n    </button>\r\n  </div>\r\n\r\n  <form class=\"form-edit\">\r\n\r\n    <div class=\"input-block alias-name\">\r\n      <label for=\"alias-name\">\r\n        {{ 'EDIT_ALIAS.NAME.LABEL' | translate }}\r\n      </label>\r\n      <input type=\"text\" id=\"alias-name\" [value]=\"alias.name\" placeholder=\"{{ 'EDIT_ALIAS.NAME.PLACEHOLDER' | translate }}\" readonly>\r\n    </div>\r\n\r\n    <div class=\"input-block textarea\">\r\n      <label for=\"alias-comment\">\r\n        {{ 'EDIT_ALIAS.COMMENT.LABEL' | translate }}\r\n      </label>\r\n      <textarea id=\"alias-comment\" [(ngModel)]=\"alias.comment\" [ngModelOptions]=\"{standalone: true}\" placeholder=\"{{ 'EDIT_ALIAS.COMMENT.PLACEHOLDER' | translate }}\"></textarea>\r\n      <div class=\"error-block\" *ngIf=\"alias.comment.length > 0 && notEnoughMoney\">\r\n        {{ 'EDIT_ALIAS.FORM_ERRORS.NO_MONEY' | translate }}\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"alias-cost\">{{ \"EDIT_ALIAS.COST\" | translate : {value: variablesService.default_fee, currency: variablesService.defaultCurrency} }}</div>\r\n\r\n    <div class=\"wrap-buttons\">\r\n      <button type=\"button\" class=\"blue-button\" (click)=\"updateAlias()\" [disabled]=\"notEnoughMoney || oldAliasComment === alias.comment\">{{ 'EDIT_ALIAS.BUTTON_EDIT' | translate }}</button>\r\n      <button type=\"button\" class=\"blue-button\" (click)=\"back()\">{{ 'EDIT_ALIAS.BUTTON_CANCEL' | translate }}</button>\r\n    </div>\r\n\r\n  </form>\r\n\r\n</div>\r\n\r\n\r\n"
+
+/***/ }),
+
+/***/ "./src/app/edit-alias/edit-alias.component.scss":
+/*!******************************************************!*\
+  !*** ./src/app/edit-alias/edit-alias.component.scss ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = ".form-edit {\n  margin: 2.4rem 0; }\n  .form-edit .alias-name {\n    width: 50%; }\n  .form-edit .alias-cost {\n    font-size: 1.3rem;\n    margin-top: 2rem; }\n  .form-edit .wrap-buttons {\n    display: flex;\n    justify-content: space-between;\n    margin: 2.5rem -0.7rem; }\n  .form-edit .wrap-buttons button {\n      margin: 0 0.7rem;\n      width: 15rem; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvZWRpdC1hbGlhcy9EOlxcemFub196YW5vXFxzcmNcXGd1aVxccXQtZGFlbW9uXFxodG1sX3NvdXJjZS9zcmNcXGFwcFxcZWRpdC1hbGlhc1xcZWRpdC1hbGlhcy5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLGdCQUFnQixFQUFBO0VBRGxCO0lBSUksVUFBVSxFQUFBO0VBSmQ7SUFRSSxpQkFBaUI7SUFDakIsZ0JBQWdCLEVBQUE7RUFUcEI7SUFhSSxhQUFhO0lBQ2IsOEJBQThCO0lBQzlCLHNCQUFzQixFQUFBO0VBZjFCO01Ba0JNLGdCQUFnQjtNQUNoQixZQUFZLEVBQUEiLCJmaWxlIjoic3JjL2FwcC9lZGl0LWFsaWFzL2VkaXQtYWxpYXMuY29tcG9uZW50LnNjc3MiLCJzb3VyY2VzQ29udGVudCI6WyIuZm9ybS1lZGl0IHtcclxuICBtYXJnaW46IDIuNHJlbSAwO1xyXG5cclxuICAuYWxpYXMtbmFtZSB7XHJcbiAgICB3aWR0aDogNTAlO1xyXG4gIH1cclxuXHJcbiAgLmFsaWFzLWNvc3Qge1xyXG4gICAgZm9udC1zaXplOiAxLjNyZW07XHJcbiAgICBtYXJnaW4tdG9wOiAycmVtO1xyXG4gIH1cclxuXHJcbiAgLndyYXAtYnV0dG9ucyB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuO1xyXG4gICAgbWFyZ2luOiAyLjVyZW0gLTAuN3JlbTtcclxuXHJcbiAgICBidXR0b24ge1xyXG4gICAgICBtYXJnaW46IDAgMC43cmVtO1xyXG4gICAgICB3aWR0aDogMTVyZW07XHJcbiAgICB9XHJcbiAgfVxyXG59XHJcbiJdfQ== */"
+
+/***/ }),
+
+/***/ "./src/app/edit-alias/edit-alias.component.ts":
+/*!****************************************************!*\
+  !*** ./src/app/edit-alias/edit-alias.component.ts ***!
+  \****************************************************/
+/*! exports provided: EditAliasComponent */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "EditAliasComponent", function() { return EditAliasComponent; });
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
+/* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
+var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (undefined && undefined.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+
+
+
+
+
+
+var EditAliasComponent = /** @class */ (function () {
+    function EditAliasComponent(location, router, backend, variablesService, modalService, ngZone) {
+        this.location = location;
+        this.router = router;
+        this.backend = backend;
+        this.variablesService = variablesService;
+        this.modalService = modalService;
+        this.ngZone = ngZone;
+        this.requestProcessing = false;
+    }
+    EditAliasComponent.prototype.ngOnInit = function () {
+        this.wallet = this.variablesService.currentWallet;
+        var alias = this.backend.getWalletAlias(this.wallet.address);
+        this.alias = {
+            name: alias.name,
+            address: alias.address,
+            comment: alias.comment
+        };
+        this.oldAliasComment = alias.comment;
+        this.notEnoughMoney = this.wallet.unlocked_balance.isLessThan(this.variablesService.default_fee_big);
+    };
+    EditAliasComponent.prototype.updateAlias = function () {
+        var _this = this;
+        if (this.requestProcessing || this.notEnoughMoney || this.oldAliasComment === this.alias.comment) {
+            return;
+        }
+        this.requestProcessing = true;
+        this.backend.updateAlias(this.wallet.wallet_id, this.alias, this.variablesService.default_fee, function (status) {
+            if (status) {
+                _this.modalService.prepareModal('success', '');
+                _this.wallet.alias['comment'] = _this.alias.comment;
+                _this.ngZone.run(function () {
+                    _this.router.navigate(['/wallet/' + _this.wallet.wallet_id]);
+                });
+            }
+            _this.requestProcessing = false;
+        });
+    };
+    EditAliasComponent.prototype.back = function () {
+        this.location.back();
+    };
+    EditAliasComponent = __decorate([
+        Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"])({
+            selector: 'app-edit-alias',
+            template: __webpack_require__(/*! ./edit-alias.component.html */ "./src/app/edit-alias/edit-alias.component.html"),
+            styles: [__webpack_require__(/*! ./edit-alias.component.scss */ "./src/app/edit-alias/edit-alias.component.scss")]
+        }),
+        __metadata("design:paramtypes", [_angular_common__WEBPACK_IMPORTED_MODULE_1__["Location"],
+            _angular_router__WEBPACK_IMPORTED_MODULE_2__["Router"],
+            _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__["BackendService"],
+            _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__["VariablesService"],
+            _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__["ModalService"],
+            _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"]])
+    ], EditAliasComponent);
+    return EditAliasComponent;
+}());
+
+
+
+/***/ }),
+
 /***/ "./src/app/history/history.component.html":
 /*!************************************************!*\
   !*** ./src/app/history/history.component.html ***!
@@ -3630,7 +3792,7 @@ var CreateWalletComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"wrap-table\">\r\n\r\n  <table class=\"history-table\">\r\n    <thead>\r\n    <tr #head (window:resize)=\"calculateWidth()\">\r\n      <th>{{ 'HISTORY.STATUS' | translate }}</th>\r\n      <th>{{ 'HISTORY.DATE' | translate }}</th>\r\n      <th>{{ 'HISTORY.AMOUNT' | translate }}</th>\r\n      <th>{{ 'HISTORY.FEE' | translate }}</th>\r\n      <th>{{ 'HISTORY.ADDRESS' | translate }}</th>\r\n    </tr>\r\n    </thead>\r\n    <tbody>\r\n    <ng-container *ngFor=\"let item of variablesService.currentWallet.history; let index = index\">\r\n      <tr (click)=\"openDetails(index)\">\r\n        <td>\r\n          <div class=\"status\" [class.send]=\"!item.is_income\" [class.received]=\"item.is_income\">\r\n            <ng-container *ngIf=\"variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0\">\r\n              <div class=\"confirmation\" tooltip=\"{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}\" placement=\"bottom\" tooltipClass=\"table-tooltip\" [delay]=\"500\">\r\n                <div class=\"fill\" [style.height]=\"getHeight(item) + '%'\"></div>\r\n              </div>\r\n            </ng-container>\r\n            <i class=\"icon\"></i>\r\n            <span>{{ (item.is_income ? 'HISTORY.RECEIVED' : 'HISTORY.SEND') | translate }}</span>\r\n          </div>\r\n        </td>\r\n        <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>\r\n        <td>\r\n          <span *ngIf=\"item.sortAmount && item.sortAmount.toString() !== '0'\">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n        </td>\r\n        <td>\r\n          <span *ngIf=\"item.sortFee && item.sortFee.toString() !== '0'\">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n        </td>\r\n        <td class=\"remote-address\">\r\n          <span *ngIf=\"!(item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0])\">{{item | historyTypeMessages}}</span>\r\n          <span *ngIf=\"item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0]\" (contextmenu)=\"variablesService.onContextMenuOnlyCopy($event, item.remote_addresses[0])\">{{item.remote_addresses[0]}}</span>\r\n        </td>\r\n      </tr>\r\n      <tr class=\"transaction-details\" [class.open]=\"index === openedDetails\">\r\n        <td colspan=\"5\">\r\n          <app-transaction-details *ngIf=\"index === openedDetails\" [transaction]=\"item\" [sizes]=\"calculatedWidth\"></app-transaction-details>\r\n        </td>\r\n      </tr>\r\n    </ng-container>\r\n    </tbody>\r\n  </table>\r\n\r\n</div>\r\n"
+module.exports = "<div class=\"wrap-table\">\r\n\r\n  <table class=\"history-table\">\r\n    <thead>\r\n    <tr #head (window:resize)=\"calculateWidth()\">\r\n      <th>{{ 'HISTORY.STATUS' | translate }}</th>\r\n      <th>{{ 'HISTORY.DATE' | translate }}</th>\r\n      <th>{{ 'HISTORY.AMOUNT' | translate }}</th>\r\n      <th>{{ 'HISTORY.FEE' | translate }}</th>\r\n      <th>{{ 'HISTORY.ADDRESS' | translate }}</th>\r\n    </tr>\r\n    </thead>\r\n    <tbody>\r\n    <ng-container *ngFor=\"let item of variablesService.currentWallet.history; let index = index\">\r\n      <tr (click)=\"openDetails(index)\">\r\n        <td>\r\n          <div class=\"status\" [class.send]=\"!item.is_income\" [class.received]=\"item.is_income\">\r\n            <ng-container *ngIf=\"variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0\">\r\n              <div class=\"confirmation\" tooltip=\"{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}\" placement=\"bottom\" tooltipClass=\"table-tooltip\" [delay]=\"500\">\r\n                <div class=\"fill\" [style.height]=\"getHeight(item) + '%'\"></div>\r\n              </div>\r\n            </ng-container>\r\n            <i class=\"icon\"></i>\r\n            <span>{{ (item.is_income ? 'HISTORY.RECEIVED' : 'HISTORY.SEND') | translate }}</span>\r\n          </div>\r\n        </td>\r\n        <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>\r\n        <td>\r\n          <span *ngIf=\"item.sortAmount && item.sortAmount.toString() !== '0'\">{{item.sortAmount | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n        </td>\r\n        <td>\r\n          <span *ngIf=\"item.sortFee && item.sortFee.toString() !== '0'\">{{item.sortFee | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n        </td>\r\n        <td class=\"remote-address\">\r\n          <span *ngIf=\"!(item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0])\">{{item | historyTypeMessages}}</span>\r\n          <span *ngIf=\"item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0]\" (contextmenu)=\"variablesService.onContextMenuOnlyCopy($event, item.remote_addresses[0])\">{{item.remote_addresses[0]}}</span>\r\n        </td>\r\n      </tr>\r\n      <tr class=\"transaction-details\" [class.open]=\"index === openedDetails\">\r\n        <td colspan=\"5\">\r\n          <ng-container *ngIf=\"index === openedDetails\">\r\n            <app-transaction-details [transaction]=\"item\" [sizes]=\"calculatedWidth\"></app-transaction-details>\r\n          </ng-container>\r\n        </td>\r\n      </tr>\r\n    </ng-container>\r\n    </tbody>\r\n  </table>\r\n\r\n</div>\r\n"
 
 /***/ }),
 
@@ -3657,6 +3819,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "HistoryComponent", function() { return HistoryComponent; });
 /* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
 /* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -3668,13 +3831,20 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 };
 
 
+
 var HistoryComponent = /** @class */ (function () {
-    function HistoryComponent(variablesService) {
+    function HistoryComponent(route, variablesService) {
+        this.route = route;
         this.variablesService = variablesService;
         this.openedDetails = false;
         this.calculatedWidth = [];
     }
-    HistoryComponent.prototype.ngOnInit = function () { };
+    HistoryComponent.prototype.ngOnInit = function () {
+        var _this = this;
+        this.parentRouting = this.route.parent.params.subscribe(function () {
+            _this.openedDetails = false;
+        });
+    };
     HistoryComponent.prototype.ngAfterViewChecked = function () {
         this.calculateWidth();
     };
@@ -3706,7 +3876,9 @@ var HistoryComponent = /** @class */ (function () {
         this.calculatedWidth.push(this.head.nativeElement.childNodes[3].clientWidth);
         this.calculatedWidth.push(this.head.nativeElement.childNodes[4].clientWidth);
     };
-    HistoryComponent.prototype.ngOnDestroy = function () { };
+    HistoryComponent.prototype.ngOnDestroy = function () {
+        this.parentRouting.unsubscribe();
+    };
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ViewChild"])('head'),
         __metadata("design:type", _angular_core__WEBPACK_IMPORTED_MODULE_0__["ElementRef"])
@@ -3717,7 +3889,8 @@ var HistoryComponent = /** @class */ (function () {
             template: __webpack_require__(/*! ./history.component.html */ "./src/app/history/history.component.html"),
             styles: [__webpack_require__(/*! ./history.component.scss */ "./src/app/history/history.component.scss")]
         }),
-        __metadata("design:paramtypes", [_helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_1__["VariablesService"]])
+        __metadata("design:paramtypes", [_angular_router__WEBPACK_IMPORTED_MODULE_2__["ActivatedRoute"],
+            _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_1__["VariablesService"]])
     ], HistoryComponent);
     return HistoryComponent;
 }());
@@ -4840,7 +5013,10 @@ var RestoreWalletComponent = /** @class */ (function () {
     RestoreWalletComponent.prototype.ngOnInit = function () {
     };
     RestoreWalletComponent.prototype.createWallet = function () {
-        this.router.navigate(['/seed-phrase'], { queryParams: { wallet_id: this.wallet.id } });
+        var _this = this;
+        this.ngZone.run(function () {
+            _this.router.navigate(['/seed-phrase'], { queryParams: { wallet_id: _this.wallet.id } });
+        });
     };
     RestoreWalletComponent.prototype.saveWallet = function () {
         var _this = this;
@@ -4911,7 +5087,7 @@ var RestoreWalletComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"head\">\r\n    <div class=\"breadcrumbs\">\r\n      <span [routerLink]=\"['/main']\">{{ 'BREADCRUMBS.ADD_WALLET' | translate }}</span>\r\n      <span>{{ 'BREADCRUMBS.SAVE_PHRASE' | translate }}</span>\r\n    </div>\r\n    <a class=\"back-btn\" [routerLink]=\"['/main']\">\r\n      <i class=\"icon back\"></i>\r\n      <span>{{ 'COMMON.BACK' | translate }}</span>\r\n    </a>\r\n  </div>\r\n\r\n  <h3 class=\"seed-phrase-title\">{{ 'SEED_PHRASE.TITLE' | translate }}</h3>\r\n\r\n  <div class=\"seed-phrase-content\">\r\n    <ng-container *ngFor=\"let word of seedPhrase.split(' '); let index = index\">\r\n      <div class=\"word\">{{(index + 1) + '. ' + word}}</div>\r\n    </ng-container>\r\n  </div>\r\n\r\n  <button type=\"button\" class=\"blue-button\" (click)=\"runWallet()\">{{ 'SEED_PHRASE.BUTTON_CREATE_ACCOUNT' | translate }}</button>\r\n\r\n</div>\r\n"
+module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"head\">\r\n    <div class=\"breadcrumbs\">\r\n      <span [routerLink]=\"['/main']\">{{ 'BREADCRUMBS.ADD_WALLET' | translate }}</span>\r\n      <span>{{ 'BREADCRUMBS.SAVE_PHRASE' | translate }}</span>\r\n    </div>\r\n    <a class=\"back-btn\" [routerLink]=\"['/main']\">\r\n      <i class=\"icon back\"></i>\r\n      <span>{{ 'COMMON.BACK' | translate }}</span>\r\n    </a>\r\n  </div>\r\n\r\n  <h3 class=\"seed-phrase-title\">{{ 'SEED_PHRASE.TITLE' | translate }}</h3>\r\n\r\n  <div class=\"seed-phrase-content\" (contextmenu)=\"variablesService.onContextMenuOnlyCopy($event, seedPhrase)\">\r\n    <ng-container *ngFor=\"let word of seedPhrase.split(' '); let index = index\">\r\n      <div class=\"word\">{{(index + 1) + '. ' + word}}</div>\r\n    </ng-container>\r\n  </div>\r\n\r\n  <button type=\"button\" class=\"blue-button\" (click)=\"runWallet()\">{{ 'SEED_PHRASE.BUTTON_CREATE_ACCOUNT' | translate }}</button>\r\n\r\n</div>\r\n"
 
 /***/ }),
 
@@ -5360,10 +5536,11 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 
 
 var SidebarComponent = /** @class */ (function () {
-    function SidebarComponent(route, router, variablesService) {
+    function SidebarComponent(route, router, variablesService, ngZone) {
         this.route = route;
         this.router = router;
         this.variablesService = variablesService;
+        this.ngZone = ngZone;
     }
     SidebarComponent.prototype.ngOnInit = function () {
         var _this = this;
@@ -5400,9 +5577,12 @@ var SidebarComponent = /** @class */ (function () {
         this.walletSubRouting.unsubscribe();
     };
     SidebarComponent.prototype.logOut = function () {
+        var _this = this;
         this.variablesService.stopCountdown();
         this.variablesService.appPass = '';
-        this.router.navigate(['/login'], { queryParams: { type: 'auth' } });
+        this.ngZone.run(function () {
+            _this.router.navigate(['/login'], { queryParams: { type: 'auth' } });
+        });
     };
     SidebarComponent = __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"])({
@@ -5412,7 +5592,8 @@ var SidebarComponent = /** @class */ (function () {
         }),
         __metadata("design:paramtypes", [_angular_router__WEBPACK_IMPORTED_MODULE_1__["ActivatedRoute"],
             _angular_router__WEBPACK_IMPORTED_MODULE_1__["Router"],
-            _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_2__["VariablesService"]])
+            _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_2__["VariablesService"],
+            _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"]])
     ], SidebarComponent);
     return SidebarComponent;
 }());
@@ -5782,6 +5963,167 @@ var StakingComponent = /** @class */ (function () {
 
 /***/ }),
 
+/***/ "./src/app/transfer-alias/transfer-alias.component.html":
+/*!**************************************************************!*\
+  !*** ./src/app/transfer-alias/transfer-alias.component.html ***!
+  \**************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"head\">\r\n    <div class=\"breadcrumbs\">\r\n      <span [routerLink]=\"['/wallet/' + wallet.wallet_id + '/history']\">{{ wallet.name }}</span>\r\n      <span>{{ 'BREADCRUMBS.TRANSFER_ALIAS' | translate }}</span>\r\n    </div>\r\n    <button class=\"back-btn\" (click)=\"back()\">\r\n      <i class=\"icon back\"></i>\r\n      <span>{{ 'COMMON.BACK' | translate }}</span>\r\n    </button>\r\n  </div>\r\n\r\n  <form class=\"form-transfer\">\r\n\r\n    <div class=\"input-block alias-name\">\r\n      <label for=\"alias-name\">\r\n        {{ 'EDIT_ALIAS.NAME.LABEL' | translate }}\r\n      </label>\r\n      <input type=\"text\" id=\"alias-name\" [value]=\"alias.name\" placeholder=\"{{ 'EDIT_ALIAS.NAME.PLACEHOLDER' | translate }}\" readonly>\r\n    </div>\r\n\r\n    <div class=\"input-block textarea\">\r\n      <label for=\"alias-comment\">\r\n        {{ 'EDIT_ALIAS.COMMENT.LABEL' | translate }}\r\n      </label>\r\n      <textarea id=\"alias-comment\" [value]=\"alias.comment\" placeholder=\"{{ 'EDIT_ALIAS.COMMENT.PLACEHOLDER' | translate }}\" readonly></textarea>\r\n    </div>\r\n\r\n    <div class=\"input-block alias-transfer-address\">\r\n      <label for=\"alias-transfer\">\r\n        {{ 'TRANSFER_ALIAS.ADDRESS.LABEL' | translate }}\r\n      </label>\r\n      <input type=\"text\" id=\"alias-transfer\" [(ngModel)]=\"transferAddress\" [ngModelOptions]=\"{standalone: true}\" (ngModelChange)=\"changeAddress()\" placeholder=\"{{ 'TRANSFER_ALIAS.ADDRESS.PLACEHOLDER' | translate }}\">\r\n      <div class=\"error-block\" *ngIf=\"transferAddress.length > 0 && (transferAddressAlias || !transferAddressValid || (transferAddressValid && !permissionSend) || notEnoughMoney)\">\r\n        <div *ngIf=\"!transferAddressValid\">\r\n          {{ 'TRANSFER_ALIAS.FORM_ERRORS.WRONG_ADDRESS' | translate }}\r\n        </div>\r\n        <div *ngIf=\"transferAddressAlias || (transferAddressValid && !permissionSend)\">\r\n          {{ 'TRANSFER_ALIAS.FORM_ERRORS.ALIAS_EXISTS' | translate }}\r\n        </div>\r\n        <div *ngIf=\"notEnoughMoney\">\r\n          {{ 'TRANSFER_ALIAS.FORM_ERRORS.NO_MONEY' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"alias-cost\">{{ \"TRANSFER_ALIAS.COST\" | translate : {value: variablesService.default_fee, currency: variablesService.defaultCurrency} }}</div>\r\n\r\n    <div class=\"wrap-buttons\">\r\n      <button type=\"button\" class=\"blue-button\" (click)=\"transferAlias()\" [disabled]=\"transferAddressAlias || !transferAddressValid || notEnoughMoney\">{{ 'TRANSFER_ALIAS.BUTTON_TRANSFER' | translate }}</button>\r\n      <button type=\"button\" class=\"blue-button\" (click)=\"back()\">{{ 'TRANSFER_ALIAS.BUTTON_CANCEL' | translate }}</button>\r\n    </div>\r\n\r\n  </form>\r\n\r\n</div>\r\n"
+
+/***/ }),
+
+/***/ "./src/app/transfer-alias/transfer-alias.component.scss":
+/*!**************************************************************!*\
+  !*** ./src/app/transfer-alias/transfer-alias.component.scss ***!
+  \**************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = ".form-transfer {\n  margin: 2.4rem 0; }\n  .form-transfer .alias-name {\n    width: 50%; }\n  .form-transfer .alias-cost {\n    font-size: 1.3rem;\n    margin-top: 2rem; }\n  .form-transfer .wrap-buttons {\n    display: flex;\n    justify-content: space-between;\n    margin: 2.5rem -0.7rem; }\n  .form-transfer .wrap-buttons button {\n      margin: 0 0.7rem;\n      width: 15rem; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvdHJhbnNmZXItYWxpYXMvRDpcXHphbm9femFub1xcc3JjXFxndWlcXHF0LWRhZW1vblxcaHRtbF9zb3VyY2Uvc3JjXFxhcHBcXHRyYW5zZmVyLWFsaWFzXFx0cmFuc2Zlci1hbGlhcy5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLGdCQUFnQixFQUFBO0VBRGxCO0lBSUksVUFBVSxFQUFBO0VBSmQ7SUFRSSxpQkFBaUI7SUFDakIsZ0JBQWdCLEVBQUE7RUFUcEI7SUFhSSxhQUFhO0lBQ2IsOEJBQThCO0lBQzlCLHNCQUFzQixFQUFBO0VBZjFCO01Ba0JNLGdCQUFnQjtNQUNoQixZQUFZLEVBQUEiLCJmaWxlIjoic3JjL2FwcC90cmFuc2Zlci1hbGlhcy90cmFuc2Zlci1hbGlhcy5jb21wb25lbnQuc2NzcyIsInNvdXJjZXNDb250ZW50IjpbIi5mb3JtLXRyYW5zZmVyIHtcclxuICBtYXJnaW46IDIuNHJlbSAwO1xyXG5cclxuICAuYWxpYXMtbmFtZSB7XHJcbiAgICB3aWR0aDogNTAlO1xyXG4gIH1cclxuXHJcbiAgLmFsaWFzLWNvc3Qge1xyXG4gICAgZm9udC1zaXplOiAxLjNyZW07XHJcbiAgICBtYXJnaW4tdG9wOiAycmVtO1xyXG4gIH1cclxuXHJcbiAgLndyYXAtYnV0dG9ucyB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuO1xyXG4gICAgbWFyZ2luOiAyLjVyZW0gLTAuN3JlbTtcclxuXHJcbiAgICBidXR0b24ge1xyXG4gICAgICBtYXJnaW46IDAgMC43cmVtO1xyXG4gICAgICB3aWR0aDogMTVyZW07XHJcbiAgICB9XHJcbiAgfVxyXG59XHJcbiJdfQ== */"
+
+/***/ }),
+
+/***/ "./src/app/transfer-alias/transfer-alias.component.ts":
+/*!************************************************************!*\
+  !*** ./src/app/transfer-alias/transfer-alias.component.ts ***!
+  \************************************************************/
+/*! exports provided: TransferAliasComponent */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TransferAliasComponent", function() { return TransferAliasComponent; });
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _angular_common__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @angular/common */ "./node_modules/@angular/common/fesm5/common.js");
+/* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
+/* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
+var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (undefined && undefined.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+
+
+
+
+
+
+var TransferAliasComponent = /** @class */ (function () {
+    function TransferAliasComponent(location, router, backend, variablesService, modalService, ngZone) {
+        this.location = location;
+        this.router = router;
+        this.backend = backend;
+        this.variablesService = variablesService;
+        this.modalService = modalService;
+        this.ngZone = ngZone;
+        this.transferAddress = '';
+        this.processingRequst = false;
+    }
+    TransferAliasComponent.prototype.ngOnInit = function () {
+        this.wallet = this.variablesService.currentWallet;
+        var alias = this.backend.getWalletAlias(this.wallet.address);
+        this.alias = {
+            name: alias.name,
+            address: alias.address,
+            comment: alias.comment,
+            tracking_key: alias.tracking_key
+        };
+        this.notEnoughMoney = this.wallet.unlocked_balance.isLessThan(this.variablesService.default_fee_big);
+    };
+    TransferAliasComponent.prototype.changeAddress = function () {
+        var _this = this;
+        this.backend.validateAddress(this.transferAddress, function (status) {
+            _this.transferAddressValid = status;
+            if (status) {
+                _this.backend.getPoolInfo(function (statusPool, dataPool) {
+                    if (dataPool.hasOwnProperty('aliases_que') && dataPool.aliases_que.length) {
+                        _this.setStatus(!~dataPool.aliases_que.searchBy('address', _this.transferAddress));
+                    }
+                    else {
+                        _this.setStatus(status);
+                    }
+                });
+            }
+            else {
+                _this.setStatus(false);
+            }
+        });
+    };
+    TransferAliasComponent.prototype.setStatus = function (statusSet) {
+        var _this = this;
+        this.permissionSend = statusSet;
+        if (statusSet) {
+            this.backend.getAliasByAddress(this.transferAddress, function (status, data) {
+                _this.ngZone.run(function () {
+                    if (status) {
+                        _this.transferAddressAlias = true;
+                        _this.permissionSend = false;
+                    }
+                    else {
+                        _this.transferAddressAlias = false;
+                    }
+                });
+            });
+        }
+        else {
+            this.ngZone.run(function () {
+                _this.transferAddressAlias = false;
+            });
+        }
+    };
+    TransferAliasComponent.prototype.transferAlias = function () {
+        var _this = this;
+        if (this.processingRequst || !this.permissionSend || !this.transferAddressValid || this.notEnoughMoney) {
+            return;
+        }
+        this.processingRequst = true;
+        var newAlias = {
+            name: this.alias.name,
+            address: this.transferAddress,
+            comment: this.alias.comment,
+            tracking_key: this.alias.tracking_key
+        };
+        this.backend.updateAlias(this.wallet.wallet_id, newAlias, this.variablesService.default_fee, function (status, data) {
+            if (status && data.hasOwnProperty('success') && data.success) {
+                _this.modalService.prepareModal('info', 'TRANSFER_ALIAS.REQUEST_SEND_REG');
+                _this.ngZone.run(function () {
+                    _this.router.navigate(['/wallet/' + _this.wallet.wallet_id]);
+                });
+            }
+            _this.processingRequst = false;
+        });
+    };
+    TransferAliasComponent.prototype.back = function () {
+        this.location.back();
+    };
+    TransferAliasComponent = __decorate([
+        Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"])({
+            selector: 'app-transfer-alias',
+            template: __webpack_require__(/*! ./transfer-alias.component.html */ "./src/app/transfer-alias/transfer-alias.component.html"),
+            styles: [__webpack_require__(/*! ./transfer-alias.component.scss */ "./src/app/transfer-alias/transfer-alias.component.scss")]
+        }),
+        __metadata("design:paramtypes", [_angular_common__WEBPACK_IMPORTED_MODULE_1__["Location"],
+            _angular_router__WEBPACK_IMPORTED_MODULE_2__["Router"],
+            _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__["BackendService"],
+            _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_4__["VariablesService"],
+            _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__["ModalService"],
+            _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"]])
+    ], TransferAliasComponent);
+    return TransferAliasComponent;
+}());
+
+
+
+/***/ }),
+
 /***/ "./src/app/typing-message/typing-message.component.html":
 /*!**************************************************************!*\
   !*** ./src/app/typing-message/typing-message.component.html ***!
@@ -5856,7 +6198,7 @@ var TypingMessageComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"head\">\r\n    <div class=\"breadcrumbs\">\r\n      <span (click)=\"back()\">{{variablesService.currentWallet.name}}</span>\r\n      <span>{{ 'BREADCRUMBS.WALLET_DETAILS' | translate }}</span>\r\n    </div>\r\n    <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\r\n      <i class=\"icon back\"></i>\r\n      <span>{{ 'COMMON.BACK' | translate }}</span>\r\n    </button>\r\n  </div>\r\n\r\n  <form class=\"form-details\" [formGroup]=\"detailsForm\" (ngSubmit)=\"onSubmitEdit()\">\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"wallet-name\">{{ 'WALLET_DETAILS.LABEL_NAME' | translate }}</label>\r\n      <input type=\"text\" id=\"wallet-name\" formControlName=\"name\">\r\n      <div class=\"error-block\" *ngIf=\"detailsForm.controls['name'].invalid && (detailsForm.controls['name'].dirty || detailsForm.controls['name'].touched)\">\r\n        <div *ngIf=\"detailsForm.controls['name'].errors['required']\">\r\n          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"detailsForm.controls['name'].errors['duplicate']\">\r\n          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_DUPLICATE' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"wallet-location\">{{ 'WALLET_DETAILS.LABEL_FILE_LOCATION' | translate }}</label>\r\n      <input type=\"text\" id=\"wallet-location\" formControlName=\"path\" readonly>\r\n    </div>\r\n\r\n    <div class=\"input-block textarea\">\r\n      <label for=\"seed-phrase\">{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>\r\n      <div class=\"seed-phrase\" id=\"seed-phrase\">\r\n        <div class=\"seed-phrase-hint\" (click)=\"showSeedPhrase()\" *ngIf=\"!showSeed\">{{ 'WALLET_DETAILS.SEED_PHRASE_HINT' | translate }}</div>\r\n        <div class=\"seed-phrase-content\" *ngIf=\"showSeed\">\r\n          <ng-container *ngFor=\"let word of seedPhrase.split(' '); let index = index\">\r\n            <div class=\"word\">{{(index + 1) + '. ' + word}}</div>\r\n          </ng-container>\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"wallet-buttons\">\r\n      <button type=\"submit\" class=\"blue-button\" [disabled]=\"!detailsForm.valid\">{{ 'WALLET_DETAILS.BUTTON_SAVE' | translate }}</button>\r\n      <button type=\"button\" class=\"blue-button\" (click)=\"closeWallet()\">{{ 'WALLET_DETAILS.BUTTON_REMOVE' | translate }}</button>\r\n    </div>\r\n\r\n  </form>\r\n\r\n</div>\r\n"
+module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"head\">\r\n    <div class=\"breadcrumbs\">\r\n      <span (click)=\"back()\">{{variablesService.currentWallet.name}}</span>\r\n      <span>{{ 'BREADCRUMBS.WALLET_DETAILS' | translate }}</span>\r\n    </div>\r\n    <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\r\n      <i class=\"icon back\"></i>\r\n      <span>{{ 'COMMON.BACK' | translate }}</span>\r\n    </button>\r\n  </div>\r\n\r\n  <form class=\"form-details\" [formGroup]=\"detailsForm\" (ngSubmit)=\"onSubmitEdit()\">\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"wallet-name\">{{ 'WALLET_DETAILS.LABEL_NAME' | translate }}</label>\r\n      <input type=\"text\" id=\"wallet-name\" formControlName=\"name\">\r\n      <div class=\"error-block\" *ngIf=\"detailsForm.controls['name'].invalid && (detailsForm.controls['name'].dirty || detailsForm.controls['name'].touched)\">\r\n        <div *ngIf=\"detailsForm.controls['name'].errors['required']\">\r\n          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"detailsForm.controls['name'].errors['duplicate']\">\r\n          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_DUPLICATE' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"wallet-location\">{{ 'WALLET_DETAILS.LABEL_FILE_LOCATION' | translate }}</label>\r\n      <input type=\"text\" id=\"wallet-location\" formControlName=\"path\" readonly>\r\n    </div>\r\n\r\n    <div class=\"input-block textarea\">\r\n      <label for=\"seed-phrase\">{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>\r\n      <div class=\"seed-phrase\" id=\"seed-phrase\">\r\n        <div class=\"seed-phrase-hint\" (click)=\"showSeedPhrase()\" *ngIf=\"!showSeed\">{{ 'WALLET_DETAILS.SEED_PHRASE_HINT' | translate }}</div>\r\n        <div class=\"seed-phrase-content\" *ngIf=\"showSeed\" (contextmenu)=\"variablesService.onContextMenuOnlyCopy($event, seedPhrase)\">\r\n          <ng-container *ngFor=\"let word of seedPhrase.split(' '); let index = index\">\r\n            <div class=\"word\">{{(index + 1) + '. ' + word}}</div>\r\n          </ng-container>\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"wallet-buttons\">\r\n      <button type=\"submit\" class=\"blue-button\" [disabled]=\"!detailsForm.valid\">{{ 'WALLET_DETAILS.BUTTON_SAVE' | translate }}</button>\r\n      <button type=\"button\" class=\"blue-button\" (click)=\"closeWallet()\">{{ 'WALLET_DETAILS.BUTTON_REMOVE' | translate }}</button>\r\n    </div>\r\n\r\n  </form>\r\n\r\n</div>\r\n"
 
 /***/ }),
 
@@ -5946,9 +6288,12 @@ var WalletDetailsComponent = /** @class */ (function () {
         this.showSeed = true;
     };
     WalletDetailsComponent.prototype.onSubmitEdit = function () {
+        var _this = this;
         if (this.detailsForm.value) {
             this.variablesService.currentWallet.name = this.detailsForm.get('name').value;
-            this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
+            this.ngZone.run(function () {
+                _this.router.navigate(['/wallet/' + _this.variablesService.currentWallet.wallet_id]);
+            });
         }
     };
     WalletDetailsComponent.prototype.closeWallet = function () {
@@ -6002,7 +6347,7 @@ var WalletDetailsComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"header\">\r\n  <div>\r\n    <h3>{{variablesService.currentWallet.name}}</h3>\r\n    <!--<button (click)=\"openInBrowser('docs.zano.org/docs/how-to-get-alias')\">-->\r\n    <button [routerLink]=\"['/assign-alias']\" *ngIf=\"!variablesService.currentWallet.alias.hasOwnProperty('name')\">\r\n      <i class=\"icon account\"></i>\r\n      <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>\r\n    </button>\r\n    <span style=\"font-size: 1.3rem;\" *ngIf=\"variablesService.currentWallet.alias.hasOwnProperty('name')\">\r\n      {{variablesService.currentWallet.alias['name']}}\r\n    </span>\r\n  </div>\r\n  <div>\r\n    <button [routerLink]=\"['/details']\" routerLinkActive=\"active\">\r\n      <i class=\"icon details\"></i>\r\n      <span>{{ 'WALLET.DETAILS' | translate }}</span>\r\n    </button>\r\n    <!--<button (click)=\"closeWallet()\">\r\n      <i class=\"icon lock\"></i>\r\n      <span>{{ 'WALLET.LOCK' | translate }}</span>\r\n    </button>-->\r\n  </div>\r\n</div>\r\n<div class=\"address\">\r\n  <span>{{variablesService.currentWallet.address}}</span>\r\n  <i #copyIcon class=\"icon copy\" (click)=\"copyAddress()\"></i>\r\n</div>\r\n<div class=\"balance\">\r\n  <span [tooltip]=\"getTooltip()\" [placement]=\"'bottom'\" [tooltipClass]=\"'balance-tooltip'\" [delay]=\"500\" [timeout]=\"1000\">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>\r\n  <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n</div>\r\n<div class=\"tabs\">\r\n  <div class=\"tabs-header\">\r\n    <ng-container *ngFor=\"let tab of tabs; let index = index\">\r\n      <div class=\"tab\" [class.active]=\"tab.active\" [class.disabled]=\"(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2\" (click)=\"changeTab(index)\">\r\n        <i class=\"icon\" [ngClass]=\"tab.icon\"></i>\r\n        <span>{{ tab.title | translate }}</span>\r\n        <span class=\"indicator\" *ngIf=\"tab.indicator\">{{variablesService.currentWallet.new_contracts}}</span>\r\n      </div>\r\n    </ng-container>\r\n  </div>\r\n  <div class=\"tabs-content scrolled-content\">\r\n    <router-outlet></router-outlet>\r\n  </div>\r\n</div>\r\n\r\n"
+module.exports = "<div class=\"header\">\r\n  <div>\r\n    <h3>{{variablesService.currentWallet.name}}</h3>\r\n    <!--<button (click)=\"openInBrowser('docs.zano.org/docs/how-to-get-alias')\">-->\r\n    <button [routerLink]=\"['/assign-alias']\" *ngIf=\"!variablesService.currentWallet.alias.hasOwnProperty('name')\">\r\n      <i class=\"icon account\"></i>\r\n      <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>\r\n    </button>\r\n    <div class=\"alias\" *ngIf=\"variablesService.currentWallet.alias.hasOwnProperty('name')\">\r\n      <span>{{variablesService.currentWallet.alias['name']}}</span>\r\n      <i class=\"icon edit\" [routerLink]=\"['/edit-alias']\"></i>\r\n      <i class=\"icon transfer\" [routerLink]=\"['/transfer-alias']\"></i>\r\n    </div>\r\n  </div>\r\n  <div>\r\n    <button [routerLink]=\"['/details']\" routerLinkActive=\"active\">\r\n      <i class=\"icon details\"></i>\r\n      <span>{{ 'WALLET.DETAILS' | translate }}</span>\r\n    </button>\r\n    <!--<button (click)=\"closeWallet()\">\r\n      <i class=\"icon lock\"></i>\r\n      <span>{{ 'WALLET.LOCK' | translate }}</span>\r\n    </button>-->\r\n  </div>\r\n</div>\r\n<div class=\"address\">\r\n  <span>{{variablesService.currentWallet.address}}</span>\r\n  <i #copyIcon class=\"icon copy\" (click)=\"copyAddress()\"></i>\r\n</div>\r\n<div class=\"balance\">\r\n  <span [tooltip]=\"getTooltip()\" [placement]=\"'bottom'\" [tooltipClass]=\"'balance-tooltip'\" [delay]=\"300\" [timeout]=\"0\">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>\r\n  <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>\r\n</div>\r\n<div class=\"tabs\">\r\n  <div class=\"tabs-header\">\r\n    <ng-container *ngFor=\"let tab of tabs; let index = index\">\r\n      <div class=\"tab\" [class.active]=\"tab.active\" [class.disabled]=\"(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2\" (click)=\"changeTab(index)\">\r\n        <i class=\"icon\" [ngClass]=\"tab.icon\"></i>\r\n        <span>{{ tab.title | translate }}</span>\r\n        <span class=\"indicator\" *ngIf=\"tab.indicator\">{{variablesService.currentWallet.new_contracts}}</span>\r\n      </div>\r\n    </ng-container>\r\n  </div>\r\n  <div class=\"tabs-content scrolled-content\">\r\n    <router-outlet></router-outlet>\r\n  </div>\r\n</div>\r\n\r\n"
 
 /***/ }),
 
@@ -6013,7 +6358,7 @@ module.exports = "<div class=\"header\">\r\n  <div>\r\n    <h3>{{variablesServic
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = ":host {\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  padding: 0 3rem 3rem;\n  min-width: 95rem;\n  width: 100%;\n  height: 100%; }\n\n.header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  flex: 0 0 auto;\n  height: 8rem; }\n\n.header > div {\n    display: flex;\n    align-items: center; }\n\n.header > div :not(:last-child) {\n      margin-right: 3.2rem; }\n\n.header h3 {\n    font-size: 1.7rem;\n    font-weight: 600; }\n\n.header button {\n    display: flex;\n    align-items: center;\n    background: transparent;\n    border: none;\n    cursor: pointer;\n    font-weight: 400;\n    outline: none;\n    padding: 0; }\n\n.header button .icon {\n      margin-right: 1.2rem;\n      width: 1.7rem;\n      height: 1.7rem; }\n\n.header button .icon.account {\n        -webkit-mask: url('account.svg') no-repeat center;\n                mask: url('account.svg') no-repeat center; }\n\n.header button .icon.details {\n        -webkit-mask: url('details.svg') no-repeat center;\n                mask: url('details.svg') no-repeat center; }\n\n.header button .icon.lock {\n        -webkit-mask: url('lock.svg') no-repeat center;\n                mask: url('lock.svg') no-repeat center; }\n\n.address {\n  display: flex;\n  align-items: center;\n  flex: 0 0 auto;\n  font-size: 1.4rem;\n  line-height: 1.7rem; }\n\n.address .icon {\n    cursor: pointer;\n    margin-left: 1.2rem;\n    width: 1.7rem;\n    height: 1.7rem; }\n\n.address .icon.copy {\n      -webkit-mask: url('copy.svg') no-repeat center;\n              mask: url('copy.svg') no-repeat center; }\n\n.address .icon.copy:hover {\n        opacity: 0.75; }\n\n.address .icon.copied {\n      -webkit-mask: url('complete-testwallet.svg') no-repeat center;\n              mask: url('complete-testwallet.svg') no-repeat center; }\n\n.balance {\n  display: flex;\n  align-items: flex-end;\n  justify-content: flex-start;\n  flex: 0 0 auto;\n  margin: 2.6rem 0; }\n\n.balance :first-child {\n    font-size: 3.3rem;\n    font-weight: 600;\n    line-height: 2.4rem;\n    margin-right: 3.5rem; }\n\n.balance :last-child {\n    font-size: 1.8rem;\n    font-weight: 600;\n    line-height: 1.3rem; }\n\n.tabs {\n  display: flex;\n  flex-direction: column;\n  flex: 1 1 auto; }\n\n.tabs .tabs-header {\n    display: flex;\n    justify-content: space-between;\n    flex: 0 0 auto; }\n\n.tabs .tabs-header .tab {\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      flex: 1 0 auto;\n      cursor: pointer;\n      padding: 0 1rem;\n      height: 5rem; }\n\n.tabs .tabs-header .tab .icon {\n        margin-right: 1.3rem;\n        width: 1.7rem;\n        height: 1.7rem; }\n\n.tabs .tabs-header .tab .icon.send {\n          -webkit-mask: url('send.svg') no-repeat center;\n                  mask: url('send.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.receive {\n          -webkit-mask: url('receive.svg') no-repeat center;\n                  mask: url('receive.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.history {\n          -webkit-mask: url('history.svg') no-repeat center;\n                  mask: url('history.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.contracts {\n          -webkit-mask: url('contracts.svg') no-repeat center;\n                  mask: url('contracts.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.messages {\n          -webkit-mask: url('message.svg') no-repeat center;\n                  mask: url('message.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.staking {\n          -webkit-mask: url('staking.svg') no-repeat center;\n                  mask: url('staking.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .indicator {\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        border-radius: 1rem;\n        font-size: 1rem;\n        font-weight: 600;\n        margin-left: 1.3rem;\n        padding: 0 0.5rem;\n        min-width: 1.6rem;\n        height: 1.6rem; }\n\n.tabs .tabs-header .tab.disabled {\n        cursor: not-allowed; }\n\n.tabs .tabs-header .tab:not(:last-child) {\n        margin-right: 0.3rem; }\n\n.tabs .tabs-content {\n    display: flex;\n    padding: 3rem;\n    flex: 1 1 auto;\n    overflow-x: hidden;\n    overflow-y: overlay; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvd2FsbGV0L0Q6XFx6YW5vX3phbm9cXHNyY1xcZ3VpXFxxdC1kYWVtb25cXGh0bWxfc291cmNlL3NyY1xcYXBwXFx3YWxsZXRcXHdhbGxldC5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLGtCQUFrQjtFQUNsQixhQUFhO0VBQ2Isc0JBQXNCO0VBQ3RCLG9CQUFvQjtFQUNwQixnQkFBZ0I7RUFDaEIsV0FBVztFQUNYLFlBQVksRUFBQTs7QUFHZDtFQUNFLGFBQWE7RUFDYixtQkFBbUI7RUFDbkIsOEJBQThCO0VBQzlCLGNBQWM7RUFDZCxZQUFZLEVBQUE7O0FBTGQ7SUFRSSxhQUFhO0lBQ2IsbUJBQW1CLEVBQUE7O0FBVHZCO01BWU0sb0JBQW9CLEVBQUE7O0FBWjFCO0lBaUJJLGlCQUFpQjtJQUNqQixnQkFBZ0IsRUFBQTs7QUFsQnBCO0lBc0JJLGFBQWE7SUFDYixtQkFBbUI7SUFDbkIsdUJBQXVCO0lBQ3ZCLFlBQVk7SUFDWixlQUFlO0lBQ2YsZ0JBQWdCO0lBQ2hCLGFBQWE7SUFDYixVQUFVLEVBQUE7O0FBN0JkO01BZ0NNLG9CQUFvQjtNQUNwQixhQUFhO01BQ2IsY0FBYyxFQUFBOztBQWxDcEI7UUFxQ1EsaURBQTBEO2dCQUExRCx5Q0FBMEQsRUFBQTs7QUFyQ2xFO1FBeUNRLGlEQUEwRDtnQkFBMUQseUNBQTBELEVBQUE7O0FBekNsRTtRQTZDUSw4Q0FBdUQ7Z0JBQXZELHNDQUF1RCxFQUFBOztBQU0vRDtFQUNFLGFBQWE7RUFDYixtQkFBbUI7RUFDbkIsY0FBYztFQUNkLGlCQUFpQjtFQUNqQixtQkFBbUIsRUFBQTs7QUFMckI7SUFRSSxlQUFlO0lBQ2YsbUJBQW1CO0lBQ25CLGFBQWE7SUFDYixjQUFjLEVBQUE7O0FBWGxCO01BY00sOENBQXVEO2NBQXZELHNDQUF1RCxFQUFBOztBQWQ3RDtRQWlCUSxhQUFhLEVBQUE7O0FBakJyQjtNQXNCTSw2REFBc0U7Y0FBdEUscURBQXNFLEVBQUE7O0FBSzVFO0VBQ0UsYUFBYTtFQUNiLHFCQUFxQjtFQUNyQiwyQkFBMkI7RUFDM0IsY0FBYztFQUNkLGdCQUFnQixFQUFBOztBQUxsQjtJQVFJLGlCQUFpQjtJQUNqQixnQkFBZ0I7SUFDaEIsbUJBQW1CO0lBQ25CLG9CQUFvQixFQUFBOztBQVh4QjtJQWVJLGlCQUFpQjtJQUNqQixnQkFBZ0I7SUFDaEIsbUJBQW1CLEVBQUE7O0FBSXZCO0VBQ0UsYUFBYTtFQUNiLHNCQUFzQjtFQUN0QixjQUFjLEVBQUE7O0FBSGhCO0lBTUksYUFBYTtJQUNiLDhCQUE4QjtJQUM5QixjQUFjLEVBQUE7O0FBUmxCO01BV00sYUFBYTtNQUNiLG1CQUFtQjtNQUNuQix1QkFBdUI7TUFDdkIsY0FBYztNQUNkLGVBQWU7TUFDZixlQUFlO01BQ2YsWUFBWSxFQUFBOztBQWpCbEI7UUFvQlEsb0JBQW9CO1FBQ3BCLGFBQWE7UUFDYixjQUFjLEVBQUE7O0FBdEJ0QjtVQXlCVSw4Q0FBdUQ7a0JBQXZELHNDQUF1RCxFQUFBOztBQXpCakU7VUE2QlUsaURBQTBEO2tCQUExRCx5Q0FBMEQsRUFBQTs7QUE3QnBFO1VBaUNVLGlEQUEwRDtrQkFBMUQseUNBQTBELEVBQUE7O0FBakNwRTtVQXFDVSxtREFBNEQ7a0JBQTVELDJDQUE0RCxFQUFBOztBQXJDdEU7VUF5Q1UsaURBQTBEO2tCQUExRCx5Q0FBMEQsRUFBQTs7QUF6Q3BFO1VBNkNVLGlEQUEwRDtrQkFBMUQseUNBQTBELEVBQUE7O0FBN0NwRTtRQWtEUSxhQUFhO1FBQ2IsbUJBQW1CO1FBQ25CLHVCQUF1QjtRQUN2QixtQkFBbUI7UUFDbkIsZUFBZTtRQUNmLGdCQUFnQjtRQUNoQixtQkFBbUI7UUFDbkIsaUJBQWlCO1FBQ2pCLGlCQUFpQjtRQUNqQixjQUFjLEVBQUE7O0FBM0R0QjtRQStEUSxtQkFBbUIsRUFBQTs7QUEvRDNCO1FBbUVRLG9CQUFvQixFQUFBOztBQW5FNUI7SUF5RUksYUFBYTtJQUNiLGFBQWE7SUFDYixjQUFjO0lBQ2Qsa0JBQWtCO0lBQ2xCLG1CQUFtQixFQUFBIiwiZmlsZSI6InNyYy9hcHAvd2FsbGV0L3dhbGxldC5jb21wb25lbnQuc2NzcyIsInNvdXJjZXNDb250ZW50IjpbIjpob3N0IHtcclxuICBwb3NpdGlvbjogcmVsYXRpdmU7XHJcbiAgZGlzcGxheTogZmxleDtcclxuICBmbGV4LWRpcmVjdGlvbjogY29sdW1uO1xyXG4gIHBhZGRpbmc6IDAgM3JlbSAzcmVtO1xyXG4gIG1pbi13aWR0aDogOTVyZW07XHJcbiAgd2lkdGg6IDEwMCU7XHJcbiAgaGVpZ2h0OiAxMDAlO1xyXG59XHJcblxyXG4uaGVhZGVyIHtcclxuICBkaXNwbGF5OiBmbGV4O1xyXG4gIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuO1xyXG4gIGZsZXg6IDAgMCBhdXRvO1xyXG4gIGhlaWdodDogOHJlbTtcclxuXHJcbiAgPiBkaXYge1xyXG4gICAgZGlzcGxheTogZmxleDtcclxuICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcblxyXG4gICAgOm5vdCg6bGFzdC1jaGlsZCkge1xyXG4gICAgICBtYXJnaW4tcmlnaHQ6IDMuMnJlbTtcclxuICAgIH1cclxuICB9XHJcblxyXG4gIGgzIHtcclxuICAgIGZvbnQtc2l6ZTogMS43cmVtO1xyXG4gICAgZm9udC13ZWlnaHQ6IDYwMDtcclxuICB9XHJcblxyXG4gIGJ1dHRvbiB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICAgIGJhY2tncm91bmQ6IHRyYW5zcGFyZW50O1xyXG4gICAgYm9yZGVyOiBub25lO1xyXG4gICAgY3Vyc29yOiBwb2ludGVyO1xyXG4gICAgZm9udC13ZWlnaHQ6IDQwMDtcclxuICAgIG91dGxpbmU6IG5vbmU7XHJcbiAgICBwYWRkaW5nOiAwO1xyXG5cclxuICAgIC5pY29uIHtcclxuICAgICAgbWFyZ2luLXJpZ2h0OiAxLjJyZW07XHJcbiAgICAgIHdpZHRoOiAxLjdyZW07XHJcbiAgICAgIGhlaWdodDogMS43cmVtO1xyXG5cclxuICAgICAgJi5hY2NvdW50IHtcclxuICAgICAgICBtYXNrOiB1cmwoLi4vLi4vYXNzZXRzL2ljb25zL2FjY291bnQuc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgICB9XHJcblxyXG4gICAgICAmLmRldGFpbHMge1xyXG4gICAgICAgIG1hc2s6IHVybCguLi8uLi9hc3NldHMvaWNvbnMvZGV0YWlscy5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcbiAgICAgIH1cclxuXHJcbiAgICAgICYubG9jayB7XHJcbiAgICAgICAgbWFzazogdXJsKC4uLy4uL2Fzc2V0cy9pY29ucy9sb2NrLnN2Zykgbm8tcmVwZWF0IGNlbnRlcjtcclxuICAgICAgfVxyXG4gICAgfVxyXG4gIH1cclxufVxyXG5cclxuLmFkZHJlc3Mge1xyXG4gIGRpc3BsYXk6IGZsZXg7XHJcbiAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICBmbGV4OiAwIDAgYXV0bztcclxuICBmb250LXNpemU6IDEuNHJlbTtcclxuICBsaW5lLWhlaWdodDogMS43cmVtO1xyXG5cclxuICAuaWNvbiB7XHJcbiAgICBjdXJzb3I6IHBvaW50ZXI7XHJcbiAgICBtYXJnaW4tbGVmdDogMS4ycmVtO1xyXG4gICAgd2lkdGg6IDEuN3JlbTtcclxuICAgIGhlaWdodDogMS43cmVtO1xyXG5cclxuICAgICYuY29weSB7XHJcbiAgICAgIG1hc2s6IHVybCguLi8uLi9hc3NldHMvaWNvbnMvY29weS5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcblxyXG4gICAgICAmOmhvdmVyIHtcclxuICAgICAgICBvcGFjaXR5OiAwLjc1O1xyXG4gICAgICB9XHJcbiAgICB9XHJcblxyXG4gICAgJi5jb3BpZWQge1xyXG4gICAgICBtYXNrOiB1cmwoLi4vLi4vYXNzZXRzL2ljb25zL2NvbXBsZXRlLXRlc3R3YWxsZXQuc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgfVxyXG4gIH1cclxufVxyXG5cclxuLmJhbGFuY2Uge1xyXG4gIGRpc3BsYXk6IGZsZXg7XHJcbiAgYWxpZ24taXRlbXM6IGZsZXgtZW5kO1xyXG4gIGp1c3RpZnktY29udGVudDogZmxleC1zdGFydDtcclxuICBmbGV4OiAwIDAgYXV0bztcclxuICBtYXJnaW46IDIuNnJlbSAwO1xyXG5cclxuICA6Zmlyc3QtY2hpbGQge1xyXG4gICAgZm9udC1zaXplOiAzLjNyZW07XHJcbiAgICBmb250LXdlaWdodDogNjAwO1xyXG4gICAgbGluZS1oZWlnaHQ6IDIuNHJlbTtcclxuICAgIG1hcmdpbi1yaWdodDogMy41cmVtO1xyXG4gIH1cclxuXHJcbiAgOmxhc3QtY2hpbGQge1xyXG4gICAgZm9udC1zaXplOiAxLjhyZW07XHJcbiAgICBmb250LXdlaWdodDogNjAwO1xyXG4gICAgbGluZS1oZWlnaHQ6IDEuM3JlbTtcclxuICB9XHJcbn1cclxuXHJcbi50YWJzIHtcclxuICBkaXNwbGF5OiBmbGV4O1xyXG4gIGZsZXgtZGlyZWN0aW9uOiBjb2x1bW47XHJcbiAgZmxleDogMSAxIGF1dG87XHJcblxyXG4gIC50YWJzLWhlYWRlciB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuO1xyXG4gICAgZmxleDogMCAwIGF1dG87XHJcblxyXG4gICAgLnRhYiB7XHJcbiAgICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAgICAgIGp1c3RpZnktY29udGVudDogY2VudGVyO1xyXG4gICAgICBmbGV4OiAxIDAgYXV0bztcclxuICAgICAgY3Vyc29yOiBwb2ludGVyO1xyXG4gICAgICBwYWRkaW5nOiAwIDFyZW07XHJcbiAgICAgIGhlaWdodDogNXJlbTtcclxuXHJcbiAgICAgIC5pY29uIHtcclxuICAgICAgICBtYXJnaW4tcmlnaHQ6IDEuM3JlbTtcclxuICAgICAgICB3aWR0aDogMS43cmVtO1xyXG4gICAgICAgIGhlaWdodDogMS43cmVtO1xyXG5cclxuICAgICAgICAmLnNlbmQge1xyXG4gICAgICAgICAgbWFzazogdXJsKC4uLy4uL2Fzc2V0cy9pY29ucy9zZW5kLnN2Zykgbm8tcmVwZWF0IGNlbnRlcjtcclxuICAgICAgICB9XHJcblxyXG4gICAgICAgICYucmVjZWl2ZSB7XHJcbiAgICAgICAgICBtYXNrOiB1cmwoLi4vLi4vYXNzZXRzL2ljb25zL3JlY2VpdmUuc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgICAgIH1cclxuXHJcbiAgICAgICAgJi5oaXN0b3J5IHtcclxuICAgICAgICAgIG1hc2s6IHVybCguLi8uLi9hc3NldHMvaWNvbnMvaGlzdG9yeS5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcbiAgICAgICAgfVxyXG5cclxuICAgICAgICAmLmNvbnRyYWN0cyB7XHJcbiAgICAgICAgICBtYXNrOiB1cmwoLi4vLi4vYXNzZXRzL2ljb25zL2NvbnRyYWN0cy5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcbiAgICAgICAgfVxyXG5cclxuICAgICAgICAmLm1lc3NhZ2VzIHtcclxuICAgICAgICAgIG1hc2s6IHVybCguLi8uLi9hc3NldHMvaWNvbnMvbWVzc2FnZS5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcbiAgICAgICAgfVxyXG5cclxuICAgICAgICAmLnN0YWtpbmcge1xyXG4gICAgICAgICAgbWFzazogdXJsKC4uLy4uL2Fzc2V0cy9pY29ucy9zdGFraW5nLnN2Zykgbm8tcmVwZWF0IGNlbnRlcjtcclxuICAgICAgICB9XHJcbiAgICAgIH1cclxuXHJcbiAgICAgIC5pbmRpY2F0b3Ige1xyXG4gICAgICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICAgICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICAgICAgICBqdXN0aWZ5LWNvbnRlbnQ6IGNlbnRlcjtcclxuICAgICAgICBib3JkZXItcmFkaXVzOiAxcmVtO1xyXG4gICAgICAgIGZvbnQtc2l6ZTogMXJlbTtcclxuICAgICAgICBmb250LXdlaWdodDogNjAwO1xyXG4gICAgICAgIG1hcmdpbi1sZWZ0OiAxLjNyZW07XHJcbiAgICAgICAgcGFkZGluZzogMCAwLjVyZW07XHJcbiAgICAgICAgbWluLXdpZHRoOiAxLjZyZW07XHJcbiAgICAgICAgaGVpZ2h0OiAxLjZyZW07XHJcbiAgICAgIH1cclxuXHJcbiAgICAgICYuZGlzYWJsZWQge1xyXG4gICAgICAgIGN1cnNvcjogbm90LWFsbG93ZWQ7XHJcbiAgICAgIH1cclxuXHJcbiAgICAgICY6bm90KDpsYXN0LWNoaWxkKSB7XHJcbiAgICAgICAgbWFyZ2luLXJpZ2h0OiAwLjNyZW07XHJcbiAgICAgIH1cclxuICAgIH1cclxuICB9XHJcblxyXG4gIC50YWJzLWNvbnRlbnQge1xyXG4gICAgZGlzcGxheTogZmxleDtcclxuICAgIHBhZGRpbmc6IDNyZW07XHJcbiAgICBmbGV4OiAxIDEgYXV0bztcclxuICAgIG92ZXJmbG93LXg6IGhpZGRlbjtcclxuICAgIG92ZXJmbG93LXk6IG92ZXJsYXk7XHJcbiAgfVxyXG59XHJcbiJdfQ== */"
+module.exports = ":host {\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  padding: 0 3rem 3rem;\n  min-width: 95rem;\n  width: 100%;\n  height: 100%; }\n\n.header {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  flex: 0 0 auto;\n  height: 8rem; }\n\n.header > div {\n    display: flex;\n    align-items: center; }\n\n.header > div :not(:last-child) {\n      margin-right: 3.2rem; }\n\n.header h3 {\n    font-size: 1.7rem;\n    font-weight: 600; }\n\n.header button {\n    display: flex;\n    align-items: center;\n    background: transparent;\n    border: none;\n    cursor: pointer;\n    font-weight: 400;\n    outline: none;\n    padding: 0; }\n\n.header button .icon {\n      margin-right: 1.2rem;\n      width: 1.7rem;\n      height: 1.7rem; }\n\n.header button .icon.account {\n        -webkit-mask: url('account.svg') no-repeat center;\n                mask: url('account.svg') no-repeat center; }\n\n.header button .icon.details {\n        -webkit-mask: url('details.svg') no-repeat center;\n                mask: url('details.svg') no-repeat center; }\n\n.header button .icon.lock {\n        -webkit-mask: url('lock.svg') no-repeat center;\n                mask: url('lock.svg') no-repeat center; }\n\n.header .alias {\n    display: flex;\n    align-items: center;\n    font-size: 1.3rem; }\n\n.header .alias .icon {\n      cursor: pointer;\n      margin-right: 1.2rem;\n      width: 1.7rem;\n      height: 1.7rem; }\n\n.header .alias .icon.edit {\n        -webkit-mask: url('details.svg') no-repeat center;\n                mask: url('details.svg') no-repeat center; }\n\n.header .alias .icon.transfer {\n        -webkit-mask: url('send.svg') no-repeat center;\n                mask: url('send.svg') no-repeat center; }\n\n.address {\n  display: flex;\n  align-items: center;\n  flex: 0 0 auto;\n  font-size: 1.4rem;\n  line-height: 1.7rem; }\n\n.address .icon {\n    cursor: pointer;\n    margin-left: 1.2rem;\n    width: 1.7rem;\n    height: 1.7rem; }\n\n.address .icon.copy {\n      -webkit-mask: url('copy.svg') no-repeat center;\n              mask: url('copy.svg') no-repeat center; }\n\n.address .icon.copy:hover {\n        opacity: 0.75; }\n\n.address .icon.copied {\n      -webkit-mask: url('complete-testwallet.svg') no-repeat center;\n              mask: url('complete-testwallet.svg') no-repeat center; }\n\n.balance {\n  display: flex;\n  align-items: flex-end;\n  justify-content: flex-start;\n  flex: 0 0 auto;\n  margin: 2.6rem 0; }\n\n.balance :first-child {\n    font-size: 3.3rem;\n    font-weight: 600;\n    line-height: 2.4rem;\n    margin-right: 3.5rem; }\n\n.balance :last-child {\n    font-size: 1.8rem;\n    font-weight: 600;\n    line-height: 1.3rem; }\n\n.tabs {\n  display: flex;\n  flex-direction: column;\n  flex: 1 1 auto; }\n\n.tabs .tabs-header {\n    display: flex;\n    justify-content: space-between;\n    flex: 0 0 auto; }\n\n.tabs .tabs-header .tab {\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      flex: 1 0 auto;\n      cursor: pointer;\n      padding: 0 1rem;\n      height: 5rem; }\n\n.tabs .tabs-header .tab .icon {\n        margin-right: 1.3rem;\n        width: 1.7rem;\n        height: 1.7rem; }\n\n.tabs .tabs-header .tab .icon.send {\n          -webkit-mask: url('send.svg') no-repeat center;\n                  mask: url('send.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.receive {\n          -webkit-mask: url('receive.svg') no-repeat center;\n                  mask: url('receive.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.history {\n          -webkit-mask: url('history.svg') no-repeat center;\n                  mask: url('history.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.contracts {\n          -webkit-mask: url('contracts.svg') no-repeat center;\n                  mask: url('contracts.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.messages {\n          -webkit-mask: url('message.svg') no-repeat center;\n                  mask: url('message.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .icon.staking {\n          -webkit-mask: url('staking.svg') no-repeat center;\n                  mask: url('staking.svg') no-repeat center; }\n\n.tabs .tabs-header .tab .indicator {\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        border-radius: 1rem;\n        font-size: 1rem;\n        font-weight: 600;\n        margin-left: 1.3rem;\n        padding: 0 0.5rem;\n        min-width: 1.6rem;\n        height: 1.6rem; }\n\n.tabs .tabs-header .tab.disabled {\n        cursor: not-allowed; }\n\n.tabs .tabs-header .tab:not(:last-child) {\n        margin-right: 0.3rem; }\n\n.tabs .tabs-content {\n    display: flex;\n    padding: 3rem;\n    flex: 1 1 auto;\n    overflow-x: hidden;\n    overflow-y: overlay; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvd2FsbGV0L0Q6XFx6YW5vX3phbm9cXHNyY1xcZ3VpXFxxdC1kYWVtb25cXGh0bWxfc291cmNlL3NyY1xcYXBwXFx3YWxsZXRcXHdhbGxldC5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLGtCQUFrQjtFQUNsQixhQUFhO0VBQ2Isc0JBQXNCO0VBQ3RCLG9CQUFvQjtFQUNwQixnQkFBZ0I7RUFDaEIsV0FBVztFQUNYLFlBQVksRUFBQTs7QUFHZDtFQUNFLGFBQWE7RUFDYixtQkFBbUI7RUFDbkIsOEJBQThCO0VBQzlCLGNBQWM7RUFDZCxZQUFZLEVBQUE7O0FBTGQ7SUFRSSxhQUFhO0lBQ2IsbUJBQW1CLEVBQUE7O0FBVHZCO01BWU0sb0JBQW9CLEVBQUE7O0FBWjFCO0lBaUJJLGlCQUFpQjtJQUNqQixnQkFBZ0IsRUFBQTs7QUFsQnBCO0lBc0JJLGFBQWE7SUFDYixtQkFBbUI7SUFDbkIsdUJBQXVCO0lBQ3ZCLFlBQVk7SUFDWixlQUFlO0lBQ2YsZ0JBQWdCO0lBQ2hCLGFBQWE7SUFDYixVQUFVLEVBQUE7O0FBN0JkO01BZ0NNLG9CQUFvQjtNQUNwQixhQUFhO01BQ2IsY0FBYyxFQUFBOztBQWxDcEI7UUFxQ1EsaURBQTBEO2dCQUExRCx5Q0FBMEQsRUFBQTs7QUFyQ2xFO1FBeUNRLGlEQUEwRDtnQkFBMUQseUNBQTBELEVBQUE7O0FBekNsRTtRQTZDUSw4Q0FBdUQ7Z0JBQXZELHNDQUF1RCxFQUFBOztBQTdDL0Q7SUFtREksYUFBYTtJQUNiLG1CQUFtQjtJQUNuQixpQkFBaUIsRUFBQTs7QUFyRHJCO01Bd0RNLGVBQWU7TUFDZixvQkFBb0I7TUFDcEIsYUFBYTtNQUNiLGNBQWMsRUFBQTs7QUEzRHBCO1FBOERRLGlEQUEwRDtnQkFBMUQseUNBQTBELEVBQUE7O0FBOURsRTtRQWtFUSw4Q0FBdUQ7Z0JBQXZELHNDQUF1RCxFQUFBOztBQU0vRDtFQUNFLGFBQWE7RUFDYixtQkFBbUI7RUFDbkIsY0FBYztFQUNkLGlCQUFpQjtFQUNqQixtQkFBbUIsRUFBQTs7QUFMckI7SUFRSSxlQUFlO0lBQ2YsbUJBQW1CO0lBQ25CLGFBQWE7SUFDYixjQUFjLEVBQUE7O0FBWGxCO01BY00sOENBQXVEO2NBQXZELHNDQUF1RCxFQUFBOztBQWQ3RDtRQWlCUSxhQUFhLEVBQUE7O0FBakJyQjtNQXNCTSw2REFBc0U7Y0FBdEUscURBQXNFLEVBQUE7O0FBSzVFO0VBQ0UsYUFBYTtFQUNiLHFCQUFxQjtFQUNyQiwyQkFBMkI7RUFDM0IsY0FBYztFQUNkLGdCQUFnQixFQUFBOztBQUxsQjtJQVFJLGlCQUFpQjtJQUNqQixnQkFBZ0I7SUFDaEIsbUJBQW1CO0lBQ25CLG9CQUFvQixFQUFBOztBQVh4QjtJQWVJLGlCQUFpQjtJQUNqQixnQkFBZ0I7SUFDaEIsbUJBQW1CLEVBQUE7O0FBSXZCO0VBQ0UsYUFBYTtFQUNiLHNCQUFzQjtFQUN0QixjQUFjLEVBQUE7O0FBSGhCO0lBTUksYUFBYTtJQUNiLDhCQUE4QjtJQUM5QixjQUFjLEVBQUE7O0FBUmxCO01BV00sYUFBYTtNQUNiLG1CQUFtQjtNQUNuQix1QkFBdUI7TUFDdkIsY0FBYztNQUNkLGVBQWU7TUFDZixlQUFlO01BQ2YsWUFBWSxFQUFBOztBQWpCbEI7UUFvQlEsb0JBQW9CO1FBQ3BCLGFBQWE7UUFDYixjQUFjLEVBQUE7O0FBdEJ0QjtVQXlCVSw4Q0FBdUQ7a0JBQXZELHNDQUF1RCxFQUFBOztBQXpCakU7VUE2QlUsaURBQTBEO2tCQUExRCx5Q0FBMEQsRUFBQTs7QUE3QnBFO1VBaUNVLGlEQUEwRDtrQkFBMUQseUNBQTBELEVBQUE7O0FBakNwRTtVQXFDVSxtREFBNEQ7a0JBQTVELDJDQUE0RCxFQUFBOztBQXJDdEU7VUF5Q1UsaURBQTBEO2tCQUExRCx5Q0FBMEQsRUFBQTs7QUF6Q3BFO1VBNkNVLGlEQUEwRDtrQkFBMUQseUNBQTBELEVBQUE7O0FBN0NwRTtRQWtEUSxhQUFhO1FBQ2IsbUJBQW1CO1FBQ25CLHVCQUF1QjtRQUN2QixtQkFBbUI7UUFDbkIsZUFBZTtRQUNmLGdCQUFnQjtRQUNoQixtQkFBbUI7UUFDbkIsaUJBQWlCO1FBQ2pCLGlCQUFpQjtRQUNqQixjQUFjLEVBQUE7O0FBM0R0QjtRQStEUSxtQkFBbUIsRUFBQTs7QUEvRDNCO1FBbUVRLG9CQUFvQixFQUFBOztBQW5FNUI7SUF5RUksYUFBYTtJQUNiLGFBQWE7SUFDYixjQUFjO0lBQ2Qsa0JBQWtCO0lBQ2xCLG1CQUFtQixFQUFBIiwiZmlsZSI6InNyYy9hcHAvd2FsbGV0L3dhbGxldC5jb21wb25lbnQuc2NzcyIsInNvdXJjZXNDb250ZW50IjpbIjpob3N0IHtcclxuICBwb3NpdGlvbjogcmVsYXRpdmU7XHJcbiAgZGlzcGxheTogZmxleDtcclxuICBmbGV4LWRpcmVjdGlvbjogY29sdW1uO1xyXG4gIHBhZGRpbmc6IDAgM3JlbSAzcmVtO1xyXG4gIG1pbi13aWR0aDogOTVyZW07XHJcbiAgd2lkdGg6IDEwMCU7XHJcbiAgaGVpZ2h0OiAxMDAlO1xyXG59XHJcblxyXG4uaGVhZGVyIHtcclxuICBkaXNwbGF5OiBmbGV4O1xyXG4gIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuO1xyXG4gIGZsZXg6IDAgMCBhdXRvO1xyXG4gIGhlaWdodDogOHJlbTtcclxuXHJcbiAgPiBkaXYge1xyXG4gICAgZGlzcGxheTogZmxleDtcclxuICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcblxyXG4gICAgOm5vdCg6bGFzdC1jaGlsZCkge1xyXG4gICAgICBtYXJnaW4tcmlnaHQ6IDMuMnJlbTtcclxuICAgIH1cclxuICB9XHJcblxyXG4gIGgzIHtcclxuICAgIGZvbnQtc2l6ZTogMS43cmVtO1xyXG4gICAgZm9udC13ZWlnaHQ6IDYwMDtcclxuICB9XHJcblxyXG4gIGJ1dHRvbiB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICAgIGJhY2tncm91bmQ6IHRyYW5zcGFyZW50O1xyXG4gICAgYm9yZGVyOiBub25lO1xyXG4gICAgY3Vyc29yOiBwb2ludGVyO1xyXG4gICAgZm9udC13ZWlnaHQ6IDQwMDtcclxuICAgIG91dGxpbmU6IG5vbmU7XHJcbiAgICBwYWRkaW5nOiAwO1xyXG5cclxuICAgIC5pY29uIHtcclxuICAgICAgbWFyZ2luLXJpZ2h0OiAxLjJyZW07XHJcbiAgICAgIHdpZHRoOiAxLjdyZW07XHJcbiAgICAgIGhlaWdodDogMS43cmVtO1xyXG5cclxuICAgICAgJi5hY2NvdW50IHtcclxuICAgICAgICBtYXNrOiB1cmwoLi4vLi4vYXNzZXRzL2ljb25zL2FjY291bnQuc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgICB9XHJcblxyXG4gICAgICAmLmRldGFpbHMge1xyXG4gICAgICAgIG1hc2s6IHVybCguLi8uLi9hc3NldHMvaWNvbnMvZGV0YWlscy5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcbiAgICAgIH1cclxuXHJcbiAgICAgICYubG9jayB7XHJcbiAgICAgICAgbWFzazogdXJsKC4uLy4uL2Fzc2V0cy9pY29ucy9sb2NrLnN2Zykgbm8tcmVwZWF0IGNlbnRlcjtcclxuICAgICAgfVxyXG4gICAgfVxyXG4gIH1cclxuXHJcbiAgLmFsaWFzIHtcclxuICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICBhbGlnbi1pdGVtczogY2VudGVyO1xyXG4gICAgZm9udC1zaXplOiAxLjNyZW07XHJcblxyXG4gICAgLmljb24ge1xyXG4gICAgICBjdXJzb3I6IHBvaW50ZXI7XHJcbiAgICAgIG1hcmdpbi1yaWdodDogMS4ycmVtO1xyXG4gICAgICB3aWR0aDogMS43cmVtO1xyXG4gICAgICBoZWlnaHQ6IDEuN3JlbTtcclxuXHJcbiAgICAgICYuZWRpdCB7XHJcbiAgICAgICAgbWFzazogdXJsKC4uLy4uL2Fzc2V0cy9pY29ucy9kZXRhaWxzLnN2Zykgbm8tcmVwZWF0IGNlbnRlcjtcclxuICAgICAgfVxyXG5cclxuICAgICAgJi50cmFuc2ZlciB7XHJcbiAgICAgICAgbWFzazogdXJsKC4uLy4uL2Fzc2V0cy9pY29ucy9zZW5kLnN2Zykgbm8tcmVwZWF0IGNlbnRlcjtcclxuICAgICAgfVxyXG4gICAgfVxyXG4gIH1cclxufVxyXG5cclxuLmFkZHJlc3Mge1xyXG4gIGRpc3BsYXk6IGZsZXg7XHJcbiAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICBmbGV4OiAwIDAgYXV0bztcclxuICBmb250LXNpemU6IDEuNHJlbTtcclxuICBsaW5lLWhlaWdodDogMS43cmVtO1xyXG5cclxuICAuaWNvbiB7XHJcbiAgICBjdXJzb3I6IHBvaW50ZXI7XHJcbiAgICBtYXJnaW4tbGVmdDogMS4ycmVtO1xyXG4gICAgd2lkdGg6IDEuN3JlbTtcclxuICAgIGhlaWdodDogMS43cmVtO1xyXG5cclxuICAgICYuY29weSB7XHJcbiAgICAgIG1hc2s6IHVybCguLi8uLi9hc3NldHMvaWNvbnMvY29weS5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcblxyXG4gICAgICAmOmhvdmVyIHtcclxuICAgICAgICBvcGFjaXR5OiAwLjc1O1xyXG4gICAgICB9XHJcbiAgICB9XHJcblxyXG4gICAgJi5jb3BpZWQge1xyXG4gICAgICBtYXNrOiB1cmwoLi4vLi4vYXNzZXRzL2ljb25zL2NvbXBsZXRlLXRlc3R3YWxsZXQuc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgfVxyXG4gIH1cclxufVxyXG5cclxuLmJhbGFuY2Uge1xyXG4gIGRpc3BsYXk6IGZsZXg7XHJcbiAgYWxpZ24taXRlbXM6IGZsZXgtZW5kO1xyXG4gIGp1c3RpZnktY29udGVudDogZmxleC1zdGFydDtcclxuICBmbGV4OiAwIDAgYXV0bztcclxuICBtYXJnaW46IDIuNnJlbSAwO1xyXG5cclxuICA6Zmlyc3QtY2hpbGQge1xyXG4gICAgZm9udC1zaXplOiAzLjNyZW07XHJcbiAgICBmb250LXdlaWdodDogNjAwO1xyXG4gICAgbGluZS1oZWlnaHQ6IDIuNHJlbTtcclxuICAgIG1hcmdpbi1yaWdodDogMy41cmVtO1xyXG4gIH1cclxuXHJcbiAgOmxhc3QtY2hpbGQge1xyXG4gICAgZm9udC1zaXplOiAxLjhyZW07XHJcbiAgICBmb250LXdlaWdodDogNjAwO1xyXG4gICAgbGluZS1oZWlnaHQ6IDEuM3JlbTtcclxuICB9XHJcbn1cclxuXHJcbi50YWJzIHtcclxuICBkaXNwbGF5OiBmbGV4O1xyXG4gIGZsZXgtZGlyZWN0aW9uOiBjb2x1bW47XHJcbiAgZmxleDogMSAxIGF1dG87XHJcblxyXG4gIC50YWJzLWhlYWRlciB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuO1xyXG4gICAgZmxleDogMCAwIGF1dG87XHJcblxyXG4gICAgLnRhYiB7XHJcbiAgICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAgICAgIGp1c3RpZnktY29udGVudDogY2VudGVyO1xyXG4gICAgICBmbGV4OiAxIDAgYXV0bztcclxuICAgICAgY3Vyc29yOiBwb2ludGVyO1xyXG4gICAgICBwYWRkaW5nOiAwIDFyZW07XHJcbiAgICAgIGhlaWdodDogNXJlbTtcclxuXHJcbiAgICAgIC5pY29uIHtcclxuICAgICAgICBtYXJnaW4tcmlnaHQ6IDEuM3JlbTtcclxuICAgICAgICB3aWR0aDogMS43cmVtO1xyXG4gICAgICAgIGhlaWdodDogMS43cmVtO1xyXG5cclxuICAgICAgICAmLnNlbmQge1xyXG4gICAgICAgICAgbWFzazogdXJsKC4uLy4uL2Fzc2V0cy9pY29ucy9zZW5kLnN2Zykgbm8tcmVwZWF0IGNlbnRlcjtcclxuICAgICAgICB9XHJcblxyXG4gICAgICAgICYucmVjZWl2ZSB7XHJcbiAgICAgICAgICBtYXNrOiB1cmwoLi4vLi4vYXNzZXRzL2ljb25zL3JlY2VpdmUuc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgICAgIH1cclxuXHJcbiAgICAgICAgJi5oaXN0b3J5IHtcclxuICAgICAgICAgIG1hc2s6IHVybCguLi8uLi9hc3NldHMvaWNvbnMvaGlzdG9yeS5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcbiAgICAgICAgfVxyXG5cclxuICAgICAgICAmLmNvbnRyYWN0cyB7XHJcbiAgICAgICAgICBtYXNrOiB1cmwoLi4vLi4vYXNzZXRzL2ljb25zL2NvbnRyYWN0cy5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcbiAgICAgICAgfVxyXG5cclxuICAgICAgICAmLm1lc3NhZ2VzIHtcclxuICAgICAgICAgIG1hc2s6IHVybCguLi8uLi9hc3NldHMvaWNvbnMvbWVzc2FnZS5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcbiAgICAgICAgfVxyXG5cclxuICAgICAgICAmLnN0YWtpbmcge1xyXG4gICAgICAgICAgbWFzazogdXJsKC4uLy4uL2Fzc2V0cy9pY29ucy9zdGFraW5nLnN2Zykgbm8tcmVwZWF0IGNlbnRlcjtcclxuICAgICAgICB9XHJcbiAgICAgIH1cclxuXHJcbiAgICAgIC5pbmRpY2F0b3Ige1xyXG4gICAgICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICAgICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICAgICAgICBqdXN0aWZ5LWNvbnRlbnQ6IGNlbnRlcjtcclxuICAgICAgICBib3JkZXItcmFkaXVzOiAxcmVtO1xyXG4gICAgICAgIGZvbnQtc2l6ZTogMXJlbTtcclxuICAgICAgICBmb250LXdlaWdodDogNjAwO1xyXG4gICAgICAgIG1hcmdpbi1sZWZ0OiAxLjNyZW07XHJcbiAgICAgICAgcGFkZGluZzogMCAwLjVyZW07XHJcbiAgICAgICAgbWluLXdpZHRoOiAxLjZyZW07XHJcbiAgICAgICAgaGVpZ2h0OiAxLjZyZW07XHJcbiAgICAgIH1cclxuXHJcbiAgICAgICYuZGlzYWJsZWQge1xyXG4gICAgICAgIGN1cnNvcjogbm90LWFsbG93ZWQ7XHJcbiAgICAgIH1cclxuXHJcbiAgICAgICY6bm90KDpsYXN0LWNoaWxkKSB7XHJcbiAgICAgICAgbWFyZ2luLXJpZ2h0OiAwLjNyZW07XHJcbiAgICAgIH1cclxuICAgIH1cclxuICB9XHJcblxyXG4gIC50YWJzLWNvbnRlbnQge1xyXG4gICAgZGlzcGxheTogZmxleDtcclxuICAgIHBhZGRpbmc6IDNyZW07XHJcbiAgICBmbGV4OiAxIDEgYXV0bztcclxuICAgIG92ZXJmbG93LXg6IGhpZGRlbjtcclxuICAgIG92ZXJmbG93LXk6IG92ZXJsYXk7XHJcbiAgfVxyXG59XHJcbiJdfQ== */"
 
 /***/ }),
 
@@ -6114,6 +6459,7 @@ var WalletComponent = /** @class */ (function () {
         });
     };
     WalletComponent.prototype.changeTab = function (index) {
+        var _this = this;
         if ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts' || this.tabs[index].link === '/staking') && this.variablesService.daemon_state !== 2) {
             return;
         }
@@ -6121,7 +6467,9 @@ var WalletComponent = /** @class */ (function () {
             tab.active = false;
         });
         this.tabs[index].active = true;
-        this.router.navigate(['wallet/' + this.walletID + this.tabs[index].link]);
+        this.ngZone.run(function () {
+            _this.router.navigate(['wallet/' + _this.walletID + _this.tabs[index].link]);
+        });
     };
     WalletComponent.prototype.copyAddress = function () {
         var _this = this;

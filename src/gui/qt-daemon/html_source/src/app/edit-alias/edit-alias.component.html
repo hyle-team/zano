@@ -1,0 +1,44 @@
+<div class="content">
+
+  <div class="head">
+    <div class="breadcrumbs">
+      <span [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">{{ wallet.name }}</span>
+      <span>{{ 'BREADCRUMBS.EDIT_ALIAS' | translate }}</span>
+    </div>
+    <button class="back-btn" (click)="back()">
+      <i class="icon back"></i>
+      <span>{{ 'COMMON.BACK' | translate }}</span>
+    </button>
+  </div>
+
+  <form class="form-edit">
+
+    <div class="input-block alias-name">
+      <label for="alias-name">
+        {{ 'EDIT_ALIAS.NAME.LABEL' | translate }}
+      </label>
+      <input type="text" id="alias-name" [value]="alias.name" placeholder="{{ 'EDIT_ALIAS.NAME.PLACEHOLDER' | translate }}" readonly>
+    </div>
+
+    <div class="input-block textarea">
+      <label for="alias-comment">
+        {{ 'EDIT_ALIAS.COMMENT.LABEL' | translate }}
+      </label>
+      <textarea id="alias-comment" [(ngModel)]="alias.comment" [ngModelOptions]="{standalone: true}" placeholder="{{ 'EDIT_ALIAS.COMMENT.PLACEHOLDER' | translate }}"></textarea>
+      <div class="error-block" *ngIf="alias.comment.length > 0 && notEnoughMoney">
+        {{ 'EDIT_ALIAS.FORM_ERRORS.NO_MONEY' | translate }}
+      </div>
+    </div>
+
+    <div class="alias-cost">{{ "EDIT_ALIAS.COST" | translate : {value: variablesService.default_fee, currency: variablesService.defaultCurrency} }}</div>
+
+    <div class="wrap-buttons">
+      <button type="button" class="blue-button" (click)="updateAlias()" [disabled]="notEnoughMoney || oldAliasComment === alias.comment">{{ 'EDIT_ALIAS.BUTTON_EDIT' | translate }}</button>
+      <button type="button" class="blue-button" (click)="back()">{{ 'EDIT_ALIAS.BUTTON_CANCEL' | translate }}</button>
+    </div>
+
+  </form>
+
+</div>
+
+

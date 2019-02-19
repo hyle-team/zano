@@ -59,7 +59,9 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
   onSubmitEdit() {
     if (this.detailsForm.value) {
       this.variablesService.currentWallet.name = this.detailsForm.get('name').value;
-      this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
+      this.ngZone.run(() => {
+        this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
+      });
     }
   }
 

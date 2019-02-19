@@ -96,7 +96,9 @@ export class AssignAliasComponent implements OnInit {
           // service.unconfirmed_aliases.push({tx_hash: data.tx_hash, name: this.alias.name});
           // wallet.wakeAlias = true;
           this.modalService.prepareModal('info', 'ASSIGN_ALIAS.REQUEST_ADD_REG');
-          this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
+          this.ngZone.run(() => {
+            this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
+          });
         }
       });
     }

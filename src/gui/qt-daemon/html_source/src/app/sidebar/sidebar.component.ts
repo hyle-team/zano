@@ -1,4 +1,4 @@
-import {Component, OnInit, OnDestroy} from '@angular/core';
+import {Component, NgZone, OnInit, OnDestroy} from '@angular/core';
 import {ActivatedRoute, NavigationStart, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
 
@@ -15,9 +15,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private variablesService: VariablesService
-  ) {
-  }
+    private variablesService: VariablesService,
+    private ngZone: NgZone
+  ) {}
 
   ngOnInit() {
     if (this.router.url.indexOf('/wallet/') !== -1) {
@@ -54,7 +54,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
   logOut() {
     this.variablesService.stopCountdown();
     this.variablesService.appPass = '';
-    this.router.navigate(['/login'], {queryParams: {type: 'auth'}});
+    this.ngZone.run(() => {
+      this.router.navigate(['/login'], {queryParams: {type: 'auth'}});
+    });
   }
 
 }

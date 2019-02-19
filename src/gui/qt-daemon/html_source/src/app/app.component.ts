@@ -7,6 +7,7 @@ import {VariablesService} from './_helpers/services/variables.service';
 import {ContextMenuComponent} from 'ngx-contextmenu';
 import {IntToMoneyPipe} from './_helpers/pipes/int-to-money.pipe';
 import {BigNumber} from 'bignumber.js';
+import {ModalService} from './_helpers/services/modal.service';
 
 @Component({
   selector: 'app-root',
@@ -30,7 +31,8 @@ export class AppComponent implements OnInit, OnDestroy {
     private router: Router,
     private variablesService: VariablesService,
     private ngZone: NgZone,
-    private intToMoneyPipe: IntToMoneyPipe
+    private intToMoneyPipe: IntToMoneyPipe,
+    private modalService: ModalService
   ) {
     translate.addLangs(['en', 'fr']);
     translate.setDefaultLang('en');
@@ -316,67 +318,65 @@ export class AppComponent implements OnInit, OnDestroy {
         console.log('----------------- money_transfer_cancel -----------------');
         console.log(data);
 
-        // if (!data.ti) {
-        //   return;
-        // }
-        //
-        // var wallet_id = data.wallet_id;
-        // var tr_info = data.ti;
-        // var wallet = $rootScope.getWalletById(wallet_id);
-        // if (wallet) {
-        //   if ( tr_info.hasOwnProperty("contract") ){
-        //     for (var i = 0; i < $rootScope.contracts.length; i++) {
-        //       if ($rootScope.contracts[i].contract_id === tr_info.contract[0].contract_id && $rootScope.contracts[i].is_a === tr_info.contract[0].is_a) {
-        //         if ($rootScope.contracts[i].state === 1 || $rootScope.contracts[i].state === 110) {
-        //           $rootScope.contracts[i].isNew = true;
-        //           $rootScope.contracts[i].state = 140;
-        //           $rootScope.getContractsRecount(); //escrow_code
-        //         }
-        //         break;
-        //       }
-        //     }
-        //   }
-        //   angular.forEach(wallet.history, function (tr_item, key) {
-        //     if (tr_item.tx_hash === tr_info.tx_hash) {
-        //       wallet.history.splice(key, 1);
-        //     }
-        //   });
-        //
-        //   var error_tr = '';
-        //   switch (tr_info.tx_type) {
-        //     case 0:
-        //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL') + '<br>' +
-        //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-        //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_TO') + ' ' + $rootScope.moneyParse(tr_info.amount) + ' ' +
-        //         $filter('translate')('ERROR_GUI_TX_TYPE_NORMAL_END');
-        //       informer.error(error_tr);
-        //       break;
-        //     case 1:
-        //       informer.error('ERROR_GUI_TX_TYPE_PUSH_OFFER');
-        //       break;
-        //     case 2:
-        //       informer.error('ERROR_GUI_TX_TYPE_UPDATE_OFFER');
-        //       break;
-        //     case 3:
-        //       informer.error('ERROR_GUI_TX_TYPE_CANCEL_OFFER');
-        //       break;
-        //     case 4:
-        //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS') + '<br>' +
-        //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-        //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
-        //       informer.error(error_tr);
-        //       break;
-        //     case 5:
-        //       error_tr = $filter('translate')('ERROR_GUI_TX_TYPE_UPDATE_ALIAS') + '<br>' +
-        //         tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
-        //         $filter('translate')('ERROR_GUI_TX_TYPE_NEW_ALIAS_END');
-        //       informer.error(error_tr);
-        //       break;
-        //     case 6:
-        //       informer.error('ERROR_GUI_TX_TYPE_COIN_BASE');
-        //       break;
-        //   }
-        // }
+        if (!data.ti) {
+          return;
+        }
+
+        const wallet_id = data.wallet_id;
+        const tr_info = data.ti;
+        const wallet = this.variablesService.getWallet(wallet_id);
+
+        if (wallet) {
+          if (tr_info.hasOwnProperty('contract')) {
+            for (let i = 0; i < wallet.contracts.length; i++) {
+              if (wallet.contracts[i].contract_id === tr_info.contract[0].contract_id && wallet.contracts[i].is_a === tr_info.contract[0].is_a) {
+                if (wallet.contracts[i].state === 1 || wallet.contracts[i].state === 110) {
+                  wallet.contracts[i].is_new = true;
+                  wallet.contracts[i].state = 140;
+                  wallet.recountNewContracts();
+                }
+                break;
+              }
+            }
+          }
+
+          wallet.removeFromHistory(tr_info.tx_hash);
+
+          let error_tr = '';
+          switch (tr_info.tx_type) {
+            case 0:
+              error_tr = this.translate.instant('ERRORS.TX_TYPE_NORMAL') + '<br>' +
+                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                this.translate.instant('ERRORS.TX_TYPE_NORMAL_TO') + ' ' + this.intToMoneyPipe.transform(tr_info.amount) + ' ' +
+                this.translate.instant('ERRORS.TX_TYPE_NORMAL_END');
+              break;
+            case 1:
+              // this.translate.instant('ERRORS.TX_TYPE_PUSH_OFFER');
+              break;
+            case 2:
+              // this.translate.instant('ERRORS.TX_TYPE_UPDATE_OFFER');
+              break;
+            case 3:
+              // this.translate.instant('ERRORS.TX_TYPE_CANCEL_OFFER');
+              break;
+            case 4:
+              error_tr = this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS') + '<br>' +
+                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS_END');
+              break;
+            case 5:
+              error_tr = this.translate.instant('ERRORS.TX_TYPE_UPDATE_ALIAS') + '<br>' +
+                tr_info.tx_hash + '<br>' + wallet.name + '<br>' + wallet.address + '<br>' +
+                this.translate.instant('ERRORS.TX_TYPE_NEW_ALIAS_END');
+              break;
+            case 6:
+              error_tr = this.translate.instant('ERRORS.TX_TYPE_COIN_BASE');
+              break;
+          }
+          if (error_tr) {
+            this.modalService.prepareModal('error', error_tr);
+          }
+        }
       });
 
       this.backend.eventSubscribe('on_core_event', (data) => {
