@@ -40,11 +40,11 @@ export class HistoryComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  openDetails(index) {
-    if (index === this.openedDetails) {
+  openDetails(tx_hash) {
+    if (tx_hash === this.openedDetails) {
       this.openedDetails = false;
     } else {
-      this.openedDetails = index;
+      this.openedDetails = tx_hash;
     }
   }
 

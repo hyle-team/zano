@@ -11,8 +11,8 @@
     </tr>
     </thead>
     <tbody>
-    <ng-container *ngFor="let item of variablesService.currentWallet.history; let index = index">
-      <tr (click)="openDetails(index)">
+    <ng-container *ngFor="let item of variablesService.currentWallet.history">
+      <tr (click)="openDetails(item.tx_hash)">
         <td>
           <div class="status" [class.send]="!item.is_income" [class.received]="item.is_income">
             <ng-container *ngIf="variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0">
@@ -36,9 +36,9 @@
           <span *ngIf="item.tx_type === 0 && item.remote_addresses && item.remote_addresses[0]" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, item.remote_addresses[0])">{{item.remote_addresses[0]}}</span>
         </td>
       </tr>
-      <tr class="transaction-details" [class.open]="index === openedDetails">
+      <tr class="transaction-details" [class.open]="item.tx_hash === openedDetails">
         <td colspan="5">
-          <ng-container *ngIf="index === openedDetails">
+          <ng-container *ngIf="item.tx_hash === openedDetails">
             <app-transaction-details [transaction]="item" [sizes]="calculatedWidth"></app-transaction-details>
           </ng-container>
         </td>
