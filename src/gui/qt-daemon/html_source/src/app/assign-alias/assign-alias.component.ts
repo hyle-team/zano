@@ -9,7 +9,7 @@ import {Wallet} from '../_helpers/models/wallet.model';
 import {MoneyToIntPipe} from '../_helpers/pipes/money-to-int.pipe';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
 import BigNumber from 'bignumber.js';
-import {Subscription} from "rxjs";
+import {Subscription} from 'rxjs';
 
 @Component({
   selector: 'app-assign-alias',
@@ -94,7 +94,6 @@ export class AssignAliasComponent implements OnInit, OnDestroy {
       this.alias.comment = this.assignForm.get('comment').value;
       this.backend.registerAlias(this.wallet.wallet_id, this.alias.name, this.wallet.address, this.alias.fee, this.alias.comment, this.alias.rewardOriginal, (status, data) => {
         if (status) {
-          this.variablesService.aliasesUnconfirmed.push({tx_hash: data.tx_hash, name: this.alias.name});
           this.wallet.wakeAlias = true;
           this.modalService.prepareModal('info', 'ASSIGN_ALIAS.REQUEST_ADD_REG');
           this.ngZone.run(() => {
