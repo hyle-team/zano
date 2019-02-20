@@ -7,7 +7,7 @@
 
 #include "crypto/crypto.h"
 #include "currency_core/currency_basic.h"
-
+#include "profile_tools.h"
 
 extern "C" {
 #include "crypto/keccak.h"
@@ -154,6 +154,21 @@ protected:
   #define max_measere_scratchpad 10000000
 #endif
 #define measere_rounds 10000
+
+void generate_scratchpad()
+{
+  crypto::hash seed = crypto::cn_fast_hash("sdssdsffdss", 10);
+  std::vector<crypto::hash> scratchpad;
+  size_t count = 500000000 / 32;
+  TIME_MEASURE_START_MS(gen_time);
+  LOG_PRINT_L0("Generating....");
+  crypto::generate_scratchpad2(seed, scratchpad, count);
+  TIME_MEASURE_FINISH_MS(gen_time);
+  LOG_PRINT_L0("Generated scratchpad " << (scratchpad.size() * 32) / (1024 * 1024) << "MB in " << gen_time << "ms");
+}
+
+
+
 void measure_keccak_over_scratchpad()
 {
   std::cout << std::setw(20) << std::left << "sz\t" <<

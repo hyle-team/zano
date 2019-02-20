@@ -129,5 +129,25 @@ namespace crypto
     }
     return true;
   }
+
+#define WK2_COUNT 9
+
+  bool generate_scratchpad2(const crypto::hash& seed_data, std::vector<crypto::hash>& result_data, uint64_t target_size)
+  {
+    //this is very basic implementation, not considered for production (possible to reduce memory by keeping only every x10 item and calc it instead of read)
+    //TODO: research safe way for scratchpad generation
+    result_data.resize(target_size);
+    result_data[0] = crypto::cn_fast_hash(&seed_data, sizeof(seed_data));
+    //crypto::hash = get_transaction_hash()
+    for (size_t i = 1; i < target_size; i++)
+    {
+      result_data[i] = crypto::cn_fast_hash(&result_data[i - 1], sizeof(result_data[i - 1]));
+      for (size_t j = 0; j != WK2_COUNT; j++)
+      {
+        result_data[i] = crypto::cn_fast_hash(&result_data[i], sizeof(result_data[i]));
+      }      
+    }
+    return true;
+  }
 }
 

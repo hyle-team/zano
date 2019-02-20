@@ -281,7 +281,7 @@ namespace crypto
   }
   //------------------------------------------------------------------
   bool generate_scratchpad(const crypto::hash& source_data, std::vector<crypto::hash>& result_data, uint64_t target_size);
-
+  bool generate_scratchpad2(const crypto::hash& source_data, std::vector<crypto::hash>& result_data, uint64_t target_size);
 
 }
 
