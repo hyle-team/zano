@@ -12,6 +12,8 @@
 class test_core_listener
 {
 public:
+  virtual ~test_core_listener() = default;
+
   virtual void before_tx_pushed_to_core(const currency::transaction& tx, const currency::blobdata& blob, currency::core& c, bool invalid_tx = false) {}  // invalid_tx is true when processing a tx, marked as invalid in a test
   virtual void before_block_pushed_to_core(const currency::block& block, const currency::blobdata& blob, currency::core& c) {}
 };

@@ -68,6 +68,8 @@ namespace tools
   class i_wallet2_callback
   {
   public:
+    virtual ~i_wallet2_callback() = default;
+
     virtual void on_new_block(uint64_t /*height*/, const currency::block& /*block*/) {}
     virtual void on_transfer2(const wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) {}
     virtual void on_pos_block_found(const currency::block& /*block*/) {}

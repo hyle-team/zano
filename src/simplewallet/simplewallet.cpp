@@ -1401,7 +1401,7 @@ int main(int argc, char* argv[])
     bool r = wrpc.init(vm);
     CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet rpc server");
 
-    tools::signal_handler::install([&wrpc, &wal] {
+    tools::signal_handler::install([&wrpc/*, &wal*/ /* TODO(unassigned): use? */] {
       wrpc.send_stop_signal();
     });
     LOG_PRINT_L0("Starting wallet rpc server");
