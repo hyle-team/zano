@@ -1,28 +1,43 @@
-all: all-release
+# Define CMake generator
+system := $(shell uname)
+ifneq (, $(findstring MINGW, $(system)))
+  cmake_gen = -G 'MSYS Makefiles'
+endif
 
-cmake-debug:
-	mkdir -p build/debug
-	cd build/debug && cmake -D CMAKE_BUILD_TYPE=Debug ../..
+cmake = cmake $(cmake_gen)
 
-build-debug: cmake-debug
-	cd build/debug && $(MAKE)
+cmake_debug = $(cmake) -D CMAKE_BUILD_TYPE=Debug
+cmake_release = $(cmake) -D CMAKE_BUILD_TYPE=Release
+cmake_tests = $(cmake) -D BUILD_TESTS=ON
 
-test-debug: build-debug
-	cd build/debug && $(MAKE) test
+# Helper macro
+define CMAKE
+  mkdir -p $1 && cd $1 && $2 ../../
+endef
 
-all-debug: build-debug
+build = build
+dir_debug = $(build)/debug
+dir_release = $(build)/release
 
-cmake-release:
-	mkdir -p build/release
-	cd build/release && cmake -D CMAKE_BUILD_TYPE=Release ../..
+all: release
 
-build-release: cmake-release
-	cd build/release && $(MAKE)
+release:
+	$(eval command += $(cmake_release))
+	$(call CMAKE,$(dir_release),$(command)) && $(MAKE)
 
-test-release: build-release
-	cd build/release && $(MAKE) test
+test-release:
+	$(eval command += $(cmake_release) $(cmake_tests))
+	$(call CMAKE,$(dir_release),$(command)) && $(MAKE) && $(MAKE) test
 
-all-release: build-release
+test: test-release
+
+debug:
+	$(eval command += $(cmake_debug))
+	$(call CMAKE,$(dir_debug),$(command)) && $(MAKE)
+
+test-debug:
+	$(eval command += $(cmake_debug) $(cmake_tests))
+	$(call CMAKE,$(dir_debug),$(command)) && $(MAKE) && $(MAKE) test
 
 clean:
 	rm -rf build
@@ -30,4 +45,4 @@ clean:
 tags:
 	ctags -R --sort=1 --c++-kinds=+p --fields=+iaS --extra=+q --language-force=C++ src contrib tests/gtest
 
-.PHONY: all cmake-debug build-debug test-debug all-debug cmake-release build-release test-release all-release clean tags
+.PHONY: all release test-release test all-debug debug test-debug clean tags
