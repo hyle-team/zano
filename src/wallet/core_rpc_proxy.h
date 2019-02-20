@@ -16,6 +16,8 @@ namespace tools
   */
   struct i_core_proxy
   {
+    virtual ~i_core_proxy() = default;
+
     virtual bool set_connection_addr(const std::string& url){ return false; }
     virtual bool call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(const currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& rqt, currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& rsp){ return false; }
     virtual bool call_COMMAND_RPC_GET_BLOCKS_FAST(const currency::COMMAND_RPC_GET_BLOCKS_FAST::request& rqt, currency::COMMAND_RPC_GET_BLOCKS_FAST::response& rsp){ return false; }
