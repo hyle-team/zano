@@ -1109,7 +1109,7 @@ namespace currency
         att_count++;
       }
     }
-    if (!flags&TX_FLAG_SIGNATURE_MODE_SEPARATE)
+    if (!(flags & TX_FLAG_SIGNATURE_MODE_SEPARATE))
     {
       //take hash from attachment and put into extra
       if (tx.attachment.size())
@@ -2374,7 +2374,7 @@ namespace currency
   //---------------------------------------------------------------
   bool is_pos_block(const block& b)
   {
-    if (!b.flags&CURRENCY_BLOCK_FLAG_POS_BLOCK)
+    if (!(b.flags & CURRENCY_BLOCK_FLAG_POS_BLOCK))
       return false;
     return is_pos_block(b.miner_tx);
   }
