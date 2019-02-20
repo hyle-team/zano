@@ -123,7 +123,7 @@ ENABLE_SHARED_PCH_EXECUTABLE(daemon)
                      
 add_executable(connectivity_tool ${CONN_TOOL})
 add_dependencies(connectivity_tool version)
-target_link_libraries(connectivity_tool currency_core crypto common zlibstatic ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+target_link_libraries(connectivity_tool currency_core crypto common zlibstatic ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 ENABLE_SHARED_PCH(CONN_TOOL)
 ENABLE_SHARED_PCH_EXECUTABLE(connectivity_tool)
 
