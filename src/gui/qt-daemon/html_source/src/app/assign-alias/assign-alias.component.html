@@ -34,6 +34,11 @@
           {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_EXISTS' | translate }}
         </div>
       </div>
+      <div class="error-block" *ngIf="notEnoughMoney">
+        <div>
+          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NO_MONEY' | translate }}
+        </div>
+      </div>
     </div>
 
     <div class="input-block textarea">
