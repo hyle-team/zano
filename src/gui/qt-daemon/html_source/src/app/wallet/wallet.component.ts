@@ -1,11 +1,10 @@
-import {Component, OnInit, OnDestroy, NgZone, ViewChild, ElementRef, Renderer2} from '@angular/core';
+import {Component, OnInit, OnDestroy, NgZone, ViewChild, ElementRef} from '@angular/core';
 import {ActivatedRoute, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
 import {TranslateService} from '@ngx-translate/core';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
-import {BigNumber} from 'bignumber.js';
-import {Subscription} from "rxjs";
+import {Subscription} from 'rxjs';
 
 @Component({
   selector: 'app-wallet',
@@ -15,7 +14,11 @@ import {Subscription} from "rxjs";
 export class WalletComponent implements OnInit, OnDestroy {
   subRouting;
   walletID;
-  @ViewChild('copyIcon') copy: ElementRef;
+  copyAnimation = false;
+  copyAnimationTimeout;
+
+  @ViewChild('scrolledContent') private scrolledContent: ElementRef;
+
   tabs = [
     {
       title: 'WALLET.TABS.HISTORY',
@@ -65,7 +68,6 @@ export class WalletComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private renderer: Renderer2,
     private backend: BackendService,
     private variablesService: VariablesService,
     private ngZone: NgZone,
@@ -80,6 +82,9 @@ export class WalletComponent implements OnInit, OnDestroy {
       for (let i = 0; i < this.tabs.length; i++) {
         this.tabs[i].active = (this.tabs[i].link === '/' + this.route.snapshot.firstChild.url[0].path);
       }
+      this.scrolledContent.nativeElement.scrollTop = 0;
+      clearTimeout(this.copyAnimationTimeout);
+      this.copyAnimation = false;
     });
     if (this.variablesService.currentWallet.alias.hasOwnProperty('name')) {
       this.variablesService.currentWallet.wakeAlias = false;
@@ -100,17 +105,16 @@ export class WalletComponent implements OnInit, OnDestroy {
     });
     this.tabs[index].active = true;
     this.ngZone.run( () => {
+      this.scrolledContent.nativeElement.scrollTop = 0;
       this.router.navigate(['wallet/' + this.walletID + this.tabs[index].link]);
     });
   }
 
   copyAddress() {
     this.backend.setClipboard(this.variablesService.currentWallet.address);
-    this.renderer.removeClass(this.copy.nativeElement, 'copy');
-    this.renderer.addClass(this.copy.nativeElement, 'copied');
-    window.setTimeout(() => {
-      this.renderer.removeClass(this.copy.nativeElement, 'copied');
-      this.renderer.addClass(this.copy.nativeElement, 'copy');
+    this.copyAnimation = true;
+    this.copyAnimationTimeout = window.setTimeout(() => {
+      this.copyAnimation = false;
     }, 2000);
   }
 
@@ -141,6 +145,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.subRouting.unsubscribe();
     this.aliasSubscription.unsubscribe();
+    clearTimeout(this.copyAnimationTimeout);
   }
 
 }

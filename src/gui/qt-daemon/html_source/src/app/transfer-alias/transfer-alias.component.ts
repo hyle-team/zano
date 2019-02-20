@@ -1,10 +1,10 @@
 import {Component, NgZone, OnInit} from '@angular/core';
-import {Location} from "@angular/common";
-import {Router} from "@angular/router";
-import {BackendService} from "../_helpers/services/backend.service";
-import {VariablesService} from "../_helpers/services/variables.service";
-import {ModalService} from "../_helpers/services/modal.service";
-import {Wallet} from "../_helpers/models/wallet.model";
+import {Location} from '@angular/common';
+import {Router} from '@angular/router';
+import {BackendService} from '../_helpers/services/backend.service';
+import {VariablesService} from '../_helpers/services/variables.service';
+import {ModalService} from '../_helpers/services/modal.service';
+import {Wallet} from '../_helpers/models/wallet.model';
 
 @Component({
   selector: 'app-transfer-alias',
@@ -49,7 +49,7 @@ export class TransferAliasComponent implements OnInit {
       if (status) {
         this.backend.getPoolInfo((statusPool, dataPool) => {
           if (dataPool.hasOwnProperty('aliases_que') && dataPool.aliases_que.length) {
-            this.setStatus(!~dataPool.aliases_que.searchBy('address', this.transferAddress));
+            this.setStatus(!dataPool.aliases_que.some((el) => el.address === this.transferAddress));
           } else {
             this.setStatus(status);
           }
@@ -63,7 +63,7 @@ export class TransferAliasComponent implements OnInit {
   setStatus(statusSet) {
     this.permissionSend = statusSet;
     if (statusSet) {
-      this.backend.getAliasByAddress(this.transferAddress, (status, data) => {
+      this.backend.getAliasByAddress(this.transferAddress, (status) => {
         this.ngZone.run(() => {
           if (status) {
             this.transferAddressAlias = true;

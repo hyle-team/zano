@@ -24,7 +24,7 @@
       <label for="alias-comment">
         {{ 'EDIT_ALIAS.COMMENT.LABEL' | translate }}
       </label>
-      <textarea id="alias-comment" [(ngModel)]="alias.comment" [ngModelOptions]="{standalone: true}" placeholder="{{ 'EDIT_ALIAS.COMMENT.PLACEHOLDER' | translate }}"></textarea>
+      <textarea id="alias-comment" [(ngModel)]="alias.comment" [ngModelOptions]="{standalone: true}" placeholder="{{ 'EDIT_ALIAS.COMMENT.PLACEHOLDER' | translate }}" (contextmenu)="variablesService.onContextMenu($event)"></textarea>
       <div class="error-block" *ngIf="alias.comment.length > 0 && notEnoughMoney">
         {{ 'EDIT_ALIAS.FORM_ERRORS.NO_MONEY' | translate }}
       </div>

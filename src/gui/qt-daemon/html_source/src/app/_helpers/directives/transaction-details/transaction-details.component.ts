@@ -19,14 +19,14 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   constructor(private variablesService: VariablesService, private backendService: BackendService, private intToMoneyPipe: IntToMoneyPipe) {}
 
   ngOnInit() {
-    for (const input in this.transaction.td['rcv']) {
-      if (this.transaction.td['rcv'].hasOwnProperty(input)) {
-        this.inputs.push(this.intToMoneyPipe.transform(this.transaction.td['rcv'][input]));
+    for (const input in this.transaction.td['spn']) {
+      if (this.transaction.td['spn'].hasOwnProperty(input)) {
+        this.inputs.push(this.intToMoneyPipe.transform(this.transaction.td['spn'][input]));
       }
     }
-    for (const output in this.transaction.td['spn']) {
-      if (this.transaction.td['spn'].hasOwnProperty(output)) {
-        this.outputs.push(this.intToMoneyPipe.transform(this.transaction.td['spn'][output]));
+    for (const output in this.transaction.td['rcv']) {
+      if (this.transaction.td['rcv'].hasOwnProperty(output)) {
+        this.outputs.push(this.intToMoneyPipe.transform(this.transaction.td['rcv'][output]));
       }
     }
   }

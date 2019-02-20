@@ -996,7 +996,7 @@ bool handle_download_peer_log(po::variables_map& vm)
   }
 
   std::cout << "Remote log from offset " << start_offset << " to offset " << end_offset << " (" << end_offset - start_offset << " bytes) " <<
-    "was successfully downloaded to " << local_filename;
+    "was successfully downloaded to " << local_filename << ENDL;
 
   return true;
 }

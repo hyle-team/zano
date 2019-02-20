@@ -66,7 +66,6 @@ namespace currency
     std::string print_kv_structure(const NOTIFY_REQUEST_CHAIN::request& v)
   {
     std::stringstream ss;
-    size_t i = 0;
     ss << "block_ids: {" << ENDL << print_container_of_hashs(v.block_ids, 2) << ENDL << "}";
     return ss.str();
   }
