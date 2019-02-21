@@ -2352,25 +2352,6 @@ bool wallet2::is_transfer_unlocked(const transfer_details& td) const
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-namespace
-{
-  template<typename T>
-  T pop_random_value(std::vector<T>& vec)
-  {
-    WLT_CHECK_AND_ASSERT_MES(!vec.empty(), T(), "Vector must be non-empty");
-
-    size_t idx = crypto::rand<size_t>() % vec.size();
-    T res = vec[idx];
-    if (idx + 1 != vec.size())
-    {
-      vec[idx] = vec.back();
-    }
-    vec.resize(vec.size() - 1);
-
-    return res;
-  }
-}
-//----------------------------------------------------------------------------------------------------
 void wallet2::push_offer(const bc_services::offer_details_ex& od, currency::transaction& res_tx)
 {
   currency::tx_destination_entry tx_dest;
