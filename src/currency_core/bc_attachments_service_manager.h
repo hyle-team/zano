@@ -12,6 +12,8 @@ namespace currency
 {
   struct i_bc_service
   {
+    virtual ~i_bc_service() = default;
+
     virtual std::string get_id() = 0;
     virtual bool init(const std::string& config_folder, const boost::program_options::variables_map& vm) = 0;
     virtual bool deinit() = 0;
