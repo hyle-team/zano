@@ -22,7 +22,7 @@ namespace currency
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  class simple_wallet : public tools::i_wallet2_callback, 
+  class simple_wallet final : public tools::i_wallet2_callback,
                         public std::enable_shared_from_this<simple_wallet>
   {
   public:

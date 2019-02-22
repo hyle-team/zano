@@ -268,7 +268,7 @@ struct payment_method_summary
 void process_payment_entrie(payment_method_summary& pms, const std::string& amount_in_coin, uint64_t amount_in_this, const std::string& to_usd_rate)
 {
   double d_amount_in_coin = std::stod(amount_in_coin);
-  double d_to_usd_rate = std::stod(to_usd_rate);
+  // double d_to_usd_rate = std::stod(to_usd_rate);
   //CHECK_AND_ASSERT_THROW_MES(d_amount_in_coin, "unable to parse amount_in_coin: " << amount_in_coin);
   CHECK_AND_ASSERT_THROW_MES(amount_in_this, "unable to parse amount_this");
   //CHECK_AND_ASSERT_THROW_MES(d_to_usd_rate, "unable to parse to_usd_rate: " << to_usd_rate);
@@ -960,7 +960,6 @@ bool handle_download_peer_log(po::variables_map& vm)
 
   const uint64_t chunk_size = 1024 * 1024 * 5;
   uint64_t end_offset = start_offset;
-  uint64_t bytes = 0;
   while (true)
   {
     req.log_chunk_offset = end_offset;

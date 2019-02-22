@@ -7,13 +7,14 @@ import {ActivatedRoute} from '@angular/router';
 
 export class TooltipDirective implements OnDestroy {
 
-  @HostBinding('style.cursor') cursor = 'pointer';
+  @HostBinding('style.cursor') cursor;
 
   @Input('tooltip') tooltipInner: any;
   @Input() placement: string;
   @Input() tooltipClass: string;
   @Input() timeout = 0;
   @Input() delay = 0;
+  @Input() showWhenNoOverflow = true;
   tooltip: HTMLElement;
 
   removeTooltipTimeout;
@@ -23,10 +24,13 @@ export class TooltipDirective implements OnDestroy {
   }
 
   @HostListener('mouseenter') onMouseEnter() {
-    if (!this.tooltip) {
-      this.show();
-    } else {
-      this.cancelHide();
+    if (this.showWhenNoOverflow || (!this.showWhenNoOverflow && this.el.nativeElement.offsetWidth < this.el.nativeElement.scrollWidth)) {
+      this.cursor = 'pointer';
+      if (!this.tooltip) {
+        this.show();
+      } else {
+        this.cancelHide();
+      }
     }
   }
 

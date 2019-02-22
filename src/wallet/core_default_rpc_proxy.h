@@ -16,7 +16,7 @@
 
 namespace tools
 {
-  class default_http_core_proxy: public i_core_proxy
+  class default_http_core_proxy final : public i_core_proxy
   {
   public:
 

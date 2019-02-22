@@ -313,11 +313,8 @@ bool bad_chain_switching_with_rollback::c1(currency::core& c, size_t ev_index, c
 }
 
 //-----------------------------------------------------------------------------------------------------
-
 struct tx_in_pool_info
 {
-  tx_in_pool_info() {}
-  tx_in_pool_info(crypto::hash hash, size_t blobsize) : hash(hash), blobsize(blobsize) {}
   crypto::hash hash;
   size_t blobsize;
 };
@@ -325,8 +322,13 @@ struct tx_in_pool_info
 struct params_tx_pool
 {
   params_tx_pool() {}
-  params_tx_pool(crypto::hash hash, size_t blobsize) : txs({ tx_in_pool_info(hash, blobsize) }) {}
-  params_tx_pool(crypto::hash hash1, size_t blobsize1, crypto::hash hash2, size_t blobsize2) : txs({ tx_in_pool_info(hash1, blobsize1), tx_in_pool_info(hash2, blobsize2) }) {}
+  params_tx_pool(crypto::hash hash, size_t blobsize) : txs{ tx_in_pool_info{ hash, blobsize } }
+  {}
+  params_tx_pool(crypto::hash hash1, size_t blobsize1, crypto::hash hash2, size_t blobsize2)
+  {
+    txs.push_back(tx_in_pool_info{ hash1, blobsize1 });
+    txs.push_back(tx_in_pool_info{ hash2, blobsize2 });
+  }
 
   std::vector<tx_in_pool_info> txs;
   BEGIN_KV_SERIALIZE_MAP()

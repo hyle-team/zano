@@ -124,7 +124,7 @@ namespace tools
       return m_rpc.on_get_current_core_tx_expiration_median(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
-    bool call_COMMAND_RPC_GET_POOL_INFO(const currency::COMMAND_RPC_GET_POOL_INFO::request& req, currency::COMMAND_RPC_GET_POOL_INFO::response& res)
+    bool call_COMMAND_RPC_GET_POOL_INFO(const currency::COMMAND_RPC_GET_POOL_INFO::request& req, currency::COMMAND_RPC_GET_POOL_INFO::response& res) override
     {
       return m_rpc.on_get_pool_info(req, res, m_cntxt_stub);
     }

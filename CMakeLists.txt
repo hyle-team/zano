@@ -201,8 +201,11 @@ else()
   endif()
 endif()
 
+set(BUILD_TESTS FALSE CACHE BOOL "Build Zano tests")
 
 add_subdirectory(contrib)
 add_subdirectory(src)
-add_subdirectory(tests)
 
+if (BUILD_TESTS)
+  add_subdirectory(tests)
+endif()
