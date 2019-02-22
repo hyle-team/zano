@@ -21,7 +21,7 @@
           <i class="icon alert" *ngIf="!item.is_new"></i>
           <i class="icon new" *ngIf="item.is_new"></i>
           <i class="icon" [class.purchase]="item.is_a" [class.sell]="!item.is_a"></i>
-          <span tooltip="{{ item.private_detailes.t }}" placement="top" tooltipClass="table-tooltip" [delay]="500">{{item.private_detailes.t}}</span>
+          <span tooltip="{{ item.private_detailes.t }}" placement="top-left" tooltipClass="table-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{item.private_detailes.t}}</span>
         </div>
       </td>
       <td>
@@ -36,7 +36,7 @@
         </div>
       </td>
       <td>
-        <div class="comment" tooltip="{{ item.private_detailes.c }}" placement="top" tooltipClass="table-tooltip" [delay]="500">
+        <div class="comment" tooltip="{{ item.private_detailes.c }}" placement="top-right" tooltipClass="table-tooltip" [delay]="500">
           {{item.private_detailes.c}}
         </div>
       </td>

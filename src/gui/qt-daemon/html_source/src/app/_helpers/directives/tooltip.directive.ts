@@ -42,7 +42,8 @@ export class TooltipDirective implements OnDestroy {
 
   show() {
     this.create();
-    this.setPosition();
+    this.placement = this.placement === null ? 'top' : this.placement;
+    this.setPosition(this.placement);
   }
 
   hide() {
@@ -87,12 +88,6 @@ export class TooltipDirective implements OnDestroy {
         this.renderer.addClass(this.tooltip, classes[i]);
       }
     }
-    if (this.placement !== null) {
-      this.renderer.addClass(this.tooltip, 'ng-tooltip-' + this.placement);
-    } else {
-      this.placement = 'top';
-      this.renderer.addClass(this.tooltip, 'ng-tooltip-top');
-    }
     this.renderer.setStyle(this.tooltip, 'opacity', '0');
     this.renderer.setStyle(this.tooltip, '-webkit-transition', `opacity ${this.delay}ms`);
     this.renderer.setStyle(this.tooltip, '-moz-transition', `opacity ${this.delay}ms`);
@@ -103,35 +98,96 @@ export class TooltipDirective implements OnDestroy {
     }, 0);
   }
 
-  setPosition() {
+  setPosition(placement) {
     const hostPos = this.el.nativeElement.getBoundingClientRect();
-    // const scrollPos = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    this.renderer.addClass(this.tooltip, 'ng-tooltip-' + placement);
+    const topExit = hostPos.top - this.tooltip.getBoundingClientRect().height - parseInt(getComputedStyle(this.tooltip).marginTop, 10) < 0;
+    const bottomExit = window.innerHeight < hostPos.bottom + this.tooltip.getBoundingClientRect().height + parseInt(getComputedStyle(this.tooltip).marginTop, 10);
 
-    if (this.placement === 'top') {
-      this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
-      this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
+    switch (placement) {
+      case 'top':
+        if (topExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('bottom');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.left + (hostPos.right - hostPos.left) / 2 - this.tooltip.getBoundingClientRect().width / 2 + 'px');
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'top-left':
+        if (topExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('bottom-left');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'top-right':
+        if (topExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('bottom-right');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.right - this.tooltip.offsetWidth + 'px');
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'bottom':
+        if (bottomExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('top');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.left + (hostPos.right - hostPos.left) / 2 - this.tooltip.getBoundingClientRect().width / 2 + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'bottom-left':
+        if (bottomExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('top-left');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'bottom-right':
+        if (bottomExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('top-right');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.right - this.tooltip.offsetWidth + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'left':
+        this.renderer.setStyle(this.tooltip, 'top', hostPos.top + 'px');
+        this.renderer.setStyle(this.tooltip, 'left', hostPos.left - this.tooltip.getBoundingClientRect().width + 'px');
+        break;
+      case 'right':
+        this.renderer.setStyle(this.tooltip, 'top', hostPos.top + 'px');
+        this.renderer.setStyle(this.tooltip, 'left', hostPos.right + 'px');
+        break;
     }
+  }
 
-    if (this.placement === 'bottom') {
-      if (window.innerHeight < hostPos.bottom + this.tooltip.offsetHeight + parseInt(getComputedStyle(this.tooltip).marginTop, 10)) {
-        this.renderer.removeClass(this.tooltip, 'ng-tooltip-bottom');
-        this.renderer.addClass(this.tooltip, 'ng-tooltip-top');
-        this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
-        this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
-      } else {
-        this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
-        this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
-      }
+  checkSides() {
+    if (this.tooltip.getBoundingClientRect().left < 0) {
+      this.renderer.setStyle(this.tooltip, 'left', 0);
     }
-
-    if (this.placement === 'left') {
-      this.renderer.setStyle(this.tooltip, 'top', hostPos.top + 'px');
-      this.renderer.setStyle(this.tooltip, 'left', hostPos.left - this.tooltip.getBoundingClientRect().width + 'px');
-    }
-
-    if (this.placement === 'right') {
-      this.renderer.setStyle(this.tooltip, 'top', hostPos.top + 'px');
-      this.renderer.setStyle(this.tooltip, 'left', hostPos.right + 'px');
+    if (this.tooltip.getBoundingClientRect().right > window.innerWidth) {
+      this.renderer.setStyle(this.tooltip, 'left', window.innerWidth - this.tooltip.getBoundingClientRect().width + 'px');
     }
   }
 
