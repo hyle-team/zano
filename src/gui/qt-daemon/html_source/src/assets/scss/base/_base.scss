@@ -310,6 +310,7 @@ input[type='checkbox'].style-checkbox {
 .table-tooltip {
   font-size: 1.3rem;
   padding: 1rem 2rem;
+  white-space: pre-wrap;
 
   @include themify($themes) {
     background: themed(tooltipBackgroundColor);
