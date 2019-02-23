@@ -18,7 +18,7 @@ extern "C" {
 #include "crypto/wild_keccak.h"
 //#include "crypto/wild_keccak2.h"
 #include "../core_tests/random_helper.h"
-
+#include "crypto/hash.h"
 
 
 
@@ -151,7 +151,7 @@ protected:
 #ifdef _DEBUG
   #define max_measere_scratchpad 100000
 #else
-  #define max_measere_scratchpad 10000000
+  #define max_measere_scratchpad 50000000
 #endif
 #define measere_rounds 10000
 
@@ -167,58 +167,41 @@ void generate_scratchpad()
   LOG_PRINT_L0("Generated scratchpad " << (scratchpad.size() * 32) / (1024 * 1024) << "MB in " << gen_time << "ms");
 }
 
-
-
-void measure_keccak_over_scratchpad()
+void generate_light_scratchpad()
 {
-  std::cout << std::setw(20) << std::left << "sz\t" <<
+  crypto::hash seed = crypto::cn_fast_hash("sdssdsffdss", 10);
+  std::vector<crypto::hash> scratchpad;
+  size_t count = 500000000 / 32;
+  TIME_MEASURE_START_MS(gen_time);
+  LOG_PRINT_L0("Generating....");
+  crypto::generate_scratchpad_light(seed, scratchpad, count);
+  TIME_MEASURE_FINISH_MS(gen_time);
+  LOG_PRINT_L0("Generated scratchpad " << (scratchpad.size() * 32) / (1024 * 1024) << "MB in " << gen_time << "ms");
+}
+
+
+void measure_keccak_over_scratchpad(uint64_t start_scratchpad_size, uint64_t step_size)
+{
+//  std::cout << std::setw(20) << std::left << "sz\t" <<
     //std::setw(10) << "original\t" <<
-    std::setw(10) << "original opt\t" <<
+//    std::setw(10) << "original opt\t" <<
 //    std::setw(10) << "w2\t" << 
-    std::setw(10) << "w2_opt" << ENDL;
+//    std::setw(10) << "w2_opt" << ENDL;
 
   std::vector<crypto::hash> scratchpad_vec;
   scratchpad_vec.resize(max_measere_scratchpad);
   std::string has_str = "Keccak is a family of sponge functions. The sponge function is a generalization of the concept of cryptographic hash function with infinite output and can perform quasi all symmetric cryptographic functions, from hashing to pseudo-random number generation to authenticated encryption";
 
-  //static const uint64_t my_own_random_seed = 4669201609102990671;
-  //random_state_test_restorer::reset_random(my_own_random_seed); // random seeded, entering deterministic mode...
-  //uint64_t size_original = scratchpad_vec.size();
-  //scratchpad_vec.resize(i / sizeof(crypto::hash));
   for (size_t j = 0; j != scratchpad_vec.size(); j++)
     scratchpad_vec[j] = crypto::rand<crypto::hash>();
 
-
-  crypto::hash res_to_test = { 0 };
-  crypto::hash res_etalon = { 0 };
-  OPT_XOR_4_RES(scratchpad_vec[0], scratchpad_vec[1], scratchpad_vec[2], scratchpad_vec[3], res_to_test);
-  OPT_XOR_4_RES(scratchpad_vec[0], scratchpad_vec[1], scratchpad_vec[2], scratchpad_vec[3], res_etalon);
-
-
-// 
-//   crypto::hash res_h1 = currency::null_hash;
-//   res_h1 = crypto::get_wild_keccak2_over_scratchpad(has_str, 1, scratchpad_vec, 1000);
-// 
-//   crypto::hash res_h2 = currency::null_hash;
-//   crypto::get_wild_keccak2(has_str, res_h2, 1, scratchpad_vec, 1000);
-//   if (res_h2 != res_h1)
-//   {
-//     return;
-//   }
-
-  for (uint64_t i = 1000; i < max_measere_scratchpad; i += 100000)
+  for (uint64_t i = start_scratchpad_size; i < max_measere_scratchpad; i += i/10)
   {
 
     crypto::hash res_h = currency::null_hash;
     uint64_t ticks_a = epee::misc_utils::get_tick_count();
     *(uint64_t*)(&has_str[8]) = i;
-    //original keccak
-//     for (size_t r = 0; r != measere_rounds; r++)
-//     {
-//       *(size_t*)(&has_str[0]) = r;
-//       res_h = crypto::get_blob_longhash(has_str, 1, scratchpad_vec, i);
-//     }
-    //original keccak opt
+
     uint64_t ticks_b = epee::misc_utils::get_tick_count();
     for (size_t r = 0; r != measere_rounds; r++)
     {
@@ -228,11 +211,11 @@ void measure_keccak_over_scratchpad()
 
     //wild keccak 2
     uint64_t ticks_c = epee::misc_utils::get_tick_count();
-//     for (size_t r = 0; r != measere_rounds; r++)
-//     {
-//       *(size_t*)(&has_str[1]) = r;
-//       res_h = crypto::get_wild_keccak2_over_scratchpad(has_str, 1, scratchpad_vec, i);
-//     }
+    for (size_t r = 0; r != measere_rounds; r++)
+    {
+      *(size_t*)(&has_str[1]) = r;
+      res_h = crypto::cn_fast_hash(has_str.data(), has_str.size());
+    }
     //wild keccak 2 opt
     uint64_t ticks_d = epee::misc_utils::get_tick_count();
     for (size_t r = 0; r != measere_rounds; r++)
@@ -243,8 +226,15 @@ void measure_keccak_over_scratchpad()
     uint64_t ticks_e = epee::misc_utils::get_tick_count();
     std::cout << std::setw(20) << std::left << i * sizeof(crypto::hash) << "\t" <<
       //std::setw(10) << ticks_b - ticks_a << "\t" <<
-      std::setw(10) << ticks_c - ticks_b << "\t" <<
-      //std::setw(10) << ticks_d - ticks_c << "\t" <<
+      //std::setw(10) << ticks_c - ticks_b << "\t" <<
+      std::setw(10) << ticks_d - ticks_c << "\t" <<
       std::setw(10) << ticks_e - ticks_d << ENDL;
   }
+}
+
+void measure_keccak_over_scratchpad()
+{
+  //measure_keccak_over_scratchpad(100/32, 100/32);
+  //measure_keccak_over_scratchpad(10, max_measere_scratchpad / 10);
+  measure_keccak_over_scratchpad(max_measere_scratchpad/10, 0);
 }

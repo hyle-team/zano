@@ -24,4 +24,18 @@ namespace currency
     std::recursive_mutex m_lock;
   };
 
+
+  class scratchpad_light
+  {
+    scratchpad_light();
+    bool generate(const crypto::hash& seed, uint64_t height);
+    crypto::hash get_pow_hash(const blobdata& bd, uint64_t height, const crypto::hash& seed);
+    crypto::hash get_pow_hash(const block& b, const crypto::hash& seed);
+    uint64_t size();
+  private:
+    std::vector<crypto::hash> m_scratchpad_light;
+    std::recursive_mutex m_lock;
+
+  };
+
 }

@@ -225,8 +225,10 @@ namespace crypto
   inline
   bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
   {
+    uint64_t count_access = 0;
     crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st)
     {
+      ++count_access;
       if (!sz)
       {
         return;
@@ -248,9 +250,33 @@ namespace crypto
           }
           st[i] ^= int_array_ptr[ int_array_ptr[ int_array_ptr[st[depend_index] % int64_sz] % int64_sz] % int64_sz];
         }
+    });   
+    return true;
+  }
+
+  template<class t_items_accessor>
+    bool get_wild_keccak_light(const std::string& bd, crypto::hash& res, t_items_accessor cb_get_item)
+  {
+    crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st)
+    {
+      for (size_t i = 0; i != sizeof(st) / sizeof(st[0]); i++)
+      {
+        size_t depend_index = 0;
+        if (i == 0)
+        {
+          depend_index = sizeof(st) / sizeof(st[0]) - 1;
+        }
+        else
+        {
+          depend_index = i - 1;
+        }
+        st[i] ^= cb_get_item(cb_get_item(cb_get_item(st[depend_index])));
+      }
     });
     return true;
   }
+  //------------------------------------------------------------------
+    bool get_wild_keccak_light(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad_light);    
   //------------------------------------------------------------------
   inline
     bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad)
@@ -282,6 +308,6 @@ namespace crypto
   //------------------------------------------------------------------
   bool generate_scratchpad(const crypto::hash& source_data, std::vector<crypto::hash>& result_data, uint64_t target_size);
   bool generate_scratchpad2(const crypto::hash& source_data, std::vector<crypto::hash>& result_data, uint64_t target_size);
-
+  bool generate_scratchpad_light(const crypto::hash& seed_data, std::vector<crypto::hash>& result_data, uint64_t target_size);
 }
 
