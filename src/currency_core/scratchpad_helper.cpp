@@ -15,6 +15,7 @@ namespace currency
   {
 
   }
+  //------------------------------------------------------------------------------------
   bool scratchpad_keeper::generate(const crypto::hash& scr_seed, uint64_t height)
   {
     bool r = false;
@@ -25,7 +26,8 @@ namespace currency
     CRITICAL_REGION_END();
     return r;
   }
-  crypto::hash scratchpad_keeper::get_pow_hash(const blobdata& bd, uint64_t height, const crypto::hash& scr_seed)
+  //------------------------------------------------------------------------------------
+  crypto::hash scratchpad_keeper::get_pow_hash_from_blob(const blobdata& bd, uint64_t height, const crypto::hash& scr_seed)
   {
     CRITICAL_REGION_LOCAL(m_lock);
     crypto::hash res_hash = null_hash;
@@ -41,13 +43,34 @@ namespace currency
     CHECK_AND_ASSERT_THROW_MES(res, "Fatal error on hash calculation: scratchpad_size=" << m_scratchpad.size());
     return res_hash;
   }
-  crypto::hash scratchpad_keeper::get_pow_hash(const block& b, const crypto::hash& scr_seed)
-  {
-    blobdata bl = get_block_hashing_blob(b);
-    return get_pow_hash(bl, get_block_height(b), scr_seed);
-  }
+  //------------------------------------------------------------------------------------
+
+  //------------------------------------------------------------------------------------
   uint64_t scratchpad_keeper::size()
   {
     return m_scratchpad.size();
   }
+  //------------------------------------------------------------------------------------
+  crypto::hash scratchpad_light_pool::get_pow_hash_from_blob(const blobdata& bd, uint64_t height, const crypto::hash& seed)
+  {
+    CRITICAL_REGION_LOCAL(m_lock);
+    std::shared_ptr<std::vector<crypto::hash>> pscr_light;
+    if (!m_scratchpad_pools.get(seed, pscr_light))
+    {
+      LOG_PRINT_MAGENTA("Generating scratchpad light for " << seed << "["<< height <<"]", LOG_LEVEL_0);
+      pscr_light.reset(new std::vector<crypto::hash>());
+      bool r = crypto::generate_scratchpad_light(seed, *pscr_light, currency::get_scratchpad_size_for_height(height));
+      CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate_scratchpad_light");
+      m_scratchpad_pools.set(seed, pscr_light);
+      LOG_PRINT_MAGENTA("Generated ok", LOG_LEVEL_0);
+    }
+    CHECK_AND_ASSERT_THROW_MES(pscr_light->size() == currency::get_scratchpad_size_for_height(height),
+      "Wrong size of cached scratchpad = " << pscr_light->size() << ", expected " << currency::get_scratchpad_size_for_height(height) << " for height " << height);
+    crypto::hash res = currency::null_hash;
+    bool r = crypto::get_wild_keccak_light(bd, res, *pscr_light);
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to get_wild_keccak_light");
+    return res;
+  }
+  //------------------------------------------------------------------------------------
 }
+

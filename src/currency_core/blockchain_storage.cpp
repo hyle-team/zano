@@ -100,7 +100,8 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(std::share
                                                                  m_current_fee_median_effective_index(0), 
                                                                  m_is_reorganize_in_process(false), 
                                                                  m_deinit_is_done(false), 
-                                                                 m_current_scratchpad_seed(currency::null_hash)
+                                                                 m_current_scratchpad_seed(currency::null_hash), 
+                                                                 m_current_scratchpad_seed_height(0)
 
 
 {
@@ -291,6 +292,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
 
   initialize_db_solo_options_values();
   get_seed_for_scratchpad(m_db_blocks.size(), m_current_scratchpad_seed);
+  m_current_scratchpad_seed_height = m_db_blocks.size();
  
 
   m_services_mgr.init(config_folder, vm);
@@ -4582,9 +4584,10 @@ void blockchain_storage::on_block_added(const block_extended_info& bei, const cr
 //------------------------------------------------------------------
  bool blockchain_storage::check_scratchpad() 
 {
-  if (get_scratchpad_size_for_height(m_db_blocks.size()) != m_scratchpad.size())
+  if(get_scratchpad_last_update_rebuild_height(m_db_blocks.size()) != m_current_scratchpad_seed_height)
   {
     get_seed_for_scratchpad(m_db_blocks.size(), m_current_scratchpad_seed);
+    m_current_scratchpad_seed_height = get_scratchpad_last_update_rebuild_height(m_db_blocks.size());
   }
   return true;
 }

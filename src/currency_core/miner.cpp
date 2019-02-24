@@ -345,7 +345,7 @@ namespace currency
       }
       b.nonce = nonce;
       access_nonce_in_block_blob(local_blob_data) = b.nonce;
-      crypto::hash h = m_scratchpad.get_pow_hash(local_blob_data, local_height, local_seed);
+      crypto::hash h = m_scratchpad.get_pow_hash_from_blob(local_blob_data, local_height, local_seed);
 
       if(check_hash(h, local_diff))
       {
