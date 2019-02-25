@@ -542,7 +542,7 @@ bool MainWindow::init_backend(int argc, char* argv[])
 
 QString    MainWindow::is_remnotenode_mode_preconfigured()
 {
-  return m_backend.is_remote_node_mode() ? "TRUE":"FALSE";
+  return "FALSE";
 }
 
 QString MainWindow::start_backend(const QString& params)
@@ -554,19 +554,6 @@ QString MainWindow::start_backend(const QString& params)
   {
     ar.error_code = API_RETURN_CODE_BAD_ARG;
     return MAKE_RESPONSE(ar);
-  }
-  if (sbp.configure_for_remote_node)
-  {
-    //@#@
-    sbp.remote_node_host = "88.198.50.112";
-    sbp.remote_node_port = 11512;
-
-    bool r = m_backend.configure_for_remote_node(sbp.remote_node_host + ":" + std::to_string(sbp.remote_node_port));
-    if (!r)
-    {
-      ar.error_code = API_RETURN_CODE_BAD_ARG;
-      return MAKE_RESPONSE(ar);
-    }
   }
 
   bool r = m_backend.start();
@@ -627,7 +614,7 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
   std::string json_str;
   epee::serialization::store_t_to_json(tei, json_str);
 
-  LOG_PRINT_L0("SENDING SIGNAL -> [money_transfer]" << std::endl << json_str);
+  LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer]" << std::endl << json_str);
   //this->money_transfer(json_str.c_str());
   QMetaObject::invokeMethod(this, "money_transfer", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   if (!m_tray_icon)
@@ -670,7 +657,7 @@ bool MainWindow::money_transfer_cancel(const view::transfer_event_info& tei)
   std::string json_str;
   epee::serialization::store_t_to_json(tei, json_str);
 
-  LOG_PRINT_L0("SENDING SIGNAL -> [money_transfer_cancel]");
+  LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer_cancel]");
   //this->money_transfer_cancel(json_str.c_str());
   QMetaObject::invokeMethod(this, "money_transfer_cancel", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
 
@@ -679,7 +666,7 @@ bool MainWindow::money_transfer_cancel(const view::transfer_event_info& tei)
 }
 bool MainWindow::wallet_sync_progress(const view::wallet_sync_progres_param& p)
 {
-  LOG_PRINT_L2("SENDING SIGNAL -> [wallet_sync_progress]" << " wallet_id: " << p.wallet_id << ": " << p.progress << "%");
+  LOG_PRINT_L2(get_wallet_log_prefix(p.wallet_id) + "SENDING SIGNAL -> [wallet_sync_progress]" << " wallet_id: " << p.wallet_id << ": " << p.progress << "%");
   //this->wallet_sync_progress(epee::serialization::store_t_to_json(p).c_str());
   QMetaObject::invokeMethod(this, "wallet_sync_progress", Qt::QueuedConnection, Q_ARG(QString, epee::serialization::store_t_to_json(p).c_str()));
   return true;
