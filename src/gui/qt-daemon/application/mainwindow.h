@@ -215,6 +215,7 @@ private:
   bool store_app_config();
   bool load_app_config();
 
+  std::string get_wallet_log_prefix(size_t wallet_id) const { return m_backend.get_wallet_log_prefix(wallet_id); }
 
 
   //MediatorObject mo;

@@ -3546,7 +3546,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   if (!m_is_in_checkpoint_zone)
   {
     CHECK_AND_ASSERT_MES(tx.signatures.size() == sig_index, false, "tx signatures count differs from inputs");
-    if (!get_tx_flags(tx)&TX_FLAG_SIGNATURE_MODE_SEPARATE)
+    if (!(get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE))
     {
       bool r = validate_attachment_info(tx.extra, tx.attachment, false);
       CHECK_AND_ASSERT_MES(r, false, "Failed to validate attachments in tx " << tx_prefix_hash << ": incorrect extra_attachment_info in tx.extra");

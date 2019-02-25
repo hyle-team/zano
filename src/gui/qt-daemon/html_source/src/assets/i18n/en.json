@@ -166,10 +166,11 @@
     "BUTTON_ASSIGN": "Assign",
     "BUTTON_CANCEL": "Cancel",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required.",
-      "NAME_WRONG": "Alias has wrong name.",
-      "NAME_LENGTH": "The alias must be 6-25 characters long.",
-      "NAME_EXISTS": "Alias name already exists."
+      "NAME_REQUIRED": "Name is required",
+      "NAME_WRONG": "Alias has wrong name",
+      "NAME_LENGTH": "The alias must be 6-25 characters long",
+      "NAME_EXISTS": "Alias name already exists",
+      "NO_MONEY": "You do not have enough funds to assign this alias"
     },
     "ONE_ALIAS": "You can create only one alias per wallet",
     "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"

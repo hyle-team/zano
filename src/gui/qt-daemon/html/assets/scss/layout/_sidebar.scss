@@ -41,6 +41,13 @@ app-sidebar {
             }
           }
 
+          .icon {
+
+            @include themify($themes) {
+              background-color: themed(blueTextColor);
+            }
+          }
+
           .indicator {
 
             @include themify($themes) {

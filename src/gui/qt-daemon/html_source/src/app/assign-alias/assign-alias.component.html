@@ -14,10 +14,10 @@
   <form class="form-assign" [formGroup]="assignForm">
 
     <div class="input-block alias-name">
-      <label for="alias-name" tooltip="{{ 'ASSIGN_ALIAS.NAME.TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip assign-alias-tooltip" [delay]="500">
+      <label for="alias-name" tooltip="{{ 'ASSIGN_ALIAS.NAME.TOOLTIP' | translate }}" placement="bottom-left" tooltipClass="table-tooltip assign-alias-tooltip" [delay]="500">
         {{ 'ASSIGN_ALIAS.NAME.LABEL' | translate }}
       </label>
-      <input type="text" id="alias-name" formControlName="name" placeholder="{{ 'ASSIGN_ALIAS.NAME.PLACEHOLDER' | translate }}">
+      <input type="text" id="alias-name" formControlName="name" placeholder="{{ 'ASSIGN_ALIAS.NAME.PLACEHOLDER' | translate }}" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="assignForm.controls['name'].invalid && (assignForm.controls['name'].dirty || assignForm.controls['name'].touched)">
         <div *ngIf="assignForm.controls['name'].errors['required']">
           {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_REQUIRED' | translate }}
@@ -34,13 +34,18 @@
           {{ 'ASSIGN_ALIAS.FORM_ERRORS.NAME_EXISTS' | translate }}
         </div>
       </div>
+      <div class="error-block" *ngIf="notEnoughMoney">
+        <div>
+          {{ 'ASSIGN_ALIAS.FORM_ERRORS.NO_MONEY' | translate }}
+        </div>
+      </div>
     </div>
 
     <div class="input-block textarea">
-      <label for="alias-comment" tooltip="{{ 'ASSIGN_ALIAS.COMMENT.TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip assign-alias-tooltip" [delay]="500">
+      <label for="alias-comment" tooltip="{{ 'ASSIGN_ALIAS.COMMENT.TOOLTIP' | translate }}" placement="bottom-left" tooltipClass="table-tooltip assign-alias-tooltip" [delay]="500">
         {{ 'ASSIGN_ALIAS.COMMENT.LABEL' | translate }}
       </label>
-      <textarea id="alias-comment" formControlName="comment" placeholder="{{ 'ASSIGN_ALIAS.COMMENT.PLACEHOLDER' | translate }}"></textarea>
+      <textarea id="alias-comment" formControlName="comment" placeholder="{{ 'ASSIGN_ALIAS.COMMENT.PLACEHOLDER' | translate }}" (contextmenu)="variablesService.onContextMenu($event)"></textarea>
     </div>
 
     <div class="alias-cost">{{ "ASSIGN_ALIAS.COST" | translate : {value: alias.price | intToMoney, currency: variablesService.defaultCurrency} }}</div>

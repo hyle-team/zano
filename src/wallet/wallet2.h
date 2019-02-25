@@ -46,6 +46,22 @@
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet");
 
+// wallet-specific logging functions
+#define WLT_LOG_L0(msg) LOG_PRINT_L0("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_L1(msg) LOG_PRINT_L1("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_L2(msg) LOG_PRINT_L2("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_L3(msg) LOG_PRINT_L3("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_L4(msg) LOG_PRINT_L4("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_ERROR(msg) LOG_ERROR("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_BLUE(msg, log_level)    LOG_PRINT_BLUE("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_CYAN(msg, log_level)    LOG_PRINT_CYAN("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_GREEN(msg, log_level)   LOG_PRINT_GREEN("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_MAGENTA(msg, log_level) LOG_PRINT_MAGENTA("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_RED(msg, log_level)     LOG_PRINT_RED("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_YELLOW(msg, log_level)  LOG_PRINT_YELLOW("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_CHECK_AND_ASSERT_MES(expr, ret, msg) CHECK_AND_ASSERT_MES(expr, ret, "[W:" << m_log_prefix << "]" << msg)
+#define WLT_CHECK_AND_ASSERT_MES_NO_RET(expr, msg) CHECK_AND_ASSERT_MES_NO_RET(expr, "[W:" << m_log_prefix << "]" << msg)
+
 namespace tools
 {
 #pragma pack(push, 1)
@@ -68,6 +84,8 @@ namespace tools
   class i_wallet2_callback
   {
   public:
+    virtual ~i_wallet2_callback() = default;
+
     virtual void on_new_block(uint64_t /*height*/, const currency::block& /*block*/) {}
     virtual void on_transfer2(const wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) {}
     virtual void on_pos_block_found(const currency::block& /*block*/) {}
@@ -112,7 +130,8 @@ namespace tools
                 m_height_of_start_sync(0), 
                 m_last_sync_percent(0), 
                 m_fake_outputs_count(0),
-                m_do_rise_transfer(false)
+                m_do_rise_transfer(false),
+                m_log_prefix("???")
     {
       m_core_runtime_config = currency::get_default_core_runtime_config();
     };
@@ -236,7 +255,8 @@ namespace tools
     void store();
     void store(const std::wstring& path);
     std::wstring get_wallet_path(){ return m_wallet_file; }
-    currency::account_base& get_account(){return m_account;}
+    currency::account_base& get_account() { return m_account; }
+    const currency::account_base& get_account() const { return m_account; }
 
     void get_recent_transfers_history(std::vector<wallet_rpc::wallet_transfer_info>& trs, size_t offset, size_t count);
     uint64_t get_recent_transfers_total_count();
@@ -478,6 +498,8 @@ namespace tools
       std::vector<currency::tx_destination_entry>& prepared_destinations,
       crypto::hash multisig_id = currency::null_hash);
 
+    std::string get_log_prefix() const { return m_log_prefix; }
+
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
@@ -548,6 +570,10 @@ private:
     bool handle_expiration_list(uint64_t tx_expiration_ts_median);
     void handle_contract_expirations(uint64_t tx_expiration_ts_median);
 
+    void change_contract_state(wallet_rpc::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_rpc::wallet_transfer_info& wti) const;
+    void change_contract_state(wallet_rpc::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
+
+
     uint64_t get_tx_expiration_median() const;
 
     void print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee);
@@ -556,12 +582,22 @@ private:
     bool validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::proposal_body& prop,
       std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd);
 
+    bool validate_escrow_release(const currency::transaction& tx, bool release_type_normal, const bc_services::contract_private_details& cpd,
+      const currency::txout_multisig& source_ms_out, const crypto::hash& ms_id, size_t source_ms_out_index, const currency::transaction& source_tx, const currency::account_keys& a_keys) const;
+
     bool validate_escrow_contract(const wallet_rpc::wallet_transfer_info& wti, const bc_services::contract_private_details& cpd, bool is_a,
       const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::escrow_relese_templates_body& rtb);
 
+    bool validate_escrow_cancel_release(const currency::transaction& tx, const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
+      const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd, const currency::transaction& source_tx,
+      size_t source_ms_out_index, const currency::account_keys& b_keys, uint64_t minimum_release_fee) const;
+      
     bool validate_escrow_cancel_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
       const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd,
       const currency::transaction& proposal_template_tx);
+
+    void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_rpc::wallet_transfer_info_details& res_td) const;
+    void print_source_entry(const currency::tx_source_entry& src) const;
 
     struct construct_tx_param
     {
@@ -608,6 +644,7 @@ private:
 
 
     currency::account_base m_account;
+    std::string m_log_prefix; // part of pub address, prefix for logging functions
     std::wstring m_wallet_file;
     std::string m_password;
     std::vector<crypto::hash> m_blockchain;
@@ -862,13 +899,6 @@ namespace tools
         splitted_dsts.push_back(change_dst);
     }
     //----------------------------------------------------------------------------------------------------
-    inline void print_source_entry(const currency::tx_source_entry& src)
-    {
-      std::ostringstream indexes;
-      std::for_each(src.outputs.begin(), src.outputs.end(), [&](const currency::tx_source_entry::output_entry& s_e) { indexes << s_e.first << " "; });
-      LOG_PRINT_L0("amount=" << currency::print_money(src.amount) << ", real_output=" <<src.real_output << ", real_output_in_tx_index=" << src.real_output_in_tx_index << ", indexes: " << indexes.str());
-    }
-    //----------------------------------------------------------------------------------------------------
   }
   //----------------------------------------------------------------------------------------------------
   template<typename T>
@@ -905,7 +935,7 @@ namespace tools
 #ifdef _DEBUG
     if (final_detinations.size() > 10)
     {
-      LOG_PRINT_L0("final_detinations.size()=" << final_detinations.size());
+      WLT_LOG_L0("final_detinations.size()=" << final_detinations.size());
     }
 #endif
     //@#@
@@ -998,7 +1028,7 @@ namespace tools
     TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
     THROW_IF_TRUE_WALLET_EX(CURRENCY_MAX_TRANSACTION_BLOB_SIZE <= get_object_blobsize(tx), error::tx_too_big, tx, m_upper_transaction_size_limit);
-    LOG_PRINT_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"
+    WLT_LOG_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"
       << ", prepare_tx_sources_time: " << prepare_tx_sources_time << " ms"
       << ", prepare_tx_destinations_time: " << prepare_tx_destinations_time << " ms"
       << ", construct_tx_time: " << construct_tx_time << " ms"
@@ -1088,7 +1118,7 @@ namespace tools
     add_sent_tx_detailed_info(tx, prepared_destinations, selected_transfers);
     TIME_MEASURE_FINISH(add_sent_tx_detailed_info_time);
 
-    LOG_PRINT_GREEN("[wallet::transfer] prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
+    WLT_LOG_GREEN("[wallet::transfer] prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
       << ", precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
       << ", send_transaction_to_network_time: " << print_fixed_decimal_point(send_transaction_to_network_time, 3)
       << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
@@ -1201,6 +1231,24 @@ namespace tools
 
 
 }
+
+#if !defined(KEEP_WALLET_LOG_MACROS)
+#undef WLT_LOG_L0
+#undef WLT_LOG_L1
+#undef WLT_LOG_L2
+#undef WLT_LOG_L3
+#undef WLT_LOG_L4
+#undef WLT_LOG_ERROR
+#undef WLT_LOG_BLUE
+#undef WLT_LOG_CYAN
+#undef WLT_LOG_GREEN
+#undef WLT_LOG_MAGENTA
+#undef WLT_LOG_RED
+#undef WLT_LOG_YELLOW
+#undef WLT_CHECK_AND_ASSERT_MES
+#undef WLT_CHECK_AND_ASSERT_MES_NO_RET
+#endif
+
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"

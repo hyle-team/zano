@@ -1,10 +1,10 @@
 import {Component, NgZone, OnInit} from '@angular/core';
 import {Location} from '@angular/common';
 import {Router} from '@angular/router';
-import {BackendService} from "../_helpers/services/backend.service";
-import {VariablesService} from "../_helpers/services/variables.service";
+import {BackendService} from '../_helpers/services/backend.service';
+import {VariablesService} from '../_helpers/services/variables.service';
 import {ModalService} from '../_helpers/services/modal.service';
-import {Wallet} from "../_helpers/models/wallet.model";
+import {Wallet} from '../_helpers/models/wallet.model';
 
 @Component({
   selector: 'app-edit-alias',
@@ -15,7 +15,7 @@ export class EditAliasComponent implements OnInit {
 
   wallet: Wallet;
   alias: any;
-  oldAliasComment: 'string';
+  oldAliasComment: string;
   notEnoughMoney: boolean;
   requestProcessing = false;
 

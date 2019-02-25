@@ -15,7 +15,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private ngZone: NgZone
   ) {}
 

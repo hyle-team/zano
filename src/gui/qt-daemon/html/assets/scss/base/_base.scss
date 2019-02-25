@@ -310,6 +310,7 @@ input[type='checkbox'].style-checkbox {
 .table-tooltip {
   font-size: 1.3rem;
   padding: 1rem 2rem;
+  white-space: pre-wrap;
 
   @include themify($themes) {
     background: themed(tooltipBackgroundColor);
@@ -318,6 +319,23 @@ input[type='checkbox'].style-checkbox {
   }
 
   &.ng-tooltip-top {
+    margin-top: -1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      bottom: -2rem;
+      left: calc(50% - 1rem);
+      border-width: 1rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: themed(tooltipBackgroundColor) transparent transparent transparent;
+      }
+    }
+  }
+
+  &.ng-tooltip-top-left {
     margin-top: -1rem;
 
     &:before {
@@ -334,7 +352,41 @@ input[type='checkbox'].style-checkbox {
     }
   }
 
+  &.ng-tooltip-top-right {
+    margin-top: -1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      bottom: -1rem;
+      right: 0.7rem;
+      border-width: 0.5rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: themed(tooltipBackgroundColor) themed(tooltipBackgroundColor) transparent transparent;
+      }
+    }
+  }
+
   &.ng-tooltip-bottom {
+    margin-top: 1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      top: -2rem;
+      left: calc(50% - 1rem);
+      border-width: 1rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: transparent transparent themed(tooltipBackgroundColor) transparent;
+      }
+    }
+  }
+
+  &.ng-tooltip-bottom-left {
     margin-top: 1rem;
 
     &:before {
@@ -342,11 +394,28 @@ input[type='checkbox'].style-checkbox {
       position: absolute;
       top: -1rem;
       left: 0.7rem;
-      border-width: 1rem 0 0 1rem;
+      border-width: 0.5rem;
       border-style: solid;
 
       @include themify($themes) {
-        border-color: transparent transparent transparent themed(tooltipBackgroundColor);
+        border-color: transparent transparent themed(tooltipBackgroundColor) themed(tooltipBackgroundColor);
+      }
+    }
+  }
+
+  &.ng-tooltip-bottom-right {
+    margin-top: 1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      top: -1rem;
+      right: 0.7rem;
+      border-width: 0.5rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: transparent themed(tooltipBackgroundColor) themed(tooltipBackgroundColor) transparent;
       }
     }
   }
