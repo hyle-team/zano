@@ -78,7 +78,7 @@ namespace epee
   {
 
     t_object t;
-    std::recursive_mutex m;
+    mutable std::recursive_mutex m;
     template<typename t_proxy_object, typename t_proxy_lock_time_watching_policy>
     friend class locked_object_proxy;
   public:
@@ -104,6 +104,16 @@ namespace epee
     locked_object_proxy<t_object, lock_time_watching_policy> operator*()
     {
       return locked_object_proxy<t_object, lock_time_watching_policy>(t, m);
+    }
+
+    locked_object_proxy<const t_object, lock_time_watching_policy> operator->() const
+    {
+      return locked_object_proxy<const t_object, lock_time_watching_policy>(t, m);
+    }
+
+    locked_object_proxy<const t_object, lock_time_watching_policy> operator*() const
+    {
+      return locked_object_proxy<const t_object, lock_time_watching_policy>(t, m);
     }
 
     /*locked_object_proxy<t_object> operator()()
