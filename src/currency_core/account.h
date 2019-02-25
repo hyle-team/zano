@@ -50,7 +50,7 @@ namespace currency
     void generate();
     const account_keys& get_keys() const;
     const account_public_address& get_public_address() const { return m_keys.m_account_address; };
-    std::string get_public_address_str();
+    std::string get_public_address_str() const;
     std::string get_restore_data() const;
     std::string get_restore_braindata() const;
 

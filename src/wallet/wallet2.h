@@ -255,7 +255,8 @@ namespace tools
     void store();
     void store(const std::wstring& path);
     std::wstring get_wallet_path(){ return m_wallet_file; }
-    currency::account_base& get_account(){return m_account;}
+    currency::account_base& get_account() { return m_account; }
+    const currency::account_base& get_account() const { return m_account; }
 
     void get_recent_transfers_history(std::vector<wallet_rpc::wallet_transfer_info>& trs, size_t offset, size_t count);
     uint64_t get_recent_transfers_total_count();
@@ -496,6 +497,8 @@ namespace tools
       currency::keypair& one_time_key,
       std::vector<currency::tx_destination_entry>& prepared_destinations,
       crypto::hash multisig_id = currency::null_hash);
+
+    std::string get_log_prefix() const { return m_log_prefix; }
 
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);

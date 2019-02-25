@@ -116,7 +116,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
-  std::string account_base::get_public_address_str()
+  std::string account_base::get_public_address_str() const
   {
     //TODO: change this code into base 58
     return get_account_address_as_str(m_keys.m_account_address);
