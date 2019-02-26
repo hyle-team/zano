@@ -571,7 +571,7 @@ bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
   m_wallet_states->operator [](wsi.wallet_id) = wsi.wallet_state;
   std::string json_str;
   epee::serialization::store_t_to_json(wsi, json_str);
-  LOG_PRINT_L0("SENDING SIGNAL -> [update_wallet_status]:" << std::endl << json_str );
+  LOG_PRINT_L0(get_wallet_log_prefix(wsi.wallet_id) + "SENDING SIGNAL -> [update_wallet_status]:" << std::endl << json_str );
   QMetaObject::invokeMethod(this, "update_wallet_status", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
 }

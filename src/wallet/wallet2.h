@@ -599,6 +599,8 @@ private:
     void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_rpc::wallet_transfer_info_details& res_td) const;
     void print_source_entry(const currency::tx_source_entry& src) const;
 
+    void init_log_prefix();
+
     struct construct_tx_param
     {
       std::vector<currency::tx_destination_entry> dsts;

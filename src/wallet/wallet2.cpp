@@ -1757,6 +1757,11 @@ namespace
   }
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::init_log_prefix()
+{
+  m_log_prefix = m_account.get_public_address_str().substr(0, 6);
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::load_keys(const std::string& buff, const std::string& password)
 {
   wallet2::keys_file_data keys_file_data;
@@ -1781,14 +1786,14 @@ void wallet2::load_keys(const std::string& buff, const std::string& password)
     WLT_LOG_L0("Wrong password for wallet " << string_encoding::convert_to_ansii(m_wallet_file));
     tools::error::throw_wallet_ex<error::invalid_password>(std::string(__FILE__ ":" STRINGIZE(__LINE__)));
   }
-  
-  m_log_prefix = m_account.get_public_address_str().substr(0, 6);
+  init_log_prefix();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::assign_account(const currency::account_base& acc)
 {
   clear();
   m_account = acc;
+  init_log_prefix();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::generate(const std::wstring& path, const std::string& pass)
@@ -1797,6 +1802,7 @@ void wallet2::generate(const std::wstring& path, const std::string& pass)
   m_wallet_file = path;
   m_password = pass;
   m_account.generate();
+  init_log_prefix();
   boost::system::error_code ignored_ec;
   THROW_IF_TRUE_WALLET_EX(boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));
   store();
@@ -1808,6 +1814,7 @@ void wallet2::restore(const std::wstring& path, const std::string& pass, const s
   m_wallet_file = path;
   m_password = pass;
   bool r = m_account.restore_keys_from_braindata(restore_key);
+  init_log_prefix();
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
   boost::system::error_code ignored_ec;
   THROW_IF_TRUE_WALLET_EX(boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));
