@@ -204,8 +204,7 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
 
   if (command_line::has_arg(m_vm, arg_remote_node))
   {
-    bool r = configure_for_remote_node(command_line::get_arg(m_vm, arg_remote_node));
-    CHECK_AND_ASSERT_MES(r, false, "Failed to configure_for_remote_node");
+    // configure for remote node
   }
 
   m_pview->init(path_to_html);
@@ -220,18 +219,6 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
   }
   return true;
   CATCH_ENTRY_L0("init", false);
-}
-
-bool daemon_backend::configure_for_remote_node(const std::string& remote_host)
-{
-  //parse node
-  tools::default_http_core_proxy* proxy = new tools::default_http_core_proxy();
-  m_rpc_proxy.reset(proxy);
-  bool r = proxy->set_connection_addr(remote_host);
-  CHECK_AND_ASSERT_MES(r, false, "Failed to assign remote node address");
-  proxy->set_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected);
-  m_remote_node_mode = true;
-  return true;
 }
 
 bool daemon_backend::start()
@@ -618,7 +605,7 @@ std::string daemon_backend::get_my_offers(const bc_services::core_offers_filter&
         size_t offers_added = offers_count_after - offers_count_before;
         if (offers_added > 0)
         {
-          LOG_PRINT("get_my_offers(): " << offers_added << " offers added from wallet " << wallet_title, LOG_LEVEL_2);
+          LOG_PRINT(get_wallet_log_prefix(w.second.wallet_id) + "get_my_offers(): " << offers_added << " offers added from wallet " << wallet_title, LOG_LEVEL_2);
         }
         
         ++wallet_index;
@@ -948,14 +935,14 @@ std::string daemon_backend::request_alias_registration(const currency::alias_rpc
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR("request_alias_registration error: " << e.what());
+      LOG_ERROR(get_wallet_log_prefix(wallet_id) + "request_alias_registration error: " << e.what());
       std::string err_code = API_RETURN_CODE_INTERNAL_ERROR;
       err_code += std::string(":") + e.what();
       return err_code;
     }
     catch (...)
     {
-      LOG_ERROR("request_alias_registration error: unknown error");
+      LOG_ERROR(get_wallet_log_prefix(wallet_id) + "request_alias_registration error: unknown error");
       return API_RETURN_CODE_INTERNAL_ERROR;
     }
   }
@@ -987,14 +974,14 @@ std::string daemon_backend::request_alias_update(const currency::alias_rpc_detai
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR("request_alias_update error: " << e.what());
+      LOG_ERROR(get_wallet_log_prefix(wallet_id) + "request_alias_update error: " << e.what());
       std::string err_code = API_RETURN_CODE_INTERNAL_ERROR;
       err_code += std::string(":") + e.what();
       return err_code;
     }
     catch (...)
     {
-      LOG_ERROR("request_alias_update error: unknown error");
+      LOG_ERROR(get_wallet_log_prefix(wallet_id) + "request_alias_update error: unknown error");
       return API_RETURN_CODE_INTERNAL_ERROR;
     }
   }
@@ -1094,14 +1081,14 @@ std::string daemon_backend::transfer(size_t wallet_id, const view::transfer_para
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("Transfer error: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "Transfer error: " << e.what());
     std::string err_code = API_RETURN_CODE_INTERNAL_ERROR;
     err_code += std::string(":") + e.what();
     return err_code;
   }
   catch (...)
   {
-    LOG_ERROR("Transfer error: unknown error");
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "Transfer error: unknown error");
     return API_RETURN_CODE_INTERNAL_ERROR;
   }
 
@@ -1156,20 +1143,20 @@ std::string daemon_backend::create_proposal(size_t wallet_id,
   }
   catch (const tools::error::not_enough_money& e)
   {
-    LOG_ERROR("send_escrow_proposal error: API_RETURN_CODE_NOT_ENOUGH_MONEY: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "send_escrow_proposal error: API_RETURN_CODE_NOT_ENOUGH_MONEY: " << e.what());
     std::string err_code = API_RETURN_CODE_NOT_ENOUGH_MONEY;
     return err_code;
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("send_escrow_proposal error: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "send_escrow_proposal error: " << e.what());
     std::string err_code = API_RETURN_CODE_INTERNAL_ERROR;
     err_code += std::string(":") + e.what();
     return err_code;
   }
   catch (...)
   {
-    LOG_ERROR("send_escrow_proposal error: unknown error");
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "send_escrow_proposal error: unknown error");
     return API_RETURN_CODE_INTERNAL_ERROR;
   }
 }
@@ -1225,7 +1212,7 @@ std::string daemon_backend::accept_cancel_contract(size_t wallet_id, const crypt
     //TODO: add some 
     TIME_MEASURE_FINISH_MS(timing1);
     if (timing1 > 500)
-      LOG_PRINT_RED_L0("[daemon_backend::accept_cancel_contract] LOW PERFORMANCE: " << timing1 );
+      LOG_PRINT_RED_L0(get_wallet_log_prefix(wallet_id) + "[daemon_backend::accept_cancel_contract] LOW PERFORMANCE: " << timing1 );
 
     return API_RETURN_CODE_OK;
   }
@@ -1344,14 +1331,14 @@ std::string daemon_backend::push_offer(size_t wallet_id, const bc_services::offe
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("push_offer error: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "push_offer error: " << e.what());
     std::string err_code = API_RETURN_CODE_INTERNAL_ERROR;
     err_code += std::string(":") + e.what();
     return err_code;
   }
   catch (...)
   {
-    LOG_ERROR("push_offer error: unknown error");
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "push_offer error: unknown error");
     return API_RETURN_CODE_INTERNAL_ERROR;
   }
 }
@@ -1365,14 +1352,14 @@ std::string daemon_backend::cancel_offer(const view::cancel_offer_param& co, cur
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("cancel_offer error: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(co.wallet_id) + "cancel_offer error: " << e.what());
     std::string err_code = API_RETURN_CODE_INTERNAL_ERROR;
     err_code += std::string(":") + e.what();
     return err_code;
   }
   catch (...)
   {
-    LOG_ERROR("cancel_offer error: unknown error");
+    LOG_ERROR(get_wallet_log_prefix(co.wallet_id) + "cancel_offer error: unknown error");
     return API_RETURN_CODE_INTERNAL_ERROR;
   }
 }
@@ -1388,14 +1375,14 @@ std::string daemon_backend::push_update_offer(const bc_services::update_offer_de
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("cancel_offer error: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(uo.wallet_id) + "push_update_offer error: " << e.what());
     std::string err_code = API_RETURN_CODE_INTERNAL_ERROR;
     err_code += std::string(":") + e.what();
     return err_code;
   }
   catch (...)
   {
-    LOG_ERROR("cancel_offer error: unknown error");
+    LOG_ERROR(get_wallet_log_prefix(uo.wallet_id) + "push_update_offer error: unknown error");
     return API_RETURN_CODE_INTERNAL_ERROR;
   }
 }
@@ -1468,7 +1455,7 @@ void daemon_backend::on_transfer_canceled(size_t wallet_id, const tools::wallet_
   }
   else
   {
-    LOG_ERROR("on_transfer() wallet with id = " << wallet_id << " not found");
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer() wallet with id = " << wallet_id << " not found");
   }
   m_pview->money_transfer_cancel(tei);
 }
@@ -1546,10 +1533,10 @@ void daemon_backend::wallet_vs_options::worker_func()
       {
         pos_minin_interval.do_call([this](){
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
-          LOG_PRINT_L1("Starting PoS mint iteration");
+          LOG_PRINT_L1(w->get()->get_log_prefix() + " Starting PoS mint iteration");
           if (!w->get()->fill_mining_context(ctx) || ctx.rsp.status != CORE_RPC_STATUS_OK)
             return true;
-          LOG_PRINT_L1("POS_ENTRIES: " << ctx.sp.pos_entries.size());          
+          LOG_PRINT_L1(w->get()->get_log_prefix() + " POS_ENTRIES: " << ctx.sp.pos_entries.size());
           tools::wallet2::scan_pos(ctx, break_mining_loop, [this](){
             return *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online &&  *plast_daemon_height == last_wallet_synch_height;
           }, core_conf);
@@ -1558,7 +1545,7 @@ void daemon_backend::wallet_vs_options::worker_func()
           {
             w->get()->build_minted_block(ctx.sp, ctx.rsp);
           }
-          LOG_PRINT_L1("PoS mint iteration finished(" << ctx.rsp.status << ")");
+          LOG_PRINT_L1(w->get()->get_log_prefix() + " PoS mint iteration finished(" << ctx.rsp.status << ")");
           return true;
         });
       }
@@ -1577,7 +1564,7 @@ void daemon_backend::wallet_vs_options::worker_func()
 
     catch (const std::exception& e)
     {
-      LOG_PRINT_L0("Failed to refresh wallet: " << e.what());
+      LOG_PRINT_L0(w->get()->get_log_prefix() + "Failed to refresh wallet: " << e.what());
       wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_error;
       pview->update_wallet_status(wsi);
       return;
@@ -1585,7 +1572,7 @@ void daemon_backend::wallet_vs_options::worker_func()
 
     catch (...)
     {
-      LOG_PRINT_L0("Failed to refresh wallet, unknownk exception");
+      LOG_PRINT_L0(w->get()->get_log_prefix() + "Failed to refresh wallet, unknownk exception");
       wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_error;
       pview->update_wallet_status(wsi);
       return;
@@ -1602,3 +1589,14 @@ daemon_backend::wallet_vs_options::~wallet_vs_options()
   if (miner_thread.joinable())
     miner_thread.join();
 }
+
+std::string daemon_backend::get_wallet_log_prefix(size_t wallet_id) const
+{
+  CRITICAL_REGION_LOCAL(m_wallets_lock);
+  auto it = m_wallets.find(wallet_id);
+  if (it == m_wallets.end())
+    return std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":???]";
+
+  return std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":" + it->second.w->get()->get_account().get_public_address_str().substr(0, 6) + "]";
+}
+

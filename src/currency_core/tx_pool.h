@@ -92,7 +92,7 @@ namespace currency
 
     bool have_tx(const crypto::hash &id)const;
     bool have_tx_keyimg_as_spent(const crypto::key_image& key_im)const;
-    bool have_tx_keyimges_as_spent(const transaction& tx)const;
+    bool have_tx_keyimges_as_spent(const transaction& tx, crypto::key_image* p_spent_ki = nullptr) const;
     const performnce_data& get_performnce_data() const { return m_performance_data; }
 
 
