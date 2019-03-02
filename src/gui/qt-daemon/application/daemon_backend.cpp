@@ -42,7 +42,8 @@ daemon_backend::daemon_backend():m_pview(&m_view_stub),
                                  m_remote_node_mode(false),
                                  m_is_pos_allowed(false)
 {
-	m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
+  m_offers_service.set_disabled(true);
+	//m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
 }
 
 const command_line::arg_descriptor<bool> arg_alloc_win_console = {"alloc-win-console", "Allocates debug console with GUI", false};

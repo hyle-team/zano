@@ -67,6 +67,7 @@ namespace bc_services
     crypto::hash get_last_seen_block_id();
     void set_last_seen_block_id(const crypto::hash& h);
     bool clear();
+    bool set_disabled(bool is_disabled) { m_disabled = is_disabled; }
     bool is_disabled(){ return m_disabled; }
     static void init_options(boost::program_options::options_description& desc);
   private:

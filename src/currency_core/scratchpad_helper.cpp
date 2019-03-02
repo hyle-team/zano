@@ -64,7 +64,7 @@ namespace currency
       m_scratchpad_pools.set(seed, pscr_light);
       LOG_PRINT_MAGENTA("Generated ok", LOG_LEVEL_0);
     }
-    CHECK_AND_ASSERT_THROW_MES(pscr_light->size() == currency::get_scratchpad_size_for_height(height),
+    CHECK_AND_ASSERT_THROW_MES(pscr_light->size()*10 == currency::get_scratchpad_size_for_height(height),
       "Wrong size of cached scratchpad = " << pscr_light->size() << ", expected " << currency::get_scratchpad_size_for_height(height) << " for height " << height);
     crypto::hash res = currency::null_hash;
     bool r = crypto::get_wild_keccak_light(bd, res, *pscr_light);

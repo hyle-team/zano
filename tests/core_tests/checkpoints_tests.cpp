@@ -597,7 +597,7 @@ gen_no_attchments_in_coinbase::gen_no_attchments_in_coinbase()
   // NOTE: This test is made deterministic to be able to correctly set up checkpoint.
   random_state_test_restorer::reset_random(); // random generator's state was previously stored, will be restore on dtor (see also m_random_state_test_restorer)
 
-  bool r = m_miner_acc.restore_keys_from_braindata("confusion reason crash guess dude scatter rabbit view story protect trickle gather");
+  bool r = m_miner_acc.restore_keys_from_braindata("battle harsh arrow gain best doubt nose raw protect salty apart tell distant final yeah stubborn true stop shoulder breathe throne problem everyone stranger only");
   CHECK_AND_ASSERT_THROW_MES(r, "gen_no_attchments_in_coinbase: Can't restore account from braindata");
 
   REGISTER_CALLBACK_METHOD(gen_no_attchments_in_coinbase, c1);
@@ -628,7 +628,7 @@ bool gen_no_attchments_in_coinbase::init_config_set_cp(currency::core& c, size_t
   crc.pos_minimum_heigh = 1;
   c.get_blockchain_storage().set_core_runtime_config(crc);
 
-  m_checkpoints.add_checkpoint(12, "d34f992c250cad590b474bf0096273fb9beb0d5540a258b46bbbe6e99632fc1a");
+  m_checkpoints.add_checkpoint(12, "4ba98ca9d92e99e28a30bd5395a305213be2fc18372bbf94ef216ba017640e56");
   c.set_checkpoints(currency::checkpoints(m_checkpoints));
 
   return true;

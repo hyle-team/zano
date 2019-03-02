@@ -2412,6 +2412,10 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   uint64_t get_scratchpad_size_for_height(uint64_t h)
   {
+    if (h < CURRENCY_BLOCKS_PER_DAY * 7)
+    {
+      return 100;
+    }
     //let's have ~250MB/year if block interval is 2 minutes
     return CURRENCY_SCRATCHPAD_BASE_SIZE + get_scratchpad_last_update_rebuild_height(h)*30;
   }
