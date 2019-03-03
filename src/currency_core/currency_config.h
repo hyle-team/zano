@@ -8,7 +8,7 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      75
+#define CURRENCY_FORMATION_VERSION                      76
                                                         
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
