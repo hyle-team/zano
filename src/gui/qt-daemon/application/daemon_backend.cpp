@@ -1596,8 +1596,8 @@ std::string daemon_backend::get_wallet_log_prefix(size_t wallet_id) const
   CRITICAL_REGION_LOCAL(m_wallets_lock);
   auto it = m_wallets.find(wallet_id);
   if (it == m_wallets.end())
-    return std::string("[W:???id=") + epee::string_tools::num_to_string_fast(wallet_id) + "]";
+    return std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":???]";
 
-  return std::string("[W:") + it->second.w->get()->get_account().get_public_address_str().substr(0, 6) + "]";
+  return std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":" + it->second.w->get()->get_account().get_public_address_str().substr(0, 6) + "]";
 }
 
