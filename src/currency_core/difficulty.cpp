@@ -211,7 +211,11 @@ namespace currency {
     {
       cut_begin = REDEF_DIFFICULTY_CUT_LAST;
       cut_end = cut_begin + (REDEF_DIFFICULTY_WINDOW - (REDEF_DIFFICULTY_CUT_OLD + REDEF_DIFFICULTY_CUT_LAST));
+      if (cut_end > length)
+        cut_end = length;
+      
     }
+    CHECK_AND_ASSERT_THROW_MES(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length, "validation in next_difficulty is failed");
   }
 
   wide_difficulty_type get_adjustment_for_zone(vector<uint64_t>& timestamps_sorted, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds, size_t REDEF_DIFFICULTY_WINDOW, size_t REDEF_DIFFICULTY_CUT_OLD, size_t REDEF_DIFFICULTY_CUT_LAST)
@@ -221,7 +225,6 @@ namespace currency {
     size_t cut_end = 0;
     get_adjustment_zone(length, cut_begin, cut_end, REDEF_DIFFICULTY_WINDOW, REDEF_DIFFICULTY_CUT_OLD, REDEF_DIFFICULTY_CUT_LAST);
 
-    CHECK_AND_ASSERT_THROW_MES(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length, "validation in next_difficulty is failed");
     uint64_t time_span = timestamps_sorted[cut_begin] - timestamps_sorted[cut_end - 1];
     if (time_span == 0)
     {
