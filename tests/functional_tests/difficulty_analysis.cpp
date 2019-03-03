@@ -100,14 +100,14 @@ currency::wide_difficulty_type bbr_next_difficulty(std::vector<uint64_t>& timest
 
 void get_cut_location_from_len(size_t length, size_t& cut_begin, size_t& cut_end, size_t REDEF_DIFFICULTY_WINDOW, size_t REDEF_DIFFICULTY_CUT_OLD, size_t REDEF_DIFFICULTY_CUT_LAST)
 {
-  if (length <= REDEF_DIFFICULTY_WINDOW)
+  if (length <= REDEF_DIFFICULTY_WINDOW - (REDEF_DIFFICULTY_CUT_OLD+ REDEF_DIFFICULTY_CUT_LAST))
   {
     cut_begin = 0;
     cut_end = length;
   }
   else
   {
-    cut_begin = REDEF_DIFFICULTY_WINDOW - REDEF_DIFFICULTY_CUT_LAST + 1;
+    cut_begin = REDEF_DIFFICULTY_CUT_LAST;
     cut_end = cut_begin + (REDEF_DIFFICULTY_WINDOW - (REDEF_DIFFICULTY_CUT_OLD + REDEF_DIFFICULTY_CUT_LAST));
   }
 }
@@ -154,7 +154,7 @@ currency::wide_difficulty_type bbr_next_difficulty_composit(std::vector<uint64_t
   sort(timestamps.begin(), timestamps.end(), std::greater<uint64_t>());
   std::vector<uint64_t> timestamps_local = timestamps;
   currency::wide_difficulty_type dif = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, REDEF_DIFFICULTY_WINDOW, REDEF_DIFFICULTY_CUT_OLD, REDEF_DIFFICULTY_CUT_LAST);
-  currency::wide_difficulty_type dif2 = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, 200, 5, 5);
+  currency::wide_difficulty_type dif2 = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, 240, 5, 5);
   currency::wide_difficulty_type dif3 = bbr_next_difficulty_configurable(timestamps_local, cumulative_difficulties, target_seconds, 40, 1, 1);
   return (dif3 + dif2 + dif) / 3;
 }
@@ -300,10 +300,19 @@ void run_emulation(const std::string& path)
   }); \
   current_index+=2;
 
+
+#define PERFORME_SIMULATION_FOR_FUNCTION_NO_WINDOW(func_name) \
+  perform_simulation_for_function(timestamp_to_hashrate, current_index, blocks, result_blocks, \
+    [&](std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds) \
+  { \
+    return func_name(timestamps, cumulative_difficulties, target_seconds); \
+  }); \
+  current_index+=2;
+
   PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, BBR_DIFFICULTY_WINDOW, BBR_DIFFICULTY_CUT, BBR_DIFFICULTY_CUT);
   PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, 500, 60, 60);
   PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, 300, 60, 60);
-  PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_composit, 720, 60, 60);
+  PERFORME_SIMULATION_FOR_FUNCTION_NO_WINDOW(currency::next_difficulty);
 
   print_blocks(result_blocks, path + "result.txt");
   LOG_PRINT_L0("Done");
