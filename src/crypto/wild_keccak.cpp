@@ -9,6 +9,7 @@
 
 
 #include "wild_keccak.h"
+#include "include_base_utils.h"
 namespace crypto
 {
 
@@ -118,16 +119,71 @@ namespace crypto
   }
   bool generate_scratchpad(const crypto::hash& seed_data, std::vector<crypto::hash>& result_data, uint64_t target_size)
   {
-    //this is very basic implementation, not considered for production (possible to reduce memory by keeping only every x10 item and calc it instead of read)
-    //TODO: research safe way for scratchpad generation
     result_data.resize(target_size);
     result_data[0] = crypto::cn_fast_hash(&seed_data, sizeof(seed_data));
-    //crypto::hash = get_transaction_hash()
     for (size_t i = 1; i < target_size; i++)
     {
       result_data[i] = crypto::cn_fast_hash(&result_data[i - 1], sizeof(result_data[i - 1]));
     }
     return true;
+  }
+
+#define WK2_COUNT 0
+
+  bool generate_scratchpad2(const crypto::hash& seed_data, std::vector<crypto::hash>& result_data, uint64_t target_size)
+  {
+    CHECK_AND_ASSERT_THROW_MES(target_size % 10 == 0, "wrong target_size = " << target_size);
+    result_data.resize(target_size);
+    result_data[0] = crypto::cn_fast_hash(&seed_data, sizeof(seed_data));
+    for (size_t i = 1; i < target_size; i++)
+    {
+      result_data[i] = crypto::cn_fast_hash(&result_data[i - 1], sizeof(result_data[i - 1]));     
+    }
+    return true;
+  }
+
+  bool generate_scratchpad_light(const crypto::hash& seed_data, std::vector<crypto::hash>& result_data, uint64_t target_size)
+  {
+    CHECK_AND_ASSERT_THROW_MES(target_size % 10 == 0, "wrong target_size = " << target_size);
+    result_data.reserve(target_size/10);
+    result_data.push_back(crypto::cn_fast_hash(&seed_data, sizeof(seed_data)));
+    crypto::hash prev_hash = result_data[0];
+    for (size_t i = 1; i < target_size; i++)
+    {
+      prev_hash = crypto::cn_fast_hash(&prev_hash, sizeof(prev_hash));
+      if (!(i % 10))
+      {
+        result_data.push_back(prev_hash);
+      }
+    }
+    return true;
+  }
+
+
+  bool get_wild_keccak_light(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad_light)
+  {
+    if (!scratchpad_light.size())
+      return false;
+    auto light_scr_accessor = [&](uint64_t i)
+    {
+      //get index of int64 item in scratchpad from i, where is is random number in whole uint64_t range
+      uint64_t int64_mod_index = i%(scratchpad_light.size() * 10 * 4);
+      //get related hash index 
+      uint64_t hash_index = int64_mod_index / 4;
+      //get_in hash index (from 0 to 3)
+      uint64_t in_hash_index = int64_mod_index % 4;
+
+      //get index of primary hash in scratchpad_light
+      uint64_t primary_item_index = (hash_index - (hash_index % 10)) / 10;
+      uint64_t sha_count = hash_index % 10;
+      crypto::hash res = scratchpad_light[primary_item_index];
+      for (uint64_t i = 0; i != sha_count; i++)
+      {
+        res = cn_fast_hash(&res, sizeof(res));
+      }
+      return ((uint64_t*)&res)[in_hash_index];
+    };
+    return get_wild_keccak_light(bd, res, light_scr_accessor);
   }
 }
 

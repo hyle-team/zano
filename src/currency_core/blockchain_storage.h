@@ -511,8 +511,9 @@ namespace currency
     mutable uint64_t m_current_fee_median;
     mutable uint64_t m_current_fee_median_effective_index;
     bool m_is_reorganize_in_process;
-    mutable scratchpad_keeper m_scratchpad;
+    mutable scratchpad_light_pool m_scratchpad; //TODO: optimization for using full scratchpad in mainchain
     crypto::hash m_current_scratchpad_seed;
+    uint64_t m_current_scratchpad_seed_height;
     mutable std::atomic<bool> m_deinit_is_done;
 
 

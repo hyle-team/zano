@@ -660,6 +660,8 @@ namespace currency
       uint64_t tx_count_in_last_block;
       uint64_t default_fee;
       uint64_t minimum_fee;
+      uint64_t last_block_timestamp;
+      std::string last_block_hash;
       //market
       uint64_t offers_count;
 
@@ -708,6 +710,8 @@ namespace currency
         KV_SERIALIZE(tx_count_in_last_block)
         KV_SERIALIZE(default_fee)
         KV_SERIALIZE(minimum_fee)
+        KV_SERIALIZE(last_block_timestamp)
+        KV_SERIALIZE(last_block_hash)
         KV_SERIALIZE(offers_count)
       END_KV_SERIALIZE_MAP()
     };
