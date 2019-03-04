@@ -485,6 +485,15 @@ export class BackendService {
     this.runCommand('open_url_in_browser', url, callback);
   }
 
+  start_backend(node, host, port, callback) {
+    const params = {
+      configure_for_remote_node: node,
+      remote_node_host: host,
+      remote_node_port: parseInt(port, 10)
+    };
+    this.runCommand('start_backend', params, callback);
+  }
+
   getDefaultFee(callback) {
     this.runCommand('get_default_fee', {}, callback);
   }

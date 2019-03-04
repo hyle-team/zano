@@ -1904,6 +1904,14 @@ var BackendService = /** @class */ (function () {
     BackendService.prototype.openUrlInBrowser = function (url, callback) {
         this.runCommand('open_url_in_browser', url, callback);
     };
+    BackendService.prototype.start_backend = function (node, host, port, callback) {
+        var params = {
+            configure_for_remote_node: node,
+            remote_node_host: host,
+            remote_node_port: parseInt(port, 10)
+        };
+        this.runCommand('start_backend', params, callback);
+    };
     BackendService.prototype.getDefaultFee = function (callback) {
         this.runCommand('get_default_fee', {}, callback);
     };
@@ -2594,6 +2602,9 @@ var AppComponent = /** @class */ (function () {
         this.backend.initService().subscribe(function (initMessage) {
             console.log('Init message: ', initMessage);
             _this.backend.webkitLaunchedScript();
+            _this.backend.start_backend(false, '127.0.0.1', 11512, function (st2, dd2) {
+                console.log(st2, dd2);
+            });
             _this.backend.eventSubscribe('quit_requested', function () {
                 if (!_this.onQuitRequest) {
                     _this.ngZone.run(function () {
