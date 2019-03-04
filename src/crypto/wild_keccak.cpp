@@ -177,7 +177,7 @@ namespace crypto
       uint64_t primary_item_index = (hash_index - (hash_index % 10)) / 10;
       uint64_t sha_count = hash_index % 10;
       crypto::hash res = scratchpad_light[primary_item_index];
-      for (int i = 0; i != sha_count; i++)
+      for (uint64_t i = 0; i != sha_count; i++)
       {
         res = cn_fast_hash(&res, sizeof(res));
       }

@@ -7,6 +7,8 @@
 #include "currency_protocol/blobdatatype.h"
 #include "currency_core/currency_basic.h"
 #include "cache_helper.h"
+#include "currency_core/currency_format_utils.h"
+#include "currency_core/currency_format_utils_blocks.h"
 
 namespace currency
 {
