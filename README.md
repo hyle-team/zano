@@ -13,12 +13,12 @@ Building
 | [Qt](https://download.qt.io/archive/qt/) (only for GUI) | 5.8.0 | 5.9.1 | 5.10.1 |
 
 ### Linux
+
 Recommended OS version: Ubuntu 17.04 LTS.
- 1. Install dependencies: `sudo apt-get install build-essential git cmake unzip libicu-dev ocl-icd-opencl-dev mesa-common-dev libglu1-mesa-dev`
- 2. Install Qt and Boost
- 3. Set `BOOST_ROOT` and `QT_PREFIX_PATH` environment variables
- 4. `mkdir build` <br> `cd build` <br> `cmake -DBUILD_GUI=FALSE -DSTATIC=TRUE ..` <br> `make`
-5. In order to build GUI, revise and run script at `/utils/build_script_linux.sh`
+
+1. `$ sudo apt install git g++ cmake unzip libicu-dev mesa-common-dev libglu1-mesa-dev qt5-default qtwebengine5-dev`
+2. `$ cd zano/ && make -j$(nproc) gui`
+3. Look for the binaries, including the `Zano` GUI, in the build directory
 
 ### Windows
 Recommended OS version: Windows 7 x64.
