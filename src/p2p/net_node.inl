@@ -1062,8 +1062,9 @@ namespace nodetool
       ce.time_started = cntxt.m_started;
       ce.last_recv = cntxt.m_last_recv;
       ce.last_send = cntxt.m_last_send;
-      std::strncpy(ce.version, cntxt.m_remote_version.c_str(), std::min(sizeof(ce.version), cntxt.m_remote_version.size()));
-      ce.version[sizeof(ce.version) - 1] = 0; //null terminating just to be sure
+      size_t len = std::min(sizeof(ce.version) - 1, cntxt.m_remote_version.size());
+      std::strncpy(ce.version, cntxt.m_remote_version.c_str(), len);
+      ce.version[len] = 0; //null terminating just to be sure
       rsp.connections_list.push_back(ce);
       return true;
     });
