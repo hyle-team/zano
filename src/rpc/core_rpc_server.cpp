@@ -794,6 +794,7 @@ namespace currency
     blobdata block_blob = t_serializable_object_to_blob(b);
 
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
+    res.prev_hash = string_tools::pod_to_hex(b.prev_id);
     res.status = CORE_RPC_STATUS_OK;
 
     return true;
