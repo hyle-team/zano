@@ -98,9 +98,6 @@ endif()
 
 add_library(crypto ${CRYPTO})
 
-MESSAGE( STATUS "INCLUDING OpenCL_INCLUDE_DIRS:         " ${OpenCL_INCLUDE_DIRS} )
-include_directories( ${OpenCL_INCLUDE_DIRS} )
-
 add_library(currency_core ${CURRENCY_CORE})
 add_dependencies(currency_core version rpc ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(CURRENCY_CORE)
