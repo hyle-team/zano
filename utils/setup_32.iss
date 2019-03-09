@@ -31,7 +31,7 @@ WizardImageFile=../resources/installer_bg_164x313.bmp
 PrivilegesRequired=poweruser
 ;SetupIconFile=../resources/app.ico
 AppMutex=Zano_instance
-
+UninstallDisplayIcon={app}\{#MyAppExeName}
 
 
 [Languages]
