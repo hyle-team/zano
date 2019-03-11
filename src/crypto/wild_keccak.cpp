@@ -4,6 +4,7 @@
 
 // Memory-hard extension of keccak for PoW 
 // Copyright (c) 2014 The Boolberry developers
+// Copyright (c) 2019 The Hyle Team
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -77,46 +78,6 @@ namespace crypto
     }
   }
 
-  void mul_f::keccakf(uint64_t st[25], int rounds)
-  {
-    int i, j, round;
-    uint64_t t, bc[5];
-
-    for (round = 0; round < rounds; round++) {
-
-      // Theta
-      for (i = 0; i < 5; i++)     
-      {
-        bc[i] = st[i] ^ st[i + 5] ^ st[i + 10] * st[i + 15] * st[i + 20];//surprise
-      }
-
-      for (i = 0; i < 5; i++) {
-        t = bc[(i + 4) % 5] ^ ROTL64(bc[(i + 1) % 5], 1);
-        for (j = 0; j < 25; j += 5)
-          st[j + i] ^= t;
-      }
-
-      // Rho Pi
-      t = st[1];
-      for (i = 0; i < 24; i++) {
-        j = keccakf_piln[i];
-        bc[0] = st[j];
-        st[j] = ROTL64(t, keccakf_rotc[i]);
-        t = bc[0];
-      }
-
-      //  Chi
-      for (j = 0; j < 25; j += 5) {
-        for (i = 0; i < 5; i++)
-          bc[i] = st[j + i];
-        for (i = 0; i < 5; i++)
-          st[j + i] ^= (~bc[(i + 1) % 5]) & bc[(i + 2) % 5];
-      }
-
-      //  Iota
-      st[0] ^= keccakf_rndc[round];
-    }
-  }
   bool generate_scratchpad(const crypto::hash& seed_data, std::vector<crypto::hash>& result_data, uint64_t target_size)
   {
     result_data.resize(target_size);
@@ -124,20 +85,6 @@ namespace crypto
     for (size_t i = 1; i < target_size; i++)
     {
       result_data[i] = crypto::cn_fast_hash(&result_data[i - 1], sizeof(result_data[i - 1]));
-    }
-    return true;
-  }
-
-#define WK2_COUNT 0
-
-  bool generate_scratchpad2(const crypto::hash& seed_data, std::vector<crypto::hash>& result_data, uint64_t target_size)
-  {
-    CHECK_AND_ASSERT_THROW_MES(target_size % 10 == 0, "wrong target_size = " << target_size);
-    result_data.resize(target_size);
-    result_data[0] = crypto::cn_fast_hash(&seed_data, sizeof(seed_data));
-    for (size_t i = 1; i < target_size; i++)
-    {
-      result_data[i] = crypto::cn_fast_hash(&result_data[i - 1], sizeof(result_data[i - 1]));     
     }
     return true;
   }
