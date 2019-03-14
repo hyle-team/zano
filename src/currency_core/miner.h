@@ -73,7 +73,7 @@ namespace currency
       {
         nonce_ref = bl.nonce;
 
-        crypto::hash h = sk.get_pow_hash(bd, height, seed);
+        crypto::hash h = sk.get_pow_hash_from_blob(bd, height, seed);
         if(check_hash(h, diffic))
         {
           LOG_PRINT_L0("Found nonce for block: " << get_block_hash(bl) << "[" << height << "]: PoW:" << h << "(diff:" << diffic << "), ts: " << bl.timestamp);

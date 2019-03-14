@@ -145,9 +145,10 @@ namespace currency
     //check key images for transaction if it is not kept by block
     if(!from_core && !kept_by_block)
     {
-      if(have_tx_keyimges_as_spent(tx))
+      crypto::key_image spent_ki = AUTO_VAL_INIT(spent_ki);
+      if(have_tx_keyimges_as_spent(tx, &spent_ki))
       {
-        LOG_ERROR("Transaction with id= "<< id << " used already spent key images");
+        LOG_ERROR("Transaction " << id << " uses already spent key image " << spent_ki);
         tvc.m_verification_failed = true;
         return false;
       }
@@ -735,15 +736,19 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::have_tx_keyimges_as_spent(const transaction& tx) const
+  bool tx_memory_pool::have_tx_keyimges_as_spent(const transaction& tx, crypto::key_image* p_spent_ki /* = nullptr */) const
   {
     for(const auto& in : tx.vin)
     {
       if (in.type() == typeid(txin_to_key))
       {
         CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, true);//should never fail
-        if(have_tx_keyimg_as_spent(tokey_in.k_image))
-           return true;
+        if (have_tx_keyimg_as_spent(tokey_in.k_image))
+        {
+          if (p_spent_ki)
+            *p_spent_ki = tokey_in.k_image;
+          return true;
+        }
 
       }
     }
@@ -761,8 +766,10 @@ namespace currency
         auto ki_entry_ptr = m_db_key_images_set.get(tokey_in.k_image);
         if (ki_entry_ptr.get())
           count = *ki_entry_ptr;
+        uint64_t count_before = count;
         ++count;
         m_db_key_images_set.set(tokey_in.k_image, count);
+        LOG_PRINT_L2("tx pool: key image added: " << tokey_in.k_image << ", from tx " << get_transaction_hash(tx) << ", counter: " << count_before << " -> " << count);
       }
     }
     return false;
@@ -828,11 +835,13 @@ namespace currency
           continue;
         }
         count = *ki_entry_ptr;
+        uint64_t count_before = count;
         --count;
         if (count)
           m_db_key_images_set.set(tokey_in.k_image, count);
         else
           m_db_key_images_set.erase(tokey_in.k_image);
+        LOG_PRINT_L2("tx pool: key image removed: " << tokey_in.k_image << ", from tx " << get_transaction_hash(tx) << ", counter: " << count_before << " -> " << count);
       }
     }
     return false;

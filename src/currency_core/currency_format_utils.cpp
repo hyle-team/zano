@@ -2412,8 +2412,12 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   uint64_t get_scratchpad_size_for_height(uint64_t h)
   {
-    //let's have ~256MB/year if block interval is 2 minutes
-    return CURRENCY_SCRATCHPAD_BASE_SIZE + get_scratchpad_last_update_rebuild_height(h)*32;
+    if (h < CURRENCY_BLOCKS_PER_DAY * 7)
+    {
+      return 100;
+    }
+    //let's have ~250MB/year if block interval is 2 minutes
+    return CURRENCY_SCRATCHPAD_BASE_SIZE + get_scratchpad_last_update_rebuild_height(h)*30;
   }
   //-----------------------------------------------------------------------------------------------
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, uint64_t already_generated_coins, uint64_t &reward, uint64_t height)

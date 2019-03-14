@@ -156,6 +156,8 @@ namespace currency
       m_core.get_blockchain_storage().get_top_block(b);
       res.last_block_total_reward = currency::get_reward_from_miner_tx(b.miner_tx);
       res.pos_diff_total_coins_rate = (pos_diff / (res.total_coins - PREMINE_AMOUNT + 1)).convert_to<uint64_t>();
+      res.last_block_timestamp = b.timestamp;
+      res.last_block_hash = string_tools::pod_to_hex(get_block_hash(b));
     }
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_POS_BLOCK_TS_SHIFT_VS_ACTUAL)
     {
@@ -792,6 +794,7 @@ namespace currency
     blobdata block_blob = t_serializable_object_to_blob(b);
 
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
+    res.prev_hash = string_tools::pod_to_hex(b.prev_id);
     res.status = CORE_RPC_STATUS_OK;
 
     return true;
