@@ -347,7 +347,7 @@ export class BackendService {
   }
 
   closeWallet(wallet_id, callback) {
-    this.runCommand('close_wallet', {wallet_id: wallet_id}, callback);
+    this.runCommand('close_wallet', {wallet_id: +wallet_id}, callback);
   }
 
   getSmartWalletInfo(wallet_id, callback) {
