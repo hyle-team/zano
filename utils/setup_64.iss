@@ -32,6 +32,7 @@ PrivilegesRequired=poweruser
 ArchitecturesAllowed=x64
 ;SetupIconFile=../resources/app.ico
 AppMutex=Zano_instance
+UninstallDisplayIcon={app}\{#MyAppExeName}
 
 
 [Languages]

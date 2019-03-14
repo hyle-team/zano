@@ -1,5 +1,4 @@
 // Copyright (c) 2014-2018 Zano Project
-// Copyright (c) 2014-2018 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -98,7 +97,8 @@
 #define BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT          2000      //by default, blocks ids count in synchronizing
 #define BLOCKS_SYNCHRONIZING_DEFAULT_COUNT              200       //by default, blocks count in blocks downloading
 #define BLOCKS_SYNCHRONIZING_DEFAULT_SIZE               2000000   //by default keep synchronizing packets not bigger then 2MB
-#define CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT      500         
+#define CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT      500     
+#define CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT         500    
 
 
 #define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week
