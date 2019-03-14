@@ -18,10 +18,6 @@ cmake_gui = -D BUILD_GUI=ON
 cmake_static = -D STATIC=ON
 cmake_tests = -D BUILD_TESTS=ON
 
-gui:
-	$(eval command += $(cmake_release) $(cmake_gui))
-	$(call CMAKE,$(dir_release),$(command)) && $(MAKE)
-
 # Helper macro
 define CMAKE
   mkdir -p $1 && cd $1 && $2 ../../
