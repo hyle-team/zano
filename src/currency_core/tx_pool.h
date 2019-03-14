@@ -128,15 +128,27 @@ namespace currency
     bool get_transaction(const crypto::hash& h, transaction& tx)const;
     bool get_transaction(const crypto::hash& h, tx_details& txd)const;
     size_t get_transactions_count() const;
-    bool have_key_images(const std::unordered_set<crypto::key_image>& kic, const transaction& tx)const;
-    bool append_key_images(std::unordered_set<crypto::key_image>& kic, const transaction& tx);
+    static bool have_key_images(const std::unordered_set<crypto::key_image>& kic, const transaction& tx);
+    static bool append_key_images(std::unordered_set<crypto::key_image>& kic, const transaction& tx);
     std::string print_pool(bool short_format)const;
     uint64_t get_core_time() const;
     bool get_aliases_from_tx_pool(std::list<extra_alias_entry>& aliases)const;
     bool get_aliases_from_tx_pool(std::map<std::string, size_t>& aliases)const;
-    //crypto::hash get_last_core_hash() {return m_last_core_top_hash;}
-    //void set_last_core_hash(const crypto::hash& h) { m_last_core_top_hash = h; }
 
+    template<class archive_t>
+    void serialize(archive_t & ar, const unsigned int version)
+    {
+      if (version < CURRENT_MEMPOOL_ARCHIVE_VER)
+        return;
+      CHECK_PROJECT_NAME();
+      CRITICAL_REGION_LOCAL(m_transactions_lock);
+      ar & m_transactions;
+      ar & m_cancel_offer_hashes;
+      ar & m_black_tx_list;
+      ar & m_key_images_set;
+      ar & m_alias_names_set;
+      ar & m_alias_addresses_set;
+    }
 
   private:
     bool on_tx_add(const transaction& tx, bool kept_by_block);
@@ -152,36 +164,41 @@ namespace currency
     bool is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const;
     bool validate_alias_info(const transaction& tx, bool is_in_block)const;
     bool get_key_images_from_tx_pool(std::unordered_set<crypto::key_image>& key_images)const;
-    //bool push_alias_info(const transaction& tx);
-    //bool pop_alias_info(const transaction& tx);
     bool process_cancel_offer_rules(const transaction& tx);
     bool unprocess_cancel_offer_rules(const transaction& tx);
     bool check_is_taken(const crypto::hash& id) const;
     void set_taken(const crypto::hash& id);
     void reset_all_taken();
-    
-    typedef tools::db::cached_key_value_accessor<crypto::hash, tx_details, true, false> transactions_container;
-    typedef tools::db::cached_key_value_accessor<crypto::hash, bool, false, false> hash_container; 
-    typedef tools::db::cached_key_value_accessor<crypto::key_image, uint64_t, false, false> key_images_container;
-    typedef tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> solo_options_container;
-    typedef tools::db::cached_key_value_accessor<std::string, bool, false, false> aliases_container; 
-    typedef tools::db::cached_key_value_accessor<account_public_address, bool, false, false> address_to_aliases_container;
+
+
+    //typedef tools::db::cached_key_value_accessor<crypto::hash, tx_details, true, false> transactions_container;
+    //typedef tools::db::cached_key_value_accessor<crypto::hash, bool, false, false> hash_container; 
+    //typedef tools::db::cached_key_value_accessor<crypto::key_image, uint64_t, false, false> key_images_container;
+    //typedef tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> solo_options_container;
+    //typedef tools::db::cached_key_value_accessor<std::string, bool, false, false> aliases_container; 
+    //typedef tools::db::cached_key_value_accessor<account_public_address, bool, false, false> address_to_aliases_container;
+
+    typedef std::unordered_map<crypto::hash, tx_details> transactions_container;
+    typedef std::unordered_map<crypto::key_image, uint64_t> key_images_container;
+    typedef std::unordered_set<crypto::hash> hash_container;
+    typedef std::unordered_set<std::string> aliases_container;
+    typedef std::unordered_set<account_public_address> aliases_addresses_container;
+
 
 
     //main accessor
     epee::shared_recursive_mutex m_dummy_rw_lock;
-    tools::db::basic_db_accessor m_db;
-    //containers
+    mutable epee::critical_section m_transactions_lock;
 
-    transactions_container m_db_transactions;
-    hash_container m_db_cancel_offer_hash;
-    hash_container  m_db_black_tx_list;
-    key_images_container m_db_key_images_set;
-    aliases_container m_db_alias_names;
-    address_to_aliases_container m_db_alias_addresses;
-    solo_options_container m_db_solo_options;
-    tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_major_compatibility_version;
-    //crypto::hash m_last_core_top_hash;
+    //containers
+    transactions_container m_transactions;
+    hash_container m_cancel_offer_hashes;
+    hash_container  m_black_tx_list;
+    key_images_container m_key_images_set;
+    aliases_container m_alias_names_set;
+    aliases_addresses_container m_alias_addresses_set;
+
+    //tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_major_compatibility_version; -- TODO
 
 
     epee::math_helper::once_a_time_seconds<30> m_remove_stuck_tx_interval;
@@ -195,6 +212,11 @@ namespace currency
     mutable epee::critical_section m_taken_txs_lock;
     std::unordered_set<crypto::hash> m_taken_txs;
     mutable epee::critical_section m_remove_stuck_txs_lock;
+    mutable epee::critical_section m_cancel_offer_hashes_lock;
+    mutable epee::critical_section m_aliases_lock;
+    mutable epee::critical_section m_black_tx_list_lock;
+    mutable epee::critical_section m_key_images_set_lock;
+
 
     
     /************************************************************************/
@@ -239,6 +261,3 @@ namespace boost
 }
 
 BOOST_CLASS_VERSION(currency::tx_memory_pool, CURRENT_MEMPOOL_ARCHIVE_VER)
-
-
-

@@ -198,7 +198,7 @@
 #define CURRENCY_CORE_INSTANCE_LOCK_FILE                "lock.lck"
 
 
-#define CURRENCY_POOLDATA_FOLDERNAME                    "poolstate"
+#define CURRENCY_POOLDATA_FILENAME                      "poolstate.bin"
 #define CURRENCY_BLOCKCHAINDATA_FOLDERNAME              "blockchain"
 #define P2P_NET_DATA_FILENAME                           "p2pstate.bin"
 #define MINER_CONFIG_FILENAME                           "miner_conf.json"
@@ -220,7 +220,7 @@
 
 #define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+62)
 
-#define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
+#define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+0)
 
 
 

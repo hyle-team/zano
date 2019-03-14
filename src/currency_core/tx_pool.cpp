@@ -24,14 +24,7 @@
 
 DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated name length exceeded, name was truncated
 
-#define TRANSACTION_POOL_CONTAINER_TRANSACTIONS           "transactions"
-#define TRANSACTION_POOL_CONTAINER_CANCEL_OFFER_HASH      "cancel_offer_hash"
-#define TRANSACTION_POOL_CONTAINER_BLACK_TX_LIST          "black_tx_list"
-#define TRANSACTION_POOL_CONTAINER_ALIAS_NAMES            "alias_names"
-#define TRANSACTION_POOL_CONTAINER_ALIAS_ADDRESSES        "alias_addresses"
-#define TRANSACTION_POOL_CONTAINER_KEY_IMAGES             "key_images"
-#define TRANSACTION_POOL_CONTAINER_SOLO_OPTIONS           "solo"
-#define TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION      BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 1
+//#define TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION      BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 1
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "tx_pool"
@@ -40,20 +33,10 @@ ENABLE_CHANNEL_BY_DEFAULT("tx_pool");
 namespace currency
 {
   //---------------------------------------------------------------------------------
-  tx_memory_pool::tx_memory_pool(blockchain_storage& bchs, i_currency_protocol* pprotocol) :
-    m_blockchain(bchs),
-    m_pprotocol(pprotocol),
-    m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_dummy_rw_lock),
-    m_db_transactions(m_db),
-    m_db_cancel_offer_hash(m_db),
-    m_db_black_tx_list(m_db),
-    m_db_solo_options(m_db), 
-    m_db_key_images_set(m_db),
-    m_db_alias_names(m_db),
-    m_db_alias_addresses(m_db),
-    m_db_storage_major_compatibility_version(TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION, m_db_solo_options)
+  tx_memory_pool::tx_memory_pool(blockchain_storage& bchs, i_currency_protocol* pprotocol)
+    : m_blockchain(bchs)
+    , m_pprotocol(pprotocol)
   {
-
   }
 
   bool tx_memory_pool::is_valid_contract_finalization_tx(const transaction &tx)const
@@ -230,29 +213,11 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
-#define LOCAL_READONLY_TRANSACTION() \
-  m_db.begin_readonly_transaction(); \
-  misc_utils::auto_scope_leave_caller db_tx_closer = misc_utils::create_scope_leave_handler([&]() \
-  { \
-    m_db.commit_transaction(); \
-  });
-
-
   bool tx_memory_pool::do_insert_transaction(const transaction &tx, const crypto::hash &id, uint64_t blob_size, bool kept_by_block, uint64_t fee, const crypto::hash& max_used_block_id, uint64_t max_used_block_height)
   {
-    TIME_MEASURE_START_PD(begin_tx_time);
-    m_db.begin_transaction();
-    TIME_MEASURE_FINISH_PD(begin_tx_time);
-
     TIME_MEASURE_START_PD(update_db_time);
-    misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&]()
-    {
-      TIME_MEASURE_START_PD(db_commit_time);
-      m_db.commit_transaction();
-      TIME_MEASURE_FINISH_PD(db_commit_time);
-
-    });
-    //CHECK_AND_ASSERT_MES_CUSTOM(!m_db_transactions.get(id), false, (tvc.m_added_to_pool = false, tvc.m_verification_failed = true), "internal error: failed to add transaction " << id << "     to the pool as it already exists");
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+    
     tx_details td = AUTO_VAL_INIT(td);
     td.blob_size = blob_size;
     td.tx = tx;
@@ -264,7 +229,7 @@ namespace currency
     td.last_failed_id = null_hash;
     td.receive_time = get_core_time();
 
-    m_db_transactions.set(id, td);
+    m_transactions.insert(std::make_pair(id, td));
     on_tx_add(tx, kept_by_block);
 
     TIME_MEASURE_FINISH_PD(update_db_time);
@@ -293,9 +258,8 @@ namespace currency
   {
     //TODO: this code doesn't take into account offer id in source tx
     //TODO: add scan on tx size for free transaction here
-    m_db_transactions.begin_transaction();
-    misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&](){m_db_transactions.commit_transaction(); });
 
+    CRITICAL_REGION_LOCAL(m_cancel_offer_hashes_lock);
 
     size_t serv_att_count = 0;
     std::list<bc_services::cancel_offer> co_list;
@@ -312,7 +276,7 @@ namespace currency
             return false;
           }
           bc_services::extract_type_and_add<bc_services::cancel_offer>(srv_at.body, co_list);
-          if (m_db_cancel_offer_hash.get(co_list.back().tx_id))
+          if (m_cancel_offer_hashes.count(co_list.back().tx_id))
           {
             LOG_ERROR("cancellation of offer " << co_list.back().tx_id << " has already been processed earlier; zero fee is disallowed");
             return false;
@@ -329,7 +293,7 @@ namespace currency
 
     for (auto co : co_list)
     {
-      m_db_cancel_offer_hash.set(co.tx_id, true);
+      m_cancel_offer_hashes.insert(co.tx_id);
     }
 
     return true;
@@ -337,8 +301,7 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::unprocess_cancel_offer_rules(const transaction& tx)
   {
-    m_db_transactions.begin_transaction();
-    misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&](){m_db_transactions.commit_transaction(); });
+    CRITICAL_REGION_LOCAL(m_cancel_offer_hashes_lock);
 
     std::list<bc_services::cancel_offer> co_list;
     for (const auto& a : tx.attachment)
@@ -352,33 +315,30 @@ namespace currency
           bc_services::extract_type_and_add<bc_services::cancel_offer>(srv_at.body, co_list);
           if (!co_list.size())
             return false;
-          auto vptr = m_db_cancel_offer_hash.find(co_list.back().tx_id);
-          if (vptr == m_db_cancel_offer_hash.end())
+          auto it = m_cancel_offer_hashes.find(co_list.back().tx_id);
+          if (it == m_cancel_offer_hashes.end())
             return false;
-          m_db_cancel_offer_hash.erase(co_list.back().tx_id);
+          m_cancel_offer_hashes.erase(co_list.back().tx_id);
         }
       }
     }
     return true;
   }
-//   //---------------------------------------------------------------------------------
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_aliases_from_tx_pool(std::list<extra_alias_entry>& aliases)const
   {
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
 
     //TODO: OPTIMIZATION put cache here!!!!!
-
-    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+    for (auto& td : m_transactions)
     {
       tx_extra_info ei = AUTO_VAL_INIT(ei);
-      bool r = parse_and_validate_tx_extra(tx_entry.tx, ei);
-      CHECK_AND_ASSERT_MES(r, false, "failed to validate transaction extra on unprocess_blockchain_tx_extra");
+      bool r = parse_and_validate_tx_extra(td.second.tx, ei);
+      CHECK_AND_ASSERT_MES(r, false, "failed to validate transaction extra for tx " << get_transaction_hash(td.second.tx));
       if (ei.m_alias.m_alias.size())
         aliases.push_back(ei.m_alias);
-
-      return true;
-    });
+    }
     return true;
-
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_aliases_from_tx_pool(std::map<std::string, size_t>& aliases)const
@@ -395,14 +355,14 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::validate_alias_info(const transaction& tx, bool is_in_block) const
   {
-    LOCAL_READONLY_TRANSACTION();
+    CRITICAL_REGION_LOCAL(m_aliases_lock);
+
     extra_alias_entry eai = AUTO_VAL_INIT(eai);
     if (get_type_in_variant_container(tx.extra, eai))
     {
       //check in blockchain
       extra_alias_entry eai2 = AUTO_VAL_INIT(eai2);
       bool already_have_alias_registered = m_blockchain.get_alias_info(eai.m_alias, eai2);
-      //size_t alias_size = eai.m_alias.size();
       
       if (!is_in_block  && !eai.m_sign.size() && already_have_alias_registered)
       {
@@ -422,12 +382,12 @@ namespace currency
 
       if (!is_in_block)
       {
-        if (m_db_alias_names.get(eai.m_alias))
+        if (m_alias_names_set.count(eai.m_alias))
         {
           LOG_PRINT_L0("Alias \"" << eai.m_alias << "\" already in transaction pool, transaction rejected");
           return false;
         }
-        if (m_db_alias_addresses.get(eai.m_address))
+        if (m_alias_addresses_set.count(eai.m_address))
         {
           LOG_PRINT_L0("Alias \"" << eai.m_alias << "\" already in transaction pool by it's address(" << get_account_address_as_str(eai.m_address) << ") , transaction rejected");
           return false;
@@ -440,8 +400,8 @@ namespace currency
         }
       }
 
-
     }
+
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -456,20 +416,18 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::take_tx(const crypto::hash &id, transaction &tx, size_t& blob_size, uint64_t& fee)
   {
-    
-    m_db_transactions.begin_transaction();
-    misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&](){m_db_transactions.commit_transaction();});
-    
-    auto txe_tr = m_db_transactions.find(id);
-    if (txe_tr == m_db_transactions.end())
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    auto it = m_transactions.find(id);
+    if (it == m_transactions.end())
       return false;
 
-    tx = txe_tr->tx;
-    blob_size = txe_tr->blob_size;
-    fee = txe_tr->fee;
-    unprocess_cancel_offer_rules(txe_tr->tx);
-    m_db_transactions.erase(id);
-    on_tx_remove(tx, txe_tr->kept_by_block);
+    tx = it->second.tx;
+    blob_size = it->second.blob_size;
+    fee = it->second.fee;
+    unprocess_cancel_offer_rules(it->second.tx);
+    m_transactions.erase(id);
+    on_tx_remove(tx, it->second.kept_by_block);
     set_taken(id);
     return true;
   }
@@ -486,9 +444,8 @@ namespace currency
 
     CRITICAL_REGION_LOCAL(m_remove_stuck_txs_lock);
     CRITICAL_SECTION_UNLOCK(m_remove_stuck_txs_lock);// release try_lock iteration
-    
-    m_db_transactions.begin_transaction();
-    misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&](){m_db_transactions.commit_transaction(); });
+
+    CRITICAL_REGION_LOCAL1(m_transactions_lock); // !!TODO!! review lock scheme
 
     struct tx_to_delete_entry
     {
@@ -503,8 +460,13 @@ namespace currency
     std::vector<tx_to_delete_entry> to_delete;
 
     const uint64_t tx_expiration_ts_median = m_blockchain.get_tx_expiration_median();
-    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+
+    for(auto& td : m_transactions)
     {
+      auto& tx_entry = td.second;
+      const crypto::hash& h = td.first;
+      //m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+
       //never remove transactions which related to alt blocks, 
       //or we can get network split as a worst case (impossible to switch to 
       //altchain if it won, and node stuck forever).
@@ -526,103 +488,79 @@ namespace currency
         LOG_PRINT_L0("Tx " << h << " removed from tx pool, reason: expired, expiration time: " << get_tx_expiration_time(tx_entry.tx) << ", blockchain median: " << tx_expiration_ts_median);
         to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
       }
-
-      return true;
-    });
+    }
     
     for (auto& e : to_delete)
     {
-      m_db_transactions.erase(e.hash);
+      m_transactions.erase(e.hash);
       on_tx_remove(e.tx, e.kept_by_block);
     }
-
 
     return true;
   }
   //---------------------------------------------------------------------------------
   size_t tx_memory_pool::get_transactions_count() const 
   {
-    return m_db_transactions.size();
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+    return m_transactions.size();
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_transactions(std::list<transaction>& txs) const
   {
-    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
-    {
-      txs.push_back(tx_entry.tx);
-      return true;
-    });
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    for(auto& td : m_transactions)
+      txs.push_back(td.second.tx);
 
     return true;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_all_transactions_details(std::list<tx_rpc_extended_info>& txs) const
   {
-    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    for(auto& td : m_transactions)
     {
       txs.push_back(tx_rpc_extended_info());
       tx_rpc_extended_info& trei = txs.back();
-      trei.blob_size = tx_entry.blob_size;
-      fill_tx_rpc_details(trei, tx_entry.tx, nullptr, h, tx_entry.receive_time, true);
-      return true;
-    });
+      trei.blob_size = td.second.blob_size;
+      fill_tx_rpc_details(trei, td.second.tx, nullptr, td.first, td.second.receive_time, true);
+    }
 
     return true;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_all_transactions_brief_details(std::list<tx_rpc_brief_info>& txs) const
   {
-    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    for(auto& td : m_transactions)
     {
       txs.push_back(tx_rpc_brief_info());
       tx_rpc_brief_info& trbi = txs.back();
-      trbi.id = epee::string_tools::pod_to_hex(h);
-      trbi.fee = tx_entry.fee;
-      trbi.sz = tx_entry.blob_size;
-      trbi.total_amount = get_outs_money_amount(tx_entry.tx);
-      return true;
-    });
+      trbi.id = epee::string_tools::pod_to_hex(td.first);
+      trbi.fee = td.second.fee;
+      trbi.sz = td.second.blob_size;
+      trbi.total_amount = get_outs_money_amount(td.second.tx);
+    }
 
     return true;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_all_transactions_list(std::list<std::string>& txs)const
   {
-    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
-    {
-      txs.push_back(epee::string_tools::pod_to_hex(h));
-      return true;
-    });
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    for(auto& td : m_transactions)
+      txs.push_back(epee::string_tools::pod_to_hex(td.first));
 
     return true;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_transactions_details(const std::list<std::string>& ids, std::list<tx_rpc_extended_info>& txs) const
   {
-    for (auto& id_str:  ids)
-    {
-      crypto::hash id = null_hash;
-      if (!epee::string_tools::hex_to_pod(id_str, id))
-      {
-        LOG_ERROR("Failed to parse id in list: " << id_str);
-        return false;
-      }
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
 
-      auto ptei = m_db_transactions.get(id);
-      if (!ptei)
-        return false;
-
-      txs.push_back(tx_rpc_extended_info());
-      tx_rpc_extended_info& trei = txs.back();
-      trei.blob_size = ptei->blob_size;
-      fill_tx_rpc_details(trei, ptei->tx, nullptr, id, ptei->receive_time, false);
-    }
-    return true;
-  }
-  //---------------------------------------------------------------------------------
-  bool tx_memory_pool::get_transactions_brief_details(const std::list<std::string>& ids, std::list<tx_rpc_brief_info>& txs)const
-  {
-    LOCAL_READONLY_TRANSACTION();
     for (auto& id_str : ids)
     {
       crypto::hash id = null_hash;
@@ -632,45 +570,78 @@ namespace currency
         return false;
       }
 
-      auto ptei = m_db_transactions.get(id);
-      if (!ptei)
+      auto it = m_transactions.find(id);
+      if (it == m_transactions.end())
+        return false;
+
+      txs.push_back(tx_rpc_extended_info());
+      tx_rpc_extended_info& trei = txs.back();
+      trei.blob_size = it->second.blob_size;
+      fill_tx_rpc_details(trei, it->second.tx, nullptr, id, it->second.receive_time, false);
+    }
+    return true;
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::get_transactions_brief_details(const std::list<std::string>& ids, std::list<tx_rpc_brief_info>& txs)const
+  {
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    for (auto& id_str : ids)
+    {
+      crypto::hash id = null_hash;
+      if (!epee::string_tools::hex_to_pod(id_str, id))
+      {
+        LOG_ERROR("Failed to parse id in list: " << id_str);
+        return false;
+      }
+
+      auto it = m_transactions.find(id);
+      if (it == m_transactions.end())
         return false;
 
       txs.push_back(tx_rpc_brief_info());
       tx_rpc_brief_info& trbi = txs.back();
-      trbi.sz = ptei->blob_size;
+      trbi.sz = it->second.blob_size;
       trbi.id = id_str;
-      trbi.fee = ptei->fee;
-      trbi.total_amount = get_outs_money_amount(ptei->tx);
+      trbi.fee = it->second.fee;
+      trbi.total_amount = get_outs_money_amount(it->second.tx);
     }
     return true;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_transaction_details(const crypto::hash& id, tx_rpc_extended_info& trei) const
   {
-    auto ptei = m_db_transactions.get(id);
-    if (!ptei)
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    auto it = m_transactions.find(id);
+    if (it == m_transactions.end())
       return false;
 
-    fill_tx_rpc_details(trei, ptei->tx, nullptr, id, ptei->receive_time, false);
+    fill_tx_rpc_details(trei, it->second.tx, nullptr, id, it->second.receive_time, false);
     return true;
   }  
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_transaction(const crypto::hash& id, transaction& tx) const
   {
-    auto tx_ptr = m_db_transactions.find(id);
-    if (tx_ptr == m_db_transactions.end())
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    auto it = m_transactions.find(id);
+    if (it == m_transactions.end())
       return false;
-    tx = tx_ptr->tx;
+
+    tx = it->second.tx;
     return true;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_transaction(const crypto::hash& id, tx_details& txd) const
   {
-    auto tx_ptr = m_db_transactions.find(id);
-    if (tx_ptr == m_db_transactions.end())
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    auto it = m_transactions.find(id);
+    if (it == m_transactions.end())
       return false;
-    txd = *tx_ptr;
+
+    txd = it->second;
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -701,11 +672,12 @@ namespace currency
     LOG_PRINT_GREEN("Preparing relay message...", LOG_LEVEL_0);
     NOTIFY_NEW_TRANSACTIONS::request r = AUTO_VAL_INIT(r);
 
-    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& k, const tx_details& v)
     {
-      r.txs.push_back(t_serializable_object_to_blob(v.tx));
-      return true;
-    });
+      CRITICAL_REGION_LOCAL(m_transactions_lock);
+      for(auto& td : m_transactions)
+        r.txs.push_back(t_serializable_object_to_blob(td.second.tx));
+    }
+
     LOG_PRINT_GREEN("Sending....", LOG_LEVEL_0);
     CHECK_AND_ASSERT_MES(m_pprotocol, false, "m_pprotocol is not set");
     currency_connection_context fake_context = AUTO_VAL_INIT(fake_context);
@@ -719,20 +691,22 @@ namespace currency
     // atm:
     // 1) the only side effect of a tx being blacklisted is the one is just ignored by fill_block_template(), but it still can be added to blockchain/pool
     // 2) it's permanent
+    CRITICAL_REGION_LOCAL(m_black_tx_list_lock);
     LOG_PRINT_YELLOW("TX ADDED TO POOL'S BLACKLIST: " << get_transaction_hash(tx), LOG_LEVEL_0);
-    m_db.begin_transaction();
-    m_db_black_tx_list.set(get_transaction_hash(tx), true);
-    m_db.commit_transaction();
+    m_black_tx_list.insert(get_transaction_hash(tx));
     return true;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::have_tx(const crypto::hash &id) const
   {    
-    if(m_db_transactions.get(id))
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    if(m_transactions.count(id))
       return true;
 
     if (check_is_taken(id))
       return true;
+
     return false;
   }
   //---------------------------------------------------------------------------------
@@ -757,18 +731,20 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::insert_key_images(const transaction& tx, bool kept_by_block)
   {
+    CRITICAL_REGION_LOCAL(m_key_images_set_lock);
+
     for(const auto& in : tx.vin)
     {
       if (in.type() == typeid(txin_to_key))
       {
         CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, true);//should never fail
         uint64_t count = 0;
-        auto ki_entry_ptr = m_db_key_images_set.get(tokey_in.k_image);
-        if (ki_entry_ptr.get())
-          count = *ki_entry_ptr;
+        auto it = m_key_images_set.find(tokey_in.k_image);
+        if (it != m_key_images_set.end())
+          count = it->second;
         uint64_t count_before = count;
         ++count;
-        m_db_key_images_set.set(tokey_in.k_image, count);
+        m_key_images_set[tokey_in.k_image] = count;
         LOG_PRINT_L2("tx pool: key image added: " << tokey_in.k_image << ", from tx " << get_transaction_hash(tx) << ", counter: " << count_before << " -> " << count);
       }
     }
@@ -793,13 +769,15 @@ namespace currency
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::insert_alias_info(const transaction& tx)
   {
+    CRITICAL_REGION_LOCAL(m_aliases_lock);
+    
     tx_extra_info ei = AUTO_VAL_INIT(ei);
     bool r = parse_and_validate_tx_extra(tx, ei);
     CHECK_AND_ASSERT_MES(r, false, "failed to validate transaction extra on unprocess_blockchain_tx_extra");
     if (ei.m_alias.m_alias.size())
     {
-      m_db_alias_names.set(ei.m_alias.m_alias, true);
-      m_db_alias_addresses.set(ei.m_alias.m_address, true);
+      m_alias_names_set.insert(ei.m_alias.m_alias);
+      m_alias_addresses_set.insert(ei.m_alias.m_address);
     }
 
     return true;
@@ -807,14 +785,15 @@ namespace currency
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::remove_alias_info(const transaction& tx)
   {
+    CRITICAL_REGION_LOCAL(m_aliases_lock);
     
     tx_extra_info ei = AUTO_VAL_INIT(ei);
     bool r = parse_and_validate_tx_extra(tx, ei);
     CHECK_AND_ASSERT_MES(r, false, "failed to validate transaction extra on unprocess_blockchain_tx_extra");
     if (ei.m_alias.m_alias.size())
     {
-      m_db_alias_names.erase(ei.m_alias.m_alias);
-      m_db_alias_addresses.erase(ei.m_alias.m_address);
+      m_alias_names_set.erase(ei.m_alias.m_alias);
+      m_alias_addresses_set.erase(ei.m_alias.m_address);
     }
 
     return true;
@@ -822,25 +801,27 @@ namespace currency
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::remove_key_images(const transaction& tx, bool kept_by_block)
   {
+    CRITICAL_REGION_LOCAL(m_key_images_set_lock);
+
     for(const auto& in : tx.vin)
     {
       if (in.type() == typeid(txin_to_key))
       {
         CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, true);//should never fail
         uint64_t count = 0;
-        auto ki_entry_ptr = m_db_key_images_set.get(tokey_in.k_image);
-        if (!ki_entry_ptr.get() || *ki_entry_ptr == 0)
+        auto it = m_key_images_set.find(tokey_in.k_image);
+        if (it == m_key_images_set.end())
         {
           LOG_ERROR("INTERNAL_ERROR: for tx " << get_transaction_hash(tx) << " key image " << tokey_in.k_image << " not found");
           continue;
         }
-        count = *ki_entry_ptr;
+        count = it->second;
         uint64_t count_before = count;
         --count;
         if (count)
-          m_db_key_images_set.set(tokey_in.k_image, count);
+          m_key_images_set[tokey_in.k_image] = count;
         else
-          m_db_key_images_set.erase(tokey_in.k_image);
+          m_key_images_set.erase(tokey_in.k_image);
         LOG_PRINT_L2("tx pool: key image removed: " << tokey_in.k_image << ", from tx " << get_transaction_hash(tx) << ", counter: " << count_before << " -> " << count);
       }
     }
@@ -849,27 +830,28 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_key_images_from_tx_pool(std::unordered_set<crypto::key_image>& key_images) const
   {
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
     
-    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+    for(auto td : m_transactions)
     {
-      for (auto& in : tx_entry.tx.vin)
+      for (auto& in : td.second.tx.vin)
       {
         if (in.type() == typeid(txin_to_key))
         {
           key_images.insert(boost::get<txin_to_key>(in).k_image);
         }
       }
-      return true;
-    });
+    }
 
     return true;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::have_tx_keyimg_as_spent(const crypto::key_image& key_im)const
   {
-    
-    auto ptr = m_db_key_images_set.find(key_im);
-    if (ptr)
+    CRITICAL_REGION_LOCAL(m_key_images_set_lock);
+
+    auto it = m_key_images_set.find(key_im);
+    if (it != m_key_images_set.end())
       return true;
     return false;
   }
@@ -886,31 +868,33 @@ namespace currency
   //---------------------------------------------------------------------------------
   void tx_memory_pool::purge_transactions()
   {
-    
-    m_db.begin_transaction();
-    m_db_transactions.clear();
-    m_db_key_images_set.clear();
-    m_db_cancel_offer_hash.clear();
-    m_db.commit_transaction();
+    m_transactions.clear();
+    m_cancel_offer_hashes.clear();
     // should m_db_black_tx_list be cleared here?
+    m_key_images_set.clear();
+    // TODO : m_alias_names_set ?
+    // TODO : m_alias_addresses_set ?
   }
   //---------------------------------------------------------------------------------
   void tx_memory_pool::clear()
   {
-    m_db.begin_transaction();
-    m_db_transactions.clear();
-    m_db_cancel_offer_hash.clear();
-    m_db_black_tx_list.clear();
-    m_db_key_images_set.clear();
-    m_db.commit_transaction();
+    m_transactions.clear();
+    m_cancel_offer_hashes.clear();
+    m_black_tx_list.clear();
+    m_key_images_set.clear();
+    // TODO : m_alias_names_set ?
+    // TODO : m_alias_addresses_set ?
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const 
   {
     //not the best implementation at this time, sorry :(
 
-    if (m_db_black_tx_list.get(get_transaction_hash(txd.tx)))
-      return false;
+    {
+      CRITICAL_REGION_LOCAL(m_black_tx_list_lock);
+      if (m_black_tx_list.count(get_transaction_hash(txd.tx)))
+        return false;
+    }
 
     //check is ring_signature already checked ?
     if(txd.max_used_block_id == null_hash)
@@ -954,9 +938,8 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::have_key_images(const std::unordered_set<crypto::key_image>& k_images, const transaction& tx)const 
+  bool tx_memory_pool::have_key_images(const std::unordered_set<crypto::key_image>& k_images, const transaction& tx)
   {
-    LOCAL_READONLY_TRANSACTION();
     for(size_t i = 0; i!= tx.vin.size(); i++)
     {
       if (tx.vin[i].type() == typeid(txin_to_key))
@@ -990,8 +973,8 @@ namespace currency
     {
       std::list<std::pair<crypto::hash, tx_details>> txs;
       {
-        
-        m_db_transactions.enumerate_items([&txs](uint64_t i, const crypto::hash& h, const tx_details &tx_entry) { txs.push_back(std::make_pair(h, tx_entry)); return true; });
+        CRITICAL_REGION_LOCAL(m_transactions_lock);
+        txs.assign(m_transactions.begin(), m_transactions.end());
       }
       if (txs.empty())
         return "(no transactions, the pool is empty)";
@@ -1023,11 +1006,11 @@ namespace currency
     }
     
     // long format
-    
-    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+    for(auto& td : m_transactions)
     {
-      auto& txd = tx_entry;
-      ss << "id: " << h << ENDL
+      auto& txd = td.second;
+      ss << "id: " << td.first << ENDL
         << obj_to_json_str(txd.tx) << ENDL
         << "blob_size: " << txd.blob_size << ENDL
         << "fee: " << txd.fee << ENDL
@@ -1037,8 +1020,7 @@ namespace currency
         << "last_failed_height: " << txd.last_failed_height << ENDL
         << "last_failed_id: " << txd.last_failed_id << ENDL
         << "live_time: " << epee::misc_utils::get_time_interval_string(get_core_time() - txd.receive_time) << ENDL;
-      return true;
-    });
+    }
 
     return ss.str();
   }
@@ -1051,38 +1033,31 @@ namespace currency
     uint64_t &fee, 
     uint64_t height)
   {
-    LOCAL_READONLY_TRANSACTION();
-    //typedef transactions_container::value_type txv;
-    typedef std::pair<crypto::hash, std::shared_ptr<const tx_details> > txv;
-    
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    typedef std::pair<crypto::hash, tx_details> txv;
 
     std::vector<txv> txs_v;
-    txs_v.reserve(m_db_transactions.size());
+    txs_v.reserve(m_transactions.size());
     std::vector<txv*> txs;
+    txs.reserve(m_transactions.size());
 
     //std::transform(m_transactions.begin(), m_transactions.end(), txs.begin(), [](txv &a) -> txv * { return &a; });
     //keep getting it as a values cz db items cache will keep it as unserialied object stored by shared ptrs 
-    m_db_transactions.enumerate_keys([&](uint64_t i, crypto::hash& k){txs_v.resize(i + 1); txs_v[i].first = k; return true;});
-    txs.resize(txs_v.size(), nullptr);
-    
-    for (uint64_t i = 0; i != txs_v.size(); i++)
-    {      
-      auto& k = txs_v[i].first;
-      txs_v[i].second = m_db_transactions.get(k);
-      if (!txs_v[i].second)
-      {
-        LOG_ERROR("Internal tx pool db error: key " << k << " was enumerated as key but couldn't get value");
-        continue;
-      }
+    size_t i = 0;
+    for(auto& t : m_transactions)
+    {
+      txs_v.resize(i + 1);
+      txs_v[i] = t;
+      
+      txs.resize(i + 1);
       txs[i] = &txs_v[i];
     }
-
-    
     
     std::sort(txs.begin(), txs.end(), [](txv *a, txv *b) -> bool {
       boost::multiprecision::uint128_t a_, b_;
-      a_ = boost::multiprecision::uint128_t(a->second->fee) * b->second->blob_size;
-      b_ = boost::multiprecision::uint128_t(b->second->fee) * a->second->blob_size;
+      a_ = boost::multiprecision::uint128_t(a->second.fee) * b->second.blob_size;
+      b_ = boost::multiprecision::uint128_t(b->second.fee) * a->second.blob_size;
       return a_ > b_;
     });
 
@@ -1103,7 +1078,7 @@ namespace currency
     for (auto txp : txs) 
     {
       tx_extra_info ei = AUTO_VAL_INIT(ei);
-      bool r = parse_and_validate_tx_extra(txp->second->tx, ei);
+      bool r = parse_and_validate_tx_extra(txp->second.tx, ei);
       CHECK_AND_ASSERT_MES(r, false, "parse_and_validate_tx_extra failed while looking up the tx pool");
       if (!ei.m_alias.m_alias.empty() && !ei.m_alias.m_sign.size()) {
         alias_regs_exist = true;
@@ -1120,7 +1095,7 @@ namespace currency
       txv &tx(*txs[i]);
 
       // expiration time check -- skip expired transactions
-      if (is_tx_expired(tx.second->tx, tx_expiration_ts_median))
+      if (is_tx_expired(tx.second.tx, tx_expiration_ts_median))
       {
           txs[i] = nullptr;
           continue;
@@ -1128,7 +1103,7 @@ namespace currency
       
       // alias checks
       tx_extra_info ei = AUTO_VAL_INIT(ei);
-      bool r = parse_and_validate_tx_extra(tx.second->tx, ei);
+      bool r = parse_and_validate_tx_extra(tx.second.tx, ei);
       CHECK_AND_ASSERT_MES(r, false, "failed to validate transaction extra on unprocess_blockchain_tx_extra");
       if (!ei.m_alias.m_alias.empty())
       {
@@ -1143,24 +1118,22 @@ namespace currency
 
       //is_transaction_ready_to_go can change tx_details in case of some errors, so we make local copy, 
       //do check if it's changed and reassign it to db if needed
-      tx_details local_copy_txd = *(tx.second);
+      tx_details local_copy_txd = tx.second;
       bool is_tx_ready_to_go_result = is_transaction_ready_to_go(local_copy_txd, tx.first);
       if (!is_tx_ready_to_go_result && 
-        (local_copy_txd.last_failed_height != tx.second->last_failed_height || local_copy_txd.last_failed_id != tx.second->last_failed_id))
+        (local_copy_txd.last_failed_height != tx.second.last_failed_height || local_copy_txd.last_failed_id != tx.second.last_failed_id))
       {
-        m_db_transactions.begin_transaction();
-        m_db_transactions.set(get_transaction_hash(local_copy_txd.tx), local_copy_txd);
-        m_db_transactions.commit_transaction();
+        m_transactions[get_transaction_hash(local_copy_txd.tx)] = local_copy_txd;
       }
 
-      if (!is_tx_ready_to_go_result || have_key_images(k_images, tx.second->tx)) {
+      if (!is_tx_ready_to_go_result || have_key_images(k_images, tx.second.tx)) {
         txs[i] = NULL;
         continue;
       }
-      append_key_images(k_images, tx.second->tx);
+      append_key_images(k_images, tx.second.tx);
 
-      current_size += tx.second->blob_size;
-      current_fee += tx.second->fee;
+      current_size += tx.second.blob_size;
+      current_fee += tx.second.fee;
 
       uint64_t current_reward;
       if (!get_block_reward(pos, median_size, current_size + CURRENCY_COINBASE_BLOB_RESERVED_SIZE, already_generated_coins, current_reward, height))
@@ -1187,11 +1160,11 @@ namespace currency
         {
           bl.tx_hashes.push_back(txs[i]->first);
         }
-        else if (have_attachment_service_in_container(txs[i]->second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
+        else if (have_attachment_service_in_container(txs[i]->second.tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
         {
           // BC_OFFERS_SERVICE_INSTRUCTION_DEL transactions has zero fee, so include them here regardless of reward effectiveness
           bl.tx_hashes.push_back(txs[i]->first);
-          total_size += txs[i]->second->blob_size;
+          total_size += txs[i]->second.blob_size;
         }
       }
     }
@@ -1200,49 +1173,32 @@ namespace currency
   //---------------------------------------------------------------------------------
   void tx_memory_pool::initialize_db_solo_options_values()
   {
-    m_db.begin_transaction();
-    m_db_storage_major_compatibility_version = TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION;
-    m_db.commit_transaction();
+    //m_db.begin_transaction();
+    //m_db_storage_major_compatibility_version = TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION;
+    //m_db.commit_transaction();
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::init(const std::string& config_folder)
   {
     m_config_folder = config_folder;
 
-    uint64_t cache_size = CACHE_SIZE;
-    LOG_PRINT_GREEN("Using pool db file cache size(L1): " << cache_size, LOG_LEVEL_0);
-
-    LOG_PRINT_L0("Loading blockchain...");
-    const std::string folder_name = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME;
-    tools::create_directories_if_necessary(folder_name);
-    bool res = m_db.open(folder_name, cache_size);
-    CHECK_AND_ASSERT_MES(res, false, "Failed to initialize pool database in folder: " << folder_name);
-
-    res = m_db_transactions.init(TRANSACTION_POOL_CONTAINER_TRANSACTIONS);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_key_images_set.init(TRANSACTION_POOL_CONTAINER_KEY_IMAGES);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_cancel_offer_hash.init(TRANSACTION_POOL_CONTAINER_CANCEL_OFFER_HASH);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_black_tx_list.init(TRANSACTION_POOL_CONTAINER_BLACK_TX_LIST);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_alias_names.init(TRANSACTION_POOL_CONTAINER_ALIAS_NAMES);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_alias_addresses.init(TRANSACTION_POOL_CONTAINER_ALIAS_ADDRESSES);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_solo_options.init(TRANSACTION_POOL_CONTAINER_SOLO_OPTIONS);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    const std::string filename = m_config_folder + "/" CURRENCY_POOLDATA_FILENAME;
+    LOG_PRINT_L0("Loading tx pool from " << filename);
+    boost::system::error_code ec;
+    if(!boost::filesystem::exists(filename, ec))
+      return true;
+    bool res = tools::unserialize_obj_from_file(*this, filename);
+    if(!res)
+    {
+      LOG_PRINT_L0("Failed to load tx pool from " << filename);
+    }
 
 
-    m_db_transactions.set_cache_size(1000);
-    m_db_alias_names.set_cache_size(10000);
-    m_db_alias_addresses.set_cache_size(10000);
-    m_db_cancel_offer_hash.set_cache_size(1000);
-    m_db_black_tx_list.set_cache_size(1000);
+    // TODO
 
     bool need_reinit = false;
-    if (m_db_storage_major_compatibility_version != TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION)
-      need_reinit = true;
+    //if (m_db_storage_major_compatibility_version != TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION)
+    //  need_reinit = true;
 
     if (need_reinit)
     {
@@ -1251,14 +1207,25 @@ namespace currency
     }
     initialize_db_solo_options_values();
 
-    LOG_PRINT_GREEN("TX_POOL Initialized ok. (" << m_db_transactions.size() << " transactions)", LOG_LEVEL_0);
+    LOG_PRINT_GREEN("TX_POOL Initialized ok. (" << m_transactions.size() << " transactions)", LOG_LEVEL_0);
     return true;
   }
 
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::deinit()
   {
-    m_db.close();
+    if (!tools::create_directories_if_necessary(m_config_folder))
+    {
+      LOG_PRINT_L0("Failed to create data directory: " << m_config_folder);
+      return false;
+    }
+
+    std::string filename = m_config_folder + "/" CURRENCY_POOLDATA_FILENAME;
+    bool res = tools::serialize_obj_to_file(*this, filename);
+    if(!res)
+    {
+      LOG_PRINT_L0("Failed to serialize tx pool to file " << filename);
+    }
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -1285,7 +1252,7 @@ namespace currency
     for (const auto& in : tx.vin)
     {
       if (in.type() == typeid(txin_multisig))
-        result.push_back(ms_out_info({ boost::get<txin_multisig>(in).multisig_out_id, idx, true }));
+        result.push_back(ms_out_info{ boost::get<txin_multisig>(in).multisig_out_id, idx, true });
       ++idx;
     }
 
@@ -1293,7 +1260,7 @@ namespace currency
     for (const auto& out : tx.vout)
     {
       if (out.target.type() == typeid(txout_multisig))
-        result.push_back(ms_out_info({ get_multisig_out_id(tx, idx), idx, false }));
+        result.push_back(ms_out_info{ get_multisig_out_id(tx, idx), idx, false });
       ++idx;
     }
   }
@@ -1319,8 +1286,8 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::check_tx_multisig_ins_and_outs(const transaction& tx, bool check_against_pool_txs) const 
   {
-    
-    LOCAL_READONLY_TRANSACTION();
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
     std::vector<ms_out_info> ms_ids;
     collect_multisig_ids_from_tx(tx, ms_ids);
 
@@ -1337,17 +1304,17 @@ namespace currency
       if (check_against_pool_txs)
       {
         bool has_found = false;
-        m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+        for(auto& t : m_transactions)
         {
-          if (does_tx_have_given_multisig_id(tx_entry.tx, el.multisig_id))
+          if (does_tx_have_given_multisig_id(t.second.tx, el.multisig_id))
           {
             has_found = true;
             LOG_PRINT_L0("Transaction " << get_transaction_hash(tx) << (el.is_input ? " : input #" : " : output #") << el.input_output_index << " has multisig id " << el.multisig_id <<
-              " that is already in the pool in tx " << get_transaction_hash(tx_entry.tx));
+              " that is already in the pool in tx " << get_transaction_hash(t.second.tx));
             return false;
           }  
-          return true;
-        });
+        }
+
         if (has_found)
           return false;
       }
@@ -1356,8 +1323,3 @@ namespace currency
     return true;
   }
 }
-
-#undef LOG_DEFAULT_CHANNEL 
-#define LOG_DEFAULT_CHANNEL NULL
-
-
