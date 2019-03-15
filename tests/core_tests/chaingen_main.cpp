@@ -56,7 +56,7 @@ bool clean_data_directory()
 {
   std::string config_folder = command_line::get_arg(g_vm, command_line::arg_data_dir);
 
-  static const char* const files[] = { CURRENCY_BLOCKCHAINDATA_FOLDERNAME, CURRENCY_POOLDATA_FOLDERNAME, MINER_CONFIG_FILENAME };
+  static const char* const files[] = { CURRENCY_BLOCKCHAINDATA_FOLDERNAME, CURRENCY_POOLDATA_FILENAME, MINER_CONFIG_FILENAME };
   for (size_t i = 0; i < sizeof files / sizeof files[0]; ++i)
   {
     boost::filesystem::path filename(config_folder + "/" + files[i]);
