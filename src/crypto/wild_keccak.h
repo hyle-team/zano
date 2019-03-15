@@ -93,14 +93,7 @@ namespace crypto
   };
 
 
-  //------------------------------------------------------------------
-  inline
-    bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
-  {
-  
-    const uint64_t* int_array_ptr = (const uint64_t*)&scratchpad[0];
-    size_t int64_sz = sz * 4;
-  }
+
   //------------------------------------------------------------------
   inline
   bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const uint64_t*& int_array_ptr_scratch, uint64_t int64_sz)
@@ -130,7 +123,16 @@ namespace crypto
     });   
     return true;
   }
+  //------------------------------------------------------------------
+  inline
+    bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
+  {
 
+    const uint64_t* int_array_ptr = (const uint64_t*)&scratchpad[0];
+    size_t int64_sz = sz * 4;
+    return get_wild_keccak2(bd, res, int_array_ptr, int64_sz);
+  }
+  //------------------------------------------------------------------
   template<class t_items_accessor>
     bool get_wild_keccak_light(const std::string& bd, crypto::hash& res, t_items_accessor cb_get_item)
   {
