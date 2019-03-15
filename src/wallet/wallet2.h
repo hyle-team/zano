@@ -255,7 +255,8 @@ namespace tools
     void store();
     void store(const std::wstring& path);
     std::wstring get_wallet_path(){ return m_wallet_file; }
-    currency::account_base& get_account(){return m_account;}
+    currency::account_base& get_account() { return m_account; }
+    const currency::account_base& get_account() const { return m_account; }
 
     void get_recent_transfers_history(std::vector<wallet_rpc::wallet_transfer_info>& trs, size_t offset, size_t count);
     uint64_t get_recent_transfers_total_count();
@@ -497,6 +498,8 @@ namespace tools
       std::vector<currency::tx_destination_entry>& prepared_destinations,
       crypto::hash multisig_id = currency::null_hash);
 
+    std::string get_log_prefix() const { return m_log_prefix; }
+
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
@@ -595,6 +598,8 @@ private:
 
     void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_rpc::wallet_transfer_info_details& res_td) const;
     void print_source_entry(const currency::tx_source_entry& src) const;
+
+    void init_log_prefix();
 
     struct construct_tx_param
     {

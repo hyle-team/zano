@@ -152,6 +152,7 @@ int main(int argc, char* argv[])
 
   //create objects and link them
   bc_services::bc_offers_service offers_service(nullptr);
+  offers_service.set_disabled(true);
   currency::core ccore(NULL);
   currency::t_currency_protocol_handler<currency::core> cprotocol(ccore, NULL );
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2psrv(cprotocol);

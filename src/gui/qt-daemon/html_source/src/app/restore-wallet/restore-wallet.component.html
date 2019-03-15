@@ -43,7 +43,7 @@
 
     <div class="input-block">
       <label for="phrase-key">{{ 'RESTORE_WALLET.LABEL_PHRASE_KEY' | translate }}</label>
-      <input type="text" id="phrase-key" formControlName="key" [attr.disabled]="walletSaved ? '' : null">
+      <input type="text" id="phrase-key" formControlName="key" [attr.disabled]="walletSaved ? '' : null" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="restoreForm.controls['key'].invalid && (restoreForm.controls['key'].dirty || restoreForm.controls['key'].touched)">
         <div *ngIf="restoreForm.controls['key'].errors['required']">
           {{ 'RESTORE_WALLET.FORM_ERRORS.KEY_REQUIRED' | translate }}

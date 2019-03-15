@@ -98,9 +98,6 @@ endif()
 
 add_library(crypto ${CRYPTO})
 
-MESSAGE( STATUS "INCLUDING OpenCL_INCLUDE_DIRS:         " ${OpenCL_INCLUDE_DIRS} )
-include_directories( ${OpenCL_INCLUDE_DIRS} )
-
 add_library(currency_core ${CURRENCY_CORE})
 add_dependencies(currency_core version rpc ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(CURRENCY_CORE)
@@ -164,6 +161,8 @@ if(BUILD_GUI)
 
   set_property(TARGET Zano PROPERTY FOLDER "prog")
   set_target_properties(Zano PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/Info.plist.in)
+
+  set_target_properties(Zano PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "--html-path=${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/html")
 
   set(CMAKE_AUTOMOC OFF)
 endif()

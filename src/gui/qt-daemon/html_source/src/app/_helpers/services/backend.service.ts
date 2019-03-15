@@ -347,7 +347,7 @@ export class BackendService {
   }
 
   closeWallet(wallet_id, callback) {
-    this.runCommand('close_wallet', {wallet_id: wallet_id}, callback);
+    this.runCommand('close_wallet', {wallet_id: +wallet_id}, callback);
   }
 
   getSmartWalletInfo(wallet_id, callback) {
@@ -483,10 +483,6 @@ export class BackendService {
 
   openUrlInBrowser(url, callback?) {
     this.runCommand('open_url_in_browser', url, callback);
-  }
-
-  is_remnotenode_mode_preconfigured(callback) {
-    this.runCommand('is_remnotenode_mode_preconfigured', {}, callback);
   }
 
   start_backend(node, host, port, callback) {

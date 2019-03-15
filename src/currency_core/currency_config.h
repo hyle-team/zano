@@ -1,5 +1,4 @@
 // Copyright (c) 2014-2018 Zano Project
-// Copyright (c) 2014-2018 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -8,7 +7,7 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      75
+#define CURRENCY_FORMATION_VERSION                      76
                                                         
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -47,8 +46,7 @@
 #define BASE_REWARD_DUST_THRESHOLD                      ((uint64_t)1000000) // pow(10, 6) - change this will cause hard-fork!
 #define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)//((uint64_t)100000) // pow(10, 5)
 
-//#define CURRENCY_SCRATCHPAD_BASE_SIZE                   16777216 //count in crypto::hash, to get size in bytes x32
-#define CURRENCY_SCRATCHPAD_BASE_SIZE                   167 //count in crypto::hash, to get size in bytes x32
+#define CURRENCY_SCRATCHPAD_BASE_SIZE                   16777210 //count in crypto::hash, to get size in bytes x32
 #define CURRENCY_SCRATCHPAD_REBUILD_INTERVAL            720 //once a day if block goes once in 2 minute
 #define CURRENCY_SCRATCHPAD_BASE_INDEX_ID_OFFSET        20  //offset down from last rebuild height to block id, that used for indexing seed blocks in CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW
 #define CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW          700 //window for addressing seed block ids 
@@ -99,7 +97,8 @@
 #define BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT          2000      //by default, blocks ids count in synchronizing
 #define BLOCKS_SYNCHRONIZING_DEFAULT_COUNT              200       //by default, blocks count in blocks downloading
 #define BLOCKS_SYNCHRONIZING_DEFAULT_SIZE               2000000   //by default keep synchronizing packets not bigger then 2MB
-#define CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT      500         
+#define CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT      500     
+#define CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT         500    
 
 
 #define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week
