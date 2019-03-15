@@ -96,7 +96,7 @@ namespace crypto
 
   //------------------------------------------------------------------
   inline
-  bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const uint64_t*& int_array_ptr_scratch, uint64_t int64_sz)
+  bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const uint64_t* int_array_ptr_scratch, uint64_t int64_sz)
   {
     uint64_t count_access = 0;
     crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st)
