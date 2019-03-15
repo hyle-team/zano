@@ -168,9 +168,9 @@ if(BUILD_GUI)
   set(CMAKE_AUTOMOC OFF)
 
   # GUI convenience "bundle"
-  set(GUI_DIR ${CMAKE_CURRENT_BINARY_DIR}/gui)
-  set_target_properties(Zano PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GUI_DIR})
-  add_custom_command(TARGET Zano POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${HTML_DIR} ${GUI_DIR}/html)
+  # set(GUI_DIR ${CMAKE_CURRENT_BINARY_DIR}/gui)
+  # set_target_properties(Zano PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GUI_DIR})
+  # add_custom_command(TARGET Zano POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${HTML_DIR} ${GUI_DIR}/html)
 endif()
 
 if(APPLE)
