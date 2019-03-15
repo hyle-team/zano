@@ -93,36 +93,40 @@ namespace crypto
   };
 
 
-
   //------------------------------------------------------------------
   inline
-  bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
+    bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const std::vector<crypto::hash>& scratchpad, uint64_t sz)
+  {
+  
+    const uint64_t* int_array_ptr = (const uint64_t*)&scratchpad[0];
+    size_t int64_sz = sz * 4;
+  }
+  //------------------------------------------------------------------
+  inline
+  bool get_wild_keccak2(const std::string& bd, crypto::hash& res, const uint64_t*& int_array_ptr_scratch, uint64_t int64_sz)
   {
     uint64_t count_access = 0;
     crypto::wild_keccak2_dbl<crypto::regular_f>(reinterpret_cast<const uint8_t*>(bd.data()), bd.size(), reinterpret_cast<uint8_t*>(&res), sizeof(res), [&](crypto::state_t_m& st)
     {
       ++count_access;
-      if (!sz)
+      if (!int64_sz)
       {
         return;
       }
 
-      const uint64_t* int_array_ptr = (const uint64_t*)&scratchpad[0];
-      size_t int64_sz = sz * 4;
-
-        for (size_t i = 0; i != sizeof(st) / sizeof(st[0]); i++)
+      for (size_t i = 0; i != sizeof(st) / sizeof(st[0]); i++)
+      {
+        size_t depend_index = 0;
+        if (i == 0)
         {
-          size_t depend_index = 0;
-          if (i == 0)
-          {
-            depend_index = sizeof(st) / sizeof(st[0]) - 1;
-          }
-          else
-          {
-            depend_index = i - 1;
-          }
-          st[i] ^= int_array_ptr[ int_array_ptr[ int_array_ptr[st[depend_index] % int64_sz] % int64_sz] % int64_sz];
+          depend_index = sizeof(st) / sizeof(st[0]) - 1;
         }
+        else
+        {
+          depend_index = i - 1;
+        }
+        st[i] ^= int_array_ptr_scratch[int_array_ptr_scratch[int_array_ptr_scratch[st[depend_index] % int64_sz] % int64_sz] % int64_sz];
+      }
     });   
     return true;
   }

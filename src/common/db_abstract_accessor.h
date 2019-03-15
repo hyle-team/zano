@@ -15,8 +15,8 @@
 #include "cache_helper.h"
 #include "profile_tools.h"
 #include "../serialization/serialization.h"
-#include "epee/include/readwrite_lock.h"
-#include "epee/include/math_helper.h"
+#include "readwrite_lock.h"
+#include "math_helper.h"
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "db"
