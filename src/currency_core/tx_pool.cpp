@@ -418,16 +418,23 @@ namespace currency
   {
     CRITICAL_REGION_LOCAL(m_transactions_lock);
 
-    auto it = m_transactions.find(id);
-    if (it == m_transactions.end())
-      return false;
+    bool kept_by_block = false;
+    
+    // a scope to highlight 'it' lifetime
+    {
+      auto it = m_transactions.find(id);
+      if (it == m_transactions.end())
+        return false;
 
-    tx = it->second.tx;
-    blob_size = it->second.blob_size;
-    fee = it->second.fee;
-    unprocess_cancel_offer_rules(it->second.tx);
-    m_transactions.erase(id);
-    on_tx_remove(tx, it->second.kept_by_block);
+      tx = it->second.tx;
+      blob_size = it->second.blob_size;
+      fee = it->second.fee;
+      unprocess_cancel_offer_rules(it->second.tx);
+      kept_by_block = it->second.kept_by_block;
+      m_transactions.erase(id); // it became invalidated here
+    }
+    
+    on_tx_remove(tx, kept_by_block);
     set_taken(id);
     return true;
   }
