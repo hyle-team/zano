@@ -159,7 +159,6 @@ namespace currency
     bool remove_alias_info(const transaction& tx);
 
     bool is_valid_contract_finalization_tx(const transaction &tx)const;
-    void initialize_db_solo_options_values();
     bool remove_stuck_transactions();
     bool is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const;
     bool validate_alias_info(const transaction& tx, bool is_in_block)const;
@@ -170,21 +169,11 @@ namespace currency
     void set_taken(const crypto::hash& id);
     void reset_all_taken();
 
-
-    //typedef tools::db::cached_key_value_accessor<crypto::hash, tx_details, true, false> transactions_container;
-    //typedef tools::db::cached_key_value_accessor<crypto::hash, bool, false, false> hash_container; 
-    //typedef tools::db::cached_key_value_accessor<crypto::key_image, uint64_t, false, false> key_images_container;
-    //typedef tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> solo_options_container;
-    //typedef tools::db::cached_key_value_accessor<std::string, bool, false, false> aliases_container; 
-    //typedef tools::db::cached_key_value_accessor<account_public_address, bool, false, false> address_to_aliases_container;
-
     typedef std::unordered_map<crypto::hash, tx_details> transactions_container;
     typedef std::unordered_map<crypto::key_image, uint64_t> key_images_container;
     typedef std::unordered_set<crypto::hash> hash_container;
     typedef std::unordered_set<std::string> aliases_container;
     typedef std::unordered_set<account_public_address> aliases_addresses_container;
-
-
 
     //main accessor
     epee::shared_recursive_mutex m_dummy_rw_lock;
@@ -197,9 +186,6 @@ namespace currency
     key_images_container m_key_images_set;
     aliases_container m_alias_names_set;
     aliases_addresses_container m_alias_addresses_set;
-
-    //tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_major_compatibility_version; -- TODO
-
 
     epee::math_helper::once_a_time_seconds<30> m_remove_stuck_tx_interval;
 

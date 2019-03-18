@@ -24,8 +24,6 @@
 
 DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated name length exceeded, name was truncated
 
-//#define TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION      BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 1
-
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "tx_pool"
 ENABLE_CHANNEL_BY_DEFAULT("tx_pool");
@@ -472,7 +470,6 @@ namespace currency
     {
       auto& tx_entry = td.second;
       const crypto::hash& h = td.first;
-      //m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
 
       //never remove transactions which related to alt blocks, 
       //or we can get network split as a worst case (impossible to switch to 
@@ -1179,13 +1176,6 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
-  void tx_memory_pool::initialize_db_solo_options_values()
-  {
-    //m_db.begin_transaction();
-    //m_db_storage_major_compatibility_version = TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION;
-    //m_db.commit_transaction();
-  }
-  //---------------------------------------------------------------------------------
   bool tx_memory_pool::init(const std::string& config_folder)
   {
     m_config_folder = config_folder;
@@ -1198,22 +1188,9 @@ namespace currency
     bool res = tools::unserialize_obj_from_file(*this, filename);
     if(!res)
     {
-      LOG_PRINT_L0("Failed to load tx pool from " << filename);
+      LOG_ERROR("Failed to load tx pool from " << filename);
+      return false;
     }
-
-
-    // TODO
-
-    bool need_reinit = false;
-    //if (m_db_storage_major_compatibility_version != TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION)
-    //  need_reinit = true;
-
-    if (need_reinit)
-    {
-      clear();
-      LOG_PRINT_MAGENTA("Tx Pool reinitialized.", LOG_LEVEL_0);
-    }
-    initialize_db_solo_options_values();
 
     LOG_PRINT_GREEN("TX_POOL Initialized ok. (" << m_transactions.size() << " transactions)", LOG_LEVEL_0);
     return true;
