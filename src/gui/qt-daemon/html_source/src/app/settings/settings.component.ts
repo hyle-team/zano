@@ -10,10 +10,29 @@ import {Location} from '@angular/common';
   styleUrls: ['./settings.component.scss']
 })
 export class SettingsComponent implements OnInit {
+
   theme: string;
   changeForm: any;
+  appLockOptions = [
+    {
+      id: 5,
+      name: 'SETTINGS.APP_LOCK.TIME1'
+    },
+    {
+      id: 15,
+      name: 'SETTINGS.APP_LOCK.TIME2'
+    },
+    {
+      id: 60,
+      name: 'SETTINGS.APP_LOCK.TIME3'
+    },
+    {
+      id: 0,
+      name: 'SETTINGS.APP_LOCK.TIME4'
+    }
+  ];
 
-  constructor(private renderer: Renderer2, private variablesService: VariablesService, private backend: BackendService, private location: Location) {
+  constructor(private renderer: Renderer2, public variablesService: VariablesService, private backend: BackendService, private location: Location) {
     this.theme = this.variablesService.settings.theme;
     this.changeForm = new FormGroup({
       password: new FormControl('', Validators.required),
@@ -47,6 +66,11 @@ export class SettingsComponent implements OnInit {
         }
       });
     }
+  }
+
+  onLockChange() {
+    this.variablesService.restartCountdown();
+    this.backend.storeAppData();
   }
 
   back() {

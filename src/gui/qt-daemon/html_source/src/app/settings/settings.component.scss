@@ -22,6 +22,21 @@
   }
 }
 
+.lock-selection {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 2.4rem 0;
+  width: 50%;
+
+  .lock-selection-title {
+    display: flex;
+    font-size: 1.5rem;
+    line-height: 2.7rem;
+    margin-bottom: 1rem;
+  }
+}
+
 .master-password {
   width: 50%;
 
@@ -42,6 +57,6 @@
 .last-build {
   position: absolute;
   bottom: 3rem;
-  right: 3rem;
-  font-size: 1.3rem;
+  left: 3rem;
+  font-size: 1rem;
 }

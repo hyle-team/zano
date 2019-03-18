@@ -30,6 +30,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { NgSelectModule } from '@ng-select/ng-select';
 
 import { BackendService } from './_helpers/services/backend.service';
 import { ModalService } from './_helpers/services/modal.service';
@@ -109,6 +110,7 @@ Highcharts.setOptions({
     }),
     FormsModule,
     ReactiveFormsModule,
+    NgSelectModule,
     ChartModule,
     ContextMenuModule.forRoot()
   ],

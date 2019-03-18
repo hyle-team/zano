@@ -29,6 +29,7 @@ export class VariablesService {
   public default_fee_big = new BigNumber('10000000000');
 
   public settings = {
+    appLockTime: 15,
     theme: '',
     language: 'en',
     default_path: '/',
@@ -48,7 +49,6 @@ export class VariablesService {
 
   public idle = new Idle()
     .whenNotInteractive()
-    .within(15)
     .do(() => {
       this.ngZone.run(() => {
         this.idle.stop();
@@ -96,11 +96,15 @@ export class VariablesService {
   }
 
   startCountdown() {
-    this.idle.start();
+    this.idle.within(this.settings.appLockTime).start();
   }
 
   stopCountdown() {
     this.idle.stop();
+  }
+
+  restartCountdown() {
+    this.idle.within(this.settings.appLockTime).restart();
   }
 
   public onContextMenu($event: MouseEvent): void {

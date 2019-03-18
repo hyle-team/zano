@@ -15,7 +15,7 @@
     "BACK": "Go back"
   },
   "BREADCRUMBS": {
-    "ADD_WALLET": "Add new wallet",
+    "ADD_WALLET": "Add wallet",
     "CREATE_WALLET": "Create new wallet",
     "SAVE_PHRASE": "Save your seed phrase",
     "OPEN_WALLET": "Open existing wallet",
@@ -30,7 +30,7 @@
   },
   "SIDEBAR": {
     "TITLE": "Wallets",
-    "ADD_NEW": "+ Add new",
+    "ADD_NEW": "+ Add",
     "ACCOUNT": {
       "STAKING": "Staking",
       "MESSAGES": "New offers/Messages",
@@ -109,6 +109,13 @@
     "DARK_THEME": "Dark theme",
     "WHITE_THEME": "White theme",
     "GRAY_THEME": "Grey theme",
+    "APP_LOCK": {
+      "TITLE": "Lock app after:",
+      "TIME1": "5 min",
+      "TIME2": "15 min",
+      "TIME3": "1 hour",
+      "TIME4": "Never"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
       "OLD": "Old password",
@@ -145,7 +152,7 @@
     "LABEL_SEED_PHRASE": "Seed phrase",
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
     "BUTTON_SAVE": "Save",
-    "BUTTON_REMOVE": "Remove wallet",
+    "BUTTON_REMOVE": "Close wallet",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
       "NAME_DUPLICATE": "Name is duplicate."
@@ -234,7 +241,7 @@
   },
   "HISTORY": {
     "STATUS": "Status",
-    "STATUS_TOOLTIP": "Approved {{current}}/{{total}}",
+    "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
     "SEND": "Send",
     "RECEIVED": "Received",
     "DATE": "Date",
