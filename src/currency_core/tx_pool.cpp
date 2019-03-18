@@ -1059,6 +1059,7 @@ namespace currency
       
       txs.resize(i + 1);
       txs[i] = &txs_v[i];
+      ++i;
     }
     
     std::sort(txs.begin(), txs.end(), [](txv *a, txv *b) -> bool {
