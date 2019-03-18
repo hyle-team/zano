@@ -162,9 +162,15 @@ if(BUILD_GUI)
   set_property(TARGET Zano PROPERTY FOLDER "prog")
   set_target_properties(Zano PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/Info.plist.in)
 
-  set_target_properties(Zano PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "--html-path=${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/html")
+  set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/html)
+  set_target_properties(Zano PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "--html-path=${HTML_DIR}")
 
   set(CMAKE_AUTOMOC OFF)
+
+  # GUI convenience "bundle"
+  # set(GUI_DIR ${CMAKE_CURRENT_BINARY_DIR}/gui)
+  # set_target_properties(Zano PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GUI_DIR})
+  # add_custom_command(TARGET Zano POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${HTML_DIR} ${GUI_DIR}/html)
 endif()
 
 if(APPLE)
