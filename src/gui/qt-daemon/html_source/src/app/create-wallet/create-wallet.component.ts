@@ -34,6 +34,7 @@ export class CreateWalletComponent implements OnInit {
   };
 
   walletSaved = false;
+  walletSavedName = '';
 
   constructor(
     private router: Router,
@@ -59,6 +60,7 @@ export class CreateWalletComponent implements OnInit {
       this.backend.saveFileDialog(this.translate.instant('CREATE_WALLET.TITLE_SAVE'), '*', this.variablesService.settings.default_path, (file_status, file_data) => {
         if (file_status) {
           this.variablesService.settings.default_path = file_data.path.substr(0, file_data.path.lastIndexOf('/'));
+          this.walletSavedName = file_data.path.substr(file_data.path.lastIndexOf('/') + 1, file_data.path.length - 1);
           this.backend.generateWallet(file_data.path, this.createForm.get('password').value, (generate_status, generate_data, errorCode) => {
             if (generate_status) {
               this.wallet.id = generate_data.wallet_id;

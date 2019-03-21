@@ -5,10 +5,10 @@
       <span [routerLink]="['/main']">{{ 'BREADCRUMBS.ADD_WALLET' | translate }}</span>
       <span>{{ 'BREADCRUMBS.SAVE_PHRASE' | translate }}</span>
     </div>
-    <a class="back-btn" [routerLink]="['/main']">
+    <button type="button" class="back-btn" (click)="back()">
       <i class="icon back"></i>
       <span>{{ 'COMMON.BACK' | translate }}</span>
-    </a>
+    </button>
   </div>
 
   <h3 class="seed-phrase-title">{{ 'SEED_PHRASE.TITLE' | translate }}</h3>

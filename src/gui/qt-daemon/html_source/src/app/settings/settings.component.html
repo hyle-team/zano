@@ -24,6 +24,25 @@
     </div>
   </div>
 
+  <div class="theme-selection">
+    <div class="radio-block">
+      <input class="style-radio" type="radio" id="75%" name="scale" value="dark" [checked]="scale == 7.5" (change)="setScale(7.5)">
+      <label for="75%">75% scale</label>
+    </div>
+    <div class="radio-block">
+      <input class="style-radio" type="radio" id="100%" name="scale" value="white" [checked]="scale == 10" (change)="setScale(10)">
+      <label for="100%">100% scale</label>
+    </div>
+    <div class="radio-block">
+      <input class="style-radio" type="radio" id="125%" name="scale" value="gray" [checked]="scale == 12.5" (change)="setScale(12.5)">
+      <label for="125%">125% scale</label>
+    </div>
+    <div class="radio-block">
+      <input class="style-radio" type="radio" id="150%" name="scale" value="gray" [checked]="scale == 15" (change)="setScale(15)">
+      <label for="150%">150% scale</label>
+    </div>
+  </div>
+
   <div class="lock-selection">
     <label class="lock-selection-title">{{ 'SETTINGS.APP_LOCK.TITLE' | translate }}</label>
     <ng-select class="lock-selection-select"

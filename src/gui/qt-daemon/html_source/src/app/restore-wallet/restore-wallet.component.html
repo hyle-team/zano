@@ -5,10 +5,10 @@
       <span [routerLink]="['/main']">{{ 'BREADCRUMBS.ADD_WALLET' | translate }}</span>
       <span>{{ 'BREADCRUMBS.RESTORE_WALLET' | translate }}</span>
     </div>
-    <a class="back-btn" [routerLink]="['/main']">
+    <button type="button" class="back-btn" [routerLink]="['/main']">
       <i class="icon back"></i>
       <span>{{ 'COMMON.BACK' | translate }}</span>
-    </a>
+    </button>
   </div>
 
   <form class="form-restore" [formGroup]="restoreForm">

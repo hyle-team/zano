@@ -5,10 +5,10 @@
       <span [routerLink]="['/main']">{{ 'BREADCRUMBS.ADD_WALLET' | translate }}</span>
       <span>{{ 'BREADCRUMBS.CREATE_WALLET' | translate }}</span>
     </div>
-    <a class="back-btn" [routerLink]="['/main']">
+    <button type="button" class="back-btn" [routerLink]="['/main']">
       <i class="icon back"></i>
       <span>{{ 'COMMON.BACK' | translate }}</span>
-    </a>
+    </button>
   </div>
 
   <form class="form-create" [formGroup]="createForm">
@@ -42,7 +42,7 @@
     </div>
 
     <div class="wrap-buttons">
-      <button type="button" class="transparent-button" *ngIf="walletSaved" disabled><i class="icon"></i>{{createForm.controls['name'].value}}</button>
+      <button type="button" class="transparent-button" *ngIf="walletSaved" disabled><i class="icon"></i>{{walletSavedName}}</button>
       <button type="button" class="blue-button select-button" (click)="saveWallet()" [disabled]="!createForm.valid" *ngIf="!walletSaved">{{ 'CREATE_WALLET.BUTTON_SELECT' | translate }}</button>
       <button type="button" class="blue-button create-button" (click)="createWallet()" [disabled]="!walletSaved">{{ 'CREATE_WALLET.BUTTON_CREATE' | translate }}</button>
     </div>

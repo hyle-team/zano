@@ -12,6 +12,7 @@ import {Location} from '@angular/common';
 export class SettingsComponent implements OnInit {
 
   theme: string;
+  scale: number;
   changeForm: any;
   appLockOptions = [
     {
@@ -34,6 +35,7 @@ export class SettingsComponent implements OnInit {
 
   constructor(private renderer: Renderer2, public variablesService: VariablesService, private backend: BackendService, private location: Location) {
     this.theme = this.variablesService.settings.theme;
+    this.scale = this.variablesService.settings.scale;
     this.changeForm = new FormGroup({
       password: new FormControl('', Validators.required),
       new_password: new FormControl('', Validators.required),
@@ -52,6 +54,14 @@ export class SettingsComponent implements OnInit {
     this.theme = theme;
     this.variablesService.settings.theme = this.theme;
     this.renderer.addClass(document.body, 'theme-' + this.theme);
+    this.backend.storeAppData();
+  }
+
+  setScale(scale) {
+    //this.renderer.removeClass(document.body, 'theme-' + this.theme);
+    this.scale = scale;
+    this.variablesService.settings.scale = this.scale;
+    this.renderer.setStyle(document.documentElement, 'font-size', this.scale + 'px');
     this.backend.storeAppData();
   }
 
