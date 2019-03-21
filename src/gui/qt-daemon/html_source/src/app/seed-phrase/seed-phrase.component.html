@@ -19,6 +19,8 @@
     </ng-container>
   </div>
 
-  <button type="button" class="blue-button" (click)="runWallet()">{{ 'SEED_PHRASE.BUTTON_CREATE_ACCOUNT' | translate }}</button>
+  <button type="button" class="blue-button seed-phrase-button" (click)="runWallet()">{{ 'SEED_PHRASE.BUTTON_CREATE_ACCOUNT' | translate }}</button>
 
 </div>
+
+<app-progress-container [width]="'100%'" [labels]="['PROGRESS.ADD_WALLET', 'PROGRESS.SELECT_LOCATION', 'PROGRESS.CREATE_WALLET']"></app-progress-container>

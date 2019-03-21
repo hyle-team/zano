@@ -58,7 +58,6 @@ export class SettingsComponent implements OnInit {
   }
 
   setScale(scale) {
-    //this.renderer.removeClass(document.body, 'theme-' + this.theme);
     this.scale = scale;
     this.variablesService.settings.scale = this.scale;
     this.renderer.setStyle(document.documentElement, 'font-size', this.scale + 'px');

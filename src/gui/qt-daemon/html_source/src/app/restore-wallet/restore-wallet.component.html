@@ -55,7 +55,7 @@
     </div>
 
     <div class="wrap-buttons">
-      <button type="button" class="transparent-button" *ngIf="walletSaved">{{restoreForm.controls['name'].value}}</button>
+      <button type="button" class="transparent-button" *ngIf="walletSaved" disabled><i class="icon"></i>{{walletSavedName}}</button>
       <button type="button" class="blue-button select-button" (click)="saveWallet()" [disabled]="!restoreForm.valid" *ngIf="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_SELECT' | translate }}</button>
       <button type="button" class="blue-button create-button" (click)="createWallet()" [disabled]="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_CREATE' | translate }}</button>
     </div>
@@ -63,3 +63,5 @@
   </form>
 
 </div>
+
+<app-progress-container [width]="progressWidth" [labels]="['PROGRESS.ADD_WALLET', 'PROGRESS.SELECT_LOCATION', 'PROGRESS.RESTORE_WALLET']"></app-progress-container>

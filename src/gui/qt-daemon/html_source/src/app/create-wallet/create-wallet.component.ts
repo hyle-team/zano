@@ -35,6 +35,7 @@ export class CreateWalletComponent implements OnInit {
 
   walletSaved = false;
   walletSavedName = '';
+  progressWidth = '9rem';
 
   constructor(
     private router: Router,
@@ -51,6 +52,7 @@ export class CreateWalletComponent implements OnInit {
 
   createWallet() {
     this.ngZone.run(() => {
+      this.progressWidth = '100%';
       this.router.navigate(['/seed-phrase'], {queryParams: {wallet_id: this.wallet.id}});
     });
   }
@@ -77,6 +79,7 @@ export class CreateWalletComponent implements OnInit {
               );
               this.ngZone.run(() => {
                 this.walletSaved = true;
+                this.progressWidth = '50%';
               });
             } else {
               if (errorCode && errorCode === 'ALREADY_EXISTS') {

@@ -52,6 +52,7 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
 
 
 import { ChartModule, HIGHCHARTS_MODULES, Highcharts} from 'angular-highcharts';
+import { ProgressContainerComponent } from './_helpers/directives/progress-container/progress-container.component';
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
@@ -95,7 +96,8 @@ Highcharts.setOptions({
     TooltipDirective,
     InputValidateDirective,
     ModalContainerComponent,
-    TransactionDetailsComponent
+    TransactionDetailsComponent,
+    ProgressContainerComponent
   ],
   imports: [
     BrowserModule,

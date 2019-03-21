@@ -698,3 +698,27 @@ app-transaction-details {
     }
   }
 }
+
+app-progress-container {
+
+  .progress-bar-container {
+
+    @include themify($themes) {
+      color: themed(mainTextColor);
+    }
+
+    .progress-bar {
+
+      @include themify($themes) {
+        background-color: themed(progressBarBackgroundColor);
+      }
+
+      .progress-bar-full {
+
+        @include themify($themes) {
+          background-color: themed(progressBarFullBackgroundColor);
+        }
+      }
+    }
+  }
+}

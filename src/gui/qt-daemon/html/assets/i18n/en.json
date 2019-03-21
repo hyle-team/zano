@@ -104,6 +104,12 @@
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
     "BUTTON_CREATE_ACCOUNT" : "Create wallet"
   },
+  "PROGRESS": {
+    "ADD_WALLET": "Add wallet",
+    "SELECT_LOCATION": "Select wallet location",
+    "CREATE_WALLET": "Create new wallet",
+    "RESTORE_WALLET": "Restore from backup"
+  },
   "SETTINGS": {
     "TITLE": "Settings",
     "DARK_THEME": "Dark theme",
