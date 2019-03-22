@@ -37,6 +37,35 @@
   }
 }
 
+.scale-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 4rem;
+  width: 50%;
+  height: 0.5rem;
+
+  .button-block {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 0 auto;
+    margin: 0 0.2rem;
+    padding: 0;
+    height: 0.5rem;
+
+    .label {
+      position: absolute;
+      bottom: -1rem;
+      left: 50%;
+      transform: translate(-50%, 100%);
+      font-size: 1rem;
+      white-space: nowrap;
+    }
+  }
+}
+
 .master-password {
   width: 50%;
 

@@ -75,6 +75,37 @@ app-settings {
         color: themed(optionalTextColor);
       }
     }
+
+    .scale-selection {
+
+      .button-block {
+
+        @include themify($themes) {
+          background-color: themed(tabInactiveBackgroundColor);
+        }
+
+        .label {
+
+          @include themify($themes) {
+            color: themed(optionalTextColor);
+          }
+        }
+
+        &.active {
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+
+          .label {
+
+            @include themify($themes) {
+              color: themed(blueTextColor);
+            }
+          }
+        }
+      }
+    }
   }
 }
 

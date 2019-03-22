@@ -32,6 +32,24 @@ export class SettingsComponent implements OnInit {
       name: 'SETTINGS.APP_LOCK.TIME4'
     }
   ];
+  appScaleOptions = [
+    {
+      id: 7.5,
+      name: '75% scale'
+    },
+    {
+      id: 10,
+      name: '100% scale'
+    },
+    {
+      id: 12.5,
+      name: '125% scale'
+    },
+    {
+      id: 15,
+      name: '150% scale'
+    }
+  ];
 
   constructor(private renderer: Renderer2, public variablesService: VariablesService, private backend: BackendService, private location: Location) {
     this.theme = this.variablesService.settings.theme;

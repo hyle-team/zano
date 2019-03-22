@@ -1,6 +1,6 @@
 <div class="content">
 
-  <div class="head">
+  <div class="head" *ngIf="variablesService.wallets.length > 0">
     <button type="button" class="back-btn" (click)="back()">
       <i class="icon back"></i>
       <span>{{ 'COMMON.BACK' | translate }}</span>
