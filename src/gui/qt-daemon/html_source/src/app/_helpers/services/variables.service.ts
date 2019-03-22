@@ -60,6 +60,7 @@ export class VariablesService {
 
   public allContextMenu: ContextMenuComponent;
   public onlyCopyContextMenu: ContextMenuComponent;
+  public pasteSelectContextMenu: ContextMenuComponent;
 
   constructor(private router: Router, private ngZone: NgZone, private contextMenuService: ContextMenuService) {
   }
@@ -130,6 +131,25 @@ export class VariablesService {
     });
     $event.preventDefault();
     $event.stopPropagation();
+  }
+
+  public onContextMenuPasteSelect($event: MouseEvent): void {
+    $event.target['contextSelectionStart'] = $event.target['selectionStart'];
+    $event.target['contextSelectionEnd'] = $event.target['selectionEnd'];
+
+    console.warn($event.target);
+    console.warn($event.target['disabled']);
+
+
+    if ($event.target && ($event.target['nodeName'].toUpperCase() === 'TEXTAREA' || $event.target['nodeName'].toUpperCase() === 'INPUT') && !$event.target['readOnly']) {
+      this.contextMenuService.show.next({
+        contextMenu: this.pasteSelectContextMenu,
+        event: $event,
+        item: $event.target,
+      });
+      $event.preventDefault();
+      $event.stopPropagation();
+    }
   }
 
 }

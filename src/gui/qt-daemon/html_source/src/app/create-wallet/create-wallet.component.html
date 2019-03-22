@@ -15,7 +15,7 @@
 
     <div class="input-block">
       <label for="wallet-name">{{ 'CREATE_WALLET.NAME' | translate }}</label>
-      <input type="text" id="wallet-name" formControlName="name" [attr.disabled]="walletSaved ? '' : null">
+      <input type="text" id="wallet-name" formControlName="name" [attr.readonly]="walletSaved ? '' : null" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="createForm.controls['name'].invalid && (createForm.controls['name'].dirty || createForm.controls['name'].touched)">
         <div *ngIf="createForm.controls['name'].errors['required']">
           {{ 'CREATE_WALLET.FORM_ERRORS.NAME_REQUIRED' | translate }}
@@ -28,12 +28,12 @@
 
     <div class="input-block">
       <label for="wallet-password">{{ 'CREATE_WALLET.PASS' | translate }}</label>
-      <input type="password" id="wallet-password" formControlName="password" [attr.disabled]="walletSaved ? '' : null">
+      <input type="password" id="wallet-password" formControlName="password" [attr.readonly]="walletSaved ? '' : null" (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
     </div>
 
     <div class="input-block">
       <label for="confirm-wallet-password">{{ 'CREATE_WALLET.CONFIRM' | translate }}</label>
-      <input type="password" id="confirm-wallet-password" formControlName="confirm" [attr.disabled]="walletSaved ? '' : null">
+      <input type="password" id="confirm-wallet-password" formControlName="confirm" [attr.readonly]="walletSaved ? '' : null" (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
       <div class="error-block" *ngIf="createForm.controls['password'].dirty && createForm.controls['confirm'].dirty && createForm.errors">
         <div *ngIf="createForm.errors['confirm_mismatch']">
           {{ 'CREATE_WALLET.FORM_ERRORS.CONFIRM_NOT_MATCH' | translate }}

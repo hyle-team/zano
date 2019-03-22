@@ -349,6 +349,7 @@
     "AMOUNT": "Amount",
     "YOUR_DEPOSIT": "Your deposit",
     "SELLER_DEPOSIT": "Seller deposit",
+    "BUYER_DEPOSIT": "Buyer deposit",
     "SAME_AMOUNT": "Same amount",
     "COMMENT": "Comment",
     "DETAILS": "Additional details",
@@ -360,6 +361,7 @@
       "SELLER_NOT_VALID": "Seller not valid.",
       "AMOUNT_REQUIRED": "Amount is required.",
       "YOUR_DEPOSIT_REQUIRED": "Your deposit is required.",
+      "YOUR_DEPOSIT_TOO_SMALL": "Your deposit should be equal or greater than amount.",
       "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required.",
       "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract.",
       "COMMENT_MAXIMUM": "Maximum field length reached."
@@ -406,7 +408,12 @@
     "BUTTON_RECEIVED": "Item received (Transfer payment and return pledge to seller)",
     "BUTTON_CANCEL_BUYER": "Cancel contract (Return pledge)",
     "BUTTON_NOT_CANCEL": "Do not cancel (Item shipped)",
-    "BUTTON_CANCEL_SELLER": "Cancel contract (Return pledge)"
+    "BUTTON_CANCEL_SELLER": "Cancel contract (Return pledge)",
+    "HOURS": "hours",
+    "CANCEL": "Cancel",
+    "NULLIFY_QUESTION": "Are you sure you want to nullify your pledge and the seller's pledge?",
+    "BUTTON_NULLIFY_SHORT": "Nullify",
+    "WAITING_TIME_QUESTION": "Are you sure you want to cancel the contract?"
   },
   "MESSAGES": {
     "ADDRESS": "Address",

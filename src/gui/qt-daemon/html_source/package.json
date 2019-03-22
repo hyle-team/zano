@@ -40,7 +40,7 @@
   "devDependencies": {
     "@angular-devkit/build-angular": "^0.12.2",
     "@angular/cli": "~7.0.2",
-    "@angular/compiler-cli": "~7.0.0",
+    "@angular/compiler-cli": "^7.2.10",
     "@angular/language-service": "~7.0.0",
     "@types/highcharts": "^5.0.34",
     "@types/jasmine": "~2.8.8",

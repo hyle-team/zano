@@ -110,6 +110,49 @@
       margin: 0 0.5rem;
     }
   }
+
+  .nullify-block-row {
+    display: flex;
+    justify-content: center;
+
+    .input-block {
+      align-items: center;
+
+      .nullify-block {
+        margin: 1rem 0;
+
+        .blue-button {
+          margin: 0 0.5rem;
+        }
+      }
+    }
+  }
+
+  .time-cancel-block-row {
+    display: flex;
+    justify-content: center;
+
+    .input-block {
+      align-items: center;
+      margin-bottom: 0;
+
+      select {
+        width: auto;
+      }
+
+      .time-cancel-block {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        margin: 1rem 0;
+
+        .blue-button {
+          margin: 0 0.5rem;
+        }
+      }
+    }
+  }
+
 }
 
 .progress-bar-container {

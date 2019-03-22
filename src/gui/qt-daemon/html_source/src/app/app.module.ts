@@ -53,6 +53,7 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
 
 import { ChartModule, HIGHCHARTS_MODULES, Highcharts} from 'angular-highcharts';
 import { ProgressContainerComponent } from './_helpers/directives/progress-container/progress-container.component';
+import { InputDisableSelectionDirective } from './_helpers/directives/input-disable-selection/input-disable-selection.directive';
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
@@ -97,7 +98,8 @@ Highcharts.setOptions({
     InputValidateDirective,
     ModalContainerComponent,
     TransactionDetailsComponent,
-    ProgressContainerComponent
+    ProgressContainerComponent,
+    InputDisableSelectionDirective
   ],
   imports: [
     BrowserModule,
