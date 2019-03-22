@@ -24,15 +24,40 @@
     </div>
   </div>
 
+  <div class="scale-selection">
+    <button type="button" class="button-block" [class.active]="item.id === variablesService.settings.scale" *ngFor="let item of appScaleOptions" (click)="setScale(item.id)">
+      <span class="label">{{item.name}}</span>
+    </button>
+  </div>
+
+  <div class="lock-selection">
+    <label class="lock-selection-title">{{ 'SETTINGS.APP_LOCK.TITLE' | translate }}</label>
+    <ng-select class="lock-selection-select"
+               [items]="appLockOptions"
+               bindValue="id"
+               bindLabel="name"
+               [(ngModel)]="variablesService.settings.appLockTime"
+               [clearable]="false"
+               [searchable]="false"
+               (change)="onLockChange()">
+      <ng-template ng-label-tmp let-item="item">
+        {{item.name | translate}}
+      </ng-template>
+      <ng-template ng-option-tmp let-item="item" let-index="index">
+        {{item.name | translate}}
+      </ng-template>
+    </ng-select>
+  </div>
+
   <form class="master-password" [formGroup]="changeForm" (ngSubmit)="onSubmitChangePass()">
 
     <span class="master-password-title">{{ 'SETTINGS.MASTER_PASSWORD.TITLE' | translate }}</span>
 
     <div class="input-block">
       <label for="old-password">{{ 'SETTINGS.MASTER_PASSWORD.OLD' | translate }}</label>
-      <input type="password" id="old-password" formControlName="password"/>
+      <input type="password" id="old-password" formControlName="password" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
       <div class="error-block" *ngIf="changeForm.controls['password'].invalid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched)">
-        <div *ngIf="changeForm.controls['password'].errors.required">
+        <div *ngIf="changeForm.controls['password'].errors['required']">
           {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}
         </div>
       </div>
@@ -43,9 +68,9 @@
 
     <div class="input-block">
       <label for="new-password">{{ 'SETTINGS.MASTER_PASSWORD.NEW' | translate }}</label>
-      <input type="password" id="new-password" formControlName="new_password"/>
+      <input type="password" id="new-password" formControlName="new_password" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
       <div class="error-block" *ngIf="changeForm.controls['new_password'].invalid && (changeForm.controls['new_password'].dirty || changeForm.controls['new_password'].touched)">
-        <div *ngIf="changeForm.controls['new_password'].errors.required">
+        <div *ngIf="changeForm.controls['new_password'].errors['required']">
           {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}
         </div>
       </div>
@@ -53,9 +78,9 @@
 
     <div class="input-block">
       <label for="confirm-password">{{ 'SETTINGS.MASTER_PASSWORD.CONFIRM' | translate }}</label>
-      <input type="password" id="confirm-password" formControlName="new_confirmation"/>
+      <input type="password" id="confirm-password" formControlName="new_confirmation" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
       <div class="error-block" *ngIf="changeForm.controls['new_confirmation'].invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched)">
-        <div *ngIf="changeForm.controls['new_confirmation'].errors.required">
+        <div *ngIf="changeForm.controls['new_confirmation'].errors['required']">
           {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}
         </div>
       </div>

@@ -38,14 +38,18 @@
   </div>
 </div>
 <div class="sidebar-settings">
-  <button [routerLink]="['/settings']" routerLinkActive="active">
-    <i class="icon settings"></i>
-    <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>
-  </button>
-  <button (click)="logOut()">
-    <i class="icon logout"></i>
-    <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
-  </button>
+  <div class="wrap-button" routerLinkActive="active">
+    <button [routerLink]="['/settings']">
+      <i class="icon settings"></i>
+      <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>
+    </button>
+  </div>
+  <div class="wrap-button">
+    <button (click)="logOut()">
+      <i class="icon logout"></i>
+      <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
+    </button>
+  </div>
 </div>
 <div class="sidebar-synchronization-status">
   <div class="status-container">

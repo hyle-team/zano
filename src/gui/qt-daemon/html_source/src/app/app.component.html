@@ -14,3 +14,8 @@
 <context-menu #onlyCopyContextMenu>
   <ng-template contextMenuItem (execute)="contextMenuOnlyCopy($event.item)">{{ 'CONTEXT_MENU.COPY' | translate }}</ng-template>
 </context-menu>
+
+<context-menu #pasteSelectContextMenu>
+  <ng-template contextMenuItem (execute)="contextMenuPaste($event.item)">{{ 'CONTEXT_MENU.PASTE' | translate }}</ng-template>
+  <ng-template contextMenuItem (execute)="contextMenuSelect($event.item)">{{ 'CONTEXT_MENU.SELECT' | translate }}</ng-template>
+</context-menu>

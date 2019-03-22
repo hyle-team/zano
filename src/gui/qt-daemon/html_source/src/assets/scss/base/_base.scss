@@ -24,6 +24,12 @@ button {
 
   &.blue-button:not(:disabled) {
 
+    &.error-text {
+      @include themify($themes) {
+        color: themed(redTextColor);
+      }
+    }
+
     @include themify($themes) {
       background-color: themed(blueButtonBackgroundColor);
       color: themed(alternativeTextColor);
@@ -162,6 +168,12 @@ button {
     @include themify($themes) {
       color: themed(redTextColor);
     }
+  }
+}
+
+.error-text {
+  @include themify($themes) {
+    color: themed(redTextColor);
   }
 }
 
@@ -546,6 +558,69 @@ input[type='checkbox'].style-checkbox {
   }
 }
 
+.ng-select {
+
+  &.lock-selection-select {
+    width: 100%;
+
+    .ng-select-container {
+      border: none;
+      border-radius: 0;
+      cursor: pointer;
+      font-size: 1.4rem;
+      outline: none;
+      padding: 0 1rem;
+      height: 4.2rem;
+
+      @include themify($themes) {
+        background-color: themed(inputBackgroundColor);
+        color: themed(mainTextColor);
+      }
+
+      .ng-value-container {
+        padding: 0;
+      }
+    }
+
+    .ng-dropdown-panel {
+      border: none;
+
+      @include themify($themes) {
+        background-color: themed(inputBackgroundColor);
+      }
+
+      .ng-dropdown-panel-items {
+
+        .ng-option {
+          font-size: 1.4rem;
+          padding: 1rem;
+
+          @include themify($themes) {
+            background-color: themed(inputBackgroundColor);
+            color: themed(mainTextColor);
+          }
+
+          &.ng-option-marked {
+
+            @include themify($themes) {
+              background-color: themed(selectHoverColor);
+              color: themed(mainTextColor);
+            }
+          }
+
+          &.ng-option-selected {
+
+            @include themify($themes) {
+              background-color: themed(selectSelectedColor);
+              color: themed(mainTextColor);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 app-modal-container {
 
   .modal {
@@ -630,6 +705,30 @@ app-transaction-details {
           @include themify($themes) {
             color: themed(blueTextColor);
           }
+        }
+      }
+    }
+  }
+}
+
+app-progress-container {
+
+  .progress-bar-container {
+
+    @include themify($themes) {
+      color: themed(mainTextColor);
+    }
+
+    .progress-bar {
+
+      @include themify($themes) {
+        background-color: themed(progressBarBackgroundColor);
+      }
+
+      .progress-bar-full {
+
+        @include themify($themes) {
+          background-color: themed(progressBarFullBackgroundColor);
         }
       }
     }

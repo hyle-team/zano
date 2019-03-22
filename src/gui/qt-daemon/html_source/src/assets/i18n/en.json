@@ -15,7 +15,7 @@
     "BACK": "Go back"
   },
   "BREADCRUMBS": {
-    "ADD_WALLET": "Add new wallet",
+    "ADD_WALLET": "Add wallet",
     "CREATE_WALLET": "Create new wallet",
     "SAVE_PHRASE": "Save your seed phrase",
     "OPEN_WALLET": "Open existing wallet",
@@ -30,7 +30,7 @@
   },
   "SIDEBAR": {
     "TITLE": "Wallets",
-    "ADD_NEW": "+ Add new",
+    "ADD_NEW": "+ Add",
     "ACCOUNT": {
       "STAKING": "Staking",
       "MESSAGES": "New offers/Messages",
@@ -104,11 +104,24 @@
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
     "BUTTON_CREATE_ACCOUNT" : "Create wallet"
   },
+  "PROGRESS": {
+    "ADD_WALLET": "Add wallet",
+    "SELECT_LOCATION": "Select wallet location",
+    "CREATE_WALLET": "Create new wallet",
+    "RESTORE_WALLET": "Restore from backup"
+  },
   "SETTINGS": {
     "TITLE": "Settings",
     "DARK_THEME": "Dark theme",
     "WHITE_THEME": "White theme",
     "GRAY_THEME": "Grey theme",
+    "APP_LOCK": {
+      "TITLE": "Lock app after:",
+      "TIME1": "5 min",
+      "TIME2": "15 min",
+      "TIME3": "1 hour",
+      "TIME4": "Never"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
       "OLD": "Old password",
@@ -145,7 +158,7 @@
     "LABEL_SEED_PHRASE": "Seed phrase",
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
     "BUTTON_SAVE": "Save",
-    "BUTTON_REMOVE": "Remove wallet",
+    "BUTTON_REMOVE": "Close wallet",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
       "NAME_DUPLICATE": "Name is duplicate."
@@ -234,7 +247,7 @@
   },
   "HISTORY": {
     "STATUS": "Status",
-    "STATUS_TOOLTIP": "Approved {{current}}/{{total}}",
+    "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
     "SEND": "Send",
     "RECEIVED": "Received",
     "DATE": "Date",
@@ -336,6 +349,7 @@
     "AMOUNT": "Amount",
     "YOUR_DEPOSIT": "Your deposit",
     "SELLER_DEPOSIT": "Seller deposit",
+    "BUYER_DEPOSIT": "Buyer deposit",
     "SAME_AMOUNT": "Same amount",
     "COMMENT": "Comment",
     "DETAILS": "Additional details",
@@ -347,6 +361,7 @@
       "SELLER_NOT_VALID": "Seller not valid.",
       "AMOUNT_REQUIRED": "Amount is required.",
       "YOUR_DEPOSIT_REQUIRED": "Your deposit is required.",
+      "YOUR_DEPOSIT_TOO_SMALL": "Your deposit should be equal or greater than amount.",
       "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required.",
       "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract.",
       "COMMENT_MAXIMUM": "Maximum field length reached."
@@ -393,7 +408,12 @@
     "BUTTON_RECEIVED": "Item received (Transfer payment and return pledge to seller)",
     "BUTTON_CANCEL_BUYER": "Cancel contract (Return pledge)",
     "BUTTON_NOT_CANCEL": "Do not cancel (Item shipped)",
-    "BUTTON_CANCEL_SELLER": "Cancel contract (Return pledge)"
+    "BUTTON_CANCEL_SELLER": "Cancel contract (Return pledge)",
+    "HOURS": "hours",
+    "CANCEL": "Cancel",
+    "NULLIFY_QUESTION": "Are you sure you want to nullify your pledge and the seller's pledge?",
+    "BUTTON_NULLIFY_SHORT": "Nullify",
+    "WAITING_TIME_QUESTION": "Are you sure you want to cancel the contract?"
   },
   "MESSAGES": {
     "ADDRESS": "Address",
@@ -427,7 +447,7 @@
     "CORE_BUSY": "Internal error (core is busy)",
     "DAEMON_BUSY": "Internal error: deamon is busy",
     "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
-    "NOT_ENOUGH_OUTPUTS_TO_MIX": "For the sake of security, mixed transaction will take several days",
+    "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",
     "TRANSACTION_IS_TO_BIG": "Transaction exceeds network limit, send required amount with multiple transactions",
     "TRANSFER_ATTEMPT": "There is no connection to Zano network",
     "ACCESS_DENIED": "Access denied",
