@@ -38,7 +38,7 @@ int main(int argc, char** argv)
   //generate_scratchpad();
   //generate_light_scratchpad(); 
   //measure_keccak_over_scratchpad();
-  test_scratchpad_against_light_scratchpad();
+  //test_scratchpad_against_light_scratchpad();
   /*
   TEST_PERFORMANCE2(test_construct_tx, 1, 1);
   TEST_PERFORMANCE2(test_construct_tx, 1, 2);

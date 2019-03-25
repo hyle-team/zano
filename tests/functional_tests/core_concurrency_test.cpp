@@ -101,17 +101,14 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
 
     const currency::account_public_address& miner_addr = wallets[random_in_range(0, wallets.size() - 1)]->get_account().get_public_address();
     currency::block b = AUTO_VAL_INIT(b);
-    currency::scratchpad_keeper sk;
-    crypto::hash seed = currency::null_hash;
 
-    sk.generate(seed, height);
     if (is_in_main_chain)
     {
       blobdata ex_nonce;
       wide_difficulty_type diff = 0;
       if (prev_block.height != 0)
         test_core_time::adjust(prev_block.bl.timestamp + DIFFICULTY_POW_TARGET);
-      r = bcs.create_block_template(b, seed, miner_addr, diff, height, ex_nonce);
+      r = bcs.create_block_template(b, miner_addr, diff, height, ex_nonce);
       CHECK_AND_ASSERT_MES(r, false, "create_block_template failed");
     }
     else
@@ -145,7 +142,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
     test_core_time::adjust(b.timestamp);
 
     currency::wide_difficulty_type diff = 0;
-    r = currency::miner::find_nonce_for_given_block(b, diff, height, seed, sk);
+    r = currency::miner::find_nonce_for_given_block(b, diff, height);
     CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
     currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);

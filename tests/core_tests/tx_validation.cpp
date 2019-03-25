@@ -1309,7 +1309,7 @@ bool tx_expiration_time_and_block_template::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect tx count in the pool: " << c.get_pool_transactions_count());
 
   account_public_address addr = AUTO_VAL_INIT(addr);
-  bool r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, addr, c);
+  bool r = mine_next_pow_block_in_playtime(addr, c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   // tx MAY stay in the pool, check it as forced condition (may change in future)

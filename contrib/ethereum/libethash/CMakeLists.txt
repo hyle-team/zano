@@ -1,39 +1,33 @@
-set(LIBRARY ethash)
+# ethash: C/C++ implementation of Ethash, the Ethereum Proof of Work algorithm.
+# Copyright 2018 Pawel Bylica.
+# Licensed under the Apache License, Version 2.0. See the LICENSE file.
 
-if (CPPETHEREUM)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-endif ()
+# set(include_dir ${PROJECT_SOURCE_DIR}/include)
 
 
-if (NOT MSVC)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
-endif()
+add_library(
+    ethash
+    bit_manipulation.h
+    builtins.h
+    endianness.hpp
+    ethash/ethash.h
+    ethash/ethash.hpp
+    ethash-internal.hpp
+    ethash.cpp
+    ethash/hash_types.h
+    managed.cpp
+    ethash/keccak.h
+    ethash/keccak.hpp
+    keccak.c
+    keccakf800.c
+    keccakf1600.c
+    kiss99.hpp
+    primes.h
+    primes.c
+    ethash/progpow.hpp
+    progpow.cpp
+)
 
-set(FILES 	util.h
-          	io.c
-          	internal.c
-          	ethash.h
-          	endian.h
-          	compiler.h
-          	fnv.h
-          	data_sizes.h)
 
-if (MSVC)
-	list(APPEND FILES util_win32.c io_win32.c mmap_win32.c)
-else()
-	list(APPEND FILES io_posix.c)
-endif()
 
-# if (NOT CRYPTOPP_FOUND)
-# 	find_package(CryptoPP 5.6.2)
-# endif()
 
-list(APPEND FILES sha3.c sha3.h)
-
-add_library(ethash ${FILES})
-
-# if (CRYPTOPP_FOUND)
-#	TARGET_LINK_LIBRARIES(ethash ${CRYPTOPP_LIBRARIES})
-# endif()
-
-# install(TARGETS ethash RUNTIME DESTINATION bin ARCHIVE DESTINATION lib LIBRARY DESTINATION lib)

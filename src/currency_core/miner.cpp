@@ -20,6 +20,7 @@
 #include "string_coding.h"
 #include "version.h"
 #include "storages/portable_storage_template_helper.h"
+#include "basic_pow_helpers.h"
 
 using namespace epee;
 
@@ -64,16 +65,14 @@ namespace currency
     stop();
   }
   //-----------------------------------------------------------------------------------------------------
-  bool miner::set_block_template(const block& bl, const wide_difficulty_type& di, uint64_t height, const crypto::hash& seed)
+  bool miner::set_block_template(const block& bl, const wide_difficulty_type& di, uint64_t height)
   {
     CRITICAL_REGION_LOCAL(m_template_lock);
     m_template = bl;
     m_diffic = di;
     m_height = height;
-    m_seed = seed;
     ++m_template_no;
     m_starter_nonce = crypto::rand<uint32_t>();
-    m_scratchpad.generate(m_seed, height);
     return true;
   }
   //-----------------------------------------------------------------------------------------------------
@@ -96,13 +95,12 @@ namespace currency
     {
       extra_nonce += std::string("|") + m_extra_messages[m_config.current_extra_message_index];
     }
-    crypto::hash seed = null_hash;
-    if(!m_phandler->get_block_template(bl, seed, m_mine_address, m_mine_address, di, height, extra_nonce))
+    if(!m_phandler->get_block_template(bl, m_mine_address, m_mine_address, di, height, extra_nonce))
     {
       LOG_ERROR("Failed to get_block_template()");
       return false;
     }
-    set_block_template(bl, di, height, seed);
+    set_block_template(bl, di, height);
     return true;
   }
   //-----------------------------------------------------------------------------------------------------
@@ -309,8 +307,8 @@ namespace currency
     wide_difficulty_type local_diff = 0;
     uint32_t local_template_ver = 0;
     blobdata local_blob_data;
-    crypto::hash local_seed = null_hash;
     uint64_t local_height = 0;
+    crypto::hash local_blob_data_hash = null_hash;
 
     //uint64_t local_template_height = 0;
     block b;
@@ -327,14 +325,15 @@ namespace currency
       {        
         CRITICAL_REGION_BEGIN(m_template_lock);
         b = m_template;
+        b.nonce = 0;
         local_diff = m_diffic;
-        local_seed = m_seed;
         local_height = m_height;
         CRITICAL_REGION_END();
         //local_template_height = get_block_height(b);
         local_template_ver = m_template_no;
         nonce = m_starter_nonce + th_local_index;
         local_blob_data = get_block_hashing_blob(b);
+        local_blob_data_hash = crypto::cn_fast_hash(local_blob_data.data(), local_blob_data.size());
       }
 
       if(!local_template_ver)//no any set_block_template call
@@ -343,9 +342,9 @@ namespace currency
         epee::misc_utils::sleep_no_w(1000);
         continue;
       }
-      b.nonce = nonce;
-      access_nonce_in_block_blob(local_blob_data) = b.nonce;
-      crypto::hash h = m_scratchpad.get_pow_hash_from_blob(local_blob_data, local_height, local_seed);
+      //b.nonce = nonce;
+      //access_nonce_in_block_blob(local_blob_data) = b.nonce;
+      crypto::hash h = get_block_longhash(local_height, local_blob_data_hash, nonce);
 
       if(check_hash(h, local_diff))
       {
