@@ -12,7 +12,7 @@
         <div style="display: flex; align-items: center;">
           <span>{{wallet.alias['name']}}</span>
           <ng-container *ngIf="wallet.alias['comment'] && wallet.alias['comment'].length">
-            <i class="icon comment" tooltip="{{wallet.alias['comment']}}" placement="top" tooltipClass="table-tooltip" [delay]="500"></i>
+            <i class="icon comment" tooltip="{{wallet.alias['comment']}}" placement="top" tooltipClass="table-tooltip comment-tooltip" [delay]="500"></i>
           </ng-container>
         </div>
         <span>$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>

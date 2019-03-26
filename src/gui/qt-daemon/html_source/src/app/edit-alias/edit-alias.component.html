@@ -24,16 +24,26 @@
       <label for="alias-comment">
         {{ 'EDIT_ALIAS.COMMENT.LABEL' | translate }}
       </label>
-      <textarea id="alias-comment" [(ngModel)]="alias.comment" [ngModelOptions]="{standalone: true}" placeholder="{{ 'EDIT_ALIAS.COMMENT.PLACEHOLDER' | translate }}" (contextmenu)="variablesService.onContextMenu($event)"></textarea>
+      <textarea id="alias-comment"
+                class="scrolled-content"
+                [(ngModel)]="alias.comment"
+                [ngModelOptions]="{standalone: true}"
+                [maxlength]="variablesService.maxCommentLength"
+                (contextmenu)="variablesService.onContextMenu($event)"
+                placeholder="{{ 'EDIT_ALIAS.COMMENT.PLACEHOLDER' | translate }}">
+      </textarea>
       <div class="error-block" *ngIf="alias.comment.length > 0 && notEnoughMoney">
         {{ 'EDIT_ALIAS.FORM_ERRORS.NO_MONEY' | translate }}
+      </div>
+      <div class="error-block" *ngIf="alias.comment.length >= variablesService.maxCommentLength">
+        {{ 'EDIT_ALIAS.FORM_ERRORS.MAX_LENGTH' | translate }}
       </div>
     </div>
 
     <div class="alias-cost">{{ "EDIT_ALIAS.COST" | translate : {value: variablesService.default_fee, currency: variablesService.defaultCurrency} }}</div>
 
     <div class="wrap-buttons">
-      <button type="button" class="blue-button" (click)="updateAlias()" [disabled]="notEnoughMoney || oldAliasComment === alias.comment">{{ 'EDIT_ALIAS.BUTTON_EDIT' | translate }}</button>
+      <button type="button" class="blue-button" (click)="updateAlias()" [disabled]="notEnoughMoney || (oldAliasComment === alias.comment) || alias.comment.length > variablesService.maxCommentLength">{{ 'EDIT_ALIAS.BUTTON_EDIT' | translate }}</button>
       <button type="button" class="blue-button" (click)="back()">{{ 'EDIT_ALIAS.BUTTON_CANCEL' | translate }}</button>
     </div>
 
