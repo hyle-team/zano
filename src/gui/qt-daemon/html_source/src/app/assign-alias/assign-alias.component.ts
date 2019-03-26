@@ -21,7 +21,13 @@ export class AssignAliasComponent implements OnInit, OnDestroy {
   wallet: Wallet;
   assignForm = new FormGroup({
     name: new FormControl('', [Validators.required, Validators.pattern(/^@?[a-z0-9\.\-]{6,25}$/)]),
-    comment: new FormControl('')
+    comment: new FormControl('', [(g: FormControl) => {
+      if (g.value > this.variablesService.maxCommentLength) {
+        return {'maxLength': true};
+      } else {
+        return null;
+      }
+    }])
   });
   assignFormSubscription: Subscription;
   alias = {

@@ -41,7 +41,7 @@ export class EditAliasComponent implements OnInit {
   }
 
   updateAlias() {
-    if (this.requestProcessing || this.notEnoughMoney || this.oldAliasComment === this.alias.comment) {
+    if (this.requestProcessing || this.notEnoughMoney || this.oldAliasComment === this.alias.comment || this.alias.comment.length > this.variablesService.maxCommentLength) {
       return;
     }
     this.requestProcessing = true;

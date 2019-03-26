@@ -183,7 +183,8 @@
       "NAME_WRONG": "Alias has wrong name",
       "NAME_LENGTH": "The alias must be 6-25 characters long",
       "NAME_EXISTS": "Alias name already exists",
-      "NO_MONEY": "You do not have enough funds to assign this alias"
+      "NO_MONEY": "You do not have enough funds to assign this alias",
+      "MAX_LENGTH": "Maximum comment length reached"
     },
     "ONE_ALIAS": "You can create only one alias per wallet",
     "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
@@ -198,7 +199,8 @@
       "PLACEHOLDER": "Enter comment"
     },
     "FORM_ERRORS": {
-      "NO_MONEY": "You do not have enough funds to change the comment to this alias"
+      "NO_MONEY": "You do not have enough funds to change the comment to this alias",
+      "MAX_LENGTH": "Maximum comment length reached"
     },
     "COST": "Cost to edit alias {{value}} {{currency}}",
     "BUTTON_EDIT": "Edit",
@@ -215,7 +217,7 @@
     },
     "ADDRESS": {
       "LABEL": "The account to which the alias will be transferred",
-      "PLACEHOLDER": "Enter account number"
+      "PLACEHOLDER": "Enter wallet address"
     },
     "FORM_ERRORS": {
       "WRONG_ADDRESS": "No wallet with this account exists",

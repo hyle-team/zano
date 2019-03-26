@@ -149,7 +149,7 @@ button {
       height: 100%;
       min-height: 7.5rem;
       max-height: 7.5rem;
-      overflow: hidden;
+      overflow: auto;
       resize: none;
 
       @include themify($themes) {
@@ -518,6 +518,10 @@ input[type='checkbox'].style-checkbox {
       color: themed(blueTextColor);
     }
   }
+}
+
+.comment-tooltip {
+  max-width: 18rem;
 }
 
 .ngx-contextmenu {
