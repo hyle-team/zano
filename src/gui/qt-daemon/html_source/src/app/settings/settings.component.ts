@@ -1,4 +1,4 @@
-import {Component, OnInit, Renderer2} from '@angular/core';
+import {Component, NgZone, OnInit, Renderer2} from '@angular/core';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
 import {FormControl, FormGroup, Validators} from '@angular/forms';
@@ -51,7 +51,15 @@ export class SettingsComponent implements OnInit {
     }
   ];
 
-  constructor(private renderer: Renderer2, public variablesService: VariablesService, private backend: BackendService, private location: Location) {
+  currentBuild = '';
+
+  constructor(
+    private renderer: Renderer2,
+    public variablesService: VariablesService,
+    private backend: BackendService,
+    private location: Location,
+    private ngZone: NgZone
+  ) {
     this.theme = this.variablesService.settings.theme;
     this.scale = this.variablesService.settings.scale;
     this.changeForm = new FormGroup({
@@ -65,7 +73,13 @@ export class SettingsComponent implements OnInit {
     }]);
   }
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.backend.getVersion((version) => {
+      this.ngZone.run(() => {
+        this.currentBuild = version;
+      });
+    });
+  }
 
   setTheme(theme) {
     this.renderer.removeClass(document.body, 'theme-' + this.theme);
