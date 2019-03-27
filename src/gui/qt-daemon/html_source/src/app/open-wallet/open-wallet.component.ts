@@ -85,31 +85,31 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
                 });
               });
             } else {
+              const new_wallet = new Wallet(
+                open_data.wallet_id,
+                this.openForm.get('name').value,
+                this.openForm.get('password').value,
+                open_data['wi'].path,
+                open_data['wi'].address,
+                open_data['wi'].balance,
+                open_data['wi'].unlocked_balance,
+                open_data['wi'].mined_total,
+                open_data['wi'].tracking_hey
+              );
+              new_wallet.alias = this.backend.getWalletAlias(new_wallet.address);
+              if (open_data.recent_history && open_data.recent_history.history) {
+                new_wallet.prepareHistory(open_data.recent_history.history);
+              }
+              this.backend.getContracts(open_data.wallet_id, (contracts_status, contracts_data) => {
+                if (contracts_status && contracts_data.hasOwnProperty('contracts')) {
+                  this.ngZone.run(() => {
+                    new_wallet.prepareContractsAfterOpen(contracts_data.contracts, this.variablesService.exp_med_ts, this.variablesService.height_app, this.variablesService.settings.viewedContracts, this.variablesService.settings.notViewedContracts);
+                  });
+                }
+              });
+              this.variablesService.wallets.push(new_wallet);
               this.backend.runWallet(open_data.wallet_id, (run_status, run_data) => {
                 if (run_status) {
-                  const new_wallet = new Wallet(
-                    open_data.wallet_id,
-                    this.openForm.get('name').value,
-                    this.openForm.get('password').value,
-                    open_data['wi'].path,
-                    open_data['wi'].address,
-                    open_data['wi'].balance,
-                    open_data['wi'].unlocked_balance,
-                    open_data['wi'].mined_total,
-                    open_data['wi'].tracking_hey
-                  );
-                  new_wallet.alias = this.backend.getWalletAlias(new_wallet.address);
-                  if (open_data.recent_history && open_data.recent_history.history) {
-                    new_wallet.prepareHistory(open_data.recent_history.history);
-                  }
-                  this.backend.getContracts(open_data.wallet_id, (contracts_status, contracts_data) => {
-                    if (contracts_status && contracts_data.hasOwnProperty('contracts')) {
-                      this.ngZone.run(() => {
-                        new_wallet.prepareContractsAfterOpen(contracts_data.contracts, this.variablesService.exp_med_ts, this.variablesService.height_app, this.variablesService.settings.viewedContracts, this.variablesService.settings.notViewedContracts);
-                      });
-                    }
-                  });
-                  this.variablesService.wallets.push(new_wallet);
                   this.backend.storeSecureAppData((status, data) => {
                     console.log('Store App Data', status, data);
                   });
