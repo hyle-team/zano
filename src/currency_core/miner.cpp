@@ -348,8 +348,9 @@ namespace currency
 
       if(check_hash(h, local_diff))
       {
+        b.nonce = nonce;
         ++m_config.current_extra_message_index;
-        LOG_PRINT_GREEN("Found block for difficulty: " << local_diff, LOG_LEVEL_0);
+        LOG_PRINT_GREEN("Found block for difficulty: " << local_diff << ", height: " << local_height << ", PoW hash: " << h << ", local_blob_data_hash: " << local_blob_data_hash << ", nonce: " << std::hex << nonce, LOG_LEVEL_0);
         if(!m_phandler->handle_block_found(b))
         {
           --m_config.current_extra_message_index;
