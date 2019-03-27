@@ -1,3 +1,16 @@
+.app-content {
+
+  .preloader {
+
+    .loading-bar {
+
+      @include themify($themes) {
+        background-color: themed(progressBarFullBackgroundColor);
+      }
+    }
+  }
+}
+
 button {
   border: none;
   font-family: OpenSans, sans-serif;
