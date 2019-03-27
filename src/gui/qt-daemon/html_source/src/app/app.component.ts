@@ -75,6 +75,7 @@ export class AppComponent implements OnInit, OnDestroy {
           this.ngZone.run(() => {
             this.router.navigate(['/']);
           });
+          this.variablesService.daemon_state = 5;
           this.backend.storeSecureAppData(() => {
             this.backend.storeAppData(() => {
               const recursionCloseWallets = () => {
