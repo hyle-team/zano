@@ -95,7 +95,7 @@ mix_rng_state::mix_rng_state(uint64_t seed) noexcept
     rng = kiss99{z, w, jsr, jcong};
 
     // Create random permutations of mix destinations / sources.
-    // Uses Fisher–Yates shuffle.
+    // Uses Fisher-Yates shuffle.
     for (uint32_t i = 0; i < num_regs; ++i)
     {
         dst_seq[i] = i;

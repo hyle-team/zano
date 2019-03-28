@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "ethash/hash_types.h"
+#include <ethash/hash_types.h>
 
 namespace ethash
 {
