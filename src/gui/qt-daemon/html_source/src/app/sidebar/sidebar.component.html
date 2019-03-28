@@ -5,14 +5,14 @@
   <div class="sidebar-accounts-list scrolled-content">
     <div class="sidebar-account" *ngFor="let wallet of variablesService.wallets" [class.active]="wallet?.wallet_id === walletActive" [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">
       <div class="sidebar-account-row account-title-balance">
-        <span class="title">{{wallet.name}}</span>
+        <span class="title" tooltip="{{ wallet.name }}" placement="top-left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{wallet.name}}</span>
         <span class="balance">{{wallet.balance | intToMoney : '3' }} {{variablesService.defaultCurrency}}</span>
       </div>
       <div class="sidebar-account-row account-alias">
         <div style="display: flex; align-items: center;">
           <span>{{wallet.alias['name']}}</span>
           <ng-container *ngIf="wallet.alias['comment'] && wallet.alias['comment'].length">
-            <i class="icon comment" tooltip="{{wallet.alias['comment']}}" placement="top" tooltipClass="table-tooltip comment-tooltip" [delay]="500"></i>
+            <i class="icon comment" tooltip="{{wallet.alias['comment']}}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500"></i>
           </ng-container>
         </div>
         <span>$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>

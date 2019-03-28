@@ -68,6 +68,7 @@
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
       "NAME_DUPLICATE": "Name is duplicate.",
+      "MAX_LENGTH": "Maximum name length reached.",
       "CONFIRM_NOT_MATCH": "Confirm password not match."
     }
   },
@@ -80,7 +81,8 @@
     "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate."
+      "NAME_DUPLICATE": "Name is duplicate.",
+      "MAX_LENGTH": "Maximum name length reached."
     }
   },
   "RESTORE_WALLET": {
@@ -95,6 +97,7 @@
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
       "NAME_DUPLICATE": "Name is duplicate.",
+      "MAX_LENGTH": "Maximum name length reached.",
       "CONFIRM_NOT_MATCH": "Confirm password not match.",
       "KEY_REQUIRED": "Key is required.",
       "KEY_NOT_VALID": "Key not valid."
@@ -161,7 +164,8 @@
     "BUTTON_REMOVE": "Close wallet",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate."
+      "NAME_DUPLICATE": "Name is duplicate.",
+      "MAX_LENGTH": "Maximum name length reached."
     }
   },
   "ASSIGN_ALIAS": {
@@ -411,6 +415,7 @@
     "BUTTON_CANCEL_BUYER": "Cancel contract (Return pledge)",
     "BUTTON_NOT_CANCEL": "Do not cancel (Item shipped)",
     "BUTTON_CANCEL_SELLER": "Cancel contract (Return pledge)",
+    "HOUR": "hour",
     "HOURS": "hours",
     "CANCEL": "Cancel",
     "NULLIFY_QUESTION": "Are you sure you want to nullify your pledge and the seller's pledge?",

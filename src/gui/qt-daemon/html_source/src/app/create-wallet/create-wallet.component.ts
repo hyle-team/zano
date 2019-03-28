@@ -58,7 +58,7 @@ export class CreateWalletComponent implements OnInit {
   }
 
   saveWallet() {
-    if (this.createForm.valid) {
+    if (this.createForm.valid && this.createForm.get('name').value.length <= this.variablesService.maxWalletNameLength) {
       this.backend.saveFileDialog(this.translate.instant('CREATE_WALLET.TITLE_SAVE'), '*', this.variablesService.settings.default_path, (file_status, file_data) => {
         if (file_status) {
           this.variablesService.settings.default_path = file_data.path.substr(0, file_data.path.lastIndexOf('/'));

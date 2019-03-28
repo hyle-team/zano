@@ -15,7 +15,7 @@
 
     <div class="input-block">
       <label for="wallet-name">{{ 'CREATE_WALLET.NAME' | translate }}</label>
-      <input type="text" id="wallet-name" formControlName="name" [attr.readonly]="walletSaved ? '' : null" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="wallet-name" formControlName="name" [attr.readonly]="walletSaved ? '' : null" [maxlength]="variablesService.maxWalletNameLength" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="createForm.controls['name'].invalid && (createForm.controls['name'].dirty || createForm.controls['name'].touched)">
         <div *ngIf="createForm.controls['name'].errors['required']">
           {{ 'CREATE_WALLET.FORM_ERRORS.NAME_REQUIRED' | translate }}
@@ -23,6 +23,9 @@
         <div *ngIf="createForm.controls['name'].errors['duplicate']">
           {{ 'CREATE_WALLET.FORM_ERRORS.NAME_DUPLICATE' | translate }}
         </div>
+      </div>
+      <div class="error-block" *ngIf="createForm.get('name').value.length >= variablesService.maxWalletNameLength">
+        {{ 'CREATE_WALLET.FORM_ERRORS.MAX_LENGTH' | translate }}
       </div>
     </div>
 
