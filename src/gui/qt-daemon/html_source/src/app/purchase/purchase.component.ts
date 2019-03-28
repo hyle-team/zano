@@ -7,6 +7,7 @@ import {ModalService} from '../_helpers/services/modal.service';
 import {Location} from '@angular/common';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
 import {TranslateService} from '@ngx-translate/core';
+import {BigNumber} from 'bignumber.js';
 
 @Component({
   selector: 'app-purchase',
@@ -56,11 +57,15 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     time: new FormControl({value: '12', disabled: false}),
     timeCancel: new FormControl({value: '12', disabled: false}),
     payment: new FormControl('')
+  }, function (g: FormGroup) {
+    return (new BigNumber(g.get('yourDeposit').value)).isLessThan(g.get('amount').value) ? {'your_deposit_too_small': true} : null;
   });
 
   additionalOptions = false;
   currentContract = null;
   heightAppEvent;
+  showTimeSelect = false;
+  showNullify = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -153,13 +158,13 @@ export class PurchaseComponent implements OnInit, OnDestroy {
         this.currentContract.is_new = true;
         this.variablesService.currentWallet.recountNewContracts();
       }
-      if (!this.newPurchase && this.currentContract.is_a && (this.currentContract.state === 201 || this.currentContract.state === 2 || this.currentContract.state === 120 || this.currentContract.state === 130)) {
-        if (this.currentContract.cancel_expiration_time === 0 && (this.currentContract.height === 0 || (this.variablesService.height_app - this.currentContract.height) < 10)) {
-          this.purchaseForm.get('timeCancel').disable();
-        } else {
-          this.purchaseForm.get('timeCancel').enable();
-        }
-      }
+      // if (!this.newPurchase && this.currentContract.is_a && (this.currentContract.state === 201 || this.currentContract.state === 2 || this.currentContract.state === 120 || this.currentContract.state === 130)) {
+      //   if (this.currentContract.cancel_expiration_time === 0 && (this.currentContract.height === 0 || (this.variablesService.height_app - this.currentContract.height) < 10)) {
+      //     this.purchaseForm.get('timeCancel').disable();
+      //   } else {
+      //     this.purchaseForm.get('timeCancel').enable();
+      //   }
+      // }
     });
   }
 

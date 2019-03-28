@@ -29,7 +29,9 @@ export class VariablesService {
   public default_fee_big = new BigNumber('10000000000');
 
   public settings = {
+    appLockTime: 15,
     theme: '',
+    scale: 10,
     language: 'en',
     default_path: '/',
     viewedContracts: [],
@@ -41,6 +43,8 @@ export class VariablesService {
   public aliases: any = [];
   public aliasesChecked: any = {};
   public enableAliasSearch = false;
+  public maxWalletNameLength = 25;
+  public maxCommentLength = 255;
 
   getHeightAppEvent = new BehaviorSubject(null);
   getRefreshStackingEvent = new BehaviorSubject(null);
@@ -48,7 +52,6 @@ export class VariablesService {
 
   public idle = new Idle()
     .whenNotInteractive()
-    .within(15)
     .do(() => {
       this.ngZone.run(() => {
         this.idle.stop();
@@ -59,6 +62,7 @@ export class VariablesService {
 
   public allContextMenu: ContextMenuComponent;
   public onlyCopyContextMenu: ContextMenuComponent;
+  public pasteSelectContextMenu: ContextMenuComponent;
 
   constructor(private router: Router, private ngZone: NgZone, private contextMenuService: ContextMenuService) {
   }
@@ -96,11 +100,15 @@ export class VariablesService {
   }
 
   startCountdown() {
-    this.idle.start();
+    this.idle.within(this.settings.appLockTime).start();
   }
 
   stopCountdown() {
     this.idle.stop();
+  }
+
+  restartCountdown() {
+    this.idle.within(this.settings.appLockTime).restart();
   }
 
   public onContextMenu($event: MouseEvent): void {
@@ -125,6 +133,25 @@ export class VariablesService {
     });
     $event.preventDefault();
     $event.stopPropagation();
+  }
+
+  public onContextMenuPasteSelect($event: MouseEvent): void {
+    $event.target['contextSelectionStart'] = $event.target['selectionStart'];
+    $event.target['contextSelectionEnd'] = $event.target['selectionEnd'];
+
+    console.warn($event.target);
+    console.warn($event.target['disabled']);
+
+
+    if ($event.target && ($event.target['nodeName'].toUpperCase() === 'TEXTAREA' || $event.target['nodeName'].toUpperCase() === 'INPUT') && !$event.target['readOnly']) {
+      this.contextMenuService.show.next({
+        contextMenu: this.pasteSelectContextMenu,
+        event: $event,
+        item: $event.target,
+      });
+      $event.preventDefault();
+      $event.stopPropagation();
+    }
   }
 
 }

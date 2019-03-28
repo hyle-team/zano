@@ -68,8 +68,10 @@
         }
 
         .status, .comment {
+          display: inline-block;
           text-overflow: ellipsis;
           overflow: hidden;
+          max-width: 100%;
         }
       }
     }

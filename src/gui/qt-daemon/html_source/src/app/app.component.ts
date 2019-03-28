@@ -75,6 +75,7 @@ export class AppComponent implements OnInit, OnDestroy {
           this.ngZone.run(() => {
             this.router.navigate(['/']);
           });
+          this.variablesService.daemon_state = 5;
           this.backend.storeSecureAppData(() => {
             this.backend.storeAppData(() => {
               const recursionCloseWallets = () => {
@@ -471,6 +472,9 @@ export class AppComponent implements OnInit, OnDestroy {
             this.renderer.addClass(document.body, 'theme-' + this.variablesService.settings.theme);
           } else {
             this.renderer.addClass(document.body, 'theme-' + this.variablesService.defaultTheme);
+          }
+          if (this.variablesService.settings.hasOwnProperty('scale') && [7.5, 10, 12.5, 15].indexOf(this.variablesService.settings.scale) !== -1) {
+            this.renderer.setStyle(document.documentElement, 'font-size', this.variablesService.settings.scale + 'px');
           }
         } else {
           this.variablesService.settings.theme = this.variablesService.defaultTheme;

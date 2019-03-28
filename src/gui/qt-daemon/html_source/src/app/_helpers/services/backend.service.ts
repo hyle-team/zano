@@ -582,6 +582,12 @@ export class BackendService {
     this.runCommand('get_tx_pool_info', {}, callback);
   }
 
+  getVersion(callback) {
+    this.runCommand('get_version', {}, (status, version) => {
+      callback(version);
+    });
+  }
+
 }
 
 
@@ -615,11 +621,7 @@ export class BackendService {
         this.runCommand('reset_wallet_password', {wallet_id: wallet_id, pass: pass}, callback);
       },
 
-      getVersion: function (callback) {
-        this.runCommand('get_version', {}, function (status, version) {
-          callback(version)
-        })
-      },
+
 
       getOsVersion: function (callback) {
         this.runCommand('get_os_version', {}, function (status, version) {

@@ -30,7 +30,7 @@
   <div class="input-blocks-row">
     <div class="input-block">
       <label for="purchase-seller">{{ 'PURCHASE.SELLER' | translate }}</label>
-      <input type="text" id="purchase-seller" formControlName="seller" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="purchase-seller" formControlName="seller" [readonly]="!newPurchase" appInputDisableSelection (contextmenu)="(!newPurchase) ? variablesService.onContextMenuOnlyCopy($event, purchaseForm.controls['seller'].value) : variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="purchaseForm.controls['seller'].invalid && (purchaseForm.controls['seller'].dirty || purchaseForm.controls['seller'].touched)">
         <div *ngIf="purchaseForm.controls['seller'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.SELLER_REQUIRED' | translate }}
@@ -57,18 +57,21 @@
 
   <div class="input-blocks-row">
     <div class="input-block">
-      <label for="purchase-your-deposit">{{ 'PURCHASE.YOUR_DEPOSIT' | translate }}</label>
+      <label for="purchase-your-deposit">{{ ( (currentContract && !currentContract.is_a) ? 'PURCHASE.BUYER_DEPOSIT' : 'PURCHASE.YOUR_DEPOSIT') | translate }}</label>
       <input type="text" id="purchase-your-deposit" formControlName="yourDeposit" appInputValidate="money" [readonly]="!newPurchase" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="purchaseForm.controls['yourDeposit'].invalid && (purchaseForm.controls['yourDeposit'].dirty || purchaseForm.controls['yourDeposit'].touched)">
         <div *ngIf="purchaseForm.controls['yourDeposit'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.YOUR_DEPOSIT_REQUIRED' | translate }}
         </div>
       </div>
+      <div class="error-block" *ngIf="purchaseForm.invalid && (purchaseForm.controls['yourDeposit'].dirty || purchaseForm.controls['amount'].touched) && purchaseForm.errors && purchaseForm.errors['your_deposit_too_small']">
+        {{ 'PURCHASE.FORM_ERRORS.YOUR_DEPOSIT_TOO_SMALL' | translate }}
+      </div>
     </div>
 
     <div class="input-block">
       <div class="wrap-label">
-        <label for="purchase-seller-deposit">{{ 'PURCHASE.SELLER_DEPOSIT' | translate }}</label>
+        <label for="purchase-seller-deposit">{{ ( (currentContract && !currentContract.is_a) ? 'PURCHASE.YOUR_DEPOSIT' : 'PURCHASE.SELLER_DEPOSIT') | translate }}</label>
         <div class="checkbox-block">
           <input type="checkbox" id="purchase-same-amount" class="style-checkbox" formControlName="sameAmount" (change)="sameAmountChange()">
           <label for="purchase-same-amount">{{ 'PURCHASE.SAME_AMOUNT' | translate }}</label>
@@ -148,7 +151,7 @@
       <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.RECEIVED' | translate }}</span>
 
       <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NOT_RECEIVED' | translate }}</span>
-      <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
+      <span *ngIf="currentContract.state == 4" class="error-text">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
 
       <span *ngIf="currentContract.state == 5">{{ 'PURCHASE.PROPOSAL_CANCEL_SELLER' | translate }}</span>
       <!--<span *ngIf="currentContract.state == 5" ng-bind="'(' + (contract.cancel_expiration_time | buyingTime : 2) + ')'"></span>-->
@@ -178,7 +181,7 @@
       <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.RECEIVED' | translate }}</span>
 
       <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NOT_RECEIVED' | translate }}</span>
-      <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
+      <span *ngIf="currentContract.state == 4" class="error-text">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
 
       <span *ngIf="currentContract.state == 5">{{ 'PURCHASE.PROPOSAL_CANCEL_BUYER' | translate }}</span>
       <!--<span *ngIf="currentContract.state == 5" ng-bind="'(' + (contract.cancel_expiration_time | buyingTime : 1) + ')'"></span>-->
@@ -206,14 +209,14 @@
       <button type="button" class="turquoise-button" (click)="ignoredContract();">{{'PURCHASE.BUTTON_IGNORE' | translate}}</button>
     </ng-container>
 
-    <ng-container *ngIf="currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
-      <button type="button" class="blue-button" (click)="productNotGot();" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
+    <ng-container *ngIf="!showNullify && !showTimeSelect && currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
+      <button type="button" class="blue-button error-text" (click)="showNullify = true;" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
         {{'PURCHASE.BUTTON_NULLIFY' | translate}}
       </button>
       <button type="button" class="turquoise-button" (click)="dealsDetailsFinish();" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
         {{'PURCHASE.BUTTON_RECEIVED' | translate}}
       </button>
-      <button type="button" class="green-button" (click)="dealsDetailsCancel();" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
+      <button type="button" class="green-button" (click)="showTimeSelect = true;" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
         {{'PURCHASE.BUTTON_CANCEL_BUYER' | translate}}
       </button>
     </ng-container>
@@ -225,14 +228,30 @@
 
   </div>
 
-  <div style="display: flex; justify-content: center;" *ngIf="!newPurchase && currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
+  <div class="nullify-block-row" *ngIf="showNullify">
     <div class="input-block">
+      <div>{{'PURCHASE.NULLIFY_QUESTION' | translate}}</div>
+      <div class="nullify-block">
+        <button type="button" class="blue-button" (click)="showNullify = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
+        <button type="button" class="blue-button" (click)="productNotGot();">{{ 'PURCHASE.BUTTON_NULLIFY_SHORT' | translate }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="time-cancel-block-row" *ngIf="showTimeSelect && !newPurchase && currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
+    <div class="input-block">
+      <div>{{ 'PURCHASE.WAITING_TIME_QUESTION' | translate }}</div>
       <label for="purchase-timeCancel">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
       <select id="purchase-timeCancel" formControlName="timeCancel">
-        <option *ngFor="let title of [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]" [value]="title">
-          {{title}}
+        <option value="1">1 {{ 'PURCHASE.HOUR' | translate }}</option>
+        <option *ngFor="let title of [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]" [value]="title">
+          {{title}} {{ 'PURCHASE.HOURS' | translate }}
         </option>
       </select>
+      <div class="time-cancel-block">
+        <button type="button" class="blue-button" (click)="showTimeSelect = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
+        <button type="button" class="blue-button" (click)="dealsDetailsCancel();">{{ 'PURCHASE.BUTTON_CANCEL_BUYER' | translate }}</button>
+      </div>
     </div>
   </div>
 
