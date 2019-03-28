@@ -43,6 +43,7 @@ export class VariablesService {
   public aliases: any = [];
   public aliasesChecked: any = {};
   public enableAliasSearch = false;
+  public maxWalletNameLength = 25;
   public maxCommentLength = 255;
 
   getHeightAppEvent = new BehaviorSubject(null);

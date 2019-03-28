@@ -4,6 +4,7 @@
   justify-content: space-between;
   flex: 0 0 25rem;
   padding: 0 3rem 3rem;
+  max-width: 25rem;
 }
 
 .sidebar-accounts {
@@ -54,11 +55,15 @@
 
           .title {
             font-size: 1.5rem;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
           }
 
           .balance {
             font-size: 1.8rem;
             font-weight: 600;
+            white-space: nowrap;
           }
         }
 
