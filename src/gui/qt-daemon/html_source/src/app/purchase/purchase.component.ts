@@ -54,8 +54,8 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     sameAmount: new FormControl({value: false, disabled: false}),
     comment: new FormControl(''),
     fee: new FormControl(this.variablesService.default_fee),
-    time: new FormControl({value: '12', disabled: false}),
-    timeCancel: new FormControl({value: '12', disabled: false}),
+    time: new FormControl({value: 12, disabled: false}),
+    timeCancel: new FormControl({value: 12, disabled: false}),
     payment: new FormControl('')
   }, function (g: FormGroup) {
     return (new BigNumber(g.get('yourDeposit').value)).isLessThan(g.get('amount').value) ? {'your_deposit_too_small': true} : null;
@@ -105,8 +105,8 @@ export class PurchaseComponent implements OnInit, OnDestroy {
           sameAmount: this.currentContract.private_detailes.to_pay.isEqualTo(this.currentContract.private_detailes.b_pledge),
           comment: this.currentContract.private_detailes.c,
           fee: this.variablesService.default_fee,
-          time: '12',
-          timeCancel: '12',
+          time: 12,
+          timeCancel: 12,
           payment: this.currentContract.payment_id
         });
         this.purchaseForm.get('sameAmount').disable();

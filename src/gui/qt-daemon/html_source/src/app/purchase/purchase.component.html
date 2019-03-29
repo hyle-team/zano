@@ -110,11 +110,15 @@
     </div>
     <div class="input-block" *ngIf="newPurchase">
       <label for="purchase-time">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
-      <select id="purchase-time" formControlName="time">
-        <option *ngFor="let title of [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]" [value]="title">
-          {{title}}
-        </option>
-      </select>
+      <ng-select id="purchase-time" class="lock-selection-select"
+                 [clearable]="false"
+                 [searchable]="false"
+                 formControlName="time">
+        <ng-option [value]="1">1 {{ 'PURCHASE.HOUR' | translate }}</ng-option>
+        <ng-option *ngFor="let title of [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]" [value]="title">
+          {{title}} {{ 'PURCHASE.HOURS' | translate }}
+        </ng-option>
+      </ng-select>
     </div>
     <div class="input-block">
       <label for="purchase-payment">{{ 'PURCHASE.PAYMENT' | translate }}</label>
@@ -242,12 +246,15 @@
     <div class="input-block">
       <div>{{ 'PURCHASE.WAITING_TIME_QUESTION' | translate }}</div>
       <label for="purchase-timeCancel">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
-      <select id="purchase-timeCancel" formControlName="timeCancel">
-        <option value="1">1 {{ 'PURCHASE.HOUR' | translate }}</option>
-        <option *ngFor="let title of [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]" [value]="title">
+      <ng-select id="purchase-timeCancel" class="lock-selection-select"
+                 [clearable]="false"
+                 [searchable]="false"
+                 formControlName="timeCancel">
+        <ng-option [value]="1">1 {{ 'PURCHASE.HOUR' | translate }}</ng-option>
+        <ng-option *ngFor="let title of [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24]" [value]="title">
           {{title}} {{ 'PURCHASE.HOURS' | translate }}
-        </option>
-      </select>
+        </ng-option>
+      </ng-select>
       <div class="time-cancel-block">
         <button type="button" class="blue-button" (click)="showTimeSelect = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
         <button type="button" class="blue-button" (click)="dealsDetailsCancel();">{{ 'PURCHASE.BUTTON_CANCEL_BUYER' | translate }}</button>

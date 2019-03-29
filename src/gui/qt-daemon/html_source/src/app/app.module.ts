@@ -59,9 +59,9 @@ import { InputDisableSelectionDirective } from './_helpers/directives/input-disa
 // import * as highstock from 'highcharts/modules/stock.src';
 
 Highcharts.setOptions({
-  // global: {
-  //   useUTC: false
-  // }
+  global: {
+    useUTC: false
+  }
 });
 
 @NgModule({
