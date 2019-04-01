@@ -78,8 +78,8 @@ export class LoginComponent implements OnInit, OnDestroy {
             let openWallets = 0;
             let runWallets = 0;
             data.forEach((wallet, wallet_index) => {
-              this.backend.openWallet(wallet.path, wallet.pass, true, (open_status, open_data) => {
-                if (open_status) {
+              this.backend.openWallet(wallet.path, wallet.pass, true, (open_status, open_data, open_error) => {
+                if (open_status || open_error === 'FILE_RESTORED') {
                   openWallets++;
                   this.ngZone.run(() => {
                     const new_wallet = new Wallet(

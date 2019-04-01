@@ -4246,8 +4246,8 @@ var LoginComponent = /** @class */ (function () {
                         var openWallets_1 = 0;
                         var runWallets_1 = 0;
                         data.forEach(function (wallet, wallet_index) {
-                            _this.backend.openWallet(wallet.path, wallet.pass, true, function (open_status, open_data) {
-                                if (open_status) {
+                            _this.backend.openWallet(wallet.path, wallet.pass, true, function (open_status, open_data, open_error) {
+                                if (open_status || open_error === 'FILE_RESTORED') {
                                     openWallets_1++;
                                     _this.ngZone.run(function () {
                                         var new_wallet = new _helpers_models_wallet_model__WEBPACK_IMPORTED_MODULE_6__["Wallet"](open_data.wallet_id, wallet.name, wallet.pass, open_data['wi'].path, open_data['wi'].address, open_data['wi'].balance, open_data['wi'].unlocked_balance, open_data['wi'].mined_total, open_data['wi'].tracking_hey);
