@@ -437,7 +437,7 @@ namespace
       difficulty_to_boundary_long(worker_difficulty, target_boundary);
 
       ethash_hash256 seed_hash = ethash_calculate_epoch_seed(ethash_height_to_epoch(m_block_template_height));
-      return R"("result":[")" + pod_to_net_format(m_block_template_ethash) + R"(",")" + pod_to_net_format(seed_hash) + R"(",")" + pod_to_net_format_reverse(target_boundary) + R"("])";
+      return R"("result":[")" + pod_to_net_format(m_block_template_ethash) + R"(",")" + pod_to_net_format(seed_hash) + R"(",")" + pod_to_net_format_reverse(target_boundary) + R"(",")" + pod_to_net_format_reverse(m_block_template_height) + R"("])";
     }
 
     void update_work(protocol_handler_t* p_ph)
