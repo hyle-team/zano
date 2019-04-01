@@ -80,8 +80,8 @@ namespace
 #define HR_TO_STREAM_IN_MHS_3P(hr) std::fixed << std::setprecision(3) << hr / 1000000.0
 
 // debug stuff
-#define DBG_NETWORK_DIFFICULTY 160000000000ull // if non-zero: use this value as net difficulty when checking shares (useful for debugging on testnet, recommended value is 160000000000ull)
-#define DBG_CORE_ALWAYS_SYNCRONIZED 1 // if set to 1: allows the server to start even if the core is not syncronized, useful for debugging with --offline-mode
+#define DBG_NETWORK_DIFFICULTY 0 // if non-zero: use this value as net difficulty when checking shares (useful for debugging on testnet, recommended value is 160000000000ull)
+#define DBG_CORE_ALWAYS_SYNCRONIZED 0 // if set to 1: allows the server to start even if the core is not syncronized, useful for debugging with --offline-mode
 #define STRINGIZE_DETAIL(x) #x
 #define STRINGIZE(x) STRINGIZE_DETAIL(x)
 #define DP(x) LOG_PRINT_L0("LINE " STRINGIZE(__LINE__) ":             " #x " = " << x)
