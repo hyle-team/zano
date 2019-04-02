@@ -206,6 +206,12 @@ int main(int argc, char* argv[])
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core rpc server.");
   LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << rpc_server.get_binded_port(), LOG_LEVEL_0);
 
+  //initialize core here
+  LOG_PRINT_L0("Initializing core...");
+  res = ccore.init(vm);
+  CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
+  LOG_PRINT_L0("Core initialized OK");
+
   if (stratum_enabled)
   {
     LOG_PRINT_L0("Initializing stratum server...");
@@ -213,11 +219,7 @@ int main(int argc, char* argv[])
     CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize stratum server.");
   }
 
-  //initialize core here
-  LOG_PRINT_L0("Initializing core...");
-  res = ccore.init(vm);
-  CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
-  LOG_PRINT_L0("Core initialized OK");
+
   
   auto& bcs = ccore.get_blockchain_storage();
   if (!offers_service.is_disabled() && bcs.get_current_blockchain_size() > 1 && bcs.get_top_block_id() != offers_service.get_last_seen_block_id())
@@ -243,6 +245,7 @@ int main(int argc, char* argv[])
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core rpc server.");
   LOG_PRINT_L0("Core rpc server started ok");
 
+  //start stratum only after core got initialized
   if (stratum_enabled)
   {
     LOG_PRINT_L0("Starting stratum server...");
