@@ -57,7 +57,7 @@ namespace
   const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_retarget_time = {"stratum-vdiff-retarget-time",  "Stratum server: check to see if we should retarget this often (sec.)",  VDIFF_RETARGET_TIME_DEFAULT };
   const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_retarget_shares = {"stratum-vdiff-retarget-shares",  "Stratum server: enforce retargeting if got this many shares",  VDIFF_RETARGET_SHARES_COUNT };
   const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_variance_percent  = {"stratum-vdiff-variance-percent",  "Stratum server: allow average time to very this % from target without retarget",  VDIFF_VARIANCE_PERCENT_DEFAULT };
-
+  const command_line::arg_descriptor<bool>        arg_stratum_always_online = { "stratum-always-online",                   "Stratum server consider core as always online, useful for debugging with --offline-mode" };
 
 //==============================================================================================================================
 
@@ -316,6 +316,7 @@ namespace
       , m_total_blocks_found(0)
       , m_stop_flag(false)
       , m_blocktemplate_update_thread(&this_t::block_template_update_thread, this)
+      , m_is_core_always_online(false)
     {
       LOG_PRINT_L4("stratum_protocol_handler_config::ctor()");
     }
@@ -641,6 +642,11 @@ namespace
       m_p_core->add_blockchain_update_listener(this);
     }
 
+    void set_is_core_always_online(bool is_core_always_online)
+    {
+      m_is_core_always_online = is_core_always_online;
+    }
+
     void set_miner_address(const account_public_address& miner_addr)
     {
       m_miner_addr = miner_addr;
@@ -654,6 +660,8 @@ namespace
 #if DBG_CORE_ALWAYS_SYNCRONIZED == 1
       return true; // standalone mode, usefull for debugging WITH --offline-mode option
 #endif
+      if (m_is_core_always_online)
+        return true;
 
       // TODO!!! Bad design, need more correct way of getting this information
       currency::i_currency_protocol* proto = m_p_core->get_protocol();
@@ -758,6 +766,7 @@ namespace
     size_t m_nameless_worker_id;
     size_t m_total_blocks_found;
     shares_per_minute_rate_t m_shares_per_minute;
+    bool m_is_core_always_online;
 
     std::atomic<bool> m_stop_flag;
     std::thread m_blocktemplate_update_thread;
@@ -1104,6 +1113,8 @@ void stratum_server::init_options(boost::program_options::options_description& d
   command_line::add_arg(desc, arg_stratum_vdiff_variance_percent);
   command_line::add_arg(desc, arg_stratum_block_template_update_period);
   command_line::add_arg(desc, arg_stratum_hr_print_interval);
+  command_line::add_arg(desc, arg_stratum_always_online);
+  
 }
 //------------------------------------------------------------------------------------------------------------------------------
 bool stratum_server::should_start(const boost::program_options::variables_map& vm)
@@ -1123,6 +1134,12 @@ bool stratum_server::init(const boost::program_options::variables_map& vm)
   auto& config = m_impl->server.get_config_object();
   config.set_core(m_p_core);
   
+  if (command_line::has_arg(vm, arg_stratum_always_online))
+  {
+     config.set_is_core_always_online(command_line::get_arg(vm, arg_stratum_always_online));
+  }
+
+
   if (command_line::has_arg(vm, arg_stratum_miner_address))
   {
     std::string miner_address_str = command_line::get_arg(vm, arg_stratum_miner_address);
