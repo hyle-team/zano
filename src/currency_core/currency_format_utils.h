@@ -85,6 +85,13 @@ namespace currency
     tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0){}
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0){}
     tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0){}
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(amount)
+      FIELD(addr)
+      FIELD(minimum_sigs)
+      FIELD(amount_to_provide)
+    END_SERIALIZE()
   };
 
   struct tx_extra_info 
@@ -391,11 +398,12 @@ namespace currency
   uint64_t get_base_block_reward(bool is_pos, uint64_t already_generated_coins, uint64_t height);
   uint64_t get_scratchpad_last_update_rebuild_height(uint64_t h);
   uint64_t get_scratchpad_size_for_height(uint64_t h);
-  bool is_payment_id_size_ok(const std::string& payment_id);
+  bool is_payment_id_size_ok(const payment_id_t& payment_id);
   std::string get_account_address_as_str(const account_public_address& addr);
-  std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const std::string& payment_id);
+  std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id);
   bool get_account_address_from_str(account_public_address& addr, const std::string& str);
-  bool get_account_address_and_payment_id_from_str(account_public_address& addr, std::string& payment_id, const std::string& str);
+  bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str);
+  bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id);
   bool is_coinbase(const transaction& tx);
   bool is_coinbase(const transaction& tx, bool& pos_coinbase);
   bool have_attachment_service_in_container(const std::vector<attachment_v>& av, const std::string& service_id, const std::string& instruction);

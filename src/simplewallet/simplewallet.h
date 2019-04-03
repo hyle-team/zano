@@ -33,6 +33,7 @@ namespace currency
     bool deinit();
     bool run();
     void stop();
+    void set_offline_mode(bool offline_mode);
 
     //wallet *create_wallet();
     bool process_command(const std::vector<std::string> &args);
@@ -72,6 +73,7 @@ namespace currency
     bool set_log(const std::vector<std::string> &args);
     bool enable_concole_logger(const std::vector<std::string> &args);
     bool integrated_address(const std::vector<std::string> &args);
+    bool get_tx_key(const std::vector<std::string> &args_);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr);
@@ -145,10 +147,11 @@ namespace currency
     std::string m_daemon_address;
     std::string m_daemon_host;
     int m_daemon_port;
-    bool m_do_refresh;
+    bool m_do_refresh_after_load;
     bool m_do_not_set_date;
     bool m_print_brain_wallet;
     bool m_do_pos_mining;
+    bool m_offline_mode;
 
     epee::console_handlers_binder m_cmd_binder;
 

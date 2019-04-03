@@ -47,7 +47,7 @@ namespace
   const command_line::arg_descriptor<int> arg_daemon_port = {"daemon-port", "Use daemon instance at port <arg> instead of default", 0};
   const command_line::arg_descriptor<uint32_t> arg_log_level = {"set-log", "", 0, true};
   const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
-
+  const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
 
@@ -172,10 +172,11 @@ bool simple_wallet::help(const std::vector<std::string> &args/* = std::vector<st
 simple_wallet::simple_wallet()
   : m_daemon_port(0), 
   m_print_brain_wallet(false), 
-  m_do_refresh(false),
+  m_do_refresh_after_load(false),
   m_do_not_set_date(false),
   m_do_pos_mining(false),
-  m_refresh_progress_reporter(*this)
+  m_refresh_progress_reporter(*this),
+  m_offline_mode(false)
 {
   m_cmd_binder.set_handler("start_mining", boost::bind(&simple_wallet::start_mining, this, _1), "start_mining <threads_count> - Start mining in daemon");
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, _1), "Stop mining in daemon");
@@ -203,7 +204,8 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("scan_transfers_for_id", boost::bind(&simple_wallet::scan_transfers_for_id, this, _1), "Rescan transfers for tx_id");
   m_cmd_binder.set_handler("scan_transfers_for_ki", boost::bind(&simple_wallet::scan_transfers_for_ki, this, _1), "Rescan transfers for key image");
   m_cmd_binder.set_handler("integrated_address", boost::bind(&simple_wallet::integrated_address, this, _1), "integrated_address [<payment_id>|<integrated_address] - encodes given payment_id along with wallet's address into an integrated address (random payment_id will be used if none is provided). Decodes given integrated_address into standard address");
-    
+  m_cmd_binder.set_handler("get_tx_key", boost::bind(&simple_wallet::get_tx_key, this, _1), "Get transaction one-time secret key (r) for a given <txid>");
+
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -278,10 +280,10 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     }
   }
 
-  m_do_refresh = true;
+  m_do_refresh_after_load = true;
   if (command_line::has_arg(vm, arg_dont_refresh))
   {
-    m_do_refresh = false;
+    m_do_refresh_after_load = false;
   }
 
   if (command_line::has_arg(vm, arg_print_brain_wallet))
@@ -411,7 +413,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
 
   m_wallet->init(m_daemon_address);
 
-  if (!m_do_refresh)
+  if (m_do_refresh_after_load && !m_offline_mode)
     refresh(std::vector<std::string>());
 
   success_msg_writer() <<
@@ -1237,6 +1239,47 @@ bool simple_wallet::integrated_address(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool simple_wallet::get_tx_key(const std::vector<std::string> &args_)
+{
+  std::vector<std::string> local_args = args_;
+
+  if (local_args.size() != 1) {
+    fail_msg_writer() << "usage: get_tx_key <txid>";
+    return true;
+  }
+
+  currency::blobdata txid_data;
+  if (!epee::string_tools::parse_hexstr_to_binbuff(local_args.front(), txid_data) || txid_data.size() != sizeof(crypto::hash))
+  {
+    fail_msg_writer() << "failed to parse txid";
+    return true;
+  }
+  crypto::hash txid = *reinterpret_cast<const crypto::hash*>(txid_data.data());
+
+  crypto::secret_key tx_key;
+  std::vector<crypto::secret_key> amount_keys;
+  if (m_wallet->get_tx_key(txid, tx_key))
+  {
+    success_msg_writer() << "tx one-time secret key: " << epee::string_tools::pod_to_hex(tx_key);
+    return true;
+  }
+  else
+  {
+    fail_msg_writer() << "no tx keys found for this txid";
+    return true;
+  }
+}
+//----------------------------------------------------------------------------------------------------
+void simple_wallet::set_offline_mode(bool offline_mode)
+{
+  if (offline_mode && !m_offline_mode)
+  {
+    message_writer(epee::log_space::console_color_yellow, true, std::string(), LOG_LEVEL_0)
+      << "WARNING: the wallet is running in OFFLINE MODE!";
+  }
+  m_offline_mode = offline_mode;
+}
+//----------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
 #ifdef WIN32
@@ -1271,13 +1314,15 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_dont_set_date);
   command_line::add_arg(desc_params, arg_print_brain_wallet);
   command_line::add_arg(desc_params, arg_do_pos_mining);
-  
+  command_line::add_arg(desc_params, arg_offline_mode);
+
   
   tools::wallet_rpc_server::init_options(desc_params);
 
   po::positional_options_description positional_options;
   positional_options.add(arg_command.name, -1);
 
+  shared_ptr<currency::simple_wallet> sw(new currency::simple_wallet);
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
   po::variables_map vm;
@@ -1287,9 +1332,8 @@ int main(int argc, char* argv[])
 
     if (command_line::get_arg(vm, command_line::arg_help))
     {
-      simple_wallet w;
       success_msg_writer() << "Usage: simplewallet [--wallet-file=<file>|--generate-new-wallet=<file>] [--daemon-address=<host>:<port>] [<COMMAND>]";
-      success_msg_writer() << desc_all << '\n' << w.get_commands_str();
+      success_msg_writer() << desc_all << '\n' << sw->get_commands_str();
       return false;
     }
     else if (command_line::get_arg(vm, command_line::arg_version))
@@ -1320,10 +1364,13 @@ int main(int argc, char* argv[])
     log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, arg_log_level));
   }
   
+  bool offline_mode = command_line::get_arg(vm, arg_offline_mode);
+
   if(command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
   {
     // runs wallet as RPC server
     log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+    sw->set_offline_mode(offline_mode);
     LOG_PRINT_L0("Starting wallet RPC server...");
 
     if (!command_line::has_arg(vm, arg_wallet_file) || command_line::get_arg(vm, arg_wallet_file).empty())
@@ -1332,7 +1379,7 @@ int main(int argc, char* argv[])
       return 1;
     }
 
-    if (!command_line::has_arg(vm, arg_daemon_address) )
+    if (!command_line::has_arg(vm, arg_daemon_address) && !command_line::has_arg(vm, arg_offline_mode))
     {
       LOG_ERROR("Daemon address is not set.");
       return 1;
@@ -1385,7 +1432,8 @@ int main(int argc, char* argv[])
         wal.init(daemon_address);
         if (command_line::get_arg(vm, arg_generate_new_wallet).size())
           return 1;
-        wal.refresh();
+        if (!offline_mode)
+          wal.refresh();
         LOG_PRINT_GREEN("Loaded ok", LOG_LEVEL_0);
       }
       catch (const std::exception& e)
@@ -1420,8 +1468,8 @@ int main(int argc, char* argv[])
     }
   }else
   {
-    shared_ptr<currency::simple_wallet> sw(new currency::simple_wallet);
     //runs wallet with console interface 
+    sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
     CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet");
     if (command_line::get_arg(vm, arg_generate_new_wallet).size())

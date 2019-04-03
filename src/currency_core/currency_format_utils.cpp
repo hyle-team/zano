@@ -2483,7 +2483,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------
-  bool is_payment_id_size_ok(const std::string& payment_id)
+  bool is_payment_id_size_ok(const payment_id_t& payment_id)
   {
     return payment_id.size() <= BC_PAYMENT_ID_SERVICE_SIZE_MAX;
   }
@@ -2493,7 +2493,7 @@ namespace currency
     return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr));
   }
   //-----------------------------------------------------------------------
-  std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const std::string& payment_id)
+  std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id)
   {
     return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id);
   }
@@ -2504,7 +2504,7 @@ namespace currency
     return get_account_address_and_payment_id_from_str(addr, integrated_payment_id, str);
   }
   //-----------------------------------------------------------------------
-  bool get_account_address_and_payment_id_from_str(account_public_address& addr, std::string& payment_id, const std::string& str)
+  bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str)
   {
     static const size_t addr_blob_size = sizeof(account_public_address);
     blobdata blob;
@@ -2555,6 +2555,11 @@ namespace currency
     }
 
     return true;
+  }
+  //---------------------------------------------------------------
+  bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id)
+  {
+    return epee::string_tools::parse_hexstr_to_binbuff(payment_id_str, payment_id);
   }
   //------------------------------------------------------------------
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)

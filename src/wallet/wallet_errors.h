@@ -124,6 +124,14 @@ namespace tools
       }
     };
     //----------------------------------------------------------------------------------------------------
+    struct wallet_common_error : public wallet_runtime_error
+    {
+      explicit wallet_common_error(std::string&& loc, const std::string& message)
+        : wallet_runtime_error(std::move(loc), message)
+      {
+      }
+    };
+    //----------------------------------------------------------------------------------------------------
     struct unexpected_txin_type : public wallet_internal_error
     {
       explicit unexpected_txin_type(std::string&& loc, const currency::transaction& tx)
