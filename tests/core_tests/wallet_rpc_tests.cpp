@@ -137,7 +137,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
   
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
@@ -171,7 +171,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   CHECK_AND_ASSERT_MES(r, false, "RPC call failed, code: " << je.code << ", msg: " << je.message);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
 

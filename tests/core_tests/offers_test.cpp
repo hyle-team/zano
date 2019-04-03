@@ -567,7 +567,7 @@ bool offers_handling_on_chain_switching::c1(currency::core& c, size_t ev_index, 
   uint64_t blk_1r_height = c.get_current_blockchain_size() - 2;
   crypto::hash blk_1r_id = c.get_block_id_by_height(blk_1r_height);
   block blk_2a = AUTO_VAL_INIT(blk_2a);
-  r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), blk_1r_id, blk_1r_height + 1, &blk_2a);
+  r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), blk_1r_id, blk_1r_height + 1, &blk_2a);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -577,7 +577,7 @@ bool offers_handling_on_chain_switching::c1(currency::core& c, size_t ev_index, 
 
   // mine second alt block (include offer tx) -- this should trigger chain switching
   block blk_3a = AUTO_VAL_INIT(blk_3a);
-  r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({tx_1}), get_block_hash(blk_2a), blk_1r_height + 2, &blk_3a);
+  r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({tx_1}), get_block_hash(blk_2a), blk_1r_height + 2, &blk_3a);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -673,7 +673,7 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
   crypto::hash create_offer_tx_id = get_transaction_hash(create_offer_tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   refresh_wallet_and_check_balance("offer's put into the blockchain", "Alice", alice_wlt, alice_start_balance - od.fee, true, 1);
@@ -699,7 +699,7 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
 
   // add it to the blockchain
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // Alice's banace should not change
@@ -937,7 +937,7 @@ bool offers_updating_hack::update_foreign_offer(currency::core& c, size_t ev_ind
 
   // put in a block 'tx', leave Alice's tx in the pool
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx })), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx })), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   LOG_PRINT_L0(ENDL << c.get_tx_pool().print_pool(true));
 
@@ -1005,7 +1005,7 @@ bool offers_updating_hack::delete_foreign_offer(currency::core& c, size_t ev_ind
 
   // put in a block 'tx', leave Alice's tx in the pool
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx_c })), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx_c })), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   LOG_PRINT_L0(ENDL << c.get_tx_pool().print_pool(true));
@@ -1264,7 +1264,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CATCH_ENTRY2(false);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, some_addr, c);
+  r = mine_next_pow_block_in_playtime(some_addr, c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
 
@@ -1280,7 +1280,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CATCH_ENTRY2(false);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, some_addr, c);
+  r = mine_next_pow_block_in_playtime(some_addr, c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
 
@@ -1297,7 +1297,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CATCH_ENTRY2(false);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, some_addr, c);
+  r = mine_next_pow_block_in_playtime(some_addr, c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
 
@@ -1313,7 +1313,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CATCH_ENTRY2(false);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, some_addr, c);
+  r = mine_next_pow_block_in_playtime(some_addr, c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
 

@@ -4,12 +4,13 @@ set(UPNPC_BUILD_TESTS OFF CACHE BOOL "Build test executables")
 add_subdirectory(miniupnpc)
 add_subdirectory(zlib)
 add_subdirectory(db)
-
+add_subdirectory(ethereum)
 
 
 set_property(TARGET upnpc-static PROPERTY FOLDER "contrib")
 set_property(TARGET zlibstatic PROPERTY FOLDER "contrib")
 set_property(TARGET lmdb PROPERTY FOLDER "contrib")
+
 
 
 

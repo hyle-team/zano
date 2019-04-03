@@ -495,7 +495,7 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_0(currency::core&
     r = populate_wallet_with_stake_coins(w.w, alice_wlt, w.pos_entries_count, m_wallet_stake_amount, pos_amounts);
     CHECK_AND_ASSERT_MES(r, false, "populate_wallet_with_stake_coins failed");
 
-    r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, alice_wlt->get_account().get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE + 1); // to preventing run out of the money for Alice
+    r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE + 1); // to preventing run out of the money for Alice
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
     c.get_blockchain_storage().get_top_block(b);
     uint64_t ts = b.timestamp;
@@ -552,7 +552,7 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_1(currency::core&
     r = populate_wallet_with_stake_coins(w.w, alice_wlt, w.pos_entries_count, m_wallet_stake_amount, pos_amounts);
     CHECK_AND_ASSERT_MES(r, false, "populate_wallet_with_stake_coins failed");
 
-    r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, alice_wlt->get_account().get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE + 1); // to preventing run out of the money for Alice
+    r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE + 1); // to preventing run out of the money for Alice
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
     c.get_blockchain_storage().get_top_block(b);
     uint64_t ts = b.timestamp;
@@ -662,7 +662,7 @@ bool pos_wallet_minting_same_amount_diff_outs::c1(currency::core& c, size_t ev_i
       ts = ideal_next_pow_block_ts; // "wait" until ideal_next_pow_block_ts if it was not already happened (fast forward but don't wayback the time)
     test_core_time::adjust(ts);
     size_t tx_count_before = c.get_pool_transactions_count();
-    r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+    r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
     CHECK_AND_ASSERT_MES(tx_count_before == 0 || c.get_pool_transactions_count() < tx_count_before, false, "invalid number of txs in tx pool: " << c.get_pool_transactions_count() << ", was: " << tx_count_before);
     last_pow_block_ts = ts;

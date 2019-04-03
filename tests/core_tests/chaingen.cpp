@@ -693,15 +693,8 @@ bool test_generator::find_nounce(currency::block& blk, std::vector<const block_i
 {
   if(height != blocks.size())
     throw std::runtime_error("wrong height in find_nounce");
-
-  crypto::hash seed = currency::null_hash;
-  currency::get_seed_for_scratchpad_cb(height, seed, [&](uint64_t index) -> crypto::hash
-  {
-    return currency::get_block_hash(blocks[index]->b);  
-  });
-
   
-  return miner::find_nonce_for_given_block(blk, dif, height, seed, m_scratchpad);
+  return miner::find_nonce_for_given_block(blk, dif, height);
 }
 
 bool test_generator::construct_genesis_block(currency::block& blk, const currency::account_base& miner_acc, uint64_t timestamp)

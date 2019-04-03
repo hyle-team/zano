@@ -39,7 +39,7 @@
 #include "dispatch_core_events.h"
 #include "bc_attachments_service_manager.h"
 #include "common/median_db_cache.h"
-#include "scratchpad_helper.h"
+
 
 
 MARK_AS_POD_C11(crypto::key_image);
@@ -231,8 +231,8 @@ namespace currency
     wide_difficulty_type get_cached_next_difficulty(bool pos) const;
 
     typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, uint64_t already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
-    bool create_block_template(block& b, crypto::hash& seed, const account_public_address& miner_address, const account_public_address& stakeholder_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func = nullptr) const;
-    bool create_block_template(block& b, crypto::hash& seed, const account_public_address& miner_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce) const;
+    bool create_block_template(block& b, const account_public_address& miner_address, const account_public_address& stakeholder_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func = nullptr) const;
+    bool create_block_template(block& b, const account_public_address& miner_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce) const;
 
     bool have_block(const crypto::hash& id) const;
     size_t get_total_transactions()const;
@@ -510,10 +510,7 @@ namespace currency
     //work like a cache to avoid 
     mutable uint64_t m_current_fee_median;
     mutable uint64_t m_current_fee_median_effective_index;
-    bool m_is_reorganize_in_process;
-    mutable scratchpad_light_pool m_scratchpad; //TODO: optimization for using full scratchpad in mainchain
-    crypto::hash m_current_scratchpad_seed;
-    uint64_t m_current_scratchpad_seed_height;
+    bool m_is_reorganize_in_process;    
     mutable std::atomic<bool> m_deinit_is_done;
 
 
@@ -542,10 +539,6 @@ namespace currency
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
-    bool get_seed_for_scratchpad(uint64_t height, crypto::hash& seed)const ;
-    bool get_seed_for_scratchpad_alt_chain(uint64_t height, crypto::hash& seed, const alt_chain_type& alt_chain) const ;
-    
-    bool check_scratchpad();
 
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
     bool validate_transaction(const block& b, uint64_t height, const transaction& tx)const;
@@ -572,7 +565,6 @@ namespace currency
     uint64_t get_adjusted_time()const;
     bool complete_timestamps_vector(uint64_t start_height, std::vector<uint64_t>& timestamps);
     bool update_next_comulative_size_limit();
-    //bool get_block_for_scratchpad_alt(uint64_t connection_height, uint64_t block_index, std::list<blockchain_storage::blocks_ext_by_hash::iterator>& alt_chain, block & b);
     bool process_blockchain_tx_extra(const transaction& tx);
     bool unprocess_blockchain_tx_extra(const transaction& tx);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);

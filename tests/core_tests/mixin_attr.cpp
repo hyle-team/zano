@@ -289,7 +289,7 @@ bool mix_in_spent_outs::c1(currency::core& c, size_t ev_index, const std::vector
   
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of txs in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are txs in the pool");
