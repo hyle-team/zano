@@ -397,7 +397,7 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
 
       currency::transaction tx = AUTO_VAL_INIT(tx);
       std::vector<tx_destination_entry> destinations{ tx_destination_entry(se.amount, wlt_to->get_account().get_public_address()) };
-      wlt_from->transfer(destinations, 0, 0, se.fee, empty_extra, empty_attachment, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+      wlt_from->transfer(destinations, 0, 0, se.fee, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
       CHECK_AND_NO_ASSERT_MES(mine_next_block_with_tx(c, tx), false, "mine_next_block_with_tx failed");
       mine_empty_block = false;
