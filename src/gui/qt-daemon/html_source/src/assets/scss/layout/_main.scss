@@ -68,6 +68,11 @@ app-wallet-details {
 app-settings {
 
   .content {
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    justify-content: space-between;
+    flex-direction: column;
 
     .theme-selection {
 
