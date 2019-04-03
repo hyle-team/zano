@@ -2731,7 +2731,6 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   const bc_services::contract_private_details& ecrow_details)
 {
   construct_tx_param construct_params = AUTO_VAL_INIT(construct_params);
-  finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   construct_params.fee = fee;
   construct_params.multisig_id = multisig_id;
   construct_params.split_strategy_id = detail::ssi_digit;
@@ -2755,8 +2754,11 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   tsa.service_id = BC_ESCROW_SERVICE_ID;
   tsa.instruction = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_NORMAL;
   construct_params.extra.push_back(tsa);
-  prepare_transaction(construct_params, ftp);
-  finalize_transaction(ftp, tx_release_template, crypto::secret_key(), false);
+  {
+    finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    prepare_transaction(construct_params, ftp);
+    finalize_transaction(ftp, tx_release_template, crypto::secret_key(), false);
+  }
 
   //generate burn escrow 
   construct_params.dsts.resize(1);
@@ -2767,8 +2769,11 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   construct_params.extra.clear();
   tsa.instruction = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_BURN;
   construct_params.extra.push_back(tsa);
-  prepare_transaction(construct_params, ftp);
-  finalize_transaction(ftp, tx_burn_template, crypto::secret_key(), false);
+  {
+    finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    prepare_transaction(construct_params, ftp);
+    finalize_transaction(ftp, tx_burn_template, crypto::secret_key(), false);
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::build_escrow_cancel_template(crypto::hash multisig_id,
