@@ -143,7 +143,7 @@ export class BackendService {
   }
 
   private bigNumberParser(key, val) {
-    if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge', 'coast'].indexOf(key) === -1) {
+    if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge', 'coast', 'a'].indexOf(key) === -1) {
       return val.toNumber();
     }
     if (key === 'rcv' || key === 'spn') {
