@@ -1,4 +1,5 @@
 import {Component, NgZone, OnDestroy, OnInit} from '@angular/core';
+import {Location} from "@angular/common";
 import {BackendService} from '../_helpers/services/backend.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
@@ -18,6 +19,7 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
+    private location: Location,
     private backend: BackendService,
     private variablesService: VariablesService,
     private modalService: ModalService,
@@ -70,6 +72,10 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
         });
       });
     }
+  }
+
+  back() {
+    this.location.back();
   }
 
   ngOnDestroy() {

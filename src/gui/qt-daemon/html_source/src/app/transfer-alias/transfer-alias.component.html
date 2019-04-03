@@ -5,7 +5,7 @@
       <span [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">{{ wallet.name }}</span>
       <span>{{ 'BREADCRUMBS.TRANSFER_ALIAS' | translate }}</span>
     </div>
-    <button class="back-btn" (click)="back()">
+    <button type="button" class="back-btn" (click)="back()">
       <i class="icon back"></i>
       <span>{{ 'COMMON.BACK' | translate }}</span>
     </button>

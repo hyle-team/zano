@@ -119,7 +119,7 @@ export class Wallet {
           }
         }
         if (!exists) {
-          if (this.history.length && items[i].timestamp > this.history[0].timestamp) {
+          if (this.history.length && items[i].timestamp >= this.history[0].timestamp) {
             this.history.unshift(this.prepareHistoryItem(items[i]));
           } else {
             this.history.push(this.prepareHistoryItem(items[i]));

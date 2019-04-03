@@ -6,6 +6,10 @@
 .content {
   padding: 3rem;
   min-height: 100%;
+
+  .head {
+    justify-content: flex-end;
+  }
 }
 
 .add-wallet {
