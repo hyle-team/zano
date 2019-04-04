@@ -46,6 +46,8 @@ namespace tools
         MAP_JON_RPC_WE("get_bulk_payments",         on_get_bulk_payments,         wallet_rpc::COMMAND_RPC_GET_BULK_PAYMENTS)
         MAP_JON_RPC_WE("make_integrated_address",   on_make_integrated_address,   wallet_rpc::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS)
         MAP_JON_RPC_WE("split_integrated_address",  on_split_integrated_address,  wallet_rpc::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS)
+        MAP_JON_RPC_WE("sign_transfer",             on_sign_transfer,             wallet_rpc::COMMAND_SIGN_TRANSFER)
+        MAP_JON_RPC_WE("submit_transfer",           on_submit_transfer,           wallet_rpc::COMMAND_SUBMIT_TRANSFER)
 
         // supernet api
         MAP_JON_RPC_WE("maketelepod",   on_maketelepod,   wallet_rpc::COMMAND_RPC_MAKETELEPOD)
@@ -64,6 +66,9 @@ namespace tools
       bool on_get_bulk_payments(const wallet_rpc::COMMAND_RPC_GET_BULK_PAYMENTS::request& req, wallet_rpc::COMMAND_RPC_GET_BULK_PAYMENTS::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_make_integrated_address(const wallet_rpc::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request& req, wallet_rpc::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_split_integrated_address(const wallet_rpc::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::request& req, wallet_rpc::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_sign_transfer(const wallet_rpc::COMMAND_SIGN_TRANSFER::request& req, wallet_rpc::COMMAND_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_submit_transfer(const wallet_rpc::COMMAND_SUBMIT_TRANSFER::request& req, wallet_rpc::COMMAND_SUBMIT_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
       bool on_maketelepod(const wallet_rpc::COMMAND_RPC_MAKETELEPOD::request& req, wallet_rpc::COMMAND_RPC_MAKETELEPOD::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_clonetelepod(const wallet_rpc::COMMAND_RPC_CLONETELEPOD::request& req, wallet_rpc::COMMAND_RPC_CLONETELEPOD::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_telepodstatus(const wallet_rpc::COMMAND_RPC_TELEPODSTATUS::request& req, wallet_rpc::COMMAND_RPC_TELEPODSTATUS::response& res, epee::json_rpc::error& er, connection_context& cntx);

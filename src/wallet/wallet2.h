@@ -255,6 +255,8 @@ namespace tools
     uint8_t tx_outs_attr;
     bool shuffle;
 
+    crypto::public_key spend_pub_key;  // only for validations
+
     BEGIN_SERIALIZE_OBJECT()
       FIELD(dsts)
       FIELD(fake_outputs_count)
@@ -270,6 +272,7 @@ namespace tools
       FIELD(crypt_address)
       FIELD(tx_outs_attr)
       FIELD(shuffle)
+      FIELD(spend_pub_key)
     END_SERIALIZE()
   };
 
@@ -294,7 +297,6 @@ namespace tools
     std::vector<uint64_t> selected_transfers;
     std::vector<currency::tx_destination_entry> prepared_destinations;
 
-
     BEGIN_SERIALIZE_OBJECT()
       FIELD(unlock_time)
       FIELD(extra)
@@ -310,21 +312,20 @@ namespace tools
     END_SERIALIZE()
   };
 
-  /*uct constructed_tx_data
+  struct finalized_tx
   {
-    //std::vector<currency::tx_destination_entry> prepared_destinations;
     currency::transaction tx;
-    //std::vector<uint64_t> selected_transfers;
-    crypto::secret_key one_time_key;
+    crypto::secret_key    one_time_key;
+    finalize_tx_param     ftp;
+    std::vector<std::pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
 
     BEGIN_SERIALIZE_OBJECT()
-      //FIELD(prepared_destinations)
       FIELD(tx)
-      //FIELD(selected_transfers)
       FIELD(one_time_key)
+      FIELD(ftp)
+      FIELD(outs_key_images)
     END_SERIALIZE()
-  };*/
-
+  };
 
   class wallet2
   {
@@ -613,8 +614,10 @@ namespace tools
 
     bool is_watch_only() const { return m_watch_only; }
     void sign_transfer(const std::string& tx_sources_blob, std::string& signed_tx_blob, currency::transaction& tx);
+    void sign_transfer_files(const std::string& tx_sources_file, const std::string& signed_tx_file, currency::transaction& tx);
+    void submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx);
+    void submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx);
 
-    
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
     uint64_t get_blockchain_current_height() const { return m_blockchain.size(); }
     template <class t_archive>

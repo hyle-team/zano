@@ -302,6 +302,89 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_sign_transfer(const wallet_rpc::COMMAND_SIGN_TRANSFER::request& req, wallet_rpc::COMMAND_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      currency::transaction tx = AUTO_VAL_INIT(tx);
+      std::string tx_unsigned_blob;
+      if (!string_tools::parse_hexstr_to_binbuff(req.tx_unsigned_hex, tx_unsigned_blob))
+      {
+        er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+        er.message = "tx_unsigned_hex is invalid";
+        return false;
+      }
+      std::string tx_signed_blob;
+      m_wallet.sign_transfer(tx_unsigned_blob, tx_signed_blob, tx);
+
+      res.tx_signed_hex = epee::string_tools::buff_to_hex_nodelimer(tx_signed_blob);
+      res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
+    }
+    catch (const std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+      er.message = e.what();
+      return false;
+    }
+    catch (...)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_submit_transfer(const wallet_rpc::COMMAND_SUBMIT_TRANSFER::request& req, wallet_rpc::COMMAND_SUBMIT_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    //std::string tx_unsigned_blob;
+    //if (!string_tools::parse_hexstr_to_binbuff(req.tx_unsigned_hex, tx_unsigned_blob))
+    //{
+    //  er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+    //  er.message = "tx_unsigned_hex is invalid";
+    //  return false;
+    //}
+
+    std::string tx_signed_blob;
+    if (!string_tools::parse_hexstr_to_binbuff(req.tx_signed_hex, tx_signed_blob))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "tx_signed_hex is invalid";
+      return false;
+    }
+
+    try
+    {
+      currency::transaction tx = AUTO_VAL_INIT(tx);
+      // TODO m_wallet.submit_transfer(tx_unsigned_blob, tx_signed_blob, tx);
+      res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
+    }
+    catch (const std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+      er.message = e.what();
+      return false;
+    }
+    catch (...)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_maketelepod(const wallet_rpc::COMMAND_RPC_MAKETELEPOD::request& req, wallet_rpc::COMMAND_RPC_MAKETELEPOD::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     //check available balance

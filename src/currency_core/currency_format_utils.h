@@ -67,12 +67,26 @@ namespace currency
     crypto::public_key real_out_tx_key; //real output's transaction's public key
     size_t real_output_in_tx_index;     //index in transaction outputs vector
     uint64_t amount;                    //money
+    uint64_t transfer_index;            //money
     crypto::hash multisig_id;           //if txin_multisig: multisig output id
     size_t ms_sigs_count;               //if txin_multisig: must be equal to output's minimum_sigs
     size_t ms_keys_count;               //if txin_multisig: must be equal to size of output's keys container
     bool separately_signed_tx_complete; //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
 
     bool is_multisig() const { return ms_sigs_count > 0; }
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(outputs)
+      FIELD(real_output)
+      FIELD(real_out_tx_key)
+      FIELD(real_output_in_tx_index)
+      FIELD(amount)
+      FIELD(transfer_index)
+      FIELD(multisig_id)
+      FIELD(ms_sigs_count)
+      FIELD(ms_keys_count)
+      FIELD(separately_signed_tx_complete)
+    END_SERIALIZE()
   };
 
   struct tx_destination_entry

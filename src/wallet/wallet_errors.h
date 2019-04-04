@@ -678,3 +678,12 @@ if (cond)                                                                       
 
 
 #define THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, mess)      THROW_IF_TRUE_WALLET_INT_ERR_EX((!(cond)), mess)
+
+#define THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, mess)                                                                              \
+  if (!(cond))                                                                                                                    \
+  {                                                                                                                               \
+    std::stringstream ss;                                                                                                         \
+    ss << mess;                                                                                                                   \
+    LOG_ERROR(" (" << #cond << ") is FALSE. THROW EXCEPTION: wallet_common_error");                                               \
+    tools::error::throw_wallet_ex<tools::error::wallet_common_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str());    \
+  }

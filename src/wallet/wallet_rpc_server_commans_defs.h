@@ -360,6 +360,51 @@ namespace wallet_rpc
     };
   };
 
+  struct COMMAND_SIGN_TRANSFER
+  {
+    struct request
+    {
+      std::string     tx_unsigned_hex;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_unsigned_hex)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string     tx_signed_hex;
+      std::string     tx_hash;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_signed_hex)
+        KV_SERIALIZE(tx_hash)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_SUBMIT_TRANSFER
+  {
+    struct request
+    {
+      //std::string     tx_unsigned_hex;
+      std::string     tx_signed_hex;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        //KV_SERIALIZE(tx_unsigned_hex)
+        KV_SERIALIZE(tx_signed_hex)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string     tx_hash;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_hash)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   /*stay-alone instance*/
   struct telepod
