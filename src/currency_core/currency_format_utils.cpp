@@ -1212,7 +1212,7 @@ namespace currency
   //---------------------------------------------------------------
   std::string get_word_from_timstamp(uint64_t timestamp)
   {
-    uint64_t date_offset = timestamp ? timestamp - WALLET_BRAIN_DATE_OFFSET : 0;
+    uint64_t date_offset = timestamp > WALLET_BRAIN_DATE_OFFSET ? timestamp - WALLET_BRAIN_DATE_OFFSET : 0;
     uint64_t weeks_count = date_offset / WALLET_BRAIN_DATE_QUANTUM;
     CHECK_AND_ASSERT_THROW_MES(weeks_count < std::numeric_limits<uint32_t>::max(), "internal error: unable to converto to uint32, val = " << weeks_count);
     uint32_t weeks_count_32 = static_cast<uint32_t>(weeks_count);
@@ -1664,24 +1664,7 @@ namespace currency
     }
     return true;
   }
-//   //--------------------------------------------------------------
-//   crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_long_ash, uint64_t nonce)
-//   {
-//     //TODO: add wild keccak 2
-//     return null_hash;//TODO;
-//   }
-//   //---------------------------------------------------------------
-//   void get_block_longhash(const block& b, crypto::hash& res)
-//   {
-//     //TODO: add wild keccak 2
-//   }
-//   //---------------------------------------------------------------
-//   crypto::hash get_block_longhash(const block& b)
-//   {
-//     crypto::hash p = null_hash;
-//     get_block_longhash(b, p);
-//     return p;
-//   }
+
   //---------------------------------------------------------------
   uint64_t get_alias_coast_from_fee(const std::string& alias, uint64_t median_fee)
   {
@@ -2403,21 +2386,6 @@ namespace currency
       return PREMINE_AMOUNT;
   
     return CURRENCY_TESTNET_CONST_REWARD;
-  }
-  //-----------------------------------------------------------------------------------------------
-  uint64_t get_scratchpad_last_update_rebuild_height(uint64_t h)
-  {
-    return h - (h%CURRENCY_SCRATCHPAD_REBUILD_INTERVAL);
-  }
-  //-----------------------------------------------------------------------------------------------
-  uint64_t get_scratchpad_size_for_height(uint64_t h)
-  {
-    if (h < CURRENCY_BLOCKS_PER_DAY * 7)
-    {
-      return 100;
-    }
-    //let's have ~250MB/year if block interval is 2 minutes
-    return CURRENCY_SCRATCHPAD_BASE_SIZE + get_scratchpad_last_update_rebuild_height(h)*30;
   }
   //-----------------------------------------------------------------------------------------------
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, uint64_t already_generated_coins, uint64_t &reward, uint64_t height)

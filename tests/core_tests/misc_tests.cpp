@@ -347,7 +347,7 @@ bool block_template_vs_invalid_txs_from_pool::check_block_template(currency::cor
 
   bool r = false;
   currency::block b = AUTO_VAL_INIT(b);
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, addr, c, &b);
+  r = mine_next_pow_block_in_playtime(addr, c, &b);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   return true;

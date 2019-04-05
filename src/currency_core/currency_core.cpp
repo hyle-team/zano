@@ -401,14 +401,9 @@ namespace currency
     return m_mempool.add_tx(tx, tx_hash, blob_size, tvc, kept_by_block);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_block_template(block& b, crypto::hash& seed, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe)
-  {
-    return m_blockchain_storage.create_block_template(b, seed, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
-  }
   bool core::get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe)
   {
-    crypto::hash seed_subst = currency::null_hash;
-    return m_blockchain_storage.create_block_template(b, seed_subst, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
+    return m_blockchain_storage.create_block_template(b, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
   }
   //-----------------------------------------------------------------------------------------------
   bool core::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp) const 

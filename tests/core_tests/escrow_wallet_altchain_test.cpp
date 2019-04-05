@@ -85,7 +85,7 @@ bool escrow_altchain_meta_impl::generate(std::vector<test_event_entry>& events) 
 bool escrow_altchain_meta_impl::mine_next_block_with_tx(currency::core& c, const currency::transaction& tx)
 {
   block b = AUTO_VAL_INIT(b);
-  bool r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx }), m_last_block_hash, m_last_block_height + 1, &b);
+  bool r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx }), m_last_block_hash, m_last_block_height + 1, &b);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
   m_last_block_hash = get_block_hash(b);
   m_last_block_height = get_block_height(b);
@@ -95,7 +95,7 @@ bool escrow_altchain_meta_impl::mine_next_block_with_tx(currency::core& c, const
 bool escrow_altchain_meta_impl::mine_next_block_with_no_tx(currency::core& c)
 {
   block b = AUTO_VAL_INIT(b);
-  bool r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), m_last_block_hash, m_last_block_height + 1, &b);
+  bool r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), m_last_block_hash, m_last_block_height + 1, &b);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
   m_last_block_hash = get_block_hash(b);
   m_last_block_height = get_block_height(b);

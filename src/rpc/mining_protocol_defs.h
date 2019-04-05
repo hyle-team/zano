@@ -120,34 +120,6 @@ namespace mining
     };
   };
 
-  struct COMMAND_RPC_GET_FULLSCRATCHPAD
-  {
-    RPC_METHOD_NAME("getfullscratchpad");
-
-    struct request
-    {
-      std::string id;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(id)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      height_info hi;
-      std::string scratchpad_hex;
-      std::string status;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(hi)
-        KV_SERIALIZE(scratchpad_hex)
-        KV_SERIALIZE(status)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-
   struct COMMAND_RPC_SUBMITSHARE
   {
     RPC_METHOD_NAME("submit");
@@ -176,32 +148,6 @@ namespace mining
       END_KV_SERIALIZE_MAP()
     };
   };
-
-
-  struct COMMAND_RPC_STORE_SCRATCHPAD
-  {
-    RPC_METHOD_NAME("store_scratchpad");
-
-    struct request
-    {
-      std::string local_file_path;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(local_file_path)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-
 
 }
 
