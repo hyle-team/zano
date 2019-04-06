@@ -4344,6 +4344,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
   size_t tx_processed_count = 0;
   uint64_t fee_summary = 0;
+  uint64_t coins_to_reimburse = 0;
 
   for(const crypto::hash& tx_id : bl.tx_hashes)
   {
@@ -4408,6 +4409,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     ++tx_processed_count;
     if (fee)
       block_fees.push_back(fee);
+    coins_to_reimburse += get_burned_coins_amount(tx);
   }
   TIME_MEASURE_FINISH_PD(all_txs_insert_time_5);
 
@@ -4469,7 +4471,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   bei.cumulative_diff_adjusted += cumulative_diff_delta;
 
   //etc 
-  bei.already_generated_coins = already_generated_coins + base_reward;
+  CHECK_AND_ASSERT_THROW_MES(!already_generated_coins || coins_to_reimburse < already_generated_coins, "coins_to_reimburse(" << coins_to_reimburse <<") expected to be less then bei.already_generated_coins(" << bei.already_generated_coins <<")");
+  bei.already_generated_coins = (already_generated_coins + base_reward) - coins_to_reimburse;
 
   auto blocks_index_ptr = m_db_blocks_index.get(id);
   if (blocks_index_ptr)

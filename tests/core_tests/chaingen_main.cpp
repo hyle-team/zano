@@ -13,6 +13,7 @@
 #include "currency_core/bc_offers_service.h"
 #include "random_helper.h"
 #include "core_state_helper.h"
+#include "burned_reimburse_test.h"
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
@@ -932,6 +933,8 @@ int main(int argc, char* argv[])
 
     GENERATE_AND_PLAY(gen_uint_overflow_1);
     GENERATE_AND_PLAY(gen_uint_overflow_2);
+
+    GENERATE_AND_PLAY(bunred_coins_reimburse_test);    
 
     //GENERATE_AND_PLAY(gen_block_reward); */
 

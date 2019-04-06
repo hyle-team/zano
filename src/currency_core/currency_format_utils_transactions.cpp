@@ -130,5 +130,21 @@ namespace currency
   {
     return t_serializable_object_to_blob(tx, b_blob);
   }
-
+  //---------------------------------------------------------------
+  uint64_t get_burned_coins_amount(const transaction& tx)
+  {
+    uint64_t res = 0;
+    for (auto& o : tx.vout)
+    {
+      if (o.target.type() == typeid(txout_to_key))
+      {
+        if (boost::get<txout_to_key>(o.target).key == currency::null_pkey)
+        {
+          res += o.amount;
+        }
+      }
+    }
+    return res;
+  }
+  //---------------------------------------------------------------
 }
