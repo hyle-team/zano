@@ -68,11 +68,47 @@ app-wallet-details {
 app-settings {
 
   .content {
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    justify-content: space-between;
+    flex-direction: column;
 
     .theme-selection {
 
       @include themify($themes) {
         color: themed(optionalTextColor);
+      }
+    }
+
+    .scale-selection {
+
+      .button-block {
+
+        @include themify($themes) {
+          background-color: themed(tabInactiveBackgroundColor);
+        }
+
+        .label {
+
+          @include themify($themes) {
+            color: themed(optionalTextColor);
+          }
+        }
+
+        &.active {
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+
+          .label {
+
+            @include themify($themes) {
+              color: themed(blueTextColor);
+            }
+          }
+        }
       }
     }
   }

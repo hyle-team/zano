@@ -98,7 +98,7 @@ namespace currency
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
     boost::split(words, restore_data_, boost::is_space());
-    CHECK_AND_ASSERT_THROW_MES(words.size() == BRAINWALLET_DEFAULT_WORDS_COUNT, "Words count missmatch: " << words.size());
+    CHECK_AND_ASSERT_MES(words.size() == BRAINWALLET_DEFAULT_WORDS_COUNT, false, "Words count missmatch: " << words.size());
 
     std::string timestamp_word = words.back();
     words.erase(--words.end());

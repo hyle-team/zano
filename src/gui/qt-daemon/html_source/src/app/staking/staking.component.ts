@@ -5,6 +5,7 @@ import {BackendService} from '../_helpers/services/backend.service';
 import {ActivatedRoute} from '@angular/router';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
 import {TranslateService} from '@ngx-translate/core';
+import {BigNumber} from 'bignumber.js';
 
 @Component({
   selector: 'app-staking',
@@ -54,11 +55,13 @@ export class StakingComponent implements OnInit, OnDestroy {
 
   chart: Chart;
 
-  total = 0;
+  total = new BigNumber(0);
   pending = {
     list: [],
-    total: 0
+    total: new BigNumber(0)
   };
+
+  currentPeriod = 'All';
 
   constructor(
     private route: ActivatedRoute,
@@ -76,7 +79,7 @@ export class StakingComponent implements OnInit, OnDestroy {
       this.getMiningHistory();
     });
     this.heightAppEvent = this.variablesService.getHeightAppEvent.subscribe((newHeight: number) => {
-      if (this.pending.total) {
+      if (!this.pending.total.isZero()) {
         const pendingCount = this.pending.list.length;
         for (let i = pendingCount - 1; i >= 0; i--) {
           if (newHeight - this.pending.list[i].h >= 10) {
@@ -84,9 +87,9 @@ export class StakingComponent implements OnInit, OnDestroy {
           }
         }
         if (pendingCount !== this.pending.list.length) {
-          this.pending.total = 0;
+          this.pending.total = new BigNumber(0);
           for (let i = 0; i < this.pending.list.length; i++) {
-            this.pending.total += this.pending.list[i].a;
+            this.pending.total = this.pending.total.plus(this.pending.list[i].a);
           }
         }
       }
@@ -215,9 +218,9 @@ export class StakingComponent implements OnInit, OnDestroy {
   getMiningHistory() {
     if (this.variablesService.currentWallet.loaded) {
       this.backend.getMiningHistory(this.variablesService.currentWallet.wallet_id, (status, data) => {
-        this.total = 0;
+        this.total = new BigNumber(0);
         this.pending.list = [];
-        this.pending.total = 0;
+        this.pending.total = new BigNumber(0);
         this.originalData = [];
         if (data.mined_entries) {
           data.mined_entries.forEach((item, key) => {
@@ -226,10 +229,10 @@ export class StakingComponent implements OnInit, OnDestroy {
             }
           });
           data.mined_entries.forEach((item) => {
-            this.total += item.a;
+            this.total = this.total.plus(item.a);
             if (this.variablesService.height_app - item.h < 10) {
               this.pending.list.push(item);
-              this.pending.total += item.a;
+              this.pending.total = this.pending.total.plus(item.a);
             }
             this.originalData.push([parseInt(item.t, 10), parseFloat(this.intToMoneyPipe.transform(item.a))]);
           });
@@ -250,6 +253,7 @@ export class StakingComponent implements OnInit, OnDestroy {
       p.active = false;
     });
     period.active = true;
+    this.currentPeriod = period.key;
 
     const d = new Date();
     let min = null;
@@ -260,7 +264,7 @@ export class StakingComponent implements OnInit, OnDestroy {
         const time = (new Date(item[0])).setUTCMinutes(0, 0, 0);
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
-          find[1] += item[1];
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
         } else {
           newData.push([time, item[1]]);
         }
@@ -272,7 +276,7 @@ export class StakingComponent implements OnInit, OnDestroy {
         const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
-          find[1] += item[1];
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
         } else {
           newData.push([time, item[1]]);
         }
@@ -284,7 +288,7 @@ export class StakingComponent implements OnInit, OnDestroy {
         const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
-          find[1] += item[1];
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
         } else {
           newData.push([time, item[1]]);
         }
@@ -296,7 +300,7 @@ export class StakingComponent implements OnInit, OnDestroy {
         const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
-          find[1] += item[1];
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
         } else {
           newData.push([time, item[1]]);
         }

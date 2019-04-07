@@ -16,7 +16,9 @@
     </div>
   </div>
   <div class="selected" *ngIf="selectedDate && selectedDate.date">
-    <span>{{selectedDate.date | date : 'MMM. EEEE, dd, yyyy'}}</span>
+    <span *ngIf="currentPeriod === '1 day'">{{selectedDate.date | date : 'HH:00 - HH:59, MMM. EEEE, dd, yyyy'}}</span>
+    <span *ngIf="currentPeriod === 'All'">{{selectedDate.date | date : 'HH:mm, MMM. EEEE, dd, yyyy'}}</span>
+    <span *ngIf="!(currentPeriod === '1 day' || currentPeriod === 'All')">{{selectedDate.date | date : 'MMM. EEEE, dd, yyyy'}}</span>
     <span>{{selectedDate.amount}} {{variablesService.defaultCurrency}}</span>
   </div>
 </div>

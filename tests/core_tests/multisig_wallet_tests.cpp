@@ -156,7 +156,7 @@ bool multisig_wallet_test::c1(currency::core& c, size_t ev_index, const std::vec
   transaction result_tx = AUTO_VAL_INIT(result_tx);
   miner_wlt->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
 
-  bool r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  bool r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   //findout multisig out intex
@@ -171,7 +171,7 @@ bool multisig_wallet_test::c1(currency::core& c, size_t ev_index, const std::vec
   crypto::hash multisig_id = get_multisig_out_id(result_tx, i);
   CHECK_AND_ASSERT_MES(multisig_id != null_hash, false, "Multisig failed: failed to get get_multisig_out_id");
 
-  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   std::shared_ptr<tools::wallet2> wallet_a = init_playtime_test_wallet(events, c, m_accunt_a);
@@ -204,7 +204,7 @@ bool multisig_wallet_test::c1(currency::core& c, size_t ev_index, const std::vec
     tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD),
     result_tx);
 
-  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   wallet_a->refresh();
@@ -296,7 +296,7 @@ bool multisig_wallet_test_many_dst::c1(currency::core& c, size_t ev_index, const
   CHECK_AND_ASSERT_MES(it != result_tx.vout.end(), false, "Can't find output txout_multisig");
   size_t multisig_index = it - result_tx.vout.begin();
 
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   std::shared_ptr<tools::wallet2> w = init_playtime_test_wallet(events, c, addresses[0]);
@@ -313,7 +313,7 @@ bool multisig_wallet_test_many_dst::c1(currency::core& c, size_t ev_index, const
   transfer_multisig(*w.get(), owner_keys, get_multisig_out_id(result_tx, multisig_index), std::vector<tx_destination_entry>({ de2 }), 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
   TMP_LOG_RESTORE;
 
-  r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
@@ -424,7 +424,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   // Mine a block and make sure tx was put into it
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
@@ -483,7 +483,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
     0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   // Once Bob refreshes his wallet he should see that Alice has already spent they shared multisig
@@ -545,7 +545,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
     0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are txs in the pool.");
 
@@ -580,7 +580,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(caught, false, "Dan was able to make multisig tx for alreadly spent output");
 
   // Miner mines the next PoW block, confirming Alice's transaction.
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are txs in the pool.");
 
@@ -685,7 +685,7 @@ bool multisig_wallet_same_dst_addr::c1(currency::core& c, size_t ev_index, const
 
   // mine the next PoW and make sure everythig is allright
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are transactions in the pool");
 
@@ -703,7 +703,7 @@ bool multisig_wallet_same_dst_addr::c1(currency::core& c, size_t ev_index, const
     0, TX_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are transactions in the pool");
 
@@ -774,7 +774,7 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
 
   // mine the next PoW and make sure everythig is allright
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are transactions in the pool");
 
@@ -798,7 +798,7 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
 
   // check the pool and mine a block
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are transactions in the pool");
 
@@ -814,7 +814,7 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
     0, TX_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are transactions in the pool");
 
@@ -1621,7 +1621,7 @@ multisig_and_checkpoints::multisig_and_checkpoints()
 bool multisig_and_checkpoints::set_cp(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   currency::checkpoints checkpoints;
-  checkpoints.add_checkpoint(15, "816f96e8a0e259491ed7e03ef0f2eea69762276152f4990d71f657b1e37d8764");
+  checkpoints.add_checkpoint(15, "b9adef016fc8de02ad6d0db526e536a3c2211ee23a2d906f56989465c3e38602");
   c.set_checkpoints(std::move(checkpoints));
 
   return true;
@@ -2486,14 +2486,14 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
   transaction key_to_ms_tx = AUTO_VAL_INIT(key_to_ms_tx);
   miner_wlt->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), key_to_ms_tx);
 
-  bool r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, miner_acc.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  bool r = mine_next_pow_blocks_in_playtime(miner_acc.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   size_t ms_out_idx = get_multisig_out_index(key_to_ms_tx.vout);
   crypto::hash multisig_id = get_multisig_out_id(key_to_ms_tx, ms_out_idx);
   CHECK_AND_ASSERT_MES(multisig_id != null_hash, false, "Multisig failed: failed to get get_multisig_out_id");
 
-  //r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, miner_acc.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  //r = mine_next_pow_blocks_in_playtime(miner_acc.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   //CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);

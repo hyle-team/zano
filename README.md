@@ -16,7 +16,11 @@ Building
 
 Recommended OS version: Ubuntu 17.04 LTS.
 
-1. `$ sudo apt install git g++ cmake unzip libicu-dev mesa-common-dev libglu1-mesa-dev qt5-default qtwebengine5-dev`
+1. For server version: \
+`$ sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git libboost-all-dev screen`\
+For GUI version:\
+`$ sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git libboost-all-dev screen mesa-common-dev libglu1-mesa-dev qt5-default qtwebengine5-dev`
+
 2. `$ cd zano/ && make -j$(nproc) gui`
 3. Look for the binaries, including the `Zano` GUI, in the build directory
 

@@ -5,7 +5,7 @@
       <span [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">{{ wallet.name }}</span>
       <span>{{ 'BREADCRUMBS.ASSIGN_ALIAS' | translate }}</span>
     </div>
-    <button class="back-btn" (click)="back()">
+    <button type="button" class="back-btn" (click)="back()">
       <i class="icon back"></i>
       <span>{{ 'COMMON.BACK' | translate }}</span>
     </button>
@@ -45,7 +45,16 @@
       <label for="alias-comment" tooltip="{{ 'ASSIGN_ALIAS.COMMENT.TOOLTIP' | translate }}" placement="bottom-left" tooltipClass="table-tooltip assign-alias-tooltip" [delay]="500">
         {{ 'ASSIGN_ALIAS.COMMENT.LABEL' | translate }}
       </label>
-      <textarea id="alias-comment" formControlName="comment" placeholder="{{ 'ASSIGN_ALIAS.COMMENT.PLACEHOLDER' | translate }}" (contextmenu)="variablesService.onContextMenu($event)"></textarea>
+      <textarea id="alias-comment"
+                class="scrolled-content"
+                formControlName="comment"
+                placeholder="{{ 'ASSIGN_ALIAS.COMMENT.PLACEHOLDER' | translate }}"
+                [maxLength]="variablesService.maxCommentLength"
+                (contextmenu)="variablesService.onContextMenu($event)">
+      </textarea>
+      <div class="error-block" *ngIf="assignForm.get('comment').value.length >= variablesService.maxCommentLength">
+        {{ 'ASSIGN_ALIAS.FORM_ERRORS.MAX_LENGTH' | translate }}
+      </div>
     </div>
 
     <div class="alias-cost">{{ "ASSIGN_ALIAS.COST" | translate : {value: alias.price | intToMoney, currency: variablesService.defaultCurrency} }}</div>

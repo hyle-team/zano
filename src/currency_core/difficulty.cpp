@@ -114,12 +114,12 @@ namespace currency {
       return false;
     // usual slow check
     boost::multiprecision::uint512_t hashVal = 0;
-    for (int i = 1; i < 4; i++)
-    { // highest word is zero
-      hashVal |= swap64le(((const uint64_t *)&h)[3 - i]);
-      hashVal << 64;
+    for(int i = 0; i < 4; i++) 
+    {
+      hashVal <<= 64;
+      hashVal |= swap64le(((const uint64_t *) &h)[3-i]);
     }
-    return (hashVal * difficulty > max256bit);
+    return (hashVal * difficulty <= max256bit);
   }
 
   uint64_t difficulty_to_boundary(wide_difficulty_type difficulty)

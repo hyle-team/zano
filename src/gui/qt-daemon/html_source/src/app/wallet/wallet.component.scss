@@ -27,6 +27,11 @@
   h3 {
     font-size: 1.7rem;
     font-weight: 600;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 50rem;
+    line-height: 2.7rem;
   }
 
   button {

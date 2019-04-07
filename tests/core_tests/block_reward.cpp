@@ -87,8 +87,7 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
       wide_difficulty_type diff = 0;
       uint64_t height = 0;
       g_block_txs_total_size = txs_total_size; // passing an argument to custom_fill_block_template_func via global variable (not perfect but works well)
-      crypto::hash seed = currency::null_hash;
-      r = bcs.create_block_template(b, seed, miner_addr, miner_addr, diff, height, ex_nonce, is_pos != 0, pe, &custom_fill_block_template_func);
+      r = bcs.create_block_template(b, miner_addr, miner_addr, diff, height, ex_nonce, is_pos != 0, pe, &custom_fill_block_template_func);
       CHECK_AND_ASSERT_MES(r, false, "create_block_template failed, txs_total_size = " << txs_total_size);
       CHECK_AND_ASSERT_MES(height == top_block_height + 1, false, "Incorrect height: " << height << ", expected: " << top_block_height + 1 << ", txs_total_size = " << txs_total_size);
 

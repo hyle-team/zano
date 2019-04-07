@@ -31,6 +31,7 @@
 #include "miner_common.h"
 #include "storages/portable_storage_template_helper.h"
 #include "common/db_backend_lmdb.h"
+#include "basic_pow_helpers.h"
 #include "version.h"
 
 #undef LOG_DEFAULT_CHANNEL 
@@ -99,9 +100,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(std::share
                                                                  m_current_fee_median(0), 
                                                                  m_current_fee_median_effective_index(0), 
                                                                  m_is_reorganize_in_process(false), 
-                                                                 m_deinit_is_done(false), 
-                                                                 m_current_scratchpad_seed(currency::null_hash), 
-                                                                 m_current_scratchpad_seed_height(0)
+                                                                 m_deinit_is_done(false)
 
 
 {
@@ -291,9 +290,6 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
 
 
   initialize_db_solo_options_values();
-  get_seed_for_scratchpad(m_db_blocks.size(), m_current_scratchpad_seed);
-  m_current_scratchpad_seed_height = m_db_blocks.size();
- 
 
   m_services_mgr.init(config_folder, vm);
 
@@ -1112,16 +1108,16 @@ uint64_t blockchain_storage::get_current_comulative_blocksize_limit() const
   return m_db_current_block_cumul_sz_limit;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::create_block_template(block& b, crypto::hash& seed,
+bool blockchain_storage::create_block_template(block& b,
                                                const account_public_address& miner_address, 
                                                wide_difficulty_type& diffic, 
                                                uint64_t& height, 
                                                const blobdata& ex_nonce) const
 {
-  return create_block_template(b, seed, miner_address, miner_address, diffic, height, ex_nonce, false, pos_entry());
+  return create_block_template(b, miner_address, miner_address, diffic, height, ex_nonce, false, pos_entry());
 }
 //------------------------------------------------------------------
-bool blockchain_storage::create_block_template(block& b, crypto::hash& seed,
+bool blockchain_storage::create_block_template(block& b, 
                                                const account_public_address& miner_address, 
                                                const account_public_address& stakeholder_address,
                                                wide_difficulty_type& diffic, 
@@ -1131,7 +1127,6 @@ bool blockchain_storage::create_block_template(block& b, crypto::hash& seed,
                                                const pos_entry& pe,
                                                fill_block_template_func_t custom_fill_block_template_func /* = nullptr */) const
 {
-  seed = m_current_scratchpad_seed;
   size_t median_size;
   uint64_t already_generated_coins;
   CRITICAL_REGION_BEGIN(m_read_lock);
@@ -1456,10 +1451,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     }
     else
     {
-      crypto::hash seed = null_hash; 
-      get_seed_for_scratchpad_alt_chain(abei.height, seed, alt_chain);
-
-      proof_of_work = m_scratchpad.get_pow_hash(abei.bl, seed);
+      proof_of_work = get_block_longhash(abei.bl);
 
       if (!check_hash(proof_of_work, current_diff))
       {
@@ -1613,7 +1605,7 @@ bool blockchain_storage::pre_validate_relayed_block(block& bl, block_verificatio
   }
   else
   {    
-    proof_hash = m_scratchpad.get_pow_hash(bl, m_current_scratchpad_seed); //get_block_longhash(bl);
+    proof_hash = get_block_longhash(bl); //get_block_longhash(bl);
 
     if (!check_hash(proof_hash, current_diffic))
     {
@@ -1738,9 +1730,6 @@ bool blockchain_storage::get_main_block_rpc_details(uint64_t i, block_rpc_extend
   CRITICAL_REGION_LOCAL(m_read_lock);
   auto core_bei_ptr = m_db_blocks[i];
   crypto::hash id = get_block_hash(core_bei_ptr->bl);
-  crypto::hash pow_seed = null_hash;
-  get_seed_for_scratchpad(i, pow_seed);
-  bei.pow_seed = epee::string_tools::pod_to_hex(pow_seed);
   bei.is_orphan = false;
   bei.total_fee = 0;
   bei.total_txs_size = 0;
@@ -2763,7 +2752,6 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
       CHECK_AND_ASSERT_MES(back_item->tx_id == tx_id, false, "transactions outs global index consistency broken: tx id missmatch");
       CHECK_AND_ASSERT_MES(back_item->out_no == i, false, "transactions outs global index consistency broken: in transaction index missmatch");
       m_db_outputs.pop_back_item(ot.amount);
-      //do not let to exist empty m_outputs entries - this will broke scratchpad selector
       //if (!it->second.size())
       //  m_db_outputs.erase(it);
     }
@@ -4301,18 +4289,13 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   }
   else
   {
-    //++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    //precaution(do we really need this check?)
-    check_scratchpad();
-    //++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-    proof_hash = m_scratchpad.get_pow_hash(bl, m_current_scratchpad_seed);
+    proof_hash = get_block_longhash(bl);
 
     if (!check_hash(proof_hash, current_diffic))
     {
       LOG_ERROR("Block with id: " << id << ENDL
         << "PoW hash: " << proof_hash << ENDL
-        << "PoW seed: " << m_current_scratchpad_seed << ENDL
         << "unexpected difficulty: " << current_diffic);
       bvc.m_verification_failed = true;
       return false;
@@ -4575,28 +4558,16 @@ void blockchain_storage::on_block_added(const block_extended_info& bei, const cr
 {
   update_next_comulative_size_limit();
   m_timestamps_median_cache.clear();
-  check_scratchpad();
   m_tx_pool.on_blockchain_inc(bei.height, id);
   TIME_MEASURE_START_PD(raise_block_core_event);
   rise_core_event(CORE_EVENT_BLOCK_ADDED, void_struct());
   TIME_MEASURE_FINISH_PD(raise_block_core_event);
 }
 //------------------------------------------------------------------
- bool blockchain_storage::check_scratchpad() 
-{
-  if(get_scratchpad_last_update_rebuild_height(m_db_blocks.size()) != m_current_scratchpad_seed_height)
-  {
-    get_seed_for_scratchpad(m_db_blocks.size(), m_current_scratchpad_seed);
-    m_current_scratchpad_seed_height = get_scratchpad_last_update_rebuild_height(m_db_blocks.size());
-  }
-  return true;
-}
-//------------------------------------------------------------------
 void blockchain_storage::on_block_removed(const block_extended_info& bei)
 {
   m_tx_pool.on_blockchain_dec(m_db_blocks.size() - 1, get_top_block_id());
   m_timestamps_median_cache.clear();
-  check_scratchpad();
   LOG_PRINT_L2("block at height " << bei.height << " was removed from the blockchain");
 }
 //------------------------------------------------------------------
@@ -5328,42 +5299,6 @@ bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx
   // case b4
   LOG_ERROR("ms outout " << input.multisig_out_id << " was not found neither in main chain, nor in alt chain");
   return false;
-}
-//------------------------------------------------------------------
-bool blockchain_storage::get_seed_for_scratchpad(uint64_t height, crypto::hash& seed)const 
-{
-  CRITICAL_REGION_LOCAL(m_read_lock);
-  LOG_PRINT_MAGENTA("Get seed for scratchpad [main_chain] on height " << height, LOG_LEVEL_0);
-  return get_seed_for_scratchpad_cb(height, seed, [&](uint64_t index) -> crypto::hash
-  {
-    return get_block_hash(m_db_blocks[index]->bl);
-  });
-}
-//------------------------------------------------------------------
-bool blockchain_storage::get_seed_for_scratchpad_alt_chain(uint64_t height, crypto::hash& seed, const alt_chain_type& alt_chain)const 
-{
-  CRITICAL_REGION_LOCAL(m_read_lock);
-  //alt_chain: front -> mainchain, back -> alternative head
-  uint64_t connection_to_main_chain = height;
-  if (alt_chain.size())
-    connection_to_main_chain = alt_chain.front()->second.height;
-
-  return get_seed_for_scratchpad_cb(height, seed, [&](uint64_t index) -> crypto::hash
-  {
-    if (index < connection_to_main_chain)
-    {
-      //addressed to main chain
-      return get_block_hash(m_db_blocks[index]->bl);
-    }
-    else
-    {
-      //addressed to alt chain
-      uint64_t offset = index - connection_to_main_chain;
-      CHECK_AND_ASSERT_THROW_MES(offset < alt_chain.size(), "Internal error: failed to validate offset(" << offset  << ") < alt_chain.size()("<< alt_chain.size() <<")");
-      CHECK_AND_ASSERT_THROW_MES(alt_chain[offset]->second.height == index, "Internal error: failed to validate offset(" << offset << ") < alt_chain.size()(" << alt_chain.size() << ")");
-      return get_block_hash(alt_chain[offset]->second.bl);
-    }
-  });
 }
 //------------------------------------------------------------------
 bool blockchain_storage::get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height /* = 0 */) const
