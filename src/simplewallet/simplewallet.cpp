@@ -206,6 +206,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("integrated_address", boost::bind(&simple_wallet::integrated_address, this, _1), "integrated_address [<payment_id>|<integrated_address] - encodes given payment_id along with wallet's address into an integrated address (random payment_id will be used if none is provided). Decodes given integrated_address into standard address");
   m_cmd_binder.set_handler("get_tx_key", boost::bind(&simple_wallet::get_tx_key, this, _1), "Get transaction one-time secret key (r) for a given <txid>");
 
+  m_cmd_binder.set_handler("save_watch_only", boost::bind(&simple_wallet::save_watch_only, this, _1), "Save a watch-only keys file <filename> <password>.");
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -1278,6 +1279,31 @@ void simple_wallet::set_offline_mode(bool offline_mode)
       << "WARNING: the wallet is running in OFFLINE MODE!";
   }
   m_offline_mode = offline_mode;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::save_watch_only(const std::vector<std::string> &args)
+{
+  if (args.size() < 2)
+  {
+    fail_msg_writer() << "wrong parameters, expected filename and password";
+    return true;
+  }
+  try
+  {
+    m_wallet->store(epee::string_encoding::convert_to_unicode(args[0]), args[1], true);
+    success_msg_writer() << "Watch-only wallet has been stored to " << args[0];
+  }
+  catch (const std::exception& e)
+  {
+    LOG_ERROR("unexpected error: " << e.what());
+    fail_msg_writer() << "unexpected error: " << e.what();
+  }
+  catch (...)
+  {
+    LOG_ERROR("Unknown error");
+    fail_msg_writer() << "unknown error";
+  }
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])

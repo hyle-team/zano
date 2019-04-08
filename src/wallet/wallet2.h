@@ -297,6 +297,8 @@ namespace tools
     std::vector<uint64_t> selected_transfers;
     std::vector<currency::tx_destination_entry> prepared_destinations;
 
+    crypto::public_key spend_pub_key;  // only for validations
+
     BEGIN_SERIALIZE_OBJECT()
       FIELD(unlock_time)
       FIELD(extra)
@@ -309,6 +311,7 @@ namespace tools
       FIELD(sources)
       FIELD(selected_transfers)
       FIELD(prepared_destinations)
+      FIELD(spend_pub_key)
     END_SERIALIZE()
   };
 
@@ -468,7 +471,8 @@ namespace tools
     void restore(const std::wstring& path, const std::string& pass, const std::string& restore_key);
     void load(const std::wstring& wallet, const std::string& password);    
     void store();
-    void store(const std::wstring& path);
+    void store(const std::wstring& path, const std::string& password, bool store_as_watch_only = false);
+    bool store_keys(std::string& buff, const std::string& password, bool store_as_watch_only = false);
     std::wstring get_wallet_path(){ return m_wallet_file; }
     currency::account_base& get_account() { return m_account; }
     const currency::account_base& get_account() const { return m_account; }
@@ -534,7 +538,8 @@ namespace tools
       uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED,
       bool shuffle = true,
       uint8_t flags = 0,
-      bool send_to_network = true);
+      bool send_to_network = true,
+      std::string* p_signed_tx_blob_str = nullptr);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts, 
                   size_t fake_outputs_count, 
@@ -698,25 +703,6 @@ namespace tools
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
-    /*void prepare_transaction(const std::vector<currency::tx_destination_entry>& dsts,
-      size_t fake_outputs_count,
-      uint64_t unlock_time,
-      uint64_t fee,
-      const std::vector<currency::extra_v>& extra,
-      const std::vector<currency::attachment_v>& attachments,
-      detail::split_strategy_id_t destination_split_strategy_id,
-      const tx_dust_policy& dust_policy,
-      const currency::account_public_address& crypt_address,
-  OUT    currency::transaction &tx,
-      uint8_t tx_outs_attr,
-      bool shuffle,
-      bool mark_tx_as_complete,
-      uint8_t flags,
-  OUT    std::vector<uint64_t>& selected_transfers,
-  OUT    currency::keypair& one_time_key,
-  OUT    std::vector<currency::tx_destination_entry>& prepared_destinations,
-      crypto::hash multisig_id = currency::null_hash);*/
-
     void prepare_transaction(const construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
     void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx);
 
@@ -725,7 +711,6 @@ namespace tools
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
-    bool store_keys(std::string& buff, const std::string& password);
     void load_keys(const std::string& keys_file_name, const std::string& password);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b);
     void detach_blockchain(uint64_t height);
@@ -797,7 +782,7 @@ private:
 
     uint64_t get_tx_expiration_median() const;
 
-    void print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee);
+    void print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee = UINT64_MAX);
 
     // Validates escrow template tx in assumption it's related to wallet's account (wallet's account is either A or B party in escrow process)
     bool validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::proposal_body& prop,

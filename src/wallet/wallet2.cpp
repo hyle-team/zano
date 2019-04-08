@@ -272,29 +272,52 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     for (size_t i_in_outs = 0; i_in_outs != outs.size(); i_in_outs++)
     {
       size_t o = outs[i_in_outs];
-      THROW_IF_TRUE_WALLET_EX(tx.vout.size() <= o, error::wallet_internal_error, "wrong out in transaction: internal index=" +
-        std::to_string(o) + ", total_outs=" + std::to_string(tx.vout.size()));
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(o < tx.vout.size(), "wrong out in transaction: internal index=" << o << ", total_outs=" << tx.vout.size());
       if (tx.vout[o].target.type() == typeid(txout_to_key))
       {
-        currency::keypair in_ephemeral;
+        const currency::txout_to_key& otk = boost::get<currency::txout_to_key>(tx.vout[o].target);
+
+        // obtain key image for this output
         crypto::key_image ki = currency::null_ki;
-        currency::generate_key_image_helper(m_account.get_keys(), tx_pub_key, o, in_ephemeral, ki);
-        THROW_IF_TRUE_WALLET_EX(in_ephemeral.pub != boost::get<currency::txout_to_key>(tx.vout[o].target).key,
-          error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
-
-        auto it = m_key_images.find(ki);
-        if (it != m_key_images.end())
+        if (m_watch_only)
         {
-          THROW_IF_TRUE_WALLET_EX(it->second >= m_transfers.size(), error::wallet_internal_error, "m_key_images entry has wrong m_transfers index, it->second: " + epee::string_tools::num_to_string_fast(it->second) + ", m_transfers.size(): " + epee::string_tools::num_to_string_fast(m_transfers.size()));
-          const transfer_details& local_td = m_transfers[it->second];
-          WLT_LOG_YELLOW("tx " << get_transaction_hash(tx) << " @ block " << height << " has output #" << o << " with key image " << ki << " that has already been seen in output #" <<
-            local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx) << " @ block " << local_td.m_spent_height <<
-            ". This output can't ever be spent and will be skipped.", LOG_LEVEL_0);
-          THROW_IF_TRUE_WALLET_EX(tx_money_got_in_outs < tx.vout[o].amount, error::wallet_internal_error, "tx_money_got_in_outs: " + epee::string_tools::num_to_string_fast(tx_money_got_in_outs) + ", tx.vout[o].amount:" + print_money(tx.vout[o].amount));
-          tx_money_got_in_outs -= tx.vout[o].amount;
-          continue; // skip the output
+          // don't have spend secret key, so we unable to calculate key image for an output
+          // look it up in special container instead
+          auto it = m_pending_key_images.find(otk.key);
+          if (it != m_pending_key_images.end())
+          {
+            ki = it->second;
+            WLT_LOG_L1("pending key image " << ki << " was found by out pub key " << otk.key);
+          }
+          else
+          {
+            ki = currency::null_ki;
+            WLT_LOG_L1("can't find pending key image by out pub key: " << otk.key << ", key image temporarily set to null");
+          }
         }
-
+        else
+        {
+          // normal wallet, calculate and store key images for own outs
+          currency::keypair in_ephemeral;
+          currency::generate_key_image_helper(m_account.get_keys(), tx_pub_key, o, in_ephemeral, ki);
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(in_ephemeral.pub == otk.key, "key_image generated ephemeral public key that does not match with output_key");
+        }
+        
+        if (ki != currency::null_ki)
+        {
+          auto it = m_key_images.find(ki);
+          if (it != m_key_images.end())
+          {
+            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "m_key_images entry has wrong m_transfers index, it->second: " << it->second << ", m_transfers.size(): " << m_transfers.size());
+            const transfer_details& local_td = m_transfers[it->second];
+            WLT_LOG_YELLOW("tx " << get_transaction_hash(tx) << " @ block " << height << " has output #" << o << " with key image " << ki << " that has already been seen in output #" <<
+              local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx) << " @ block " << local_td.m_spent_height <<
+              ". This output can't ever be spent and will be skipped.", LOG_LEVEL_0);
+            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tx_money_got_in_outs >= tx.vout[o].amount, "tx_money_got_in_outs: " << tx_money_got_in_outs << ", tx.vout[o].amount:" << tx.vout[o].amount);
+            tx_money_got_in_outs -= tx.vout[o].amount;
+            continue; // skip the output
+          }
+        }
 
         mtd.receive_indices.push_back(o);
 
@@ -314,7 +337,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           }
         }
         size_t transfer_index = m_transfers.size()-1;
-        m_key_images[td.m_key_image] = transfer_index;
+        if (td.m_key_image != currency::null_ki)
+          m_key_images[td.m_key_image] = transfer_index;
         add_transfer_to_transfers_cache(tx.vout[o].amount, transfer_index);
         WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
       }
@@ -1686,6 +1710,7 @@ bool wallet2::reset_all()
   m_blockchain.clear();
   m_transfers.clear();
   m_key_images.clear();
+  // m_pending_key_images is not cleared intentionally
   m_unconfirmed_in_transfers.clear();
   m_unconfirmed_txs.clear();
   m_unconfirmed_multisig_transfers.clear();
@@ -1702,11 +1727,16 @@ bool wallet2::reset_all()
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::store_keys(std::string& buff, const std::string& password)
+bool wallet2::store_keys(std::string& buff, const std::string& password, bool store_as_watch_only /* = false */)
 {
+  currency::account_base acc = m_account;
+  if (store_as_watch_only)
+    acc.make_account_watch_only();
+
   std::string account_data;
-  bool r = epee::serialization::store_t_to_binary(m_account, account_data);
+  bool r = epee::serialization::store_t_to_binary(acc, account_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "failed to serialize wallet keys");
+
   wallet2::keys_file_data keys_file_data = boost::value_initialized<wallet2::keys_file_data>();
 
   crypto::chacha8_key key;
@@ -1857,8 +1887,11 @@ void wallet2::generate(const std::wstring& path, const std::string& pass)
   init_log_prefix();
   boost::system::error_code ignored_ec;
   THROW_IF_TRUE_WALLET_EX(boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));
-  bool stub;
-  load_keys2ki(true, stub);
+  if (m_watch_only)
+  {
+    bool stub;
+    load_keys2ki(true, stub);
+  }
   store();
 }
 //----------------------------------------------------------------------------------------------------
@@ -1930,24 +1963,21 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
 //----------------------------------------------------------------------------------------------------
 void wallet2::store()
 {
-  store(m_wallet_file);
+  store(m_wallet_file, m_password, false);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::store(const std::wstring& path_to_save)
+void wallet2::store(const std::wstring& path_to_save, const std::string& password, bool store_as_watch_only)
 {
   LOG_PRINT_L0("(before storing: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!(store_as_watch_only && path_to_save == m_wallet_file), "ttrying to save watch-only wallet to the same wallet file!");
+
   //prepare data
   std::string keys_buff;
-  bool r = store_keys(keys_buff, m_password);
+  bool r = store_keys(keys_buff, password);
   CHECK_AND_ASSERT_THROW_MES(r, "failed to store_keys for wallet " << epee::string_encoding::convert_to_ansii(m_wallet_file));
 
   wallet_file_binary_header wbh = AUTO_VAL_INIT(wbh);
-
-//  std::stringstream ss;
-//  r = tools::portble_serialize_obj_to_stream(*this, ss);
-//  CHECK_AND_ASSERT_THROW_MES(r, "failed to portble_serialize_obj_to_stream for wallet " << epee::string_encoding::convert_to_ansii(m_wallet_file));
-//  std::string body_buff = ss.str();
 
   //store data
 
@@ -1965,8 +1995,18 @@ void wallet2::store(const std::wstring& path_to_save)
   CHECK_AND_ASSERT_THROW_MES(!data_file.fail(), "failed to open binary wallet file for saving: " << epee::string_encoding::convert_to_ansii(m_wallet_file));
   data_file << header_buff << keys_buff;
   WLT_LOG_L0("Storing to file...");
-  r = tools::portble_serialize_obj_to_stream(*this, data_file);
-  CHECK_AND_ASSERT_THROW_MES(r, "failed to portble_serialize_obj_to_stream for wallet " << epee::string_encoding::convert_to_ansii(m_wallet_file));
+
+  if (store_as_watch_only)
+  {
+    // TODO
+    r = tools::portble_serialize_obj_to_stream(*this, data_file);
+    CHECK_AND_ASSERT_THROW_MES(r, "failed to portble_serialize_obj_to_stream for wallet " << epee::string_encoding::convert_to_ansii(m_wallet_file));
+  }
+  else
+  {
+    r = tools::portble_serialize_obj_to_stream(*this, data_file);
+    CHECK_AND_ASSERT_THROW_MES(r, "failed to portble_serialize_obj_to_stream for wallet " << epee::string_encoding::convert_to_ansii(m_wallet_file));
+  }
 
   data_file.flush();
   data_file.close();
@@ -2173,8 +2213,6 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
 
   crypto::hash tx_hash = get_transaction_hash(ft.tx);
 
-  // foolproof check to make sure create_tx_param and create_tx_result DO match each other
-
   try
   {
     send_transaction_to_network(ft.tx);
@@ -2182,12 +2220,12 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   catch (...)
   {
     // clear spent transfers if smth went wrong
-    clear_transfers_from_flag(ft.ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, "broadcasting tx " + epee::string_tools::pod_to_hex(get_transaction_hash(ft.tx)) + " was unsuccessful");
+    clear_transfers_from_flag(ft.ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, "broadcasting tx " + epee::string_tools::pod_to_hex(tx_hash) + " was unsuccessful");
     throw;
   }
 
   add_sent_tx_detailed_info(ft.tx, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
-  m_tx_keys.insert(std::make_pair(get_transaction_hash(ft.tx), ft.one_time_key));
+  m_tx_keys.insert(std::make_pair(tx_hash, ft.one_time_key));
 
   if (m_watch_only)
   {
@@ -2237,9 +2275,9 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
     {
       THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < m_transfers.size(), "incorrect transfer index: " << p.first);
       auto& tr = m_transfers[p.first];
-      if (tr.m_key_image != currency::null_ki)
+      if (tr.m_key_image != currency::null_ki && tr.m_key_image != p.second)
       {
-        LOG_PRINT_YELLOW("transfer #" << p.first << " has not null key image: " << tr.m_key_image << " will be replaced with ki " << p.second, LOG_LEVEL_0);
+        LOG_PRINT_YELLOW("transfer #" << p.first << " already has not null key image " << tr.m_key_image << " and it will be replaced with ki " << p.second, LOG_LEVEL_0);
       }
       tr.m_key_image = p.second;
       m_key_images[p.second] = p.first;
@@ -2247,8 +2285,8 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
     }
   }
 
-  // print inputs' key images
-  // print tx was sent
+  // TODO: print inputs' key images
+  print_tx_sent_message(ft.tx, "(from submit_transfer)");
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx)
@@ -3332,6 +3370,7 @@ void wallet2::exception_handler()
 //----------------------------------------------------------------------------------------------------
 void wallet2::mark_transfers_as_spent(const std::vector<uint64_t>& selected_transfers, const std::string& reason /* = empty_string */)
 {
+  // TODO: design a safe undo for this operation
   mark_transfers_with_flag(selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, reason);
 }
 //----------------------------------------------------------------------------------------------------
@@ -3667,13 +3706,17 @@ void wallet2::set_genesis(const crypto::hash& genesis_hash)
   m_blockchain[0] = genesis_hash;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee)
+void wallet2::print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee /* = UINT64_MAX */)
 {
   //uint64_t balance_unlocked = 0;
   //uint64_t balance_total = balance(balance_unlocked);
 
+  std::stringstream ss;
+  if (fee != UINT64_MAX)
+    ss << "Commission: " << std::setw(21) << std::right << print_money(fee) << ENDL;
+
   WLT_LOG_CYAN("Transaction " << get_transaction_hash(tx) << " was successfully sent " << description << ENDL
-    << "Commission: " << std::setw(21) << std::right << print_money(fee) << ENDL
+    << ss.str()
 //    << "Balance:    " << std::setw(21) << print_money(balance_total) << ENDL
 //    << "Unlocked:   " << std::setw(21) << print_money(balance_unlocked) << ENDL
     << "Please, wait for confirmation for your balance to be unlocked.",
@@ -3745,28 +3788,6 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
     final_detinations.push_back(currency::tx_destination_entry(dust, dust_policy.addr_for_dust));
   }
 }
-//----------------------------------------------------------------------------------------------------
-/*void wallet2::prepare_transaction(const std::vector<currency::tx_destination_entry>& dsts,
-  size_t fake_outputs_count,
-  uint64_t unlock_time,
-  uint64_t fee,
-  const std::vector<currency::extra_v>& extra,
-  const std::vector<currency::attachment_v>& attachments,
-  tools::detail::split_strategy_id_t destination_split_strategy_id,
-  const tx_dust_policy& dust_policy,
-  const currency::account_public_address& crypt_address,
-  currency::transaction &tx,
-  uint8_t tx_outs_attr,
-  bool shuffle,
-  bool mark_tx_as_complete,
-  uint8_t flags,
-  std::vector<uint64_t>& selected_transfers,
-  currency::keypair& one_time_key,
-  std::vector<currency::tx_destination_entry>& prepared_destinations,
-  crypto::hash multisig_id)
-{
-  // TODO
-}*/
 //----------------------------------------------------------------------------------------------------
 void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate /* = currency::transaction() */)
 {
@@ -3905,12 +3926,10 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   uint8_t tx_outs_attr,
   bool shuffle,
   uint8_t flags,
-  bool send_to_network)
+  bool send_to_network,
+  std::string* p_signed_tx_blob_str)
 {
   TIME_MEASURE_START(precalculation_time);
-  //using namespace currency;
-  currency::keypair onetime_keys = AUTO_VAL_INIT(onetime_keys);
-
   construct_tx_param tx_param = AUTO_VAL_INIT(tx_param);
   tx_param.attachments = attachments;
   tx_param.crypt_address = currency::get_crypt_address_from_destinations(m_account.get_keys(), dsts);
@@ -3933,7 +3952,6 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   prepare_transaction(tx_param, ftp);
   TIME_MEASURE_FINISH(prepare_transaction_time);
 
-
   if (m_watch_only)
   {
     tx_param.spend_pub_key = m_account.get_public_address().m_spend_public_key;
@@ -3941,7 +3959,9 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
     crypto::chacha_crypt(bl, m_account.get_keys().m_view_secret_key);
     epee::file_io_utils::save_string_to_file("unsigned_zano_tx", bl);
     LOG_PRINT_L0("Transaction stored to unsigned_zano_tx. You need to sign this tx using a full-access wallet.");
-    //relay_blob = bl; // TODO: save encrypted tx param blob to relay_blob
+
+    if (p_signed_tx_blob_str != nullptr)
+      *p_signed_tx_blob_str = bl;
 
     // unlock transfers at the very end
     TIME_MEASURE_START(mark_transfers_as_spent_time);

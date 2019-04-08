@@ -122,11 +122,16 @@ namespace currency
     return get_account_address_as_str(m_keys.m_account_address);
   }
   //-----------------------------------------------------------------
+  void account_base::make_account_watch_only()
+  {
+    m_keys.m_spend_secret_key = currency::null_skey;
+  }
+  //-----------------------------------------------------------------
   std::string transform_addr_to_str(const account_public_address& addr)
   {
     return get_account_address_as_str(addr);
   }
-
+  //-----------------------------------------------------------------
   account_public_address transform_str_to_addr(const std::string& str)
   {
     account_public_address ad = AUTO_VAL_INIT(ad);

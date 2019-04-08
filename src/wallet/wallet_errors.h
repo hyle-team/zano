@@ -676,6 +676,7 @@ if (cond)                                                                       
   tools::error::throw_wallet_ex<tools::error::wallet_internal_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str());  \
 }
 
+#define THROW_IF_FALSE_WALLET_INT_ERR_EX_NO_HANDLER(cond, mess) THROW_IF_TRUE_WALLET_INT_ERR_EX_NO_HANDLER((!(cond)), mess)
 
 #define THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, mess)      THROW_IF_TRUE_WALLET_INT_ERR_EX((!(cond)), mess)
 

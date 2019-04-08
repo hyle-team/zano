@@ -231,9 +231,11 @@ namespace wallet_rpc
     struct response
     {
       std::string tx_hash;
+      std::string tx_unsigned_hex; // for cold-signing process
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_hash)
+        KV_SERIALIZE(tx_unsigned_hex)
       END_KV_SERIALIZE_MAP()
     };
   };
