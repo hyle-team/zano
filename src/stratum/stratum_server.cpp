@@ -525,7 +525,7 @@ namespace
         "nonce: " << nonce << " (0x" << epee::string_tools::pod_to_hex(nonce) << ")", LOG_LEVEL_1);
 
       block_verification_context bvc = AUTO_VAL_INIT(bvc);
-      r = m_p_core->handle_incoming_block(m_block_template, bvc, false);
+      r = m_p_core->handle_block_found(m_block_template, &bvc, false);
       if (r)
       {
         if (!bvc.m_verification_failed && !bvc.added_to_altchain && bvc.m_added_to_main_chain && !bvc.m_already_exists && !bvc.m_marked_as_orphaned)
