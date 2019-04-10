@@ -7,7 +7,7 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      78
+#define CURRENCY_FORMATION_VERSION                      79
                                                         
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -15,7 +15,7 @@
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
 #define CURRENCY_PUBLIC_ADDRESS_TEXTBLOB_VER            0
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           197   // addresses start with 'Z'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // addresses start with 'iZ'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     1
 #define CURRENT_BLOCK_MAJOR_VERSION                     1
