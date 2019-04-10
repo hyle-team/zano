@@ -14,6 +14,7 @@
 #include "account.h"
 #include "include_base_utils.h"
 
+#include "print_fixed_point_helper.h"
 #include "currency_format_utils_abstract.h"
 #include "common/crypto_stream_operators.h"
 #include "currency_protocol/currency_protocol_defs.h"
