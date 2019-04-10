@@ -7,7 +7,7 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      78
+#define CURRENCY_FORMATION_VERSION                      79
                                                         
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -15,7 +15,7 @@
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
 #define CURRENCY_PUBLIC_ADDRESS_TEXTBLOB_VER            0
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           197   // addresses start with 'Z'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // addresses start with 'iZ'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     1
 #define CURRENT_BLOCK_MAJOR_VERSION                     1
@@ -53,7 +53,7 @@
 // #define CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT        ((uint64_t)100000000) // should be TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER
 // #define CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER       1000                  // reward in minimum fees for a block in the zone
 
-#define CURRENCY_TESTNET_CONST_REWARD                   1000000000
+#define CURRENCY_TESTNET_CONST_REWARD                   100000000000000
 
 
 #define WALLET_MAX_ALLOWED_OUTPUT_AMOUNT                ((uint64_t)0xffffffffffffffffLL)
@@ -174,7 +174,7 @@
 #endif
 
 //premine
-#define PREMINE_AMOUNT                                  (2000000000000000000)
+#define PREMINE_AMOUNT                                  (17517203000000000000) // 13827203.0 reserved for coinswap, 3690000.0 - premine  
 
 //alias registration wallet
 #define ALIAS_REWARDS_ACCOUNT_SPEND_PUB_KEY             "0000000000000000000000000000000000000000000000000000000000000000" //burn alias money

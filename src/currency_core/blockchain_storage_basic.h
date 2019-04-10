@@ -48,13 +48,13 @@ namespace currency
     wide_difficulty_type cumulative_diff_adjusted;
     wide_difficulty_type cumulative_diff_precise;
     wide_difficulty_type difficulty;
-    uint64_t already_generated_coins;
+    boost::multiprecision::uint128_t already_generated_coins;
     crypto::hash stake_hash;                  //TODO: unused field for PoW blocks, subject for refactoring
     uint32_t version;
     uint64_t this_block_tx_fee_median;        //tx fee median for current block transactions 
     uint64_t effective_tx_fee_median;         //current fee median which applied for current block's alias registrations 
 
-    DEFINE_SERIALIZATION_VERSION(2);
+    DEFINE_SERIALIZATION_VERSION(1);
     BEGIN_SERIALIZE_OBJECT()
       VERSION_ENTRY(version)
       FIELDS(bl)
@@ -65,11 +65,8 @@ namespace currency
       FIELD(difficulty)
       FIELD(already_generated_coins)
       FIELD(stake_hash)
-      if (version >= 2)
-      {
-        FIELD(this_block_tx_fee_median)
-        FIELD(effective_tx_fee_median)
-      }
+      FIELD(this_block_tx_fee_median)
+      FIELD(effective_tx_fee_median)
     END_SERIALIZE()
   };
 

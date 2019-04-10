@@ -230,7 +230,7 @@ namespace currency
     wide_difficulty_type get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const;
     wide_difficulty_type get_cached_next_difficulty(bool pos) const;
 
-    typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, uint64_t already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
+    typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
     bool create_block_template(block& b, const account_public_address& miner_address, const account_public_address& stakeholder_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func = nullptr) const;
     bool create_block_template(block& b, const account_public_address& miner_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce) const;
 
@@ -270,7 +270,7 @@ namespace currency
     uint64_t get_seconds_between_last_n_block(size_t n)const;
     bool has_multisig_output(const crypto::hash& multisig_id) const;
     bool is_multisig_output_spent(const crypto::hash& multisig_id) const;
-    uint64_t total_coins()const;
+    boost::multiprecision::uint128_t total_coins()const;
     bool is_pos_allowed()const;
     uint64_t get_tx_fee_median()const;
     uint64_t get_tx_expiration_median() const;
@@ -280,7 +280,7 @@ namespace currency
     uint64_t get_last_timestamps_check_window_median() const;
     uint64_t get_last_n_blocks_timestamps_median(size_t n) const;
     bool prevalidate_alias_info(const transaction& tx, extra_alias_entry& eae);
-    bool validate_miner_transaction(const block& b, size_t cumulative_block_size, uint64_t fee, uint64_t& base_reward, uint64_t already_generated_coins) const;
+    bool validate_miner_transaction(const block& b, size_t cumulative_block_size, uint64_t fee, uint64_t& base_reward, const boost::multiprecision::uint128_t& already_generated_coins) const;
     performnce_data& get_performnce_data()const;
     bool validate_instance(const std::string& path);
     bool is_tx_expired(const transaction& tx) const;

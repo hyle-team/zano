@@ -31,7 +31,7 @@ bool block_template_against_txs_size::generate(std::vector<test_event_entry>& ev
 
 static size_t g_block_txs_total_size = 0;
 static uint64_t g_block_txs_fee = 0;
-bool custom_fill_block_template_func(block &bl, bool pos, size_t median_size, uint64_t already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height)
+bool custom_fill_block_template_func(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height)
 {
   total_size = g_block_txs_total_size;
   fee = g_block_txs_fee;

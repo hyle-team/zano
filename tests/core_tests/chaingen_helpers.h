@@ -44,7 +44,7 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
 {
   struct loc_helper
   {
-    static bool fill_block_template_func(currency::block &bl, bool pos, size_t median_size, uint64_t already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height)
+    static bool fill_block_template_func(currency::block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height)
     {
       fee = 0;
       total_size = 0;

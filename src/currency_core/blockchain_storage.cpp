@@ -1029,7 +1029,7 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
                                                     size_t cumulative_block_size, 
                                                     uint64_t fee, 
                                                     uint64_t& base_reward, 
-                                                    uint64_t already_generated_coins) const
+                                                    const boost::multiprecision::uint128_t& already_generated_coins) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   //validate reward
@@ -1128,7 +1128,7 @@ bool blockchain_storage::create_block_template(block& b,
                                                fill_block_template_func_t custom_fill_block_template_func /* = nullptr */) const
 {
   size_t median_size;
-  uint64_t already_generated_coins;
+  boost::multiprecision::uint128_t already_generated_coins;
   CRITICAL_REGION_BEGIN(m_read_lock);
   b.major_version = CURRENT_BLOCK_MAJOR_VERSION;
   b.minor_version = CURRENT_BLOCK_MINOR_VERSION;
@@ -2107,7 +2107,7 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
   return true;
 }
 //------------------------------------------------------------------
-uint64_t blockchain_storage::total_coins() const
+boost::multiprecision::uint128_t blockchain_storage::total_coins() const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   if (!m_db_blocks.size())
@@ -4423,7 +4423,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   }
 
   uint64_t base_reward = 0;
-  uint64_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins:0;
+  boost::multiprecision::uint128_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins:0;
   if (!validate_miner_transaction(bl, cumulative_block_size, fee_summary, base_reward, already_generated_coins))
   {
     LOG_PRINT_L0("Block with id: " << id

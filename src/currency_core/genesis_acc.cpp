@@ -9,20 +9,23 @@
 
 namespace currency
 {
-  const std::string ggenesis_tx_pub_key_str = "698b7bd6fc1bea739657b9fa8441a5a7a4cae69cb7efa2defc60e4c6609009f4";
+  const std::string ggenesis_tx_pub_key_str = "a68aabfbd365bd8e299e917591c6b8014853fd6237fee41d068d2975e37dbae4";
   const crypto::public_key ggenesis_tx_pub_key = epee::string_tools::parse_tpod_from_hex_string<crypto::public_key>(ggenesis_tx_pub_key_str);
-  
-  const genesis_tx_dictionary_entry ggenesis_dict[10] = {
-    { 690562910953636312ULL,5 },
-    { 940036618224342135ULL,3 },
-    { 1343336992873709805ULL,9 },
-    { 2417587344126263675ULL,7 },
-    { 2976852013260878279ULL,8 },
-    { 9662281438621735689ULL,4 },
-    { 14708441932961059072ULL,6 },
-    { 15678994962012632719ULL,1 },
-    { 17191212896741366274ULL,2 },
-    { 18291644074790683797ULL,0 }
+  const genesis_tx_dictionary_entry ggenesis_dict[14] = {
+    { 898363347618325980ULL,7 },
+    { 1234271292339965434ULL,1 },
+    { 2785329203593578547ULL,12 },
+    { 4955366495399988463ULL,11 },
+    { 5233257582118330150ULL,5 },
+    { 6604452700210763953ULL,13 },
+    { 8712326356392296687ULL,9 },
+    { 8863158309745010598ULL,4 },
+    { 9527474759752332295ULL,2 },
+    { 9921730437908704447ULL,8 },
+    { 11109691972771859220ULL,0 },
+    { 14297297752337562678ULL,3 },
+    { 15951161519112687845ULL,6 },
+    { 17472133472787764818ULL,10 }
   };
 
 }
