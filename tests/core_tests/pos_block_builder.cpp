@@ -106,7 +106,7 @@ void pos_block_builder::step3_build_stake_kernel(
 }
 
 void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
-  uint64_t already_generated_coins,
+  const boost::multiprecision::uint128_t& already_generated_coins,
   const account_public_address &reward_receiver_address,
   const blobdata& extra_nonce,
   size_t max_outs,
@@ -165,7 +165,7 @@ void pos_block_builder::step5_sign(const crypto::public_key& stake_tx_pub_key, s
   m_step = 5;
 }
 
-bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins,
+bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
   size_t current_block_size,
   uint64_t fee,
   uint64_t pos_stake_amount,

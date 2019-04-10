@@ -1046,7 +1046,7 @@ namespace currency
   bool tx_memory_pool::fill_block_template(block &bl, 
     bool pos, 
     size_t median_size, 
-    uint64_t already_generated_coins, 
+    const boost::multiprecision::uint128_t& already_generated_coins,
     size_t &total_size, 
     uint64_t &fee, 
     uint64_t height)

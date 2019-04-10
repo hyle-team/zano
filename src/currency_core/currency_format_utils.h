@@ -163,7 +163,7 @@ namespace currency
 
 
   //---------------------------------------------------------------
-  bool construct_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins, 
+  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
                                                              uint64_t fee, 
                                                              const account_public_address &miner_address, 
@@ -174,7 +174,7 @@ namespace currency
                                                              bool pos = false,
                                                              const pos_entry& pe = pos_entry());
 
-  bool construct_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins, 
+  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
                                                              uint64_t fee, 
                                                              const std::vector<tx_destination_entry>& destinations,
@@ -309,9 +309,7 @@ namespace currency
   uint64_t get_block_height(const block& b);
   std::vector<txout_v> relative_output_offsets_to_absolute(const std::vector<txout_v>& off);
   std::vector<txout_v> absolute_output_offsets_to_relative(const std::vector<txout_v>& off);
-  // prints amount in format "3.14000000", "0.00000000"
-  std::string print_money(uint64_t amount);
-  std::string print_fixed_decimal_point(uint64_t amount, size_t decimal_point);
+
   // prints amount in format "3.14", "0.0"
   std::string print_money_brief(uint64_t amount);
   uint64_t get_actual_timestamp(const block& b);
@@ -382,8 +380,8 @@ namespace currency
   /************************************************************************/
   size_t get_max_block_size();
   size_t get_max_tx_size();
-  bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, uint64_t already_generated_coins, uint64_t &reward, uint64_t height);
-  uint64_t get_base_block_reward(bool is_pos, uint64_t already_generated_coins, uint64_t height);
+  bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height);
+  uint64_t get_base_block_reward(bool is_pos, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t height);
   bool is_payment_id_size_ok(const std::string& payment_id);
   std::string get_account_address_as_str(const account_public_address& addr);
   std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const std::string& payment_id);
@@ -440,7 +438,7 @@ namespace currency
   {
     return alias_info_to_rpc_alias_info(ai.m_alias, ai, ari);
   }
-
+  //---------------------------------------------------------------
   template<class alias_rpc_details_t>
   bool alias_info_to_rpc_alias_info(const std::string& alias, const currency::extra_alias_entry_base& aib, alias_rpc_details_t& ari)
   {
@@ -452,7 +450,19 @@ namespace currency
 
     return true;
   }
-
+  //---------------------------------------------------------------
+  template<typename t_number>
+  std::string print_fixed_decimal_point(t_number amount, size_t decimal_point)
+  {
+    return epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
+  }
+  //---------------------------------------------------------------
+  template<typename t_number>
+  std::string print_money(t_number amount)
+  {
+    return print_fixed_decimal_point(amount, CURRENCY_DISPLAY_DECIMAL_POINT);
+  }
+  //---------------------------------------------------------------
   template<class alias_rpc_details_t>
   bool alias_rpc_details_to_alias_info(const alias_rpc_details_t& ard, currency::extra_alias_entry& ai)
   {
