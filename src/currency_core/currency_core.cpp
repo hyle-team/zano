@@ -451,7 +451,7 @@ namespace currency
     m_miner.resume();
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::handle_block_found(const block& b, block_verification_context* p_verification_result /* = nullptr */)
+  bool core::handle_block_found(const block& b, block_verification_context* p_verification_result, bool need_update_miner_block_template)
   {
     TIME_MEASURE_START_MS(time_total_ms);
     block_verification_context bvc = boost::value_initialized<block_verification_context>();
@@ -471,7 +471,8 @@ namespace currency
 
     //anyway - update miner template
     TIME_MEASURE_START_MS(time_update_block_template_ms);
-    update_miner_block_template();
+    if (need_update_miner_block_template)
+      update_miner_block_template();
     TIME_MEASURE_FINISH_MS(time_update_block_template_ms);
 
     uint64_t time_pack_txs_ms = 0, time_relay_ms = 0;
@@ -528,6 +529,11 @@ namespace currency
     LOG_PRINT_L2("handle_block_found timings (ms): total: " << time_total_ms << ", add new block: " << time_add_new_block_ms << ", update template: " << time_update_block_template_ms << ", pack txs: " << time_pack_txs_ms << ", relay: " << time_relay_ms);
 
     return p_verification_result->m_added_to_main_chain;
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool core::handle_block_found(const block& b, block_verification_context* p_verification_result /* = nullptr */)
+  {
+    return handle_block_found(b, p_verification_result, true);
   }
   //-----------------------------------------------------------------------------------------------
   void core::on_synchronized()

@@ -24,7 +24,7 @@ namespace currency
     }
   };
 #pragma pack(pop)
-  extern const genesis_tx_dictionary_entry ggenesis_dict[10];
+  extern const genesis_tx_dictionary_entry ggenesis_dict[14];
 
   extern const crypto::public_key ggenesis_tx_pub_key;
 

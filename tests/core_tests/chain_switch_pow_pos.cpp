@@ -29,7 +29,6 @@ gen_chain_switch_pow_pos::gen_chain_switch_pow_pos()
 
 bool gen_chain_switch_pow_pos::generate(std::vector<test_event_entry>& events) const
 {                     
-  return false; // TODO: for test check only, remove pls
   uint64_t ts_start = 1420000000;
   std::list<currency::account_base> miner_stake_sources, alice_stake_sources, bob_stake_sources;
 
