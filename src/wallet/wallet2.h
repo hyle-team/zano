@@ -446,6 +446,7 @@ namespace tools
     void restore(const std::wstring& path, const std::string& pass, const std::string& restore_key);
     void load(const std::wstring& wallet, const std::string& password);    
     void store();
+    void store(const std::wstring& path);
     void store(const std::wstring& path, const std::string& password);
     void store_watch_only(const std::wstring& path, const std::string& password) const;
     bool store_keys(std::string& buff, const std::string& password, bool store_as_watch_only = false);

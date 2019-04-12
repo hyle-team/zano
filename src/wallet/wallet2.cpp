@@ -1981,6 +1981,11 @@ void wallet2::store()
   store(m_wallet_file, m_password);
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::store(const std::wstring& path)
+{
+  store(path, m_password);
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::store(const std::wstring& path_to_save, const std::string& password)
 {
   LOG_PRINT_L0("(before storing: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
