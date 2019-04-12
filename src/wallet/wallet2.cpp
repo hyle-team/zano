@@ -651,7 +651,8 @@ void wallet2::request_cancel_contract(const crypto::hash& contract_id, uint64_t 
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(construct_param, ftp);
   currency::transaction tx = AUTO_VAL_INIT(tx);
-  finalize_transaction(ftp, tx, crypto::secret_key(), true);
+  crypto::secret_key sk = AUTO_VAL_INIT(sk);
+  finalize_transaction(ftp, tx, sk, true);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been requested for cancellaton with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
 
   print_tx_sent_message(tx, "(transport for cancel proposal)", fee);
@@ -2992,7 +2993,8 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   {
     finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
     prepare_transaction(construct_params, ftp);
-    finalize_transaction(ftp, tx_release_template, crypto::secret_key(), false);
+    crypto::secret_key sk = AUTO_VAL_INIT(sk);
+    finalize_transaction(ftp, tx_release_template, sk, false);
   }
 
   //generate burn escrow 
@@ -3007,7 +3009,8 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   {
     finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
     prepare_transaction(construct_params, ftp);
-    finalize_transaction(ftp, tx_burn_template, crypto::secret_key(), false);
+    crypto::secret_key sk = AUTO_VAL_INIT(sk);
+    finalize_transaction(ftp, tx_burn_template, sk, false);
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -3047,7 +3050,8 @@ void wallet2::build_escrow_cancel_template(crypto::hash multisig_id,
   construct_params.extra.push_back(expir);
 
   prepare_transaction(construct_params, ftp);
-  finalize_transaction(ftp, tx_cancel_template, crypto::secret_key(), false);
+  crypto::secret_key sk = AUTO_VAL_INIT(sk);
+  finalize_transaction(ftp, tx_cancel_template, sk, false);
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -3228,7 +3232,8 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   try
   {
       prepare_transaction(ctp, ftp);
-      finalize_transaction(ftp, tx, crypto::secret_key(), false);
+      crypto::secret_key sk = AUTO_VAL_INIT(sk);
+      finalize_transaction(ftp, tx, sk, false);
   }
   catch (...)
   {
@@ -4042,7 +4047,8 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   }
 
   TIME_MEASURE_START(finalize_transaction_time);
-  finalize_transaction(ftp, tx, crypto::secret_key(), send_to_network);
+  crypto::secret_key sk = AUTO_VAL_INIT(sk);
+  finalize_transaction(ftp, tx, sk, send_to_network);
   TIME_MEASURE_FINISH(finalize_transaction_time);
 
   // unlock transfers at the very end
