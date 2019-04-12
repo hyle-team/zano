@@ -39,6 +39,14 @@ namespace currency
     return height / ETHASH_EPOCH_LENGTH;
   }
   //--------------------------------------------------------------
+  crypto::hash ethash_epoch_to_seed(int epoch)
+  {
+    auto res_eth = ethash_calculate_epoch_seed(epoch);
+    crypto::hash result = currency::null_hash;
+    memcpy(&result.data, &res_eth, sizeof(res_eth));
+    return result;
+  }
+  //--------------------------------------------------------------
   crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_long_ash, uint64_t nonce)
   {
     int epoch = ethash_height_to_epoch(height);

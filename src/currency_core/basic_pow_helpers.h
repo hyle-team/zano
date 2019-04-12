@@ -28,6 +28,7 @@
 namespace currency
 {
   int ethash_height_to_epoch(uint64_t height);
+  crypto::hash ethash_epoch_to_seed(int epoch);
   crypto::hash get_block_longhash(uint64_t h, const crypto::hash& block_long_ash, uint64_t nonce);
   void get_block_longhash(const block& b, crypto::hash& res);
   crypto::hash get_block_longhash(const block& b);

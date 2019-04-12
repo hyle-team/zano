@@ -799,6 +799,10 @@ namespace currency
 
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
     res.prev_hash = string_tools::pod_to_hex(b.prev_id);
+
+    //calculate epoch seed
+    res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
+
     res.status = CORE_RPC_STATUS_OK;
 
     return true;
