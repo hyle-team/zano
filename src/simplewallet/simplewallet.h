@@ -58,6 +58,7 @@ namespace currency
     bool dump_key_images(const std::vector<std::string>& args);
     bool show_incoming_transfers(const std::vector<std::string> &args);
     bool show_incoming_transfers_counts(const std::vector<std::string> &args);
+    bool list_outputs(const std::vector<std::string> &args);
     bool show_payments(const std::vector<std::string> &args);
     bool get_transfer_info(const std::vector<std::string> &args);    
     bool scan_for_key_image_collisions(const std::vector<std::string> &args);    
@@ -75,6 +76,8 @@ namespace currency
     bool integrated_address(const std::vector<std::string> &args);
     bool get_tx_key(const std::vector<std::string> &args_);
     bool save_watch_only(const std::vector<std::string> &args);
+    bool sign_transfer(const std::vector<std::string> &args);
+    bool submit_transfer(const std::vector<std::string> &args);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr);

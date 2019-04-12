@@ -32,7 +32,7 @@ namespace tools
 
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
-    bool run(bool do_mint);
+    bool run(bool do_mint, bool offline_mode);
 
     CHAIN_HTTP_TO_MAP2(connection_context); //forward http requests to uri map
 

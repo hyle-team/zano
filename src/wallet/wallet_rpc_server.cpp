@@ -33,22 +33,26 @@ namespace tools
   wallet_rpc_server::wallet_rpc_server(wallet2& w):m_wallet(w), m_do_mint(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::run(bool do_mint)
+  bool wallet_rpc_server::run(bool do_mint, bool offline_mode)
   {
     m_do_mint = do_mint;
-    m_net_server.add_idle_handler([this](){
-      size_t blocks_fetched = 0;
-      bool received_money = false;
-      bool ok;
-      std::atomic<bool> stop(false);
-      m_wallet.refresh(blocks_fetched, received_money, ok, stop);
-      if (stop)
-        return true;
 
-      if(m_do_mint)
-        m_wallet.try_mint_pos();
-      return true;
-    }, 2000);
+    if (!offline_mode)
+    {
+      m_net_server.add_idle_handler([this]() {
+        size_t blocks_fetched = 0;
+        bool received_money = false;
+        bool ok;
+        std::atomic<bool> stop(false);
+        m_wallet.refresh(blocks_fetched, received_money, ok, stop);
+        if (stop)
+          return true;
+
+        if (m_do_mint)
+          m_wallet.try_mint_pos();
+        return true;
+      }, 2000);
+    }
 
     //DO NOT START THIS SERVER IN MORE THEN 1 THREADS WITHOUT REFACTORING
     return epee::http_server_impl_base<wallet_rpc_server, connection_context>::run(1, true);

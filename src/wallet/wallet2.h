@@ -254,37 +254,10 @@ namespace tools
     currency::account_public_address crypt_address;
     uint8_t tx_outs_attr;
     bool shuffle;
-
-    crypto::public_key spend_pub_key;  // only for validations
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(dsts)
-      FIELD(fake_outputs_count)
-      FIELD(fee)
-      FIELD(dust_policy)
-      FIELD(multisig_id)
-      FIELD(flags)
-      FIELD(split_strategy_id)
-      FIELD(mark_tx_as_complete)
-      FIELD(unlock_time)
-      FIELD(extra)
-      FIELD(attachments)
-      FIELD(crypt_address)
-      FIELD(tx_outs_attr)
-      FIELD(shuffle)
-      FIELD(spend_pub_key)
-    END_SERIALIZE()
   };
 
   struct finalize_tx_param
   {
-    //std::vector<currency::tx_destination_entry> dsts;
-    //size_t fake_outputs_count;
-    //uint64_t fee;
-    //tx_dust_policy dust_policy;
-    //bool mark_tx_as_complete;
-    //detail::split_strategy_id_t split_strategy_id;
-
     uint64_t unlock_time;
     std::vector<currency::extra_v> extra;
     std::vector<currency::attachment_v> attachments;
@@ -354,11 +327,13 @@ namespace tools
       m_core_runtime_config = currency::get_default_core_runtime_config();
     };
 
-#define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            0x00000001
-#define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          0x00000002       
-#define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      0x00000004
-#define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   0x00000008
-    
+#define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            uint32_t(1 << 0)
+#define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          uint32_t(1 << 1)       
+#define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
+#define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
+#define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
+
+    static std::string transfer_flags_to_str(uint32_t flags);
     static std::string transform_tx_to_str(const currency::transaction& tx);
     static currency::transaction transform_str_to_tx(const std::string& tx_str);
 
@@ -393,9 +368,9 @@ namespace tools
 
       uint64_t amount() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index].amount; }
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
+      bool is_spendable() const { return (m_flags & (~WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)) == 0; } // spenable = has no flags or mined flag only
 
       BEGIN_KV_SERIALIZE_MAP()
-        //KV_SERIALIZE(*m_ptx_wallet_info)
         KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)
         KV_SERIALIZE(m_internal_output_index)
         KV_SERIALIZE(m_spent_height)
@@ -471,7 +446,8 @@ namespace tools
     void restore(const std::wstring& path, const std::string& pass, const std::string& restore_key);
     void load(const std::wstring& wallet, const std::string& password);    
     void store();
-    void store(const std::wstring& path, const std::string& password, bool store_as_watch_only = false);
+    void store(const std::wstring& path, const std::string& password);
+    void store_watch_only(const std::wstring& path, const std::string& password) const;
     bool store_keys(std::string& buff, const std::string& password, bool store_as_watch_only = false);
     std::wstring get_wallet_path(){ return m_wallet_file; }
     currency::account_base& get_account() { return m_account; }
@@ -613,7 +589,8 @@ namespace tools
     static bool scan_pos(mining_context& cxt, std::atomic<bool>& stop, idle_condition_cb_t idle_condition_cb, const currency::core_runtime_config &runtime_config);
     bool fill_mining_context(mining_context& ctx);
     void get_transfers(wallet2::transfer_container& incoming_transfers) const;
-    
+    std::string get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const;
+
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;
 
@@ -634,6 +611,7 @@ namespace tools
       a & m_transfers;
       a & m_multisig_transfers;
       a & m_key_images;
+      a & m_pending_key_images;
       a & m_unconfirmed_txs;
       a & m_unconfirmed_multisig_transfers;
       a & m_tx_keys;
@@ -813,9 +791,10 @@ private:
       const std::vector<currency::tx_destination_entry>& destinations,
       const std::vector<uint64_t>& selected_indicies);
     void mark_transfers_as_spent(const std::vector<uint64_t>& selected_transfers, const std::string& reason = std::string());
-    void mark_transfers_with_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason = std::string());
+    void mark_transfers_with_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason = std::string(), bool throw_if_flag_already_set = false);
     void clear_transfers_from_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason = std::string());
     void exception_handler();
+    void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
 
 
