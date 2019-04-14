@@ -47,11 +47,11 @@ namespace currency
     return result;
   }
   //--------------------------------------------------------------
-  crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_long_ash, uint64_t nonce)
+  crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_header_hash, uint64_t nonce)
   {
     int epoch = ethash_height_to_epoch(height);
     const auto& context = progpow::get_global_epoch_context_full(static_cast<int>(epoch));
-    auto res_eth = progpow::hash(context, height, *(ethash::hash256*)&block_long_ash, nonce);
+    auto res_eth = progpow::hash(context, height, *(ethash::hash256*)&block_header_hash, nonce);
     crypto::hash result = currency::null_hash;
     memcpy(&result.data, &res_eth.final_hash, sizeof(res_eth.final_hash));
     return result;

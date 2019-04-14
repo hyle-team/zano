@@ -28,6 +28,7 @@ namespace tools
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
     command_line::add_arg(desc, arg_miner_text_info);
+    command_line::add_arg(desc, arg_rpc_ignore_status);    
   }
   //------------------------------------------------------------------------------------------------------------------------------
   wallet_rpc_server::wallet_rpc_server(wallet2& w):m_wallet(w), m_do_mint(false)
