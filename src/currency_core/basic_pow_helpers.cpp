@@ -57,6 +57,14 @@ namespace currency
     return result;
   }
   //---------------------------------------------------------------
+  crypto::hash get_block_header_mining_hash(const block& b)
+  {
+    blobdata bd = get_block_hashing_blob(b);
+
+    access_nonce_in_block_blob(bd) = 0;
+    return crypto::cn_fast_hash(bd.data(), bd.size());
+  }
+  //---------------------------------------------------------------
   void get_block_longhash(const block& b, crypto::hash& res)
   {
     /*
@@ -65,11 +73,7 @@ namespace currency
     To achieve the same effect we make blob of data from block in normal way, but then set to zerro nonce
     inside serialized buffer, and then pass this nonce to ethash algo as a second argument, as it expected.
     */
-    blobdata bd = get_block_hashing_blob(b);
-
-    access_nonce_in_block_blob(bd) = 0;
-    crypto::hash bl_hash = crypto::cn_fast_hash(bd.data(), bd.size());
-
+    crypto::hash bl_hash = get_block_header_mining_hash(b);
     res = get_block_longhash(get_block_height(b), bl_hash, b.nonce);
   }
   //---------------------------------------------------------------

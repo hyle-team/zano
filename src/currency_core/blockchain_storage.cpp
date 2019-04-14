@@ -4297,6 +4297,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       LOG_ERROR("Block with id: " << id << ENDL
         << "PoW hash: " << proof_hash << ENDL 
         << "nonce: " << bl.nonce << ENDL
+        << "header_mining_hash: " << get_block_header_mining_hash(bl) << ENDL        
         << "expected difficulty: " << current_diffic);
       bvc.m_verification_failed = true;
       return false;
