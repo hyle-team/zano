@@ -24,23 +24,29 @@ namespace currency
   {
     const command_line::arg_descriptor<std::string> arg_rpc_bind_ip   = {"rpc-bind-ip", "", "127.0.0.1"};
     const command_line::arg_descriptor<std::string> arg_rpc_bind_port = {"rpc-bind-port", "", std::to_string(RPC_DEFAULT_PORT)};
+    const command_line::arg_descriptor<bool> arg_rpc_ignore_status    = {"rpc-ignore-offline", "Let rpc calls despite online/offline status", false, true };
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)
   {
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
+    command_line::add_arg(desc, arg_rpc_ignore_status);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   core_rpc_server::core_rpc_server(core& cr, nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& p2p,
     bc_services::bc_offers_service& of
-    ) :m_core(cr), m_p2p(p2p), m_of(of), m_session_counter(0)
+    ) :m_core(cr), m_p2p(p2p), m_of(of), m_session_counter(0), m_ignore_status(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::handle_command_line(const boost::program_options::variables_map& vm)
   {
     m_bind_ip = command_line::get_arg(vm, arg_rpc_bind_ip);
     m_port = command_line::get_arg(vm, arg_rpc_bind_port);
+    if (command_line::has_arg(vm, arg_rpc_ignore_status))
+    {
+      m_ignore_status = command_line::get_arg(vm, arg_rpc_ignore_status);
+    }
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -55,6 +61,8 @@ namespace currency
   bool core_rpc_server::check_core_ready_(const std::string& calling_method)
   {
 #ifndef TESTNET
+    if (m_ignore_status)
+      return true;
     if(!m_p2p.get_payload_object().is_synchronized())
     {
       LOG_PRINT_L0("[" << calling_method << "]Core busy cz is_synchronized");
@@ -799,6 +807,10 @@ namespace currency
 
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
     res.prev_hash = string_tools::pod_to_hex(b.prev_id);
+
+    //calculate epoch seed
+    res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
+
     res.status = CORE_RPC_STATUS_OK;
 
     return true;

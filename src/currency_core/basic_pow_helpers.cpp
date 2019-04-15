@@ -39,14 +39,30 @@ namespace currency
     return height / ETHASH_EPOCH_LENGTH;
   }
   //--------------------------------------------------------------
-  crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_long_ash, uint64_t nonce)
+  crypto::hash ethash_epoch_to_seed(int epoch)
+  {
+    auto res_eth = ethash_calculate_epoch_seed(epoch);
+    crypto::hash result = currency::null_hash;
+    memcpy(&result.data, &res_eth, sizeof(res_eth));
+    return result;
+  }
+  //--------------------------------------------------------------
+  crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_header_hash, uint64_t nonce)
   {
     int epoch = ethash_height_to_epoch(height);
     const auto& context = progpow::get_global_epoch_context_full(static_cast<int>(epoch));
-    auto res_eth = progpow::hash(context, height, *(ethash::hash256*)&block_long_ash, nonce);
+    auto res_eth = progpow::hash(context, height, *(ethash::hash256*)&block_header_hash, nonce);
     crypto::hash result = currency::null_hash;
     memcpy(&result.data, &res_eth.final_hash, sizeof(res_eth.final_hash));
     return result;
+  }
+  //---------------------------------------------------------------
+  crypto::hash get_block_header_mining_hash(const block& b)
+  {
+    blobdata bd = get_block_hashing_blob(b);
+
+    access_nonce_in_block_blob(bd) = 0;
+    return crypto::cn_fast_hash(bd.data(), bd.size());
   }
   //---------------------------------------------------------------
   void get_block_longhash(const block& b, crypto::hash& res)
@@ -57,11 +73,7 @@ namespace currency
     To achieve the same effect we make blob of data from block in normal way, but then set to zerro nonce
     inside serialized buffer, and then pass this nonce to ethash algo as a second argument, as it expected.
     */
-    blobdata bd = get_block_hashing_blob(b);
-
-    access_nonce_in_block_blob(bd) = 0;
-    crypto::hash bl_hash = crypto::cn_fast_hash(bd.data(), bd.size());
-
+    crypto::hash bl_hash = get_block_header_mining_hash(b);
     res = get_block_longhash(get_block_height(b), bl_hash, b.nonce);
   }
   //---------------------------------------------------------------

@@ -821,7 +821,7 @@ namespace
       }
 
       m_json_helper.feed(str, data_size);
-      LP_CC_WORKER(m_context, "data received: " << data_size << " bytes:" << ENDL << std::string(str, data_size), LOG_LEVEL_4);
+      LP_CC_WORKER(m_context, "DATA received <<<<<<<<<<<<< " << data_size << " bytes:" << ENDL << std::string(str, data_size), LOG_LEVEL_0);
 
       if (m_json_helper.has_objects())
       {
@@ -975,7 +975,7 @@ namespace
     void send(const std::string& data)
     {
       static_cast<epee::net_utils::i_service_endpoint*>(m_p_connection)->do_send(data.c_str(), data.size());
-      LOG_PRINT_CC(m_context, "DATA sent >>>>>>>>>>>>> " << ENDL << data, LOG_LEVEL_4);
+      LOG_PRINT_CC(m_context, "DATA sent >>>>>>>>>>>>> " << ENDL << data, LOG_LEVEL_0);
     }
 
     void send_notification(const std::string& json)
