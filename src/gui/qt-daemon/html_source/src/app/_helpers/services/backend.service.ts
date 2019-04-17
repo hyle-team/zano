@@ -60,7 +60,7 @@ export class BackendService {
             'currency': this.variablesService.defaultCurrency
           });
         } else {
-          error_translate = 'INFORMER.NO_MONEY';
+          error_translate = 'ERRORS.NO_MONEY';
         }
         break;
       case 'INTERNAL_ERROR:not enough outputs to mix':
