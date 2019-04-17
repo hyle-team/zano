@@ -4,6 +4,23 @@
 
 .form-send {
 
+  .input-block-address {
+    position: relative;
+
+    .address-dropdown {
+      position: absolute;
+      top: 6.5rem;
+      max-height: 10rem;
+      overflow: auto;
+      width: 100%;
+
+      div {
+        font-size: 1.4rem;
+        padding: 1rem;
+      }
+    }
+  }
+
   .input-blocks-row {
     display: flex;
 

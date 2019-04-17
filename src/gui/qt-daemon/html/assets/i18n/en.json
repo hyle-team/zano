@@ -245,6 +245,7 @@
     "FORM_ERRORS": {
       "ADDRESS_REQUIRED": "Address is required.",
       "ADDRESS_NOT_VALID": "Address not valid.",
+      "ALIAS_NOT_VALID": "Alias not valid.",
       "AMOUNT_REQUIRED": "Amount is required.",
       "AMOUNT_ZERO": "Amount is zero.",
       "FEE_REQUIRED": "Fee is required.",
@@ -450,6 +451,7 @@
     }
   },
   "ERRORS": {
+    "NO_MONEY": "Not enough money",
     "NOT_ENOUGH_MONEY": "Insufficient funds in account",
     "CORE_BUSY": "Internal error (core is busy)",
     "DAEMON_BUSY": "Internal error: deamon is busy",

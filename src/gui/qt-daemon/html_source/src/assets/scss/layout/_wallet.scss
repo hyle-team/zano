@@ -92,6 +92,24 @@ app-send {
 
   .form-send {
 
+    .input-block-address {
+
+      .address-dropdown {
+
+        @include themify($themes) {
+          background-color: themed(inputBackgroundColor);
+          color: themed(mainTextColor);
+        }
+
+
+        div:hover {
+          @include themify($themes) {
+            background-color: themed(selectHoverColor);
+          }
+        }
+      }
+    }
+
     .send-select {
 
       @include themify($themes) {
@@ -178,7 +196,7 @@ app-history {
           }
         }
 
-        .status.send  {
+        .status.send {
 
           .icon {
             background-color: #ff5252;
