@@ -932,8 +932,13 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
       return false;
     return true;
   };
+  TIME_MEASURE_START_PD(target_calculating_enum_blocks);
   enum_blockchain(cb, alt_chain, split_height);
-  return next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+  TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
+  TIME_MEASURE_START_PD(target_calculating_calc);
+  wide_difficulty_type res = next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+  TIME_MEASURE_FINISH_PD(target_calculating_calc);
+  return res;
 }
 //------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_cached_next_difficulty(bool pos) const

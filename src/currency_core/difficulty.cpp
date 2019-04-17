@@ -239,6 +239,7 @@ namespace currency {
 
   wide_difficulty_type next_difficulty(vector<uint64_t>& timestamps, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
   {
+    TIME_MEASURE_START_PD(target_calculating_enum_blocks);
     // timestamps  - first is latest, back - is oldest timestamps
     if (timestamps.size() > DIFFICULTY_WINDOW)
     {
