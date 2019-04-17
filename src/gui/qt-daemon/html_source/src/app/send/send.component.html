@@ -1,14 +1,23 @@
 <form class="form-send" [formGroup]="sendForm" (ngSubmit)="onSend()">
 
-  <div class="input-block">
+  <div class="input-block input-block-address">
     <label for="send-address">{{ 'SEND.ADDRESS' | translate }}</label>
-    <input type="text" id="send-address" formControlName="address" (contextmenu)="variablesService.onContextMenu($event)">
+
+    <input type="text" id="send-address" formControlName="address" (mousedown)="addressMouseDown($event)" (contextmenu)="variablesService.onContextMenu($event)">
+
+    <div class="address-dropdown scrolled-content" *ngIf="isOpen">
+      <div *ngFor="let item of localAliases" (click)="setAlias(item.name)">{{item.name}}</div>
+    </div>
+
     <div class="error-block" *ngIf="sendForm.controls['address'].invalid && (sendForm.controls['address'].dirty || sendForm.controls['address'].touched)">
       <div *ngIf="sendForm.controls['address'].errors['required']">
         {{ 'SEND.FORM_ERRORS.ADDRESS_REQUIRED' | translate }}
       </div>
       <div *ngIf="sendForm.controls['address'].errors['address_not_valid']">
         {{ 'SEND.FORM_ERRORS.ADDRESS_NOT_VALID' | translate }}
+      </div>
+      <div *ngIf="sendForm.controls['address'].errors['alias_not_valid']">
+        {{ 'SEND.FORM_ERRORS.ALIAS_NOT_VALID' | translate }}
       </div>
     </div>
   </div>
