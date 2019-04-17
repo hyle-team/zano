@@ -645,7 +645,7 @@ namespace currency
       uint64_t pow_sequence_factor;
       uint64_t last_pow_timestamp;
       uint64_t last_pos_timestamp;
-      uint64_t total_coins;
+      std::string total_coins;
       uint64_t block_reward;
       uint64_t last_block_total_reward;
       uint64_t pos_diff_total_coins_rate;
@@ -1234,7 +1234,7 @@ namespace currency
     std::string pow_seed;
     uint64_t type;
     bool is_orphan;
-    uint64_t already_generated_coins;
+    std::string already_generated_coins;
     uint64_t this_block_fee_median;
     uint64_t effective_fee_median;
     std::list<tx_rpc_extended_info> transactions_details;

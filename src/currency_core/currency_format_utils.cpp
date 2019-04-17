@@ -40,7 +40,7 @@ namespace currency
 
   //---------------------------------------------------------------
   /*
-  bool construct_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins,
+  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
   size_t current_block_size,
   uint64_t fee,
   const account_public_address &miner_address,
@@ -76,7 +76,7 @@ namespace currency
     return diff;
   }
   //------------------------------------------------------------------
-  bool construct_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins,
+  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
     size_t current_block_size,
     uint64_t fee,
     const account_public_address &miner_address,
@@ -122,7 +122,7 @@ namespace currency
     return construct_miner_tx(height, median_size, already_generated_coins, current_block_size, fee, destinations, tx, extra_nonce, max_outs, pos, pe);
   }
   //------------------------------------------------------------------
-  bool construct_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins,
+  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
     size_t current_block_size,
     uint64_t fee,
     const std::vector<tx_destination_entry>& destinations,
@@ -1604,15 +1604,7 @@ namespace currency
   }
 
 
-  std::string print_fixed_decimal_point(uint64_t amount, size_t decimal_point)
-  {
-    return epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
-  }
-  //---------------------------------------------------------------
-  std::string print_money(uint64_t amount)
-  {
-    return print_fixed_decimal_point(amount, CURRENCY_DISPLAY_DECIMAL_POINT);
-  }
+
   //---------------------------------------------------------------
   std::string print_money_brief(uint64_t amount)
   {
@@ -1713,10 +1705,10 @@ namespace currency
     std::cout << std::endl << "Reward change for 10 years:" << std::endl;
     std::cout << std::setw(10) << std::left << "day" << std::setw(19) << "block reward" << std::setw(19) << "generated coins" << std::endl;
 
-    uint64_t already_generated_coins = PREMINE_AMOUNT;
-    uint64_t money_was_at_begining_of_year = already_generated_coins;
-    uint64_t total_generated_in_year_by_pos = 0;
-    uint64_t total_generated_in_year_by_pow = 0;
+    boost::multiprecision::uint128_t already_generated_coins = PREMINE_AMOUNT;
+    boost::multiprecision::uint128_t money_was_at_begining_of_year = already_generated_coins;
+    boost::multiprecision::uint128_t total_generated_in_year_by_pos = 0;
+    boost::multiprecision::uint128_t total_generated_in_year_by_pow = 0;
     //uint64_t total_money_supply = TOTAL_MONEY_SUPPLY;
     uint64_t h = 0;
     for (uint64_t day = 0; day != 365 * 10; ++day)
@@ -1730,8 +1722,8 @@ namespace currency
           << std::setw(10) << day
           << std::setw(19) << print_money(emission_reward)
           << std::setw(4) << print_money(already_generated_coins) 
-          << "(POS: " << std::to_string(GET_PERECENTS_BIG_NUMBERS(total_generated_in_year_by_pos, money_was_at_begining_of_year)) << "%"
-          << ", POW: " << std::to_string(GET_PERECENTS_BIG_NUMBERS(total_generated_in_year_by_pow, money_was_at_begining_of_year)) << "%)"
+          << "(POS: " << boost::lexical_cast<std::string>(GET_PERECENTS_BIG_NUMBERS(total_generated_in_year_by_pos, money_was_at_begining_of_year)) << "%"
+          << ", POW: " << boost::lexical_cast<std::string>(GET_PERECENTS_BIG_NUMBERS(total_generated_in_year_by_pow, money_was_at_begining_of_year)) << "%)"
 
           << std::setw(19) << ",PoS coins/year: " << print_money(total_generated_in_year_by_pos)
           << std::setw(19) << ",PoW coins/year:" << print_money(total_generated_in_year_by_pow)
@@ -1765,7 +1757,7 @@ namespace currency
 //     std::cout << std::endl << "Reward change for 20 days:" << std::endl;
 //     std::cout << std::setw(10) << std::left << "day" << std::setw(19) << "block reward" << std::setw(19) << "generated coins" << std::endl;
 // 
-//     uint64_t already_generated_coins = PREMINE_AMOUNT;
+//     const boost::multiprecision::uint128_t& already_generated_coins = PREMINE_AMOUNT;
 //     //uint64_t total_money_supply = TOTAL_MONEY_SUPPLY;
 //     uint64_t h = 0;
 //     for (uint64_t day = 0; day != 20; ++day)
@@ -1798,7 +1790,7 @@ namespace currency
     ss << std::endl << "Reward change for the first " << n_of_first_blocks << " blocks:" << std::endl;
     ss << std::setw(10) << std::left << "block #" << std::setw(20) << "block reward" << std::setw(20) << "generated coins" << std::setw(8) << "type" << std::endl;
 
-    uint64_t already_generated_coins = 0;
+    boost::multiprecision::uint128_t already_generated_coins = 0;
     uint64_t total_generated_pos = 0;
     uint64_t total_generated_pow = 0;
 
@@ -2296,7 +2288,7 @@ namespace currency
     pei_rpc.prev_id = epee::string_tools::pod_to_hex(bei_chain.bl.prev_id);
     pei_rpc.actual_timestamp = get_actual_timestamp(bei_chain.bl);
     pei_rpc.type = is_pos_block(bei_chain.bl) ? 0 : 1;
-    pei_rpc.already_generated_coins = bei_chain.already_generated_coins;    
+    pei_rpc.already_generated_coins = boost::lexical_cast<std::string>(bei_chain.already_generated_coins);
     pei_rpc.this_block_fee_median = bei_chain.this_block_tx_fee_median;
     pei_rpc.effective_fee_median = bei_chain.effective_tx_fee_median;
     pei_rpc.height = bei_chain.height;
@@ -2380,7 +2372,7 @@ namespace currency
     return CURRENCY_MAX_TRANSACTION_BLOB_SIZE;
   }
   //-----------------------------------------------------------------------------------------------
-  uint64_t get_base_block_reward(bool is_pos, uint64_t already_generated_coins, uint64_t height)
+  uint64_t get_base_block_reward(bool is_pos, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t height)
   {
     if (!height)
       return PREMINE_AMOUNT;
@@ -2388,7 +2380,7 @@ namespace currency
     return CURRENCY_TESTNET_CONST_REWARD;
   }
   //-----------------------------------------------------------------------------------------------
-  bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, uint64_t already_generated_coins, uint64_t &reward, uint64_t height)
+  bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height)
   {
     uint64_t base_reward = get_base_block_reward(is_pos, already_generated_coins, height);
 

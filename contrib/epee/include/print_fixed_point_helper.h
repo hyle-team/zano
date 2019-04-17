@@ -31,9 +31,10 @@ namespace epee
 {
   namespace string_tools
   {
-    inline std::string print_fixed_decimal_point(uint64_t amount, size_t decimal_point)
+    template<typename t_number>
+    inline std::string print_fixed_decimal_point(t_number amount, size_t decimal_point)
     {
-      std::string s = std::to_string(amount);
+      std::string s = boost::lexical_cast<std::string>(amount);
       if (s.size() < decimal_point + 1)
       {
         s.insert(0, decimal_point + 1 - s.size(), '0');

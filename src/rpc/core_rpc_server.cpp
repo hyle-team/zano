@@ -24,23 +24,29 @@ namespace currency
   {
     const command_line::arg_descriptor<std::string> arg_rpc_bind_ip   = {"rpc-bind-ip", "", "127.0.0.1"};
     const command_line::arg_descriptor<std::string> arg_rpc_bind_port = {"rpc-bind-port", "", std::to_string(RPC_DEFAULT_PORT)};
+    const command_line::arg_descriptor<bool> arg_rpc_ignore_status    = {"rpc-ignore-offline", "Let rpc calls despite online/offline status", false, true };
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)
   {
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
+    command_line::add_arg(desc, arg_rpc_ignore_status);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   core_rpc_server::core_rpc_server(core& cr, nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& p2p,
     bc_services::bc_offers_service& of
-    ) :m_core(cr), m_p2p(p2p), m_of(of), m_session_counter(0)
+    ) :m_core(cr), m_p2p(p2p), m_of(of), m_session_counter(0), m_ignore_status(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::handle_command_line(const boost::program_options::variables_map& vm)
   {
     m_bind_ip = command_line::get_arg(vm, arg_rpc_bind_ip);
     m_port = command_line::get_arg(vm, arg_rpc_bind_port);
+    if (command_line::has_arg(vm, arg_rpc_ignore_status))
+    {
+      m_ignore_status = command_line::get_arg(vm, arg_rpc_ignore_status);
+    }
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -55,6 +61,8 @@ namespace currency
   bool core_rpc_server::check_core_ready_(const std::string& calling_method)
   {
 #ifndef TESTNET
+    if (m_ignore_status)
+      return true;
     if(!m_p2p.get_payload_object().is_synchronized())
     {
       LOG_PRINT_L0("[" << calling_method << "]Core busy cz is_synchronized");
@@ -131,8 +139,12 @@ namespace currency
       if (pow_bl_ptr)
         res.last_pow_timestamp = pow_bl_ptr->bl.timestamp;
     }
+    boost::multiprecision::uint128_t total_coins = 0;
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS)
-      res.total_coins = m_core.get_blockchain_storage().total_coins();
+    {
+      total_coins = m_core.get_blockchain_storage().total_coins();
+      res.total_coins = boost::lexical_cast<std::string>(total_coins);
+    }
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_LAST_BLOCK_SIZE)
     {
       std::vector<size_t> sz;
@@ -151,11 +163,11 @@ namespace currency
       res.pow_sequence_factor = m_core.get_blockchain_storage().get_current_sequence_factor(false);
     if (req.flags&(COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY | COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS))
     {
-      res.block_reward = currency::get_base_block_reward(true, res.total_coins, res.height);
+      res.block_reward = currency::get_base_block_reward(true, total_coins, res.height);
       currency::block b = AUTO_VAL_INIT(b);
       m_core.get_blockchain_storage().get_top_block(b);
       res.last_block_total_reward = currency::get_reward_from_miner_tx(b.miner_tx);
-      res.pos_diff_total_coins_rate = (pos_diff / (res.total_coins - PREMINE_AMOUNT + 1)).convert_to<uint64_t>();
+      res.pos_diff_total_coins_rate = (pos_diff / (total_coins - PREMINE_AMOUNT + 1)).convert_to<uint64_t>();
       res.last_block_timestamp = b.timestamp;
       res.last_block_hash = string_tools::pod_to_hex(get_block_hash(b));
     }
@@ -795,6 +807,10 @@ namespace currency
 
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
     res.prev_hash = string_tools::pod_to_hex(b.prev_id);
+
+    //calculate epoch seed
+    res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
+
     res.status = CORE_RPC_STATUS_OK;
 
     return true;
