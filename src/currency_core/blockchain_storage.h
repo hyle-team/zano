@@ -501,7 +501,7 @@ namespace currency
     mutable core_runtime_config m_core_runtime_config;
     mutable i_core_event_handler* m_event_handler;
     mutable i_core_event_handler m_event_handler_stub;
-    
+
     //tools::median_db_cache<uint64_t, uint64_t> m_tx_fee_median;
     mutable std::unordered_map<size_t, uint64_t> m_timestamps_median_cache;
     mutable performnce_data m_performance_data;
@@ -510,7 +510,10 @@ namespace currency
     //just informational 
     mutable wide_difficulty_type m_cached_next_pow_difficulty;
     mutable wide_difficulty_type m_cached_next_pos_difficulty;
-    //work like a cache to avoid 
+
+    mutable std::list <std::pair<wide_difficulty_type, uint64_t>> m_pos_targetdata_cache;
+    mutable std::list <std::pair<wide_difficulty_type, uint64_t>> m_pow_targetdata_cache;
+    //work like a cache to avoid recalculation on read operations
     mutable uint64_t m_current_fee_median;
     mutable uint64_t m_current_fee_median_effective_index;
     bool m_is_reorganize_in_process;    
@@ -560,9 +563,12 @@ namespace currency
     const std::vector<txin_etc_details_v>& get_txin_etc_options(const txin_v& in)const;
     void on_block_added(const block_extended_info& bei, const crypto::hash& id);
     void on_block_removed(const block_extended_info& bei);
+    void update_targetdata_cache_on_block_added(const block_extended_info& bei);
+    void update_targetdata_cache_on_block_removed(const block_extended_info& bei);
     uint64_t tx_fee_median_for_height(uint64_t h) const;
     uint64_t get_tx_fee_median_effective_index(uint64_t h) const;    
     void on_abort_transaction();
+    void load_targetdata_cache(bool is_pos) const;
     
 
     uint64_t get_adjusted_time()const;

@@ -52,7 +52,7 @@ bool gen_chain_switch_pow_pos::generate(std::vector<test_event_entry>& events) c
   for(size_t i = 0; i < CURRENCY_MINED_MONEY_UNLOCK_WINDOW; ++i)
   {
     block blk = AUTO_VAL_INIT(blk);
-    uint64_t ts = blk_0r.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN / 3; // to increase main chain difficulty
+    uint64_t ts = blk_0r.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN / 2; // to increase main chain difficulty
     bool r = generator.construct_block_manually(blk, blk_0r, miner_acc,test_generator::bf_timestamp, 0, 0, ts);
     CHECK_AND_ASSERT_MES(r, false, "construct_block_manually failed");
     events.push_back(blk);

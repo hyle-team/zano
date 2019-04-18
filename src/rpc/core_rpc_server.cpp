@@ -893,7 +893,7 @@ namespace currency
     response.height = get_block_height(blk);
     response.depth = m_core.get_current_blockchain_size() - response.height - 1;
     response.hash = string_tools::pod_to_hex(get_block_hash(blk));
-    response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<uint64_t>();
+    response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<std::string>();
     response.reward = get_block_reward(blk);
     return true;
   }

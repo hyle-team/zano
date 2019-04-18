@@ -55,23 +55,7 @@ namespace currency {
     return a + b < a || (c && a + b == (uint64_t)-1);
   }
 
-  bool check_hash_old(const crypto::hash &hash, difficulty_type difficulty) {
-    uint64_t low, high, top, cur;
-    // First check the highest word, this will most likely fail for a random hash.
-    mul(swap64le(((const uint64_t *)&hash)[3]), difficulty, top, high);
-    if (high != 0) {
-      return false;
-    }
-    mul(swap64le(((const uint64_t *)&hash)[0]), difficulty, low, cur);
-    mul(swap64le(((const uint64_t *)&hash)[1]), difficulty, low, high);
-    bool carry = cadd(cur, low);
-    cur = high;
-    mul(swap64le(((const uint64_t *)&hash)[2]), difficulty, low, high);
-    carry = cadc(cur, low, carry);
-    carry = cadc(high, top, carry);
-    return !carry;
-  }
-
+ 
 #if defined(_MSC_VER)
 #ifdef max
 #undef max
@@ -141,48 +125,6 @@ namespace currency {
       (reinterpret_cast<uint64_t*>(&result))[i] = nominal_hash.convert_to<uint64_t>();
       nominal_hash >>= 64;
     }
-  }
-
-  difficulty_type next_difficulty_old(vector<uint64_t> timestamps, vector<difficulty_type> cumulative_difficulties, size_t target_seconds) {
-    //cutoff DIFFICULTY_LAG
-    if (timestamps.size() > DIFFICULTY_WINDOW)
-    {
-      timestamps.resize(DIFFICULTY_WINDOW);
-      cumulative_difficulties.resize(DIFFICULTY_WINDOW);
-    }
-
-
-    size_t length = timestamps.size();
-    assert(length == cumulative_difficulties.size());
-    if (length <= 1) {
-      return DIFFICULTY_STARTER;
-    }
-    static_assert(DIFFICULTY_WINDOW >= 2, "Window is too small");
-    assert(length <= DIFFICULTY_WINDOW);
-    sort(timestamps.begin(), timestamps.end());
-    size_t cut_begin, cut_end;
-    static_assert(2 * DIFFICULTY_CUT <= DIFFICULTY_WINDOW - 2, "Cut length is too large");
-    if (length <= DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT) {
-      cut_begin = 0;
-      cut_end = length;
-    }
-    else {
-      cut_begin = (length - (DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT) + 1) / 2;
-      cut_end = cut_begin + (DIFFICULTY_WINDOW - 2 * DIFFICULTY_CUT);
-    }
-    assert(/*cut_begin >= 0 &&*/ cut_begin + 2 <= cut_end && cut_end <= length);
-    uint64_t time_span = timestamps[cut_end - 1] - timestamps[cut_begin];
-    if (time_span == 0) {
-      time_span = 1;
-    }
-    difficulty_type total_work = cumulative_difficulties[cut_end - 1] - cumulative_difficulties[cut_begin];
-    assert(total_work > 0);
-    uint64_t low, high;
-    mul(total_work, target_seconds, low, high);
-    if (high != 0 || low + time_span - 1 < low) {
-      return 0;
-    }
-    return (low + time_span - 1) / time_span;
   }
 
   void get_cut_location_from_len(size_t length, size_t& cut_begin, size_t& cut_end, size_t REDEF_DIFFICULTY_WINDOW, size_t REDEF_DIFFICULTY_CUT_OLD, size_t REDEF_DIFFICULTY_CUT_LAST)
