@@ -51,6 +51,7 @@ namespace math_helper
 		average()
 		{
 			m_base = default_base;
+      m_count = 0;
 		}
 
 		bool set_base()
@@ -71,6 +72,7 @@ namespace math_helper
 			CRITICAL_REGION_LOCAL(m_lock);
 
 //#ifndef DEBUG_STUB
+      m_count++;
 			m_list.push_back(vl);
 			if(m_list.size() > m_base )
 				m_list.pop_front();
@@ -106,9 +108,20 @@ namespace math_helper
 
 			return 0;
 		}
+    uint64_t& get_count()
+    {
+      return m_count;
+    }
+
+    void reset()
+    {
+      m_count = 0;
+      m_list.clear();
+    }
 
 	private:
-		unsigned int m_base;	
+		unsigned int m_base;
+    uint64_t m_count;
 		std::list<value_type> m_list;
 		mutable critical_section m_lock;
 	};

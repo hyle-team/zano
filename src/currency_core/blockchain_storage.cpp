@@ -895,6 +895,26 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   //skip genesis timestamp
   uint64_t stop_ind = 0;
   uint64_t blocks_size = m_db_blocks.size();
+  TIME_MEASURE_START_PD(target_calculating_enum_blocks);
+
+  //@#@
+// #define PRINT_PERFORMANCE_DATA_NATIVE(var_name)     << #var_name": " << m_db_blocks.get_performance_data_native().var_name.get_avg() << "(" << m_db_blocks.get_performance_data_native().var_name.get_count()<< ")" << ENDL
+// #define PRINT_PERFORMANCE_DATA_GLOBAL(var_name)     << #var_name": " << m_db_blocks.get_performance_data_global().var_name.get_avg() << "(" << m_db_blocks.get_performance_data_global().var_name.get_count()<< ")" << ENDL
+// #define PRINT_PERFORMANCE_DATA(var_name)     << #var_name": " << m_db_blocks.get_performance_data().var_name.get_avg() << "(" << m_db_blocks.get_performance_data().var_name.get_count()<< ")" << ENDL
+// 
+// #define RESET_PERFORMANCE_DATA_NATIVE(var_name)     m_db_blocks.get_performance_data_native().var_name.reset();
+// #define RESET_PERFORMANCE_DATA_GLOBAL(var_name)     m_db_blocks.get_performance_data_global().var_name.reset();
+// #define RESET_PERFORMANCE_DATA(var_name)     m_db_blocks.get_performance_data().var_name.reset();
+// 
+// 
+//   RESET_PERFORMANCE_DATA_GLOBAL(backend_get_pod_time);
+//   RESET_PERFORMANCE_DATA_GLOBAL(backend_get_t_time);
+//   RESET_PERFORMANCE_DATA_GLOBAL(get_serialize_t_time);
+//   RESET_PERFORMANCE_DATA(hit_percent);
+//   RESET_PERFORMANCE_DATA(read_cache_microsec);
+//   RESET_PERFORMANCE_DATA(read_db_microsec);
+//   RESET_PERFORMANCE_DATA(update_cache_microsec);
+//   RESET_PERFORMANCE_DATA(write_to_cache_microsec);
   for (uint64_t cur_ind = blocks_size - 1; cur_ind != stop_ind && count < DIFFICULTY_WINDOW; cur_ind--)
   {
     auto beiptr = m_db_blocks[cur_ind];
@@ -906,8 +926,32 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
     commulative_difficulties.push_back(beiptr->cumulative_diff_precise);
     ++count;
   }
+  //@#@
+
+
+
+//  LOG_PRINT_MAGENTA("[GET_NEXT_DIFF_CONDITIONAL][DB STAT]: count: " << count << ENDL 
+//    PRINT_PERFORMANCE_DATA_NATIVE(backend_set_pod_time)
+//    PRINT_PERFORMANCE_DATA_NATIVE(backend_set_t_time)
+//    PRINT_PERFORMANCE_DATA_NATIVE(set_serialize_t_time)
+//     PRINT_PERFORMANCE_DATA_GLOBAL(backend_get_pod_time)
+//     PRINT_PERFORMANCE_DATA_GLOBAL(backend_get_t_time)
+//     PRINT_PERFORMANCE_DATA_GLOBAL(get_serialize_t_time)
+//     PRINT_PERFORMANCE_DATA(hit_percent)
+//     PRINT_PERFORMANCE_DATA(read_cache_microsec)
+//     PRINT_PERFORMANCE_DATA(read_db_microsec)
+//     PRINT_PERFORMANCE_DATA(update_cache_microsec)
+//     PRINT_PERFORMANCE_DATA(write_to_cache_microsec)
+//     //PRINT_PERFORMANCE_DATA(write_to_db_microsec)
+//     , LOG_LEVEL_0);
+  //!@#@
+
   wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
-  return dif = next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+  TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
+  TIME_MEASURE_START_PD(target_calculating_calc);
+  dif = next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+  TIME_MEASURE_FINISH_PD(target_calculating_calc);
+  return dif;
 }
 //------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const
@@ -932,13 +976,8 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
       return false;
     return true;
   };
-  TIME_MEASURE_START_PD(target_calculating_enum_blocks);
   enum_blockchain(cb, alt_chain, split_height);
-  TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
-  TIME_MEASURE_START_PD(target_calculating_calc);
-  wide_difficulty_type res = next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
-  TIME_MEASURE_FINISH_PD(target_calculating_calc);
-  return res;
+  return next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
 }
 //------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_cached_next_difficulty(bool pos) const
@@ -4547,14 +4586,14 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     << ENDL << "HEIGHT " << bei.height << ", difficulty: " << current_diffic << ", cumul_diff_precise: " << bei.cumulative_diff_precise << ", cumul_diff_adj: " << bei.cumulative_diff_adjusted << " (+" << cumulative_diff_delta << ")"
     << ENDL << "block reward: " << print_money_brief(base_reward + fee_summary) << " (" << print_money_brief(base_reward) << " + " << print_money_brief(fee_summary) 
     << ")" << ", coinbase_blob_size: " << coinbase_blob_size << ", cumulative size: " << cumulative_block_size << ", tx_count: " << bei.bl.tx_hashes.size()
-    << ", " << block_processing_time_0_ms 
-    << "(" << block_processing_time_1 
-    << "/" << target_calculating_time_2 
+    << ", timing: " << block_processing_time_0_ms <<  "ms" 
+    << "(micrsec:" << block_processing_time_1 
+    << "(" << target_calculating_time_2 << "(" << m_performance_data.target_calculating_enum_blocks.get_last_val() << "/" << m_performance_data.target_calculating_calc.get_last_val() << ")"
     << "/" << longhash_calculating_time_3 
     << "/" << insert_time_4 
     << "/" << all_txs_insert_time_5
     << "/" << etc_stuff_6    
-    << ")micrs");
+    << "))");
 
   on_block_added(bei, id);
 
