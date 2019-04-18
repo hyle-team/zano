@@ -68,6 +68,9 @@ namespace currency
       epee::math_helper::average<uint64_t, 5> etc_stuff_6;
       epee::math_helper::average<uint64_t, 5> insert_time_4;
       epee::math_helper::average<uint64_t, 5> raise_block_core_event;
+      //target_calculating_time_2
+      epee::math_helper::average<uint64_t, 5> target_calculating_enum_blocks;
+      epee::math_helper::average<uint64_t, 5> target_calculating_calc;
 
       //tx processing zone
       epee::math_helper::average<uint64_t, 5> tx_check_inputs_time;
