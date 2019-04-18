@@ -521,6 +521,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getAliases() {
     this.backend.getAllAliases((status, data, error) => {
+
+      console.warn(error);
+
       if (error === 'CORE_BUSY') {
         window.setTimeout(() => {
           this.getAliases();
