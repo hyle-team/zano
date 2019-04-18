@@ -76,6 +76,13 @@ app-wallet {
             background-color: themed(contentBackgroundColor);
           }
         }
+
+        &:hover:not(.active) {
+
+          @include themify($themes) {
+            background-color: themed(tabHoverBackgroundColor);
+          }
+        }
       }
     }
 
