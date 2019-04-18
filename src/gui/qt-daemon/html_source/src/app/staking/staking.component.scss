@@ -64,7 +64,11 @@
 
   .title {
     font-size: 1.3rem;
-    width: 9rem;
+    padding: 0 1rem;
+
+    &:first-child{
+      padding-left: 0;
+    }
   }
 
   .options {

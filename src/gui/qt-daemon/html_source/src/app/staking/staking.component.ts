@@ -20,29 +20,57 @@ export class StakingComponent implements OnInit, OnDestroy {
 
   periods = [
     {
-      title: this.translate.instant('STAKING.DAY'),
-      key: '1 day',
-      active: false
-    },
-    {
-      title: this.translate.instant('STAKING.WEEK'),
+      title: this.translate.instant('STAKING.PERIOD.WEEK1'),
       key: '1 week',
       active: false
     },
     {
-      title: this.translate.instant('STAKING.MONTH'),
+      title: this.translate.instant('STAKING.PERIOD.WEEK2'),
+      key: '2 week',
+      active: false
+    },
+    {
+      title: this.translate.instant('STAKING.PERIOD.MONTH1'),
       key: '1 month',
       active: false
     },
     {
-      title: this.translate.instant('STAKING.YEAR'),
+      title: this.translate.instant('STAKING.PERIOD.MONTH3'),
+      key: '3 month',
+      active: false
+    },
+    {
+      title: this.translate.instant('STAKING.PERIOD.MONTH6'),
+      key: '6 month',
+      active: false
+    },
+    {
+      title: this.translate.instant('STAKING.PERIOD.YEAR'),
       key: '1 year',
       active: false
     },
     {
-      title: this.translate.instant('STAKING.ALL'),
+      title: this.translate.instant('STAKING.PERIOD.ALL'),
       key: 'All',
       active: true
+    }
+  ];
+
+  groups = [
+    {
+      title: this.translate.instant('STAKING.GROUP.DAY'),
+      key: 'day',
+      active: true
+    },
+    {
+      title: this.translate.instant('STAKING.GROUP.WEEK'),
+      key: 'week',
+      active: false
+    },
+    {
+      title: this.translate.instant('STAKING.GROUP.MONTH'),
+      key: 'month',
+      active: false
     }
   ];
 
@@ -61,8 +89,6 @@ export class StakingComponent implements OnInit, OnDestroy {
     total: new BigNumber(0)
   };
 
-  currentPeriod = 'All';
-
   constructor(
     private route: ActivatedRoute,
     private variablesService: VariablesService,
@@ -73,6 +99,15 @@ export class StakingComponent implements OnInit, OnDestroy {
   ) {
   }
 
+  static makeGroupTime(key, date) {
+    if (key === 'day') {
+      return date.setHours(0, 0, 0, 0);
+    } else if (key === 'week') {
+      return new Date(date.setDate(date.getDate() - date.getDay())).setHours(0, 0, 0, 0);
+    } else {
+      return new Date(date.setDate(1)).setHours(0, 0, 0, 0);
+    }
+  }
 
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(() => {
@@ -112,7 +147,12 @@ export class StakingComponent implements OnInit, OnDestroy {
         type: 'line',
         backgroundColor: 'transparent',
         height: null,
-        zoomType: null
+        zoomType: null,
+        events: {
+          load: () => {
+            this.changePeriod();
+          }
+        }
       },
 
       yAxis: {
@@ -241,39 +281,31 @@ export class StakingComponent implements OnInit, OnDestroy {
           });
         }
         this.ngZone.run(() => {
-          this.drawChart(JSON.parse(JSON.stringify(this.originalData)));
+          this.drawChart([]);
         });
       });
     }
-
   }
 
-  changePeriod(period) {
-    this.periods.forEach((p) => {
-      p.active = false;
-    });
-    period.active = true;
-    this.currentPeriod = period.key;
+  changePeriod(period?) {
+    if (period) {
+      this.periods.forEach((p) => {
+        p.active = false;
+      });
+      period.active = true;
+    } else {
+      period = this.periods.find((p) => p.active);
+    }
 
     const d = new Date();
     let min = null;
     const newData = [];
 
-    if (period.key === '1 day') {
+    const group = this.groups.find((g) => g.active);
+
+    if (period.key === '1 week') {
       this.originalData.forEach((item) => {
-        const time = (new Date(item[0])).setUTCMinutes(0, 0, 0);
-        const find = newData.find(itemNew => itemNew[0] === time);
-        if (find) {
-          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
-        } else {
-          newData.push([time, item[1]]);
-        }
-      });
-      this.chart.ref.series[0].setData(newData, true);
-      min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 1, 0, 0, 0, 0);
-    } else if (period.key === '1 week') {
-      this.originalData.forEach((item) => {
-        const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
           find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
@@ -283,9 +315,21 @@ export class StakingComponent implements OnInit, OnDestroy {
       });
       this.chart.ref.series[0].setData(newData, true);
       min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 7, 0, 0, 0, 0);
+    } else if (period.key === '2 week') {
+      this.originalData.forEach((item) => {
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
+        const find = newData.find(itemNew => itemNew[0] === time);
+        if (find) {
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
+        } else {
+          newData.push([time, item[1]]);
+        }
+      });
+      this.chart.ref.series[0].setData(newData, true);
+      min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 14, 0, 0, 0, 0);
     } else if (period.key === '1 month') {
       this.originalData.forEach((item) => {
-        const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
           find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
@@ -295,9 +339,33 @@ export class StakingComponent implements OnInit, OnDestroy {
       });
       this.chart.ref.series[0].setData(newData, true);
       min = Date.UTC(d.getFullYear(), d.getMonth() - 1, d.getDate(), 0, 0, 0, 0);
+    } else if (period.key === '3 month') {
+      this.originalData.forEach((item) => {
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
+        const find = newData.find(itemNew => itemNew[0] === time);
+        if (find) {
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
+        } else {
+          newData.push([time, item[1]]);
+        }
+      });
+      this.chart.ref.series[0].setData(newData, true);
+      min = Date.UTC(d.getFullYear(), d.getMonth() - 3, d.getDate(), 0, 0, 0, 0);
+    } else if (period.key === '6 month') {
+      this.originalData.forEach((item) => {
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
+        const find = newData.find(itemNew => itemNew[0] === time);
+        if (find) {
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
+        } else {
+          newData.push([time, item[1]]);
+        }
+      });
+      this.chart.ref.series[0].setData(newData, true);
+      min = Date.UTC(d.getFullYear(), d.getMonth() - 6, d.getDate(), 0, 0, 0, 0);
     } else if (period.key === '1 year') {
       this.originalData.forEach((item) => {
-        const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
           find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
@@ -308,12 +376,28 @@ export class StakingComponent implements OnInit, OnDestroy {
       this.chart.ref.series[0].setData(newData, true);
       min = Date.UTC(d.getFullYear() - 1, d.getMonth(), d.getDate(), 0, 0, 0, 0);
     } else {
-      this.chart.ref.series[0].setData(this.originalData, true);
+      this.originalData.forEach((item) => {
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
+        const find = newData.find(itemNew => itemNew[0] === time);
+        if (find) {
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
+        } else {
+          newData.push([time, item[1]]);
+        }
+      });
+      this.chart.ref.series[0].setData(newData, true);
     }
 
     this.chart.ref.xAxis[0].setExtremes(min, null);
   }
 
+  changeGroup(group) {
+    this.groups.forEach((g) => {
+      g.active = false;
+    });
+    group.active = true;
+    this.changePeriod();
+  }
 
   ngOnDestroy() {
     this.parentRouting.unsubscribe();
