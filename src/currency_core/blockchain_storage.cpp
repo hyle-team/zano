@@ -61,6 +61,7 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION   3 //mismatch here means full resync
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MINOR_COMPATIBILITY_VERSION   4 //mismatch here means some reinitializations
 
+#define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
 
 
 DISABLE_VS_WARNINGS(4267)
@@ -447,6 +448,8 @@ bool blockchain_storage::clear()
   m_db_aliases.clear();
   m_db_addr_to_alias.clear();
   m_db_per_block_gindex_incs.clear();
+  m_pos_targetdata_cache.clear();
+  m_pow_targetdata_cache.clear();
 
   m_db.commit_transaction();
   
@@ -889,62 +892,21 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   CRITICAL_REGION_LOCAL(m_read_lock);
   std::vector<uint64_t> timestamps;
   std::vector<wide_difficulty_type> commulative_difficulties;
-  size_t count = 0;
   if (!m_db_blocks.size())
     return DIFFICULTY_STARTER;
   //skip genesis timestamp
-  uint64_t stop_ind = 0;
-  uint64_t blocks_size = m_db_blocks.size();
   TIME_MEASURE_START_PD(target_calculating_enum_blocks);
+  std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = pos ? m_pos_targetdata_cache : m_pow_targetdata_cache;
+  if (targetdata_cache.empty())
+    load_targetdata_cache(pos);
 
-  //@#@
-// #define PRINT_PERFORMANCE_DATA_NATIVE(var_name)     << #var_name": " << m_db_blocks.get_performance_data_native().var_name.get_avg() << "(" << m_db_blocks.get_performance_data_native().var_name.get_count()<< ")" << ENDL
-// #define PRINT_PERFORMANCE_DATA_GLOBAL(var_name)     << #var_name": " << m_db_blocks.get_performance_data_global().var_name.get_avg() << "(" << m_db_blocks.get_performance_data_global().var_name.get_count()<< ")" << ENDL
-// #define PRINT_PERFORMANCE_DATA(var_name)     << #var_name": " << m_db_blocks.get_performance_data().var_name.get_avg() << "(" << m_db_blocks.get_performance_data().var_name.get_count()<< ")" << ENDL
-// 
-// #define RESET_PERFORMANCE_DATA_NATIVE(var_name)     m_db_blocks.get_performance_data_native().var_name.reset();
-// #define RESET_PERFORMANCE_DATA_GLOBAL(var_name)     m_db_blocks.get_performance_data_global().var_name.reset();
-// #define RESET_PERFORMANCE_DATA(var_name)     m_db_blocks.get_performance_data().var_name.reset();
-// 
-// 
-//   RESET_PERFORMANCE_DATA_GLOBAL(backend_get_pod_time);
-//   RESET_PERFORMANCE_DATA_GLOBAL(backend_get_t_time);
-//   RESET_PERFORMANCE_DATA_GLOBAL(get_serialize_t_time);
-//   RESET_PERFORMANCE_DATA(hit_percent);
-//   RESET_PERFORMANCE_DATA(read_cache_microsec);
-//   RESET_PERFORMANCE_DATA(read_db_microsec);
-//   RESET_PERFORMANCE_DATA(update_cache_microsec);
-//   RESET_PERFORMANCE_DATA(write_to_cache_microsec);
-  for (uint64_t cur_ind = blocks_size - 1; cur_ind != stop_ind && count < DIFFICULTY_WINDOW; cur_ind--)
+  size_t count = 0;
+  for (auto it = targetdata_cache.rbegin(); it != targetdata_cache.rend() && count < DIFFICULTY_WINDOW; it++)
   {
-    auto beiptr = m_db_blocks[cur_ind];
-
-    bool is_pos_bl = is_pos_block(beiptr->bl);
-    if (pos != is_pos_bl)
-      continue;
-    timestamps.push_back(beiptr->bl.timestamp);
-    commulative_difficulties.push_back(beiptr->cumulative_diff_precise);
+    timestamps.push_back(it->second);
+    commulative_difficulties.push_back(it->first);
     ++count;
   }
-  //@#@
-
-
-
-//  LOG_PRINT_MAGENTA("[GET_NEXT_DIFF_CONDITIONAL][DB STAT]: count: " << count << ENDL 
-//    PRINT_PERFORMANCE_DATA_NATIVE(backend_set_pod_time)
-//    PRINT_PERFORMANCE_DATA_NATIVE(backend_set_t_time)
-//    PRINT_PERFORMANCE_DATA_NATIVE(set_serialize_t_time)
-//     PRINT_PERFORMANCE_DATA_GLOBAL(backend_get_pod_time)
-//     PRINT_PERFORMANCE_DATA_GLOBAL(backend_get_t_time)
-//     PRINT_PERFORMANCE_DATA_GLOBAL(get_serialize_t_time)
-//     PRINT_PERFORMANCE_DATA(hit_percent)
-//     PRINT_PERFORMANCE_DATA(read_cache_microsec)
-//     PRINT_PERFORMANCE_DATA(read_db_microsec)
-//     PRINT_PERFORMANCE_DATA(update_cache_microsec)
-//     PRINT_PERFORMANCE_DATA(write_to_cache_microsec)
-//     //PRINT_PERFORMANCE_DATA(write_to_db_microsec)
-//     , LOG_LEVEL_0);
-  //!@#@
 
   wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
   TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
@@ -4600,21 +4562,65 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   bvc.m_added_to_main_chain = true;
   return true;
 }
+//------------------------------------------------------------------
 void blockchain_storage::on_block_added(const block_extended_info& bei, const crypto::hash& id)
 {
   update_next_comulative_size_limit();
   m_timestamps_median_cache.clear();
   m_tx_pool.on_blockchain_inc(bei.height, id);
+
+  update_targetdata_cache_on_block_added(bei);
+
   TIME_MEASURE_START_PD(raise_block_core_event);
   rise_core_event(CORE_EVENT_BLOCK_ADDED, void_struct());
   TIME_MEASURE_FINISH_PD(raise_block_core_event);
+
 }
 //------------------------------------------------------------------
 void blockchain_storage::on_block_removed(const block_extended_info& bei)
 {
   m_tx_pool.on_blockchain_dec(m_db_blocks.size() - 1, get_top_block_id());
   m_timestamps_median_cache.clear();
+  update_targetdata_cache_on_block_removed(bei);
   LOG_PRINT_L2("block at height " << bei.height << " was removed from the blockchain");
+}
+//------------------------------------------------------------------
+void blockchain_storage::update_targetdata_cache_on_block_added(const block_extended_info& bei)
+{
+  if (bei.height == 0)
+    return; //skip genesis
+  std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = is_pos_block(bei.bl) ? m_pos_targetdata_cache : m_pow_targetdata_cache;
+  targetdata_cache.push_back(std::pair<wide_difficulty_type, uint64_t>(bei.cumulative_diff_precise, bei.bl.timestamp));
+  while (targetdata_cache.size() > TARGETDATA_CACHE_SIZE)
+    targetdata_cache.pop_front();
+}
+//------------------------------------------------------------------
+void blockchain_storage::update_targetdata_cache_on_block_removed(const block_extended_info& bei)
+{
+  std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = is_pos_block(bei.bl) ? m_pos_targetdata_cache : m_pow_targetdata_cache;
+  if (targetdata_cache.size())
+    targetdata_cache.pop_back();
+  if (targetdata_cache.size() < DIFFICULTY_WINDOW)
+    targetdata_cache.clear();
+}
+//------------------------------------------------------------------
+void blockchain_storage::load_targetdata_cache(bool is_pos)const
+{
+  std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = is_pos? m_pos_targetdata_cache: m_pow_targetdata_cache;
+  targetdata_cache.clear();
+  uint64_t stop_ind = 0;
+  uint64_t blocks_size = m_db_blocks.size();
+  size_t count = 0;
+  for (uint64_t cur_ind = blocks_size - 1; cur_ind != stop_ind && count < DIFFICULTY_WINDOW + 5; cur_ind--)
+  {
+    auto beiptr = m_db_blocks[cur_ind];
+
+    bool is_pos_bl = is_pos_block(beiptr->bl);
+    if (is_pos != is_pos_bl)
+      continue;
+    targetdata_cache.push_front(std::pair<wide_difficulty_type, uint64_t>(beiptr->cumulative_diff_precise, beiptr->bl.timestamp));
+    ++count;
+  }
 }
 //------------------------------------------------------------------
 void blockchain_storage::on_abort_transaction()

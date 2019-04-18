@@ -834,7 +834,7 @@ namespace currency
       uint64_t height;
       uint64_t depth;
       std::string hash;
-      difficulty_type difficulty;
+      std::string difficulty;
       uint64_t reward;
       
       BEGIN_KV_SERIALIZE_MAP()
