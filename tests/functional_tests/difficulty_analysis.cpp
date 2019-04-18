@@ -319,6 +319,7 @@ void run_emulation(const std::string& path)
   LOG_PRINT_L0("Done");
 }
 
+void hash_rate_analysis(const std::string& path);
 
 void run_difficulty_analysis(const std::string& path)
 {
@@ -335,7 +336,7 @@ void run_difficulty_analysis(const std::string& path)
 //   std::cout << pow_hash << ENDL;
 
   //crypto::hash mining_hash = currency::get_block_header_mining_hash(b);
-  crypto::hash id_hash = currency::get_block_hash(b);
+  //crypto::hash id_hash = currency::get_block_hash(b);
 
 
 
