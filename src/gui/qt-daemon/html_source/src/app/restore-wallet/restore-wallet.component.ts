@@ -62,8 +62,7 @@ export class RestoreWalletComponent implements OnInit {
   saveWallet() {
     if (this.restoreForm.valid && this.restoreForm.get('name').value.length <= this.variablesService.maxWalletNameLength) {
       this.backend.isValidRestoreWalletText(this.restoreForm.get('key').value, (valid_status, valid_data) => {
-
-        if (valid_data === 'FALSE') {
+        if (valid_data !== 'TRUE') {
           this.ngZone.run(() => {
             this.restoreForm.get('key').setErrors({key_not_valid: true});
           });

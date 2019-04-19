@@ -245,6 +245,7 @@
     "FORM_ERRORS": {
       "ADDRESS_REQUIRED": "Address is required.",
       "ADDRESS_NOT_VALID": "Address not valid.",
+      "ALIAS_NOT_VALID": "Alias not valid.",
       "AMOUNT_REQUIRED": "Amount is required.",
       "AMOUNT_ZERO": "Amount is zero.",
       "FEE_REQUIRED": "Fee is required.",
@@ -439,17 +440,28 @@
     "TITLE_PENDING": "Pending",
     "TITLE_TOTAL": "Total",
     "TITLE_PERIOD": "Time period:",
-    "DAY": "1 day",
-    "WEEK": "1 week",
-    "MONTH": "1 month",
-    "YEAR": "1 year",
-    "ALL": "All",
+    "PERIOD": {
+      "WEEK1": "1 week",
+      "WEEK2": "2 week",
+      "MONTH1": "1 month",
+      "MONTH3": "3 month",
+      "MONTH6": "6 month",
+      "YEAR": "1 year",
+      "ALL": "All"
+    },
+    "TITLE_GROUP": "Group:",
+    "GROUP": {
+      "DAY": "day",
+      "WEEK": "week",
+      "MONTH": "month"
+    },
     "SWITCH": {
       "ON": "ON",
       "OFF": "OFF"
     }
   },
   "ERRORS": {
+    "NO_MONEY": "Not enough money",
     "NOT_ENOUGH_MONEY": "Insufficient funds in account",
     "CORE_BUSY": "Internal error (core is busy)",
     "DAEMON_BUSY": "Internal error: deamon is busy",

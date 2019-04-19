@@ -34,8 +34,8 @@ target_link_libraries(difficulty-tests currency_core ${CMAKE_THREAD_LIBS_INIT} e
 target_link_libraries(functional_tests wallet currency_core crypto common rpc zlibstatic ethash upnpc-static ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 target_link_libraries(hash-tests crypto ethash)
 target_link_libraries(hash-target-tests crypto currency_core ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-target_link_libraries(performance_tests currency_core common crypto zlibstatic ethash${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-target_link_libraries(unit_tests wallet currency_core crypto common gtest_main zlibstatic ethash${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+target_link_libraries(performance_tests currency_core common crypto zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+target_link_libraries(unit_tests wallet currency_core crypto common gtest_main zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 target_link_libraries(net_load_tests_clt currency_core common crypto gtest_main ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 target_link_libraries(net_load_tests_srv currency_core common crypto gtest_main ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 

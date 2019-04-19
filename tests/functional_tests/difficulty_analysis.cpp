@@ -12,6 +12,7 @@
 using namespace epee;
 #include "wallet/wallet2.h"
 #include "currency_core/blockchain_storage.h"
+#include "currency_core/basic_pow_helpers.h"
 
  
 using std::size_t;
@@ -318,11 +319,29 @@ void run_emulation(const std::string& path)
   LOG_PRINT_L0("Done");
 }
 
+void hash_rate_analysis(const std::string& path);
 
 void run_difficulty_analysis(const std::string& path)
 {
-  //hash_rate_analysis(path);
-  run_emulation(path);
+//   currency::block b = AUTO_VAL_INIT(b);
+//   std::string s("sdsccasc");
+//   b.miner_tx.extra.push_back(s);
+// 
+//   crypto::hash mining_hash = currency::null_hash;
+//   bool r = string_tools::parse_tpod_from_hex_string("7759031ee0f014fe45476724df268f61c890b4a4637df1489a6c94c0135efbd8", mining_hash);
+//   uint64_t nonce = 13704307308123612296;
+//   crypto::hash pow_hash = currency::get_block_longhash(6, mining_hash, nonce);
+//   
+//   std::cout << mining_hash << ENDL;
+//   std::cout << pow_hash << ENDL;
+
+  //crypto::hash mining_hash = currency::get_block_header_mining_hash(b);
+  //crypto::hash id_hash = currency::get_block_hash(b);
+
+
+
+  hash_rate_analysis(path);
+  //run_emulation(path);
 
 }
 

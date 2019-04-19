@@ -885,7 +885,7 @@ var Wallet = /** @class */ (function () {
         }
         else if ((item.hasOwnProperty('contract') && (item.contract[0].state === 3 || item.contract[0].state === 6 || item.contract[0].state === 601) && !item.contract[0].is_a)) {
             item.sortFee = item.fee.negated();
-            item.sortAmount = item.amount.negated();
+            item.sortAmount = item.amount;
         }
         else {
             if (!item.is_income) {
@@ -1633,7 +1633,7 @@ var BackendService = /** @class */ (function () {
                     });
                 }
                 else {
-                    error_translate = 'INFORMER.NO_MONEY';
+                    error_translate = 'ERRORS.NO_MONEY';
                 }
                 break;
             case 'INTERNAL_ERROR:not enough outputs to mix':
@@ -3175,6 +3175,7 @@ var AppComponent = /** @class */ (function () {
     AppComponent.prototype.getAliases = function () {
         var _this = this;
         this.backend.getAllAliases(function (status, data, error) {
+            console.warn(error);
             if (error === 'CORE_BUSY') {
                 window.setTimeout(function () {
                     _this.getAliases();
@@ -5262,7 +5263,7 @@ var RestoreWalletComponent = /** @class */ (function () {
         var _this = this;
         if (this.restoreForm.valid && this.restoreForm.get('name').value.length <= this.variablesService.maxWalletNameLength) {
             this.backend.isValidRestoreWalletText(this.restoreForm.get('key').value, function (valid_status, valid_data) {
-                if (valid_data === 'FALSE') {
+                if (valid_data !== 'TRUE') {
                     _this.ngZone.run(function () {
                         _this.restoreForm.get('key').setErrors({ key_not_valid: true });
                     });
@@ -5470,7 +5471,7 @@ var SeedPhraseComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<form class=\"form-send\" [formGroup]=\"sendForm\" (ngSubmit)=\"onSend()\">\r\n\r\n  <div class=\"input-block\">\r\n    <label for=\"send-address\">{{ 'SEND.ADDRESS' | translate }}</label>\r\n    <input type=\"text\" id=\"send-address\" formControlName=\"address\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n    <div class=\"error-block\" *ngIf=\"sendForm.controls['address'].invalid && (sendForm.controls['address'].dirty || sendForm.controls['address'].touched)\">\r\n      <div *ngIf=\"sendForm.controls['address'].errors['required']\">\r\n        {{ 'SEND.FORM_ERRORS.ADDRESS_REQUIRED' | translate }}\r\n      </div>\r\n      <div *ngIf=\"sendForm.controls['address'].errors['address_not_valid']\">\r\n        {{ 'SEND.FORM_ERRORS.ADDRESS_NOT_VALID' | translate }}\r\n      </div>\r\n    </div>\r\n  </div>\r\n\r\n  <div class=\"input-blocks-row\">\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"send-amount\">{{ 'SEND.AMOUNT' | translate }}</label>\r\n      <input type=\"text\" id=\"send-amount\" formControlName=\"amount\" appInputValidate=\"money\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      <div class=\"error-block\" *ngIf=\"sendForm.controls['amount'].invalid && (sendForm.controls['amount'].dirty || sendForm.controls['amount'].touched)\">\r\n        <div *ngIf=\"sendForm.controls['amount'].errors['required']\">\r\n          {{ 'SEND.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"sendForm.controls['amount'].errors['zero']\">\r\n          {{ 'SEND.FORM_ERRORS.AMOUNT_ZERO' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"send-comment\">{{ 'SEND.COMMENT' | translate }}</label>\r\n      <input type=\"text\" id=\"send-comment\" formControlName=\"comment\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n    </div>\r\n\r\n  </div>\r\n\r\n  <button type=\"button\" class=\"send-select\" (click)=\"toggleOptions()\">\r\n    <span>{{ 'SEND.DETAILS' | translate }}</span><i class=\"icon arrow\" [class.down]=\"!additionalOptions\" [class.up]=\"additionalOptions\"></i>\r\n  </button>\r\n\r\n  <div class=\"additional-details\" *ngIf=\"additionalOptions\">\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"send-mixin\">{{ 'SEND.MIXIN' | translate }}</label>\r\n      <input type=\"text\" id=\"send-mixin\" formControlName=\"mixin\" appInputValidate=\"integer\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      <div class=\"error-block\" *ngIf=\"sendForm.controls['mixin'].invalid && (sendForm.controls['mixin'].dirty || sendForm.controls['mixin'].touched)\">\r\n        <div *ngIf=\"sendForm.controls['mixin'].errors['required']\">\r\n          {{ 'SEND.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"send-fee\">{{ 'SEND.FEE' | translate }}</label>\r\n      <input type=\"text\" id=\"send-fee\" formControlName=\"fee\" appInputValidate=\"money\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      <div class=\"error-block\" *ngIf=\"sendForm.controls['fee'].invalid && (sendForm.controls['fee'].dirty || sendForm.controls['fee'].touched)\">\r\n        <div *ngIf=\"sendForm.controls['fee'].errors['required']\">\r\n          {{ 'SEND.FORM_ERRORS.FEE_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"sendForm.controls['fee'].errors['less_min']\">\r\n          {{ 'SEND.FORM_ERRORS.FEE_MINIMUM' | translate : {fee: variablesService.default_fee} }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n  </div>\r\n\r\n  <button type=\"submit\" class=\"blue-button\" [disabled]=\"!sendForm.valid || !variablesService.currentWallet.loaded\">{{ 'SEND.BUTTON' | translate }}</button>\r\n\r\n</form>\r\n"
+module.exports = "<form class=\"form-send\" [formGroup]=\"sendForm\" (ngSubmit)=\"onSend()\">\r\n\r\n  <div class=\"input-block input-block-address\">\r\n    <label for=\"send-address\">{{ 'SEND.ADDRESS' | translate }}</label>\r\n\r\n    <input type=\"text\" id=\"send-address\" formControlName=\"address\" (mousedown)=\"addressMouseDown($event)\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n\r\n    <div class=\"address-dropdown scrolled-content\" *ngIf=\"isOpen\">\r\n      <div *ngFor=\"let item of localAliases\" (click)=\"setAlias(item.name)\">{{item.name}}</div>\r\n    </div>\r\n\r\n    <div class=\"error-block\" *ngIf=\"sendForm.controls['address'].invalid && (sendForm.controls['address'].dirty || sendForm.controls['address'].touched)\">\r\n      <div *ngIf=\"sendForm.controls['address'].errors['required']\">\r\n        {{ 'SEND.FORM_ERRORS.ADDRESS_REQUIRED' | translate }}\r\n      </div>\r\n      <div *ngIf=\"sendForm.controls['address'].errors['address_not_valid']\">\r\n        {{ 'SEND.FORM_ERRORS.ADDRESS_NOT_VALID' | translate }}\r\n      </div>\r\n      <div *ngIf=\"sendForm.controls['address'].errors['alias_not_valid']\">\r\n        {{ 'SEND.FORM_ERRORS.ALIAS_NOT_VALID' | translate }}\r\n      </div>\r\n    </div>\r\n  </div>\r\n\r\n  <div class=\"input-blocks-row\">\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"send-amount\">{{ 'SEND.AMOUNT' | translate }}</label>\r\n      <input type=\"text\" id=\"send-amount\" formControlName=\"amount\" appInputValidate=\"money\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      <div class=\"error-block\" *ngIf=\"sendForm.controls['amount'].invalid && (sendForm.controls['amount'].dirty || sendForm.controls['amount'].touched)\">\r\n        <div *ngIf=\"sendForm.controls['amount'].errors['required']\">\r\n          {{ 'SEND.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"sendForm.controls['amount'].errors['zero']\">\r\n          {{ 'SEND.FORM_ERRORS.AMOUNT_ZERO' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"send-comment\">{{ 'SEND.COMMENT' | translate }}</label>\r\n      <input type=\"text\" id=\"send-comment\" formControlName=\"comment\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n    </div>\r\n\r\n  </div>\r\n\r\n  <button type=\"button\" class=\"send-select\" (click)=\"toggleOptions()\">\r\n    <span>{{ 'SEND.DETAILS' | translate }}</span><i class=\"icon arrow\" [class.down]=\"!additionalOptions\" [class.up]=\"additionalOptions\"></i>\r\n  </button>\r\n\r\n  <div class=\"additional-details\" *ngIf=\"additionalOptions\">\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"send-mixin\">{{ 'SEND.MIXIN' | translate }}</label>\r\n      <input type=\"text\" id=\"send-mixin\" formControlName=\"mixin\" appInputValidate=\"integer\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      <div class=\"error-block\" *ngIf=\"sendForm.controls['mixin'].invalid && (sendForm.controls['mixin'].dirty || sendForm.controls['mixin'].touched)\">\r\n        <div *ngIf=\"sendForm.controls['mixin'].errors['required']\">\r\n          {{ 'SEND.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"send-fee\">{{ 'SEND.FEE' | translate }}</label>\r\n      <input type=\"text\" id=\"send-fee\" formControlName=\"fee\" appInputValidate=\"money\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      <div class=\"error-block\" *ngIf=\"sendForm.controls['fee'].invalid && (sendForm.controls['fee'].dirty || sendForm.controls['fee'].touched)\">\r\n        <div *ngIf=\"sendForm.controls['fee'].errors['required']\">\r\n          {{ 'SEND.FORM_ERRORS.FEE_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"sendForm.controls['fee'].errors['less_min']\">\r\n          {{ 'SEND.FORM_ERRORS.FEE_MINIMUM' | translate : {fee: variablesService.default_fee} }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n  </div>\r\n\r\n  <button type=\"submit\" class=\"blue-button\" [disabled]=\"!sendForm.valid || !variablesService.currentWallet.loaded\">{{ 'SEND.BUTTON' | translate }}</button>\r\n\r\n</form>\r\n"
 
 /***/ }),
 
@@ -5481,7 +5482,7 @@ module.exports = "<form class=\"form-send\" [formGroup]=\"sendForm\" (ngSubmit)=
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = ":host {\n  width: 100%; }\n\n.form-send .input-blocks-row {\n  display: flex; }\n\n.form-send .input-blocks-row > div {\n    flex-basis: 50%; }\n\n.form-send .input-blocks-row > div:first-child {\n      margin-right: 1.5rem; }\n\n.form-send .input-blocks-row > div:last-child {\n      margin-left: 1.5rem; }\n\n.form-send .send-select {\n  display: flex;\n  align-items: center;\n  background: transparent;\n  border: none;\n  font-size: 1.3rem;\n  line-height: 1.3rem;\n  margin: 1.5rem 0 0;\n  padding: 0;\n  width: 100%;\n  max-width: 15rem;\n  height: 1.3rem; }\n\n.form-send .send-select .arrow {\n    margin-left: 1rem;\n    width: 0.8rem;\n    height: 0.8rem; }\n\n.form-send .send-select .arrow.down {\n      -webkit-mask: url('arrow-down.svg') no-repeat center;\n              mask: url('arrow-down.svg') no-repeat center; }\n\n.form-send .send-select .arrow.up {\n      -webkit-mask: url('arrow-up.svg') no-repeat center;\n              mask: url('arrow-up.svg') no-repeat center; }\n\n.form-send .additional-details {\n  display: flex;\n  margin-top: 1.5rem;\n  padding: 0.5rem 0 2rem; }\n\n.form-send .additional-details > div {\n    flex-basis: 25%; }\n\n.form-send .additional-details > div:first-child {\n      padding-left: 1.5rem;\n      padding-right: 1rem; }\n\n.form-send .additional-details > div:last-child {\n      padding-left: 1rem;\n      padding-right: 1.5rem; }\n\n.form-send button {\n  margin: 2.4rem 0;\n  width: 100%;\n  max-width: 15rem; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvc2VuZC9EOlxcemFub196YW5vXFxzcmNcXGd1aVxccXQtZGFlbW9uXFxodG1sX3NvdXJjZS9zcmNcXGFwcFxcc2VuZFxcc2VuZC5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLFdBQVcsRUFBQTs7QUFHYjtFQUdJLGFBQWEsRUFBQTs7QUFIakI7SUFNTSxlQUFlLEVBQUE7O0FBTnJCO01BU1Esb0JBQW9CLEVBQUE7O0FBVDVCO01BYVEsbUJBQW1CLEVBQUE7O0FBYjNCO0VBbUJJLGFBQWE7RUFDYixtQkFBbUI7RUFDbkIsdUJBQXVCO0VBQ3ZCLFlBQVk7RUFDWixpQkFBaUI7RUFDakIsbUJBQW1CO0VBQ25CLGtCQUFrQjtFQUNsQixVQUFVO0VBQ1YsV0FBVztFQUNYLGdCQUFnQjtFQUNoQixjQUFjLEVBQUE7O0FBN0JsQjtJQWdDTSxpQkFBaUI7SUFDakIsYUFBYTtJQUNiLGNBQWMsRUFBQTs7QUFsQ3BCO01BcUNRLG9EQUE0RDtjQUE1RCw0Q0FBNEQsRUFBQTs7QUFyQ3BFO01BeUNRLGtEQUEwRDtjQUExRCwwQ0FBMEQsRUFBQTs7QUF6Q2xFO0VBK0NJLGFBQWE7RUFDYixrQkFBa0I7RUFDbEIsc0JBQXNCLEVBQUE7O0FBakQxQjtJQW9ETSxlQUFlLEVBQUE7O0FBcERyQjtNQXVEUSxvQkFBb0I7TUFDcEIsbUJBQW1CLEVBQUE7O0FBeEQzQjtNQTREUSxrQkFBa0I7TUFDbEIscUJBQXFCLEVBQUE7O0FBN0Q3QjtFQW1FSSxnQkFBZ0I7RUFDaEIsV0FBVztFQUNYLGdCQUFnQixFQUFBIiwiZmlsZSI6InNyYy9hcHAvc2VuZC9zZW5kLmNvbXBvbmVudC5zY3NzIiwic291cmNlc0NvbnRlbnQiOlsiOmhvc3Qge1xyXG4gIHdpZHRoOiAxMDAlO1xyXG59XHJcblxyXG4uZm9ybS1zZW5kIHtcclxuXHJcbiAgLmlucHV0LWJsb2Nrcy1yb3cge1xyXG4gICAgZGlzcGxheTogZmxleDtcclxuXHJcbiAgICA+IGRpdiB7XHJcbiAgICAgIGZsZXgtYmFzaXM6IDUwJTtcclxuXHJcbiAgICAgICY6Zmlyc3QtY2hpbGQge1xyXG4gICAgICAgIG1hcmdpbi1yaWdodDogMS41cmVtO1xyXG4gICAgICB9XHJcblxyXG4gICAgICAmOmxhc3QtY2hpbGQge1xyXG4gICAgICAgIG1hcmdpbi1sZWZ0OiAxLjVyZW07XHJcbiAgICAgIH1cclxuICAgIH1cclxuICB9XHJcblxyXG4gIC5zZW5kLXNlbGVjdCB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICAgIGJhY2tncm91bmQ6IHRyYW5zcGFyZW50O1xyXG4gICAgYm9yZGVyOiBub25lO1xyXG4gICAgZm9udC1zaXplOiAxLjNyZW07XHJcbiAgICBsaW5lLWhlaWdodDogMS4zcmVtO1xyXG4gICAgbWFyZ2luOiAxLjVyZW0gMCAwO1xyXG4gICAgcGFkZGluZzogMDtcclxuICAgIHdpZHRoOiAxMDAlO1xyXG4gICAgbWF4LXdpZHRoOiAxNXJlbTtcclxuICAgIGhlaWdodDogMS4zcmVtO1xyXG5cclxuICAgIC5hcnJvdyB7XHJcbiAgICAgIG1hcmdpbi1sZWZ0OiAxcmVtO1xyXG4gICAgICB3aWR0aDogMC44cmVtO1xyXG4gICAgICBoZWlnaHQ6IDAuOHJlbTtcclxuXHJcbiAgICAgICYuZG93biB7XHJcbiAgICAgICAgbWFzazogdXJsKH5zcmMvYXNzZXRzL2ljb25zL2Fycm93LWRvd24uc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgICB9XHJcblxyXG4gICAgICAmLnVwIHtcclxuICAgICAgICBtYXNrOiB1cmwofnNyYy9hc3NldHMvaWNvbnMvYXJyb3ctdXAuc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgICB9XHJcbiAgICB9XHJcbiAgfVxyXG5cclxuICAuYWRkaXRpb25hbC1kZXRhaWxzIHtcclxuICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICBtYXJnaW4tdG9wOiAxLjVyZW07XHJcbiAgICBwYWRkaW5nOiAwLjVyZW0gMCAycmVtO1xyXG5cclxuICAgID4gZGl2IHtcclxuICAgICAgZmxleC1iYXNpczogMjUlO1xyXG5cclxuICAgICAgJjpmaXJzdC1jaGlsZCB7XHJcbiAgICAgICAgcGFkZGluZy1sZWZ0OiAxLjVyZW07XHJcbiAgICAgICAgcGFkZGluZy1yaWdodDogMXJlbTtcclxuICAgICAgfVxyXG5cclxuICAgICAgJjpsYXN0LWNoaWxkIHtcclxuICAgICAgICBwYWRkaW5nLWxlZnQ6IDFyZW07XHJcbiAgICAgICAgcGFkZGluZy1yaWdodDogMS41cmVtO1xyXG4gICAgICB9XHJcbiAgICB9XHJcbiAgfVxyXG5cclxuICBidXR0b24ge1xyXG4gICAgbWFyZ2luOiAyLjRyZW0gMDtcclxuICAgIHdpZHRoOiAxMDAlO1xyXG4gICAgbWF4LXdpZHRoOiAxNXJlbTtcclxuICB9XHJcbn1cclxuIl19 */"
+module.exports = ":host {\n  width: 100%; }\n\n.form-send .input-block-address {\n  position: relative; }\n\n.form-send .input-block-address .address-dropdown {\n    position: absolute;\n    top: 6.5rem;\n    max-height: 10rem;\n    overflow: auto;\n    width: 100%; }\n\n.form-send .input-block-address .address-dropdown div {\n      font-size: 1.4rem;\n      padding: 1rem; }\n\n.form-send .input-blocks-row {\n  display: flex; }\n\n.form-send .input-blocks-row > div {\n    flex-basis: 50%; }\n\n.form-send .input-blocks-row > div:first-child {\n      margin-right: 1.5rem; }\n\n.form-send .input-blocks-row > div:last-child {\n      margin-left: 1.5rem; }\n\n.form-send .send-select {\n  display: flex;\n  align-items: center;\n  background: transparent;\n  border: none;\n  font-size: 1.3rem;\n  line-height: 1.3rem;\n  margin: 1.5rem 0 0;\n  padding: 0;\n  width: 100%;\n  max-width: 15rem;\n  height: 1.3rem; }\n\n.form-send .send-select .arrow {\n    margin-left: 1rem;\n    width: 0.8rem;\n    height: 0.8rem; }\n\n.form-send .send-select .arrow.down {\n      -webkit-mask: url('arrow-down.svg') no-repeat center;\n              mask: url('arrow-down.svg') no-repeat center; }\n\n.form-send .send-select .arrow.up {\n      -webkit-mask: url('arrow-up.svg') no-repeat center;\n              mask: url('arrow-up.svg') no-repeat center; }\n\n.form-send .additional-details {\n  display: flex;\n  margin-top: 1.5rem;\n  padding: 0.5rem 0 2rem; }\n\n.form-send .additional-details > div {\n    flex-basis: 25%; }\n\n.form-send .additional-details > div:first-child {\n      padding-left: 1.5rem;\n      padding-right: 1rem; }\n\n.form-send .additional-details > div:last-child {\n      padding-left: 1rem;\n      padding-right: 1.5rem; }\n\n.form-send button {\n  margin: 2.4rem 0;\n  width: 100%;\n  max-width: 15rem; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvc2VuZC9EOlxcemFub196YW5vXFxzcmNcXGd1aVxccXQtZGFlbW9uXFxodG1sX3NvdXJjZS9zcmNcXGFwcFxcc2VuZFxcc2VuZC5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLFdBQVcsRUFBQTs7QUFHYjtFQUdJLGtCQUFrQixFQUFBOztBQUh0QjtJQU1NLGtCQUFrQjtJQUNsQixXQUFXO0lBQ1gsaUJBQWlCO0lBQ2pCLGNBQWM7SUFDZCxXQUFXLEVBQUE7O0FBVmpCO01BYVEsaUJBQWlCO01BQ2pCLGFBQWEsRUFBQTs7QUFkckI7RUFvQkksYUFBYSxFQUFBOztBQXBCakI7SUF1Qk0sZUFBZSxFQUFBOztBQXZCckI7TUEwQlEsb0JBQW9CLEVBQUE7O0FBMUI1QjtNQThCUSxtQkFBbUIsRUFBQTs7QUE5QjNCO0VBb0NJLGFBQWE7RUFDYixtQkFBbUI7RUFDbkIsdUJBQXVCO0VBQ3ZCLFlBQVk7RUFDWixpQkFBaUI7RUFDakIsbUJBQW1CO0VBQ25CLGtCQUFrQjtFQUNsQixVQUFVO0VBQ1YsV0FBVztFQUNYLGdCQUFnQjtFQUNoQixjQUFjLEVBQUE7O0FBOUNsQjtJQWlETSxpQkFBaUI7SUFDakIsYUFBYTtJQUNiLGNBQWMsRUFBQTs7QUFuRHBCO01Bc0RRLG9EQUE0RDtjQUE1RCw0Q0FBNEQsRUFBQTs7QUF0RHBFO01BMERRLGtEQUEwRDtjQUExRCwwQ0FBMEQsRUFBQTs7QUExRGxFO0VBZ0VJLGFBQWE7RUFDYixrQkFBa0I7RUFDbEIsc0JBQXNCLEVBQUE7O0FBbEUxQjtJQXFFTSxlQUFlLEVBQUE7O0FBckVyQjtNQXdFUSxvQkFBb0I7TUFDcEIsbUJBQW1CLEVBQUE7O0FBekUzQjtNQTZFUSxrQkFBa0I7TUFDbEIscUJBQXFCLEVBQUE7O0FBOUU3QjtFQW9GSSxnQkFBZ0I7RUFDaEIsV0FBVztFQUNYLGdCQUFnQixFQUFBIiwiZmlsZSI6InNyYy9hcHAvc2VuZC9zZW5kLmNvbXBvbmVudC5zY3NzIiwic291cmNlc0NvbnRlbnQiOlsiOmhvc3Qge1xyXG4gIHdpZHRoOiAxMDAlO1xyXG59XHJcblxyXG4uZm9ybS1zZW5kIHtcclxuXHJcbiAgLmlucHV0LWJsb2NrLWFkZHJlc3Mge1xyXG4gICAgcG9zaXRpb246IHJlbGF0aXZlO1xyXG5cclxuICAgIC5hZGRyZXNzLWRyb3Bkb3duIHtcclxuICAgICAgcG9zaXRpb246IGFic29sdXRlO1xyXG4gICAgICB0b3A6IDYuNXJlbTtcclxuICAgICAgbWF4LWhlaWdodDogMTByZW07XHJcbiAgICAgIG92ZXJmbG93OiBhdXRvO1xyXG4gICAgICB3aWR0aDogMTAwJTtcclxuXHJcbiAgICAgIGRpdiB7XHJcbiAgICAgICAgZm9udC1zaXplOiAxLjRyZW07XHJcbiAgICAgICAgcGFkZGluZzogMXJlbTtcclxuICAgICAgfVxyXG4gICAgfVxyXG4gIH1cclxuXHJcbiAgLmlucHV0LWJsb2Nrcy1yb3cge1xyXG4gICAgZGlzcGxheTogZmxleDtcclxuXHJcbiAgICA+IGRpdiB7XHJcbiAgICAgIGZsZXgtYmFzaXM6IDUwJTtcclxuXHJcbiAgICAgICY6Zmlyc3QtY2hpbGQge1xyXG4gICAgICAgIG1hcmdpbi1yaWdodDogMS41cmVtO1xyXG4gICAgICB9XHJcblxyXG4gICAgICAmOmxhc3QtY2hpbGQge1xyXG4gICAgICAgIG1hcmdpbi1sZWZ0OiAxLjVyZW07XHJcbiAgICAgIH1cclxuICAgIH1cclxuICB9XHJcblxyXG4gIC5zZW5kLXNlbGVjdCB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICAgIGJhY2tncm91bmQ6IHRyYW5zcGFyZW50O1xyXG4gICAgYm9yZGVyOiBub25lO1xyXG4gICAgZm9udC1zaXplOiAxLjNyZW07XHJcbiAgICBsaW5lLWhlaWdodDogMS4zcmVtO1xyXG4gICAgbWFyZ2luOiAxLjVyZW0gMCAwO1xyXG4gICAgcGFkZGluZzogMDtcclxuICAgIHdpZHRoOiAxMDAlO1xyXG4gICAgbWF4LXdpZHRoOiAxNXJlbTtcclxuICAgIGhlaWdodDogMS4zcmVtO1xyXG5cclxuICAgIC5hcnJvdyB7XHJcbiAgICAgIG1hcmdpbi1sZWZ0OiAxcmVtO1xyXG4gICAgICB3aWR0aDogMC44cmVtO1xyXG4gICAgICBoZWlnaHQ6IDAuOHJlbTtcclxuXHJcbiAgICAgICYuZG93biB7XHJcbiAgICAgICAgbWFzazogdXJsKH5zcmMvYXNzZXRzL2ljb25zL2Fycm93LWRvd24uc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgICB9XHJcblxyXG4gICAgICAmLnVwIHtcclxuICAgICAgICBtYXNrOiB1cmwofnNyYy9hc3NldHMvaWNvbnMvYXJyb3ctdXAuc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgICB9XHJcbiAgICB9XHJcbiAgfVxyXG5cclxuICAuYWRkaXRpb25hbC1kZXRhaWxzIHtcclxuICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICBtYXJnaW4tdG9wOiAxLjVyZW07XHJcbiAgICBwYWRkaW5nOiAwLjVyZW0gMCAycmVtO1xyXG5cclxuICAgID4gZGl2IHtcclxuICAgICAgZmxleC1iYXNpczogMjUlO1xyXG5cclxuICAgICAgJjpmaXJzdC1jaGlsZCB7XHJcbiAgICAgICAgcGFkZGluZy1sZWZ0OiAxLjVyZW07XHJcbiAgICAgICAgcGFkZGluZy1yaWdodDogMXJlbTtcclxuICAgICAgfVxyXG5cclxuICAgICAgJjpsYXN0LWNoaWxkIHtcclxuICAgICAgICBwYWRkaW5nLWxlZnQ6IDFyZW07XHJcbiAgICAgICAgcGFkZGluZy1yaWdodDogMS41cmVtO1xyXG4gICAgICB9XHJcbiAgICB9XHJcbiAgfVxyXG5cclxuICBidXR0b24ge1xyXG4gICAgbWFyZ2luOiAyLjRyZW0gMDtcclxuICAgIHdpZHRoOiAxMDAlO1xyXG4gICAgbWF4LXdpZHRoOiAxNXJlbTtcclxuICB9XHJcbn1cclxuIl19 */"
 
 /***/ }),
 
@@ -5527,26 +5528,59 @@ var SendComponent = /** @class */ (function () {
         this.variablesService = variablesService;
         this.modalService = modalService;
         this.ngZone = ngZone;
+        this.isOpen = false;
+        this.localAliases = [];
         this.currentWalletId = null;
         this.sendForm = new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormGroup"]({
             address: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"]('', [_angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required, function (g) {
+                    _this.localAliases = [];
                     if (g.value) {
-                        _this.backend.validateAddress(g.value, function (valid_status) {
-                            _this.ngZone.run(function () {
-                                if (valid_status === false) {
-                                    g.setErrors(Object.assign({ 'address_not_valid': true }, g.errors));
-                                }
-                                else {
-                                    if (g.hasError('address_not_valid')) {
-                                        delete g.errors['address_not_valid'];
-                                        if (Object.keys(g.errors).length === 0) {
-                                            g.setErrors(null);
+                        if (g.value.indexOf('@') !== 0) {
+                            _this.isOpen = false;
+                            _this.backend.validateAddress(g.value, function (valid_status) {
+                                _this.ngZone.run(function () {
+                                    if (valid_status === false) {
+                                        g.setErrors(Object.assign({ 'address_not_valid': true }, g.errors));
+                                    }
+                                    else {
+                                        if (g.hasError('address_not_valid')) {
+                                            delete g.errors['address_not_valid'];
+                                            if (Object.keys(g.errors).length === 0) {
+                                                g.setErrors(null);
+                                            }
                                         }
                                     }
-                                }
+                                });
                             });
-                        });
-                        return (g.hasError('address_not_valid')) ? { 'address_not_valid': true } : null;
+                            return (g.hasError('address_not_valid')) ? { 'address_not_valid': true } : null;
+                        }
+                        else {
+                            _this.isOpen = true;
+                            _this.localAliases = _this.variablesService.aliases.filter(function (item) {
+                                return item.name.indexOf(g.value) > -1;
+                            });
+                            if (!(/^@?[a-z0-9\.\-]{6,25}$/.test(g.value))) {
+                                g.setErrors(Object.assign({ 'alias_not_valid': true }, g.errors));
+                            }
+                            else {
+                                _this.backend.getAliasByName(g.value.replace('@', ''), function (alias_status) {
+                                    _this.ngZone.run(function () {
+                                        if (alias_status) {
+                                            if (g.hasError('alias_not_valid')) {
+                                                delete g.errors['alias_not_valid'];
+                                                if (Object.keys(g.errors).length === 0) {
+                                                    g.setErrors(null);
+                                                }
+                                            }
+                                        }
+                                        else {
+                                            g.setErrors(Object.assign({ 'alias_not_valid': true }, g.errors));
+                                        }
+                                    });
+                                });
+                            }
+                            return (g.hasError('alias_not_valid')) ? { 'alias_not_valid': true } : null;
+                        }
                     }
                     return null;
                 }]),
@@ -5567,6 +5601,19 @@ var SendComponent = /** @class */ (function () {
         });
         this.additionalOptions = false;
     }
+    SendComponent.prototype.addressMouseDown = function (e) {
+        if (e['button'] === 0 && this.sendForm.get('address').value && this.sendForm.get('address').value.indexOf('@') === 0) {
+            this.isOpen = true;
+        }
+    };
+    SendComponent.prototype.setAlias = function (alias) {
+        this.sendForm.get('address').setValue(alias);
+    };
+    SendComponent.prototype.onClick = function (targetElement) {
+        if (targetElement.id !== 'send-address' && this.isOpen) {
+            this.isOpen = false;
+        }
+    };
     SendComponent.prototype.ngOnInit = function () {
         var _this = this;
         this.parentRouting = this.route.parent.params.subscribe(function (params) {
@@ -5583,22 +5630,45 @@ var SendComponent = /** @class */ (function () {
     SendComponent.prototype.onSend = function () {
         var _this = this;
         if (this.sendForm.valid) {
-            this.backend.validateAddress(this.sendForm.get('address').value, function (valid_status) {
-                if (valid_status === false) {
+            if (this.sendForm.get('address').value.indexOf('@') !== 0) {
+                this.backend.validateAddress(this.sendForm.get('address').value, function (valid_status) {
+                    if (valid_status === false) {
+                        _this.ngZone.run(function () {
+                            _this.sendForm.get('address').setErrors({ 'address_not_valid': true });
+                        });
+                    }
+                    else {
+                        _this.backend.sendMoney(_this.currentWalletId, _this.sendForm.get('address').value, _this.sendForm.get('amount').value, _this.sendForm.get('fee').value, _this.sendForm.get('mixin').value, _this.sendForm.get('comment').value, function (send_status) {
+                            if (send_status) {
+                                _this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
+                                _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null };
+                                _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 0, fee: _this.variablesService.default_fee });
+                            }
+                        });
+                    }
+                });
+            }
+            else {
+                this.backend.getAliasByName(this.sendForm.get('address').value.replace('@', ''), function (alias_status, alias_data) {
                     _this.ngZone.run(function () {
-                        _this.sendForm.get('address').setErrors({ address_not_valid: true });
-                    });
-                }
-                else {
-                    _this.backend.sendMoney(_this.currentWalletId, _this.sendForm.get('address').value, _this.sendForm.get('amount').value, _this.sendForm.get('fee').value, _this.sendForm.get('mixin').value, _this.sendForm.get('comment').value, function (send_status, send_data) {
-                        if (send_status) {
-                            _this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
-                            _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null };
-                            _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 0, fee: _this.variablesService.default_fee });
+                        if (alias_status === false) {
+                            _this.ngZone.run(function () {
+                                _this.sendForm.get('address').setErrors({ 'alias_not_valid': true });
+                            });
+                        }
+                        else {
+                            _this.backend.sendMoney(_this.currentWalletId, alias_data.address, // this.sendForm.get('address').value,
+                            _this.sendForm.get('amount').value, _this.sendForm.get('fee').value, _this.sendForm.get('mixin').value, _this.sendForm.get('comment').value, function (send_status) {
+                                if (send_status) {
+                                    _this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
+                                    _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null };
+                                    _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 0, fee: _this.variablesService.default_fee });
+                                }
+                            });
                         }
                     });
-                }
-            });
+                });
+            }
         }
     };
     SendComponent.prototype.toggleOptions = function () {
@@ -5614,6 +5684,12 @@ var SendComponent = /** @class */ (function () {
             fee: this.sendForm.get('fee').value
         };
     };
+    __decorate([
+        Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["HostListener"])('document:click', ['$event.target']),
+        __metadata("design:type", Function),
+        __metadata("design:paramtypes", [Object]),
+        __metadata("design:returntype", void 0)
+    ], SendComponent.prototype, "onClick", null);
     SendComponent = __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"])({
             selector: 'app-send',
@@ -5923,7 +5999,7 @@ var SidebarComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"chart-header\">\r\n  <div class=\"general\">\r\n    <div>\r\n      <span class=\"label\">{{ 'STAKING.TITLE' | translate }}</span>\r\n      <span class=\"value\">\r\n        <app-staking-switch [wallet_id]=\"variablesService.currentWallet.wallet_id\" [(staking)]=\"variablesService.currentWallet.staking\"></app-staking-switch>\r\n      </span>\r\n    </div>\r\n    <div>\r\n      <span class=\"label\">{{ 'STAKING.TITLE_PENDING' | translate }}</span>\r\n      <span class=\"value\">{{pending.total | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n    </div>\r\n    <div>\r\n      <span class=\"label\">{{ 'STAKING.TITLE_TOTAL' | translate }}</span>\r\n      <span class=\"value\">{{total | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n    </div>\r\n  </div>\r\n  <div class=\"selected\" *ngIf=\"selectedDate && selectedDate.date\">\r\n    <span *ngIf=\"currentPeriod === '1 day'\">{{selectedDate.date | date : 'HH:00 - HH:59, MMM. EEEE, dd, yyyy'}}</span>\r\n    <span *ngIf=\"currentPeriod === 'All'\">{{selectedDate.date | date : 'HH:mm, MMM. EEEE, dd, yyyy'}}</span>\r\n    <span *ngIf=\"!(currentPeriod === '1 day' || currentPeriod === 'All')\">{{selectedDate.date | date : 'MMM. EEEE, dd, yyyy'}}</span>\r\n    <span>{{selectedDate.amount}} {{variablesService.defaultCurrency}}</span>\r\n  </div>\r\n</div>\r\n\r\n<div class=\"chart\">\r\n  <div [chart]=\"chart\"></div>\r\n</div>\r\n\r\n<div class=\"chart-options\">\r\n  <div class=\"title\">\r\n    {{ 'STAKING.TITLE_PERIOD' | translate }}\r\n  </div>\r\n  <div class=\"options\">\r\n    <ng-container *ngFor=\"let period of periods\">\r\n      <button type=\"button\" [class.active]=\"period.active\" (click)=\"changePeriod(period)\">{{period.title}}</button>\r\n    </ng-container>\r\n  </div>\r\n</div>\r\n"
+module.exports = "<div class=\"chart-header\">\r\n  <div class=\"general\">\r\n    <div>\r\n      <span class=\"label\">{{ 'STAKING.TITLE' | translate }}</span>\r\n      <span class=\"value\">\r\n        <app-staking-switch [wallet_id]=\"variablesService.currentWallet.wallet_id\" [(staking)]=\"variablesService.currentWallet.staking\"></app-staking-switch>\r\n      </span>\r\n    </div>\r\n    <div>\r\n      <span class=\"label\">{{ 'STAKING.TITLE_PENDING' | translate }}</span>\r\n      <span class=\"value\">{{pending.total | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n    </div>\r\n    <div>\r\n      <span class=\"label\">{{ 'STAKING.TITLE_TOTAL' | translate }}</span>\r\n      <span class=\"value\">{{total | intToMoney}} {{variablesService.defaultCurrency}}</span>\r\n    </div>\r\n  </div>\r\n  <div class=\"selected\" *ngIf=\"selectedDate && selectedDate.date\">\r\n    <span>{{selectedDate.date | date : 'MMM. EEEE, dd, yyyy'}}</span>\r\n    <span>{{selectedDate.amount}} {{variablesService.defaultCurrency}}</span>\r\n  </div>\r\n</div>\r\n\r\n<div class=\"chart\">\r\n  <div [chart]=\"chart\"></div>\r\n</div>\r\n\r\n<div class=\"chart-options\">\r\n  <div class=\"title\">\r\n    {{ 'STAKING.TITLE_PERIOD' | translate }}\r\n  </div>\r\n  <div class=\"options\">\r\n    <ng-container *ngFor=\"let period of periods\">\r\n      <button type=\"button\" [class.active]=\"period.active\" (click)=\"changePeriod(period)\">{{period.title}}</button>\r\n    </ng-container>\r\n  </div>\r\n\r\n  <div class=\"title\">\r\n    {{ 'STAKING.TITLE_GROUP' | translate }}\r\n  </div>\r\n  <div class=\"options\">\r\n    <ng-container *ngFor=\"let group of groups\">\r\n      <button type=\"button\" [class.active]=\"group.active\" (click)=\"changeGroup(group)\">{{group.title}}</button>\r\n    </ng-container>\r\n  </div>\r\n</div>\r\n"
 
 /***/ }),
 
@@ -5934,7 +6010,7 @@ module.exports = "<div class=\"chart-header\">\r\n  <div class=\"general\">\r\n 
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = ":host {\n  display: flex;\n  flex-direction: column;\n  width: 100%; }\n\n.chart-header {\n  display: flex;\n  flex: 0 0 auto; }\n\n.chart-header .general {\n    display: flex;\n    flex-direction: column;\n    align-items: flex-start;\n    justify-content: center;\n    flex-grow: 1;\n    font-size: 1.3rem;\n    margin: -0.5rem 0; }\n\n.chart-header .general > div {\n      display: flex;\n      align-items: center;\n      margin: 0.5rem 0;\n      height: 2rem; }\n\n.chart-header .general > div .label {\n        display: inline-block;\n        width: 9rem; }\n\n.chart-header .selected {\n    display: flex;\n    flex-direction: column;\n    align-items: flex-end;\n    justify-content: center;\n    flex-grow: 1;\n    font-size: 1.8rem; }\n\n.chart-header .selected span {\n      line-height: 2.9rem; }\n\n.chart {\n  display: flex;\n  align-items: center;\n  flex: 1 1 auto;\n  min-height: 40rem; }\n\n.chart > div {\n    width: 100%;\n    height: 100%; }\n\n.chart-options {\n  display: flex;\n  align-items: center;\n  height: 2.4rem;\n  flex: 0 0 auto; }\n\n.chart-options .title {\n    font-size: 1.3rem;\n    width: 9rem; }\n\n.chart-options .options {\n    display: flex;\n    justify-content: space-between;\n    flex-grow: 1;\n    height: 100%; }\n\n.chart-options .options button {\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      flex: 1 1 auto;\n      cursor: pointer;\n      font-size: 1.3rem;\n      margin: 0 0.1rem;\n      padding: 0;\n      height: 100%; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvc3Rha2luZy9EOlxcemFub196YW5vXFxzcmNcXGd1aVxccXQtZGFlbW9uXFxodG1sX3NvdXJjZS9zcmNcXGFwcFxcc3Rha2luZ1xcc3Rha2luZy5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLGFBQWE7RUFDYixzQkFBc0I7RUFDdEIsV0FBVyxFQUFBOztBQUdiO0VBQ0UsYUFBYTtFQUNiLGNBQWMsRUFBQTs7QUFGaEI7SUFLSSxhQUFhO0lBQ2Isc0JBQXNCO0lBQ3RCLHVCQUF1QjtJQUN2Qix1QkFBdUI7SUFDdkIsWUFBWTtJQUNaLGlCQUFpQjtJQUNqQixpQkFBaUIsRUFBQTs7QUFYckI7TUFjTSxhQUFhO01BQ2IsbUJBQW1CO01BQ25CLGdCQUFnQjtNQUNoQixZQUFZLEVBQUE7O0FBakJsQjtRQW9CUSxxQkFBcUI7UUFDckIsV0FBVyxFQUFBOztBQXJCbkI7SUEyQkksYUFBYTtJQUNiLHNCQUFzQjtJQUN0QixxQkFBcUI7SUFDckIsdUJBQXVCO0lBQ3ZCLFlBQVk7SUFDWixpQkFBaUIsRUFBQTs7QUFoQ3JCO01BbUNNLG1CQUFtQixFQUFBOztBQUt6QjtFQUNFLGFBQWE7RUFDYixtQkFBbUI7RUFDbkIsY0FBYztFQUNkLGlCQUFpQixFQUFBOztBQUpuQjtJQU9JLFdBQVc7SUFDWCxZQUFZLEVBQUE7O0FBSWhCO0VBQ0UsYUFBYTtFQUNiLG1CQUFtQjtFQUNuQixjQUFjO0VBQ2QsY0FBYyxFQUFBOztBQUpoQjtJQU9JLGlCQUFpQjtJQUNqQixXQUFXLEVBQUE7O0FBUmY7SUFZSSxhQUFhO0lBQ2IsOEJBQThCO0lBQzlCLFlBQVk7SUFDWixZQUFZLEVBQUE7O0FBZmhCO01Ba0JNLGFBQWE7TUFDYixtQkFBbUI7TUFDbkIsdUJBQXVCO01BQ3ZCLGNBQWM7TUFDZCxlQUFlO01BQ2YsaUJBQWlCO01BQ2pCLGdCQUFnQjtNQUNoQixVQUFVO01BQ1YsWUFBWSxFQUFBIiwiZmlsZSI6InNyYy9hcHAvc3Rha2luZy9zdGFraW5nLmNvbXBvbmVudC5zY3NzIiwic291cmNlc0NvbnRlbnQiOlsiOmhvc3Qge1xyXG4gIGRpc3BsYXk6IGZsZXg7XHJcbiAgZmxleC1kaXJlY3Rpb246IGNvbHVtbjtcclxuICB3aWR0aDogMTAwJTtcclxufVxyXG5cclxuLmNoYXJ0LWhlYWRlciB7XHJcbiAgZGlzcGxheTogZmxleDtcclxuICBmbGV4OiAwIDAgYXV0bztcclxuXHJcbiAgLmdlbmVyYWwge1xyXG4gICAgZGlzcGxheTogZmxleDtcclxuICAgIGZsZXgtZGlyZWN0aW9uOiBjb2x1bW47XHJcbiAgICBhbGlnbi1pdGVtczogZmxleC1zdGFydDtcclxuICAgIGp1c3RpZnktY29udGVudDogY2VudGVyO1xyXG4gICAgZmxleC1ncm93OiAxO1xyXG4gICAgZm9udC1zaXplOiAxLjNyZW07XHJcbiAgICBtYXJnaW46IC0wLjVyZW0gMDtcclxuXHJcbiAgICA+IGRpdiB7XHJcbiAgICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAgICAgIG1hcmdpbjogMC41cmVtIDA7XHJcbiAgICAgIGhlaWdodDogMnJlbTtcclxuXHJcbiAgICAgIC5sYWJlbCB7XHJcbiAgICAgICAgZGlzcGxheTogaW5saW5lLWJsb2NrO1xyXG4gICAgICAgIHdpZHRoOiA5cmVtO1xyXG4gICAgICB9XHJcbiAgICB9XHJcbiAgfVxyXG5cclxuICAuc2VsZWN0ZWQge1xyXG4gICAgZGlzcGxheTogZmxleDtcclxuICAgIGZsZXgtZGlyZWN0aW9uOiBjb2x1bW47XHJcbiAgICBhbGlnbi1pdGVtczogZmxleC1lbmQ7XHJcbiAgICBqdXN0aWZ5LWNvbnRlbnQ6IGNlbnRlcjtcclxuICAgIGZsZXgtZ3JvdzogMTtcclxuICAgIGZvbnQtc2l6ZTogMS44cmVtO1xyXG5cclxuICAgIHNwYW4ge1xyXG4gICAgICBsaW5lLWhlaWdodDogMi45cmVtO1xyXG4gICAgfVxyXG4gIH1cclxufVxyXG5cclxuLmNoYXJ0IHtcclxuICBkaXNwbGF5OiBmbGV4O1xyXG4gIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAgZmxleDogMSAxIGF1dG87XHJcbiAgbWluLWhlaWdodDogNDByZW07XHJcblxyXG4gID4gZGl2IHtcclxuICAgIHdpZHRoOiAxMDAlO1xyXG4gICAgaGVpZ2h0OiAxMDAlO1xyXG4gIH1cclxufVxyXG5cclxuLmNoYXJ0LW9wdGlvbnMge1xyXG4gIGRpc3BsYXk6IGZsZXg7XHJcbiAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICBoZWlnaHQ6IDIuNHJlbTtcclxuICBmbGV4OiAwIDAgYXV0bztcclxuXHJcbiAgLnRpdGxlIHtcclxuICAgIGZvbnQtc2l6ZTogMS4zcmVtO1xyXG4gICAgd2lkdGg6IDlyZW07XHJcbiAgfVxyXG5cclxuICAub3B0aW9ucyB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuO1xyXG4gICAgZmxleC1ncm93OiAxO1xyXG4gICAgaGVpZ2h0OiAxMDAlO1xyXG5cclxuICAgIGJ1dHRvbiB7XHJcbiAgICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAgICAgIGp1c3RpZnktY29udGVudDogY2VudGVyO1xyXG4gICAgICBmbGV4OiAxIDEgYXV0bztcclxuICAgICAgY3Vyc29yOiBwb2ludGVyO1xyXG4gICAgICBmb250LXNpemU6IDEuM3JlbTtcclxuICAgICAgbWFyZ2luOiAwIDAuMXJlbTtcclxuICAgICAgcGFkZGluZzogMDtcclxuICAgICAgaGVpZ2h0OiAxMDAlO1xyXG4gICAgfVxyXG4gIH1cclxufVxyXG4iXX0= */"
+module.exports = ":host {\n  display: flex;\n  flex-direction: column;\n  width: 100%; }\n\n.chart-header {\n  display: flex;\n  flex: 0 0 auto; }\n\n.chart-header .general {\n    display: flex;\n    flex-direction: column;\n    align-items: flex-start;\n    justify-content: center;\n    flex-grow: 1;\n    font-size: 1.3rem;\n    margin: -0.5rem 0; }\n\n.chart-header .general > div {\n      display: flex;\n      align-items: center;\n      margin: 0.5rem 0;\n      height: 2rem; }\n\n.chart-header .general > div .label {\n        display: inline-block;\n        width: 9rem; }\n\n.chart-header .selected {\n    display: flex;\n    flex-direction: column;\n    align-items: flex-end;\n    justify-content: center;\n    flex-grow: 1;\n    font-size: 1.8rem; }\n\n.chart-header .selected span {\n      line-height: 2.9rem; }\n\n.chart {\n  display: flex;\n  align-items: center;\n  flex: 1 1 auto;\n  min-height: 40rem; }\n\n.chart > div {\n    width: 100%;\n    height: 100%; }\n\n.chart-options {\n  display: flex;\n  align-items: center;\n  height: 2.4rem;\n  flex: 0 0 auto; }\n\n.chart-options .title {\n    font-size: 1.3rem;\n    padding: 0 1rem; }\n\n.chart-options .title:first-child {\n      padding-left: 0; }\n\n.chart-options .options {\n    display: flex;\n    justify-content: space-between;\n    flex-grow: 1;\n    height: 100%; }\n\n.chart-options .options button {\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      flex: 1 1 auto;\n      cursor: pointer;\n      font-size: 1.3rem;\n      margin: 0 0.1rem;\n      padding: 0;\n      height: 100%; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvc3Rha2luZy9EOlxcemFub196YW5vXFxzcmNcXGd1aVxccXQtZGFlbW9uXFxodG1sX3NvdXJjZS9zcmNcXGFwcFxcc3Rha2luZ1xcc3Rha2luZy5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLGFBQWE7RUFDYixzQkFBc0I7RUFDdEIsV0FBVyxFQUFBOztBQUdiO0VBQ0UsYUFBYTtFQUNiLGNBQWMsRUFBQTs7QUFGaEI7SUFLSSxhQUFhO0lBQ2Isc0JBQXNCO0lBQ3RCLHVCQUF1QjtJQUN2Qix1QkFBdUI7SUFDdkIsWUFBWTtJQUNaLGlCQUFpQjtJQUNqQixpQkFBaUIsRUFBQTs7QUFYckI7TUFjTSxhQUFhO01BQ2IsbUJBQW1CO01BQ25CLGdCQUFnQjtNQUNoQixZQUFZLEVBQUE7O0FBakJsQjtRQW9CUSxxQkFBcUI7UUFDckIsV0FBVyxFQUFBOztBQXJCbkI7SUEyQkksYUFBYTtJQUNiLHNCQUFzQjtJQUN0QixxQkFBcUI7SUFDckIsdUJBQXVCO0lBQ3ZCLFlBQVk7SUFDWixpQkFBaUIsRUFBQTs7QUFoQ3JCO01BbUNNLG1CQUFtQixFQUFBOztBQUt6QjtFQUNFLGFBQWE7RUFDYixtQkFBbUI7RUFDbkIsY0FBYztFQUNkLGlCQUFpQixFQUFBOztBQUpuQjtJQU9JLFdBQVc7SUFDWCxZQUFZLEVBQUE7O0FBSWhCO0VBQ0UsYUFBYTtFQUNiLG1CQUFtQjtFQUNuQixjQUFjO0VBQ2QsY0FBYyxFQUFBOztBQUpoQjtJQU9JLGlCQUFpQjtJQUNqQixlQUFlLEVBQUE7O0FBUm5CO01BV00sZUFBZSxFQUFBOztBQVhyQjtJQWdCSSxhQUFhO0lBQ2IsOEJBQThCO0lBQzlCLFlBQVk7SUFDWixZQUFZLEVBQUE7O0FBbkJoQjtNQXNCTSxhQUFhO01BQ2IsbUJBQW1CO01BQ25CLHVCQUF1QjtNQUN2QixjQUFjO01BQ2QsZUFBZTtNQUNmLGlCQUFpQjtNQUNqQixnQkFBZ0I7TUFDaEIsVUFBVTtNQUNWLFlBQVksRUFBQSIsImZpbGUiOiJzcmMvYXBwL3N0YWtpbmcvc3Rha2luZy5jb21wb25lbnQuc2NzcyIsInNvdXJjZXNDb250ZW50IjpbIjpob3N0IHtcclxuICBkaXNwbGF5OiBmbGV4O1xyXG4gIGZsZXgtZGlyZWN0aW9uOiBjb2x1bW47XHJcbiAgd2lkdGg6IDEwMCU7XHJcbn1cclxuXHJcbi5jaGFydC1oZWFkZXIge1xyXG4gIGRpc3BsYXk6IGZsZXg7XHJcbiAgZmxleDogMCAwIGF1dG87XHJcblxyXG4gIC5nZW5lcmFsIHtcclxuICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICBmbGV4LWRpcmVjdGlvbjogY29sdW1uO1xyXG4gICAgYWxpZ24taXRlbXM6IGZsZXgtc3RhcnQ7XHJcbiAgICBqdXN0aWZ5LWNvbnRlbnQ6IGNlbnRlcjtcclxuICAgIGZsZXgtZ3JvdzogMTtcclxuICAgIGZvbnQtc2l6ZTogMS4zcmVtO1xyXG4gICAgbWFyZ2luOiAtMC41cmVtIDA7XHJcblxyXG4gICAgPiBkaXYge1xyXG4gICAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAgICBhbGlnbi1pdGVtczogY2VudGVyO1xyXG4gICAgICBtYXJnaW46IDAuNXJlbSAwO1xyXG4gICAgICBoZWlnaHQ6IDJyZW07XHJcblxyXG4gICAgICAubGFiZWwge1xyXG4gICAgICAgIGRpc3BsYXk6IGlubGluZS1ibG9jaztcclxuICAgICAgICB3aWR0aDogOXJlbTtcclxuICAgICAgfVxyXG4gICAgfVxyXG4gIH1cclxuXHJcbiAgLnNlbGVjdGVkIHtcclxuICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICBmbGV4LWRpcmVjdGlvbjogY29sdW1uO1xyXG4gICAgYWxpZ24taXRlbXM6IGZsZXgtZW5kO1xyXG4gICAganVzdGlmeS1jb250ZW50OiBjZW50ZXI7XHJcbiAgICBmbGV4LWdyb3c6IDE7XHJcbiAgICBmb250LXNpemU6IDEuOHJlbTtcclxuXHJcbiAgICBzcGFuIHtcclxuICAgICAgbGluZS1oZWlnaHQ6IDIuOXJlbTtcclxuICAgIH1cclxuICB9XHJcbn1cclxuXHJcbi5jaGFydCB7XHJcbiAgZGlzcGxheTogZmxleDtcclxuICBhbGlnbi1pdGVtczogY2VudGVyO1xyXG4gIGZsZXg6IDEgMSBhdXRvO1xyXG4gIG1pbi1oZWlnaHQ6IDQwcmVtO1xyXG5cclxuICA+IGRpdiB7XHJcbiAgICB3aWR0aDogMTAwJTtcclxuICAgIGhlaWdodDogMTAwJTtcclxuICB9XHJcbn1cclxuXHJcbi5jaGFydC1vcHRpb25zIHtcclxuICBkaXNwbGF5OiBmbGV4O1xyXG4gIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAgaGVpZ2h0OiAyLjRyZW07XHJcbiAgZmxleDogMCAwIGF1dG87XHJcblxyXG4gIC50aXRsZSB7XHJcbiAgICBmb250LXNpemU6IDEuM3JlbTtcclxuICAgIHBhZGRpbmc6IDAgMXJlbTtcclxuXHJcbiAgICAmOmZpcnN0LWNoaWxke1xyXG4gICAgICBwYWRkaW5nLWxlZnQ6IDA7XHJcbiAgICB9XHJcbiAgfVxyXG5cclxuICAub3B0aW9ucyB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAganVzdGlmeS1jb250ZW50OiBzcGFjZS1iZXR3ZWVuO1xyXG4gICAgZmxleC1ncm93OiAxO1xyXG4gICAgaGVpZ2h0OiAxMDAlO1xyXG5cclxuICAgIGJ1dHRvbiB7XHJcbiAgICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAgICAgIGp1c3RpZnktY29udGVudDogY2VudGVyO1xyXG4gICAgICBmbGV4OiAxIDEgYXV0bztcclxuICAgICAgY3Vyc29yOiBwb2ludGVyO1xyXG4gICAgICBmb250LXNpemU6IDEuM3JlbTtcclxuICAgICAgbWFyZ2luOiAwIDAuMXJlbTtcclxuICAgICAgcGFkZGluZzogMDtcclxuICAgICAgaGVpZ2h0OiAxMDAlO1xyXG4gICAgfVxyXG4gIH1cclxufVxyXG4iXX0= */"
 
 /***/ }),
 
@@ -5984,29 +6060,56 @@ var StakingComponent = /** @class */ (function () {
         this.translate = translate;
         this.periods = [
             {
-                title: this.translate.instant('STAKING.DAY'),
-                key: '1 day',
-                active: false
-            },
-            {
-                title: this.translate.instant('STAKING.WEEK'),
+                title: this.translate.instant('STAKING.PERIOD.WEEK1'),
                 key: '1 week',
                 active: false
             },
             {
-                title: this.translate.instant('STAKING.MONTH'),
+                title: this.translate.instant('STAKING.PERIOD.WEEK2'),
+                key: '2 week',
+                active: false
+            },
+            {
+                title: this.translate.instant('STAKING.PERIOD.MONTH1'),
                 key: '1 month',
                 active: false
             },
             {
-                title: this.translate.instant('STAKING.YEAR'),
+                title: this.translate.instant('STAKING.PERIOD.MONTH3'),
+                key: '3 month',
+                active: false
+            },
+            {
+                title: this.translate.instant('STAKING.PERIOD.MONTH6'),
+                key: '6 month',
+                active: false
+            },
+            {
+                title: this.translate.instant('STAKING.PERIOD.YEAR'),
                 key: '1 year',
                 active: false
             },
             {
-                title: this.translate.instant('STAKING.ALL'),
+                title: this.translate.instant('STAKING.PERIOD.ALL'),
                 key: 'All',
                 active: true
+            }
+        ];
+        this.groups = [
+            {
+                title: this.translate.instant('STAKING.GROUP.DAY'),
+                key: 'day',
+                active: true
+            },
+            {
+                title: this.translate.instant('STAKING.GROUP.WEEK'),
+                key: 'week',
+                active: false
+            },
+            {
+                title: this.translate.instant('STAKING.GROUP.MONTH'),
+                key: 'month',
+                active: false
             }
         ];
         this.selectedDate = {
@@ -6019,8 +6122,19 @@ var StakingComponent = /** @class */ (function () {
             list: [],
             total: new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](0)
         };
-        this.currentPeriod = 'All';
     }
+    StakingComponent_1 = StakingComponent;
+    StakingComponent.makeGroupTime = function (key, date) {
+        if (key === 'day') {
+            return date.setHours(0, 0, 0, 0);
+        }
+        else if (key === 'week') {
+            return new Date(date.setDate(date.getDate() - date.getDay())).setHours(0, 0, 0, 0);
+        }
+        else {
+            return new Date(date.setDate(1)).setHours(0, 0, 0, 0);
+        }
+    };
     StakingComponent.prototype.ngOnInit = function () {
         var _this = this;
         this.parentRouting = this.route.parent.params.subscribe(function () {
@@ -6059,7 +6173,12 @@ var StakingComponent = /** @class */ (function () {
                 type: 'line',
                 backgroundColor: 'transparent',
                 height: null,
-                zoomType: null
+                zoomType: null,
+                events: {
+                    load: function () {
+                        _this.changePeriod();
+                    }
+                }
             },
             yAxis: {
                 min: 0,
@@ -6182,37 +6301,28 @@ var StakingComponent = /** @class */ (function () {
                     });
                 }
                 _this.ngZone.run(function () {
-                    _this.drawChart(JSON.parse(JSON.stringify(_this.originalData)));
+                    _this.drawChart([]);
                 });
             });
         }
     };
     StakingComponent.prototype.changePeriod = function (period) {
-        this.periods.forEach(function (p) {
-            p.active = false;
-        });
-        period.active = true;
-        this.currentPeriod = period.key;
+        if (period) {
+            this.periods.forEach(function (p) {
+                p.active = false;
+            });
+            period.active = true;
+        }
+        else {
+            period = this.periods.find(function (p) { return p.active; });
+        }
         var d = new Date();
         var min = null;
         var newData = [];
-        if (period.key === '1 day') {
+        var group = this.groups.find(function (g) { return g.active; });
+        if (period.key === '1 week') {
             this.originalData.forEach(function (item) {
-                var time = (new Date(item[0])).setUTCMinutes(0, 0, 0);
-                var find = newData.find(function (itemNew) { return itemNew[0] === time; });
-                if (find) {
-                    find[1] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](find[1]).plus(item[1]).toNumber();
-                }
-                else {
-                    newData.push([time, item[1]]);
-                }
-            });
-            this.chart.ref.series[0].setData(newData, true);
-            min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 1, 0, 0, 0, 0);
-        }
-        else if (period.key === '1 week') {
-            this.originalData.forEach(function (item) {
-                var time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
+                var time = StakingComponent_1.makeGroupTime(group.key, new Date(item[0]));
                 var find = newData.find(function (itemNew) { return itemNew[0] === time; });
                 if (find) {
                     find[1] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](find[1]).plus(item[1]).toNumber();
@@ -6224,9 +6334,23 @@ var StakingComponent = /** @class */ (function () {
             this.chart.ref.series[0].setData(newData, true);
             min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 7, 0, 0, 0, 0);
         }
+        else if (period.key === '2 week') {
+            this.originalData.forEach(function (item) {
+                var time = StakingComponent_1.makeGroupTime(group.key, new Date(item[0]));
+                var find = newData.find(function (itemNew) { return itemNew[0] === time; });
+                if (find) {
+                    find[1] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](find[1]).plus(item[1]).toNumber();
+                }
+                else {
+                    newData.push([time, item[1]]);
+                }
+            });
+            this.chart.ref.series[0].setData(newData, true);
+            min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 14, 0, 0, 0, 0);
+        }
         else if (period.key === '1 month') {
             this.originalData.forEach(function (item) {
-                var time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
+                var time = StakingComponent_1.makeGroupTime(group.key, new Date(item[0]));
                 var find = newData.find(function (itemNew) { return itemNew[0] === time; });
                 if (find) {
                     find[1] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](find[1]).plus(item[1]).toNumber();
@@ -6238,9 +6362,37 @@ var StakingComponent = /** @class */ (function () {
             this.chart.ref.series[0].setData(newData, true);
             min = Date.UTC(d.getFullYear(), d.getMonth() - 1, d.getDate(), 0, 0, 0, 0);
         }
+        else if (period.key === '3 month') {
+            this.originalData.forEach(function (item) {
+                var time = StakingComponent_1.makeGroupTime(group.key, new Date(item[0]));
+                var find = newData.find(function (itemNew) { return itemNew[0] === time; });
+                if (find) {
+                    find[1] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](find[1]).plus(item[1]).toNumber();
+                }
+                else {
+                    newData.push([time, item[1]]);
+                }
+            });
+            this.chart.ref.series[0].setData(newData, true);
+            min = Date.UTC(d.getFullYear(), d.getMonth() - 3, d.getDate(), 0, 0, 0, 0);
+        }
+        else if (period.key === '6 month') {
+            this.originalData.forEach(function (item) {
+                var time = StakingComponent_1.makeGroupTime(group.key, new Date(item[0]));
+                var find = newData.find(function (itemNew) { return itemNew[0] === time; });
+                if (find) {
+                    find[1] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](find[1]).plus(item[1]).toNumber();
+                }
+                else {
+                    newData.push([time, item[1]]);
+                }
+            });
+            this.chart.ref.series[0].setData(newData, true);
+            min = Date.UTC(d.getFullYear(), d.getMonth() - 6, d.getDate(), 0, 0, 0, 0);
+        }
         else if (period.key === '1 year') {
             this.originalData.forEach(function (item) {
-                var time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
+                var time = StakingComponent_1.makeGroupTime(group.key, new Date(item[0]));
                 var find = newData.find(function (itemNew) { return itemNew[0] === time; });
                 if (find) {
                     find[1] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](find[1]).plus(item[1]).toNumber();
@@ -6253,16 +6405,34 @@ var StakingComponent = /** @class */ (function () {
             min = Date.UTC(d.getFullYear() - 1, d.getMonth(), d.getDate(), 0, 0, 0, 0);
         }
         else {
-            this.chart.ref.series[0].setData(this.originalData, true);
+            this.originalData.forEach(function (item) {
+                var time = StakingComponent_1.makeGroupTime(group.key, new Date(item[0]));
+                var find = newData.find(function (itemNew) { return itemNew[0] === time; });
+                if (find) {
+                    find[1] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](find[1]).plus(item[1]).toNumber();
+                }
+                else {
+                    newData.push([time, item[1]]);
+                }
+            });
+            this.chart.ref.series[0].setData(newData, true);
         }
         this.chart.ref.xAxis[0].setExtremes(min, null);
+    };
+    StakingComponent.prototype.changeGroup = function (group) {
+        this.groups.forEach(function (g) {
+            g.active = false;
+        });
+        group.active = true;
+        this.changePeriod();
     };
     StakingComponent.prototype.ngOnDestroy = function () {
         this.parentRouting.unsubscribe();
         this.heightAppEvent.unsubscribe();
         this.refreshStackingEvent.unsubscribe();
     };
-    StakingComponent = __decorate([
+    var StakingComponent_1;
+    StakingComponent = StakingComponent_1 = __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"])({
             selector: 'app-staking',
             template: __webpack_require__(/*! ./staking.component.html */ "./src/app/staking/staking.component.html"),

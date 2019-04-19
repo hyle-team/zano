@@ -193,6 +193,8 @@ namespace currency
       res.performance_data.etc_stuff_6 = pd.etc_stuff_6.get_avg();
       res.performance_data.insert_time_4 = pd.insert_time_4.get_avg();
       res.performance_data.raise_block_core_event = pd.raise_block_core_event.get_avg();
+      res.performance_data.target_calculating_enum_blocks = pd.target_calculating_enum_blocks.get_avg();
+      res.performance_data.target_calculating_calc = pd.target_calculating_calc.get_avg();
       //tx processing zone
       res.performance_data.tx_check_inputs_time = pd.tx_check_inputs_time.get_avg();
       res.performance_data.tx_add_one_tx_time = pd.tx_add_one_tx_time.get_avg();
@@ -891,7 +893,7 @@ namespace currency
     response.height = get_block_height(blk);
     response.depth = m_core.get_current_blockchain_size() - response.height - 1;
     response.hash = string_tools::pod_to_hex(get_block_hash(blk));
-    response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<uint64_t>();
+    response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<std::string>();
     response.reward = get_block_reward(blk);
     return true;
   }

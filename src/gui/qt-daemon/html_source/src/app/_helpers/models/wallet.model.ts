@@ -79,7 +79,7 @@ export class Wallet {
       item.sortFee = new BigNumber(0);
     } else if ((item.hasOwnProperty('contract') && (item.contract[0].state === 3 || item.contract[0].state === 6 || item.contract[0].state === 601) && !item.contract[0].is_a)) {
       item.sortFee = item.fee.negated();
-      item.sortAmount = item.amount.negated();
+      item.sortAmount = item.amount;
     } else {
       if (!item.is_income) {
         item.sortFee = item.fee.negated();

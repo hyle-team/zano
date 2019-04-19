@@ -15,12 +15,8 @@
 
 namespace currency
 {
-    typedef std::uint64_t difficulty_type;
+      
     typedef boost::multiprecision::uint128_t wide_difficulty_type;
-
-    bool check_hash_old(const crypto::hash &hash, difficulty_type difficulty);
-    difficulty_type next_difficulty_old(std::vector<std::uint64_t> timestamps, std::vector<difficulty_type> cumulative_difficulties);
-    difficulty_type next_difficulty_old(std::vector<std::uint64_t> timestamps, std::vector<difficulty_type> cumulative_difficulties, size_t target_seconds);
 
     bool check_hash(const crypto::hash &hash, wide_difficulty_type difficulty);
     wide_difficulty_type next_difficulty(std::vector<std::uint64_t>& timestamps, std::vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds);

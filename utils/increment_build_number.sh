@@ -3,7 +3,7 @@ curr_path=${BASH_SOURCE%/*}
 version_file_path=../src/version.h.in
 
 pushd $curr_path
-git pull
+git pull --ff-only
 if [ $? -ne 0 ]; then
    echo "Failed to pull"
    popd
