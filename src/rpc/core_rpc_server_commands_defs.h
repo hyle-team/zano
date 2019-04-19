@@ -791,7 +791,7 @@ namespace currency
 
     struct response
     {
-      uint64_t difficulty;
+      std::string difficulty;
       uint64_t height;
       crypto::hash seed;
       blobdata blocktemplate_blob;

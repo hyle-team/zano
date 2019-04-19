@@ -804,7 +804,7 @@ namespace currency
       LOG_ERROR("Failed to create block template");
       return false;
     }
-    res.difficulty = dt.convert_to<uint64_t>();
+    res.difficulty = dt.convert_to<std::string>();
     blobdata block_blob = t_serializable_object_to_blob(b);
 
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
