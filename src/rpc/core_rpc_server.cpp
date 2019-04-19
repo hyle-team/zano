@@ -1112,7 +1112,7 @@ namespace currency
     set_session_blob(job_id, b);
     job.blob = string_tools::buff_to_hex_nodelimer(currency::get_block_hashing_blob(b));
     //TODO: set up share difficulty here!
-    job.difficulty = std::to_string(bt_res.difficulty); //difficulty leaved as string field since it will be refactored into 128 bit format
+    job.difficulty = bt_res.difficulty; //difficulty leaved as string field since it will be refactored into 128 bit format
     job.job_id = "SOME_JOB_ID";
     get_current_hi(job.prev_hi);
     return true;
