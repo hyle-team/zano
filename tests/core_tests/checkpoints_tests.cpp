@@ -628,7 +628,7 @@ bool gen_no_attchments_in_coinbase::init_config_set_cp(currency::core& c, size_t
   crc.pos_minimum_heigh = 1;
   c.get_blockchain_storage().set_core_runtime_config(crc);
 
-  m_checkpoints.add_checkpoint(12, "446b25ca3816e36df92745ea91c3c54a8745db565bafd4d2aa7df9da49220a19");
+  m_checkpoints.add_checkpoint(12, "ea03a5c99aeedc2050ca5dae011a6c411b31f8b7fb9d0b82735c403b5c608b7b");
   c.set_checkpoints(currency::checkpoints(m_checkpoints));
 
   return true;
