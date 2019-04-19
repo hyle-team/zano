@@ -1,0 +1,14 @@
+<div class="modal">
+  <h3 class="title">{{ 'OPEN_WALLET.MODAL.TITLE' | translate }}</h3>
+  <form class="open-form" (ngSubmit)="open()">
+    <div class="wallet-path">{{ path }}</div>
+    <div class="input-block">
+      <label for="password">{{ 'OPEN_WALLET.MODAL.LABEL' | translate }}</label>
+      <input type="password" id="password" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
+    </div>
+    <div class="wrap-button">
+      <button type="submit" class="blue-button">{{ 'OPEN_WALLET.MODAL.OPEN' | translate }}</button>
+      <button type="button" class="blue-button" (click)="skip()">{{ 'OPEN_WALLET.MODAL.SKIP' | translate }}</button>
+    </div>
+  </form>
+</div>

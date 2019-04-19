@@ -63,9 +63,9 @@ export class SettingsComponent implements OnInit {
     this.theme = this.variablesService.settings.theme;
     this.scale = this.variablesService.settings.scale;
     this.changeForm = new FormGroup({
-      password: new FormControl('', Validators.required),
-      new_password: new FormControl('', Validators.required),
-      new_confirmation: new FormControl('', Validators.required)
+      password: new FormControl(''),
+      new_password: new FormControl(''),
+      new_confirmation: new FormControl('')
     }, [(g: FormGroup) => {
       return g.get('new_password').value === g.get('new_confirmation').value ? null : {'confirm_mismatch': true};
     }, (g: FormGroup) => {

@@ -9,21 +9,11 @@
       <div class="input-block">
         <label for="master-pass">{{ 'LOGIN.SETUP_MASTER_PASS' | translate }}</label>
         <input type="password" id="master-pass" formControlName="password" (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
-        <div class="error-block" *ngIf="regForm.controls['password'].invalid && (regForm.controls['password'].dirty || regForm.controls['password'].touched)">
-          <div *ngIf="regForm.controls['password'].errors['required']">
-            {{ 'LOGIN.FORM_ERRORS.PASS_REQUIRED' | translate }}
-          </div>
-        </div>
       </div>
 
       <div class="input-block">
         <label for="confirm-pass">{{ 'LOGIN.SETUP_CONFIRM_PASS' | translate }}</label>
         <input type="password" id="confirm-pass" formControlName="confirmation" (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
-        <div class="error-block" *ngIf="regForm.controls['confirmation'].invalid && (regForm.controls['confirmation'].dirty || regForm.controls['confirmation'].touched)">
-          <div *ngIf="regForm.controls['confirmation'].errors['required']">
-            {{ 'LOGIN.FORM_ERRORS.CONFIRM_REQUIRED' | translate }}
-          </div>
-        </div>
         <div class="error-block" *ngIf="regForm.controls['password'].dirty && regForm.controls['confirmation'].dirty && regForm.errors">
           <div *ngIf="regForm.errors['mismatch']">
             {{ 'LOGIN.FORM_ERRORS.MISMATCH' | translate }}
@@ -31,7 +21,10 @@
         </div>
       </div>
 
-      <button type="submit" class="blue-button">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>
+      <div class="wrap-button">
+        <button type="submit" class="blue-button" [disabled]="!regForm.controls['password'].value.length || !regForm.controls['confirmation'].value.length || (regForm.errors && regForm.errors['mismatch'])">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>
+        <button type="button" class="blue-button" (click)="onSkipCreatePass()" [disabled]="regForm.controls['password'].value.length || regForm.controls['confirmation'].value.length">{{ 'LOGIN.BUTTON_SKIP' | translate }}</button>
+      </div>
 
     </form>
 
@@ -40,11 +33,6 @@
       <div class="input-block">
         <label for="master-pass-login">{{ 'LOGIN.MASTER_PASS' | translate }}</label>
         <input type="password" id="master-pass-login" formControlName="password" autofocus (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
-        <div class="error-block" *ngIf="authForm.controls['password'].invalid && (authForm.controls['password'].dirty || authForm.controls['password'].touched)">
-          <div *ngIf="authForm.controls['password'].errors['required']">
-            {{ 'LOGIN.FORM_ERRORS.PASS_REQUIRED' | translate }}
-          </div>
-        </div>
       </div>
 
       <button type="submit" class="blue-button">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>

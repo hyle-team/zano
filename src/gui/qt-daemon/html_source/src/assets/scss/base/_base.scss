@@ -780,3 +780,14 @@ app-progress-container {
     }
   }
 }
+
+app-open-wallet-modal {
+
+  .modal {
+
+    @include themify($themes) {
+      background: themed(modalBackground);
+      color: themed(mainTextColor);
+    }
+  }
+}

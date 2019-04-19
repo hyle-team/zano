@@ -16,14 +16,14 @@ export class LoginComponent implements OnInit, OnDestroy {
   queryRouting;
 
   regForm = new FormGroup({
-    password: new FormControl('', Validators.required),
-    confirmation: new FormControl('', Validators.required)
+    password: new FormControl(''),
+    confirmation: new FormControl('')
   }, function (g: FormGroup) {
     return g.get('password').value === g.get('confirmation').value ? null : {'mismatch': true};
   });
 
   authForm = new FormGroup({
-    password: new FormControl('', Validators.required)
+    password: new FormControl('')
   });
 
   type = 'reg';
@@ -32,7 +32,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone
   ) {
@@ -59,6 +59,19 @@ export class LoginComponent implements OnInit, OnDestroy {
         }
       });
     }
+  }
+
+  onSkipCreatePass():void {
+    this.variablesService.appPass = '';
+    this.backend.storeSecureAppData((status, data) => {
+      if (status) {
+        this.ngZone.run(() => {
+          this.router.navigate(['/']);
+        });
+      } else {
+        console.log(data);
+      }
+    });
   }
 
   onSubmitAuthPass(): void {
