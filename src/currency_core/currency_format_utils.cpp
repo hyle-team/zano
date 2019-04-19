@@ -2377,7 +2377,7 @@ namespace currency
     if (!height)
       return PREMINE_AMOUNT;
   
-    return CURRENCY_TESTNET_CONST_REWARD;
+    return CURRENCY_BLOCK_REWARD;
   }
   //-----------------------------------------------------------------------------------------------
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height)
