@@ -7,7 +7,7 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      79
+#define CURRENCY_FORMATION_VERSION                      80
                                                         
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -53,7 +53,7 @@
 // #define CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT        ((uint64_t)100000000) // should be TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER
 // #define CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER       1000                  // reward in minimum fees for a block in the zone
 
-#define CURRENCY_TESTNET_CONST_REWARD                   100000000000000
+#define CURRENCY_BLOCK_REWARD                   1000000000000 // 1.0 coin
 
 
 #define WALLET_MAX_ALLOWED_OUTPUT_AMOUNT                ((uint64_t)0xffffffffffffffffLL)
