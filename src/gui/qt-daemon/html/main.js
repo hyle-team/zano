@@ -2088,7 +2088,7 @@ var BackendService = /** @class */ (function () {
     };
     BackendService.prototype.getWalletAlias = function (address) {
         var _this = this;
-        if (address != null && this.variablesService.daemon_state === 2) {
+        if (address !== null && this.variablesService.daemon_state === 2) {
             if (this.variablesService.aliasesChecked[address] == null) {
                 this.variablesService.aliasesChecked[address] = {};
                 if (this.variablesService.aliases.length) {
@@ -3219,6 +3219,9 @@ var AppComponent = /** @class */ (function () {
             else if (error === 'OVERFLOW') {
                 _this.variablesService.aliases = [];
                 _this.variablesService.enableAliasSearch = false;
+                _this.variablesService.wallets.forEach(function (wallet) {
+                    wallet.alias = _this.backend.getWalletAlias(wallet.address);
+                });
             }
             else {
                 _this.variablesService.enableAliasSearch = true;
@@ -4647,6 +4650,9 @@ var OpenWalletModalComponent = /** @class */ (function () {
     };
     OpenWalletModalComponent.prototype.openWallet = function () {
         var _this = this;
+        if (this.wallets.length === 0) {
+            return;
+        }
         this.backend.openWallet(this.wallet.path, this.wallet.pass, false, function (open_status, open_data, open_error) {
             if (open_error && open_error === 'FILE_NOT_FOUND') {
                 var error_translate = _this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');

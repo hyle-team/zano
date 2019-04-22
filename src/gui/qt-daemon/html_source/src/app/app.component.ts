@@ -551,6 +551,9 @@ export class AppComponent implements OnInit, OnDestroy {
       } else if (error === 'OVERFLOW') {
         this.variablesService.aliases = [];
         this.variablesService.enableAliasSearch = false;
+        this.variablesService.wallets.forEach(wallet => {
+          wallet.alias = this.backend.getWalletAlias(wallet.address);
+        });
       } else {
         this.variablesService.enableAliasSearch = true;
         if (data.aliases && data.aliases.length) {

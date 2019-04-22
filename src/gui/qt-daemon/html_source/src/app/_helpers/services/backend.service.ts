@@ -565,7 +565,7 @@ export class BackendService {
   }
 
   getWalletAlias(address) {
-    if (address != null && this.variablesService.daemon_state === 2) {
+    if (address !== null && this.variablesService.daemon_state === 2) {
       if (this.variablesService.aliasesChecked[address] == null) {
         this.variablesService.aliasesChecked[address] = {};
         if (this.variablesService.aliases.length) {
