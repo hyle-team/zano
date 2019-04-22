@@ -49,6 +49,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   logOut() {
     this.variablesService.stopCountdown();
+    this.variablesService.appLogin = false;
     this.variablesService.appPass = '';
     this.ngZone.run(() => {
       this.router.navigate(['/login'], {queryParams: {type: 'auth'}});

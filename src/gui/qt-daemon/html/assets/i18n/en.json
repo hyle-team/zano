@@ -4,6 +4,7 @@
     "SETUP_CONFIRM_PASS": "Confirm the password",
     "MASTER_PASS": "Master password",
     "BUTTON_NEXT": "Next",
+    "BUTTON_SKIP": "Skip",
     "INCORRECT_PASSWORD": "Invalid password",
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Password is required.",
@@ -83,6 +84,13 @@
       "NAME_REQUIRED": "Name is required.",
       "NAME_DUPLICATE": "Name is duplicate.",
       "MAX_LENGTH": "Maximum name length reached."
+    },
+    "MODAL": {
+      "TITLE": "Type wallet password",
+      "LABEL": "Password to this wallet",
+      "OPEN": "Open wallet",
+      "SKIP": "Skip",
+      "NOT_FOUND": "Not found"
     }
   },
   "RESTORE_WALLET": {

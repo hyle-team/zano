@@ -1589,7 +1589,19 @@ var BackendService = /** @class */ (function () {
         this.moneyToIntPipe = moneyToIntPipe;
         this.backendLoaded = false;
     }
-    BackendService.prototype.Debug = function (type, message) {
+    BackendService_1 = BackendService;
+    BackendService.bigNumberParser = function (key, val) {
+        if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge', 'coast', 'a'].indexOf(key) === -1) {
+            return val.toNumber();
+        }
+        if (key === 'rcv' || key === 'spn') {
+            for (var i = 0; i < val.length; i++) {
+                val[i] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](val[i]);
+            }
+        }
+        return val;
+    };
+    BackendService.Debug = function (type, message) {
         switch (type) {
             case 0:
                 console.error(message);
@@ -1715,33 +1727,19 @@ var BackendService = /** @class */ (function () {
             this.modalService.prepareModal('error', error_translate);
         }
     };
-    BackendService.prototype.bigNumberParser = function (key, val) {
-        if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge', 'coast', 'a'].indexOf(key) === -1) {
-            return val.toNumber();
-        }
-        if (key === 'rcv' || key === 'spn') {
-            for (var i = 0; i < val.length; i++) {
-                val[i] = new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](val[i]);
-            }
-        }
-        return val;
-    };
     BackendService.prototype.commandDebug = function (command, params, result) {
-        this.Debug(2, '----------------- ' + command + ' -----------------');
+        BackendService_1.Debug(2, '----------------- ' + command + ' -----------------');
         var debug = {
             _send_params: params,
             _result: result
         };
-        this.Debug(2, debug);
+        BackendService_1.Debug(2, debug);
         try {
-            this.Debug(2, json_bignumber__WEBPACK_IMPORTED_MODULE_6__["default"].parse(result, this.bigNumberParser));
+            BackendService_1.Debug(2, json_bignumber__WEBPACK_IMPORTED_MODULE_6__["default"].parse(result, BackendService_1.bigNumberParser));
         }
         catch (e) {
-            this.Debug(2, { response_data: result, error_code: 'OK' });
+            BackendService_1.Debug(2, { response_data: result, error_code: 'OK' });
         }
-    };
-    BackendService.prototype.asVal = function (data) {
-        return { v: data };
     };
     BackendService.prototype.backendCallback = function (resultStr, params, callback, command) {
         var Result = resultStr;
@@ -1751,7 +1749,7 @@ var BackendService = /** @class */ (function () {
             }
             else {
                 try {
-                    Result = json_bignumber__WEBPACK_IMPORTED_MODULE_6__["default"].parse(resultStr, this.bigNumberParser);
+                    Result = json_bignumber__WEBPACK_IMPORTED_MODULE_6__["default"].parse(resultStr, BackendService_1.bigNumberParser);
                 }
                 catch (e) {
                     Result = { response_data: resultStr, error_code: 'OK' };
@@ -1766,7 +1764,7 @@ var BackendService = /** @class */ (function () {
         }
         var Status = (Result.error_code === 'OK' || Result.error_code === 'TRUE');
         if (!Status && Status !== undefined && Result.error_code !== undefined) {
-            this.Debug(1, 'API error for command: "' + command + '". Error code: ' + Result.error_code);
+            BackendService_1.Debug(1, 'API error for command: "' + command + '". Error code: ' + Result.error_code);
         }
         var data = ((typeof Result === 'object') && 'response_data' in Result) ? Result.response_data : Result;
         var res_error_code = false;
@@ -1788,7 +1786,7 @@ var BackendService = /** @class */ (function () {
         if (this.backendObject) {
             var Action = this.backendObject[command];
             if (!Action) {
-                this.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
+                BackendService_1.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
             }
             else {
                 var that_1 = this;
@@ -1809,13 +1807,12 @@ var BackendService = /** @class */ (function () {
         }
     };
     BackendService.prototype.eventSubscribe = function (command, callback) {
-        var _this = this;
         if (command === 'on_core_event') {
             this.backendObject[command].connect(callback);
         }
         else {
             this.backendObject[command].connect(function (str) {
-                callback(json_bignumber__WEBPACK_IMPORTED_MODULE_6__["default"].parse(str, _this.bigNumberParser));
+                callback(json_bignumber__WEBPACK_IMPORTED_MODULE_6__["default"].parse(str, BackendService_1.bigNumberParser));
             });
         }
     };
@@ -1848,6 +1845,13 @@ var BackendService = /** @class */ (function () {
         this.runCommand('get_app_data', {}, callback);
     };
     BackendService.prototype.storeAppData = function (callback) {
+        var _this = this;
+        if (this.variablesService.wallets.length) {
+            this.variablesService.settings.wallets = [];
+            this.variablesService.wallets.forEach(function (wallet) {
+                _this.variablesService.settings.wallets.push({ name: wallet.name, path: wallet.path });
+            });
+        }
         this.runCommand('store_app_data', this.variablesService.settings, callback);
     };
     BackendService.prototype.getSecureAppData = function (pass, callback) {
@@ -1855,15 +1859,18 @@ var BackendService = /** @class */ (function () {
     };
     BackendService.prototype.storeSecureAppData = function (callback) {
         var _this = this;
-        if (this.variablesService.appPass === '') {
-            return callback(false);
-        }
         var wallets = [];
         this.variablesService.wallets.forEach(function (wallet) {
             wallets.push({ name: wallet.name, pass: wallet.pass, path: wallet.path });
         });
         this.backendObject['store_secure_app_data'](JSON.stringify(wallets), this.variablesService.appPass, function (dataStore) {
             _this.backendCallback(dataStore, {}, callback, 'store_secure_app_data');
+        });
+    };
+    BackendService.prototype.dropSecureAppData = function (callback) {
+        var _this = this;
+        this.backendObject['drop_secure_app_data'](function (dataStore) {
+            _this.backendCallback(dataStore, {}, callback, 'drop_secure_app_data');
         });
     };
     BackendService.prototype.haveSecureAppData = function (callback) {
@@ -1965,14 +1972,14 @@ var BackendService = /** @class */ (function () {
             fee: this.variablesService.default_fee_big,
             b_fee: this.variablesService.default_fee_big
         };
-        this.Debug(1, params);
+        BackendService_1.Debug(1, params);
         this.runCommand('create_proposal', params, callback);
     };
     BackendService.prototype.getContracts = function (wallet_id, callback) {
         var params = {
             wallet_id: parseInt(wallet_id, 10)
         };
-        this.Debug(1, params);
+        BackendService_1.Debug(1, params);
         this.runCommand('get_contracts', params, callback);
     };
     BackendService.prototype.acceptProposal = function (wallet_id, contract_id, callback) {
@@ -1980,7 +1987,7 @@ var BackendService = /** @class */ (function () {
             wallet_id: parseInt(wallet_id, 10),
             contract_id: contract_id
         };
-        this.Debug(1, params);
+        BackendService_1.Debug(1, params);
         this.runCommand('accept_proposal', params, callback);
     };
     BackendService.prototype.releaseProposal = function (wallet_id, contract_id, release_type, callback) {
@@ -1989,7 +1996,7 @@ var BackendService = /** @class */ (function () {
             contract_id: contract_id,
             release_type: release_type // "normal" or "burn"
         };
-        this.Debug(1, params);
+        BackendService_1.Debug(1, params);
         this.runCommand('release_contract', params, callback);
     };
     BackendService.prototype.requestCancelContract = function (wallet_id, contract_id, time, callback) {
@@ -1999,7 +2006,7 @@ var BackendService = /** @class */ (function () {
             fee: this.variablesService.default_fee_big,
             expiration_period: parseInt(time, 10) * 60 * 60
         };
-        this.Debug(1, params);
+        BackendService_1.Debug(1, params);
         this.runCommand('request_cancel_contract', params, callback);
     };
     BackendService.prototype.acceptCancelContract = function (wallet_id, contract_id, callback) {
@@ -2007,7 +2014,7 @@ var BackendService = /** @class */ (function () {
             wallet_id: parseInt(wallet_id, 10),
             contract_id: contract_id
         };
-        this.Debug(1, params);
+        BackendService_1.Debug(1, params);
         this.runCommand('accept_cancel_contract', params, callback);
     };
     BackendService.prototype.getMiningHistory = function (wallet_id, callback) {
@@ -2081,7 +2088,7 @@ var BackendService = /** @class */ (function () {
     };
     BackendService.prototype.getWalletAlias = function (address) {
         var _this = this;
-        if (address != null && this.variablesService.daemon_state === 2) {
+        if (address !== null && this.variablesService.daemon_state === 2) {
             if (this.variablesService.aliasesChecked[address] == null) {
                 this.variablesService.aliasesChecked[address] = {};
                 if (this.variablesService.aliases.length) {
@@ -2114,9 +2121,13 @@ var BackendService = /** @class */ (function () {
             callback(version);
         });
     };
-    BackendService = __decorate([
+    var BackendService_1;
+    BackendService = BackendService_1 = __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Injectable"])(),
-        __metadata("design:paramtypes", [_ngx_translate_core__WEBPACK_IMPORTED_MODULE_2__["TranslateService"], _variables_service__WEBPACK_IMPORTED_MODULE_3__["VariablesService"], _modal_service__WEBPACK_IMPORTED_MODULE_4__["ModalService"], _pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__["MoneyToIntPipe"]])
+        __metadata("design:paramtypes", [_ngx_translate_core__WEBPACK_IMPORTED_MODULE_2__["TranslateService"],
+            _variables_service__WEBPACK_IMPORTED_MODULE_3__["VariablesService"],
+            _modal_service__WEBPACK_IMPORTED_MODULE_4__["ModalService"],
+            _pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_5__["MoneyToIntPipe"]])
     ], BackendService);
     return BackendService;
 }());
@@ -2332,6 +2343,7 @@ var VariablesService = /** @class */ (function () {
         this.contextMenuService = contextMenuService;
         this.digits = 12;
         this.appPass = '';
+        this.appLogin = false;
         this.moneyEquivalent = 0;
         this.defaultTheme = 'dark';
         this.defaultCurrency = 'ZAN';
@@ -2352,7 +2364,8 @@ var VariablesService = /** @class */ (function () {
             language: 'en',
             default_path: '/',
             viewedContracts: [],
-            notViewedContracts: []
+            notViewedContracts: [],
+            wallets: []
         };
         this.wallets = [];
         this.aliases = [];
@@ -2369,6 +2382,7 @@ var VariablesService = /** @class */ (function () {
             _this.ngZone.run(function () {
                 _this.idle.stop();
                 _this.appPass = '';
+                _this.appLogin = false;
                 _this.router.navigate(['/login'], { queryParams: { type: 'auth' } });
             });
         });
@@ -2646,7 +2660,7 @@ var AppRoutingModule = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<app-sidebar *ngIf=\"variablesService.appPass\"></app-sidebar>\r\n\r\n<div class=\"app-content scrolled-content\">\r\n  <router-outlet *ngIf=\"[0, 1, 2].indexOf(variablesService.daemon_state) !== -1\"></router-outlet>\r\n  <div class=\"preloader\" *ngIf=\"[3, 4, 5].indexOf(variablesService.daemon_state) !== -1\">\r\n    <span *ngIf=\"variablesService.daemon_state === 3\">{{ 'SIDEBAR.SYNCHRONIZATION.LOADING' | translate }}</span>\r\n    <span *ngIf=\"variablesService.daemon_state === 4\">{{ 'SIDEBAR.SYNCHRONIZATION.ERROR' | translate }}</span>\r\n    <span *ngIf=\"variablesService.daemon_state === 5\">{{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }}</span>\r\n    <span class=\"loading-bar\"></span>\r\n  </div>\r\n</div>\r\n\r\n<context-menu #allContextMenu>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuCopy($event.item)\">{{ 'CONTEXT_MENU.COPY' | translate }}</ng-template>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuPaste($event.item)\">{{ 'CONTEXT_MENU.PASTE' | translate }}</ng-template>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuSelect($event.item)\">{{ 'CONTEXT_MENU.SELECT' | translate }}</ng-template>\r\n</context-menu>\r\n\r\n<context-menu #onlyCopyContextMenu>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuOnlyCopy($event.item)\">{{ 'CONTEXT_MENU.COPY' | translate }}</ng-template>\r\n</context-menu>\r\n\r\n<context-menu #pasteSelectContextMenu>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuPaste($event.item)\">{{ 'CONTEXT_MENU.PASTE' | translate }}</ng-template>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuSelect($event.item)\">{{ 'CONTEXT_MENU.SELECT' | translate }}</ng-template>\r\n</context-menu>\r\n"
+module.exports = "<app-sidebar *ngIf=\"variablesService.appLogin\"></app-sidebar>\r\n\r\n<div class=\"app-content scrolled-content\">\r\n  <router-outlet *ngIf=\"[0, 1, 2].indexOf(variablesService.daemon_state) !== -1\"></router-outlet>\r\n  <div class=\"preloader\" *ngIf=\"[3, 4, 5].indexOf(variablesService.daemon_state) !== -1\">\r\n    <span *ngIf=\"variablesService.daemon_state === 3\">{{ 'SIDEBAR.SYNCHRONIZATION.LOADING' | translate }}</span>\r\n    <span *ngIf=\"variablesService.daemon_state === 4\">{{ 'SIDEBAR.SYNCHRONIZATION.ERROR' | translate }}</span>\r\n    <span *ngIf=\"variablesService.daemon_state === 5\">{{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }}</span>\r\n    <span class=\"loading-bar\"></span>\r\n  </div>\r\n</div>\r\n\r\n<context-menu #allContextMenu>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuCopy($event.item)\">{{ 'CONTEXT_MENU.COPY' | translate }}</ng-template>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuPaste($event.item)\">{{ 'CONTEXT_MENU.PASTE' | translate }}</ng-template>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuSelect($event.item)\">{{ 'CONTEXT_MENU.SELECT' | translate }}</ng-template>\r\n</context-menu>\r\n\r\n<context-menu #onlyCopyContextMenu>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuOnlyCopy($event.item)\">{{ 'CONTEXT_MENU.COPY' | translate }}</ng-template>\r\n</context-menu>\r\n\r\n<context-menu #pasteSelectContextMenu>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuPaste($event.item)\">{{ 'CONTEXT_MENU.PASTE' | translate }}</ng-template>\r\n  <ng-template contextMenuItem (execute)=\"contextMenuSelect($event.item)\">{{ 'CONTEXT_MENU.SELECT' | translate }}</ng-template>\r\n</context-menu>\r\n\r\n\r\n<app-open-wallet-modal *ngIf=\"needOpenWallets.length\" [wallets]=\"needOpenWallets\"></app-open-wallet-modal>\r\n"
 
 /***/ }),
 
@@ -2714,6 +2728,7 @@ var AppComponent = /** @class */ (function () {
         this.modalService = modalService;
         this.onQuitRequest = false;
         this.firstOnlineState = false;
+        this.needOpenWallets = [];
         translate.addLangs(['en', 'fr']);
         translate.setDefaultLang('en');
         // const browserLang = translate.getBrowserLang();
@@ -2750,8 +2765,9 @@ var AppComponent = /** @class */ (function () {
                     _this.ngZone.run(function () {
                         _this.router.navigate(['/']);
                     });
+                    _this.needOpenWallets = [];
                     _this.variablesService.daemon_state = 5;
-                    _this.backend.storeSecureAppData(function () {
+                    var saveFunction_1 = function () {
                         _this.backend.storeAppData(function () {
                             var recursionCloseWallets = function () {
                                 if (_this.variablesService.wallets.length) {
@@ -2767,7 +2783,15 @@ var AppComponent = /** @class */ (function () {
                             };
                             recursionCloseWallets();
                         });
-                    });
+                    };
+                    if (_this.variablesService.appPass) {
+                        _this.backend.storeSecureAppData(function () {
+                            saveFunction_1();
+                        });
+                    }
+                    else {
+                        saveFunction_1();
+                    }
                 }
                 _this.onQuitRequest = true;
             });
@@ -3040,7 +3064,8 @@ var AppComponent = /** @class */ (function () {
                 if (data.events != null) {
                     var _loop_1 = function (i, length_1) {
                         switch (data.events[i].method) {
-                            case 'CORE_EVENT_BLOCK_ADDED': break;
+                            case 'CORE_EVENT_BLOCK_ADDED':
+                                break;
                             case 'CORE_EVENT_ADD_ALIAS':
                                 if (_this.variablesService.aliasesChecked[data.events[i].details.address] != null) {
                                     _this.variablesService.aliasesChecked[data.events[i].details.address]['name'] = '@' + data.events[i].details.alias;
@@ -3094,7 +3119,8 @@ var AppComponent = /** @class */ (function () {
                                 }
                                 _this.variablesService.changeAliases();
                                 break;
-                            default: break;
+                            default:
+                                break;
                         }
                     };
                     for (var i = 0, length_1 = data.events.length; i < length_1; i++) {
@@ -3147,9 +3173,18 @@ var AppComponent = /** @class */ (function () {
                             });
                         }
                         else {
-                            _this.ngZone.run(function () {
-                                _this.router.navigate(['/login'], { queryParams: { type: 'reg' } });
-                            });
+                            if (Object.keys(data).length !== 0) {
+                                _this.needOpenWallets = JSON.parse(JSON.stringify(_this.variablesService.settings.wallets));
+                                _this.ngZone.run(function () {
+                                    _this.variablesService.appLogin = true;
+                                    _this.router.navigate(['/']);
+                                });
+                            }
+                            else {
+                                _this.ngZone.run(function () {
+                                    _this.router.navigate(['/login'], { queryParams: { type: 'reg' } });
+                                });
+                            }
                         }
                     });
                 }
@@ -3184,6 +3219,9 @@ var AppComponent = /** @class */ (function () {
             else if (error === 'OVERFLOW') {
                 _this.variablesService.aliases = [];
                 _this.variablesService.enableAliasSearch = false;
+                _this.variablesService.wallets.forEach(function (wallet) {
+                    wallet.alias = _this.backend.getWalletAlias(wallet.address);
+                });
             }
             else {
                 _this.variablesService.enableAliasSearch = true;
@@ -3201,14 +3239,18 @@ var AppComponent = /** @class */ (function () {
                         wallet.alias = _this.backend.getWalletAlias(wallet.address);
                     });
                     _this.variablesService.aliases = _this.variablesService.aliases.sort(function (a, b) {
-                        if (a.name.length > b.name.length)
+                        if (a.name.length > b.name.length) {
                             return 1;
-                        if (a.name.length < b.name.length)
+                        }
+                        if (a.name.length < b.name.length) {
                             return -1;
-                        if (a.name > b.name)
+                        }
+                        if (a.name > b.name) {
                             return 1;
-                        if (a.name < b.name)
+                        }
+                        if (a.name < b.name) {
                             return -1;
+                        }
                         return 0;
                     });
                     _this.variablesService.changeAliases();
@@ -3317,42 +3359,43 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _main_main_component__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./main/main.component */ "./src/app/main/main.component.ts");
 /* harmony import */ var _create_wallet_create_wallet_component__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./create-wallet/create-wallet.component */ "./src/app/create-wallet/create-wallet.component.ts");
 /* harmony import */ var _open_wallet_open_wallet_component__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./open-wallet/open-wallet.component */ "./src/app/open-wallet/open-wallet.component.ts");
-/* harmony import */ var _restore_wallet_restore_wallet_component__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./restore-wallet/restore-wallet.component */ "./src/app/restore-wallet/restore-wallet.component.ts");
-/* harmony import */ var _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./seed-phrase/seed-phrase.component */ "./src/app/seed-phrase/seed-phrase.component.ts");
-/* harmony import */ var _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ./wallet-details/wallet-details.component */ "./src/app/wallet-details/wallet-details.component.ts");
-/* harmony import */ var _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ./assign-alias/assign-alias.component */ "./src/app/assign-alias/assign-alias.component.ts");
-/* harmony import */ var _edit_alias_edit_alias_component__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ./edit-alias/edit-alias.component */ "./src/app/edit-alias/edit-alias.component.ts");
-/* harmony import */ var _transfer_alias_transfer_alias_component__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ./transfer-alias/transfer-alias.component */ "./src/app/transfer-alias/transfer-alias.component.ts");
-/* harmony import */ var _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ./wallet/wallet.component */ "./src/app/wallet/wallet.component.ts");
-/* harmony import */ var _send_send_component__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ./send/send.component */ "./src/app/send/send.component.ts");
-/* harmony import */ var _receive_receive_component__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ./receive/receive.component */ "./src/app/receive/receive.component.ts");
-/* harmony import */ var _history_history_component__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ./history/history.component */ "./src/app/history/history.component.ts");
-/* harmony import */ var _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ./contracts/contracts.component */ "./src/app/contracts/contracts.component.ts");
-/* harmony import */ var _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ./purchase/purchase.component */ "./src/app/purchase/purchase.component.ts");
-/* harmony import */ var _messages_messages_component__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ./messages/messages.component */ "./src/app/messages/messages.component.ts");
-/* harmony import */ var _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ./typing-message/typing-message.component */ "./src/app/typing-message/typing-message.component.ts");
-/* harmony import */ var _staking_staking_component__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! ./staking/staking.component */ "./src/app/staking/staking.component.ts");
-/* harmony import */ var _angular_common_http__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! @angular/common/http */ "./node_modules/@angular/common/fesm5/http.js");
-/* harmony import */ var _ngx_translate_core__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! @ngx-translate/core */ "./node_modules/@ngx-translate/core/fesm5/ngx-translate-core.js");
-/* harmony import */ var _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! @ngx-translate/http-loader */ "./node_modules/@ngx-translate/http-loader/fesm5/ngx-translate-http-loader.js");
-/* harmony import */ var _angular_forms__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! @angular/forms */ "./node_modules/@angular/forms/fesm5/forms.js");
-/* harmony import */ var _ng_select_ng_select__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! @ng-select/ng-select */ "./node_modules/@ng-select/ng-select/fesm5/ng-select.js");
-/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! ./_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
-/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! ./_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
-/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! ./_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
-/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! ./_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
-/* harmony import */ var _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! ./_helpers/pipes/history-type-messages.pipe */ "./src/app/_helpers/pipes/history-type-messages.pipe.ts");
-/* harmony import */ var _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! ./_helpers/pipes/contract-status-messages.pipe */ "./src/app/_helpers/pipes/contract-status-messages.pipe.ts");
-/* harmony import */ var _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! ./_helpers/pipes/contract-time-left.pipe */ "./src/app/_helpers/pipes/contract-time-left.pipe.ts");
-/* harmony import */ var _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_37__ = __webpack_require__(/*! ./_helpers/directives/tooltip.directive */ "./src/app/_helpers/directives/tooltip.directive.ts");
-/* harmony import */ var _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_38__ = __webpack_require__(/*! ./_helpers/directives/input-validate/input-validate.directive */ "./src/app/_helpers/directives/input-validate/input-validate.directive.ts");
-/* harmony import */ var _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_39__ = __webpack_require__(/*! ./_helpers/directives/staking-switch/staking-switch.component */ "./src/app/_helpers/directives/staking-switch/staking-switch.component.ts");
-/* harmony import */ var _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_40__ = __webpack_require__(/*! ./_helpers/directives/modal-container/modal-container.component */ "./src/app/_helpers/directives/modal-container/modal-container.component.ts");
-/* harmony import */ var _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_41__ = __webpack_require__(/*! ./_helpers/directives/transaction-details/transaction-details.component */ "./src/app/_helpers/directives/transaction-details/transaction-details.component.ts");
-/* harmony import */ var ngx_contextmenu__WEBPACK_IMPORTED_MODULE_42__ = __webpack_require__(/*! ngx-contextmenu */ "./node_modules/ngx-contextmenu/fesm5/ngx-contextmenu.js");
-/* harmony import */ var angular_highcharts__WEBPACK_IMPORTED_MODULE_43__ = __webpack_require__(/*! angular-highcharts */ "./node_modules/angular-highcharts/fesm5/angular-highcharts.js");
-/* harmony import */ var _helpers_directives_progress_container_progress_container_component__WEBPACK_IMPORTED_MODULE_44__ = __webpack_require__(/*! ./_helpers/directives/progress-container/progress-container.component */ "./src/app/_helpers/directives/progress-container/progress-container.component.ts");
-/* harmony import */ var _helpers_directives_input_disable_selection_input_disable_selection_directive__WEBPACK_IMPORTED_MODULE_45__ = __webpack_require__(/*! ./_helpers/directives/input-disable-selection/input-disable-selection.directive */ "./src/app/_helpers/directives/input-disable-selection/input-disable-selection.directive.ts");
+/* harmony import */ var _open_wallet_modal_open_wallet_modal_component__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./open-wallet-modal/open-wallet-modal.component */ "./src/app/open-wallet-modal/open-wallet-modal.component.ts");
+/* harmony import */ var _restore_wallet_restore_wallet_component__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./restore-wallet/restore-wallet.component */ "./src/app/restore-wallet/restore-wallet.component.ts");
+/* harmony import */ var _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ./seed-phrase/seed-phrase.component */ "./src/app/seed-phrase/seed-phrase.component.ts");
+/* harmony import */ var _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ./wallet-details/wallet-details.component */ "./src/app/wallet-details/wallet-details.component.ts");
+/* harmony import */ var _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ./assign-alias/assign-alias.component */ "./src/app/assign-alias/assign-alias.component.ts");
+/* harmony import */ var _edit_alias_edit_alias_component__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ./edit-alias/edit-alias.component */ "./src/app/edit-alias/edit-alias.component.ts");
+/* harmony import */ var _transfer_alias_transfer_alias_component__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ./transfer-alias/transfer-alias.component */ "./src/app/transfer-alias/transfer-alias.component.ts");
+/* harmony import */ var _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ./wallet/wallet.component */ "./src/app/wallet/wallet.component.ts");
+/* harmony import */ var _send_send_component__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ./send/send.component */ "./src/app/send/send.component.ts");
+/* harmony import */ var _receive_receive_component__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ./receive/receive.component */ "./src/app/receive/receive.component.ts");
+/* harmony import */ var _history_history_component__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ./history/history.component */ "./src/app/history/history.component.ts");
+/* harmony import */ var _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ./contracts/contracts.component */ "./src/app/contracts/contracts.component.ts");
+/* harmony import */ var _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ./purchase/purchase.component */ "./src/app/purchase/purchase.component.ts");
+/* harmony import */ var _messages_messages_component__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ./messages/messages.component */ "./src/app/messages/messages.component.ts");
+/* harmony import */ var _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! ./typing-message/typing-message.component */ "./src/app/typing-message/typing-message.component.ts");
+/* harmony import */ var _staking_staking_component__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! ./staking/staking.component */ "./src/app/staking/staking.component.ts");
+/* harmony import */ var _angular_common_http__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! @angular/common/http */ "./node_modules/@angular/common/fesm5/http.js");
+/* harmony import */ var _ngx_translate_core__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! @ngx-translate/core */ "./node_modules/@ngx-translate/core/fesm5/ngx-translate-core.js");
+/* harmony import */ var _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! @ngx-translate/http-loader */ "./node_modules/@ngx-translate/http-loader/fesm5/ngx-translate-http-loader.js");
+/* harmony import */ var _angular_forms__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! @angular/forms */ "./node_modules/@angular/forms/fesm5/forms.js");
+/* harmony import */ var _ng_select_ng_select__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! @ng-select/ng-select */ "./node_modules/@ng-select/ng-select/fesm5/ng-select.js");
+/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! ./_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! ./_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
+/* harmony import */ var _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! ./_helpers/pipes/money-to-int.pipe */ "./src/app/_helpers/pipes/money-to-int.pipe.ts");
+/* harmony import */ var _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! ./_helpers/pipes/int-to-money.pipe */ "./src/app/_helpers/pipes/int-to-money.pipe.ts");
+/* harmony import */ var _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! ./_helpers/pipes/history-type-messages.pipe */ "./src/app/_helpers/pipes/history-type-messages.pipe.ts");
+/* harmony import */ var _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! ./_helpers/pipes/contract-status-messages.pipe */ "./src/app/_helpers/pipes/contract-status-messages.pipe.ts");
+/* harmony import */ var _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_37__ = __webpack_require__(/*! ./_helpers/pipes/contract-time-left.pipe */ "./src/app/_helpers/pipes/contract-time-left.pipe.ts");
+/* harmony import */ var _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_38__ = __webpack_require__(/*! ./_helpers/directives/tooltip.directive */ "./src/app/_helpers/directives/tooltip.directive.ts");
+/* harmony import */ var _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_39__ = __webpack_require__(/*! ./_helpers/directives/input-validate/input-validate.directive */ "./src/app/_helpers/directives/input-validate/input-validate.directive.ts");
+/* harmony import */ var _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_40__ = __webpack_require__(/*! ./_helpers/directives/staking-switch/staking-switch.component */ "./src/app/_helpers/directives/staking-switch/staking-switch.component.ts");
+/* harmony import */ var _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_41__ = __webpack_require__(/*! ./_helpers/directives/modal-container/modal-container.component */ "./src/app/_helpers/directives/modal-container/modal-container.component.ts");
+/* harmony import */ var _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_42__ = __webpack_require__(/*! ./_helpers/directives/transaction-details/transaction-details.component */ "./src/app/_helpers/directives/transaction-details/transaction-details.component.ts");
+/* harmony import */ var ngx_contextmenu__WEBPACK_IMPORTED_MODULE_43__ = __webpack_require__(/*! ngx-contextmenu */ "./node_modules/ngx-contextmenu/fesm5/ngx-contextmenu.js");
+/* harmony import */ var angular_highcharts__WEBPACK_IMPORTED_MODULE_44__ = __webpack_require__(/*! angular-highcharts */ "./node_modules/angular-highcharts/fesm5/angular-highcharts.js");
+/* harmony import */ var _helpers_directives_progress_container_progress_container_component__WEBPACK_IMPORTED_MODULE_45__ = __webpack_require__(/*! ./_helpers/directives/progress-container/progress-container.component */ "./src/app/_helpers/directives/progress-container/progress-container.component.ts");
+/* harmony import */ var _helpers_directives_input_disable_selection_input_disable_selection_directive__WEBPACK_IMPORTED_MODULE_46__ = __webpack_require__(/*! ./_helpers/directives/input-disable-selection/input-disable-selection.directive */ "./src/app/_helpers/directives/input-disable-selection/input-disable-selection.directive.ts");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -3402,8 +3445,9 @@ var __decorate = (undefined && undefined.__decorate) || function (decorators, ta
 
 
 
+
 function HttpLoaderFactory(httpClient) {
-    return new _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_27__["TranslateHttpLoader"](httpClient, './assets/i18n/', '.json');
+    return new _ngx_translate_http_loader__WEBPACK_IMPORTED_MODULE_28__["TranslateHttpLoader"](httpClient, './assets/i18n/', '.json');
 }
 
 
@@ -3411,7 +3455,7 @@ function HttpLoaderFactory(httpClient) {
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
-angular_highcharts__WEBPACK_IMPORTED_MODULE_43__["Highcharts"].setOptions({
+angular_highcharts__WEBPACK_IMPORTED_MODULE_44__["Highcharts"].setOptions({
     global: {
         useUTC: false
     }
@@ -3429,59 +3473,60 @@ var AppModule = /** @class */ (function () {
                 _main_main_component__WEBPACK_IMPORTED_MODULE_7__["MainComponent"],
                 _create_wallet_create_wallet_component__WEBPACK_IMPORTED_MODULE_8__["CreateWalletComponent"],
                 _open_wallet_open_wallet_component__WEBPACK_IMPORTED_MODULE_9__["OpenWalletComponent"],
-                _restore_wallet_restore_wallet_component__WEBPACK_IMPORTED_MODULE_10__["RestoreWalletComponent"],
-                _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_11__["SeedPhraseComponent"],
-                _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_12__["WalletDetailsComponent"],
-                _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_13__["AssignAliasComponent"],
-                _edit_alias_edit_alias_component__WEBPACK_IMPORTED_MODULE_14__["EditAliasComponent"],
-                _transfer_alias_transfer_alias_component__WEBPACK_IMPORTED_MODULE_15__["TransferAliasComponent"],
-                _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_16__["WalletComponent"],
-                _send_send_component__WEBPACK_IMPORTED_MODULE_17__["SendComponent"],
-                _receive_receive_component__WEBPACK_IMPORTED_MODULE_18__["ReceiveComponent"],
-                _history_history_component__WEBPACK_IMPORTED_MODULE_19__["HistoryComponent"],
-                _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_20__["ContractsComponent"],
-                _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_21__["PurchaseComponent"],
-                _messages_messages_component__WEBPACK_IMPORTED_MODULE_22__["MessagesComponent"],
-                _staking_staking_component__WEBPACK_IMPORTED_MODULE_24__["StakingComponent"],
-                _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_23__["TypingMessageComponent"],
-                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_32__["MoneyToIntPipe"],
-                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_33__["IntToMoneyPipe"],
-                _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_39__["StakingSwitchComponent"],
-                _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_34__["HistoryTypeMessagesPipe"],
-                _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_35__["ContractStatusMessagesPipe"],
-                _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_36__["ContractTimeLeftPipe"],
-                _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_37__["TooltipDirective"],
-                _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_38__["InputValidateDirective"],
-                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_40__["ModalContainerComponent"],
-                _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_41__["TransactionDetailsComponent"],
-                _helpers_directives_progress_container_progress_container_component__WEBPACK_IMPORTED_MODULE_44__["ProgressContainerComponent"],
-                _helpers_directives_input_disable_selection_input_disable_selection_directive__WEBPACK_IMPORTED_MODULE_45__["InputDisableSelectionDirective"]
+                _open_wallet_modal_open_wallet_modal_component__WEBPACK_IMPORTED_MODULE_10__["OpenWalletModalComponent"],
+                _restore_wallet_restore_wallet_component__WEBPACK_IMPORTED_MODULE_11__["RestoreWalletComponent"],
+                _seed_phrase_seed_phrase_component__WEBPACK_IMPORTED_MODULE_12__["SeedPhraseComponent"],
+                _wallet_details_wallet_details_component__WEBPACK_IMPORTED_MODULE_13__["WalletDetailsComponent"],
+                _assign_alias_assign_alias_component__WEBPACK_IMPORTED_MODULE_14__["AssignAliasComponent"],
+                _edit_alias_edit_alias_component__WEBPACK_IMPORTED_MODULE_15__["EditAliasComponent"],
+                _transfer_alias_transfer_alias_component__WEBPACK_IMPORTED_MODULE_16__["TransferAliasComponent"],
+                _wallet_wallet_component__WEBPACK_IMPORTED_MODULE_17__["WalletComponent"],
+                _send_send_component__WEBPACK_IMPORTED_MODULE_18__["SendComponent"],
+                _receive_receive_component__WEBPACK_IMPORTED_MODULE_19__["ReceiveComponent"],
+                _history_history_component__WEBPACK_IMPORTED_MODULE_20__["HistoryComponent"],
+                _contracts_contracts_component__WEBPACK_IMPORTED_MODULE_21__["ContractsComponent"],
+                _purchase_purchase_component__WEBPACK_IMPORTED_MODULE_22__["PurchaseComponent"],
+                _messages_messages_component__WEBPACK_IMPORTED_MODULE_23__["MessagesComponent"],
+                _staking_staking_component__WEBPACK_IMPORTED_MODULE_25__["StakingComponent"],
+                _typing_message_typing_message_component__WEBPACK_IMPORTED_MODULE_24__["TypingMessageComponent"],
+                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_33__["MoneyToIntPipe"],
+                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_34__["IntToMoneyPipe"],
+                _helpers_directives_staking_switch_staking_switch_component__WEBPACK_IMPORTED_MODULE_40__["StakingSwitchComponent"],
+                _helpers_pipes_history_type_messages_pipe__WEBPACK_IMPORTED_MODULE_35__["HistoryTypeMessagesPipe"],
+                _helpers_pipes_contract_status_messages_pipe__WEBPACK_IMPORTED_MODULE_36__["ContractStatusMessagesPipe"],
+                _helpers_pipes_contract_time_left_pipe__WEBPACK_IMPORTED_MODULE_37__["ContractTimeLeftPipe"],
+                _helpers_directives_tooltip_directive__WEBPACK_IMPORTED_MODULE_38__["TooltipDirective"],
+                _helpers_directives_input_validate_input_validate_directive__WEBPACK_IMPORTED_MODULE_39__["InputValidateDirective"],
+                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_41__["ModalContainerComponent"],
+                _helpers_directives_transaction_details_transaction_details_component__WEBPACK_IMPORTED_MODULE_42__["TransactionDetailsComponent"],
+                _helpers_directives_progress_container_progress_container_component__WEBPACK_IMPORTED_MODULE_45__["ProgressContainerComponent"],
+                _helpers_directives_input_disable_selection_input_disable_selection_directive__WEBPACK_IMPORTED_MODULE_46__["InputDisableSelectionDirective"]
             ],
             imports: [
                 _angular_platform_browser__WEBPACK_IMPORTED_MODULE_0__["BrowserModule"],
                 _app_routing_module__WEBPACK_IMPORTED_MODULE_2__["AppRoutingModule"],
-                _angular_common_http__WEBPACK_IMPORTED_MODULE_25__["HttpClientModule"],
-                _ngx_translate_core__WEBPACK_IMPORTED_MODULE_26__["TranslateModule"].forRoot({
+                _angular_common_http__WEBPACK_IMPORTED_MODULE_26__["HttpClientModule"],
+                _ngx_translate_core__WEBPACK_IMPORTED_MODULE_27__["TranslateModule"].forRoot({
                     loader: {
-                        provide: _ngx_translate_core__WEBPACK_IMPORTED_MODULE_26__["TranslateLoader"],
+                        provide: _ngx_translate_core__WEBPACK_IMPORTED_MODULE_27__["TranslateLoader"],
                         useFactory: HttpLoaderFactory,
-                        deps: [_angular_common_http__WEBPACK_IMPORTED_MODULE_25__["HttpClient"]]
+                        deps: [_angular_common_http__WEBPACK_IMPORTED_MODULE_26__["HttpClient"]]
                     }
                 }),
-                _angular_forms__WEBPACK_IMPORTED_MODULE_28__["FormsModule"],
-                _angular_forms__WEBPACK_IMPORTED_MODULE_28__["ReactiveFormsModule"],
-                _ng_select_ng_select__WEBPACK_IMPORTED_MODULE_29__["NgSelectModule"],
-                angular_highcharts__WEBPACK_IMPORTED_MODULE_43__["ChartModule"],
-                ngx_contextmenu__WEBPACK_IMPORTED_MODULE_42__["ContextMenuModule"].forRoot()
+                _angular_forms__WEBPACK_IMPORTED_MODULE_29__["FormsModule"],
+                _angular_forms__WEBPACK_IMPORTED_MODULE_29__["ReactiveFormsModule"],
+                _ng_select_ng_select__WEBPACK_IMPORTED_MODULE_30__["NgSelectModule"],
+                angular_highcharts__WEBPACK_IMPORTED_MODULE_44__["ChartModule"],
+                ngx_contextmenu__WEBPACK_IMPORTED_MODULE_43__["ContextMenuModule"].forRoot()
             ],
             providers: [
-                _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_30__["BackendService"],
-                _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_31__["ModalService"],
-                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_32__["MoneyToIntPipe"],
-                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_33__["IntToMoneyPipe"],
+                _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_31__["BackendService"],
+                _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_32__["ModalService"],
+                _helpers_pipes_money_to_int_pipe__WEBPACK_IMPORTED_MODULE_33__["MoneyToIntPipe"],
+                _helpers_pipes_int_to_money_pipe__WEBPACK_IMPORTED_MODULE_34__["IntToMoneyPipe"],
             ],
             entryComponents: [
-                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_40__["ModalContainerComponent"]
+                _helpers_directives_modal_container_modal_container_component__WEBPACK_IMPORTED_MODULE_41__["ModalContainerComponent"]
             ],
             bootstrap: [_app_component__WEBPACK_IMPORTED_MODULE_3__["AppComponent"]]
         })
@@ -3865,6 +3910,7 @@ var CreateWalletComponent = /** @class */ (function () {
                         if (generate_status) {
                             _this.wallet.id = generate_data.wallet_id;
                             _this.variablesService.opening_wallet = new _helpers_models_wallet_model__WEBPACK_IMPORTED_MODULE_6__["Wallet"](generate_data.wallet_id, _this.createForm.get('name').value, _this.createForm.get('password').value, generate_data['wi'].path, generate_data['wi'].address, generate_data['wi'].balance, generate_data['wi'].unlocked_balance, generate_data['wi'].mined_total, generate_data['wi'].tracking_hey);
+                            _this.variablesService.opening_wallet.alias = _this.backend.getWalletAlias(generate_data['wi'].address);
                             _this.ngZone.run(function () {
                                 _this.walletSaved = true;
                                 _this.progressWidth = '50%';
@@ -4138,7 +4184,7 @@ var HistoryComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"wrap-login\">\r\n\r\n    <div class=\"logo\"></div>\r\n\r\n    <form *ngIf=\"type === 'reg'\" class=\"form-login\" [formGroup]=\"regForm\" (ngSubmit)=\"onSubmitCreatePass()\">\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"master-pass\">{{ 'LOGIN.SETUP_MASTER_PASS' | translate }}</label>\r\n        <input type=\"password\" id=\"master-pass\" formControlName=\"password\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\">\r\n        <div class=\"error-block\" *ngIf=\"regForm.controls['password'].invalid && (regForm.controls['password'].dirty || regForm.controls['password'].touched)\">\r\n          <div *ngIf=\"regForm.controls['password'].errors['required']\">\r\n            {{ 'LOGIN.FORM_ERRORS.PASS_REQUIRED' | translate }}\r\n          </div>\r\n        </div>\r\n      </div>\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"confirm-pass\">{{ 'LOGIN.SETUP_CONFIRM_PASS' | translate }}</label>\r\n        <input type=\"password\" id=\"confirm-pass\" formControlName=\"confirmation\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\">\r\n        <div class=\"error-block\" *ngIf=\"regForm.controls['confirmation'].invalid && (regForm.controls['confirmation'].dirty || regForm.controls['confirmation'].touched)\">\r\n          <div *ngIf=\"regForm.controls['confirmation'].errors['required']\">\r\n            {{ 'LOGIN.FORM_ERRORS.CONFIRM_REQUIRED' | translate }}\r\n          </div>\r\n        </div>\r\n        <div class=\"error-block\" *ngIf=\"regForm.controls['password'].dirty && regForm.controls['confirmation'].dirty && regForm.errors\">\r\n          <div *ngIf=\"regForm.errors['mismatch']\">\r\n            {{ 'LOGIN.FORM_ERRORS.MISMATCH' | translate }}\r\n          </div>\r\n        </div>\r\n      </div>\r\n\r\n      <button type=\"submit\" class=\"blue-button\">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>\r\n\r\n    </form>\r\n\r\n    <form *ngIf=\"type !== 'reg'\" class=\"form-login\" [formGroup]=\"authForm\" (ngSubmit)=\"onSubmitAuthPass()\">\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"master-pass-login\">{{ 'LOGIN.MASTER_PASS' | translate }}</label>\r\n        <input type=\"password\" id=\"master-pass-login\" formControlName=\"password\" autofocus (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\">\r\n        <div class=\"error-block\" *ngIf=\"authForm.controls['password'].invalid && (authForm.controls['password'].dirty || authForm.controls['password'].touched)\">\r\n          <div *ngIf=\"authForm.controls['password'].errors['required']\">\r\n            {{ 'LOGIN.FORM_ERRORS.PASS_REQUIRED' | translate }}\r\n          </div>\r\n        </div>\r\n      </div>\r\n\r\n      <button type=\"submit\" class=\"blue-button\">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>\r\n\r\n    </form>\r\n\r\n  </div>\r\n\r\n</div>\r\n"
+module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"wrap-login\">\r\n\r\n    <div class=\"logo\"></div>\r\n\r\n    <form *ngIf=\"type === 'reg'\" class=\"form-login\" [formGroup]=\"regForm\" (ngSubmit)=\"onSubmitCreatePass()\">\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"master-pass\">{{ 'LOGIN.SETUP_MASTER_PASS' | translate }}</label>\r\n        <input type=\"password\" id=\"master-pass\" formControlName=\"password\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\">\r\n      </div>\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"confirm-pass\">{{ 'LOGIN.SETUP_CONFIRM_PASS' | translate }}</label>\r\n        <input type=\"password\" id=\"confirm-pass\" formControlName=\"confirmation\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\">\r\n        <div class=\"error-block\" *ngIf=\"regForm.controls['password'].dirty && regForm.controls['confirmation'].dirty && regForm.errors\">\r\n          <div *ngIf=\"regForm.errors['mismatch']\">\r\n            {{ 'LOGIN.FORM_ERRORS.MISMATCH' | translate }}\r\n          </div>\r\n        </div>\r\n      </div>\r\n\r\n      <div class=\"wrap-button\">\r\n        <button type=\"submit\" class=\"blue-button\" [disabled]=\"!regForm.controls['password'].value.length || !regForm.controls['confirmation'].value.length || (regForm.errors && regForm.errors['mismatch'])\">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>\r\n        <button type=\"button\" class=\"blue-button\" (click)=\"onSkipCreatePass()\" [disabled]=\"regForm.controls['password'].value.length || regForm.controls['confirmation'].value.length\">{{ 'LOGIN.BUTTON_SKIP' | translate }}</button>\r\n      </div>\r\n\r\n    </form>\r\n\r\n    <form *ngIf=\"type !== 'reg'\" class=\"form-login\" [formGroup]=\"authForm\" (ngSubmit)=\"onSubmitAuthPass()\">\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"master-pass-login\">{{ 'LOGIN.MASTER_PASS' | translate }}</label>\r\n        <input type=\"password\" id=\"master-pass-login\" formControlName=\"password\" autofocus (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\">\r\n      </div>\r\n\r\n      <button type=\"submit\" class=\"blue-button\">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>\r\n\r\n    </form>\r\n\r\n  </div>\r\n\r\n</div>\r\n"
 
 /***/ }),
 
@@ -4149,7 +4195,7 @@ module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"wrap-login\">\r\
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = ":host {\n  position: fixed;\n  top: 0;\n  left: 0;\n  width: 100%;\n  height: 100%; }\n  :host .content {\n    display: flex; }\n  :host .content .wrap-login {\n      margin: auto;\n      width: 100%;\n      max-width: 40rem; }\n  :host .content .wrap-login .logo {\n        background: url('logo.svg') no-repeat center;\n        width: 100%;\n        height: 20rem; }\n  :host .content .wrap-login .form-login {\n        display: flex;\n        flex-direction: column; }\n  :host .content .wrap-login .form-login button {\n          margin: 2.5rem auto;\n          width: 100%;\n          max-width: 15rem; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvbG9naW4vRDpcXHphbm9femFub1xcc3JjXFxndWlcXHF0LWRhZW1vblxcaHRtbF9zb3VyY2Uvc3JjXFxhcHBcXGxvZ2luXFxsb2dpbi5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLGVBQWU7RUFDZixNQUFNO0VBQ04sT0FBTztFQUNQLFdBQVc7RUFDWCxZQUFZLEVBQUE7RUFMZDtJQVFJLGFBQWEsRUFBQTtFQVJqQjtNQVdNLFlBQVk7TUFDWixXQUFXO01BQ1gsZ0JBQWdCLEVBQUE7RUFidEI7UUFnQlEsNENBQTZEO1FBQzdELFdBQVc7UUFDWCxhQUFhLEVBQUE7RUFsQnJCO1FBc0JRLGFBQWE7UUFDYixzQkFBc0IsRUFBQTtFQXZCOUI7VUEwQlUsbUJBQW1CO1VBQ25CLFdBQVc7VUFDWCxnQkFBZ0IsRUFBQSIsImZpbGUiOiJzcmMvYXBwL2xvZ2luL2xvZ2luLmNvbXBvbmVudC5zY3NzIiwic291cmNlc0NvbnRlbnQiOlsiOmhvc3Qge1xyXG4gIHBvc2l0aW9uOiBmaXhlZDtcclxuICB0b3A6IDA7XHJcbiAgbGVmdDogMDtcclxuICB3aWR0aDogMTAwJTtcclxuICBoZWlnaHQ6IDEwMCU7XHJcblxyXG4gIC5jb250ZW50IHtcclxuICAgIGRpc3BsYXk6IGZsZXg7XHJcblxyXG4gICAgLndyYXAtbG9naW4ge1xyXG4gICAgICBtYXJnaW46IGF1dG87XHJcbiAgICAgIHdpZHRoOiAxMDAlO1xyXG4gICAgICBtYXgtd2lkdGg6IDQwcmVtO1xyXG5cclxuICAgICAgLmxvZ28ge1xyXG4gICAgICAgIGJhY2tncm91bmQ6IHVybCguLi8uLi9hc3NldHMvaWNvbnMvbG9nby5zdmcpIG5vLXJlcGVhdCBjZW50ZXI7XHJcbiAgICAgICAgd2lkdGg6IDEwMCU7XHJcbiAgICAgICAgaGVpZ2h0OiAyMHJlbTtcclxuICAgICAgfVxyXG5cclxuICAgICAgLmZvcm0tbG9naW4ge1xyXG4gICAgICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICAgICAgZmxleC1kaXJlY3Rpb246IGNvbHVtbjtcclxuXHJcbiAgICAgICAgYnV0dG9uIHtcclxuICAgICAgICAgIG1hcmdpbjogMi41cmVtIGF1dG87XHJcbiAgICAgICAgICB3aWR0aDogMTAwJTtcclxuICAgICAgICAgIG1heC13aWR0aDogMTVyZW07XHJcbiAgICAgICAgfVxyXG4gICAgICB9XHJcbiAgICB9XHJcbiAgfVxyXG59XHJcbiJdfQ== */"
+module.exports = ":host {\n  position: fixed;\n  top: 0;\n  left: 0;\n  width: 100%;\n  height: 100%; }\n  :host .content {\n    display: flex; }\n  :host .content .wrap-login {\n      margin: auto;\n      width: 100%;\n      max-width: 40rem; }\n  :host .content .wrap-login .logo {\n        background: url('logo.svg') no-repeat center;\n        width: 100%;\n        height: 15rem; }\n  :host .content .wrap-login .form-login {\n        display: flex;\n        flex-direction: column; }\n  :host .content .wrap-login .form-login .wrap-button {\n          display: flex;\n          align-items: center;\n          justify-content: space-between; }\n  :host .content .wrap-login .form-login .wrap-button button {\n            margin: 2.5rem 0; }\n  :host .content .wrap-login .form-login button {\n          margin: 2.5rem auto;\n          width: 100%;\n          max-width: 15rem; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvbG9naW4vRDpcXHphbm9femFub1xcc3JjXFxndWlcXHF0LWRhZW1vblxcaHRtbF9zb3VyY2Uvc3JjXFxhcHBcXGxvZ2luXFxsb2dpbi5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLGVBQWU7RUFDZixNQUFNO0VBQ04sT0FBTztFQUNQLFdBQVc7RUFDWCxZQUFZLEVBQUE7RUFMZDtJQVFJLGFBQWEsRUFBQTtFQVJqQjtNQVdNLFlBQVk7TUFDWixXQUFXO01BQ1gsZ0JBQWdCLEVBQUE7RUFidEI7UUFnQlEsNENBQTZEO1FBQzdELFdBQVc7UUFDWCxhQUFhLEVBQUE7RUFsQnJCO1FBc0JRLGFBQWE7UUFDYixzQkFBc0IsRUFBQTtFQXZCOUI7VUEwQlUsYUFBYTtVQUNiLG1CQUFtQjtVQUNuQiw4QkFBOEIsRUFBQTtFQTVCeEM7WUErQlksZ0JBQWdCLEVBQUE7RUEvQjVCO1VBb0NVLG1CQUFtQjtVQUNuQixXQUFXO1VBQ1gsZ0JBQWdCLEVBQUEiLCJmaWxlIjoic3JjL2FwcC9sb2dpbi9sb2dpbi5jb21wb25lbnQuc2NzcyIsInNvdXJjZXNDb250ZW50IjpbIjpob3N0IHtcclxuICBwb3NpdGlvbjogZml4ZWQ7XHJcbiAgdG9wOiAwO1xyXG4gIGxlZnQ6IDA7XHJcbiAgd2lkdGg6IDEwMCU7XHJcbiAgaGVpZ2h0OiAxMDAlO1xyXG5cclxuICAuY29udGVudCB7XHJcbiAgICBkaXNwbGF5OiBmbGV4O1xyXG5cclxuICAgIC53cmFwLWxvZ2luIHtcclxuICAgICAgbWFyZ2luOiBhdXRvO1xyXG4gICAgICB3aWR0aDogMTAwJTtcclxuICAgICAgbWF4LXdpZHRoOiA0MHJlbTtcclxuXHJcbiAgICAgIC5sb2dvIHtcclxuICAgICAgICBiYWNrZ3JvdW5kOiB1cmwoLi4vLi4vYXNzZXRzL2ljb25zL2xvZ28uc3ZnKSBuby1yZXBlYXQgY2VudGVyO1xyXG4gICAgICAgIHdpZHRoOiAxMDAlO1xyXG4gICAgICAgIGhlaWdodDogMTVyZW07XHJcbiAgICAgIH1cclxuXHJcbiAgICAgIC5mb3JtLWxvZ2luIHtcclxuICAgICAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAgICAgIGZsZXgtZGlyZWN0aW9uOiBjb2x1bW47XHJcblxyXG4gICAgICAgIC53cmFwLWJ1dHRvbiB7XHJcbiAgICAgICAgICBkaXNwbGF5OiBmbGV4O1xyXG4gICAgICAgICAgYWxpZ24taXRlbXM6IGNlbnRlcjtcclxuICAgICAgICAgIGp1c3RpZnktY29udGVudDogc3BhY2UtYmV0d2VlbjtcclxuXHJcbiAgICAgICAgICBidXR0b24ge1xyXG4gICAgICAgICAgICBtYXJnaW46IDIuNXJlbSAwO1xyXG4gICAgICAgICAgfVxyXG4gICAgICAgIH1cclxuXHJcbiAgICAgICAgYnV0dG9uIHtcclxuICAgICAgICAgIG1hcmdpbjogMi41cmVtIGF1dG87XHJcbiAgICAgICAgICB3aWR0aDogMTAwJTtcclxuICAgICAgICAgIG1heC13aWR0aDogMTVyZW07XHJcbiAgICAgICAgfVxyXG4gICAgICB9XHJcbiAgICB9XHJcbiAgfVxyXG59XHJcbiJdfQ== */"
 
 /***/ }),
 
@@ -4195,13 +4241,13 @@ var LoginComponent = /** @class */ (function () {
         this.modalService = modalService;
         this.ngZone = ngZone;
         this.regForm = new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormGroup"]({
-            password: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"]('', _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required),
-            confirmation: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"]('', _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required)
+            password: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](''),
+            confirmation: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"]('')
         }, function (g) {
             return g.get('password').value === g.get('confirmation').value ? null : { 'mismatch': true };
         });
         this.authForm = new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormGroup"]({
-            password: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"]('', _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required)
+            password: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"]('')
         });
         this.type = 'reg';
     }
@@ -4219,6 +4265,8 @@ var LoginComponent = /** @class */ (function () {
             this.variablesService.appPass = this.regForm.get('password').value;
             this.backend.storeSecureAppData(function (status, data) {
                 if (status) {
+                    _this.variablesService.appLogin = true;
+                    _this.variablesService.startCountdown();
                     _this.ngZone.run(function () {
                         _this.router.navigate(['/']);
                     });
@@ -4229,12 +4277,21 @@ var LoginComponent = /** @class */ (function () {
             });
         }
     };
+    LoginComponent.prototype.onSkipCreatePass = function () {
+        var _this = this;
+        this.variablesService.appPass = '';
+        this.ngZone.run(function () {
+            _this.variablesService.appLogin = true;
+            _this.router.navigate(['/']);
+        });
+    };
     LoginComponent.prototype.onSubmitAuthPass = function () {
         var _this = this;
         if (this.authForm.valid) {
             var appPass_1 = this.authForm.get('password').value;
             this.backend.getSecureAppData({ pass: appPass_1 }, function (status, data) {
                 if (!data.error_code) {
+                    _this.variablesService.appLogin = true;
                     _this.variablesService.startCountdown();
                     _this.variablesService.appPass = appPass_1;
                     if (_this.variablesService.wallets.length) {
@@ -4505,6 +4562,166 @@ var MessagesComponent = /** @class */ (function () {
 
 /***/ }),
 
+/***/ "./src/app/open-wallet-modal/open-wallet-modal.component.html":
+/*!********************************************************************!*\
+  !*** ./src/app/open-wallet-modal/open-wallet-modal.component.html ***!
+  \********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = "<div class=\"modal\">\r\n  <h3 class=\"title\">{{ 'OPEN_WALLET.MODAL.TITLE' | translate }}</h3>\r\n  <form class=\"open-form\" (ngSubmit)=\"openWallet()\">\r\n    <div class=\"wallet-path\">{{ wallet.name }}</div>\r\n    <div class=\"wallet-path\">{{ wallet.path }}</div>\r\n    <div class=\"input-block\" *ngIf=\"!wallet.notFound && !wallet.emptyPass\">\r\n      <label for=\"password\">{{ 'OPEN_WALLET.MODAL.LABEL' | translate }}</label>\r\n      <input type=\"password\" id=\"password\" name=\"password\" [(ngModel)]=\"wallet.pass\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\"/>\r\n    </div>\r\n    <div class=\"error-block\" *ngIf=\"wallet.notFound\">\r\n      {{ 'OPEN_WALLET.MODAL.NOT_FOUND' | translate }}\r\n    </div>\r\n    <div class=\"wrap-button\">\r\n      <button type=\"submit\" class=\"blue-button\" [disabled]=\"wallet.notFound\">{{ 'OPEN_WALLET.MODAL.OPEN' | translate }}</button>\r\n      <button type=\"button\" class=\"blue-button\" (click)=\"skipWallet()\">{{ 'OPEN_WALLET.MODAL.SKIP' | translate }}</button>\r\n    </div>\r\n  </form>\r\n</div>\r\n"
+
+/***/ }),
+
+/***/ "./src/app/open-wallet-modal/open-wallet-modal.component.scss":
+/*!********************************************************************!*\
+  !*** ./src/app/open-wallet-modal/open-wallet-modal.component.scss ***!
+  \********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = ":host {\n  position: fixed;\n  top: 0;\n  bottom: 0;\n  left: 0;\n  right: 0;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  background: rgba(255, 255, 255, 0.25); }\n\n.modal {\n  display: flex;\n  flex-direction: column;\n  background-position: center;\n  background-size: 200%;\n  padding: 2rem;\n  width: 34rem; }\n\n.modal .title {\n    font-size: 1.8rem;\n    text-align: center; }\n\n.modal .open-form .wallet-path {\n    font-size: 1.3rem;\n    margin: 5rem 0 2rem; }\n\n.modal .open-form .wrap-button {\n    display: flex;\n    align-items: center;\n    justify-content: space-between;\n    margin: 2rem -2rem 0; }\n\n.modal .open-form .wrap-button button {\n      flex: 1 0 0;\n      margin: 0 2rem; }\n\n/*# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbInNyYy9hcHAvb3Blbi13YWxsZXQtbW9kYWwvRDpcXHphbm9femFub1xcc3JjXFxndWlcXHF0LWRhZW1vblxcaHRtbF9zb3VyY2Uvc3JjXFxhcHBcXG9wZW4td2FsbGV0LW1vZGFsXFxvcGVuLXdhbGxldC1tb2RhbC5jb21wb25lbnQuc2NzcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtFQUNFLGVBQWU7RUFDZixNQUFNO0VBQ04sU0FBUztFQUNULE9BQU87RUFDUCxRQUFRO0VBQ1IsYUFBYTtFQUNiLG1CQUFtQjtFQUNuQix1QkFBdUI7RUFDdkIscUNBQXFDLEVBQUE7O0FBR3ZDO0VBQ0UsYUFBYTtFQUNiLHNCQUFzQjtFQUN0QiwyQkFBMkI7RUFDM0IscUJBQXFCO0VBQ3JCLGFBQWE7RUFDYixZQUFZLEVBQUE7O0FBTmQ7SUFTSSxpQkFBaUI7SUFDakIsa0JBQWtCLEVBQUE7O0FBVnRCO0lBZ0JNLGlCQUFpQjtJQUNqQixtQkFBbUIsRUFBQTs7QUFqQnpCO0lBcUJNLGFBQWE7SUFDYixtQkFBbUI7SUFDbkIsOEJBQThCO0lBQzlCLG9CQUFvQixFQUFBOztBQXhCMUI7TUEyQlEsV0FBVztNQUNYLGNBQWUsRUFBQSIsImZpbGUiOiJzcmMvYXBwL29wZW4td2FsbGV0LW1vZGFsL29wZW4td2FsbGV0LW1vZGFsLmNvbXBvbmVudC5zY3NzIiwic291cmNlc0NvbnRlbnQiOlsiOmhvc3Qge1xyXG4gIHBvc2l0aW9uOiBmaXhlZDtcclxuICB0b3A6IDA7XHJcbiAgYm90dG9tOiAwO1xyXG4gIGxlZnQ6IDA7XHJcbiAgcmlnaHQ6IDA7XHJcbiAgZGlzcGxheTogZmxleDtcclxuICBhbGlnbi1pdGVtczogY2VudGVyO1xyXG4gIGp1c3RpZnktY29udGVudDogY2VudGVyO1xyXG4gIGJhY2tncm91bmQ6IHJnYmEoMjU1LCAyNTUsIDI1NSwgMC4yNSk7XHJcbn1cclxuXHJcbi5tb2RhbCB7XHJcbiAgZGlzcGxheTogZmxleDtcclxuICBmbGV4LWRpcmVjdGlvbjogY29sdW1uO1xyXG4gIGJhY2tncm91bmQtcG9zaXRpb246IGNlbnRlcjtcclxuICBiYWNrZ3JvdW5kLXNpemU6IDIwMCU7XHJcbiAgcGFkZGluZzogMnJlbTtcclxuICB3aWR0aDogMzRyZW07XHJcblxyXG4gIC50aXRsZSB7XHJcbiAgICBmb250LXNpemU6IDEuOHJlbTtcclxuICAgIHRleHQtYWxpZ246IGNlbnRlcjtcclxuICB9XHJcblxyXG4gIC5vcGVuLWZvcm0ge1xyXG5cclxuICAgIC53YWxsZXQtcGF0aCB7XHJcbiAgICAgIGZvbnQtc2l6ZTogMS4zcmVtO1xyXG4gICAgICBtYXJnaW46IDVyZW0gMCAycmVtO1xyXG4gICAgfVxyXG5cclxuICAgIC53cmFwLWJ1dHRvbiB7XHJcbiAgICAgIGRpc3BsYXk6IGZsZXg7XHJcbiAgICAgIGFsaWduLWl0ZW1zOiBjZW50ZXI7XHJcbiAgICAgIGp1c3RpZnktY29udGVudDogc3BhY2UtYmV0d2VlbjtcclxuICAgICAgbWFyZ2luOiAycmVtIC0ycmVtIDA7XHJcblxyXG4gICAgICBidXR0b24ge1xyXG4gICAgICAgIGZsZXg6IDEgMCAwO1xyXG4gICAgICAgIG1hcmdpbjogMCAycmVtIDtcclxuICAgICAgfVxyXG4gICAgfVxyXG4gIH1cclxufVxyXG4iXX0= */"
+
+/***/ }),
+
+/***/ "./src/app/open-wallet-modal/open-wallet-modal.component.ts":
+/*!******************************************************************!*\
+  !*** ./src/app/open-wallet-modal/open-wallet-modal.component.ts ***!
+  \******************************************************************/
+/*! exports provided: OpenWalletModalComponent */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OpenWalletModalComponent", function() { return OpenWalletModalComponent; });
+/* harmony import */ var _angular_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @angular/core */ "./node_modules/@angular/core/fesm5/core.js");
+/* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
+/* harmony import */ var _helpers_models_wallet_model__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../_helpers/models/wallet.model */ "./src/app/_helpers/models/wallet.model.ts");
+/* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
+/* harmony import */ var _ngx_translate_core__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @ngx-translate/core */ "./node_modules/@ngx-translate/core/fesm5/ngx-translate-core.js");
+/* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
+var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (undefined && undefined.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+
+
+
+
+
+
+var OpenWalletModalComponent = /** @class */ (function () {
+    function OpenWalletModalComponent(variablesService, backend, translate, modalService, ngZone) {
+        this.variablesService = variablesService;
+        this.backend = backend;
+        this.translate = translate;
+        this.modalService = modalService;
+        this.ngZone = ngZone;
+        this.wallet = {
+            name: '',
+            path: '',
+            pass: '',
+            notFound: false,
+            emptyPass: false
+        };
+    }
+    OpenWalletModalComponent.prototype.ngOnInit = function () {
+        var _this = this;
+        if (this.wallets.length) {
+            this.wallet = this.wallets[0];
+            this.wallet.pass = '';
+            this.backend.openWallet(this.wallet.path, '', true, function (status, data, error) {
+                if (error === 'FILE_NOT_FOUND') {
+                    _this.wallet.notFound = true;
+                }
+                if (status) {
+                    _this.wallet.pass = '';
+                    _this.wallet.emptyPass = true;
+                    _this.backend.closeWallet(data.wallet_id);
+                    _this.openWallet();
+                }
+            });
+        }
+    };
+    OpenWalletModalComponent.prototype.openWallet = function () {
+        var _this = this;
+        if (this.wallets.length === 0) {
+            return;
+        }
+        this.backend.openWallet(this.wallet.path, this.wallet.pass, false, function (open_status, open_data, open_error) {
+            if (open_error && open_error === 'FILE_NOT_FOUND') {
+                var error_translate = _this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
+                error_translate += ':<br>' + _this.wallet.path;
+                error_translate += _this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND2');
+                _this.modalService.prepareModal('error', error_translate);
+            }
+            else {
+                if (open_status || open_error === 'FILE_RESTORED') {
+                    var exists_1 = false;
+                    _this.variablesService.wallets.forEach(function (wallet) {
+                        if (wallet.address === open_data['wi'].address) {
+                            exists_1 = true;
+                        }
+                    });
+                    if (exists_1) {
+                        _this.modalService.prepareModal('error', 'OPEN_WALLET.WITH_ADDRESS_ALREADY_OPEN');
+                        _this.backend.closeWallet(open_data.wallet_id);
+                    }
+                    else {
+                        var new_wallet_1 = new _helpers_models_wallet_model__WEBPACK_IMPORTED_MODULE_2__["Wallet"](open_data.wallet_id, _this.wallet.name, _this.wallet.pass, open_data['wi'].path, open_data['wi'].address, open_data['wi'].balance, open_data['wi'].unlocked_balance, open_data['wi'].mined_total, open_data['wi'].tracking_hey);
+                        new_wallet_1.alias = _this.backend.getWalletAlias(new_wallet_1.address);
+                        if (open_data.recent_history && open_data.recent_history.history) {
+                            new_wallet_1.prepareHistory(open_data.recent_history.history);
+                        }
+                        _this.backend.getContracts(open_data.wallet_id, function (contracts_status, contracts_data) {
+                            if (contracts_status && contracts_data.hasOwnProperty('contracts')) {
+                                _this.ngZone.run(function () {
+                                    new_wallet_1.prepareContractsAfterOpen(contracts_data.contracts, _this.variablesService.exp_med_ts, _this.variablesService.height_app, _this.variablesService.settings.viewedContracts, _this.variablesService.settings.notViewedContracts);
+                                });
+                            }
+                        });
+                        _this.variablesService.wallets.push(new_wallet_1);
+                        _this.backend.runWallet(open_data.wallet_id);
+                        _this.skipWallet();
+                    }
+                }
+            }
+        });
+    };
+    OpenWalletModalComponent.prototype.skipWallet = function () {
+        if (this.wallets.length) {
+            this.wallets.splice(0, 1);
+            this.ngOnInit();
+        }
+    };
+    __decorate([
+        Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Input"])(),
+        __metadata("design:type", Object)
+    ], OpenWalletModalComponent.prototype, "wallets", void 0);
+    OpenWalletModalComponent = __decorate([
+        Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Component"])({
+            selector: 'app-open-wallet-modal',
+            template: __webpack_require__(/*! ./open-wallet-modal.component.html */ "./src/app/open-wallet-modal/open-wallet-modal.component.html"),
+            styles: [__webpack_require__(/*! ./open-wallet-modal.component.scss */ "./src/app/open-wallet-modal/open-wallet-modal.component.scss")]
+        }),
+        __metadata("design:paramtypes", [_helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_1__["VariablesService"],
+            _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_3__["BackendService"],
+            _ngx_translate_core__WEBPACK_IMPORTED_MODULE_4__["TranslateService"],
+            _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__["ModalService"],
+            _angular_core__WEBPACK_IMPORTED_MODULE_0__["NgZone"]])
+    ], OpenWalletModalComponent);
+    return OpenWalletModalComponent;
+}());
+
+
+
+/***/ }),
+
 /***/ "./src/app/open-wallet/open-wallet.component.html":
 /*!********************************************************!*\
   !*** ./src/app/open-wallet/open-wallet.component.html ***!
@@ -4646,9 +4863,9 @@ var OpenWalletComponent = /** @class */ (function () {
                             _this.variablesService.wallets.push(new_wallet_1);
                             _this.backend.runWallet(open_data.wallet_id, function (run_status, run_data) {
                                 if (run_status) {
-                                    _this.backend.storeSecureAppData(function (status, data) {
-                                        console.log('Store App Data', status, data);
-                                    });
+                                    if (_this.variablesService.appPass) {
+                                        _this.backend.storeSecureAppData();
+                                    }
                                     _this.ngZone.run(function () {
                                         _this.router.navigate(['/wallet/' + open_data.wallet_id]);
                                     });
@@ -5414,9 +5631,9 @@ var SeedPhraseComponent = /** @class */ (function () {
             this.backend.runWallet(this.wallet_id, function (run_status, run_data) {
                 if (run_status) {
                     _this.variablesService.wallets.push(_this.variablesService.opening_wallet);
-                    _this.backend.storeSecureAppData(function (status, data) {
-                        console.log('Store App Data', status, data);
-                    });
+                    if (_this.variablesService.appPass) {
+                        _this.backend.storeSecureAppData();
+                    }
                     _this.ngZone.run(function () {
                         _this.router.navigate(['/wallet/' + _this.wallet_id]);
                     });
@@ -5716,7 +5933,7 @@ var SendComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"content scrolled-content\">\r\n\r\n  <div>\r\n    <div class=\"head\">\r\n      <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\r\n        <i class=\"icon back\"></i>\r\n        <span>{{ 'COMMON.BACK' | translate }}</span>\r\n      </button>\r\n    </div>\r\n\r\n    <h3 class=\"settings-title\">{{ 'SETTINGS.TITLE' | translate }}</h3>\r\n\r\n    <div class=\"theme-selection\">\r\n      <div class=\"radio-block\">\r\n        <input class=\"style-radio\" type=\"radio\" id=\"dark\" name=\"theme\" value=\"dark\" [checked]=\"theme == 'dark'\" (change)=\"setTheme('dark')\">\r\n        <label for=\"dark\">{{ 'SETTINGS.DARK_THEME' | translate }}</label>\r\n      </div>\r\n      <div class=\"radio-block\">\r\n        <input class=\"style-radio\" type=\"radio\" id=\"white\" name=\"theme\" value=\"white\" [checked]=\"theme == 'white'\" (change)=\"setTheme('white')\">\r\n        <label for=\"white\">{{ 'SETTINGS.WHITE_THEME' | translate }}</label>\r\n      </div>\r\n      <div class=\"radio-block\">\r\n        <input class=\"style-radio\" type=\"radio\" id=\"gray\" name=\"theme\" value=\"gray\" [checked]=\"theme == 'gray'\" (change)=\"setTheme('gray')\">\r\n        <label for=\"gray\">{{ 'SETTINGS.GRAY_THEME' | translate }}</label>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"scale-selection\">\r\n      <button type=\"button\" class=\"button-block\" [class.active]=\"item.id === variablesService.settings.scale\" *ngFor=\"let item of appScaleOptions\" (click)=\"setScale(item.id)\">\r\n        <span class=\"label\">{{item.name}}</span>\r\n      </button>\r\n    </div>\r\n\r\n    <div class=\"lock-selection\">\r\n      <label class=\"lock-selection-title\">{{ 'SETTINGS.APP_LOCK.TITLE' | translate }}</label>\r\n      <ng-select class=\"lock-selection-select\"\r\n                 [items]=\"appLockOptions\"\r\n                 bindValue=\"id\"\r\n                 bindLabel=\"name\"\r\n                 [(ngModel)]=\"variablesService.settings.appLockTime\"\r\n                 [clearable]=\"false\"\r\n                 [searchable]=\"false\"\r\n                 (change)=\"onLockChange()\">\r\n        <ng-template ng-label-tmp let-item=\"item\">\r\n          {{item.name | translate}}\r\n        </ng-template>\r\n        <ng-template ng-option-tmp let-item=\"item\" let-index=\"index\">\r\n          {{item.name | translate}}\r\n        </ng-template>\r\n      </ng-select>\r\n    </div>\r\n\r\n    <form class=\"master-password\" [formGroup]=\"changeForm\" (ngSubmit)=\"onSubmitChangePass()\">\r\n\r\n      <span class=\"master-password-title\">{{ 'SETTINGS.MASTER_PASSWORD.TITLE' | translate }}</span>\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"old-password\">{{ 'SETTINGS.MASTER_PASSWORD.OLD' | translate }}</label>\r\n        <input type=\"password\" id=\"old-password\" formControlName=\"password\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\"/>\r\n        <div class=\"error-block\" *ngIf=\"changeForm.controls['password'].invalid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched)\">\r\n          <div *ngIf=\"changeForm.controls['password'].errors['required']\">\r\n            {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}\r\n          </div>\r\n        </div>\r\n        <div class=\"error-block\" *ngIf=\"changeForm.invalid && changeForm.controls['password'].valid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched) && changeForm.errors && changeForm.errors.pass_mismatch\">\r\n          {{ 'SETTINGS.FORM_ERRORS.PASS_NOT_MATCH' | translate }}\r\n        </div>\r\n      </div>\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"new-password\">{{ 'SETTINGS.MASTER_PASSWORD.NEW' | translate }}</label>\r\n        <input type=\"password\" id=\"new-password\" formControlName=\"new_password\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\"/>\r\n        <div class=\"error-block\" *ngIf=\"changeForm.controls['new_password'].invalid && (changeForm.controls['new_password'].dirty || changeForm.controls['new_password'].touched)\">\r\n          <div *ngIf=\"changeForm.controls['new_password'].errors['required']\">\r\n            {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}\r\n          </div>\r\n        </div>\r\n      </div>\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"confirm-password\">{{ 'SETTINGS.MASTER_PASSWORD.CONFIRM' | translate }}</label>\r\n        <input type=\"password\" id=\"confirm-password\" formControlName=\"new_confirmation\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\"/>\r\n        <div class=\"error-block\" *ngIf=\"changeForm.controls['new_confirmation'].invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched)\">\r\n          <div *ngIf=\"changeForm.controls['new_confirmation'].errors['required']\">\r\n            {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}\r\n          </div>\r\n        </div>\r\n        <div class=\"error-block\" *ngIf=\"changeForm.invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched) && changeForm.errors && changeForm.errors.confirm_mismatch\">\r\n          {{ 'SETTINGS.FORM_ERRORS.CONFIRM_NOT_MATCH' | translate }}\r\n        </div>\r\n      </div>\r\n\r\n      <button type=\"submit\" class=\"blue-button\" [disabled]=\"!changeForm.valid\">{{ 'SETTINGS.MASTER_PASSWORD.BUTTON' | translate }}</button>\r\n\r\n    </form>\r\n  </div>\r\n\r\n  <div>\r\n    <div class=\"last-build\">{{ 'SETTINGS.LAST_BUILD' | translate : {value: currentBuild} }}</div>\r\n  </div>\r\n\r\n</div>\r\n"
+module.exports = "<div class=\"content scrolled-content\">\r\n\r\n  <div>\r\n    <div class=\"head\">\r\n      <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\r\n        <i class=\"icon back\"></i>\r\n        <span>{{ 'COMMON.BACK' | translate }}</span>\r\n      </button>\r\n    </div>\r\n\r\n    <h3 class=\"settings-title\">{{ 'SETTINGS.TITLE' | translate }}</h3>\r\n\r\n    <div class=\"theme-selection\">\r\n      <div class=\"radio-block\">\r\n        <input class=\"style-radio\" type=\"radio\" id=\"dark\" name=\"theme\" value=\"dark\" [checked]=\"theme == 'dark'\" (change)=\"setTheme('dark')\">\r\n        <label for=\"dark\">{{ 'SETTINGS.DARK_THEME' | translate }}</label>\r\n      </div>\r\n      <div class=\"radio-block\">\r\n        <input class=\"style-radio\" type=\"radio\" id=\"white\" name=\"theme\" value=\"white\" [checked]=\"theme == 'white'\" (change)=\"setTheme('white')\">\r\n        <label for=\"white\">{{ 'SETTINGS.WHITE_THEME' | translate }}</label>\r\n      </div>\r\n      <div class=\"radio-block\">\r\n        <input class=\"style-radio\" type=\"radio\" id=\"gray\" name=\"theme\" value=\"gray\" [checked]=\"theme == 'gray'\" (change)=\"setTheme('gray')\">\r\n        <label for=\"gray\">{{ 'SETTINGS.GRAY_THEME' | translate }}</label>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"scale-selection\">\r\n      <button type=\"button\" class=\"button-block\" [class.active]=\"item.id === variablesService.settings.scale\" *ngFor=\"let item of appScaleOptions\" (click)=\"setScale(item.id)\">\r\n        <span class=\"label\">{{item.name}}</span>\r\n      </button>\r\n    </div>\r\n\r\n    <div class=\"lock-selection\">\r\n      <label class=\"lock-selection-title\">{{ 'SETTINGS.APP_LOCK.TITLE' | translate }}</label>\r\n      <ng-select class=\"lock-selection-select\"\r\n                 [items]=\"appLockOptions\"\r\n                 bindValue=\"id\"\r\n                 bindLabel=\"name\"\r\n                 [(ngModel)]=\"variablesService.settings.appLockTime\"\r\n                 [clearable]=\"false\"\r\n                 [searchable]=\"false\"\r\n                 (change)=\"onLockChange()\">\r\n        <ng-template ng-label-tmp let-item=\"item\">\r\n          {{item.name | translate}}\r\n        </ng-template>\r\n        <ng-template ng-option-tmp let-item=\"item\" let-index=\"index\">\r\n          {{item.name | translate}}\r\n        </ng-template>\r\n      </ng-select>\r\n    </div>\r\n\r\n    <form class=\"master-password\" [formGroup]=\"changeForm\" (ngSubmit)=\"onSubmitChangePass()\">\r\n\r\n      <span class=\"master-password-title\">{{ 'SETTINGS.MASTER_PASSWORD.TITLE' | translate }}</span>\r\n\r\n      <div class=\"input-block\" *ngIf=\"variablesService.appPass\">\r\n        <label for=\"old-password\">{{ 'SETTINGS.MASTER_PASSWORD.OLD' | translate }}</label>\r\n        <input type=\"password\" id=\"old-password\" formControlName=\"password\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\"/>\r\n        <div class=\"error-block\" *ngIf=\"changeForm.invalid && changeForm.controls['password'].valid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched) && changeForm.errors && changeForm.errors.pass_mismatch\">\r\n          {{ 'SETTINGS.FORM_ERRORS.PASS_NOT_MATCH' | translate }}\r\n        </div>\r\n      </div>\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"new-password\">{{ 'SETTINGS.MASTER_PASSWORD.NEW' | translate }}</label>\r\n        <input type=\"password\" id=\"new-password\" formControlName=\"new_password\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\"/>\r\n      </div>\r\n\r\n      <div class=\"input-block\">\r\n        <label for=\"confirm-password\">{{ 'SETTINGS.MASTER_PASSWORD.CONFIRM' | translate }}</label>\r\n        <input type=\"password\" id=\"confirm-password\" formControlName=\"new_confirmation\" (contextmenu)=\"variablesService.onContextMenuPasteSelect($event)\"/>\r\n        <div class=\"error-block\" *ngIf=\"changeForm.invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched) && changeForm.errors && changeForm.errors.confirm_mismatch\">\r\n          {{ 'SETTINGS.FORM_ERRORS.CONFIRM_NOT_MATCH' | translate }}\r\n        </div>\r\n      </div>\r\n\r\n      <button type=\"submit\" class=\"blue-button\" [disabled]=\"!changeForm.valid\">{{ 'SETTINGS.MASTER_PASSWORD.BUTTON' | translate }}</button>\r\n\r\n    </form>\r\n  </div>\r\n\r\n  <div>\r\n    <div class=\"last-build\">{{ 'SETTINGS.LAST_BUILD' | translate : {value: currentBuild} }}</div>\r\n  </div>\r\n\r\n</div>\r\n"
 
 /***/ }),
 
@@ -5808,13 +6025,16 @@ var SettingsComponent = /** @class */ (function () {
         this.theme = this.variablesService.settings.theme;
         this.scale = this.variablesService.settings.scale;
         this.changeForm = new _angular_forms__WEBPACK_IMPORTED_MODULE_3__["FormGroup"]({
-            password: new _angular_forms__WEBPACK_IMPORTED_MODULE_3__["FormControl"]('', _angular_forms__WEBPACK_IMPORTED_MODULE_3__["Validators"].required),
-            new_password: new _angular_forms__WEBPACK_IMPORTED_MODULE_3__["FormControl"]('', _angular_forms__WEBPACK_IMPORTED_MODULE_3__["Validators"].required),
-            new_confirmation: new _angular_forms__WEBPACK_IMPORTED_MODULE_3__["FormControl"]('', _angular_forms__WEBPACK_IMPORTED_MODULE_3__["Validators"].required)
+            password: new _angular_forms__WEBPACK_IMPORTED_MODULE_3__["FormControl"](''),
+            new_password: new _angular_forms__WEBPACK_IMPORTED_MODULE_3__["FormControl"](''),
+            new_confirmation: new _angular_forms__WEBPACK_IMPORTED_MODULE_3__["FormControl"]('')
         }, [function (g) {
                 return g.get('new_password').value === g.get('new_confirmation').value ? null : { 'confirm_mismatch': true };
             }, function (g) {
-                return g.get('password').value === _this.variablesService.appPass ? null : { 'pass_mismatch': true };
+                if (_this.variablesService.appPass) {
+                    return g.get('password').value === _this.variablesService.appPass ? null : { 'pass_mismatch': true };
+                }
+                return null;
             }]);
     }
     SettingsComponent.prototype.ngOnInit = function () {
@@ -5839,21 +6059,21 @@ var SettingsComponent = /** @class */ (function () {
         this.backend.storeAppData();
     };
     SettingsComponent.prototype.onSubmitChangePass = function () {
-        var _this = this;
         if (this.changeForm.valid) {
             this.variablesService.appPass = this.changeForm.get('new_password').value;
-            this.backend.storeSecureAppData(function (status, data) {
-                if (status) {
-                    _this.changeForm.reset();
-                }
-                else {
-                    console.log(data);
-                }
-            });
+            if (this.variablesService.appPass) {
+                this.backend.storeSecureAppData();
+            }
+            else {
+                this.backend.dropSecureAppData();
+            }
+            this.changeForm.reset();
         }
     };
     SettingsComponent.prototype.onLockChange = function () {
-        this.variablesService.restartCountdown();
+        if (this.variablesService.appLogin) {
+            this.variablesService.restartCountdown();
+        }
         this.backend.storeAppData();
     };
     SettingsComponent.prototype.back = function () {
@@ -5966,6 +6186,7 @@ var SidebarComponent = /** @class */ (function () {
     SidebarComponent.prototype.logOut = function () {
         var _this = this;
         this.variablesService.stopCountdown();
+        this.variablesService.appLogin = false;
         this.variablesService.appPass = '';
         this.ngZone.run(function () {
             _this.router.navigate(['/login'], { queryParams: { type: 'auth' } });
@@ -6793,17 +7014,18 @@ var WalletDetailsComponent = /** @class */ (function () {
                     _this.variablesService.wallets.splice(i, 1);
                 }
             }
-            _this.backend.storeSecureAppData(function () {
-                _this.ngZone.run(function () {
-                    if (_this.variablesService.wallets.length) {
-                        _this.variablesService.currentWallet = _this.variablesService.wallets[0];
-                        _this.router.navigate(['/wallet/' + _this.variablesService.currentWallet.wallet_id]);
-                    }
-                    else {
-                        _this.router.navigate(['/']);
-                    }
-                });
+            _this.ngZone.run(function () {
+                if (_this.variablesService.wallets.length) {
+                    _this.variablesService.currentWallet = _this.variablesService.wallets[0];
+                    _this.router.navigate(['/wallet/' + _this.variablesService.currentWallet.wallet_id]);
+                }
+                else {
+                    _this.router.navigate(['/']);
+                }
             });
+            if (_this.variablesService.appPass) {
+                _this.backend.storeSecureAppData();
+            }
         });
     };
     WalletDetailsComponent.prototype.back = function () {

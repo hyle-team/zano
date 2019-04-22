@@ -1,5 +1,5 @@
 import {Component, NgZone, OnDestroy, OnInit} from '@angular/core';
-import {Location} from "@angular/common";
+import {Location} from '@angular/common';
 import {BackendService} from '../_helpers/services/backend.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
@@ -52,9 +52,9 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
       this.backend.runWallet(this.wallet_id, (run_status, run_data) => {
         if (run_status) {
           this.variablesService.wallets.push(this.variablesService.opening_wallet);
-          this.backend.storeSecureAppData((status, data) => {
-            console.log('Store App Data', status, data);
-          });
+          if (this.variablesService.appPass) {
+            this.backend.storeSecureAppData();
+          }
           this.ngZone.run(() => {
             this.router.navigate(['/wallet/' + this.wallet_id]);
           });
