@@ -13,6 +13,7 @@ export class VariablesService {
 
   public digits = 12;
   public appPass = '';
+  public appLogin = false;
   public moneyEquivalent = 0;
   public defaultTheme = 'dark';
   public defaultCurrency = 'ZAN';
@@ -35,7 +36,8 @@ export class VariablesService {
     language: 'en',
     default_path: '/',
     viewedContracts: [],
-    notViewedContracts: []
+    notViewedContracts: [],
+    wallets: []
   };
 
   public wallets: Array<Wallet> = [];
@@ -56,6 +58,7 @@ export class VariablesService {
       this.ngZone.run(() => {
         this.idle.stop();
         this.appPass = '';
+        this.appLogin = false;
         this.router.navigate(['/login'], {queryParams: {type: 'auth'}});
       });
     });

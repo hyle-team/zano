@@ -72,16 +72,17 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
           this.variablesService.wallets.splice(i, 1);
         }
       }
-      this.backend.storeSecureAppData(() => {
-        this.ngZone.run(() => {
-          if (this.variablesService.wallets.length) {
-            this.variablesService.currentWallet = this.variablesService.wallets[0];
-            this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
-          } else {
-            this.router.navigate(['/']);
-          }
-        });
+      this.ngZone.run(() => {
+        if (this.variablesService.wallets.length) {
+          this.variablesService.currentWallet = this.variablesService.wallets[0];
+          this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
+        } else {
+          this.router.navigate(['/']);
+        }
       });
+      if (this.variablesService.appPass) {
+        this.backend.storeSecureAppData();
+      }
     });
   }
 

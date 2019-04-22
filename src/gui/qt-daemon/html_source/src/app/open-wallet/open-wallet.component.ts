@@ -110,9 +110,9 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
               this.variablesService.wallets.push(new_wallet);
               this.backend.runWallet(open_data.wallet_id, (run_status, run_data) => {
                 if (run_status) {
-                  this.backend.storeSecureAppData((status, data) => {
-                    console.log('Store App Data', status, data);
-                  });
+                  if (this.variablesService.appPass) {
+                    this.backend.storeSecureAppData();
+                  }
                   this.ngZone.run(() => {
                     this.router.navigate(['/wallet/' + open_data.wallet_id]);
                   });

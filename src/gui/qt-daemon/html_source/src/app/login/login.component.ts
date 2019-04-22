@@ -16,14 +16,14 @@ export class LoginComponent implements OnInit, OnDestroy {
   queryRouting;
 
   regForm = new FormGroup({
-    password: new FormControl('', Validators.required),
-    confirmation: new FormControl('', Validators.required)
+    password: new FormControl(''),
+    confirmation: new FormControl('')
   }, function (g: FormGroup) {
     return g.get('password').value === g.get('confirmation').value ? null : {'mismatch': true};
   });
 
   authForm = new FormGroup({
-    password: new FormControl('', Validators.required)
+    password: new FormControl('')
   });
 
   type = 'reg';
@@ -32,7 +32,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone
   ) {
@@ -51,6 +51,8 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.variablesService.appPass = this.regForm.get('password').value;
       this.backend.storeSecureAppData((status, data) => {
         if (status) {
+          this.variablesService.appLogin = true;
+          this.variablesService.startCountdown();
           this.ngZone.run(() => {
             this.router.navigate(['/']);
           });
@@ -61,11 +63,20 @@ export class LoginComponent implements OnInit, OnDestroy {
     }
   }
 
+  onSkipCreatePass(): void {
+    this.variablesService.appPass = '';
+    this.ngZone.run(() => {
+      this.variablesService.appLogin = true;
+      this.router.navigate(['/']);
+    });
+  }
+
   onSubmitAuthPass(): void {
     if (this.authForm.valid) {
       const appPass = this.authForm.get('password').value;
       this.backend.getSecureAppData({pass: appPass}, (status, data) => {
         if (!data.error_code) {
+          this.variablesService.appLogin = true;
           this.variablesService.startCountdown();
           this.variablesService.appPass = appPass;
           if (this.variablesService.wallets.length) {
