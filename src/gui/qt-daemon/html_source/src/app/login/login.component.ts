@@ -51,6 +51,8 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.variablesService.appPass = this.regForm.get('password').value;
       this.backend.storeSecureAppData((status, data) => {
         if (status) {
+          this.variablesService.appLogin = true;
+          this.variablesService.startCountdown();
           this.ngZone.run(() => {
             this.router.navigate(['/']);
           });
@@ -61,16 +63,11 @@ export class LoginComponent implements OnInit, OnDestroy {
     }
   }
 
-  onSkipCreatePass():void {
+  onSkipCreatePass(): void {
     this.variablesService.appPass = '';
-    this.backend.storeSecureAppData((status, data) => {
-      if (status) {
-        this.ngZone.run(() => {
-          this.router.navigate(['/']);
-        });
-      } else {
-        console.log(data);
-      }
+    this.ngZone.run(() => {
+      this.variablesService.appLogin = true;
+      this.router.navigate(['/']);
     });
   }
 
@@ -79,6 +76,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       const appPass = this.authForm.get('password').value;
       this.backend.getSecureAppData({pass: appPass}, (status, data) => {
         if (!data.error_code) {
+          this.variablesService.appLogin = true;
           this.variablesService.startCountdown();
           this.variablesService.appPass = appPass;
           if (this.variablesService.wallets.length) {

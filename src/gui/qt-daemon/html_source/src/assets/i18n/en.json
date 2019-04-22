@@ -89,7 +89,8 @@
       "TITLE": "Type wallet password",
       "LABEL": "Password to this wallet",
       "OPEN": "Open wallet",
-      "SKIP": "Skip"
+      "SKIP": "Skip",
+      "NOT_FOUND": "Not found"
     }
   },
   "RESTORE_WALLET": {

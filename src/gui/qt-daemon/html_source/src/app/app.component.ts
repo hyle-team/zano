@@ -20,6 +20,8 @@ export class AppComponent implements OnInit, OnDestroy {
   onQuitRequest = false;
   firstOnlineState = false;
 
+  needOpenWallets = [];
+
   @ViewChild('allContextMenu') public allContextMenu: ContextMenuComponent;
   @ViewChild('onlyCopyContextMenu') public onlyCopyContextMenu: ContextMenuComponent;
 
@@ -75,8 +77,9 @@ export class AppComponent implements OnInit, OnDestroy {
           this.ngZone.run(() => {
             this.router.navigate(['/']);
           });
+          this.needOpenWallets = [];
           this.variablesService.daemon_state = 5;
-          this.backend.storeSecureAppData(() => {
+          const saveFunction = () => {
             this.backend.storeAppData(() => {
               const recursionCloseWallets = () => {
                 if (this.variablesService.wallets.length) {
@@ -91,7 +94,14 @@ export class AppComponent implements OnInit, OnDestroy {
               };
               recursionCloseWallets();
             });
-          });
+          };
+          if (this.variablesService.appPass) {
+            this.backend.storeSecureAppData(() => {
+              saveFunction();
+            });
+          } else {
+            saveFunction();
+          }
         }
         this.onQuitRequest = true;
       });
@@ -386,7 +396,8 @@ export class AppComponent implements OnInit, OnDestroy {
           for (let i = 0, length = data.events.length; i < length; i++) {
 
             switch (data.events[i].method) {
-              case 'CORE_EVENT_BLOCK_ADDED': break;
+              case 'CORE_EVENT_BLOCK_ADDED':
+                break;
               case 'CORE_EVENT_ADD_ALIAS':
                 if (this.variablesService.aliasesChecked[data.events[i].details.address] != null) {
                   this.variablesService.aliasesChecked[data.events[i].details.address]['name'] = '@' + data.events[i].details.alias;
@@ -439,7 +450,8 @@ export class AppComponent implements OnInit, OnDestroy {
                 }
                 this.variablesService.changeAliases();
                 break;
-              default: break;
+              default:
+                break;
             }
           }
         }
@@ -490,9 +502,17 @@ export class AppComponent implements OnInit, OnDestroy {
                 this.router.navigate(['/login'], {queryParams: {type: 'auth'}});
               });
             } else {
-              this.ngZone.run(() => {
-                this.router.navigate(['/login'], {queryParams: {type: 'reg'}});
-              });
+              if (Object.keys(data).length !== 0) {
+                this.needOpenWallets = JSON.parse(JSON.stringify(this.variablesService.settings.wallets));
+                this.ngZone.run(() => {
+                  this.variablesService.appLogin = true;
+                  this.router.navigate(['/']);
+                });
+              } else {
+                this.ngZone.run(() => {
+                  this.router.navigate(['/login'], {queryParams: {type: 'reg'}});
+                });
+              }
             }
           });
         }
@@ -547,10 +567,18 @@ export class AppComponent implements OnInit, OnDestroy {
             wallet.alias = this.backend.getWalletAlias(wallet.address);
           });
           this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
-            if (a.name.length > b.name.length) return 1;
-            if (a.name.length < b.name.length) return -1;
-            if (a.name > b.name) return 1;
-            if (a.name < b.name) return -1;
+            if (a.name.length > b.name.length) {
+              return 1;
+            }
+            if (a.name.length < b.name.length) {
+              return -1;
+            }
+            if (a.name > b.name) {
+              return 1;
+            }
+            if (a.name < b.name) {
+              return -1;
+            }
             return 0;
           });
           this.variablesService.changeAliases();

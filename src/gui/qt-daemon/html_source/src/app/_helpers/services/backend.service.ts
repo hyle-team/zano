@@ -13,9 +13,27 @@ export class BackendService {
   backendObject: any;
   backendLoaded = false;
 
-  constructor(private translate: TranslateService, private variablesService: VariablesService, private modalService: ModalService, private moneyToIntPipe: MoneyToIntPipe) {}
+  constructor(
+    private translate: TranslateService,
+    private variablesService: VariablesService,
+    private modalService: ModalService,
+    private moneyToIntPipe: MoneyToIntPipe
+  ) {
+  }
 
-  private Debug(type, message) {
+  static bigNumberParser(key, val) {
+    if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge', 'coast', 'a'].indexOf(key) === -1) {
+      return val.toNumber();
+    }
+    if (key === 'rcv' || key === 'spn') {
+      for (let i = 0; i < val.length; i++) {
+        val[i] = new BigNumber(val[i]);
+      }
+    }
+    return val;
+  }
+
+  static Debug(type, message) {
     switch (type) {
       case 0:
         console.error(message);
@@ -112,13 +130,14 @@ export class BackendService {
           }
         }
         break;
-      case 'NOT_FOUND': if (command !== 'open_wallet' && command !== 'get_alias_info_by_name' && command !== 'get_alias_info_by_address') {
-        error_translate = this.translate.instant('ERRORS.FILE_NOT_FOUND');
-        params = JSON.parse(params);
-        if (params.path) {
-          error_translate += ': ' + params.path;
+      case 'NOT_FOUND':
+        if (command !== 'open_wallet' && command !== 'get_alias_info_by_name' && command !== 'get_alias_info_by_address') {
+          error_translate = this.translate.instant('ERRORS.FILE_NOT_FOUND');
+          params = JSON.parse(params);
+          if (params.path) {
+            error_translate += ': ' + params.path;
+          }
         }
-      }
         break;
       case 'CANCELED':
       case '':
@@ -142,34 +161,19 @@ export class BackendService {
     }
   }
 
-  private bigNumberParser(key, val) {
-    if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge', 'coast', 'a'].indexOf(key) === -1) {
-      return val.toNumber();
-    }
-    if (key === 'rcv' || key === 'spn') {
-      for (let i = 0; i < val.length; i++) {
-        val[i] = new BigNumber(val[i]);
-      }
-    }
-    return val;
-  }
 
   private commandDebug(command, params, result) {
-    this.Debug(2, '----------------- ' + command + ' -----------------');
+    BackendService.Debug(2, '----------------- ' + command + ' -----------------');
     const debug = {
       _send_params: params,
       _result: result
     };
-    this.Debug(2, debug);
+    BackendService.Debug(2, debug);
     try {
-      this.Debug(2, JSONBigNumber.parse(result, this.bigNumberParser));
+      BackendService.Debug(2, JSONBigNumber.parse(result, BackendService.bigNumberParser));
     } catch (e) {
-      this.Debug(2, {response_data: result, error_code: 'OK'});
+      BackendService.Debug(2, {response_data: result, error_code: 'OK'});
     }
-  }
-
-  private asVal(data) {
-    return {v: data};
   }
 
   private backendCallback(resultStr, params, callback, command) {
@@ -179,7 +183,7 @@ export class BackendService {
         Result = {};
       } else {
         try {
-          Result = JSONBigNumber.parse(resultStr, this.bigNumberParser);
+          Result = JSONBigNumber.parse(resultStr, BackendService.bigNumberParser);
         } catch (e) {
           Result = {response_data: resultStr, error_code: 'OK'};
         }
@@ -194,7 +198,7 @@ export class BackendService {
     const Status = (Result.error_code === 'OK' || Result.error_code === 'TRUE');
 
     if (!Status && Status !== undefined && Result.error_code !== undefined) {
-      this.Debug(1, 'API error for command: "' + command + '". Error code: ' + Result.error_code);
+      BackendService.Debug(1, 'API error for command: "' + command + '". Error code: ' + Result.error_code);
     }
     const data = ((typeof Result === 'object') && 'response_data' in Result) ? Result.response_data : Result;
 
@@ -220,7 +224,7 @@ export class BackendService {
     if (this.backendObject) {
       const Action = this.backendObject[command];
       if (!Action) {
-        this.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
+        BackendService.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
       } else {
         const that = this;
         params = (typeof params === 'string') ? params : JSONBigNumber.stringify(params);
@@ -245,7 +249,7 @@ export class BackendService {
       this.backendObject[command].connect(callback);
     } else {
       this.backendObject[command].connect((str) => {
-        callback(JSONBigNumber.parse(str, this.bigNumberParser));
+        callback(JSONBigNumber.parse(str, BackendService.bigNumberParser));
       });
     }
   }
@@ -285,6 +289,12 @@ export class BackendService {
   }
 
   storeAppData(callback?) {
+    if (this.variablesService.wallets.length) {
+      this.variablesService.settings.wallets = [];
+      this.variablesService.wallets.forEach((wallet) => {
+        this.variablesService.settings.wallets.push({name: wallet.name, path: wallet.path});
+      });
+    }
     this.runCommand('store_app_data', this.variablesService.settings, callback);
   }
 
@@ -292,13 +302,19 @@ export class BackendService {
     this.runCommand('get_secure_app_data', pass, callback);
   }
 
-  storeSecureAppData(callback) {
+  storeSecureAppData(callback?) {
     const wallets = [];
     this.variablesService.wallets.forEach((wallet) => {
       wallets.push({name: wallet.name, pass: wallet.pass, path: wallet.path});
     });
     this.backendObject['store_secure_app_data'](JSON.stringify(wallets), this.variablesService.appPass, (dataStore) => {
       this.backendCallback(dataStore, {}, callback, 'store_secure_app_data');
+    });
+  }
+
+  dropSecureAppData(callback?) {
+    this.backendObject['drop_secure_app_data']((dataStore) => {
+      this.backendCallback(dataStore, {}, callback, 'drop_secure_app_data');
     });
   }
 
@@ -343,7 +359,7 @@ export class BackendService {
     this.runCommand('open_wallet', params, callback);
   }
 
-  closeWallet(wallet_id, callback) {
+  closeWallet(wallet_id, callback?) {
     this.runCommand('close_wallet', {wallet_id: +wallet_id}, callback);
   }
 
@@ -351,7 +367,7 @@ export class BackendService {
     this.runCommand('get_smart_wallet_info', {wallet_id: +wallet_id}, callback);
   }
 
-  runWallet(wallet_id, callback) {
+  runWallet(wallet_id, callback?) {
     this.runCommand('run_wallet', {wallet_id: +wallet_id}, callback);
   }
 
@@ -415,7 +431,7 @@ export class BackendService {
       fee: this.variablesService.default_fee_big,
       b_fee: this.variablesService.default_fee_big
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('create_proposal', params, callback);
   }
 
@@ -423,7 +439,7 @@ export class BackendService {
     const params = {
       wallet_id: parseInt(wallet_id, 10)
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('get_contracts', params, callback);
   }
 
@@ -432,7 +448,7 @@ export class BackendService {
       wallet_id: parseInt(wallet_id, 10),
       contract_id: contract_id
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('accept_proposal', params, callback);
   }
 
@@ -442,7 +458,7 @@ export class BackendService {
       contract_id: contract_id,
       release_type: release_type // "normal" or "burn"
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('release_contract', params, callback);
   }
 
@@ -453,7 +469,7 @@ export class BackendService {
       fee: this.variablesService.default_fee_big,
       expiration_period: parseInt(time, 10) * 60 * 60
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('request_cancel_contract', params, callback);
   }
 
@@ -462,7 +478,7 @@ export class BackendService {
       wallet_id: parseInt(wallet_id, 10),
       contract_id: contract_id
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('accept_cancel_contract', params, callback);
   }
 
@@ -503,7 +519,7 @@ export class BackendService {
     this.runCommand('set_localization_strings', params, callback);
   }
 
-  registerAlias (wallet_id, alias, address, fee, comment, reward, callback) {
+  registerAlias(wallet_id, alias, address, fee, comment, reward, callback) {
     const params = {
       wallet_id: wallet_id,
       alias: {
@@ -518,7 +534,7 @@ export class BackendService {
     this.runCommand('request_alias_registration', params, callback);
   }
 
-  updateAlias (wallet_id, alias, fee, callback) {
+  updateAlias(wallet_id, alias, fee, callback) {
     const params = {
       wallet_id: wallet_id,
       alias: {
@@ -532,19 +548,19 @@ export class BackendService {
     this.runCommand('request_alias_update', params, callback);
   }
 
-  getAllAliases (callback) {
+  getAllAliases(callback) {
     this.runCommand('get_all_aliases', {}, callback);
   }
 
-  getAliasByName (value, callback) {
+  getAliasByName(value, callback) {
     return this.runCommand('get_alias_info_by_name', value, callback);
   }
 
-  getAliasByAddress (value, callback) {
+  getAliasByAddress(value, callback) {
     return this.runCommand('get_alias_info_by_address', value, callback);
   }
 
-  getAliasCoast (alias, callback) {
+  getAliasCoast(alias, callback) {
     this.runCommand('get_alias_coast', {v: alias}, callback);
   }
 
