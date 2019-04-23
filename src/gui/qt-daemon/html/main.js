@@ -2373,6 +2373,7 @@ var VariablesService = /** @class */ (function () {
         this.enableAliasSearch = false;
         this.maxWalletNameLength = 25;
         this.maxCommentLength = 255;
+        this.getExpMedTsEvent = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
         this.getHeightAppEvent = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
         this.getRefreshStackingEvent = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
         this.getAliasChangedEvent = new rxjs__WEBPACK_IMPORTED_MODULE_1__["BehaviorSubject"](null);
@@ -2387,6 +2388,12 @@ var VariablesService = /** @class */ (function () {
             });
         });
     }
+    VariablesService.prototype.setExpMedTs = function (timestamp) {
+        if (timestamp !== this.exp_med_ts) {
+            this.exp_med_ts = timestamp;
+            this.getExpMedTsEvent.next(timestamp);
+        }
+    };
     VariablesService.prototype.setHeightApp = function (height) {
         if (height !== this.height_app) {
             this.height_app = height;
@@ -2839,7 +2846,8 @@ var AppComponent = /** @class */ (function () {
                 console.log('----------------- update_daemon_state -----------------');
                 console.log('DAEMON:' + data.daemon_network_state);
                 console.log(data);
-                _this.variablesService.exp_med_ts = data['expiration_median_timestamp'] + 600 + 1;
+                // this.variablesService.exp_med_ts = data['expiration_median_timestamp'] + 600 + 1;
+                _this.variablesService.setExpMedTs(data['expiration_median_timestamp'] + 600 + 1);
                 _this.variablesService.last_build_available = data.last_build_available;
                 _this.variablesService.setHeightApp(data.height);
                 _this.ngZone.run(function () {
@@ -3143,6 +3151,22 @@ var AppComponent = /** @class */ (function () {
                     });
                 });
             }, 30000);
+            _this.expMedTsEvent = _this.variablesService.getExpMedTsEvent.subscribe(function (newTimestamp) {
+                _this.variablesService.wallets.forEach(function (wallet) {
+                    wallet.contracts.forEach(function (contract) {
+                        if (contract.state === 1 && contract.expiration_time <= newTimestamp) {
+                            contract.state = 110;
+                            contract.is_new = true;
+                            wallet.recountNewContracts();
+                        }
+                        else if (contract.state === 5 && contract.cancel_expiration_time <= newTimestamp) {
+                            contract.state = 130;
+                            contract.is_new = true;
+                            wallet.recountNewContracts();
+                        }
+                    });
+                });
+            });
             _this.backend.getAppData(function (status, data) {
                 if (data && Object.keys(data).length > 0) {
                     for (var key in data) {
@@ -3306,6 +3330,7 @@ var AppComponent = /** @class */ (function () {
         if (this.intervalUpdateContractsState) {
             clearInterval(this.intervalUpdateContractsState);
         }
+        this.expMedTsEvent.unsubscribe();
     };
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["ViewChild"])('allContextMenu'),

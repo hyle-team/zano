@@ -625,6 +625,10 @@ input[type='checkbox'].style-checkbox {
 
       .ng-value-container {
         padding: 0;
+
+        .ng-input {
+          top: auto;
+        }
       }
     }
 
