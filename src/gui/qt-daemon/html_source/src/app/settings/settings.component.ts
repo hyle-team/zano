@@ -1,7 +1,7 @@
 import {Component, NgZone, OnInit, Renderer2} from '@angular/core';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
-import {FormControl, FormGroup, Validators} from '@angular/forms';
+import {FormControl, FormGroup} from '@angular/forms';
 import {Location} from '@angular/common';
 
 @Component({
@@ -63,13 +63,16 @@ export class SettingsComponent implements OnInit {
     this.theme = this.variablesService.settings.theme;
     this.scale = this.variablesService.settings.scale;
     this.changeForm = new FormGroup({
-      password: new FormControl('', Validators.required),
-      new_password: new FormControl('', Validators.required),
-      new_confirmation: new FormControl('', Validators.required)
+      password: new FormControl(''),
+      new_password: new FormControl(''),
+      new_confirmation: new FormControl('')
     }, [(g: FormGroup) => {
       return g.get('new_password').value === g.get('new_confirmation').value ? null : {'confirm_mismatch': true};
     }, (g: FormGroup) => {
-      return g.get('password').value === this.variablesService.appPass ? null : {'pass_mismatch': true};
+      if (this.variablesService.appPass) {
+        return g.get('password').value === this.variablesService.appPass ? null : {'pass_mismatch': true};
+      }
+      return null;
     }]);
   }
 
@@ -99,18 +102,19 @@ export class SettingsComponent implements OnInit {
   onSubmitChangePass() {
     if (this.changeForm.valid) {
       this.variablesService.appPass = this.changeForm.get('new_password').value;
-      this.backend.storeSecureAppData((status, data) => {
-        if (status) {
-          this.changeForm.reset();
-        } else {
-          console.log(data);
-        }
-      });
+      if (this.variablesService.appPass) {
+        this.backend.storeSecureAppData();
+      } else {
+        this.backend.dropSecureAppData();
+      }
+      this.changeForm.reset();
     }
   }
 
   onLockChange() {
-    this.variablesService.restartCountdown();
+    if (this.variablesService.appLogin) {
+      this.variablesService.restartCountdown();
+    }
     this.backend.storeAppData();
   }
 

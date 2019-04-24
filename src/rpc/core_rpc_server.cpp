@@ -193,6 +193,8 @@ namespace currency
       res.performance_data.etc_stuff_6 = pd.etc_stuff_6.get_avg();
       res.performance_data.insert_time_4 = pd.insert_time_4.get_avg();
       res.performance_data.raise_block_core_event = pd.raise_block_core_event.get_avg();
+      res.performance_data.target_calculating_enum_blocks = pd.target_calculating_enum_blocks.get_avg();
+      res.performance_data.target_calculating_calc = pd.target_calculating_calc.get_avg();
       //tx processing zone
       res.performance_data.tx_check_inputs_time = pd.tx_check_inputs_time.get_avg();
       res.performance_data.tx_add_one_tx_time = pd.tx_add_one_tx_time.get_avg();
@@ -802,7 +804,7 @@ namespace currency
       LOG_ERROR("Failed to create block template");
       return false;
     }
-    res.difficulty = dt.convert_to<uint64_t>();
+    res.difficulty = dt.convert_to<std::string>();
     blobdata block_blob = t_serializable_object_to_blob(b);
 
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
@@ -891,7 +893,7 @@ namespace currency
     response.height = get_block_height(blk);
     response.depth = m_core.get_current_blockchain_size() - response.height - 1;
     response.hash = string_tools::pod_to_hex(get_block_hash(blk));
-    response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<uint64_t>();
+    response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<std::string>();
     response.reward = get_block_reward(blk);
     return true;
   }
@@ -1110,7 +1112,7 @@ namespace currency
     set_session_blob(job_id, b);
     job.blob = string_tools::buff_to_hex_nodelimer(currency::get_block_hashing_blob(b));
     //TODO: set up share difficulty here!
-    job.difficulty = std::to_string(bt_res.difficulty); //difficulty leaved as string field since it will be refactored into 128 bit format
+    job.difficulty = bt_res.difficulty; //difficulty leaved as string field since it will be refactored into 128 bit format
     job.job_id = "SOME_JOB_ID";
     get_current_hi(job.prev_hi);
     return true;

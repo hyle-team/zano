@@ -13,6 +13,7 @@ export class VariablesService {
 
   public digits = 12;
   public appPass = '';
+  public appLogin = false;
   public moneyEquivalent = 0;
   public defaultTheme = 'dark';
   public defaultCurrency = 'ZAN';
@@ -35,7 +36,8 @@ export class VariablesService {
     language: 'en',
     default_path: '/',
     viewedContracts: [],
-    notViewedContracts: []
+    notViewedContracts: [],
+    wallets: []
   };
 
   public wallets: Array<Wallet> = [];
@@ -46,6 +48,7 @@ export class VariablesService {
   public maxWalletNameLength = 25;
   public maxCommentLength = 255;
 
+  getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);
   getRefreshStackingEvent = new BehaviorSubject(null);
   getAliasChangedEvent = new BehaviorSubject(null);
@@ -56,6 +59,7 @@ export class VariablesService {
       this.ngZone.run(() => {
         this.idle.stop();
         this.appPass = '';
+        this.appLogin = false;
         this.router.navigate(['/login'], {queryParams: {type: 'auth'}});
       });
     });
@@ -65,6 +69,13 @@ export class VariablesService {
   public pasteSelectContextMenu: ContextMenuComponent;
 
   constructor(private router: Router, private ngZone: NgZone, private contextMenuService: ContextMenuService) {
+  }
+
+  setExpMedTs(timestamp: number) {
+    if (timestamp !== this.exp_med_ts) {
+      this.exp_med_ts = timestamp;
+      this.getExpMedTsEvent.next(timestamp);
+    }
   }
 
   setHeightApp(height: number) {

@@ -459,6 +459,8 @@ namespace currency
     uint64_t etc_stuff_6;
     uint64_t insert_time_4;
     uint64_t raise_block_core_event;
+    uint64_t target_calculating_enum_blocks;
+    uint64_t target_calculating_calc;
 
     //tx processing zone
     uint64_t tx_check_inputs_time;
@@ -505,7 +507,8 @@ namespace currency
       KV_SERIALIZE(etc_stuff_6)
       KV_SERIALIZE(insert_time_4)
       KV_SERIALIZE(raise_block_core_event)
-
+      KV_SERIALIZE(target_calculating_enum_blocks)
+      KV_SERIALIZE(target_calculating_calc)
       //tx processing zone
       KV_SERIALIZE(tx_check_inputs_time)
       KV_SERIALIZE(tx_add_one_tx_time)
@@ -788,7 +791,7 @@ namespace currency
 
     struct response
     {
-      uint64_t difficulty;
+      std::string difficulty;
       uint64_t height;
       crypto::hash seed;
       blobdata blocktemplate_blob;
@@ -831,7 +834,7 @@ namespace currency
       uint64_t height;
       uint64_t depth;
       std::string hash;
-      difficulty_type difficulty;
+      std::string difficulty;
       uint64_t reward;
       
       BEGIN_KV_SERIALIZE_MAP()

@@ -589,7 +589,7 @@ bool transactions_flow_test(
     if (action == TRANSACTIONS_FLOW_TESTACTION_MIXED)
     {
       current_action++;
-      if (current_action > TRANSACTIONS_FLOW_TESTACTION_OFFERS)
+      if (current_action >= TRANSACTIONS_FLOW_TESTACTION_OFFERS)
         current_action = TRANSACTIONS_FLOW_TESTACTION_DEFAULT;
     }
   }

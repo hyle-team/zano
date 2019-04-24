@@ -33,6 +33,13 @@ button {
         background-color: themed(disabledButtonHoverColor);
       }
     }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(disabledButtonFocusColor);
+      }
+    }
   }
 
   &.blue-button:not(:disabled) {
@@ -54,6 +61,13 @@ button {
         background-color: themed(blueButtonHoverColor);
       }
     }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(blueButtonFocusColor);
+      }
+    }
   }
 
   &.green-button:not(:disabled) {
@@ -69,6 +83,13 @@ button {
         background-color: themed(greenButtonHoverColor);
       }
     }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(greenButtonFocusColor);
+      }
+    }
   }
 
   &.turquoise-button:not(:disabled) {
@@ -82,6 +103,13 @@ button {
 
       @include themify($themes) {
         background-color: themed(turquoiseButtonHoverColor);
+      }
+    }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(turquoiseButtonFocusColor);
       }
     }
   }
@@ -597,6 +625,10 @@ input[type='checkbox'].style-checkbox {
 
       .ng-value-container {
         padding: 0;
+
+        .ng-input {
+          top: auto;
+        }
       }
     }
 
@@ -749,6 +781,17 @@ app-progress-container {
           background-color: themed(progressBarFullBackgroundColor);
         }
       }
+    }
+  }
+}
+
+app-open-wallet-modal {
+
+  .modal {
+
+    @include themify($themes) {
+      background: themed(modalBackground);
+      color: themed(mainTextColor);
     }
   }
 }

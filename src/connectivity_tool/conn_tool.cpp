@@ -567,6 +567,8 @@ bool handle_get_daemon_info(po::variables_map& vm)
     << "longhash_calculating_time_3: " << res.performance_data.longhash_calculating_time_3 << ENDL
     << "raise_block_core_event: " << res.performance_data.raise_block_core_event << ENDL
     << "target_calculating_time_2: " << res.performance_data.target_calculating_time_2 << ENDL
+    << "target_calculating_enum_blocks: " << res.performance_data.target_calculating_enum_blocks << ENDL
+    << "target_calculating_calc: " << res.performance_data.target_calculating_calc << ENDL
     << "all_txs_insert_time_5: " << res.performance_data.all_txs_insert_time_5 << ENDL
     << "tx_add_one_tx_time: " << res.performance_data.tx_add_one_tx_time << ENDL
     << "tx_check_inputs_time: " << res.performance_data.tx_check_inputs_time << ENDL

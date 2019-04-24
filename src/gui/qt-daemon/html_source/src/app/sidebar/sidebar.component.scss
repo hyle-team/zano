@@ -72,6 +72,25 @@
           line-height: 3.4rem;
           margin-bottom: 0.7rem;
 
+          .name {
+            display: flex;
+            align-items: center;
+            flex-shrink: 1;
+            line-height: 1.6rem;
+            padding-right: 1rem;
+            overflow: hidden;
+
+            span {
+              text-overflow: ellipsis;
+              overflow: hidden;
+              white-space: nowrap;
+            }
+          }
+
+          .price {
+            flex-shrink: 0;
+          }
+
           .icon {
             margin-left: 0.5rem;
             width: 1.2rem;

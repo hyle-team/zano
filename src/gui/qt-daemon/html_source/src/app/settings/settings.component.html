@@ -54,14 +54,9 @@
 
       <span class="master-password-title">{{ 'SETTINGS.MASTER_PASSWORD.TITLE' | translate }}</span>
 
-      <div class="input-block">
+      <div class="input-block" *ngIf="variablesService.appPass">
         <label for="old-password">{{ 'SETTINGS.MASTER_PASSWORD.OLD' | translate }}</label>
         <input type="password" id="old-password" formControlName="password" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
-        <div class="error-block" *ngIf="changeForm.controls['password'].invalid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched)">
-          <div *ngIf="changeForm.controls['password'].errors['required']">
-            {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}
-          </div>
-        </div>
         <div class="error-block" *ngIf="changeForm.invalid && changeForm.controls['password'].valid && (changeForm.controls['password'].dirty || changeForm.controls['password'].touched) && changeForm.errors && changeForm.errors.pass_mismatch">
           {{ 'SETTINGS.FORM_ERRORS.PASS_NOT_MATCH' | translate }}
         </div>
@@ -70,21 +65,11 @@
       <div class="input-block">
         <label for="new-password">{{ 'SETTINGS.MASTER_PASSWORD.NEW' | translate }}</label>
         <input type="password" id="new-password" formControlName="new_password" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
-        <div class="error-block" *ngIf="changeForm.controls['new_password'].invalid && (changeForm.controls['new_password'].dirty || changeForm.controls['new_password'].touched)">
-          <div *ngIf="changeForm.controls['new_password'].errors['required']">
-            {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}
-          </div>
-        </div>
       </div>
 
       <div class="input-block">
         <label for="confirm-password">{{ 'SETTINGS.MASTER_PASSWORD.CONFIRM' | translate }}</label>
         <input type="password" id="confirm-password" formControlName="new_confirmation" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
-        <div class="error-block" *ngIf="changeForm.controls['new_confirmation'].invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched)">
-          <div *ngIf="changeForm.controls['new_confirmation'].errors['required']">
-            {{ 'SETTINGS.FORM_ERRORS.PASS_REQUIRED' | translate }}
-          </div>
-        </div>
         <div class="error-block" *ngIf="changeForm.invalid && (changeForm.controls['new_confirmation'].dirty || changeForm.controls['new_confirmation'].touched) && changeForm.errors && changeForm.errors.confirm_mismatch">
           {{ 'SETTINGS.FORM_ERRORS.CONFIRM_NOT_MATCH' | translate }}
         </div>

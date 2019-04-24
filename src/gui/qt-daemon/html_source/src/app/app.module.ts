@@ -10,6 +10,7 @@ import { SidebarComponent } from './sidebar/sidebar.component';
 import { MainComponent } from './main/main.component';
 import { CreateWalletComponent } from './create-wallet/create-wallet.component';
 import { OpenWalletComponent } from './open-wallet/open-wallet.component';
+import { OpenWalletModalComponent } from './open-wallet-modal/open-wallet-modal.component';
 import { RestoreWalletComponent } from './restore-wallet/restore-wallet.component';
 import { SeedPhraseComponent } from './seed-phrase/seed-phrase.component';
 import { WalletDetailsComponent } from './wallet-details/wallet-details.component';
@@ -73,6 +74,7 @@ Highcharts.setOptions({
     MainComponent,
     CreateWalletComponent,
     OpenWalletComponent,
+    OpenWalletModalComponent,
     RestoreWalletComponent,
     SeedPhraseComponent,
     WalletDetailsComponent,
