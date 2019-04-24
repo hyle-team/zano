@@ -905,7 +905,6 @@ bool simple_wallet::get_transfer_info(const std::vector<std::string> &args)
     {
       fail_msg_writer() << "failed to find transfer info by key_image";
       return true;
-
     }
   }
   std::string json_details = epee::serialization::store_t_to_json(td);

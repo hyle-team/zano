@@ -15,6 +15,7 @@
 #include "crypto/hash.h"
 #include "warnings.h"
 #include "currency_core/bc_offers_service.h"
+#include "serialization/binary_utils.h"
 
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4100)
@@ -64,6 +65,8 @@ public:
     m_cmd_binder.set_handler("rescan_aliases", boost::bind(&daemon_cmmands_handler::rescan_aliases, this, _1), "Debug function");
     m_cmd_binder.set_handler("forecast_difficulty", boost::bind(&daemon_cmmands_handler::forecast_difficulty, this, _1), "Prints PoW and PoS difficulties for as many future blocks as possible based on current conditions");
     m_cmd_binder.set_handler("print_deadlock_guard", boost::bind(&daemon_cmmands_handler::print_deadlock_guard, this, _1), "Print all threads which is blocked or involved in mutex ownership");
+    m_cmd_binder.set_handler("print_block_from_hex_blob", boost::bind(&daemon_cmmands_handler::print_block_from_hex_blob, this, _1), "Unserialize block from hex binary data to json-like representation");
+    m_cmd_binder.set_handler("print_tx_from_hex_blob", boost::bind(&daemon_cmmands_handler::print_tx_from_hex_blob, this, _1), "Unserialize transaction from hex binary data to json-like representation");
   }
 
   bool start_handling()
@@ -353,6 +356,101 @@ private:
     LOG_PRINT_GREEN("Storing text to blockchain_with_tx.txt....", LOG_LEVEL_0);
     m_srv.get_payload_object().get_core().get_blockchain_storage().print_blockchain_with_tx(start_index, end_block_parametr);
     LOG_PRINT_GREEN("Done", LOG_LEVEL_0);
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  template<class t_item>
+  bool print_t_from_hex_blob(const std::string& item_hex_blob)
+  {
+    std::string bin_buff;
+    bool res = epee::string_tools::parse_hexstr_to_binbuff(item_hex_blob, bin_buff);
+    CHECK_AND_ASSERT_MES(res, false, "failed to parse hex");
+
+    t_item item = AUTO_VAL_INIT(item);
+
+    res = ::serialization::parse_binary(bin_buff, item);
+    CHECK_AND_ASSERT_MES(res, false, "failed to parse binary");
+
+    
+    LOG_PRINT_L0("OBJECT " << typeid(item).name() << ": " << ENDL << obj_to_json_str(item));
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_block_from_hex_blob(const std::vector<std::string>& args)
+  {
+    if (!args.size())
+    {
+      std::cout << "need block blob parameter" << ENDL;
+      return false;
+    }
+
+    print_t_from_hex_blob<currency::block>(args[0]);
+
+    LOG_PRINT_GREEN("Done", LOG_LEVEL_0);
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_tx_from_hex_blob(const std::vector<std::string>& args)
+  {
+    if (!args.size())
+    {
+      std::cout << "need block blob parameter" << ENDL;
+      return false;
+    }
+
+    print_t_from_hex_blob<currency::transaction>(args[0]);
+
+    LOG_PRINT_GREEN("Done", LOG_LEVEL_0);
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  struct tx_pool_exported_blobs
+  {
+    std::list<currency::tx_rpc_extended_info> all_txs_details;
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(all_txs_details)
+    END_KV_SERIALIZE_MAP()
+  };
+  //--------------------------------------------------------------------------------
+  bool export_tx_pool_to_json(const std::vector<std::string>& args)
+  {
+//     if (!args.size())
+//     {
+//       std::cout << "need block blob parameter" << ENDL;
+//       return false;
+//     }
+//     tx_pool_exported_blobs tx_pool_json;
+//     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
+//     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
+//     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
+// 
+//     bool r = file_io_utils::save_string_to_file(args[0], pool_state);
+//     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
+//     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() <<" transactions)");
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool import_tx_pool_to_json(const std::vector<std::string>& args)
+  {
+//     if (!args.size())
+//     {
+//       std::cout << "need block blob parameter" << ENDL;
+//       return false;
+//     }
+// 
+//     std::string buff;
+//     bool r = file_io_utils::load_file_to_string(args[0], buff);
+//     
+//     tx_pool_exported_blobs tx_pool_json;
+// 
+// 
+//     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
+//     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
+//     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
+// 
+// 
+//     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
+//     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() << " transactions)");
     return true;
   }
   //--------------------------------------------------------------------------------

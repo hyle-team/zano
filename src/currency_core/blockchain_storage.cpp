@@ -3459,7 +3459,10 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
     if (in.type() == typeid(txin_to_key))
     {
       if (have_tx_keyimg_as_spent(boost::get<const txin_to_key>(in).k_image))
+      {
         return true;
+      }
+        
     }
     else if (in.type() == typeid(txin_multisig))
     {
