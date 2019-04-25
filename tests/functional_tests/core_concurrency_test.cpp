@@ -28,7 +28,7 @@ std::atomic<int64_t> test_core_time::m_time_shift;
 
 #define TESTS_DEFAULT_FEE TX_DEFAULT_FEE
 
-static std::atomic<uint64_t> s_generated_money_total(0);
+static std::atomic<uint64_t> s_generated_money_total(0); // TODO: consiger changing to boost::multiprecision::uint128_t
 static size_t s_wallets_total_count           = 10; // total number of wallet that will be randomly used to generate transactions
 //static size_t s_althchains_minimum_height     = 150; // height at which althchaining is started
 static size_t s_tx_generation_minimum_height  = 100; // height at which tx generation is started
@@ -43,7 +43,7 @@ typedef std::vector<std::shared_ptr<tools::wallet2>> cct_wallets_t;
 static const std::vector<currency::extra_v> empty_extra;
 static const std::vector<currency::attachment_v> empty_attachment;
 
-bool create_block_template_manually(const currency::block& prev_block, uint64_t already_generated_coins, const std::vector<const currency::transaction*>& txs, const currency::account_public_address& miner_addr, currency::block& result)
+bool create_block_template_manually(const currency::block& prev_block, boost::multiprecision::uint128_t already_generated_coins, const std::vector<const currency::transaction*>& txs, const currency::account_public_address& miner_addr, currency::block& result)
 {
   result.flags = 0;
   result.major_version = CURRENT_BLOCK_MAJOR_VERSION;
@@ -101,17 +101,14 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
 
     const currency::account_public_address& miner_addr = wallets[random_in_range(0, wallets.size() - 1)]->get_account().get_public_address();
     currency::block b = AUTO_VAL_INIT(b);
-    currency::scratchpad_keeper sk;
-    crypto::hash seed = currency::null_hash;
 
-    sk.generate(seed, height);
     if (is_in_main_chain)
     {
       blobdata ex_nonce;
       wide_difficulty_type diff = 0;
       if (prev_block.height != 0)
         test_core_time::adjust(prev_block.bl.timestamp + DIFFICULTY_POW_TARGET);
-      r = bcs.create_block_template(b, seed, miner_addr, diff, height, ex_nonce);
+      r = bcs.create_block_template(b, miner_addr, diff, height, ex_nonce);
       CHECK_AND_ASSERT_MES(r, false, "create_block_template failed");
     }
     else
@@ -145,7 +142,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
     test_core_time::adjust(b.timestamp);
 
     currency::wide_difficulty_type diff = 0;
-    r = currency::miner::find_nonce_for_given_block(b, diff, height, seed, sk);
+    r = currency::miner::find_nonce_for_given_block(b, diff, height);
     CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
     currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -575,7 +572,7 @@ bool core_concurrency_test(boost::program_options::variables_map& vm, size_t wth
       << replay_time_ms / (events.empty() ? 1 : events.size()) << " ms per event, " << events.size() << " events total", LOG_LEVEL_0);
 
     core_state_after_playback.fill(c);
-    uint64_t already_generated_coins = 0;
+    boost::multiprecision::uint128_t already_generated_coins = 0;
     {
       block_extended_info bei = AUTO_VAL_INIT(bei);
       c.get_blockchain_storage().get_block_extended_info_by_hash(c.get_blockchain_storage().get_top_block_id(), bei);
@@ -586,7 +583,7 @@ bool core_concurrency_test(boost::program_options::variables_map& vm, size_t wth
     if (rthreads > 0)
     {
       s_generated_money_total = s_generated_money_total / rthreads;
-      LOG_PRINT("Generated coins: " << print_money(already_generated_coins) << ", counted by readers (with fee): " << print_money(s_generated_money_total), LOG_LEVEL_0);
+      LOG_PRINT("Generated coins: " << print_money(already_generated_coins) << ", counted by readers (with fee): " << print_money(s_generated_money_total.load()), LOG_LEVEL_0);
     }
 
     LOG_PRINT("Writers' stats:", LOG_LEVEL_0);

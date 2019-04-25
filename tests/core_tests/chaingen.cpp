@@ -693,15 +693,8 @@ bool test_generator::find_nounce(currency::block& blk, std::vector<const block_i
 {
   if(height != blocks.size())
     throw std::runtime_error("wrong height in find_nounce");
-
-  crypto::hash seed = currency::null_hash;
-  currency::get_seed_for_scratchpad_cb(height, seed, [&](uint64_t index) -> crypto::hash
-  {
-    return currency::get_block_hash(blocks[index]->b);  
-  });
-
   
-  return miner::find_nonce_for_given_block(blk, dif, height, seed, m_scratchpad);
+  return miner::find_nonce_for_given_block(blk, dif, height);
 }
 
 bool test_generator::construct_genesis_block(currency::block& blk, const currency::account_base& miner_acc, uint64_t timestamp)
@@ -894,7 +887,7 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
     if (ai.m_sign.empty())
     {
       // if no alias update - reduce block reward by alias cost
-      uint64_t alias_cost = get_alias_coast_from_fee(ai.m_alias, TX_DEFAULT_FEE);
+      uint64_t alias_cost = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
       uint64_t block_reward = get_outs_money_amount(miner_tx);
       CHECK_AND_ASSERT_MES(alias_cost <= block_reward, false, "Alias '" << ai.m_alias << "' can't be registered via block coinbase, because it's price: " << print_money(alias_cost) << " is greater than block reward: " << print_money(block_reward));
       block_reward -= alias_cost;
@@ -1258,9 +1251,9 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
   uint64_t source_amount_found = 0;
   bool r = fill_tx_sources(sources, events, blk_head, from, amount + fee, nmix, std::vector<currency::tx_source_entry>(), check_for_spends, check_for_unlocktime, use_ref_by_id, &source_amount_found);
   CHECK_AND_ASSERT_MES(r, false, "couldn't fill transaction sources: " << ENDL <<
-    "  required:      " << print_money(amount + fee) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * (amount + fee) / TX_DEFAULT_FEE) << " x TX_DEFAULT_FEE" << ENDL <<
-    "  unspent coins: " << print_money(source_amount_found) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * source_amount_found / TX_DEFAULT_FEE) << " x TX_DEFAULT_FEE" << ENDL <<
-    "  lack of coins: " << print_money(amount + fee - source_amount_found) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * (amount + fee - source_amount_found) / TX_DEFAULT_FEE) << " x TX_DEFAULT_FEE" 
+    "  required:      " << print_money(amount + fee) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * (amount + fee) / TESTS_DEFAULT_FEE) << " x TESTS_DEFAULT_FEE" << ENDL <<
+    "  unspent coins: " << print_money(source_amount_found) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * source_amount_found / TESTS_DEFAULT_FEE) << " x TESTS_DEFAULT_FEE" << ENDL <<
+    "  lack of coins: " << print_money(amount + fee - source_amount_found) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * (amount + fee - source_amount_found) / TESTS_DEFAULT_FEE) << " x TESTS_DEFAULT_FEE" 
   );
 
   uint64_t inputs_amount = get_inputs_amount(sources);

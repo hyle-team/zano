@@ -7,14 +7,9 @@ graph_title performance_block
 graph_vlabel microseconds
 graph_category daemon
 
-block_processing_time_0.label block_processing_time_0
-block_processing_time_0.draw AREA
-
-block_processing_time_1.label block_processing_time_1
-block_processing_time_1.draw STACK
 
 etc_stuff_6.label etc_stuff_6
-etc_stuff_6.draw STACK
+etc_stuff_6.draw AREA
 
 insert_time_4.label insert_time_4
 insert_time_4.draw STACK
@@ -30,6 +25,13 @@ target_calculating_time_2.draw STACK
 
 all_txs_insert_time_5.label all_txs_insert_time_5
 all_txs_insert_time_5.draw STACK
+
+block_processing_time_1.label block_processing_time_1
+block_processing_time_1.draw LINE2
+
+
+block_processing_time_0.label block_processing_time_0
+block_processing_time_0.draw LINE2
 
 EOM
         exit 0;;
@@ -64,11 +66,10 @@ printf "$PARSED_RES\n"
 
 printf "target_calculating_time_2.value "
 PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep target_calculating_time_2 | cut -d ' ' -f2)"
+printf "$PARSED_RES\n"
 
 printf "all_txs_insert_time_5.value "
 PARSED_RES="$(printf "$CONN_TOOL_OUT" | grep all_txs_insert_time_5 | cut -d ' ' -f2)"
-
-
 printf "$PARSED_RES\n"
 
 

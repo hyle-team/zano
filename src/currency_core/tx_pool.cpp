@@ -757,16 +757,14 @@ namespace currency
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::on_tx_add(const transaction& tx, bool kept_by_block)
   {
-    if (!kept_by_block)
-      insert_key_images(tx, kept_by_block); // take into account only key images from txs that are not 'kept_by_block'
+    insert_key_images(tx, kept_by_block);
     insert_alias_info(tx);
     return true;
   }
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::on_tx_remove(const transaction& tx, bool kept_by_block)
   {
-    if (!kept_by_block)
-      remove_key_images(tx, kept_by_block); // take into account only key images from txs that are not 'kept_by_block'
+    remove_key_images(tx, kept_by_block);
     remove_alias_info(tx);
     return true;
   }
@@ -932,8 +930,11 @@ namespace currency
       }
     }
     //if we here, transaction seems valid, but, anyway, check for key_images collisions with blockchain, just to be sure
-    if(m_blockchain.have_tx_keyimges_as_spent(txd.tx))
+    if (m_blockchain.have_tx_keyimges_as_spent(txd.tx))
+    {
       return false;
+    }
+      
 
     if (!check_tx_multisig_ins_and_outs(txd.tx, false))
       return false;
@@ -1032,7 +1033,7 @@ namespace currency
   bool tx_memory_pool::fill_block_template(block &bl, 
     bool pos, 
     size_t median_size, 
-    uint64_t already_generated_coins, 
+    const boost::multiprecision::uint128_t& already_generated_coins,
     size_t &total_size, 
     uint64_t &fee, 
     uint64_t height)

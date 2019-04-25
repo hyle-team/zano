@@ -4,6 +4,7 @@
     "SETUP_CONFIRM_PASS": "Confirm the password",
     "MASTER_PASS": "Master password",
     "BUTTON_NEXT": "Next",
+    "BUTTON_SKIP": "Skip",
     "INCORRECT_PASSWORD": "Invalid password",
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Password is required.",
@@ -15,7 +16,7 @@
     "BACK": "Go back"
   },
   "BREADCRUMBS": {
-    "ADD_WALLET": "Add new wallet",
+    "ADD_WALLET": "Add wallet",
     "CREATE_WALLET": "Create new wallet",
     "SAVE_PHRASE": "Save your seed phrase",
     "OPEN_WALLET": "Open existing wallet",
@@ -30,7 +31,7 @@
   },
   "SIDEBAR": {
     "TITLE": "Wallets",
-    "ADD_NEW": "+ Add new",
+    "ADD_NEW": "+ Add",
     "ACCOUNT": {
       "STAKING": "Staking",
       "MESSAGES": "New offers/Messages",
@@ -68,6 +69,7 @@
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
       "NAME_DUPLICATE": "Name is duplicate.",
+      "MAX_LENGTH": "Maximum name length reached.",
       "CONFIRM_NOT_MATCH": "Confirm password not match."
     }
   },
@@ -80,7 +82,15 @@
     "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate."
+      "NAME_DUPLICATE": "Name is duplicate.",
+      "MAX_LENGTH": "Maximum name length reached."
+    },
+    "MODAL": {
+      "TITLE": "Type wallet password",
+      "LABEL": "Password to this wallet",
+      "OPEN": "Open wallet",
+      "SKIP": "Skip",
+      "NOT_FOUND": "Not found"
     }
   },
   "RESTORE_WALLET": {
@@ -95,6 +105,7 @@
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
       "NAME_DUPLICATE": "Name is duplicate.",
+      "MAX_LENGTH": "Maximum name length reached.",
       "CONFIRM_NOT_MATCH": "Confirm password not match.",
       "KEY_REQUIRED": "Key is required.",
       "KEY_NOT_VALID": "Key not valid."
@@ -104,11 +115,24 @@
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
     "BUTTON_CREATE_ACCOUNT" : "Create wallet"
   },
+  "PROGRESS": {
+    "ADD_WALLET": "Add wallet",
+    "SELECT_LOCATION": "Select wallet location",
+    "CREATE_WALLET": "Create new wallet",
+    "RESTORE_WALLET": "Restore from backup"
+  },
   "SETTINGS": {
     "TITLE": "Settings",
     "DARK_THEME": "Dark theme",
     "WHITE_THEME": "White theme",
     "GRAY_THEME": "Grey theme",
+    "APP_LOCK": {
+      "TITLE": "Lock app after:",
+      "TIME1": "5 min",
+      "TIME2": "15 min",
+      "TIME3": "1 hour",
+      "TIME4": "Never"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
       "OLD": "Old password",
@@ -145,10 +169,11 @@
     "LABEL_SEED_PHRASE": "Seed phrase",
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
     "BUTTON_SAVE": "Save",
-    "BUTTON_REMOVE": "Remove wallet",
+    "BUTTON_REMOVE": "Close wallet",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate."
+      "NAME_DUPLICATE": "Name is duplicate.",
+      "MAX_LENGTH": "Maximum name length reached."
     }
   },
   "ASSIGN_ALIAS": {
@@ -170,7 +195,8 @@
       "NAME_WRONG": "Alias has wrong name",
       "NAME_LENGTH": "The alias must be 6-25 characters long",
       "NAME_EXISTS": "Alias name already exists",
-      "NO_MONEY": "You do not have enough funds to assign this alias"
+      "NO_MONEY": "You do not have enough funds to assign this alias",
+      "MAX_LENGTH": "Maximum comment length reached"
     },
     "ONE_ALIAS": "You can create only one alias per wallet",
     "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
@@ -185,7 +211,8 @@
       "PLACEHOLDER": "Enter comment"
     },
     "FORM_ERRORS": {
-      "NO_MONEY": "You do not have enough funds to change the comment to this alias"
+      "NO_MONEY": "You do not have enough funds to change the comment to this alias",
+      "MAX_LENGTH": "Maximum comment length reached"
     },
     "COST": "Cost to edit alias {{value}} {{currency}}",
     "BUTTON_EDIT": "Edit",
@@ -202,7 +229,7 @@
     },
     "ADDRESS": {
       "LABEL": "The account to which the alias will be transferred",
-      "PLACEHOLDER": "Enter account number"
+      "PLACEHOLDER": "Enter wallet address"
     },
     "FORM_ERRORS": {
       "WRONG_ADDRESS": "No wallet with this account exists",
@@ -226,6 +253,7 @@
     "FORM_ERRORS": {
       "ADDRESS_REQUIRED": "Address is required.",
       "ADDRESS_NOT_VALID": "Address not valid.",
+      "ALIAS_NOT_VALID": "Alias not valid.",
       "AMOUNT_REQUIRED": "Amount is required.",
       "AMOUNT_ZERO": "Amount is zero.",
       "FEE_REQUIRED": "Fee is required.",
@@ -234,7 +262,7 @@
   },
   "HISTORY": {
     "STATUS": "Status",
-    "STATUS_TOOLTIP": "Approved {{current}}/{{total}}",
+    "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
     "SEND": "Send",
     "RECEIVED": "Received",
     "DATE": "Date",
@@ -336,6 +364,7 @@
     "AMOUNT": "Amount",
     "YOUR_DEPOSIT": "Your deposit",
     "SELLER_DEPOSIT": "Seller deposit",
+    "BUYER_DEPOSIT": "Buyer deposit",
     "SAME_AMOUNT": "Same amount",
     "COMMENT": "Comment",
     "DETAILS": "Additional details",
@@ -347,6 +376,7 @@
       "SELLER_NOT_VALID": "Seller not valid.",
       "AMOUNT_REQUIRED": "Amount is required.",
       "YOUR_DEPOSIT_REQUIRED": "Your deposit is required.",
+      "YOUR_DEPOSIT_TOO_SMALL": "Your deposit should be equal or greater than amount.",
       "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required.",
       "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract.",
       "COMMENT_MAXIMUM": "Maximum field length reached."
@@ -393,7 +423,13 @@
     "BUTTON_RECEIVED": "Item received (Transfer payment and return pledge to seller)",
     "BUTTON_CANCEL_BUYER": "Cancel contract (Return pledge)",
     "BUTTON_NOT_CANCEL": "Do not cancel (Item shipped)",
-    "BUTTON_CANCEL_SELLER": "Cancel contract (Return pledge)"
+    "BUTTON_CANCEL_SELLER": "Cancel contract (Return pledge)",
+    "HOUR": "hour",
+    "HOURS": "hours",
+    "CANCEL": "Cancel",
+    "NULLIFY_QUESTION": "Are you sure you want to nullify your pledge and the seller's pledge?",
+    "BUTTON_NULLIFY_SHORT": "Nullify",
+    "WAITING_TIME_QUESTION": "Are you sure you want to cancel the contract?"
   },
   "MESSAGES": {
     "ADDRESS": "Address",
@@ -412,22 +448,33 @@
     "TITLE_PENDING": "Pending",
     "TITLE_TOTAL": "Total",
     "TITLE_PERIOD": "Time period:",
-    "DAY": "1 day",
-    "WEEK": "1 week",
-    "MONTH": "1 month",
-    "YEAR": "1 year",
-    "ALL": "All",
+    "PERIOD": {
+      "WEEK1": "1 week",
+      "WEEK2": "2 week",
+      "MONTH1": "1 month",
+      "MONTH3": "3 month",
+      "MONTH6": "6 month",
+      "YEAR": "1 year",
+      "ALL": "All"
+    },
+    "TITLE_GROUP": "Group:",
+    "GROUP": {
+      "DAY": "day",
+      "WEEK": "week",
+      "MONTH": "month"
+    },
     "SWITCH": {
       "ON": "ON",
       "OFF": "OFF"
     }
   },
   "ERRORS": {
+    "NO_MONEY": "Not enough money",
     "NOT_ENOUGH_MONEY": "Insufficient funds in account",
     "CORE_BUSY": "Internal error (core is busy)",
     "DAEMON_BUSY": "Internal error: deamon is busy",
     "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
-    "NOT_ENOUGH_OUTPUTS_TO_MIX": "For the sake of security, mixed transaction will take several days",
+    "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",
     "TRANSACTION_IS_TO_BIG": "Transaction exceeds network limit, send required amount with multiple transactions",
     "TRANSFER_ATTEMPT": "There is no connection to Zano network",
     "ACCESS_DENIED": "Access denied",

@@ -316,6 +316,7 @@ DISABLE_VS_WARNINGS(4355)
       send_guard.unlock();//manual unlock
       LOG_ERROR("send to [" << print_connection_context_short(context) << ", (" << (void*)this << ")] que size is more than ABSTRACT_SERVER_SEND_QUE_MAX_COUNT(" << ABSTRACT_SERVER_SEND_QUE_MAX_COUNT << "), shutting down connection");
       close();
+      shutdown(); 
       return false;
     }
 
@@ -351,6 +352,8 @@ DISABLE_VS_WARNINGS(4355)
   template<class t_protocol_handler>
   bool connection<t_protocol_handler>::shutdown()
   {
+    if (m_was_shutdown)
+      return true;
     // Initiate graceful connection closure.
     boost::system::error_code ignored_ec;
     socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);

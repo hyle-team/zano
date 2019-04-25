@@ -79,7 +79,7 @@ export class Wallet {
       item.sortFee = new BigNumber(0);
     } else if ((item.hasOwnProperty('contract') && (item.contract[0].state === 3 || item.contract[0].state === 6 || item.contract[0].state === 601) && !item.contract[0].is_a)) {
       item.sortFee = item.fee.negated();
-      item.sortAmount = item.amount.negated();
+      item.sortAmount = item.amount;
     } else {
       if (!item.is_income) {
         item.sortFee = item.fee.negated();
@@ -119,7 +119,7 @@ export class Wallet {
           }
         }
         if (!exists) {
-          if (this.history.length && items[i].timestamp > this.history[0].timestamp) {
+          if (this.history.length && items[i].timestamp >= this.history[0].timestamp) {
             this.history.unshift(this.prepareHistoryItem(items[i]));
           } else {
             this.history.push(this.prepareHistoryItem(items[i]));

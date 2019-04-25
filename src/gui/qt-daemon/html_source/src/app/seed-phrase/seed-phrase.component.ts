@@ -1,7 +1,9 @@
 import {Component, NgZone, OnDestroy, OnInit} from '@angular/core';
+import {Location} from '@angular/common';
 import {BackendService} from '../_helpers/services/backend.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {ModalService} from '../_helpers/services/modal.service';
 
 @Component({
   selector: 'app-seed-phrase',
@@ -17,8 +19,10 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
+    private location: Location,
     private backend: BackendService,
     private variablesService: VariablesService,
+    private modalService: ModalService,
     private ngZone: NgZone
   ) {}
 
@@ -48,9 +52,9 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
       this.backend.runWallet(this.wallet_id, (run_status, run_data) => {
         if (run_status) {
           this.variablesService.wallets.push(this.variablesService.opening_wallet);
-          this.backend.storeSecureAppData((status, data) => {
-            console.log('Store App Data', status, data);
-          });
+          if (this.variablesService.appPass) {
+            this.backend.storeSecureAppData();
+          }
           this.ngZone.run(() => {
             this.router.navigate(['/wallet/' + this.wallet_id]);
           });
@@ -60,6 +64,7 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
       });
     } else {
       this.variablesService.opening_wallet = null;
+      this.modalService.prepareModal('error', 'OPEN_WALLET.WITH_ADDRESS_ALREADY_OPEN');
       this.backend.closeWallet(this.wallet_id, (close_status, close_data) => {
         console.log(close_status, close_data);
         this.ngZone.run(() => {
@@ -67,6 +72,10 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
         });
       });
     }
+  }
+
+  back() {
+    this.location.back();
   }
 
   ngOnDestroy() {

@@ -17,8 +17,11 @@ import {ModalService} from './_helpers/services/modal.service';
 export class AppComponent implements OnInit, OnDestroy {
 
   intervalUpdateContractsState;
+  expMedTsEvent;
   onQuitRequest = false;
   firstOnlineState = false;
+
+  needOpenWallets = [];
 
   @ViewChild('allContextMenu') public allContextMenu: ContextMenuComponent;
   @ViewChild('onlyCopyContextMenu') public onlyCopyContextMenu: ContextMenuComponent;
@@ -75,7 +78,9 @@ export class AppComponent implements OnInit, OnDestroy {
           this.ngZone.run(() => {
             this.router.navigate(['/']);
           });
-          this.backend.storeSecureAppData(() => {
+          this.needOpenWallets = [];
+          this.variablesService.daemon_state = 5;
+          const saveFunction = () => {
             this.backend.storeAppData(() => {
               const recursionCloseWallets = () => {
                 if (this.variablesService.wallets.length) {
@@ -90,7 +95,14 @@ export class AppComponent implements OnInit, OnDestroy {
               };
               recursionCloseWallets();
             });
-          });
+          };
+          if (this.variablesService.appPass) {
+            this.backend.storeSecureAppData(() => {
+              saveFunction();
+            });
+          } else {
+            saveFunction();
+          }
         }
         this.onQuitRequest = true;
       });
@@ -143,7 +155,8 @@ export class AppComponent implements OnInit, OnDestroy {
         console.log('----------------- update_daemon_state -----------------');
         console.log('DAEMON:' + data.daemon_network_state);
         console.log(data);
-        this.variablesService.exp_med_ts = data['expiration_median_timestamp'] + 600 + 1;
+        // this.variablesService.exp_med_ts = data['expiration_median_timestamp'] + 600 + 1;
+        this.variablesService.setExpMedTs(data['expiration_median_timestamp'] + 600 + 1);
         this.variablesService.last_build_available = data.last_build_available;
         this.variablesService.setHeightApp(data.height);
 
@@ -385,7 +398,8 @@ export class AppComponent implements OnInit, OnDestroy {
           for (let i = 0, length = data.events.length; i < length; i++) {
 
             switch (data.events[i].method) {
-              case 'CORE_EVENT_BLOCK_ADDED': break;
+              case 'CORE_EVENT_BLOCK_ADDED':
+                break;
               case 'CORE_EVENT_ADD_ALIAS':
                 if (this.variablesService.aliasesChecked[data.events[i].details.address] != null) {
                   this.variablesService.aliasesChecked[data.events[i].details.address]['name'] = '@' + data.events[i].details.alias;
@@ -438,7 +452,8 @@ export class AppComponent implements OnInit, OnDestroy {
                 }
                 this.variablesService.changeAliases();
                 break;
-              default: break;
+              default:
+                break;
             }
           }
         }
@@ -459,6 +474,22 @@ export class AppComponent implements OnInit, OnDestroy {
         });
       }, 30000);
 
+      this.expMedTsEvent = this.variablesService.getExpMedTsEvent.subscribe((newTimestamp: number) => {
+        this.variablesService.wallets.forEach((wallet) => {
+          wallet.contracts.forEach((contract) => {
+            if (contract.state === 1 && contract.expiration_time <= newTimestamp) {
+              contract.state = 110;
+              contract.is_new = true;
+              wallet.recountNewContracts();
+            } else if (contract.state === 5 && contract.cancel_expiration_time <= newTimestamp) {
+              contract.state = 130;
+              contract.is_new = true;
+              wallet.recountNewContracts();
+            }
+          });
+        });
+      });
+
 
       this.backend.getAppData((status, data) => {
         if (data && Object.keys(data).length > 0) {
@@ -471,6 +502,9 @@ export class AppComponent implements OnInit, OnDestroy {
             this.renderer.addClass(document.body, 'theme-' + this.variablesService.settings.theme);
           } else {
             this.renderer.addClass(document.body, 'theme-' + this.variablesService.defaultTheme);
+          }
+          if (this.variablesService.settings.hasOwnProperty('scale') && [7.5, 10, 12.5, 15].indexOf(this.variablesService.settings.scale) !== -1) {
+            this.renderer.setStyle(document.documentElement, 'font-size', this.variablesService.settings.scale + 'px');
           }
         } else {
           this.variablesService.settings.theme = this.variablesService.defaultTheme;
@@ -486,9 +520,17 @@ export class AppComponent implements OnInit, OnDestroy {
                 this.router.navigate(['/login'], {queryParams: {type: 'auth'}});
               });
             } else {
-              this.ngZone.run(() => {
-                this.router.navigate(['/login'], {queryParams: {type: 'reg'}});
-              });
+              if (Object.keys(data).length !== 0) {
+                this.needOpenWallets = JSON.parse(JSON.stringify(this.variablesService.settings.wallets));
+                this.ngZone.run(() => {
+                  this.variablesService.appLogin = true;
+                  this.router.navigate(['/']);
+                });
+              } else {
+                this.ngZone.run(() => {
+                  this.router.navigate(['/login'], {queryParams: {type: 'reg'}});
+                });
+              }
             }
           });
         }
@@ -517,6 +559,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getAliases() {
     this.backend.getAllAliases((status, data, error) => {
+
+      console.warn(error);
+
       if (error === 'CORE_BUSY') {
         window.setTimeout(() => {
           this.getAliases();
@@ -524,6 +569,9 @@ export class AppComponent implements OnInit, OnDestroy {
       } else if (error === 'OVERFLOW') {
         this.variablesService.aliases = [];
         this.variablesService.enableAliasSearch = false;
+        this.variablesService.wallets.forEach(wallet => {
+          wallet.alias = this.backend.getWalletAlias(wallet.address);
+        });
       } else {
         this.variablesService.enableAliasSearch = true;
         if (data.aliases && data.aliases.length) {
@@ -540,10 +588,18 @@ export class AppComponent implements OnInit, OnDestroy {
             wallet.alias = this.backend.getWalletAlias(wallet.address);
           });
           this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
-            if (a.name.length > b.name.length) return 1;
-            if (a.name.length < b.name.length) return -1;
-            if (a.name > b.name) return 1;
-            if (a.name < b.name) return -1;
+            if (a.name.length > b.name.length) {
+              return 1;
+            }
+            if (a.name.length < b.name.length) {
+              return -1;
+            }
+            if (a.name > b.name) {
+              return 1;
+            }
+            if (a.name < b.name) {
+              return -1;
+            }
             return 0;
           });
           this.variablesService.changeAliases();
@@ -604,6 +660,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.intervalUpdateContractsState) {
       clearInterval(this.intervalUpdateContractsState);
     }
+    this.expMedTsEvent.unsubscribe();
   }
 
 }

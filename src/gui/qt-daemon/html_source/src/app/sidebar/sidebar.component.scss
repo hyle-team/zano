@@ -4,6 +4,7 @@
   justify-content: space-between;
   flex: 0 0 25rem;
   padding: 0 3rem 3rem;
+  max-width: 25rem;
 }
 
 .sidebar-accounts {
@@ -54,11 +55,15 @@
 
           .title {
             font-size: 1.5rem;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
           }
 
           .balance {
             font-size: 1.8rem;
             font-weight: 600;
+            white-space: nowrap;
           }
         }
 
@@ -66,6 +71,25 @@
           font-size: 1.3rem;
           line-height: 3.4rem;
           margin-bottom: 0.7rem;
+
+          .name {
+            display: flex;
+            align-items: center;
+            flex-shrink: 1;
+            line-height: 1.6rem;
+            padding-right: 1rem;
+            overflow: hidden;
+
+            span {
+              text-overflow: ellipsis;
+              overflow: hidden;
+              white-space: nowrap;
+            }
+          }
+
+          .price {
+            flex-shrink: 0;
+          }
 
           .icon {
             margin-left: 0.5rem;
@@ -99,9 +123,9 @@
             justify-content: center;
             border-radius: 1rem;
             font-size: 1rem;
-            min-width: 24px;
-            height: 16px;
-            padding: 0 5px;
+            min-width: 2.4rem;
+            height: 1.6rem;
+            padding: 0 0.5rem;
           }
         }
 
@@ -150,27 +174,32 @@
   flex: 0 0 auto;
   padding-bottom: 1rem;
 
-  button {
-    display: flex;
-    align-items: center;
-    background: transparent;
-    border: none;
-    line-height: 3rem;
-    outline: none;
-    padding: 0;
-    font-weight: 400;
+  .wrap-button {
+    margin: 0 -3rem;
 
-    .icon {
-      margin-right: 1.2rem;
-      width: 1.7rem;
-      height: 1.7rem;
+    button {
+      display: flex;
+      align-items: center;
+      background: transparent;
+      border: none;
+      font-weight: 400;
+      line-height: 3rem;
+      outline: none;
+      padding: 0 3rem;
+      width: 100%;
 
-      &.settings {
-        mask: url(../../assets/icons/settings.svg) no-repeat center;
-      }
+      .icon {
+        margin-right: 1.2rem;
+        width: 1.7rem;
+        height: 1.7rem;
 
-      &.logout {
-        mask: url(../../assets/icons/logout.svg) no-repeat center;
+        &.settings {
+          mask: url(../../assets/icons/settings.svg) no-repeat center;
+        }
+
+        &.logout {
+          mask: url(../../assets/icons/logout.svg) no-repeat center;
+        }
       }
     }
   }
@@ -235,8 +264,41 @@
     }
 
     .loading {
-      background-image: url("../../assets/images/loading.png");
+      animation: move 5s linear infinite;
+      background-image:
+        -webkit-gradient(
+            linear, 0 0, 100% 100%,
+            color-stop(.125, rgba(0, 0, 0, .15)), color-stop(.125, transparent),
+            color-stop(.250, transparent), color-stop(.250, rgba(0, 0, 0, .10)),
+            color-stop(.375, rgba(0, 0, 0, .10)), color-stop(.375, transparent),
+            color-stop(.500, transparent), color-stop(.500, rgba(0, 0, 0, .15)),
+            color-stop(.625, rgba(0, 0, 0, .15)), color-stop(.625, transparent),
+            color-stop(.750, transparent), color-stop(.750, rgba(0, 0, 0, .10)),
+            color-stop(.875, rgba(0, 0, 0, .10)), color-stop(.875, transparent),
+            to(transparent)
+        ),
+        -webkit-gradient(
+            linear, 0 100%, 100% 0,
+            color-stop(.125, rgba(0, 0, 0, .30)), color-stop(.125, transparent),
+            color-stop(.250, transparent), color-stop(.250, rgba(0, 0, 0, .25)),
+            color-stop(.375, rgba(0, 0, 0, .25)), color-stop(.375, transparent),
+            color-stop(.500, transparent), color-stop(.500, rgba(0, 0, 0, .30)),
+            color-stop(.625, rgba(0, 0, 0, .30)), color-stop(.625, transparent),
+            color-stop(.750, transparent), color-stop(.750, rgba(0, 0, 0, .25)),
+            color-stop(.875, rgba(0, 0, 0, .25)), color-stop(.875, transparent),
+            to(transparent)
+        );
+      background-size: 7rem 7rem;
       height: 100%;
     }
+  }
+}
+
+@keyframes move {
+  0% {
+    background-position: 100% -7rem;
+  }
+  100% {
+    background-position: 100% 7rem;
   }
 }

@@ -10,6 +10,7 @@ import { SidebarComponent } from './sidebar/sidebar.component';
 import { MainComponent } from './main/main.component';
 import { CreateWalletComponent } from './create-wallet/create-wallet.component';
 import { OpenWalletComponent } from './open-wallet/open-wallet.component';
+import { OpenWalletModalComponent } from './open-wallet-modal/open-wallet-modal.component';
 import { RestoreWalletComponent } from './restore-wallet/restore-wallet.component';
 import { SeedPhraseComponent } from './seed-phrase/seed-phrase.component';
 import { WalletDetailsComponent } from './wallet-details/wallet-details.component';
@@ -30,6 +31,7 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { NgSelectModule } from '@ng-select/ng-select';
 
 import { BackendService } from './_helpers/services/backend.service';
 import { ModalService } from './_helpers/services/modal.service';
@@ -51,14 +53,16 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
 
 
 import { ChartModule, HIGHCHARTS_MODULES, Highcharts} from 'angular-highcharts';
+import { ProgressContainerComponent } from './_helpers/directives/progress-container/progress-container.component';
+import { InputDisableSelectionDirective } from './_helpers/directives/input-disable-selection/input-disable-selection.directive';
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
 
 Highcharts.setOptions({
-  // global: {
-  //   useUTC: false
-  // }
+  global: {
+    useUTC: false
+  }
 });
 
 @NgModule({
@@ -70,6 +74,7 @@ Highcharts.setOptions({
     MainComponent,
     CreateWalletComponent,
     OpenWalletComponent,
+    OpenWalletModalComponent,
     RestoreWalletComponent,
     SeedPhraseComponent,
     WalletDetailsComponent,
@@ -94,7 +99,9 @@ Highcharts.setOptions({
     TooltipDirective,
     InputValidateDirective,
     ModalContainerComponent,
-    TransactionDetailsComponent
+    TransactionDetailsComponent,
+    ProgressContainerComponent,
+    InputDisableSelectionDirective
   ],
   imports: [
     BrowserModule,
@@ -109,6 +116,7 @@ Highcharts.setOptions({
     }),
     FormsModule,
     ReactiveFormsModule,
+    NgSelectModule,
     ChartModule,
     ContextMenuModule.forRoot()
   ],

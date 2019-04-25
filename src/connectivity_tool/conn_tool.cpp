@@ -56,6 +56,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_get_info_flags     = { "getinfo-flags-hex", "Set of bits for rpc-get-daemon-info", "", true };
   const command_line::arg_descriptor<int64_t>    arg_set_peer_log_level = { "set-peer-log-level", "Set log level for remote peer", 0, true };
   const command_line::arg_descriptor<uint64_t>    arg_download_peer_log =  { "download-peer-log", "Download log from remote peer (starting offset)", 0, true };
+  const command_line::arg_descriptor<bool>        arg_do_consloe_log    = { "do-console-log", "Tool generates debug console output(debug purposes)", "", true };
 }
 
 typedef COMMAND_REQUEST_STAT_INFO_T<t_currency_protocol_handler<core>::stat_info> COMMAND_REQUEST_STAT_INFO;
@@ -540,7 +541,7 @@ bool handle_get_daemon_info(po::variables_map& vm)
     << "pow_sequence_factor: " << res.pow_sequence_factor << ENDL
     << "last_pos_timestamp: " << res.last_pos_timestamp << ENDL
     << "last_pow_timestamp: " << res.last_pow_timestamp << ENDL
-    << "total_coins: " << res.total_coins / COIN << ENDL
+    << "total_coins: " << res.total_coins << ENDL
     << "pos_difficulty_in_coins: " << currency::wide_difficulty_type(res.pos_difficulty) / COIN << ENDL
     << "block_reward: " << res.block_reward << ENDL
     << "last_block_total_reward: " << res.last_block_total_reward << ENDL
@@ -566,6 +567,8 @@ bool handle_get_daemon_info(po::variables_map& vm)
     << "longhash_calculating_time_3: " << res.performance_data.longhash_calculating_time_3 << ENDL
     << "raise_block_core_event: " << res.performance_data.raise_block_core_event << ENDL
     << "target_calculating_time_2: " << res.performance_data.target_calculating_time_2 << ENDL
+    << "target_calculating_enum_blocks: " << res.performance_data.target_calculating_enum_blocks << ENDL
+    << "target_calculating_calc: " << res.performance_data.target_calculating_calc << ENDL
     << "all_txs_insert_time_5: " << res.performance_data.all_txs_insert_time_5 << ENDL
     << "tx_add_one_tx_time: " << res.performance_data.tx_add_one_tx_time << ENDL
     << "tx_check_inputs_time: " << res.performance_data.tx_check_inputs_time << ENDL
@@ -1004,7 +1007,7 @@ int main(int argc, char* argv[])
 {
 
   string_tools::set_module_name_and_folder(argv[0]);
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_4);
+  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
@@ -1036,6 +1039,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_log_journal_len);
   command_line::add_arg(desc_params, arg_set_peer_log_level);
   command_line::add_arg(desc_params, arg_download_peer_log);
+  command_line::add_arg(desc_params, arg_do_consloe_log);
+  
 
     
 
@@ -1059,6 +1064,11 @@ int main(int argc, char* argv[])
   });
   if (!r)
     return 1;
+  if (command_line::has_arg(vm, arg_do_consloe_log) && command_line::get_arg(vm, arg_do_consloe_log))
+  {
+    log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
+  }
+
 
   if (command_line::get_arg(vm, command_line::arg_version))
   {

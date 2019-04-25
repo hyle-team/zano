@@ -13,6 +13,7 @@ export class VariablesService {
 
   public digits = 12;
   public appPass = '';
+  public appLogin = false;
   public moneyEquivalent = 0;
   public defaultTheme = 'dark';
   public defaultCurrency = 'ZAN';
@@ -29,11 +30,14 @@ export class VariablesService {
   public default_fee_big = new BigNumber('10000000000');
 
   public settings = {
+    appLockTime: 15,
     theme: '',
+    scale: 10,
     language: 'en',
     default_path: '/',
     viewedContracts: [],
-    notViewedContracts: []
+    notViewedContracts: [],
+    wallets: []
   };
 
   public wallets: Array<Wallet> = [];
@@ -41,26 +45,37 @@ export class VariablesService {
   public aliases: any = [];
   public aliasesChecked: any = {};
   public enableAliasSearch = false;
+  public maxWalletNameLength = 25;
+  public maxCommentLength = 255;
 
+  getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);
   getRefreshStackingEvent = new BehaviorSubject(null);
   getAliasChangedEvent = new BehaviorSubject(null);
 
   public idle = new Idle()
     .whenNotInteractive()
-    .within(15)
     .do(() => {
       this.ngZone.run(() => {
         this.idle.stop();
         this.appPass = '';
+        this.appLogin = false;
         this.router.navigate(['/login'], {queryParams: {type: 'auth'}});
       });
     });
 
   public allContextMenu: ContextMenuComponent;
   public onlyCopyContextMenu: ContextMenuComponent;
+  public pasteSelectContextMenu: ContextMenuComponent;
 
   constructor(private router: Router, private ngZone: NgZone, private contextMenuService: ContextMenuService) {
+  }
+
+  setExpMedTs(timestamp: number) {
+    if (timestamp !== this.exp_med_ts) {
+      this.exp_med_ts = timestamp;
+      this.getExpMedTsEvent.next(timestamp);
+    }
   }
 
   setHeightApp(height: number) {
@@ -96,11 +111,15 @@ export class VariablesService {
   }
 
   startCountdown() {
-    this.idle.start();
+    this.idle.within(this.settings.appLockTime).start();
   }
 
   stopCountdown() {
     this.idle.stop();
+  }
+
+  restartCountdown() {
+    this.idle.within(this.settings.appLockTime).restart();
   }
 
   public onContextMenu($event: MouseEvent): void {
@@ -125,6 +144,25 @@ export class VariablesService {
     });
     $event.preventDefault();
     $event.stopPropagation();
+  }
+
+  public onContextMenuPasteSelect($event: MouseEvent): void {
+    $event.target['contextSelectionStart'] = $event.target['selectionStart'];
+    $event.target['contextSelectionEnd'] = $event.target['selectionEnd'];
+
+    console.warn($event.target);
+    console.warn($event.target['disabled']);
+
+
+    if ($event.target && ($event.target['nodeName'].toUpperCase() === 'TEXTAREA' || $event.target['nodeName'].toUpperCase() === 'INPUT') && !$event.target['readOnly']) {
+      this.contextMenuService.show.next({
+        contextMenu: this.pasteSelectContextMenu,
+        event: $event,
+        item: $event.target,
+      });
+      $event.preventDefault();
+      $event.stopPropagation();
+    }
   }
 
 }

@@ -1,3 +1,16 @@
+.app-content {
+
+  .preloader {
+
+    .loading-bar {
+
+      @include themify($themes) {
+        background-color: themed(progressBarFullBackgroundColor);
+      }
+    }
+  }
+}
+
 button {
   border: none;
   font-family: OpenSans, sans-serif;
@@ -20,9 +33,22 @@ button {
         background-color: themed(disabledButtonHoverColor);
       }
     }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(disabledButtonFocusColor);
+      }
+    }
   }
 
   &.blue-button:not(:disabled) {
+
+    &.error-text {
+      @include themify($themes) {
+        color: themed(redTextColor);
+      }
+    }
 
     @include themify($themes) {
       background-color: themed(blueButtonBackgroundColor);
@@ -33,6 +59,13 @@ button {
 
       @include themify($themes) {
         background-color: themed(blueButtonHoverColor);
+      }
+    }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(blueButtonFocusColor);
       }
     }
   }
@@ -50,6 +83,13 @@ button {
         background-color: themed(greenButtonHoverColor);
       }
     }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(greenButtonFocusColor);
+      }
+    }
   }
 
   &.turquoise-button:not(:disabled) {
@@ -63,6 +103,13 @@ button {
 
       @include themify($themes) {
         background-color: themed(turquoiseButtonHoverColor);
+      }
+    }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(turquoiseButtonFocusColor);
       }
     }
   }
@@ -143,7 +190,7 @@ button {
       height: 100%;
       min-height: 7.5rem;
       max-height: 7.5rem;
-      overflow: hidden;
+      overflow: auto;
       resize: none;
 
       @include themify($themes) {
@@ -162,6 +209,12 @@ button {
     @include themify($themes) {
       color: themed(redTextColor);
     }
+  }
+}
+
+.error-text {
+  @include themify($themes) {
+    color: themed(redTextColor);
   }
 }
 
@@ -508,6 +561,11 @@ input[type='checkbox'].style-checkbox {
   }
 }
 
+.account-tooltip {
+  word-break: break-word;
+  max-width: 18rem;
+}
+
 .ngx-contextmenu {
 
   .dropdown-menu {
@@ -541,6 +599,73 @@ input[type='checkbox'].style-checkbox {
       @include themify($themes) {
         background-color: themed(chartOptionsHoverColor);
         color: themed(mainTextColor);
+      }
+    }
+  }
+}
+
+.ng-select {
+
+  &.lock-selection-select {
+    width: 100%;
+
+    .ng-select-container {
+      border: none;
+      border-radius: 0;
+      cursor: pointer;
+      font-size: 1.4rem;
+      outline: none;
+      padding: 0 1rem;
+      height: 4.2rem;
+
+      @include themify($themes) {
+        background-color: themed(inputBackgroundColor);
+        color: themed(mainTextColor);
+      }
+
+      .ng-value-container {
+        padding: 0;
+
+        .ng-input {
+          top: auto;
+        }
+      }
+    }
+
+    .ng-dropdown-panel {
+      border: none;
+
+      @include themify($themes) {
+        background-color: themed(inputBackgroundColor);
+      }
+
+      .ng-dropdown-panel-items {
+
+        .ng-option {
+          font-size: 1.4rem;
+          padding: 1rem;
+
+          @include themify($themes) {
+            background-color: themed(inputBackgroundColor);
+            color: themed(mainTextColor);
+          }
+
+          &.ng-option-marked {
+
+            @include themify($themes) {
+              background-color: themed(selectHoverColor);
+              color: themed(mainTextColor);
+            }
+          }
+
+          &.ng-option-selected {
+
+            @include themify($themes) {
+              background-color: themed(selectSelectedColor);
+              color: themed(mainTextColor);
+            }
+          }
+        }
       }
     }
   }
@@ -632,6 +757,41 @@ app-transaction-details {
           }
         }
       }
+    }
+  }
+}
+
+app-progress-container {
+
+  .progress-bar-container {
+
+    @include themify($themes) {
+      color: themed(mainTextColor);
+    }
+
+    .progress-bar {
+
+      @include themify($themes) {
+        background-color: themed(progressBarBackgroundColor);
+      }
+
+      .progress-bar-full {
+
+        @include themify($themes) {
+          background-color: themed(progressBarFullBackgroundColor);
+        }
+      }
+    }
+  }
+}
+
+app-open-wallet-modal {
+
+  .modal {
+
+    @include themify($themes) {
+      background: themed(modalBackground);
+      color: themed(mainTextColor);
     }
   }
 }

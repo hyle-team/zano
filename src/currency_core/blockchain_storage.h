@@ -39,7 +39,7 @@
 #include "dispatch_core_events.h"
 #include "bc_attachments_service_manager.h"
 #include "common/median_db_cache.h"
-#include "scratchpad_helper.h"
+
 
 
 MARK_AS_POD_C11(crypto::key_image);
@@ -68,6 +68,9 @@ namespace currency
       epee::math_helper::average<uint64_t, 5> etc_stuff_6;
       epee::math_helper::average<uint64_t, 5> insert_time_4;
       epee::math_helper::average<uint64_t, 5> raise_block_core_event;
+      //target_calculating_time_2
+      epee::math_helper::average<uint64_t, 5> target_calculating_enum_blocks;
+      epee::math_helper::average<uint64_t, 5> target_calculating_calc;
 
       //tx processing zone
       epee::math_helper::average<uint64_t, 5> tx_check_inputs_time;
@@ -230,9 +233,9 @@ namespace currency
     wide_difficulty_type get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const;
     wide_difficulty_type get_cached_next_difficulty(bool pos) const;
 
-    typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, uint64_t already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
-    bool create_block_template(block& b, crypto::hash& seed, const account_public_address& miner_address, const account_public_address& stakeholder_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func = nullptr) const;
-    bool create_block_template(block& b, crypto::hash& seed, const account_public_address& miner_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce) const;
+    typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
+    bool create_block_template(block& b, const account_public_address& miner_address, const account_public_address& stakeholder_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func = nullptr) const;
+    bool create_block_template(block& b, const account_public_address& miner_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce) const;
 
     bool have_block(const crypto::hash& id) const;
     size_t get_total_transactions()const;
@@ -270,7 +273,7 @@ namespace currency
     uint64_t get_seconds_between_last_n_block(size_t n)const;
     bool has_multisig_output(const crypto::hash& multisig_id) const;
     bool is_multisig_output_spent(const crypto::hash& multisig_id) const;
-    uint64_t total_coins()const;
+    boost::multiprecision::uint128_t total_coins()const;
     bool is_pos_allowed()const;
     uint64_t get_tx_fee_median()const;
     uint64_t get_tx_expiration_median() const;
@@ -280,7 +283,7 @@ namespace currency
     uint64_t get_last_timestamps_check_window_median() const;
     uint64_t get_last_n_blocks_timestamps_median(size_t n) const;
     bool prevalidate_alias_info(const transaction& tx, extra_alias_entry& eae);
-    bool validate_miner_transaction(const block& b, size_t cumulative_block_size, uint64_t fee, uint64_t& base_reward, uint64_t already_generated_coins) const;
+    bool validate_miner_transaction(const block& b, size_t cumulative_block_size, uint64_t fee, uint64_t& base_reward, const boost::multiprecision::uint128_t& already_generated_coins) const;
     performnce_data& get_performnce_data()const;
     bool validate_instance(const std::string& path);
     bool is_tx_expired(const transaction& tx) const;
@@ -498,7 +501,7 @@ namespace currency
     mutable core_runtime_config m_core_runtime_config;
     mutable i_core_event_handler* m_event_handler;
     mutable i_core_event_handler m_event_handler_stub;
-    
+
     //tools::median_db_cache<uint64_t, uint64_t> m_tx_fee_median;
     mutable std::unordered_map<size_t, uint64_t> m_timestamps_median_cache;
     mutable performnce_data m_performance_data;
@@ -507,13 +510,13 @@ namespace currency
     //just informational 
     mutable wide_difficulty_type m_cached_next_pow_difficulty;
     mutable wide_difficulty_type m_cached_next_pos_difficulty;
-    //work like a cache to avoid 
+
+    mutable std::list <std::pair<wide_difficulty_type, uint64_t>> m_pos_targetdata_cache;
+    mutable std::list <std::pair<wide_difficulty_type, uint64_t>> m_pow_targetdata_cache;
+    //work like a cache to avoid recalculation on read operations
     mutable uint64_t m_current_fee_median;
     mutable uint64_t m_current_fee_median_effective_index;
-    bool m_is_reorganize_in_process;
-    mutable scratchpad_light_pool m_scratchpad; //TODO: optimization for using full scratchpad in mainchain
-    crypto::hash m_current_scratchpad_seed;
-    uint64_t m_current_scratchpad_seed_height;
+    bool m_is_reorganize_in_process;    
     mutable std::atomic<bool> m_deinit_is_done;
 
 
@@ -542,10 +545,6 @@ namespace currency
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
-    bool get_seed_for_scratchpad(uint64_t height, crypto::hash& seed)const ;
-    bool get_seed_for_scratchpad_alt_chain(uint64_t height, crypto::hash& seed, const alt_chain_type& alt_chain) const ;
-    
-    bool check_scratchpad();
 
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
     bool validate_transaction(const block& b, uint64_t height, const transaction& tx)const;
@@ -564,15 +563,17 @@ namespace currency
     const std::vector<txin_etc_details_v>& get_txin_etc_options(const txin_v& in)const;
     void on_block_added(const block_extended_info& bei, const crypto::hash& id);
     void on_block_removed(const block_extended_info& bei);
+    void update_targetdata_cache_on_block_added(const block_extended_info& bei);
+    void update_targetdata_cache_on_block_removed(const block_extended_info& bei);
     uint64_t tx_fee_median_for_height(uint64_t h) const;
     uint64_t get_tx_fee_median_effective_index(uint64_t h) const;    
     void on_abort_transaction();
+    void load_targetdata_cache(bool is_pos) const;
     
 
     uint64_t get_adjusted_time()const;
     bool complete_timestamps_vector(uint64_t start_height, std::vector<uint64_t>& timestamps);
     bool update_next_comulative_size_limit();
-    //bool get_block_for_scratchpad_alt(uint64_t connection_height, uint64_t block_index, std::list<blockchain_storage::blocks_ext_by_hash::iterator>& alt_chain, block & b);
     bool process_blockchain_tx_extra(const transaction& tx);
     bool unprocess_blockchain_tx_extra(const transaction& tx);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);

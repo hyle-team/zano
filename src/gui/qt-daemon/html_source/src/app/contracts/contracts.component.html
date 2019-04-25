@@ -31,8 +31,8 @@
         <div>{{item.private_detailes.to_pay | intToMoney}} {{variablesService.defaultCurrency}}</div>
       </td>
       <td>
-        <div class="status" tooltip="{{ item | contractStatusMessages }}" placement="top" tooltipClass="table-tooltip" [delay]="500">
-          {{item | contractStatusMessages}}
+        <div class="status" [class.error-text]="item.state === 4" tooltip="{{item.state | contractStatusMessages : item.is_a}}" placement="top" tooltipClass="table-tooltip" [delay]="500">
+          {{item.state | contractStatusMessages : item.is_a}}
         </div>
       </td>
       <td>

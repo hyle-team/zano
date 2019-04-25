@@ -49,11 +49,11 @@ namespace currency
      i_currency_protocol* get_protocol(){return m_pprotocol;}
      tx_memory_pool& get_tx_pool(){ return m_mempool; };
 
+     bool handle_block_found(const block& b, block_verification_context* p_verification_result, bool need_update_miner_block_template);
+
      //-------------------- i_miner_handler -----------------------
      virtual bool handle_block_found(const block& b, block_verification_context* p_verification_result = nullptr);
-     virtual bool get_block_template(block& b, crypto::hash& seed, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
-
-     bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
+     virtual bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
 
      miner& get_miner(){ return m_miner; }
      static void init_options(boost::program_options::options_description& desc);

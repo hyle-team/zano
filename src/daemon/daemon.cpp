@@ -20,6 +20,7 @@ using namespace epee;
 #include "currency_core/checkpoints_create.h"
 #include "currency_core/currency_core.h"
 #include "rpc/core_rpc_server.h"
+#include "stratum/stratum_server.h"
 #include "currency_protocol/currency_protocol_handler.h"
 #include "daemon_commands_handler.h"
 #include "common/miniupnp_helper.h"
@@ -85,6 +86,7 @@ int main(int argc, char* argv[])
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
   currency::miner::init_options(desc_cmd_sett);
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
+  currency::stratum_server::init_options(desc_cmd_sett);
 
 
   po::options_description desc_options("Allowed options");
@@ -146,8 +148,8 @@ int main(int argc, char* argv[])
   }
 
 
-
-
+  // stratum server is enabled if any of its options present
+  bool stratum_enabled = currency::stratum_server::should_start(vm);
   LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
 
   //create objects and link them
@@ -162,6 +164,9 @@ int main(int argc, char* argv[])
   daemon_cmmands_handler dch(p2psrv, rpc_server);
   tools::miniupnp_helper upnp_helper;
   //ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
+  std::shared_ptr<currency::stratum_server> stratum_server_ptr;
+  if (stratum_enabled)
+    stratum_server_ptr = std::make_shared<currency::stratum_server>(&ccore);
 
   if (command_line::get_arg(vm, command_line::arg_show_rpc_autodoc))
   {
@@ -206,6 +211,15 @@ int main(int argc, char* argv[])
   res = ccore.init(vm);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
   LOG_PRINT_L0("Core initialized OK");
+
+  if (stratum_enabled)
+  {
+    LOG_PRINT_L0("Initializing stratum server...");
+    res = stratum_server_ptr->init(vm);
+    CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize stratum server.");
+  }
+
+
   
   auto& bcs = ccore.get_blockchain_storage();
   if (!offers_service.is_disabled() && bcs.get_current_blockchain_size() > 1 && bcs.get_top_block_id() != offers_service.get_last_seen_block_id())
@@ -231,15 +245,34 @@ int main(int argc, char* argv[])
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core rpc server.");
   LOG_PRINT_L0("Core rpc server started ok");
 
+  //start stratum only after core got initialized
+  if (stratum_enabled)
+  {
+    LOG_PRINT_L0("Starting stratum server...");
+    res = stratum_server_ptr->run(false);
+    CHECK_AND_ASSERT_MES(res, 1, "Failed to start stratum server.");
+    LOG_PRINT_L0("Stratum server started ok");
+  }
 
-  tools::signal_handler::install([&dch, &p2psrv] {
+  tools::signal_handler::install([&dch, &p2psrv, &stratum_server_ptr] {
     dch.stop_handling();
     p2psrv.send_stop_signal();
+    if (stratum_server_ptr)
+      stratum_server_ptr->send_stop_signal();
   });
 
   LOG_PRINT_L0("Starting p2p net loop...");
   p2psrv.run();
   LOG_PRINT_L0("p2p net loop stopped");
+
+  //stop components
+  if (stratum_enabled)
+  {
+    LOG_PRINT_L0("Stopping stratum server...");
+    stratum_server_ptr->send_stop_signal();
+    stratum_server_ptr->timed_wait_server_stop(1000);
+    LOG_PRINT_L0("Stratum server stopped");
+  }
 
   LOG_PRINT_L0("Stopping core rpc server...");
   rpc_server.send_stop_signal();
@@ -252,6 +285,9 @@ int main(int argc, char* argv[])
 
   LOG_PRINT_L0("Deinitializing market...");
   (static_cast<currency::i_bc_service&>(offers_service)).deinit();
+
+  LOG_PRINT_L0("Deinitializing stratum server ...");
+  stratum_server_ptr.reset();
 
   LOG_PRINT_L0("Deinitializing rpc server ...");
   rpc_server.deinit();

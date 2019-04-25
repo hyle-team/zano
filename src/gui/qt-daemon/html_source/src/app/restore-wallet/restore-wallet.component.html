@@ -5,17 +5,17 @@
       <span [routerLink]="['/main']">{{ 'BREADCRUMBS.ADD_WALLET' | translate }}</span>
       <span>{{ 'BREADCRUMBS.RESTORE_WALLET' | translate }}</span>
     </div>
-    <a class="back-btn" [routerLink]="['/main']">
+    <button type="button" class="back-btn" [routerLink]="['/main']">
       <i class="icon back"></i>
       <span>{{ 'COMMON.BACK' | translate }}</span>
-    </a>
+    </button>
   </div>
 
   <form class="form-restore" [formGroup]="restoreForm">
 
     <div class="input-block half-block">
       <label for="wallet-name">{{ 'RESTORE_WALLET.LABEL_NAME' | translate }}</label>
-      <input type="text" id="wallet-name" formControlName="name" [attr.disabled]="walletSaved ? '' : null">
+      <input type="text" id="wallet-name" formControlName="name" [attr.readonly]="walletSaved ? '' : null" [maxLength]="variablesService.maxWalletNameLength" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="restoreForm.controls['name'].invalid && (restoreForm.controls['name'].dirty || restoreForm.controls['name'].touched)">
         <div *ngIf="restoreForm.controls['name'].errors['required']">
           {{ 'RESTORE_WALLET.FORM_ERRORS.NAME_REQUIRED' | translate }}
@@ -24,16 +24,19 @@
           {{ 'RESTORE_WALLET.FORM_ERRORS.NAME_DUPLICATE' | translate }}
         </div>
       </div>
+      <div class="error-block" *ngIf="restoreForm.get('name').value.length >= variablesService.maxWalletNameLength">
+        {{ 'RESTORE_WALLET.FORM_ERRORS.MAX_LENGTH' | translate }}
+      </div>
     </div>
 
     <div class="input-block half-block">
       <label for="wallet-password">{{ 'RESTORE_WALLET.PASS' | translate }}</label>
-      <input type="password" id="wallet-password" formControlName="password" [attr.disabled]="walletSaved ? '' : null">
+      <input type="password" id="wallet-password" formControlName="password" [attr.readonly]="walletSaved ? '' : null" (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
     </div>
 
     <div class="input-block half-block">
       <label for="confirm-wallet-password">{{ 'RESTORE_WALLET.CONFIRM' | translate }}</label>
-      <input type="password" id="confirm-wallet-password" formControlName="confirm" [attr.disabled]="walletSaved ? '' : null">
+      <input type="password" id="confirm-wallet-password" formControlName="confirm" [attr.readonly]="walletSaved ? '' : null" (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
       <div class="error-block" *ngIf="restoreForm.controls['password'].dirty && restoreForm.controls['confirm'].dirty && restoreForm.errors">
         <div *ngIf="restoreForm.errors['confirm_mismatch']">
           {{ 'RESTORE_WALLET.FORM_ERRORS.CONFIRM_NOT_MATCH' | translate }}
@@ -43,7 +46,7 @@
 
     <div class="input-block">
       <label for="phrase-key">{{ 'RESTORE_WALLET.LABEL_PHRASE_KEY' | translate }}</label>
-      <input type="text" id="phrase-key" formControlName="key" [attr.disabled]="walletSaved ? '' : null">
+      <input type="text" id="phrase-key" formControlName="key" [attr.readonly]="walletSaved ? '' : null" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="restoreForm.controls['key'].invalid && (restoreForm.controls['key'].dirty || restoreForm.controls['key'].touched)">
         <div *ngIf="restoreForm.controls['key'].errors['required']">
           {{ 'RESTORE_WALLET.FORM_ERRORS.KEY_REQUIRED' | translate }}
@@ -55,7 +58,7 @@
     </div>
 
     <div class="wrap-buttons">
-      <button type="button" class="transparent-button" *ngIf="walletSaved">{{restoreForm.controls['name'].value}}</button>
+      <button type="button" class="transparent-button" *ngIf="walletSaved" disabled><i class="icon"></i>{{walletSavedName}}</button>
       <button type="button" class="blue-button select-button" (click)="saveWallet()" [disabled]="!restoreForm.valid" *ngIf="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_SELECT' | translate }}</button>
       <button type="button" class="blue-button create-button" (click)="createWallet()" [disabled]="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_CREATE' | translate }}</button>
     </div>
@@ -63,3 +66,5 @@
   </form>
 
 </div>
+
+<app-progress-container [width]="progressWidth" [labels]="['PROGRESS.ADD_WALLET', 'PROGRESS.SELECT_LOCATION', 'PROGRESS.RESTORE_WALLET']"></app-progress-container>

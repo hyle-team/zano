@@ -34,4 +34,13 @@
       <button type="button" [class.active]="period.active" (click)="changePeriod(period)">{{period.title}}</button>
     </ng-container>
   </div>
+
+  <div class="title">
+    {{ 'STAKING.TITLE_GROUP' | translate }}
+  </div>
+  <div class="options">
+    <ng-container *ngFor="let group of groups">
+      <button type="button" [class.active]="group.active" (click)="changeGroup(group)">{{group.title}}</button>
+    </ng-container>
+  </div>
 </div>

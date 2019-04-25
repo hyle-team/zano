@@ -459,6 +459,8 @@ namespace currency
     uint64_t etc_stuff_6;
     uint64_t insert_time_4;
     uint64_t raise_block_core_event;
+    uint64_t target_calculating_enum_blocks;
+    uint64_t target_calculating_calc;
 
     //tx processing zone
     uint64_t tx_check_inputs_time;
@@ -505,7 +507,8 @@ namespace currency
       KV_SERIALIZE(etc_stuff_6)
       KV_SERIALIZE(insert_time_4)
       KV_SERIALIZE(raise_block_core_event)
-
+      KV_SERIALIZE(target_calculating_enum_blocks)
+      KV_SERIALIZE(target_calculating_calc)
       //tx processing zone
       KV_SERIALIZE(tx_check_inputs_time)
       KV_SERIALIZE(tx_add_one_tx_time)
@@ -645,7 +648,7 @@ namespace currency
       uint64_t pow_sequence_factor;
       uint64_t last_pow_timestamp;
       uint64_t last_pos_timestamp;
-      uint64_t total_coins;
+      std::string total_coins;
       uint64_t block_reward;
       uint64_t last_block_total_reward;
       uint64_t pos_diff_total_coins_rate;
@@ -788,7 +791,7 @@ namespace currency
 
     struct response
     {
-      uint64_t difficulty;
+      std::string difficulty;
       uint64_t height;
       crypto::hash seed;
       blobdata blocktemplate_blob;
@@ -831,7 +834,7 @@ namespace currency
       uint64_t height;
       uint64_t depth;
       std::string hash;
-      difficulty_type difficulty;
+      std::string difficulty;
       uint64_t reward;
       
       BEGIN_KV_SERIALIZE_MAP()
@@ -1234,7 +1237,7 @@ namespace currency
     std::string pow_seed;
     uint64_t type;
     bool is_orphan;
-    uint64_t already_generated_coins;
+    std::string already_generated_coins;
     uint64_t this_block_fee_median;
     uint64_t effective_fee_median;
     std::list<tx_rpc_extended_info> transactions_details;

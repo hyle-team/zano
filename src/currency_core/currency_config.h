@@ -7,7 +7,7 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      76
+#define CURRENCY_FORMATION_VERSION                      81
                                                         
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -15,7 +15,7 @@
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
 #define CURRENCY_PUBLIC_ADDRESS_TEXTBLOB_VER            0
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           197   // addresses start with 'Z'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // addresses start with 'iZ'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     1
 #define CURRENT_BLOCK_MAJOR_VERSION                     1
@@ -46,20 +46,14 @@
 #define BASE_REWARD_DUST_THRESHOLD                      ((uint64_t)1000000) // pow(10, 6) - change this will cause hard-fork!
 #define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)//((uint64_t)100000) // pow(10, 5)
 
-#define CURRENCY_SCRATCHPAD_BASE_SIZE                   16777210 //count in crypto::hash, to get size in bytes x32
-#define CURRENCY_SCRATCHPAD_REBUILD_INTERVAL            720 //once a day if block goes once in 2 minute
-#define CURRENCY_SCRATCHPAD_BASE_INDEX_ID_OFFSET        20  //offset down from last rebuild height to block id, that used for indexing seed blocks in CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW
-#define CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW          700 //window for addressing seed block ids 
-#define CURRENCY_SCRATCHPAD_GENESIS_SEED                "4c98962ddce32c7763bb9326933a4692975ca29a76349ae7a139faa3430cc5ab"
-
-#define TX_DEFAULT_FEE                                  ((uint64_t)100000) // pow(10, 5)
+#define TX_DEFAULT_FEE                                  ((uint64_t)10000000000) // pow(10, 5)
 #define TX_MINIMUM_FEE                                  ((uint64_t)100000) // pow(10, 5)
 
 // #define CURRENCY_FIXED_REWARD_ZONE_HEIGHT               300                   // blocks will have fixed reward up to this height (including) 
 // #define CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT        ((uint64_t)100000000) // should be TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER
 // #define CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER       1000                  // reward in minimum fees for a block in the zone
 
-#define CURRENCY_TESTNET_CONST_REWARD                   1000000000
+#define CURRENCY_BLOCK_REWARD                   1000000000000 // 1.0 coin
 
 
 #define WALLET_MAX_ALLOWED_OUTPUT_AMOUNT                ((uint64_t)0xffffffffffffffffLL)
@@ -180,7 +174,7 @@
 #endif
 
 //premine
-#define PREMINE_AMOUNT                                  (2000000000000000000)
+#define PREMINE_AMOUNT                                  (17517203000000000000U) // 13827203.0 reserved for coinswap, 3690000.0 - premine  
 
 //alias registration wallet
 #define ALIAS_REWARDS_ACCOUNT_SPEND_PUB_KEY             "0000000000000000000000000000000000000000000000000000000000000000" //burn alias money

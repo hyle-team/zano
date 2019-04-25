@@ -14,6 +14,7 @@
 #include "account.h"
 #include "include_base_utils.h"
 
+#include "print_fixed_point_helper.h"
 #include "currency_format_utils_abstract.h"
 #include "common/crypto_stream_operators.h"
 #include "currency_protocol/currency_protocol_defs.h"
@@ -163,7 +164,7 @@ namespace currency
 
 
   //---------------------------------------------------------------
-  bool construct_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins, 
+  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
                                                              uint64_t fee, 
                                                              const account_public_address &miner_address, 
@@ -174,7 +175,7 @@ namespace currency
                                                              bool pos = false,
                                                              const pos_entry& pe = pos_entry());
 
-  bool construct_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins, 
+  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
                                                              uint64_t fee, 
                                                              const std::vector<tx_destination_entry>& destinations,
@@ -295,11 +296,6 @@ namespace currency
   bool parse_amount(uint64_t& amount, const std::string& str_amount);
 
 
-  
-//  crypto::hash get_block_longhash(uint64_t h, const crypto::hash& block_long_ash, uint64_t nonce);
-//   void get_block_longhash(const block& b, crypto::hash& res);
-//   crypto::hash get_block_longhash(const block& b);
-
   bool unserialize_block_complete_entry(const COMMAND_RPC_GET_BLOCKS_FAST::response& serialized,
     COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized);
 
@@ -314,9 +310,7 @@ namespace currency
   uint64_t get_block_height(const block& b);
   std::vector<txout_v> relative_output_offsets_to_absolute(const std::vector<txout_v>& off);
   std::vector<txout_v> absolute_output_offsets_to_relative(const std::vector<txout_v>& off);
-  // prints amount in format "3.14000000", "0.00000000"
-  std::string print_money(uint64_t amount);
-  std::string print_fixed_decimal_point(uint64_t amount, size_t decimal_point);
+
   // prints amount in format "3.14", "0.0"
   std::string print_money_brief(uint64_t amount);
   uint64_t get_actual_timestamp(const block& b);
@@ -387,10 +381,8 @@ namespace currency
   /************************************************************************/
   size_t get_max_block_size();
   size_t get_max_tx_size();
-  bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, uint64_t already_generated_coins, uint64_t &reward, uint64_t height);
-  uint64_t get_base_block_reward(bool is_pos, uint64_t already_generated_coins, uint64_t height);
-  uint64_t get_scratchpad_last_update_rebuild_height(uint64_t h);
-  uint64_t get_scratchpad_size_for_height(uint64_t h);
+  bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height);
+  uint64_t get_base_block_reward(bool is_pos, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t height);
   bool is_payment_id_size_ok(const std::string& payment_id);
   std::string get_account_address_as_str(const account_public_address& addr);
   std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const std::string& payment_id);
@@ -447,7 +439,7 @@ namespace currency
   {
     return alias_info_to_rpc_alias_info(ai.m_alias, ai, ari);
   }
-
+  //---------------------------------------------------------------
   template<class alias_rpc_details_t>
   bool alias_info_to_rpc_alias_info(const std::string& alias, const currency::extra_alias_entry_base& aib, alias_rpc_details_t& ari)
   {
@@ -459,7 +451,19 @@ namespace currency
 
     return true;
   }
-
+  //---------------------------------------------------------------
+  template<typename t_number>
+  std::string print_fixed_decimal_point(t_number amount, size_t decimal_point)
+  {
+    return epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
+  }
+  //---------------------------------------------------------------
+  template<typename t_number>
+  std::string print_money(t_number amount)
+  {
+    return print_fixed_decimal_point(amount, CURRENCY_DISPLAY_DECIMAL_POINT);
+  }
+  //---------------------------------------------------------------
   template<class alias_rpc_details_t>
   bool alias_rpc_details_to_alias_info(const alias_rpc_details_t& ard, currency::extra_alias_entry& ai)
   {
@@ -519,41 +523,6 @@ namespace currency
       return true;
     }
     return false;
-  }
-  //---------------------------------------------------------------
-  template<class block_chain_accessor_t>
-  bool get_seed_for_scratchpad_cb(uint64_t height, crypto::hash& seed, block_chain_accessor_t cb)
-  {
-    //CHECK_AND_ASSERT_THROW_MES(m_db_blocks.size() > height, "Internal error: m_db_blocks.size()=" << m_db_blocks.size() << " > height=" << height);
-    uint64_t last_upd_h = get_scratchpad_last_update_rebuild_height(height);
-    std::vector<crypto::hash> seed_data;
-    if (last_upd_h == 0)
-    {
-      crypto::hash genesis_seed = null_hash;
-      bool r = epee::string_tools::hex_to_pod(CURRENCY_SCRATCHPAD_GENESIS_SEED, genesis_seed);
-      CHECK_AND_ASSERT_THROW_MES(r, "Unable to parse CURRENCY_SCRATCHPAD_GENESIS_SEED " << CURRENCY_SCRATCHPAD_GENESIS_SEED);
-      LOG_PRINT_MAGENTA("[SCRATCHPAD] GENESIS SEED SELECTED: " << genesis_seed, LOG_LEVEL_0);
-      seed = genesis_seed;
-      return true;
-    }
-    uint64_t low_bound_window = 0;
-    CHECK_AND_ASSERT_THROW_MES(last_upd_h >= CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW, "Internal error: last_upd_h(" << last_upd_h << ") < CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW(" << CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW << ")");
-    low_bound_window = last_upd_h - CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW;
-
-    crypto::hash selector_id = cb(last_upd_h - CURRENCY_SCRATCHPAD_BASE_INDEX_ID_OFFSET);
-
-    const uint64_t* pselectors = (const uint64_t*)&selector_id;
-    std::stringstream ss;
-    for (size_t i = 0; i != 4; i++)
-    {
-      seed_data.push_back(cb(low_bound_window + pselectors[i] % CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW));
-      ss << "[" << std::setw(8) << std::hex << pselectors[i] << "->" << low_bound_window + pselectors[i] % CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW << "]" << seed_data.back() << ENDL;
-    }
-    seed = crypto::cn_fast_hash(&seed_data[0], sizeof(seed_data[0]) * seed_data.size());
-
-    LOG_PRINT_MAGENTA("[SCRATCHPAD] SEED SELECTED: h = " << last_upd_h << ", selector: " << selector_id << ENDL << ss.str() << "SEED: " << seed, LOG_LEVEL_0);
-
-    return true;
   }
 
   //---------------------------------------------------------------
