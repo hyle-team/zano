@@ -169,7 +169,7 @@ bool pos_emission_test::generate(std::vector<test_event_entry> &events)
   m_total_money_in_minting = m_pos_entries_to_generate * pos_entry_amount;
 
   std::vector<tx_source_entry> sources;
-  bool r = fill_tx_sources(sources, events, blk_0r, preminer_acc.get_keys(), m_total_money_in_minting + TX_DEFAULT_FEE, 0);
+  bool r = fill_tx_sources(sources, events, blk_0r, preminer_acc.get_keys(), m_total_money_in_minting + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   std::vector<tx_destination_entry> destinations;
   for (size_t i = 0; i < m_pos_entries_to_generate; ++i)
@@ -271,7 +271,7 @@ bool pos_emission_test::c1(currency::core& c, size_t ev_index, const std::vector
       {
         uint64_t amount = std::min(wallet_balance_unlocked, wallet_balance - m_total_money_in_minting);
         size_t tx_count_before = c.get_pool_transactions_count();
-        alice_wlt->transfer(amount - TX_DEFAULT_FEE, m_accounts[MINER_ACC_IDX].get_public_address()); // transfer out excess of money
+        alice_wlt->transfer(amount - TESTS_DEFAULT_FEE, m_accounts[MINER_ACC_IDX].get_public_address()); // transfer out excess of money
         CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() > tx_count_before, false, "invalid number of txs in tx pool: " << c.get_pool_transactions_count());
       }
 
@@ -445,7 +445,7 @@ bool pos_emission_test::populate_wallet_with_pos_entries(std::shared_ptr<tools::
   uint64_t total_stake_transferred = m_pos_entries_to_generate * m_pos_entry_amount;
   CHECK_AND_ASSERT_MES(total_stake_transferred <= m_total_money_in_minting, false, "total_stake_transferred: " << total_stake_transferred << ", m_total_money_in_minting: " << m_total_money_in_minting);
   uint64_t remainder = m_total_money_in_minting - total_stake_transferred;
-  if (remainder > TX_DEFAULT_FEE)
+  if (remainder > TESTS_DEFAULT_FEE)
     coin_source->transfer(remainder, w->get_account().get_public_address());
   
   return true;
@@ -525,8 +525,8 @@ bool pos_emission_test::c3(currency::core& c, size_t ev_index, const std::vector
       uint64_t unlocked_balance = 0;
       uint64_t total_balance = current_wallet->balance(unlocked_balance);
       CHECK_AND_ASSERT_MES(unlocked_balance == total_balance, false, "Total and unlocked balances don't equal: " << unlocked_balance << " != " << total_balance);
-      if (unlocked_balance > TX_DEFAULT_FEE)
-        current_wallet->transfer(unlocked_balance - TX_DEFAULT_FEE, m_accounts[MINER_ACC_IDX].get_public_address()); // transfer out all the money to Miner -- clear pos entries
+      if (unlocked_balance > TESTS_DEFAULT_FEE)
+        current_wallet->transfer(unlocked_balance - TESTS_DEFAULT_FEE, m_accounts[MINER_ACC_IDX].get_public_address()); // transfer out all the money to Miner -- clear pos entries
 
       r = populate_wallet_with_pos_entries(current_wallet, dan_wlt, change_pos_entries_iter_index++, pos_entries_change_scheme::change_pos_entries_count);
       CHECK_AND_ASSERT_MES(r, false, "populate_wallet_with_pos_entries failed");

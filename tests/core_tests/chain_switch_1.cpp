@@ -249,13 +249,13 @@ bool bad_chain_switching_with_rollback::generate(std::vector<test_event_entry>& 
   MAKE_GENESIS_BLOCK(events, blk_0, preminer_acc, test_core_time::get_time());
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4);
 
-  MAKE_TX(events, tx_1, miner_acc, alice_acc, TX_DEFAULT_FEE * 2, blk_0r);
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, TESTS_DEFAULT_FEE * 2, blk_0r);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
 
   // make tx_2 referring to tx_1 output
-  MAKE_TX(events, tx_2, alice_acc, bob_acc, TX_DEFAULT_FEE, blk_2);
+  MAKE_TX(events, tx_2, alice_acc, bob_acc, TESTS_DEFAULT_FEE, blk_2);
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_2);
 
   // check balance at gentime
@@ -267,12 +267,12 @@ bool bad_chain_switching_with_rollback::generate(std::vector<test_event_entry>& 
   CHECK_AND_ASSERT_MES(r, false, "refresh_test_wallet failed");
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", 0, 0, 0, 0, 0), false, "");
 
-  // Bob should have TX_DEFAULT_FEE
+  // Bob should have TESTS_DEFAULT_FEE
   std::shared_ptr<tools::wallet2> bob_wlt;
   generator.init_test_wallet(bob_acc, get_block_hash(blk_0), bob_wlt);
   r = generator.refresh_test_wallet(events, bob_wlt.get(), get_block_hash(blk_3), CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4 + 3);
   CHECK_AND_ASSERT_MES(r, false, "refresh_test_wallet failed");
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", TX_DEFAULT_FEE, 0, 0, 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", TESTS_DEFAULT_FEE, 0, 0, 0, 0), false, "");
 
   // start altchain from blk_0r, include tx_2 but NOT include tx_1
   DO_CALLBACK(events, "mark_invalid_block");
@@ -355,8 +355,8 @@ bool chain_switching_and_tx_with_attachment_blobsize::generate(std::vector<test_
   std::vector<attachment_v> attachment({comment_att});
 
   // create txs with attachment (and put it in the pool)
-  MAKE_TX_ATTACH(events, tx_1, miner_acc, miner_acc, TX_DEFAULT_FEE, blk_0r, attachment);
-  MAKE_TX_ATTACH(events, tx_2, miner_acc, miner_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_1, miner_acc, miner_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_2, miner_acc, miner_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
 
   // make sure the pool has correct txs
   DO_CALLBACK_PARAMS_STR(events, "check_tx_pool_txs", epee::serialization::store_t_to_json(params_tx_pool(get_transaction_hash(tx_1), get_object_blobsize(tx_1), get_transaction_hash(tx_2), get_object_blobsize(tx_2))));
@@ -477,7 +477,7 @@ bool alt_chain_coins_pow_mined_then_spent::generate(std::vector<test_event_entry
   //                +-------------tx_1      tx_1 spents 2a.miner_tx output
   
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // simulate alt-block tx behaviour
-  MAKE_TX(events, tx_1, alice_acc, alice_acc, TX_DEFAULT_FEE, blk_2ra);
+  MAKE_TX(events, tx_1, alice_acc, alice_acc, TESTS_DEFAULT_FEE, blk_2ra);
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   
   MAKE_NEXT_BLOCK_TX1(events, blk_3a, blk_2ra, miner_acc, tx_1);
@@ -516,7 +516,7 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
 
   // make two txs with one output (huge fee, probably - doesn't matter) with amount that is never seen before
   std::vector<tx_source_entry> sources;
-  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), new_amount + TX_DEFAULT_FEE, 0);
+  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), new_amount + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(tx_destination_entry(new_amount, miner_acc.get_public_address())); // no cashback, just payment
@@ -527,7 +527,7 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
 
   // second tx
   sources.clear();
-  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), new_amount + TX_DEFAULT_FEE, 0, sources);
+  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), new_amount + TESTS_DEFAULT_FEE, 0, sources);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   // use the same destinations
@@ -577,7 +577,7 @@ bool alt_blocks_with_the_same_txs::generate(std::vector<test_event_entry>& event
   //                    \-  (2a)-   (3a)-   (4 )-
   //                        tx_0
 
-  MAKE_TX(events, tx_0, miner_acc, miner_acc, TX_DEFAULT_FEE, blk_1r);
+  MAKE_TX(events, tx_0, miner_acc, miner_acc, TESTS_DEFAULT_FEE, blk_1r);
 
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_0);
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
