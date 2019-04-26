@@ -19,8 +19,11 @@
     </ng-container>
   </div>
 
-  <button type="button" class="blue-button seed-phrase-button" (click)="runWallet()">{{ 'SEED_PHRASE.BUTTON_CREATE_ACCOUNT' | translate }}</button>
-
+  <div class="wrap-buttons">
+    <button type="button" class="blue-button seed-phrase-button" (click)="runWallet()">{{ 'SEED_PHRASE.BUTTON_CREATE_ACCOUNT' | translate }}</button>
+    <button type="button" class="blue-button copy-button" *ngIf="!seedPhraseCopied" (click)="copySeedPhrase()">{{ 'SEED_PHRASE.BUTTON_COPY' | translate }}</button>
+    <button type="button" class="transparent-button copy-button" *ngIf="seedPhraseCopied" disabled><i class="icon"></i>{{ 'SEED_PHRASE.BUTTON_COPY' | translate }}</button>
+  </div>
 </div>
 
 <app-progress-container [width]="'100%'" [labels]="['PROGRESS.ADD_WALLET', 'PROGRESS.SELECT_LOCATION', 'PROGRESS.CREATE_WALLET']"></app-progress-container>
