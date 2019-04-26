@@ -72,7 +72,7 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
   uint64_t base_block_reward_pow = get_base_block_reward(false, bcs.total_coins(), top_block_height + 1);
   uint64_t base_block_reward_pos = get_base_block_reward(true, bcs.total_coins(), top_block_height + 1);
 
-  g_block_txs_fee = TX_DEFAULT_FEE; // passing an argument to custom_fill_block_template_func via global variable (not perfect but works well)
+  g_block_txs_fee = TESTS_DEFAULT_FEE; // passing an argument to custom_fill_block_template_func via global variable (not perfect but works well)
 
   CHECK_AND_ASSERT_MES(blocksize_limit > CURRENCY_COINBASE_BLOB_RESERVED_SIZE, false, "internal invariant failed");
 

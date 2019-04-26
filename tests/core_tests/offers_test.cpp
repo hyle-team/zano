@@ -263,22 +263,22 @@ bool offers_expiration_test::generate(std::vector<test_event_entry>& events) con
   od.expiration_time = 0;
   attachment.clear();
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_0, miner_acc, alice_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_0, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
 
   od.expiration_time = 1;
   attachment.clear();
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_1, miner_acc, alice_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_1, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
 
   od.expiration_time = 2;
   attachment.clear();
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_2, miner_acc, alice_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_2, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
 
   od.expiration_time = 3;
   attachment.clear();
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_3, miner_acc, alice_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_3, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
 
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1, tx_2, tx_3 }));
   m_offers_ts = blk_1.timestamp;
@@ -378,7 +378,7 @@ bool offers_filtering_1::generate(std::vector<test_event_entry>& events) const
     fill_test_offer(od);
     std::vector<currency::attachment_v> attachment;
     bc_services::put_offer_into_attachment(od, attachment);
-    MAKE_TX_LIST_ATTACH(events, txs, miner_acc, miner_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+    MAKE_TX_LIST_ATTACH(events, txs, miner_acc, miner_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
   }
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, txs);
   
@@ -389,7 +389,7 @@ bool offers_filtering_1::generate(std::vector<test_event_entry>& events) const
     fill_test_offer(od);
     std::vector<currency::attachment_v> attachment;
     bc_services::put_offer_into_attachment(od, attachment);
-    MAKE_TX_LIST_ATTACH(events, txs, miner_acc, miner_acc, TX_DEFAULT_FEE, blk_1, attachment);
+    MAKE_TX_LIST_ATTACH(events, txs, miner_acc, miner_acc, TESTS_DEFAULT_FEE, blk_1, attachment);
   }
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, txs);
 
@@ -526,7 +526,7 @@ bool offers_handling_on_chain_switching::generate(std::vector<test_event_entry>&
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());                                               // 0
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                        // 2N (N == CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
 
-  MAKE_TX(events, tx_0, miner_acc, alice_acc, TX_DEFAULT_FEE * 70, blk_0r);                                          // 2N+1
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, TESTS_DEFAULT_FEE * 70, blk_0r);                                          // 2N+1
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);                                                            // 2N+2
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                        // 4N+2
@@ -535,7 +535,7 @@ bool offers_handling_on_chain_switching::generate(std::vector<test_event_entry>&
   fill_test_offer(od);
   std::vector<currency::attachment_v> attachment;
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_1, alice_acc, alice_acc, TX_DEFAULT_FEE, blk_1r, attachment);                            // 4N+3
+  MAKE_TX_ATTACH(events, tx_1, alice_acc, alice_acc, TESTS_DEFAULT_FEE, blk_1r, attachment);                            // 4N+3
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);                                                                      // 4N+4
   //MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);                                                            // 4N+4
@@ -1255,7 +1255,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   bc_services::offer_details_ex od = AUTO_VAL_INIT(od);
   fill_test_offer(od);
   od.comment = "1";
-  od.fee = TX_DEFAULT_FEE * 3;
+  od.fee = TESTS_DEFAULT_FEE * 3;
 
   // create an offer
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
