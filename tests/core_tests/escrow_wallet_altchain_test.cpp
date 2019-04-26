@@ -318,6 +318,7 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
       size_t blocks_fetched = 0;
       alice_wlt->refresh(blocks_fetched);
       CHECK_AND_ASSERT_MES(blocks_fetched == se.expected_blocks, false, "Alice got " << blocks_fetched << " after refresh, but " << se.expected_blocks << " is expected");
+      LOG_PRINT_GREEN("Alice's transfers:" << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_1);
       if (se.a_balance != UINT64_MAX)
       {
         uint64_t alice_balance = alice_wlt->balance();
@@ -329,13 +330,13 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
         alice_wlt->get_contracts(contracts);
         CHECK_AND_ASSERT_MES(check_contract_state(contracts, m_etd.cpd, static_cast<tools::wallet_rpc::escrow_contract_details_basic::contract_state>(se.a_state), "Alice"), false, "");
       }
-      LOG_PRINT_GREEN("Alice's transfers:" << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_1);
 
       LOG_PRINT_GREEN("Bob's wallet is refreshing...", LOG_LEVEL_1);
       bob_wlt->scan_tx_pool(stub);
       blocks_fetched = 0;
       bob_wlt->refresh(blocks_fetched);
       CHECK_AND_ASSERT_MES(blocks_fetched == se.expected_blocks, false, "Bob got " << blocks_fetched << " after refresh, but " << se.expected_blocks << " is expected");
+      LOG_PRINT_GREEN("Bob's transfers:" << ENDL << bob_wlt->dump_trunsfers(), LOG_LEVEL_1);
       if (se.b_balance != UINT64_MAX)
       {
         uint64_t bob_balance = bob_wlt->balance();
@@ -347,7 +348,6 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
         bob_wlt->get_contracts(contracts);
         CHECK_AND_ASSERT_MES(check_contract_state(contracts, m_etd.cpd, static_cast<tools::wallet_rpc::escrow_contract_details_basic::contract_state>(se.b_state), "Bob"), false, "");
       }
-      LOG_PRINT_GREEN("Bob's transfers:" << ENDL << bob_wlt->dump_trunsfers(), LOG_LEVEL_1);
 
       mine_empty_block = true;
     }
@@ -413,7 +413,7 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
       }
     }
 
-    // c.get_tx_pool().remove_stuck_transactions(); ?
+    c.get_tx_pool().remove_stuck_transactions();
 
 
   }

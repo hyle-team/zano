@@ -1376,8 +1376,8 @@ bool gen_wallet_transfers_and_chain_switch::generate(std::vector<test_event_entr
   alice_wlt->get_transfers(trs);
   CHECK_AND_ASSERT_MES(trs.size() == 2 && trs[0].is_spent() && trs[1].is_spent(), false, "Wrong transfers state");
 
-  // fast forward time to make txs outdated
-  test_core_time::adjust(test_core_time::get_time() + CURRENCY_MEMPOOL_TX_LIVETIME + 1);
+  // fast forward time to make tx_1 and tx_2 outdated (blk_3 is the block where tx_2 came with)
+  test_core_time::adjust(get_actual_timestamp(blk_3) + CURRENCY_MEMPOOL_TX_LIVETIME + 1);
 
   MAKE_NEXT_BLOCK(events, blk_5a, blk_4a, miner_acc);
 
@@ -3119,6 +3119,98 @@ bool wallet_unconfirmed_tx_expiration::c1(currency::core& c, size_t ev_index, co
 
   // make sure all Alice's money are unlocked and no coins were actually spent
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("tx expired and removed from the pool,", "Alice", alice_wlt, alice_start_balance, true, 6, alice_start_balance, 0, 0, 0), false, "");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+wallet_chain_switch_with_spending_the_same_ki::wallet_chain_switch_with_spending_the_same_ki()
+{
+  REGISTER_CALLBACK_METHOD(wallet_chain_switch_with_spending_the_same_ki, c1);
+}
+
+bool wallet_chain_switch_with_spending_the_same_ki::generate(std::vector<test_event_entry>& events) const
+{
+  // Test outline
+  // 1. A wallet has one unspent output
+  // 2. wallet2::transfer() creates tx_0 that spends wallet's output
+  // 3. tx_0 is successfully put into the blockchain
+  // 4. Due to chain switch tx_0 is removed from the blockchain and get into the transaction pool
+  // 5. Make sure the wallet can't spend that output
+  // 6. After tx is expired make sure the wallet can spend that output
+
+
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(30), blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  // rewind blocks to allow wallet be able to spend the coins
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_chain_switch_with_spending_the_same_ki::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(30), true, UINT64_MAX, MK_TEST_COINS(30)), false, "");
+
+  std::vector<tx_destination_entry> destinations { tx_destination_entry(MK_TEST_COINS(30) - TESTS_DEFAULT_FEE, m_accounts[BOB_ACC_IDX].get_public_address()) };
+  try
+  {
+    // create tx_1
+    alice_wlt->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment);
+  }
+  catch (std::exception &e)
+  {
+    CHECK_AND_ASSERT_MES(false, false, "alice_wlt->transfer() caused an exception: " << e.what());
+  }
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
+
+  // mine blk_2 on height 22
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
+
+  // refresh wallet
+  alice_wlt->refresh();
+  // DO NOT scan_tx_pool here intentionally
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(0)), false, "");
+
+  uint64_t blk_1r_height = c.get_top_block_height() - 1;
+  crypto::hash blk_1r_id = c.get_block_id_by_height(blk_1r_height);
+  block blk_2a = AUTO_VAL_INIT(blk_2a);
+  r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), blk_1r_id, blk_1r_height + 1, &blk_2a);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
+
+  // one more to trigger chain switch
+  block blk_3a = AUTO_VAL_INIT(blk_3a);
+  r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), get_block_hash(blk_2a), get_block_height(blk_2a) + 1, &blk_3a);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
+
+  // make sure tx_1 has been moved back to the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(c.get_alternative_blocks_count() == 1, false, "Incorrect alt blocks count: " << c.get_alternative_blocks_count());
+
+  //const transaction& tx_1 = boost::get<transaction>(events[4 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3]);
+
+  // refresh wallet
+  alice_wlt->refresh();
+  // DO NOT scan_tx_pool here intentionally
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(0)), false, "");
 
   return true;
 }
