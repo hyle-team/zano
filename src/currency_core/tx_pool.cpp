@@ -34,6 +34,7 @@ namespace currency
   tx_memory_pool::tx_memory_pool(blockchain_storage& bchs, i_currency_protocol* pprotocol)
     : m_blockchain(bchs)
     , m_pprotocol(pprotocol)
+    , m_current_processing_tx_id(null_hash)
   {
   }
 
@@ -69,8 +70,32 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
+  bool tx_memory_pool::touch_tx(const crypto::hash &id)
+  {
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+    auto it = m_transactions.find(id);
+    CHECK_AND_ASSERT_THROW_MES(it != m_transactions.end(), "Unable to find id: " << id);
+    it->second.last_touch_time = get_core_time();
+    return true;
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const transaction &tx, const crypto::hash &id, uint64_t blob_size, tx_verification_context& tvc, bool kept_by_block, bool from_core)
   {    
+    CRITICAL_REGION_LOCAL(m_add_tx_lock);
+    
+    //using m_transactions_lock here is needed to moderate access with remove_stuck_transactions()
+    CRITICAL_REGION_BEGIN(m_transactions_lock);
+    if (have_tx(id))
+    {
+      if (kept_by_block)
+      {
+        //prevent pool to get rid of transaction by expiration time
+        touch_tx(id);
+      }
+    }
+    CRITICAL_REGION_END();
+
+
     TIME_MEASURE_START_PD(tx_processing_time);
     TIME_MEASURE_START_PD(check_inputs_types_supported_time);
     if(!check_inputs_types_supported(tx))
@@ -225,7 +250,7 @@ namespace currency
     td.max_used_block_height = max_used_block_height;
     td.last_failed_height = 0;
     td.last_failed_id = null_hash;
-    td.receive_time = get_core_time();
+    td.last_touch_time = td.receive_time = get_core_time();
 
     m_transactions.insert(std::make_pair(id, td));
     on_tx_add(tx, kept_by_block);
@@ -234,23 +259,23 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::check_is_taken(const crypto::hash& id) const
-  {
-    CRITICAL_REGION_LOCAL(m_taken_txs_lock);
-    return m_taken_txs.count(id) ? true : false;
-  }
+//   bool tx_memory_pool::check_is_taken(const crypto::hash& id) const
+//   {
+//     CRITICAL_REGION_LOCAL(m_taken_txs_lock);
+//     return m_taken_txs.count(id) ? true : false;
+//   }
   //---------------------------------------------------------------------------------
-  void tx_memory_pool::set_taken(const crypto::hash& id)
-  {
-    CRITICAL_REGION_LOCAL(m_taken_txs_lock);
-    m_taken_txs.insert(id);
-  }
+//   void tx_memory_pool::set_taken(const crypto::hash& id)
+//   {
+//     CRITICAL_REGION_LOCAL(m_taken_txs_lock);
+//     m_taken_txs.insert(id);
+//   }
   //---------------------------------------------------------------------------------
-  void tx_memory_pool::reset_all_taken()
-  {
-    CRITICAL_REGION_LOCAL(m_taken_txs_lock);
-    m_taken_txs.clear();
-  }
+//   void tx_memory_pool::reset_all_taken()
+//   {
+//     CRITICAL_REGION_LOCAL(m_taken_txs_lock);
+//     m_taken_txs.clear();
+//   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::process_cancel_offer_rules(const transaction& tx)
   {
@@ -433,7 +458,7 @@ namespace currency
     }
     
     on_tx_remove(tx, kept_by_block);
-    set_taken(id);
+    //set_taken(id);
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -444,11 +469,11 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::remove_stuck_transactions()
   {    
-    if (!CRITICAL_SECTION_TRY_LOCK(m_remove_stuck_txs_lock))
-      return true;
+//    if (!CRITICAL_SECTION_TRY_LOCK(m_remove_stuck_txs_lock))
+//      return true;
 
-    CRITICAL_REGION_LOCAL(m_remove_stuck_txs_lock);
-    CRITICAL_SECTION_UNLOCK(m_remove_stuck_txs_lock);// release try_lock iteration
+//    CRITICAL_REGION_LOCAL(m_remove_stuck_txs_lock);
+//    CRITICAL_SECTION_UNLOCK(m_remove_stuck_txs_lock);// release try_lock iteration
 
     CRITICAL_REGION_LOCAL1(m_transactions_lock); // !!TODO!! review lock scheme
 
@@ -478,7 +503,7 @@ namespace currency
         return true;
 
       // maximum age check - remove too old
-      uint64_t tx_age = get_core_time() - tx_entry.receive_time;
+      uint64_t tx_age = get_core_time() - tx_entry.last_touch_time;
       if ((tx_age > CURRENCY_MEMPOOL_TX_LIVETIME ))
       {
 
@@ -661,7 +686,7 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::on_finalize_db_transaction()
   {
-    reset_all_taken();
+    //reset_all_taken();
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -708,8 +733,8 @@ namespace currency
     if(m_transactions.count(id))
       return true;
 
-    if (check_is_taken(id))
-      return true;
+//     if (check_is_taken(id))
+//       return true;
 
     return false;
   }
@@ -858,15 +883,15 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------------------------
-  void tx_memory_pool::lock()
-  {
-    CRITICAL_SECTION_LOCK(m_remove_stuck_txs_lock);
-  }
+  //void tx_memory_pool::lock()
+  //{
+  //  CRITICAL_SECTION_LOCK(m_remove_stuck_txs_lock);
+  //}
   //---------------------------------------------------------------------------------
-  void tx_memory_pool::unlock()
-  {
-    CRITICAL_SECTION_UNLOCK(m_remove_stuck_txs_lock);
-  }
+  //void tx_memory_pool::unlock()
+  //{
+  //  CRITICAL_SECTION_UNLOCK(m_remove_stuck_txs_lock);
+  //}
   //---------------------------------------------------------------------------------
   void tx_memory_pool::purge_transactions()
   {
@@ -874,8 +899,8 @@ namespace currency
     m_cancel_offer_hashes.clear();
     // should m_db_black_tx_list be cleared here?
     m_key_images_set.clear();
-    // TODO : m_alias_names_set ?
-    // TODO : m_alias_addresses_set ?
+    m_alias_names_set.clear();
+    m_alias_addresses_set.clear();
   }
   //---------------------------------------------------------------------------------
   void tx_memory_pool::clear()

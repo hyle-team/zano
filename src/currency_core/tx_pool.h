@@ -50,6 +50,7 @@ namespace currency
       uint64_t last_failed_height;
       crypto::hash last_failed_id;
       time_t receive_time;
+      time_t last_touch_time;
 
       BEGIN_SERIALIZE_OBJECT()
         FIELD(tx)
@@ -61,7 +62,8 @@ namespace currency
         FIELD(last_failed_height)
         FIELD(last_failed_id)
         FIELD(receive_time)
-        END_SERIALIZE()
+        FIELD(last_touch_time) // last time new block added this tx
+      END_SERIALIZE()
 
     };
 
@@ -108,8 +110,8 @@ namespace currency
 
     void on_idle();
 
-    void lock();
-    void unlock();
+    //void lock();
+    //void unlock();
     void purge_transactions();
     void clear();
 
@@ -158,6 +160,7 @@ namespace currency
     bool insert_alias_info(const transaction& tx);
     bool remove_alias_info(const transaction& tx);
 
+    bool touch_tx(const crypto::hash &id);
     bool is_valid_contract_finalization_tx(const transaction &tx)const;
     bool remove_stuck_transactions();
     bool is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const;
@@ -165,19 +168,15 @@ namespace currency
     bool get_key_images_from_tx_pool(std::unordered_set<crypto::key_image>& key_images)const;
     bool process_cancel_offer_rules(const transaction& tx);
     bool unprocess_cancel_offer_rules(const transaction& tx);
-    bool check_is_taken(const crypto::hash& id) const;
-    void set_taken(const crypto::hash& id);
-    void reset_all_taken();
+//     bool check_is_taken(const crypto::hash& id) const;
+//     void set_taken(const crypto::hash& id);
+//     void reset_all_taken();
 
     typedef std::unordered_map<crypto::hash, tx_details> transactions_container;
     typedef std::unordered_map<crypto::key_image, uint64_t> key_images_container;
     typedef std::unordered_set<crypto::hash> hash_container;
     typedef std::unordered_set<std::string> aliases_container;
     typedef std::unordered_set<account_public_address> aliases_addresses_container;
-
-    //main accessor
-    epee::shared_recursive_mutex m_dummy_rw_lock;
-    mutable epee::critical_section m_transactions_lock;
 
     //containers
     transactions_container m_transactions;
@@ -195,9 +194,16 @@ namespace currency
     i_currency_protocol* m_pprotocol;
 
     //in memory containers
-    mutable epee::critical_section m_taken_txs_lock;
-    std::unordered_set<crypto::hash> m_taken_txs;
-    mutable epee::critical_section m_remove_stuck_txs_lock;
+    //mutable epee::critical_section m_taken_txs_lock;
+    //std::unordered_set<crypto::hash> m_taken_txs;
+
+
+    mutable epee::critical_section m_add_tx_lock; 
+    std::atomic<crypto::hash> m_current_processing_tx_id;
+    //main accessor
+    mutable epee::critical_section m_transactions_lock;
+    //other containers locks
+    //mutable epee::critical_section m_remove_stuck_txs_lock;
     mutable epee::critical_section m_cancel_offer_hashes_lock;
     mutable epee::critical_section m_aliases_lock;
     mutable epee::critical_section m_black_tx_list_lock;

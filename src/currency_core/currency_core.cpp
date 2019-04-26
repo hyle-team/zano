@@ -386,7 +386,9 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_tx(const transaction& tx, const crypto::hash& tx_hash, size_t blob_size, tx_verification_context& tvc, bool kept_by_block)
   {
-    if(m_mempool.have_tx(tx_hash))
+    //extra check "kept_by_block" to let happen call "m_mempool.add_tx" for transactions that came with block
+    //which should update "last_touch_time", to avoid removing transaction as "stuck" while it adding with new block(possible when mem_pool is over flooded)
+    if(!kept_by_block && m_mempool.have_tx(tx_hash))
     {
       LOG_PRINT_L3("add_new_tx: already have tx " << tx_hash << " in the pool");
       return true;

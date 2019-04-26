@@ -4654,7 +4654,7 @@ bool blockchain_storage::add_new_block(const block& bl_, block_verification_cont
 
     block bl = bl_;
     crypto::hash id = get_block_hash(bl);
-    CRITICAL_REGION_LOCAL(m_tx_pool);
+    //CRITICAL_REGION_LOCAL(m_tx_pool);
     //CRITICAL_REGION_LOCAL1(m_read_lock);
     if (have_block(id))
     {
