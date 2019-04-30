@@ -512,7 +512,7 @@ namespace currency
         return true;
 
       // maximum age check - remove too old
-      uint64_t tx_age = get_core_time() - tx_entry.receive_time;
+      int64_t tx_age = get_core_time() - tx_entry.receive_time;
       if ((tx_age > CURRENCY_MEMPOOL_TX_LIVETIME ))
       {
 
