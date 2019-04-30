@@ -47,7 +47,7 @@ namespace
   const command_line::arg_descriptor<int> arg_daemon_port = {"daemon-port", "Use daemon instance at port <arg> instead of default", 0};
   const command_line::arg_descriptor<uint32_t> arg_log_level = {"set-log", "", 0, true};
   const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
-
+  const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
 
@@ -156,10 +156,7 @@ std::string simple_wallet::get_commands_str()
 {
   std::stringstream ss;
   ss << "Commands: " << ENDL;
-  std::string usage = m_cmd_binder.get_usage();
-  boost::replace_all(usage, "\n", "\n  ");
-  usage.insert(0, "  ");
-  ss << usage << ENDL;
+  ss << m_cmd_binder.get_usage() << ENDL;
   return ss.str();
 }
 
@@ -172,10 +169,11 @@ bool simple_wallet::help(const std::vector<std::string> &args/* = std::vector<st
 simple_wallet::simple_wallet()
   : m_daemon_port(0), 
   m_print_brain_wallet(false), 
-  m_do_refresh(false),
+  m_do_refresh_after_load(false),
   m_do_not_set_date(false),
   m_do_pos_mining(false),
-  m_refresh_progress_reporter(*this)
+  m_refresh_progress_reporter(*this),
+  m_offline_mode(false)
 {
   m_cmd_binder.set_handler("start_mining", boost::bind(&simple_wallet::start_mining, this, _1), "start_mining <threads_count> - Start mining in daemon");
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, _1), "Stop mining in daemon");
@@ -185,6 +183,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("incoming_counts", boost::bind(&simple_wallet::show_incoming_transfers_counts, this, _1), "incoming_transfers counts");
   m_cmd_binder.set_handler("list_recent_transfers", boost::bind(&simple_wallet::list_recent_transfers, this, _1), "list_recent_transfers - Show recent maximum 1000 transfers");
   m_cmd_binder.set_handler("list_recent_transfers_ex", boost::bind(&simple_wallet::list_recent_transfers_ex, this, _1), "list_recent_transfers_tx - Write recent transfer in json to wallet_recent_transfers.txt");
+  m_cmd_binder.set_handler("list_outputs", boost::bind(&simple_wallet::list_outputs, this, _1), "list_outputs [spent|unspent] - Lists all the outputs that have ever been sent to this wallet if called without arguments, otherwise it lists only the spent or unspent outputs");
   m_cmd_binder.set_handler("dump_transfers", boost::bind(&simple_wallet::dump_trunsfers, this, _1), "dump_transfers - Write  transfers in json to dump_transfers.txt");
   m_cmd_binder.set_handler("dump_keyimages", boost::bind(&simple_wallet::dump_key_images, this, _1), "dump_keyimages - Write  key_images in json to dump_key_images.txt");
   m_cmd_binder.set_handler("payments", boost::bind(&simple_wallet::show_payments, this, _1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
@@ -203,7 +202,11 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("scan_transfers_for_id", boost::bind(&simple_wallet::scan_transfers_for_id, this, _1), "Rescan transfers for tx_id");
   m_cmd_binder.set_handler("scan_transfers_for_ki", boost::bind(&simple_wallet::scan_transfers_for_ki, this, _1), "Rescan transfers for key image");
   m_cmd_binder.set_handler("integrated_address", boost::bind(&simple_wallet::integrated_address, this, _1), "integrated_address [<payment_id>|<integrated_address] - encodes given payment_id along with wallet's address into an integrated address (random payment_id will be used if none is provided). Decodes given integrated_address into standard address");
-    
+  m_cmd_binder.set_handler("get_tx_key", boost::bind(&simple_wallet::get_tx_key, this, _1), "Get transaction one-time secret key (r) for a given <txid>");
+
+  m_cmd_binder.set_handler("save_watch_only", boost::bind(&simple_wallet::save_watch_only, this, _1), "save_watch_only <filename> <password> - save as watch-only wallet file.");
+  m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this, _1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
+  m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this, _1), "submit_transfer <signed_tx_file> - broadcast signed tx");
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -278,10 +281,10 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     }
   }
 
-  m_do_refresh = true;
+  m_do_refresh_after_load = true;
   if (command_line::has_arg(vm, arg_dont_refresh))
   {
-    m_do_refresh = false;
+    m_do_refresh_after_load = false;
   }
 
   if (command_line::has_arg(vm, arg_print_brain_wallet))
@@ -388,8 +391,8 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     try
     {
       m_wallet->load(epee::string_encoding::convert_to_unicode(m_wallet_file), password);
-      message_writer(epee::log_space::console_color_white, true) << "Opened wallet: " << m_wallet->get_account().get_public_address_str();
-      
+      message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+
       if (m_print_brain_wallet)
         std::cout << "Brain wallet: " << m_wallet->get_account().get_restore_braindata() << std::endl << std::flush;
 
@@ -411,7 +414,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
 
   m_wallet->init(m_daemon_address);
 
-  if (!m_do_refresh)
+  if (m_do_refresh_after_load && !m_offline_mode)
     refresh(std::vector<std::string>());
 
   success_msg_writer() <<
@@ -538,6 +541,12 @@ void simple_wallet::on_money_spent(uint64_t height, const currency::transaction&
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::refresh(const std::vector<std::string>& args)
 {
+  if (m_offline_mode)
+  {
+    success_msg_writer() << "refresh is meaningless in OFFLINE MODE";
+    return true;
+  }
+
   if (!try_connect_to_daemon())
     return true;
 
@@ -1075,7 +1084,11 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     currency::transaction tx;
     std::vector<extra_v> extra;
     m_wallet->transfer(dsts, fake_outs_count, 0, m_wallet->get_core_runtime_config().tx_default_fee, extra, attachments, tx);
-    success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+
+    if (!m_wallet->is_watch_only())
+      success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+    else
+      success_msg_writer(true) << "Transaction prepared for signing and saved into \"zano_tx_unsigned\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
   }
   catch (const tools::error::daemon_busy&)
   {
@@ -1158,7 +1171,12 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
 bool simple_wallet::run()
 {
   std::string addr_start = m_wallet->get_account().get_public_address_str().substr(0, 6);
-  return m_cmd_binder.run_handling("[" CURRENCY_NAME_BASE " wallet " + addr_start + "]: ", "");
+  std::string prompt;
+  if (m_wallet->is_watch_only())
+    prompt = "[" CURRENCY_NAME_BASE " WO wallet " + addr_start + "]: ";
+  else
+    prompt = "[" CURRENCY_NAME_BASE " wallet " + addr_start + "]: ";
+  return m_cmd_binder.run_handling(prompt, "");
 }
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::stop()
@@ -1236,6 +1254,158 @@ bool simple_wallet::integrated_address(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool simple_wallet::get_tx_key(const std::vector<std::string> &args_)
+{
+  std::vector<std::string> local_args = args_;
+
+  if (local_args.size() != 1) {
+    fail_msg_writer() << "usage: get_tx_key <txid>";
+    return true;
+  }
+
+  currency::blobdata txid_data;
+  if (!epee::string_tools::parse_hexstr_to_binbuff(local_args.front(), txid_data) || txid_data.size() != sizeof(crypto::hash))
+  {
+    fail_msg_writer() << "failed to parse txid";
+    return true;
+  }
+  crypto::hash txid = *reinterpret_cast<const crypto::hash*>(txid_data.data());
+
+  crypto::secret_key tx_key;
+  std::vector<crypto::secret_key> amount_keys;
+  if (m_wallet->get_tx_key(txid, tx_key))
+  {
+    success_msg_writer() << "tx one-time secret key: " << epee::string_tools::pod_to_hex(tx_key);
+    return true;
+  }
+  else
+  {
+    fail_msg_writer() << "no tx keys found for this txid";
+    return true;
+  }
+}
+//----------------------------------------------------------------------------------------------------
+void simple_wallet::set_offline_mode(bool offline_mode)
+{
+  if (offline_mode && !m_offline_mode)
+  {
+    message_writer(epee::log_space::console_color_yellow, true, std::string(), LOG_LEVEL_0)
+      << "WARNING: the wallet is running in OFFLINE MODE!";
+  }
+  m_offline_mode = offline_mode;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::save_watch_only(const std::vector<std::string> &args)
+{
+  if (args.size() < 2)
+  {
+    fail_msg_writer() << "wrong parameters, expected filename and password";
+    return true;
+  }
+  try
+  {
+    m_wallet->store_watch_only(epee::string_encoding::convert_to_unicode(args[0]), args[1]);
+    success_msg_writer() << "Watch-only wallet has been stored to " << args[0];
+  }
+  catch (const std::exception& e)
+  {
+    LOG_ERROR("unexpected error: " << e.what());
+    fail_msg_writer() << "unexpected error: " << e.what();
+  }
+  catch (...)
+  {
+    LOG_ERROR("Unknown error");
+    fail_msg_writer() << "unknown error";
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::list_outputs(const std::vector<std::string> &args)
+{
+  if (args.size() > 1)
+  {
+    fail_msg_writer() << "invalid syntax: one or none parameters are expected, " << args.size() << " was given";
+    return true;
+  }
+
+  bool include_spent = true, include_unspent = true;
+  if (args.size() == 1)
+  {
+    if (args[0] == "unspent" || args[0] == "available")
+      include_spent = false;
+    else if (args[0] == "spent" || args[0] == "unavailable")
+      include_unspent = false;
+    else
+    {
+      fail_msg_writer() << "invalid parameter: " << args[0];
+      return true;
+    }
+  }
+
+  success_msg_writer() << "list of all the outputs that have ever been sent to this wallet:" << ENDL <<
+    m_wallet->get_transfers_str(include_spent, include_unspent);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::sign_transfer(const std::vector<std::string> &args)
+{
+  if (m_wallet->is_watch_only())
+  {
+    fail_msg_writer() << "You can't sign transaction in watch-only wallet";
+    return true;
+
+  }
+
+  if (args.size() < 2)
+  {
+    fail_msg_writer() << "wrong parameters, expected: <unsigned_tx_file> <signed_tx_file>";
+    return true;
+  }
+  try
+  {
+    currency::transaction res_tx;
+    m_wallet->sign_transfer_files(args[0], args[1], res_tx);
+    success_msg_writer(true) << "transaction signed and stored to file: " << args[1] << ", transaction " << get_transaction_hash(res_tx) << ", " << get_object_blobsize(res_tx) << " bytes";
+  }
+  catch (const std::exception& e)
+  {
+    LOG_ERROR("unexpected error: " << e.what());
+    fail_msg_writer() << "unexpected error: " << e.what();
+  }
+  catch (...)
+  {
+    LOG_ERROR("Unknown error");
+    fail_msg_writer() << "unknown error";
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
+{
+  if (args.size() < 1)
+  {
+    fail_msg_writer() << "wrong parameters, expected filename";
+    return true;
+  }
+  try
+  {
+    currency::transaction res_tx;
+    m_wallet->submit_transfer_files(args[0], res_tx);
+    success_msg_writer(true) << "transaction " << get_transaction_hash(res_tx) << " was successfully sent, size: " << get_object_blobsize(res_tx) << " bytes";
+  }
+  catch (const std::exception& e)
+  {
+    LOG_ERROR("unexpected error: " << e.what());
+    fail_msg_writer() << "unexpected error: " << e.what();
+  }
+  catch (...)
+  {
+    LOG_ERROR("Unknown error");
+    fail_msg_writer() << "unknown error";
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
 #ifdef WIN32
@@ -1270,13 +1440,17 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_dont_set_date);
   command_line::add_arg(desc_params, arg_print_brain_wallet);
   command_line::add_arg(desc_params, arg_do_pos_mining);
-  
+  command_line::add_arg(desc_params, arg_offline_mode);
+  command_line::add_arg(desc_params, command_line::arg_log_file);
+  command_line::add_arg(desc_params, command_line::arg_log_level);
+
   
   tools::wallet_rpc_server::init_options(desc_params);
 
   po::positional_options_description positional_options;
   positional_options.add(arg_command.name, -1);
 
+  shared_ptr<currency::simple_wallet> sw(new currency::simple_wallet);
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
   po::variables_map vm;
@@ -1286,9 +1460,8 @@ int main(int argc, char* argv[])
 
     if (command_line::get_arg(vm, command_line::arg_help))
     {
-      simple_wallet w;
       success_msg_writer() << "Usage: simplewallet [--wallet-file=<file>|--generate-new-wallet=<file>] [--daemon-address=<host>:<port>] [<COMMAND>]";
-      success_msg_writer() << desc_all << '\n' << w.get_commands_str();
+      success_msg_writer() << desc_all << '\n' << sw->get_commands_str();
       return false;
     }
     else if (command_line::get_arg(vm, command_line::arg_version))
@@ -1307,22 +1480,32 @@ int main(int argc, char* argv[])
 
   //set up logging options
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
-  log_space::log_singletone::add_logger(LOGGER_FILE,
-    log_space::log_singletone::get_default_log_file().c_str(),
-    log_space::log_singletone::get_default_log_folder().c_str(), LOG_LEVEL_4);
-
+  boost::filesystem::path log_file_path(command_line::get_arg(vm, command_line::arg_log_file));
+  if (log_file_path.empty())
+    log_file_path = log_space::log_singletone::get_default_log_file();
+  std::string log_dir;
+  log_dir = log_file_path.has_parent_path() ? log_file_path.parent_path().string() : log_space::log_singletone::get_default_log_folder();
+  log_space::log_singletone::add_logger(LOGGER_FILE, log_file_path.filename().string().c_str(), log_dir.c_str(), LOG_LEVEL_4);
   message_writer(epee::log_space::console_color_white, true) << CURRENCY_NAME << " wallet v" << PROJECT_VERSION_LONG;
 
-  if(command_line::has_arg(vm, arg_log_level))
+  if (command_line::has_arg(vm, arg_log_level))
   {
     LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, arg_log_level));
     log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, arg_log_level));
   }
+  if (command_line::has_arg(vm, command_line::arg_log_level))
+  {
+    LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
+    log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, command_line::arg_log_level));
+  }
   
+  bool offline_mode = command_line::get_arg(vm, arg_offline_mode);
+
   if(command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
   {
     // runs wallet as RPC server
     log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+    sw->set_offline_mode(offline_mode);
     LOG_PRINT_L0("Starting wallet RPC server...");
 
     if (!command_line::has_arg(vm, arg_wallet_file) || command_line::get_arg(vm, arg_wallet_file).empty())
@@ -1331,7 +1514,7 @@ int main(int argc, char* argv[])
       return 1;
     }
 
-    if (!command_line::has_arg(vm, arg_daemon_address) )
+    if (!command_line::has_arg(vm, arg_daemon_address) && !command_line::has_arg(vm, arg_offline_mode))
     {
       LOG_ERROR("Daemon address is not set.");
       return 1;
@@ -1384,7 +1567,8 @@ int main(int argc, char* argv[])
         wal.init(daemon_address);
         if (command_line::get_arg(vm, arg_generate_new_wallet).size())
           return 1;
-        wal.refresh();
+        if (!offline_mode)
+          wal.refresh();
         LOG_PRINT_GREEN("Loaded ok", LOG_LEVEL_0);
       }
       catch (const std::exception& e)
@@ -1404,7 +1588,7 @@ int main(int argc, char* argv[])
       wrpc.send_stop_signal();
     });
     LOG_PRINT_L0("Starting wallet rpc server");
-    wrpc.run(command_line::get_arg(vm, arg_do_pos_mining) );
+    wrpc.run(command_line::get_arg(vm, arg_do_pos_mining), offline_mode);
     LOG_PRINT_L0("Stopped wallet rpc server");
     try
     {
@@ -1419,8 +1603,8 @@ int main(int argc, char* argv[])
     }
   }else
   {
-    shared_ptr<currency::simple_wallet> sw(new currency::simple_wallet);
     //runs wallet with console interface 
+    sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
     CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet");
     if (command_line::get_arg(vm, arg_generate_new_wallet).size())

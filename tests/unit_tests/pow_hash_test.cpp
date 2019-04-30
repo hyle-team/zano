@@ -2,11 +2,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-
-
-
 #include "gtest/gtest.h"
-
 #include "crypto/crypto.h"
 #include "currency_core/currency_basic.h"
 #include "profile_tools.h"
@@ -48,4 +44,3 @@ using namespace currency;
 //   bool res = test_scratchpad_against_light_scratchpad();
 //   ASSERT_TRUE(res);
 // }
-

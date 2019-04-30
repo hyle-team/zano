@@ -27,16 +27,15 @@ void exception_handler(){}
 //==============================================================================================================================
 
 // helper routine: creates multisig-spending tx using a wallet and keys of other ms-participants, then sends it to the core proxy
-template<typename destination_split_strategy_t>
 void transfer_multisig(tools::wallet2& w,
   const std::list<currency::account_keys>& owner_keys, 
-  crypto::hash multisig_id,
+  const crypto::hash& multisig_id,
   const std::vector<currency::tx_destination_entry>& dsts,
   uint64_t unlock_time,
   uint64_t fee,
   const std::vector<currency::extra_v>& extra,
-  const std::vector<currency::attachment_v> attachments,
-  destination_split_strategy_t destination_split_strategy,
+  const std::vector<currency::attachment_v>& attachments,
+  tools::detail::split_strategy_id_t split_strategy_id,
   const tools::tx_dust_policy& dust_policy,
   currency::transaction &tx,
   uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED,
@@ -44,31 +43,28 @@ void transfer_multisig(tools::wallet2& w,
   bool shuffle = true, 
   bool send_to_network = true)
 {
-    using namespace currency;
-    std::vector<uint64_t> selected_transfers;
-    std::vector<currency::tx_destination_entry> prepared_destinations;
     currency::account_public_address crypt_address = get_crypt_address_from_destinations(w.get_account().get_keys(), dsts);
-    currency::keypair one_time_keys = AUTO_VAL_INIT(one_time_keys);
 
     // prepare transaction will sign ms input partially with wallet's keys - it needed to be signed fully with the others
-    w.prepare_transaction(dsts,
-      0,
-      unlock_time,
-      fee,
-      extra,
-      attachments,
-      destination_split_strategy,
-      dust_policy,
-      crypt_address,
-      tx,
-      tx_outs_attr,
-      shuffle,
-      false,
-      flags,
-      selected_transfers,
-      one_time_keys,
-      prepared_destinations, 
-      multisig_id);
+    tools::construct_tx_param ctp = AUTO_VAL_INIT(ctp);
+    tools::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    ctp.attachments = attachments;
+    ctp.crypt_address = crypt_address;
+    ctp.dsts = dsts;
+    ctp.dust_policy = dust_policy;
+    ctp.extra = extra;
+    ctp.fake_outputs_count = 0;
+    ctp.fee = fee;
+    ctp.flags = flags;
+    ctp.mark_tx_as_complete = false;
+    ctp.multisig_id = multisig_id;
+    ctp.shuffle = shuffle;
+    ctp.split_strategy_id = split_strategy_id;
+    ctp.tx_outs_attr = tx_outs_attr;
+    ctp.unlock_time = unlock_time;
+
+    w.prepare_transaction(ctp, ftp, tx);
+    w.finalize_transaction(ftp, tx, crypto::secret_key(), false);
 
     // sign ms input with all other non-wallet keys
     auto it = w.get_multisig_transfers().find(multisig_id);
@@ -158,7 +154,7 @@ bool multisig_wallet_test::c1(currency::core& c, size_t ev_index, const std::vec
   dst.back().amount = AMOUNT_TO_TRANSFER_MULTISIG + TESTS_DEFAULT_FEE;
   dst.back().minimum_sigs = dst.back().addr.size();
   transaction result_tx = AUTO_VAL_INIT(result_tx);
-  miner_wlt->transfer(dst, 0, 0, TESTS_DEFAULT_FEE, extra, attachments, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
+  miner_wlt->transfer(dst, 0, 0, TESTS_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
 
   bool r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
@@ -204,7 +200,7 @@ bool multisig_wallet_test::c1(currency::core& c, size_t ev_index, const std::vec
     TESTS_DEFAULT_FEE,
     extra,
     attachments,
-    tools::detail::digit_split_strategy,
+    tools::detail::ssi_digit,
     tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD),
     result_tx);
 
@@ -293,7 +289,7 @@ bool multisig_wallet_test_many_dst::c1(currency::core& c, size_t ev_index, const
 
   transaction result_tx = AUTO_VAL_INIT(result_tx);
   TMP_LOG_SILENT;
-  miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
+  miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
   TMP_LOG_RESTORE;
 
   auto it = std::find_if(result_tx.vout.begin(), result_tx.vout.end(), [](tx_out& o) { return o.target.type() == typeid(txout_multisig); });
@@ -314,7 +310,7 @@ bool multisig_wallet_test_many_dst::c1(currency::core& c, size_t ev_index, const
   tx_destination_entry de2(amount - TESTS_DEFAULT_FEE, m_accounts[ALICE_ACC_IDX].get_public_address());
   transaction tx = AUTO_VAL_INIT(tx);
   TMP_LOG_SILENT;
-  transfer_multisig(*w.get(), owner_keys, get_multisig_out_id(result_tx, multisig_index), std::vector<tx_destination_entry>({ de2 }), 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+  transfer_multisig(*w.get(), owner_keys, get_multisig_out_id(result_tx, multisig_index), std::vector<tx_destination_entry>({ de2 }), 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
   TMP_LOG_RESTORE;
 
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -416,7 +412,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   // Send multisig tx
   transaction ms_tx = AUTO_VAL_INIT(ms_tx);
   miner_wlt->transfer(std::vector<tx_destination_entry>({ de1, de2, de3, de4, de5, de6 }),
-    0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), ms_tx);
+    0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), ms_tx);
 
   // calculate multisig hashes for further usage
   crypto::hash ms1_hash = currency::get_multisig_out_id(ms_tx, get_tx_out_index_by_amount(ms_tx, de1.amount));
@@ -484,7 +480,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
 
   currency::transaction tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*alice_wlt.get(), std::list<account_keys>({ m_accounts[BOB_ACC_IDX].get_keys() }), ms1_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount1, receiver_acc.get_public_address()) }),
-    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
@@ -499,7 +495,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   {
     // as 'false' means don't send to network. This should fail during preparation, not during sending/processing
     transfer_multisig(*bob_wlt.get(), std::list<account_keys>({ m_accounts[ALICE_ACC_IDX].get_keys() }), ms1_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount1, receiver_acc.get_public_address()) }),
-      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
+      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
   }
   catch (tools::error::wallet_internal_error&)
   {
@@ -518,7 +514,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
 
   tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*carol_wlt.get(), std::list<account_keys>({ m_accounts[DAN_ACC_IDX].get_keys() }), ms2_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount2, receiver_acc.get_public_address()) }),
-    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
@@ -530,7 +526,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   {
     // as 'false' means don't send to network. This should fail during preparation, not during sending/processing
     transfer_multisig(*dan_wlt.get(), std::list<account_keys>({ m_accounts[CAROL_ACC_IDX].get_keys() }), ms2_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount2, receiver_acc.get_public_address()) }),
-      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
+      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
   }
   catch (tools::error::wallet_internal_error&)
   {
@@ -546,7 +542,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
 
   // Re-try spending Carol-Dan multisig out on behalf of Dan. It should be OK now
   transfer_multisig(*dan_wlt.get(), std::list<account_keys>({ m_accounts[CAROL_ACC_IDX].get_keys() }), ms2_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount2, receiver_acc.get_public_address()) }),
-    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
@@ -564,7 +560,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
 
   tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*alice_wlt.get(), std::list<account_keys>({ m_accounts[DAN_ACC_IDX].get_keys() }), ms3_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount3, receiver_acc.get_public_address()) }),
-    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
@@ -575,7 +571,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   {
     // last 'false' means don't send to network. This should fail during preparation, not during sending/processing
     transfer_multisig(*dan_wlt.get(), std::list<account_keys>({ m_accounts[ALICE_ACC_IDX].get_keys() }), ms3_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount3, receiver_acc.get_public_address()) }),
-      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
+      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
   }
   catch (tools::error::wallet_internal_error&)
   {
@@ -605,7 +601,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   try
   {
     transfer_multisig(*dan_wlt.get(), std::list<account_keys>({ m_accounts[ALICE_ACC_IDX].get_keys() }), ms3_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount3, receiver_acc.get_public_address()) }),
-      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
+      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
   }
   catch (tools::error::wallet_internal_error&)
   {
@@ -704,7 +700,7 @@ bool multisig_wallet_same_dst_addr::c1(currency::core& c, size_t ev_index, const
   transaction tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*alice_wlt.get(), std::list<account_keys>({ m_accounts[ALICE_ACC_IDX].get_keys() }), ms_hash,
     std::vector<tx_destination_entry>({ tx_destination_entry(amount, m_accounts[BOB_ACC_IDX].get_public_address()) }),
-    0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
@@ -798,7 +794,7 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
   transaction ms_tx2 = AUTO_VAL_INIT(ms_tx2);
   transfer_multisig(*alice_wlt.get(), std::list<account_keys>({ m_accounts[BOB_ACC_IDX].get_keys() }), ms_hash,
     std::vector<tx_destination_entry>({ de }),
-    0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), ms_tx2);
+    0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), ms_tx2);
 
   // check the pool and mine a block
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
@@ -815,7 +811,7 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
   transaction tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*miner_wlt.get(), std::list<account_keys>({ m_accounts[BOB_ACC_IDX].get_keys() }), ms_hash2,
     std::vector<tx_destination_entry>({ tx_destination_entry(amount - TESTS_DEFAULT_FEE, m_accounts[BOB_ACC_IDX].get_public_address()) }),
-    0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
@@ -2488,7 +2484,7 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
   dst.back().amount = ms_amount + TESTS_DEFAULT_FEE;
   dst.back().minimum_sigs = dst.back().addr.size();
   transaction key_to_ms_tx = AUTO_VAL_INIT(key_to_ms_tx);
-  miner_wlt->transfer(dst, 0, 0, TESTS_DEFAULT_FEE, extra, attachments, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), key_to_ms_tx);
+  miner_wlt->transfer(dst, 0, 0, TESTS_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), key_to_ms_tx);
 
   bool r = mine_next_pow_blocks_in_playtime(miner_acc.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
@@ -2528,7 +2524,7 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
     TESTS_DEFAULT_FEE,
     extra,
     attachments,
-    tools::detail::digit_split_strategy,
+    tools::detail::ssi_digit,
     tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD),
     tx);
 

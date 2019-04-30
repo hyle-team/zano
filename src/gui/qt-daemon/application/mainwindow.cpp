@@ -650,7 +650,7 @@ bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
   TRY_ENTRY();
   m_wallet_states->operator [](wsi.wallet_id) = wsi.wallet_state;
   std::string json_str;
-  epee::serialization::store_t_to_json(wsi, json_str);
+  epee::serialization::store_t_to_json(wsi, json_str, 0, epee::serialization::eol_lf);
   LOG_PRINT_L0(get_wallet_log_prefix(wsi.wallet_id) + "SENDING SIGNAL -> [update_wallet_status]:" << std::endl << json_str );
   QMetaObject::invokeMethod(this, "update_wallet_status", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
@@ -660,7 +660,7 @@ bool MainWindow::set_options(const view::gui_options& opt)
 {
   TRY_ENTRY();
   std::string json_str;
-  epee::serialization::store_t_to_json(opt, json_str);
+  epee::serialization::store_t_to_json(opt, json_str, 0, epee::serialization::eol_lf);
   LOG_PRINT_L0("SENDING SIGNAL -> [set_options]:" << std::endl << json_str);
   QMetaObject::invokeMethod(this, "set_options", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
@@ -688,7 +688,7 @@ bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
 {
   TRY_ENTRY();
   std::string json_str;
-  epee::serialization::store_t_to_json(wsi, json_str);
+  epee::serialization::store_t_to_json(wsi, json_str, 0, epee::serialization::eol_lf);
   LOG_PRINT_L0("SENDING SIGNAL -> [update_wallets_info]"<< std::endl << json_str );
   
   QMetaObject::invokeMethod(this, "update_wallets_info", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
@@ -700,7 +700,7 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
 {
   TRY_ENTRY();
   std::string json_str;
-  epee::serialization::store_t_to_json(tei, json_str);
+  epee::serialization::store_t_to_json(tei, json_str, 0, epee::serialization::eol_lf);
 
   LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer]" << std::endl << json_str);
   //this->money_transfer(json_str.c_str());
@@ -745,7 +745,7 @@ bool MainWindow::money_transfer_cancel(const view::transfer_event_info& tei)
 {
   TRY_ENTRY();
   std::string json_str;
-  epee::serialization::store_t_to_json(tei, json_str);
+  epee::serialization::store_t_to_json(tei, json_str, 0, epee::serialization::eol_lf);
 
   LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer_cancel]");
   //this->money_transfer_cancel(json_str.c_str());
@@ -760,7 +760,7 @@ bool MainWindow::wallet_sync_progress(const view::wallet_sync_progres_param& p)
   TRY_ENTRY();
   LOG_PRINT_L2(get_wallet_log_prefix(p.wallet_id) + "SENDING SIGNAL -> [wallet_sync_progress]" << " wallet_id: " << p.wallet_id << ": " << p.progress << "%");
   //this->wallet_sync_progress(epee::serialization::store_t_to_json(p).c_str());
-  QMetaObject::invokeMethod(this, "wallet_sync_progress", Qt::QueuedConnection, Q_ARG(QString, epee::serialization::store_t_to_json(p).c_str()));
+  QMetaObject::invokeMethod(this, "wallet_sync_progress", Qt::QueuedConnection, Q_ARG(QString, epee::serialization::store_t_to_json(p, 0, epee::serialization::eol_lf).c_str()));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -811,7 +811,7 @@ QString MainWindow::get_alias_coast(const QString& param)
   PREPARE_ARG_FROM_JSON(view::struct_with_one_t_type<std::string>, lvl);
   view::get_alias_coast_response resp;
   resp.error_code = m_backend.get_alias_coast(lvl.v, resp.coast);
-  return epee::serialization::store_t_to_json(resp).c_str();
+  return epee::serialization::store_t_to_json(resp, 0, epee::serialization::eol_lf).c_str();
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
@@ -836,7 +836,7 @@ QString MainWindow::set_localization_strings(const QString param)
     resp.error_code = API_RETURN_CODE_OK;
     LOG_PRINT_L0("New localization set, language title: " << lr.language_title << ", strings " << lr.strings.size());
   }
-  return epee::serialization::store_t_to_json(resp).c_str();
+  return epee::serialization::store_t_to_json(resp, 0, epee::serialization::eol_lf).c_str();
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
@@ -1292,7 +1292,7 @@ QString MainWindow::show_openfile_dialog(const QString& param)
   if (!epee::serialization::load_t_from_json(ofdr, param.toStdString()))
   {
     ofdres.error_code = API_RETURN_CODE_BAD_ARG;
-    return epee::serialization::store_t_to_json(ofdres).c_str();
+    return epee::serialization::store_t_to_json(ofdres, 0, epee::serialization::eol_lf).c_str();
   }
 
   QString path = QFileDialog::getOpenFileName(this, ofdr.caption.c_str(),
@@ -1302,7 +1302,7 @@ QString MainWindow::show_openfile_dialog(const QString& param)
   if (!path.length())
   {
     ofdres.error_code = API_RETURN_CODE_CANCELED;
-    return epee::serialization::store_t_to_json(ofdres).c_str();
+    return epee::serialization::store_t_to_json(ofdres, 0, epee::serialization::eol_lf).c_str();
   }
 
   ofdres.error_code = API_RETURN_CODE_OK;
@@ -1325,7 +1325,7 @@ QString MainWindow::show_savefile_dialog(const QString& param)
   if (!path.length())
   {
     ofdres.error_code = API_RETURN_CODE_CANCELED;
-    return epee::serialization::store_t_to_json(ofdres).c_str();
+    return epee::serialization::store_t_to_json(ofdres, 0, epee::serialization::eol_lf).c_str();
   }
 
   ofdres.error_code = API_RETURN_CODE_OK;
