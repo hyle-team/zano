@@ -64,7 +64,8 @@ void transfer_multisig(tools::wallet2& w,
     ctp.unlock_time = unlock_time;
 
     w.prepare_transaction(ctp, ftp, tx);
-    w.finalize_transaction(ftp, tx, crypto::secret_key(), false);
+    crypto::secret_key sk = AUTO_VAL_INIT(sk);
+    w.finalize_transaction(ftp, tx, sk, false);
 
     // sign ms input with all other non-wallet keys
     auto it = w.get_multisig_transfers().find(multisig_id);
