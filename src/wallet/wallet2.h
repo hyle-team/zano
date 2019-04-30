@@ -603,11 +603,14 @@ namespace tools
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
     uint64_t get_blockchain_current_height() const { return m_blockchain.size(); }
+
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
     {
-      if (ver < WALLET_FILE_SERIALIZATION_VERSION)
+      // do not load wallet if data version is greather than the code version 
+      if (ver > WALLET_FILE_SERIALIZATION_VERSION)
         return;
+
       a & m_blockchain;
       a & m_transfers;
       a & m_multisig_transfers;
@@ -622,6 +625,7 @@ namespace tools
       a & m_contracts;
       a & m_money_expirations;
     }
+
     bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count);
