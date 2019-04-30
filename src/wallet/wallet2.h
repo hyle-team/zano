@@ -616,8 +616,11 @@ namespace tools
       a & m_multisig_transfers;
       a & m_key_images;
       
-      if(ver >= 144) //reset unconfirmed due to "coinbase relay bug" 
-        a & m_unconfirmed_txs;
+      a & m_unconfirmed_txs;
+      if (ver < 144) //reset unconfirmed due to "coinbase relay bug" 
+      {
+        m_unconfirmed_txs.clear();
+      }
 
       a & m_unconfirmed_multisig_transfers;
       a & m_payments;
