@@ -63,6 +63,8 @@ namespace currency
     bool load(const std::string& file_path);
     bool store(const std::string& file_path);
 
+    void make_account_watch_only();
+
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int /*ver*/)
     {

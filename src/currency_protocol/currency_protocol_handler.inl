@@ -235,7 +235,7 @@ namespace currency
     if (it != m_blocks_id_que.end())
     {
       //already have this block handler in que
-      LOG_PRINT("Block " << block_id << " already in processing que", LOG_LEVEL_2);
+      LOG_PRINT("Block " << block_id << " already in processing que", LOG_LEVEL_3);
       return 1;
     }
     else

@@ -231,9 +231,11 @@ namespace wallet_rpc
     struct response
     {
       std::string tx_hash;
+      std::string tx_unsigned_hex; // for cold-signing process
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_hash)
+        KV_SERIALIZE(tx_unsigned_hex)
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -255,12 +257,14 @@ namespace wallet_rpc
 
   struct payment_details
   {
+    std::string payment_id;
     std::string tx_hash;
     uint64_t amount;
     uint64_t block_height;
     uint64_t unlock_time;
 
     BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(payment_id)
       KV_SERIALIZE(tx_hash)
       KV_SERIALIZE(amount)
       KV_SERIALIZE(block_height)
@@ -276,6 +280,29 @@ namespace wallet_rpc
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(payment_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::list<payment_details> payments;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(payments)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_RPC_GET_BULK_PAYMENTS
+  {
+    struct request
+    {
+      std::vector<std::string> payment_ids;
+      uint64_t min_block_height;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(payment_ids)
+        KV_SERIALIZE(min_block_height)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -335,6 +362,51 @@ namespace wallet_rpc
     };
   };
 
+  struct COMMAND_SIGN_TRANSFER
+  {
+    struct request
+    {
+      std::string     tx_unsigned_hex;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_unsigned_hex)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string     tx_signed_hex;
+      std::string     tx_hash;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_signed_hex)
+        KV_SERIALIZE(tx_hash)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_SUBMIT_TRANSFER
+  {
+    struct request
+    {
+      //std::string     tx_unsigned_hex;
+      std::string     tx_signed_hex;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        //KV_SERIALIZE(tx_unsigned_hex)
+        KV_SERIALIZE(tx_signed_hex)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string     tx_hash;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_hash)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   /*stay-alone instance*/
   struct telepod

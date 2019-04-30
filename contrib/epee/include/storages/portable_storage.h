@@ -83,7 +83,7 @@ namespace epee
       bool		load_from_binary(const binarybuffer& target);
       template<class trace_policy>
       bool		  dump_as_xml(std::string& targetObj, const std::string& root_name = "");
-      bool		  dump_as_json(std::string& targetObj, size_t indent = 0);
+      bool		  dump_as_json(std::string& targetObj, size_t indent = 0, end_of_line_t eol = eol_crlf);
       bool		  load_from_json(const std::string& source);
 
     private:
@@ -106,11 +106,11 @@ namespace epee
 #pragma pack(pop)
     };
     inline
-    bool		  portable_storage::dump_as_json(std::string& buff, size_t indent)
+    bool		  portable_storage::dump_as_json(std::string& buff, size_t indent /* = 0 */, end_of_line_t eol /* = eol_crlf */)
     {
       TRY_ENTRY();
       std::stringstream ss;
-      epee::serialization::dump_as_json(ss, m_root, indent);
+      epee::serialization::dump_as_json(ss, m_root, indent, eol);
       buff = ss.str();
       return true;
       CATCH_ENTRY("portable_storage::dump_as_json", false)
