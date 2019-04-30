@@ -4056,6 +4056,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
 
   if (m_watch_only)
   {
+    TIME_MEASURE_START(store_unsigned_tx_time);
     ftp.spend_pub_key = m_account.get_public_address().m_spend_public_key;
     blobdata bl = t_serializable_object_to_blob(ftp);
     crypto::chacha_crypt(bl, m_account.get_keys().m_view_secret_key);
@@ -4064,11 +4065,19 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
 
     if (p_signed_tx_blob_str != nullptr)
       *p_signed_tx_blob_str = bl;
+    TIME_MEASURE_FINISH(store_unsigned_tx_time);
 
     // unlock transfers at the very end
     TIME_MEASURE_START(mark_transfers_as_spent_time);
     mark_transfers_with_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION, std::string("cold sig reservation for money transfer"), true);
     TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
+
+    WLT_LOG_GREEN("[wallet::transfer]"
+      << "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
+      << ", prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
+      << ", store_unsigned_tx_time: " << print_fixed_decimal_point(store_unsigned_tx_time, 3)
+      << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
+      , LOG_LEVEL_0);
 
     return;
   }
@@ -4083,15 +4092,14 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   mark_transfers_as_spent(ftp.selected_transfers, std::string("money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
   TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
 
-  /* TODO
-  WLT_LOG_GREEN("[wallet::transfer] prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
-    << ", precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
-    << ", send_transaction_to_network_time: " << print_fixed_decimal_point(send_transaction_to_network_time, 3)
+  WLT_LOG_GREEN("[wallet::transfer]"
+    << "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
+    << ", prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
+    << ", finalize_transaction_time: " << print_fixed_decimal_point(finalize_transaction_time, 3)
     << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
-    << ", add_sent_tx_detailed_info_time: " << print_fixed_decimal_point(add_sent_tx_detailed_info_time, 3),
-    LOG_LEVEL_0);*/
+    , LOG_LEVEL_0);
 
-  //print_tx_sent_message(tx, std::string() + "(transaction)", fee);
+  print_tx_sent_message(tx, std::string() + "(transfer)", fee);
 }
 
 
