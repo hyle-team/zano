@@ -39,7 +39,10 @@
 
     <div class="input-block">
       <label for="send-comment">{{ 'SEND.COMMENT' | translate }}</label>
-      <input type="text" id="send-comment" formControlName="comment" (contextmenu)="variablesService.onContextMenu($event)">
+      <input type="text" id="send-comment" formControlName="comment" [maxLength]="variablesService.maxCommentLength" (contextmenu)="variablesService.onContextMenu($event)">
+      <div class="error-block" *ngIf="sendForm.get('comment').value && sendForm.get('comment').value.length >= variablesService.maxCommentLength">
+        {{ 'SEND.FORM_ERRORS.MAX_LENGTH' | translate }}
+      </div>
     </div>
 
   </div>

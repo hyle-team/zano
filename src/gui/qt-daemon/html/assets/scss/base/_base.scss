@@ -567,8 +567,10 @@ input[type='checkbox'].style-checkbox {
 }
 
 .comment-tooltip {
+  overflow: auto;
   word-break: break-word;
   max-width: 50rem;
+  max-height: 25rem;
 }
 
 .ngx-contextmenu {

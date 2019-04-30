@@ -20,7 +20,7 @@
   <div class="row">
     <span class="cell label" [style.flex-basis]="sizes[0] + 'px'">{{ 'HISTORY.DETAILS.COMMENT' | translate }}</span>
     <span class="cell value" [style.flex-basis]="sizes[1] + sizes[2] + sizes[3] + 'px'"
-          tooltip="{{transaction.comment}}" placement="top" tooltipClass="table-tooltip comment-tooltip" [delay]="500" [showWhenNoOverflow]="false"
+          tooltip="{{transaction.comment}}" placement="top" tooltipClass="table-tooltip comment-tooltip scrolled-content" [delay]="500" [showWhenNoOverflow]="false"
           (contextmenu)="variablesService.onContextMenuOnlyCopy($event, transaction.comment)">
       {{transaction.comment}}
     </span>
