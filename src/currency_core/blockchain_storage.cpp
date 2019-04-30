@@ -873,7 +873,13 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
       LOG_ERROR("Failed to push ex-main chain blocks to alternative chain ");
       rollback_blockchain_switching(disconnected_chain, split_height);
       CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL!");
-      return false;
+
+      //can't do return false here, because of the risc to get stuck in "PANIC" mode when nor of 
+      //new chain nor altchain can be inserted into main chain. Got core caught in this trap when
+      //when machine time was wrongly set for a few hours back, then blocks which was detached from main chain 
+      //couldn't be added as alternative due to timestamps validation(timestamps assumed as from future)
+      //thanks @Gigabyted for reporting this problem
+      break;
     }
   }
 
@@ -2870,7 +2876,7 @@ bool blockchain_storage::pop_alias_info(const extra_alias_entry& ai)
     m_db_addr_to_alias.set(local_alias_hist.back().m_address, local_copy);
   }
 
-  LOG_PRINT_MAGENTA("[ALIAS_UNREGISTERED]: " << ai.m_alias << ": " << get_account_address_as_str(ai.m_address) << " -> " << (!alias_history_ptr->empty() ? get_account_address_as_str(alias_history_ptr->back().m_address) : "(available)"), LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("[ALIAS_UNREGISTERED]: " << ai.m_alias << ": " << get_account_address_as_str(ai.m_address) << " -> " << (!local_alias_hist.empty() ? get_account_address_as_str(local_alias_hist.back().m_address) : "(available)"), LOG_LEVEL_1);
   return true;
 }
 //------------------------------------------------------------------
@@ -2957,7 +2963,7 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
     addr_to_alias_local2.insert(ai.m_alias);
     m_db_addr_to_alias.set(local_alias_history.back().m_address, addr_to_alias_local2);
 
-    LOG_PRINT_MAGENTA("[ALIAS_UPDATED]: " << ai.m_alias << ": from: " << old_address << " to " << get_account_address_as_str(ai.m_address), LOG_LEVEL_0);
+    LOG_PRINT_MAGENTA("[ALIAS_UPDATED]: " << ai.m_alias << ": from: " << old_address << " to " << get_account_address_as_str(ai.m_address), LOG_LEVEL_1);
     rise_core_event(CORE_EVENT_UPDATE_ALIAS, alias_info_to_rpc_update_alias_info(ai, old_address));
 
   }

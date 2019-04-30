@@ -134,9 +134,8 @@ namespace currency
     uint64_t get_core_time() const;
     bool get_aliases_from_tx_pool(std::list<extra_alias_entry>& aliases)const;
     bool get_aliases_from_tx_pool(std::map<std::string, size_t>& aliases)const;
-    //crypto::hash get_last_core_hash() {return m_last_core_top_hash;}
-    //void set_last_core_hash(const crypto::hash& h) { m_last_core_top_hash = h; }
-
+    
+    bool remove_stuck_transactions(); // made public to be called from coretests
 
   private:
     bool on_tx_add(const transaction& tx, bool kept_by_block);
@@ -148,7 +147,6 @@ namespace currency
 
     bool is_valid_contract_finalization_tx(const transaction &tx)const;
     void initialize_db_solo_options_values();
-    bool remove_stuck_transactions();
     bool is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const;
     bool validate_alias_info(const transaction& tx, bool is_in_block)const;
     bool get_key_images_from_tx_pool(std::unordered_set<crypto::key_image>& key_images)const;
@@ -181,7 +179,6 @@ namespace currency
     address_to_aliases_container m_db_alias_addresses;
     solo_options_container m_db_solo_options;
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_major_compatibility_version;
-    //crypto::hash m_last_core_top_hash;
 
 
     epee::math_helper::once_a_time_seconds<30> m_remove_stuck_tx_interval;
