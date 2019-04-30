@@ -615,15 +615,22 @@ namespace tools
       a & m_transfers;
       a & m_multisig_transfers;
       a & m_key_images;
-      a & m_pending_key_images;
-      a & m_unconfirmed_txs;
+      
+      if(ver >= 144) //reset unconfirmed due to "coinbase relay bug" 
+        a & m_unconfirmed_txs;
+
       a & m_unconfirmed_multisig_transfers;
-      a & m_tx_keys;
       a & m_payments;
       a & m_transfer_history;
       a & m_unconfirmed_in_transfers;
       a & m_contracts;
       a & m_money_expirations;
+      if (ver >= 144)
+      {
+        a & m_pending_key_images;
+        a & m_tx_keys;
+      }
+
     }
 
     bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
