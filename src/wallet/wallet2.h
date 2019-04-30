@@ -293,7 +293,7 @@ namespace tools
     currency::transaction tx;
     crypto::secret_key    one_time_key;
     finalize_tx_param     ftp;
-    std::vector<std::pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
+    std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(tx)

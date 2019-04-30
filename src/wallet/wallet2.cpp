@@ -2272,7 +2272,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
       crypto::key_image ki = AUTO_VAL_INIT(ki);
       crypto::generate_key_image(ephemeral_pub, ephemeral_sec, ki);
 
-      ft.outs_key_images.push_back(std::make_pair(static_cast<uint64_t>(i), ki));
+      ft.outs_key_images.push_back(make_serializable_pair(static_cast<uint64_t>(i), ki));
     }
   }
 

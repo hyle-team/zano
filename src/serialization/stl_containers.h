@@ -9,12 +9,28 @@
 #include <vector>
 #include <list>
 
+//#include "serialization.h"
+template <template <bool> class Archive, class T>
+bool do_serialize(Archive<false> &ar, std::vector<T> &v);
+template <template <bool> class Archive, class T>
+bool do_serialize(Archive<true> &ar, std::vector<T> &v);
+
 namespace serialization
 {
   namespace detail
   {
     template <typename Archive, class T>
-    bool serialize_container_element(Archive& ar, T& e);
+    bool serialize_container_element(Archive& ar, T& e)
+    {
+      return ::do_serialize(ar, e);
+    }
+
+    template <typename Archive>
+    bool serialize_container_element(Archive& ar, uint64_t& e)
+    {
+      ar.serialize_varint(e);
+      return true;
+    }
   }
 }
 
@@ -249,23 +265,4 @@ bool do_serialize(Archive<true> &ar, std::vector<bool> &v)
   }
   ar.end_array();
   return true;
-}
-
-namespace serialization
-{
-  namespace detail
-  {
-    template <typename Archive, class T>
-    bool serialize_container_element(Archive& ar, T& e)
-    {
-      return ::do_serialize(ar, e);
-    }
-
-    template <typename Archive>
-    bool serialize_container_element(Archive& ar, uint64_t& e)
-    {
-      ar.serialize_varint(e);
-      return true;
-    }
-  }
 }
