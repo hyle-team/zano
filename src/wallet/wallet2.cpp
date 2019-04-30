@@ -1658,12 +1658,21 @@ void wallet2::detach_blockchain(uint64_t height)
       break;
     tr_hist_it = it; // note that tr_hist_it->height >= height
   }
+  
   if (tr_hist_it != m_transfer_history.rend())
   {
     auto it_from = --tr_hist_it.base();
-    // before removing wti from m_transfer_history put it into m_unconfirmed_txs as txs from detached blocks are most likely moved into the pool
+    // before removing wti from m_transfer_history put it into m_unconfirmed_txs as txs from detached blocks are most likely be moved into the pool
     for (auto it = it_from; it != m_transfer_history.end(); ++it)
     {
+      // skip coinbase txs as they are not expected to go into the pool
+      if (is_coinbase(it->tx))
+      {
+        if (!it->is_mining)
+          WLT_LOG_ERROR("is_mining flag is not consistent for tx " << it ->tx_hash);
+        continue;
+      }
+
       if (!m_unconfirmed_txs.insert(std::make_pair(it->tx_hash, *it)).second)
       {
         WLT_LOG_ERROR("can't move wti from transfer history to unronfirmed txs because such it is already here, tx hash: " << it->tx_hash);
