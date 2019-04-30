@@ -15,7 +15,7 @@
     </tr>
     </thead>
     <tbody>
-    <tr *ngFor="let item of variablesService.currentWallet.contracts" [routerLink]="'/wallet/' + walletId + '/purchase/' + item.contract_id">
+    <tr *ngFor="let item of sortedArrayContracts" [routerLink]="'/wallet/' + walletId + '/purchase/' + item.contract_id">
       <td>
         <div class="contract">
           <i class="icon alert" *ngIf="!item.is_new"></i>

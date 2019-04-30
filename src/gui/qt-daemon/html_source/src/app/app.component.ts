@@ -413,13 +413,6 @@ export class AppComponent implements OnInit, OnDestroy {
                     comment: data.events[i].details.comment
                   };
                   this.variablesService.aliases = this.variablesService.aliases.concat(newAlias);
-                  // this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
-                  //   if (a.name.length > b.name.length) return 1;
-                  //   if (a.name.length < b.name.length) return -1;
-                  //   if (a.name > b.name) return 1;
-                  //   if (a.name < b.name) return -1;
-                  //   return 0;
-                  // });
                   this.variablesService.changeAliases();
                 }
                 break;

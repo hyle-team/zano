@@ -28,9 +28,12 @@
   </div>
 
   <div class="input-blocks-row">
-    <div class="input-block">
+    <div class="input-block input-block-alias">
       <label for="purchase-seller">{{ 'PURCHASE.SELLER' | translate }}</label>
-      <input type="text" id="purchase-seller" formControlName="seller" [readonly]="!newPurchase" appInputDisableSelection (contextmenu)="(!newPurchase) ? variablesService.onContextMenuOnlyCopy($event, purchaseForm.controls['seller'].value) : variablesService.onContextMenu($event)">
+      <input type="text" id="purchase-seller" formControlName="seller" [readonly]="!newPurchase" (mousedown)="addressMouseDown($event)" (contextmenu)="(!newPurchase) ? variablesService.onContextMenuOnlyCopy($event, purchaseForm.controls['seller'].value) : variablesService.onContextMenu($event)">
+      <div class="alias-dropdown scrolled-content" *ngIf="isOpen">
+        <div *ngFor="let item of localAliases" (click)="setAlias(item.name)">{{item.name}}</div>
+      </div>
       <div class="error-block" *ngIf="purchaseForm.controls['seller'].invalid && (purchaseForm.controls['seller'].dirty || purchaseForm.controls['seller'].touched)">
         <div *ngIf="purchaseForm.controls['seller'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.SELLER_REQUIRED' | translate }}
@@ -40,6 +43,9 @@
         </div>
         <div *ngIf="purchaseForm.controls['seller'].errors['address_same']">
           {{ 'PURCHASE.FORM_ERRORS.SELLER_SAME' | translate }}
+        </div>
+        <div *ngIf="purchaseForm.controls['seller'].errors['alias_not_valid']">
+          {{ 'PURCHASE.FORM_ERRORS.ALIAS_NOT_VALID' | translate }}
         </div>
       </div>
     </div>
