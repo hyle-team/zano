@@ -48,6 +48,7 @@ export class VariablesService {
   public maxWalletNameLength = 25;
   public maxCommentLength = 255;
 
+  getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);
   getRefreshStackingEvent = new BehaviorSubject(null);
   getAliasChangedEvent = new BehaviorSubject(null);
@@ -68,6 +69,13 @@ export class VariablesService {
   public pasteSelectContextMenu: ContextMenuComponent;
 
   constructor(private router: Router, private ngZone: NgZone, private contextMenuService: ContextMenuService) {
+  }
+
+  setExpMedTs(timestamp: number) {
+    if (timestamp !== this.exp_med_ts) {
+      this.exp_med_ts = timestamp;
+      this.getExpMedTsEvent.next(timestamp);
+    }
   }
 
   setHeightApp(height: number) {

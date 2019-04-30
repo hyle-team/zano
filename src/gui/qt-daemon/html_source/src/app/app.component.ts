@@ -17,6 +17,7 @@ import {ModalService} from './_helpers/services/modal.service';
 export class AppComponent implements OnInit, OnDestroy {
 
   intervalUpdateContractsState;
+  expMedTsEvent;
   onQuitRequest = false;
   firstOnlineState = false;
 
@@ -154,7 +155,8 @@ export class AppComponent implements OnInit, OnDestroy {
         console.log('----------------- update_daemon_state -----------------');
         console.log('DAEMON:' + data.daemon_network_state);
         console.log(data);
-        this.variablesService.exp_med_ts = data['expiration_median_timestamp'] + 600 + 1;
+        // this.variablesService.exp_med_ts = data['expiration_median_timestamp'] + 600 + 1;
+        this.variablesService.setExpMedTs(data['expiration_median_timestamp'] + 600 + 1);
         this.variablesService.last_build_available = data.last_build_available;
         this.variablesService.setHeightApp(data.height);
 
@@ -411,13 +413,6 @@ export class AppComponent implements OnInit, OnDestroy {
                     comment: data.events[i].details.comment
                   };
                   this.variablesService.aliases = this.variablesService.aliases.concat(newAlias);
-                  // this.variablesService.aliases = this.variablesService.aliases.sort((a, b) => {
-                  //   if (a.name.length > b.name.length) return 1;
-                  //   if (a.name.length < b.name.length) return -1;
-                  //   if (a.name > b.name) return 1;
-                  //   if (a.name < b.name) return -1;
-                  //   return 0;
-                  // });
                   this.variablesService.changeAliases();
                 }
                 break;
@@ -471,6 +466,22 @@ export class AppComponent implements OnInit, OnDestroy {
           });
         });
       }, 30000);
+
+      this.expMedTsEvent = this.variablesService.getExpMedTsEvent.subscribe((newTimestamp: number) => {
+        this.variablesService.wallets.forEach((wallet) => {
+          wallet.contracts.forEach((contract) => {
+            if (contract.state === 1 && contract.expiration_time <= newTimestamp) {
+              contract.state = 110;
+              contract.is_new = true;
+              wallet.recountNewContracts();
+            } else if (contract.state === 5 && contract.cancel_expiration_time <= newTimestamp) {
+              contract.state = 130;
+              contract.is_new = true;
+              wallet.recountNewContracts();
+            }
+          });
+        });
+      });
 
 
       this.backend.getAppData((status, data) => {
@@ -642,6 +653,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.intervalUpdateContractsState) {
       clearInterval(this.intervalUpdateContractsState);
     }
+    this.expMedTsEvent.unsubscribe();
   }
 
 }

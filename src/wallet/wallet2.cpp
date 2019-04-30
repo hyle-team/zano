@@ -1468,7 +1468,7 @@ bool wallet2::scan_unconfirmed_outdate_tx()
     bool tx_outdated = it->second.timestamp < time_limit;
     if (tx_outdated || is_tx_expired(it->second.tx, tx_expiration_ts_median))
     {
-      WLT_LOG_BLUE("removing unconfirmed tx " << it->second.tx_hash << ", reason: " << (tx_outdated ? "outdated" : "expired"), LOG_LEVEL_0);
+      WLT_LOG_BLUE("removing unconfirmed tx " << it->second.tx_hash << ", reason: " << (tx_outdated ? "outdated" : "expired") << ", tx_expiration_ts_median=" << tx_expiration_ts_median, LOG_LEVEL_0);
       //lookup all used transfer and update flags
       for (auto i : it->second.selected_indicies)
       {
@@ -1649,6 +1649,7 @@ void wallet2::detach_blockchain(uint64_t height)
   WLT_LOG_L0("Detaching blockchain on height " << height);
   size_t transfers_detached = 0;
 
+  // rollback incoming transfers from detaching subchain
   {
     auto it = std::find_if(m_transfers.begin(), m_transfers.end(), [&](const transfer_details& td){return td.m_ptx_wallet_info->m_block_height >= height; });
     if (it != m_transfers.end())
@@ -1658,7 +1659,8 @@ void wallet2::detach_blockchain(uint64_t height)
       for (size_t i = i_start; i != m_transfers.size(); i++)
       {
         auto it_ki = m_key_images.find(m_transfers[i].m_key_image);
-        THROW_IF_TRUE_WALLET_EX(it_ki == m_key_images.end(), error::wallet_internal_error, "key image not found");
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= height, "transfer #" << i << " block height is less than " << height);
         m_key_images.erase(it_ki);
         ++transfers_detached;
       }
@@ -1671,14 +1673,14 @@ void wallet2::detach_blockchain(uint64_t height)
   m_local_bc_height -= blocks_detached;
 
   //rollback spends
+  // do not clear spent flag in spent transfers as corresponding txs are most likely in the pool
+  // they will be moved into m_unconfirmed_txs for clearing in future (if tx will expire of removed from pool)
   for (size_t i = 0, sz = m_transfers.size(); i < sz; ++i)
   {
     auto& tr = m_transfers[i];
     if (tr.m_spent_height >= height)
     {
-      uint32_t flags_before = tr.m_flags;
-      tr.m_flags &= ~(WALLET_TRANSFER_DETAIL_FLAG_SPENT);
-      WLT_LOG_BLUE("Transfer [" << i << "] marked as unspent, flags: " << flags_before << " -> " << tr.m_flags << ", reason: blockchain detach height " << height << " is lower or equal to transfer spent height " << tr.m_spent_height, LOG_LEVEL_1);
+      WLT_LOG_BLUE("Transfer [" << i << "] spent height: " << tr.m_spent_height << " -> 0, reason: detaching blockchain", LOG_LEVEL_1);
       tr.m_spent_height = 0;
     }
   }
@@ -1691,8 +1693,28 @@ void wallet2::detach_blockchain(uint64_t height)
       break;
     tr_hist_it = it; // note that tr_hist_it->height >= height
   }
+  
   if (tr_hist_it != m_transfer_history.rend())
-    m_transfer_history.erase(--tr_hist_it.base(), m_transfer_history.end());
+  {
+    auto it_from = --tr_hist_it.base();
+    // before removing wti from m_transfer_history put it into m_unconfirmed_txs as txs from detached blocks are most likely be moved into the pool
+    for (auto it = it_from; it != m_transfer_history.end(); ++it)
+    {
+      // skip coinbase txs as they are not expected to go into the pool
+      if (is_coinbase(it->tx))
+      {
+        if (!it->is_mining)
+          WLT_LOG_ERROR("is_mining flag is not consistent for tx " << it ->tx_hash);
+        continue;
+      }
+
+      if (!m_unconfirmed_txs.insert(std::make_pair(it->tx_hash, *it)).second)
+      {
+        WLT_LOG_ERROR("can't move wti from transfer history to unronfirmed txs because such it is already here, tx hash: " << it->tx_hash);
+      }
+    }
+    m_transfer_history.erase(it_from, m_transfer_history.end());
+  }
  
   //rollback payments
   for (auto it = m_payments.begin(); it != m_payments.end(); )

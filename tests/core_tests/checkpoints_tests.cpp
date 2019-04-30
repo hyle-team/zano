@@ -138,7 +138,7 @@ bool gen_checkpoints_invalid_keyimage::generate(std::vector<test_event_entry>& e
 
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
-  bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, miner_acc, MK_TEST_COINS(1), TX_DEFAULT_FEE, 0, sources, destinations);
+  bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, miner_acc, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");  
   tx_builder tb;
   tb.step1_init();

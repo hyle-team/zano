@@ -1,4 +1,4 @@
-import {Component, OnInit, OnDestroy, NgZone} from '@angular/core';
+import {Component, OnInit, OnDestroy, NgZone, HostListener} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {FormControl, FormGroup, Validators} from '@angular/forms';
 import {BackendService} from '../_helpers/services/backend.service';
@@ -15,6 +15,10 @@ import {BigNumber} from 'bignumber.js';
   styleUrls: ['./purchase.component.scss']
 })
 export class PurchaseComponent implements OnInit, OnDestroy {
+
+  isOpen = false;
+  localAliases = [];
+
   currentWalletId;
   newPurchase = false;
   parentRouting;
@@ -29,22 +33,50 @@ export class PurchaseComponent implements OnInit, OnDestroy {
       }
       return null;
     }, (g: FormControl) => {
+      this.localAliases = [];
       if (g.value) {
-        this.backend.validateAddress(g.value, (valid_status) => {
-          this.ngZone.run(() => {
-            if (valid_status === false) {
-              g.setErrors(Object.assign({'address_not_valid': true}, g.errors) );
-            } else {
-              if (g.hasError('address_not_valid')) {
-                delete g.errors['address_not_valid'];
-                if (Object.keys(g.errors).length === 0) {
-                  g.setErrors(null);
+        if (g.value.indexOf('@') !== 0) {
+          this.isOpen = false;
+          this.backend.validateAddress(g.value, (valid_status) => {
+            this.ngZone.run(() => {
+              if (valid_status === false) {
+                g.setErrors(Object.assign({'address_not_valid': true}, g.errors));
+              } else {
+                if (g.hasError('address_not_valid')) {
+                  delete g.errors['address_not_valid'];
+                  if (Object.keys(g.errors).length === 0) {
+                    g.setErrors(null);
+                  }
                 }
               }
-            }
+            });
           });
-        });
-        return (g.hasError('address_not_valid')) ? {'address_not_valid': true} : null;
+          return (g.hasError('address_not_valid')) ? {'address_not_valid': true} : null;
+        } else {
+          this.isOpen = true;
+          this.localAliases = this.variablesService.aliases.filter((item) => {
+            return item.name.indexOf(g.value) > -1;
+          });
+          if (!(/^@?[a-z0-9\.\-]{6,25}$/.test(g.value))) {
+            g.setErrors(Object.assign({'alias_not_valid': true}, g.errors));
+          } else {
+            this.backend.getAliasByName(g.value.replace('@', ''), (alias_status) => {
+              this.ngZone.run(() => {
+                if (alias_status) {
+                  if (g.hasError('alias_not_valid')) {
+                    delete g.errors['alias_not_valid'];
+                    if (Object.keys(g.errors).length === 0) {
+                      g.setErrors(null);
+                    }
+                  }
+                } else {
+                  g.setErrors(Object.assign({'alias_not_valid': true}, g.errors));
+                }
+              });
+            });
+          }
+          return (g.hasError('alias_not_valid')) ? {'alias_not_valid': true} : null;
+        }
       }
       return null;
     }]),
@@ -74,8 +106,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private ngZone: NgZone,
     private location: Location,
-    private intToMoneyPipe: IntToMoneyPipe,
-    private translate: TranslateService
+    private intToMoneyPipe: IntToMoneyPipe
   ) {
   }
 
@@ -84,6 +115,23 @@ export class PurchaseComponent implements OnInit, OnDestroy {
       this.historyBlock = this.variablesService.currentWallet.history.find(item => item.tx_type === 8 && item.contract[0].contract_id === this.currentContract.contract_id && item.contract[0].is_a === this.currentContract.is_a);
     } else if (this.currentContract.state === 601) {
       this.historyBlock = this.variablesService.currentWallet.history.find(item => item.tx_type === 12 && item.contract[0].contract_id === this.currentContract.contract_id && item.contract[0].is_a === this.currentContract.is_a);
+    }
+  }
+
+  addressMouseDown(e) {
+    if (e['button'] === 0 && this.purchaseForm.get('seller').value && this.purchaseForm.get('seller').value.indexOf('@') === 0) {
+      this.isOpen = true;
+    }
+  }
+
+  setAlias(alias) {
+    this.purchaseForm.get('seller').setValue(alias);
+  }
+
+  @HostListener('document:click', ['$event.target'])
+  public onClick(targetElement) {
+    if (targetElement.id !== 'purchase-seller' && this.isOpen) {
+      this.isOpen = false;
     }
   }
 
@@ -158,13 +206,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
         this.currentContract.is_new = true;
         this.variablesService.currentWallet.recountNewContracts();
       }
-      // if (!this.newPurchase && this.currentContract.is_a && (this.currentContract.state === 201 || this.currentContract.state === 2 || this.currentContract.state === 120 || this.currentContract.state === 130)) {
-      //   if (this.currentContract.cancel_expiration_time === 0 && (this.currentContract.height === 0 || (this.variablesService.height_app - this.currentContract.height) < 10)) {
-      //     this.purchaseForm.get('timeCancel').disable();
-      //   } else {
-      //     this.purchaseForm.get('timeCancel').enable();
-      //   }
-      // }
+
     });
   }
 
@@ -198,25 +240,54 @@ export class PurchaseComponent implements OnInit, OnDestroy {
 
   createPurchase() {
     if (this.purchaseForm.valid) {
-      if (this.purchaseForm.get('sameAmount').value) {
-        this.purchaseForm.get('sellerDeposit').setValue(this.purchaseForm.get('amount').value);
-      }
-      this.backend.createProposal(
-        this.variablesService.currentWallet.wallet_id,
-        this.purchaseForm.get('description').value,
-        this.purchaseForm.get('comment').value,
-        this.variablesService.currentWallet.address,
-        this.purchaseForm.get('seller').value,
-        this.purchaseForm.get('amount').value,
-        this.purchaseForm.get('yourDeposit').value,
-        this.purchaseForm.get('sellerDeposit').value,
-        this.purchaseForm.get('time').value,
-        this.purchaseForm.get('payment').value,
-        (create_status) => {
-          if (create_status) {
-            this.back();
-          }
+      if (this.purchaseForm.get('seller').value.indexOf('@') !== 0) {
+        if (this.purchaseForm.get('sameAmount').value) {
+          this.purchaseForm.get('sellerDeposit').setValue(this.purchaseForm.get('amount').value);
+        }
+        this.backend.createProposal(
+          this.variablesService.currentWallet.wallet_id,
+          this.purchaseForm.get('description').value,
+          this.purchaseForm.get('comment').value,
+          this.variablesService.currentWallet.address,
+          this.purchaseForm.get('seller').value,
+          this.purchaseForm.get('amount').value,
+          this.purchaseForm.get('yourDeposit').value,
+          this.purchaseForm.get('sellerDeposit').value,
+          this.purchaseForm.get('time').value,
+          this.purchaseForm.get('payment').value,
+          (create_status) => {
+            if (create_status) {
+              this.back();
+            }
+          });
+      } else {
+        this.backend.getAliasByName(this.purchaseForm.get('seller').value.replace('@', ''), (alias_status, alias_data) => {
+          this.ngZone.run(() => {
+            if (alias_status === false) {
+              this.ngZone.run(() => {
+                this.purchaseForm.get('seller').setErrors({'alias_not_valid': true});
+              });
+            } else {
+              this.backend.createProposal(
+                this.variablesService.currentWallet.wallet_id,
+                this.purchaseForm.get('description').value,
+                this.purchaseForm.get('comment').value,
+                this.variablesService.currentWallet.address,
+                alias_data.address,
+                this.purchaseForm.get('amount').value,
+                this.purchaseForm.get('yourDeposit').value,
+                this.purchaseForm.get('sellerDeposit').value,
+                this.purchaseForm.get('time').value,
+                this.purchaseForm.get('payment').value,
+                (create_status) => {
+                  if (create_status) {
+                    this.back();
+                  }
+                });
+            }
+          });
         });
+      }
     }
   }
 

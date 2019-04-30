@@ -156,6 +156,9 @@ export class BackendService {
     if (error.indexOf('FAIL:failed to save file') > -1) {
       error_translate = 'ERRORS.FILE_NOT_SAVED';
     }
+    if (error.indexOf('FAILED:failed to open binary wallet file for saving') > -1 && command === 'generate_wallet') {
+      error_translate = '';
+    }
     if (error_translate !== '') {
       this.modalService.prepareModal('error', error_translate);
     }

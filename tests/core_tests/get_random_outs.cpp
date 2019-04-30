@@ -41,7 +41,7 @@ bool get_random_outs_test::generate(std::vector<test_event_entry>& events) const
 
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3r, miner_account, txs_blk_4);                             //  2N+10
 
-  MAKE_TX_LIST_START(events, txs_blk_5, bob_account, miner_account, m_amount - TX_DEFAULT_FEE, blk_4); // 2N+11
+  MAKE_TX_LIST_START(events, txs_blk_5, bob_account, miner_account, m_amount - TESTS_DEFAULT_FEE, blk_4); // 2N+11
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_5, blk_4, miner_account, txs_blk_5);                              //  2N+12
   REWIND_BLOCKS_N_WITH_TIME(events, blk_5r, blk_5, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);  //  4N+12
   DO_CALLBACK(events, "check_get_rand_outs");                                                           //  4N+13     

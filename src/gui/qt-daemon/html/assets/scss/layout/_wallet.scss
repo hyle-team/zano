@@ -99,24 +99,6 @@ app-send {
 
   .form-send {
 
-    .input-block-address {
-
-      .address-dropdown {
-
-        @include themify($themes) {
-          background-color: themed(inputBackgroundColor);
-          color: themed(mainTextColor);
-        }
-
-
-        div:hover {
-          @include themify($themes) {
-            background-color: themed(selectHoverColor);
-          }
-        }
-      }
-    }
-
     .send-select {
 
       @include themify($themes) {
@@ -444,6 +426,34 @@ app-staking {
           @include themify($themes) {
             background-color: themed(chartOptionsHoverColor);
           }
+        }
+      }
+    }
+  }
+}
+
+.input-block-alias {
+  position: relative;
+
+  .alias-dropdown {
+    position: absolute;
+    top: 6.5rem;
+    max-height: 10rem;
+    overflow: auto;
+    width: 100%;
+
+    @include themify($themes) {
+      background-color: themed(inputBackgroundColor);
+      color: themed(mainTextColor);
+    }
+
+    div {
+      font-size: 1.4rem;
+      padding: 1rem;
+
+      &:hover {
+        @include themify($themes) {
+          background-color: themed(selectHoverColor);
         }
       }
     }

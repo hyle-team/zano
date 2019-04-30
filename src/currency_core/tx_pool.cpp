@@ -512,7 +512,7 @@ namespace currency
         return true;
 
       // maximum age check - remove too old
-      uint64_t tx_age = get_core_time() - tx_entry.receive_time;
+      int64_t tx_age = get_core_time() - tx_entry.receive_time;
       if ((tx_age > CURRENCY_MEMPOOL_TX_LIVETIME ))
       {
 
@@ -777,16 +777,14 @@ namespace currency
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::on_tx_add(const transaction& tx, bool kept_by_block)
   {
-    if (!kept_by_block)
-      insert_key_images(tx, kept_by_block); // take into account only key images from txs that are not 'kept_by_block'
+    insert_key_images(tx, kept_by_block);
     insert_alias_info(tx);
     return true;
   }
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::on_tx_remove(const transaction& tx, bool kept_by_block)
   {
-    if (!kept_by_block)
-      remove_key_images(tx, kept_by_block); // take into account only key images from txs that are not 'kept_by_block'
+    remove_key_images(tx, kept_by_block);
     remove_alias_info(tx);
     return true;
   }
@@ -944,8 +942,11 @@ namespace currency
       }
     }
     //if we here, transaction seems valid, but, anyway, check for key_images collisions with blockchain, just to be sure
-    if(m_blockchain.have_tx_keyimges_as_spent(txd.tx))
+    if (m_blockchain.have_tx_keyimges_as_spent(txd.tx))
+    {
       return false;
+    }
+      
 
     if (!check_tx_multisig_ins_and_outs(txd.tx, false))
       return false;

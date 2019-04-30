@@ -104,11 +104,11 @@ export class ContractStatusMessagesPipe implements PipeTransform {
     return state.part1 + (state.part2.length ? '. ' + state.part2 : '');
   }
 
-  transform(item: any, args?: any): any {
-    if (item.is_a) {
-      return this.getStateBuyer(item.state);
+  transform(state: number, is_a?: boolean): any {
+    if (is_a) {
+      return this.getStateBuyer(state);
     } else {
-      return this.getStateSeller(item.state);
+      return this.getStateSeller(state);
     }
   }
 

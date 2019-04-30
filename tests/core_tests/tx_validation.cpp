@@ -614,7 +614,7 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_account);
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  uint64_t amount = TX_DEFAULT_FEE * 80;
+  uint64_t amount = TESTS_DEFAULT_FEE * 80;
 
   // prepare needed outputs by transferring them to Carol and Dan
   MAKE_TX(events, tx_a, miner_account, carol_account, amount / 2, blk_1r);
@@ -698,7 +698,7 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, prev_block, miner_account, std::list<transaction>({ tx_0, tx_1 }));
 
   // spend all Alice's money to make sure she has successfully received it with 'tx'
-  MAKE_TX(events, tx_2, alice_account, bob_account, amount * 2 - TX_DEFAULT_FEE, blk_3);
+  MAKE_TX(events, tx_2, alice_account, bob_account, amount * 2 - TESTS_DEFAULT_FEE, blk_3);
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_account, tx_2);
 
   return true;

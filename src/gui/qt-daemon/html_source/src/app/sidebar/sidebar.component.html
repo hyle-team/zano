@@ -9,13 +9,13 @@
         <span class="balance">{{wallet.balance | intToMoney : '3' }} {{variablesService.defaultCurrency}}</span>
       </div>
       <div class="sidebar-account-row account-alias">
-        <div style="display: flex; align-items: center;">
-          <span>{{wallet.alias['name']}}</span>
+        <div class="name">
+          <span tooltip="{{wallet.alias['name']}}" placement="top-left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{wallet.alias['name']}}</span>
           <ng-container *ngIf="wallet.alias['comment'] && wallet.alias['comment'].length">
             <i class="icon comment" tooltip="{{wallet.alias['comment']}}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500"></i>
           </ng-container>
         </div>
-        <span>$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>
+        <span class="price">$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>
       </div>
       <div class="sidebar-account-row account-staking" *ngIf="!(!wallet.loaded && variablesService.daemon_state === 2)">
         <span class="text">{{ 'SIDEBAR.ACCOUNT.STAKING' | translate }}</span>
