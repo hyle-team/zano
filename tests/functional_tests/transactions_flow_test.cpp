@@ -143,7 +143,7 @@ bool do_register_offer(tools::wallet2& w1, transaction& tx)
 
 
 
-#define ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP CURRENCY_TX_MAX_ALLOWED_OUTS
+#define ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP (CURRENCY_TX_MAX_ALLOWED_OUTS - 4)
 
 bool do_send_money_by_fractions(tools::wallet2& w1, tools::wallet2& w2, size_t mix_in_factor, uint64_t amount_to_transfer, transaction& tx, uint64_t fraction_size)
 {
@@ -154,7 +154,7 @@ bool do_send_money_by_fractions(tools::wallet2& w1, tools::wallet2& w2, size_t m
   dsts.reserve(ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP);
   uint64_t amount_used = 0;
 
-  for (size_t i = 0; i < ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP-4; ++i)
+  for (size_t i = 0; i < ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP; ++i)
   {
     currency::tx_destination_entry de;
     de.addr.push_back(w2.get_account().get_keys().m_account_address);
