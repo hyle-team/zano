@@ -70,7 +70,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private ngZone: NgZone,
     private translate: TranslateService,
     private intToMoneyPipe: IntToMoneyPipe

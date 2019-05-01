@@ -196,7 +196,7 @@
       }
 
       &.disabled {
-        cursor: not-allowed;
+        cursor: url(../../assets/icons/not-allowed.svg), not-allowed;
       }
 
       &:not(:last-child) {
