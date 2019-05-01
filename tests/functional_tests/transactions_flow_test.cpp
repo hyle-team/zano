@@ -154,7 +154,7 @@ bool do_send_money_by_fractions(tools::wallet2& w1, tools::wallet2& w2, size_t m
   dsts.reserve(ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP);
   uint64_t amount_used = 0;
 
-  for (size_t i = 0; i < ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP; ++i)
+  for (size_t i = 0; i < ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP-4; ++i)
   {
     currency::tx_destination_entry de;
     de.addr.push_back(w2.get_account().get_keys().m_account_address);
