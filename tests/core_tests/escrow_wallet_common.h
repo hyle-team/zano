@@ -59,7 +59,7 @@ void remove_all_entries_from_variant_container_by_type(container_t& container)
 
 inline bool refresh_wallet_and_check_1_contract_state(const char* wallet_name, std::shared_ptr<tools::wallet2> wallet, uint32_t expected_contract_state, size_t block_to_be_fetched = SIZE_MAX)
 {
-  bool stub_bool = false, r = false;
+  bool stub_bool = false, r;
   size_t blocks_fetched = 0;
   LOG_PRINT_CYAN("Refreshing " << wallet_name << "'s wallet...", LOG_LEVEL_0);
   wallet->refresh(blocks_fetched);
@@ -78,7 +78,7 @@ inline bool refresh_wallet_and_check_1_contract_state(const char* wallet_name, s
 
 inline bool refresh_wallet_and_check_contract_state(const char* wallet_name, std::shared_ptr<tools::wallet2> wallet, uint32_t expected_contract_state, crypto::hash contract_id, size_t block_to_be_fetched = SIZE_MAX)
 {
-  bool stub_bool = false, r = false;
+  bool stub_bool = false, r;
   size_t blocks_fetched = 0;
   LOG_PRINT_CYAN("Refreshing " << wallet_name << "'s wallet...", LOG_LEVEL_0);
   wallet->refresh(blocks_fetched);
