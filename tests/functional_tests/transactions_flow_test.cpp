@@ -183,8 +183,9 @@ bool do_send_money_by_fractions(tools::wallet2& w1, tools::wallet2& w2, size_t m
     LOG_PRINT_GREEN("Split transaction sent " << get_transaction_hash(tx) <<  ", destinations: " << dsts.size() << ", blob size: " << get_object_blobsize(tx), LOG_LEVEL_0);
     return true;
   }
-  catch (const std::exception&)
+  catch (const std::exception& e)
   {
+    LOG_ERROR("exception while sending transfer: " << e.what());
     return false;
   }
 }
