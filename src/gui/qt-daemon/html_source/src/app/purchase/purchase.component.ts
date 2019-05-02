@@ -102,13 +102,12 @@ export class PurchaseComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone,
     private location: Location,
     private intToMoneyPipe: IntToMoneyPipe
-  ) {
-  }
+  ) {}
 
   checkAndChangeHistory() {
     if (this.currentContract.state === 201) {

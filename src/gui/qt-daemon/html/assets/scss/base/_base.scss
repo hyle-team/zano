@@ -44,12 +44,6 @@ button {
 
   &.blue-button:not(:disabled) {
 
-    &.error-text {
-      @include themify($themes) {
-        color: themed(redTextColor);
-      }
-    }
-
     @include themify($themes) {
       background-color: themed(blueButtonBackgroundColor);
       color: themed(alternativeTextColor);

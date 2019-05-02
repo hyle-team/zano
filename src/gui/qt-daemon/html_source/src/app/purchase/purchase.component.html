@@ -213,44 +213,42 @@
   <div class="purchase-buttons" *ngIf="!newPurchase">
 
     <ng-container *ngIf="!currentContract.is_a && currentContract.state == 1">
-      <button type="button" class="blue-button" (click)="acceptState();" [disabled]="currentContract.private_detailes.b_pledge.plus(variablesService.default_fee_big).plus(variablesService.default_fee_big).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
+      <button type="button" class="green-button" (click)="acceptState();" [disabled]="currentContract.private_detailes.b_pledge.plus(variablesService.default_fee_big).plus(variablesService.default_fee_big).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
         {{'PURCHASE.BUTTON_MAKE_PLEDGE' | translate}}
       </button>
-      <button type="button" class="turquoise-button" (click)="ignoredContract();">{{'PURCHASE.BUTTON_IGNORE' | translate}}</button>
+      <button type="button" class="blue-button" (click)="ignoredContract();">{{'PURCHASE.BUTTON_IGNORE' | translate}}</button>
     </ng-container>
 
     <ng-container *ngIf="!showNullify && !showTimeSelect && currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
-      <button type="button" class="blue-button error-text" (click)="showNullify = true;" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
-        {{'PURCHASE.BUTTON_NULLIFY' | translate}}
-      </button>
-      <button type="button" class="turquoise-button" (click)="dealsDetailsFinish();" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
+      <button type="button" class="green-button" (click)="dealsDetailsFinish();" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
         {{'PURCHASE.BUTTON_RECEIVED' | translate}}
       </button>
-      <button type="button" class="green-button" (click)="showTimeSelect = true;" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
+      <button type="button" class="turquoise-button" (click)="showNullify = true;" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
+        {{'PURCHASE.BUTTON_NULLIFY' | translate}}
+      </button>
+      <button type="button" class="blue-button" (click)="showTimeSelect = true;" [disabled]="currentContract.cancel_expiration_time == 0 && (currentContract.height == 0 || (variablesService.height_app - currentContract.height) < 10)">
         {{'PURCHASE.BUTTON_CANCEL_BUYER' | translate}}
       </button>
     </ng-container>
 
     <ng-container *ngIf="!currentContract.is_a && currentContract.state == 5">
-      <button type="button" class="blue-button" (click)="dealsDetailsDontCanceling();">{{'PURCHASE.BUTTON_NOT_CANCEL' | translate}}</button>
-      <button type="button" class="turquoise-button" (click)="dealsDetailsSellerCancel();">{{'PURCHASE.BUTTON_CANCEL_SELLER' | translate}}</button>
+      <button type="button" class="turquoise-button" (click)="dealsDetailsDontCanceling();">{{'PURCHASE.BUTTON_NOT_CANCEL' | translate}}</button>
+      <button type="button" class="blue-button" (click)="dealsDetailsSellerCancel();">{{'PURCHASE.BUTTON_CANCEL_SELLER' | translate}}</button>
     </ng-container>
 
   </div>
 
   <div class="nullify-block-row" *ngIf="showNullify">
-    <div class="input-block">
-      <div>{{'PURCHASE.NULLIFY_QUESTION' | translate}}</div>
-      <div class="nullify-block">
-        <button type="button" class="blue-button" (click)="showNullify = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
-        <button type="button" class="blue-button" (click)="productNotGot();">{{ 'PURCHASE.BUTTON_NULLIFY_SHORT' | translate }}</button>
-      </div>
+    <div>{{'PURCHASE.NULLIFY_QUESTION' | translate}}</div>
+    <div class="nullify-block-buttons">
+      <button type="button" class="blue-button" (click)="showNullify = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
+      <button type="button" class="blue-button" (click)="productNotGot();">{{ 'PURCHASE.BUTTON_NULLIFY_SHORT' | translate }}</button>
     </div>
   </div>
 
   <div class="time-cancel-block-row" *ngIf="showTimeSelect && !newPurchase && currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
+    <div>{{ 'PURCHASE.WAITING_TIME_QUESTION' | translate }}</div>
     <div class="input-block">
-      <div>{{ 'PURCHASE.WAITING_TIME_QUESTION' | translate }}</div>
       <label for="purchase-timeCancel">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
       <ng-select id="purchase-timeCancel" class="lock-selection-select"
                  [clearable]="false"
@@ -261,10 +259,10 @@
           {{title}} {{ 'PURCHASE.HOURS' | translate }}
         </ng-option>
       </ng-select>
-      <div class="time-cancel-block">
-        <button type="button" class="blue-button" (click)="showTimeSelect = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
-        <button type="button" class="blue-button" (click)="dealsDetailsCancel();">{{ 'PURCHASE.BUTTON_CANCEL_BUYER' | translate }}</button>
-      </div>
+    </div>
+    <div class="time-cancel-block-buttons">
+      <button type="button" class="blue-button" (click)="showTimeSelect = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
+      <button type="button" class="blue-button" (click)="dealsDetailsCancel();">{{ 'PURCHASE.BUTTON_CANCEL_BUYER' | translate }}</button>
     </div>
   </div>
 

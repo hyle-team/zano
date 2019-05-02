@@ -18,9 +18,8 @@ export class ReceiveComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private backend: BackendService,
-    private variablesService: VariablesService
-  ) {
-  }
+    public variablesService: VariablesService
+  ) {}
 
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(() => {
