@@ -229,7 +229,7 @@ namespace crypto {
 }
 
 
-POD_MAKE_COMPARABLE(crypto, public_key)
+POD_MAKE_HASHABLE(crypto, public_key)
 POD_MAKE_COMPARABLE(crypto, secret_key)
 POD_MAKE_HASHABLE(crypto, key_image)
 POD_MAKE_COMPARABLE(crypto, signature)

@@ -925,7 +925,7 @@ bool offers_updating_hack::update_foreign_offer(currency::core& c, size_t ev_ind
   // make a tx with this attachment (note: tsa.security is signed using Bob's keys, can be resign later using Alice's public address)
   transaction tx = AUTO_VAL_INIT(tx);
   bob_wlt->transfer(std::vector<tx_destination_entry>({ tx_destination_entry(TESTS_DEFAULT_FEE * 3, m_accounts[BOB_ACC_IDX].get_public_address()) }), 0, 0, TESTS_DEFAULT_FEE * 81, empty_extra, attachments,
-    tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, true, 0, false);
+    tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, true, 0, false);
 
   // don't resign yet
 
@@ -999,7 +999,7 @@ bool offers_updating_hack::delete_foreign_offer(currency::core& c, size_t ev_ind
   // make a tx with this attachment (note: tsa.security is signed using Bob's keys, can be resign later using Alice's public address)
   transaction tx_c = AUTO_VAL_INIT(tx_c);
   bob_wlt->transfer(std::vector<tx_destination_entry>({ tx_destination_entry(TESTS_DEFAULT_FEE * 3, m_accounts[BOB_ACC_IDX].get_public_address()) }), 0, 0, TESTS_DEFAULT_FEE * 19, empty_extra, attachments,
-    tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx_c, 0, true, 0, true);
+    tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx_c, 0, true, 0, true);
 
   LOG_PRINT_L0(ENDL << c.get_tx_pool().print_pool(true));
 

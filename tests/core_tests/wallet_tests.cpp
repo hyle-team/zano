@@ -3082,7 +3082,7 @@ bool wallet_unconfirmed_tx_expiration::c1(currency::core& c, size_t ev_index, co
   transaction tx = AUTO_VAL_INIT(tx);
   try
   {
-    alice_wlt->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, extra, empty_attachment, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    alice_wlt->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
   }
   catch (std::exception &e)
   {

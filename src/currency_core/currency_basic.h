@@ -51,7 +51,7 @@ namespace currency
   const static crypto::signature null_sig = AUTO_VAL_INIT(null_sig);
   const static crypto::key_derivation null_derivation = AUTO_VAL_INIT(null_derivation);
 
-
+  typedef std::string payment_id_t;
 
 
   /************************************************************************/
@@ -563,7 +563,8 @@ namespace currency
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(keyimage)
     END_KV_SERIALIZE_MAP()
   };
-}
+
+} // namespace currency
 
 POD_MAKE_HASHABLE(currency, account_public_address);
 

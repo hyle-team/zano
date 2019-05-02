@@ -87,6 +87,7 @@ inline bool refresh_wallet_and_check_contract_state(const char* wallet_name, std
 
   tools::wallet2::escrow_contracts_container contracts;
   r = wallet->get_contracts(contracts);
+  CHECK_AND_ASSERT_MES(r, false, "get_contracts() for " << wallet_name << " failed");
   for (const auto& c : contracts)
   {
     if (c.first == contract_id)

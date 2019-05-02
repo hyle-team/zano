@@ -2625,7 +2625,7 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
     blocks.back().first = m_db_blocks[i];
     std::list<crypto::hash> mis;
     get_transactions_direct(m_db_blocks[i]->bl.tx_hashes, blocks.back().second, mis);
-    CHECK_AND_ASSERT_MES(!mis.size(), false, "internal error, transaction from block not found");
+    CHECK_AND_ASSERT_MES(!mis.size(), false, "internal error, block " << get_block_hash(m_db_blocks[i]->bl) << " [" << i << "] contains missing transactions: " << mis);
   }
   return true;
 }

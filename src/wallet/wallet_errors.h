@@ -124,6 +124,14 @@ namespace tools
       }
     };
     //----------------------------------------------------------------------------------------------------
+    struct wallet_common_error : public wallet_runtime_error
+    {
+      explicit wallet_common_error(std::string&& loc, const std::string& message)
+        : wallet_runtime_error(std::move(loc), message)
+      {
+      }
+    };
+    //----------------------------------------------------------------------------------------------------
     struct unexpected_txin_type : public wallet_internal_error
     {
       explicit unexpected_txin_type(std::string&& loc, const currency::transaction& tx)
@@ -668,5 +676,15 @@ if (cond)                                                                       
   tools::error::throw_wallet_ex<tools::error::wallet_internal_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str());  \
 }
 
+#define THROW_IF_FALSE_WALLET_INT_ERR_EX_NO_HANDLER(cond, mess) THROW_IF_TRUE_WALLET_INT_ERR_EX_NO_HANDLER((!(cond)), mess)
 
 #define THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, mess)      THROW_IF_TRUE_WALLET_INT_ERR_EX((!(cond)), mess)
+
+#define THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, mess)                                                                              \
+  if (!(cond))                                                                                                                    \
+  {                                                                                                                               \
+    std::stringstream ss;                                                                                                         \
+    ss << mess;                                                                                                                   \
+    LOG_ERROR(" (" << #cond << ") is FALSE. THROW EXCEPTION: wallet_common_error");                                               \
+    tools::error::throw_wallet_ex<tools::error::wallet_common_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str());    \
+  }

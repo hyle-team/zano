@@ -56,16 +56,16 @@ namespace epee
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    bool store_t_to_json(const t_struct& str_in, std::string& json_buff, size_t indent = 0)
+    bool store_t_to_json(const t_struct& str_in, std::string& json_buff, size_t indent = 0, end_of_line_t eol = eol_crlf)
     {
       portable_storage ps;
       str_in.store(ps);
-      ps.dump_as_json(json_buff, indent);
+      ps.dump_as_json(json_buff, indent, eol);
       return true;
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    std::string store_t_to_json(const t_struct& str_in, size_t indent = 0)
+    std::string store_t_to_json(const t_struct& str_in, size_t indent = 0, end_of_line_t eol = eol_crlf)
     {
       std::string json_buff;
       store_t_to_json(str_in, json_buff, indent);
