@@ -63,12 +63,16 @@ export class TooltipDirective implements OnDestroy {
   }
 
   create() {
+    this.tooltip = this.renderer.createElement('div');
+    let innerBlock = this.renderer.createElement('div');
     if (typeof this.tooltipInner === 'string') {
-      this.tooltip = this.renderer.createElement('div');
-      this.tooltip.innerHTML = this.tooltipInner;
+      innerBlock.innerHTML = this.tooltipInner;
     } else {
-      this.tooltip = this.tooltipInner;
+      innerBlock = this.tooltipInner;
     }
+    this.renderer.addClass(innerBlock, 'tooltip-inner');
+    this.renderer.addClass(innerBlock, 'scrolled-content');
+    this.renderer.appendChild(this.tooltip, innerBlock);
     this.renderer.appendChild(document.body, this.tooltip);
 
     this.tooltip.addEventListener('mouseenter', () => {
