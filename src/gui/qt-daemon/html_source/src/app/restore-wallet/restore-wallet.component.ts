@@ -41,16 +41,13 @@ export class RestoreWalletComponent implements OnInit {
   constructor(
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone,
     private translate: TranslateService
-  ) {
-  }
+  ) {}
 
-  ngOnInit() {
-  }
-
+  ngOnInit() {}
 
   createWallet() {
     this.ngZone.run(() => {

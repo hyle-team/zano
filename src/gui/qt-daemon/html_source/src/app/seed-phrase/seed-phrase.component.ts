@@ -25,8 +25,7 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
     public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone
-  ) {
-  }
+  ) {}
 
   ngOnInit() {
     this.queryRouting = this.route.queryParams.subscribe(params => {

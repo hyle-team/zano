@@ -369,6 +369,7 @@ namespace tools
       uint64_t amount() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index].amount; }
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
       bool is_spendable() const { return (m_flags & (~WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)) == 0; } // spenable = has no flags or mined flag only
+      bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)

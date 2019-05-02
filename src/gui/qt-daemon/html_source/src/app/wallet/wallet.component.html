@@ -1,7 +1,6 @@
 <div class="header">
   <div>
     <h3 tooltip="{{ variablesService.currentWallet.name }}" placement="bottom-left" tooltipClass="table-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{variablesService.currentWallet.name}}</h3>
-    <!--<button (click)="openInBrowser('docs.zano.org/docs/how-to-get-alias')">-->
     <button [routerLink]="['/assign-alias']" *ngIf="!variablesService.currentWallet.alias.hasOwnProperty('name') && variablesService.currentWallet.loaded && variablesService.daemon_state === 2 && variablesService.currentWallet.alias_available">
       <i class="icon account"></i>
       <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>
@@ -19,10 +18,6 @@
       <i class="icon details"></i>
       <span>{{ 'WALLET.DETAILS' | translate }}</span>
     </button>
-    <!--<button (click)="closeWallet()">
-      <i class="icon lock"></i>
-      <span>{{ 'WALLET.LOCK' | translate }}</span>
-    </button>-->
   </div>
 </div>
 <div class="address">

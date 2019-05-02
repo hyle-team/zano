@@ -77,7 +77,7 @@ app-wallet {
           }
         }
 
-        &:hover:not(.active) {
+        &:hover:not(.active):not(.disabled) {
 
           @include themify($themes) {
             background-color: themed(tabHoverBackgroundColor);

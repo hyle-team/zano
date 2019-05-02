@@ -11,9 +11,9 @@
 #include <boost/thread.hpp>
 #include "include_base_utils.h"
 extern "C" {
-#include "miniupnpc/miniupnpc.h"
-#include "miniupnpc/upnpcommands.h"
-#include "miniupnpc/upnperrors.h"
+#include "miniupnp/miniupnpc/miniupnpc.h"
+#include "miniupnp/miniupnpc/upnpcommands.h"
+#include "miniupnp/miniupnpc/upnperrors.h"
 }
 
 #include "misc_language.h"
@@ -75,7 +75,7 @@ namespace tools
       deinit();
 
       int error = 0;
-      m_devlist = upnpDiscover(2000, nullptr, nullptr, 0, 0, &error);
+      m_devlist = upnpDiscover(2000, nullptr, nullptr, 0, 0, 2, &error);
       if(error)
       {
         LOG_PRINT_L0("Failed to call upnpDiscover");
