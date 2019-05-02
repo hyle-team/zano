@@ -87,6 +87,7 @@ inline bool refresh_wallet_and_check_contract_state(const char* wallet_name, std
 
   tools::wallet2::escrow_contracts_container contracts;
   r = wallet->get_contracts(contracts);
+  CHECK_AND_ASSERT_MES(r, false, "get_contracts() for " << wallet_name << " failed");
   for (const auto& c : contracts)
   {
     if (c.first == contract_id)
@@ -177,7 +178,7 @@ inline bool build_custom_escrow_template(const std::vector<test_event_entry>& ev
   std::vector<tx_destination_entry> destinations;
   bool r = false, need_to_resign = false;
 
-  uint64_t a_inputs_amount = (~custom_config_mask & eccf_template_inv_a_inputs) ? cpd.amount_a_pledge + cpd.amount_to_pay : TX_DEFAULT_FEE * 2;
+  uint64_t a_inputs_amount = (~custom_config_mask & eccf_template_inv_a_inputs) ? cpd.amount_a_pledge + cpd.amount_to_pay : TESTS_DEFAULT_FEE * 2;
   uint64_t ms_amount = (~custom_config_mask & eccf_template_inv_ms_amount) ? cpd.amount_a_pledge + cpd.amount_b_pledge + cpd.amount_to_pay + b_fee_release : cpd.amount_a_pledge + cpd.amount_b_pledge + cpd.amount_to_pay;
 
   r = fill_tx_sources(sources, events, head, a_keys, a_inputs_amount, nmix, used_sources);
@@ -204,7 +205,7 @@ inline bool build_custom_escrow_template(const std::vector<test_event_entry>& ev
   else if (custom_config_mask & eccf_template_more_than_1_multisig)
   {
     destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.m_account_address, cpd.b_addr }))); // seems to be correct
-    destinations.push_back(tx_destination_entry(TX_DEFAULT_FEE, std::list<account_public_address>({ a_keys.m_account_address, cpd.b_addr }))); // double multisig - incorrect
+    destinations.push_back(tx_destination_entry(TESTS_DEFAULT_FEE, std::list<account_public_address>({ a_keys.m_account_address, cpd.b_addr }))); // double multisig - incorrect
   }
   else
     destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.m_account_address, cpd.b_addr }))); // truly correct
@@ -334,7 +335,7 @@ inline bool build_custom_escrow_release_template(
   // inputs
   // create multisig (A-B) source, add keys from B
   tx_source_entry se = AUTO_VAL_INIT(se);
-  se.amount = (~custom_config_mask & eccf_rel_template_inv_ms_amount) ? escrow_template_tx.vout[ms_idx].amount : escrow_template_tx.vout[ms_idx].amount + 10 * TX_DEFAULT_FEE;
+  se.amount = (~custom_config_mask & eccf_rel_template_inv_ms_amount) ? escrow_template_tx.vout[ms_idx].amount : escrow_template_tx.vout[ms_idx].amount + 10 * TESTS_DEFAULT_FEE;
   se.multisig_id = ms_id;
   se.real_output_in_tx_index = ms_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(escrow_template_tx);
@@ -363,7 +364,7 @@ inline bool build_custom_escrow_release_template(
     {
       destinations.push_back(tx_destination_entry(cpd.amount_a_pledge, cpd.a_addr));
       destinations.push_back(tx_destination_entry(cpd.amount_b_pledge + cpd.amount_to_pay, cpd.b_addr));
-      destinations.push_back(tx_destination_entry(10 * TX_DEFAULT_FEE, cpd.b_addr));
+      destinations.push_back(tx_destination_entry(10 * TESTS_DEFAULT_FEE, cpd.b_addr));
     }
     else
     { // correct

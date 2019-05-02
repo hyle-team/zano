@@ -383,7 +383,7 @@ void decompose_amount_into_exact_number_of_pos_entries(uint64_t amount, size_t p
   {
     for (auto it = pos_amounts_list.begin(); it != pos_amounts_list.end() && pos_amounts_list.size() < pos_entries_count; /* nothing */)
     {
-      if (*it >= 2 * TX_DEFAULT_FEE)
+      if (*it >= 2 * TESTS_DEFAULT_FEE)
       {
         // each iteration pops one element 'a' and pushes two elements: c1 and c2, so that a == c1 + c2 (sum is invariant)
         uint64_t a = *it;
@@ -442,7 +442,7 @@ bool populate_wallet_with_stake_coins(std::shared_ptr<tools::wallet2> w, std::sh
   uint64_t balance_unlocked = 0;
   uint64_t balance = w->balance(balance_unlocked);
   CHECK_AND_ASSERT_MES(balance == balance_unlocked, false, "WARNING: balance is " << balance << " NOT EQUAL TO unlocked balance, which is " << balance_unlocked);
-  if (balance_unlocked > TX_DEFAULT_FEE)
+  if (balance_unlocked > TESTS_DEFAULT_FEE)
     WALLET_TRY_CATCH(w->transfer(balance_unlocked, money_source_w->get_account().get_public_address()));
 
   uint64_t sum = 0;
@@ -453,7 +453,7 @@ bool populate_wallet_with_stake_coins(std::shared_ptr<tools::wallet2> w, std::sh
   // populate current wallet with pos entries from scratch
   money_source_w->refresh();
   balance = money_source_w->balance(balance_unlocked);
-  CHECK_AND_ASSERT_MES(balance_unlocked > amount + TX_DEFAULT_FEE * pos_entries_count, false, "source wallet has not enough money: balance_unlocked: " << balance_unlocked << ", balance: " << balance << ", required amount: " << amount + TX_DEFAULT_FEE * pos_entries_count);
+  CHECK_AND_ASSERT_MES(balance_unlocked > amount + TESTS_DEFAULT_FEE * pos_entries_count, false, "source wallet has not enough money: balance_unlocked: " << balance_unlocked << ", balance: " << balance << ", required amount: " << amount + TESTS_DEFAULT_FEE * pos_entries_count);
 
   const account_public_address& wallet_address = w->get_account().get_public_address();
   std::vector<tx_destination_entry> destinations;
@@ -461,7 +461,7 @@ bool populate_wallet_with_stake_coins(std::shared_ptr<tools::wallet2> w, std::sh
   for(auto pos_amount : pos_amounts)
     destinations.push_back(tx_destination_entry(pos_amount, wallet_address));
 
-  WALLET_TRY_CATCH(money_source_w->transfer(destinations, 0, 0, TX_DEFAULT_FEE, empty_extra, empty_attachment));
+  WALLET_TRY_CATCH(money_source_w->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment));
 
   return true;
 
@@ -885,7 +885,7 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
       stake_tx_out_id = i;
   }
 
-  MAKE_TX_FEE(events, tx_0, alice_acc, alice_acc, alice_money - TX_DEFAULT_FEE * 17, TX_DEFAULT_FEE * 17, blk_2);
+  MAKE_TX_FEE(events, tx_0, alice_acc, alice_acc, alice_money - TESTS_DEFAULT_FEE * 17, TESTS_DEFAULT_FEE * 17, blk_2);
   // tx_0 transfers all Alice's money, so it effectevily spends all outputs in stake_ts, make sure it does
   CHECK_AND_ASSERT_MES(tx_0.vin.size() == stake_tx.vout.size(), false, "probably, tx_0 doesn't spend all Alice's money as expected, tx_0.vin.size()=" << tx_0.vin.size() << ", stake_tx.vout.size()=" << stake_tx.vout.size());
 

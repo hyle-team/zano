@@ -46,7 +46,7 @@
 #define BASE_REWARD_DUST_THRESHOLD                      ((uint64_t)1000000) // pow(10, 6) - change this will cause hard-fork!
 #define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)//((uint64_t)100000) // pow(10, 5)
 
-#define TX_DEFAULT_FEE                                  ((uint64_t)100000) // pow(10, 5)
+#define TX_DEFAULT_FEE                                  ((uint64_t)10000000000) // pow(10, 5)
 #define TX_MINIMUM_FEE                                  ((uint64_t)100000) // pow(10, 5)
 
 // #define CURRENCY_FIXED_REWARD_ZONE_HEIGHT               300                   // blocks will have fixed reward up to this height (including) 
@@ -212,7 +212,7 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+62)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+63)
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 

@@ -15,13 +15,14 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
   queryRouting;
   seedPhrase = '';
   wallet_id: number;
+  seedPhraseCopied = false;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private location: Location,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone
   ) {}
@@ -65,13 +66,20 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
     } else {
       this.variablesService.opening_wallet = null;
       this.modalService.prepareModal('error', 'OPEN_WALLET.WITH_ADDRESS_ALREADY_OPEN');
-      this.backend.closeWallet(this.wallet_id, (close_status, close_data) => {
-        console.log(close_status, close_data);
+      this.backend.closeWallet(this.wallet_id, () => {
         this.ngZone.run(() => {
           this.router.navigate(['/']);
         });
       });
     }
+  }
+
+  copySeedPhrase() {
+    this.backend.setClipboard(this.seedPhrase, () => {
+      this.ngZone.run(() => {
+        this.seedPhraseCopied = true;
+      });
+    });
   }
 
   back() {

@@ -61,19 +61,33 @@ namespace currency
   typedef boost::multiprecision::uint128_t uint128_tl;
   struct tx_source_entry
   {
-    typedef std::pair<txout_v, crypto::public_key> output_entry; // txout_v is either global output index or ref_by_id; public_key - is output ephemeral pub key
+    typedef serializable_pair<txout_v, crypto::public_key> output_entry; // txout_v is either global output index or ref_by_id; public_key - is output ephemeral pub key
 
     std::vector<output_entry> outputs;  //index + key
     uint64_t real_output;               //index in outputs vector of real output_entry
     crypto::public_key real_out_tx_key; //real output's transaction's public key
     size_t real_output_in_tx_index;     //index in transaction outputs vector
     uint64_t amount;                    //money
+    uint64_t transfer_index;            //money
     crypto::hash multisig_id;           //if txin_multisig: multisig output id
     size_t ms_sigs_count;               //if txin_multisig: must be equal to output's minimum_sigs
     size_t ms_keys_count;               //if txin_multisig: must be equal to size of output's keys container
     bool separately_signed_tx_complete; //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
 
     bool is_multisig() const { return ms_sigs_count > 0; }
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(outputs)
+      FIELD(real_output)
+      FIELD(real_out_tx_key)
+      FIELD(real_output_in_tx_index)
+      FIELD(amount)
+      FIELD(transfer_index)
+      FIELD(multisig_id)
+      FIELD(ms_sigs_count)
+      FIELD(ms_keys_count)
+      FIELD(separately_signed_tx_complete)
+    END_SERIALIZE()
   };
 
   struct tx_destination_entry
@@ -86,6 +100,13 @@ namespace currency
     tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0){}
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0){}
     tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0){}
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(amount)
+      FIELD(addr)
+      FIELD(minimum_sigs)
+      FIELD(amount_to_provide)
+    END_SERIALIZE()
   };
 
   struct tx_extra_info 
@@ -383,11 +404,12 @@ namespace currency
   size_t get_max_tx_size();
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height);
   uint64_t get_base_block_reward(bool is_pos, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t height);
-  bool is_payment_id_size_ok(const std::string& payment_id);
+  bool is_payment_id_size_ok(const payment_id_t& payment_id);
   std::string get_account_address_as_str(const account_public_address& addr);
-  std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const std::string& payment_id);
+  std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id);
   bool get_account_address_from_str(account_public_address& addr, const std::string& str);
-  bool get_account_address_and_payment_id_from_str(account_public_address& addr, std::string& payment_id, const std::string& str);
+  bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str);
+  bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id);
   bool is_coinbase(const transaction& tx);
   bool is_coinbase(const transaction& tx, bool& pos_coinbase);
   bool have_attachment_service_in_container(const std::vector<attachment_v>& av, const std::string& service_id, const std::string& instruction);

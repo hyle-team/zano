@@ -13,12 +13,16 @@
   </div>
   <div class="row">
     <span class="cell label" [style.flex-basis]="sizes[0] + 'px'">{{ 'HISTORY.DETAILS.INPUTS' | translate }}</span>
-    <span class="cell value" [style.flex-basis]="sizes[1] + 'px'" tooltip="{{inputs.join('\n')}}" placement="top" tooltipClass="table-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{inputs.join(', ')}}</span>
+    <span class="cell value" [style.flex-basis]="sizes[1] + 'px'" tooltip="{{inputs.join(', ')}}" placement="top" tooltipClass="table-tooltip table-tooltip-dimensions" [delay]="500" [showWhenNoOverflow]="false">{{inputs.join(', ')}}</span>
     <span class="cell label" [style.flex-basis]="sizes[2] + 'px'">{{ 'HISTORY.DETAILS.OUTPUTS' | translate }}</span>
-    <span class="cell value" [style.flex-basis]="sizes[3] + 'px'" tooltip="{{outputs.join('\n')}}" placement="top" tooltipClass="table-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{outputs.join(', ')}}</span>
+    <span class="cell value" [style.flex-basis]="sizes[3] + 'px'" tooltip="{{outputs.join(', ')}}" placement="top" tooltipClass="table-tooltip table-tooltip-dimensions" [delay]="500" [showWhenNoOverflow]="false">{{outputs.join(', ')}}</span>
   </div>
   <div class="row">
     <span class="cell label" [style.flex-basis]="sizes[0] + 'px'">{{ 'HISTORY.DETAILS.COMMENT' | translate }}</span>
-    <span class="cell value" [style.flex-basis]="sizes[1] + sizes[2] + sizes[3] + 'px'">{{transaction.comment}}</span>
+    <span class="cell value" [style.flex-basis]="sizes[1] + sizes[2] + sizes[3] + 'px'"
+          tooltip="{{transaction.comment}}" placement="top" tooltipClass="table-tooltip comment-tooltip" [delay]="500" [showWhenNoOverflow]="false"
+          (contextmenu)="variablesService.onContextMenuOnlyCopy($event, transaction.comment)">
+      {{transaction.comment}}
+    </span>
   </div>
 </div>

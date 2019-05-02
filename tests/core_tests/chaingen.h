@@ -16,7 +16,7 @@
 #include "chaingen_helpers.h"
 
 #define TESTS_DEFAULT_FEE                   ((uint64_t)TX_DEFAULT_FEE)
-#define MK_TEST_COINS(amount)               (static_cast<uint64_t>(amount) * TESTS_DEFAULT_FEE)
+#define MK_TEST_COINS(amount)               (static_cast<uint64_t>(amount) * TX_DEFAULT_FEE)
 #define TESTS_POS_CONFIG_MIN_COINSTAKE_AGE  4
 #define TESTS_POS_CONFIG_POS_MINIMUM_HEIGH  4
 
@@ -553,7 +553,7 @@ bool construct_tx_to_key(const std::vector<test_event_entry>& events,
                          const currency::block& blk_head,
                          const currency::account_base& from,
                          const std::vector<currency::tx_destination_entry>& destinations,
-                         uint64_t fee = TX_DEFAULT_FEE, 
+                         uint64_t fee = TESTS_DEFAULT_FEE, 
                          size_t nmix = 0, 
                          uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
                          const std::vector<currency::extra_v>& extr = empty_extra,
@@ -622,7 +622,7 @@ bool make_tx_multisig_to_key(const currency::transaction& source_tx,
                              const std::list<currency::account_keys>& participants,
                              const currency::account_public_address& target_address,
                              currency::transaction& tx,
-                             uint64_t fee = TX_DEFAULT_FEE,
+                             uint64_t fee = TESTS_DEFAULT_FEE,
                              const std::vector<currency::attachment_v>& attachments = empty_attachment,
                              const std::vector<currency::extra_v>& extra = empty_extra);
 
@@ -1124,7 +1124,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
   transaction TX_VAR = AUTO_VAL_INIT(TX_VAR); \
   {                   \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
-    WLT_WAR->transfer(destinations, 0, 0, TX_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>(), TX_VAR); \
+    WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>(), TX_VAR); \
   } \
   EVENTS_VEC.push_back(TX_VAR)
 
@@ -1132,7 +1132,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
   transaction TX_VAR = AUTO_VAL_INIT(TX_VAR); \
   {                   \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
-    WLT_WAR->transfer(destinations, 0, 0, TX_DEFAULT_FEE, std::vector<extra_v>(), ATTACH, TX_VAR); \
+    WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), ATTACH, TX_VAR); \
   } \
   EVENTS_VEC.push_back(TX_VAR)
 
@@ -1140,7 +1140,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
   transaction TX_VAR = AUTO_VAL_INIT(TX_VAR); \
   {                   \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
-    WLT_WAR->transfer(destinations, 0, 0, TX_DEFAULT_FEE, EXTRA, std::vector<attachment_v>(), TX_VAR); \
+    WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, EXTRA, std::vector<attachment_v>(), TX_VAR); \
   } \
   EVENTS_VEC.push_back(TX_VAR)
 

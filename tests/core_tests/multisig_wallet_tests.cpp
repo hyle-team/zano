@@ -27,16 +27,15 @@ void exception_handler(){}
 //==============================================================================================================================
 
 // helper routine: creates multisig-spending tx using a wallet and keys of other ms-participants, then sends it to the core proxy
-template<typename destination_split_strategy_t>
 void transfer_multisig(tools::wallet2& w,
   const std::list<currency::account_keys>& owner_keys, 
-  crypto::hash multisig_id,
+  const crypto::hash& multisig_id,
   const std::vector<currency::tx_destination_entry>& dsts,
   uint64_t unlock_time,
   uint64_t fee,
   const std::vector<currency::extra_v>& extra,
-  const std::vector<currency::attachment_v> attachments,
-  destination_split_strategy_t destination_split_strategy,
+  const std::vector<currency::attachment_v>& attachments,
+  tools::detail::split_strategy_id_t split_strategy_id,
   const tools::tx_dust_policy& dust_policy,
   currency::transaction &tx,
   uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED,
@@ -44,31 +43,29 @@ void transfer_multisig(tools::wallet2& w,
   bool shuffle = true, 
   bool send_to_network = true)
 {
-    using namespace currency;
-    std::vector<uint64_t> selected_transfers;
-    std::vector<currency::tx_destination_entry> prepared_destinations;
     currency::account_public_address crypt_address = get_crypt_address_from_destinations(w.get_account().get_keys(), dsts);
-    currency::keypair one_time_keys = AUTO_VAL_INIT(one_time_keys);
 
     // prepare transaction will sign ms input partially with wallet's keys - it needed to be signed fully with the others
-    w.prepare_transaction(dsts,
-      0,
-      unlock_time,
-      fee,
-      extra,
-      attachments,
-      destination_split_strategy,
-      dust_policy,
-      crypt_address,
-      tx,
-      tx_outs_attr,
-      shuffle,
-      false,
-      flags,
-      selected_transfers,
-      one_time_keys,
-      prepared_destinations, 
-      multisig_id);
+    tools::construct_tx_param ctp = AUTO_VAL_INIT(ctp);
+    tools::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    ctp.attachments = attachments;
+    ctp.crypt_address = crypt_address;
+    ctp.dsts = dsts;
+    ctp.dust_policy = dust_policy;
+    ctp.extra = extra;
+    ctp.fake_outputs_count = 0;
+    ctp.fee = fee;
+    ctp.flags = flags;
+    ctp.mark_tx_as_complete = false;
+    ctp.multisig_id = multisig_id;
+    ctp.shuffle = shuffle;
+    ctp.split_strategy_id = split_strategy_id;
+    ctp.tx_outs_attr = tx_outs_attr;
+    ctp.unlock_time = unlock_time;
+
+    w.prepare_transaction(ctp, ftp, tx);
+    crypto::secret_key sk = AUTO_VAL_INIT(sk);
+    w.finalize_transaction(ftp, tx, sk, false);
 
     // sign ms input with all other non-wallet keys
     auto it = w.get_multisig_transfers().find(multisig_id);
@@ -155,10 +152,10 @@ bool multisig_wallet_test::c1(currency::core& c, size_t ev_index, const std::vec
   //multisig
   dst.back().addr.push_back(m_accunt_a.get_public_address());
   dst.back().addr.push_back(m_accunt_b.get_public_address());
-  dst.back().amount = AMOUNT_TO_TRANSFER_MULTISIG + TX_DEFAULT_FEE;
+  dst.back().amount = AMOUNT_TO_TRANSFER_MULTISIG + TESTS_DEFAULT_FEE;
   dst.back().minimum_sigs = dst.back().addr.size();
   transaction result_tx = AUTO_VAL_INIT(result_tx);
-  miner_wlt->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
+  miner_wlt->transfer(dst, 0, 0, TESTS_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
 
   bool r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
@@ -201,10 +198,10 @@ bool multisig_wallet_test::c1(currency::core& c, size_t ev_index, const std::vec
     multisig_id,
     dst2,
     0,
-    TX_DEFAULT_FEE,
+    TESTS_DEFAULT_FEE,
     extra,
     attachments,
-    tools::detail::digit_split_strategy,
+    tools::detail::ssi_digit,
     tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD),
     result_tx);
 
@@ -293,7 +290,7 @@ bool multisig_wallet_test_many_dst::c1(currency::core& c, size_t ev_index, const
 
   transaction result_tx = AUTO_VAL_INIT(result_tx);
   TMP_LOG_SILENT;
-  miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
+  miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
   TMP_LOG_RESTORE;
 
   auto it = std::find_if(result_tx.vout.begin(), result_tx.vout.end(), [](tx_out& o) { return o.target.type() == typeid(txout_multisig); });
@@ -314,7 +311,7 @@ bool multisig_wallet_test_many_dst::c1(currency::core& c, size_t ev_index, const
   tx_destination_entry de2(amount - TESTS_DEFAULT_FEE, m_accounts[ALICE_ACC_IDX].get_public_address());
   transaction tx = AUTO_VAL_INIT(tx);
   TMP_LOG_SILENT;
-  transfer_multisig(*w.get(), owner_keys, get_multisig_out_id(result_tx, multisig_index), std::vector<tx_destination_entry>({ de2 }), 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+  transfer_multisig(*w.get(), owner_keys, get_multisig_out_id(result_tx, multisig_index), std::vector<tx_destination_entry>({ de2 }), 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
   TMP_LOG_RESTORE;
 
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -377,46 +374,46 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW, false, "Incorrect numbers of blocks fetched");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
-  uint64_t amount1 = TX_DEFAULT_FEE * 13 + 1;
-  uint64_t amount2 = TX_DEFAULT_FEE * 11 + 2;
-  uint64_t amount3 = TX_DEFAULT_FEE * 7 + 3;
-  uint64_t amount4 = TX_DEFAULT_FEE * 5 + 4;
-  uint64_t amount5 = TX_DEFAULT_FEE * 21;
-  uint64_t amount6 = TX_DEFAULT_FEE * 23;
+  uint64_t amount1 = TESTS_DEFAULT_FEE * 13 + 1;
+  uint64_t amount2 = TESTS_DEFAULT_FEE * 11 + 2;
+  uint64_t amount3 = TESTS_DEFAULT_FEE * 7 + 3;
+  uint64_t amount4 = TESTS_DEFAULT_FEE * 5 + 4;
+  uint64_t amount5 = TESTS_DEFAULT_FEE * 21;
+  uint64_t amount6 = TESTS_DEFAULT_FEE * 23;
 
   tx_destination_entry de1 = AUTO_VAL_INIT(de1);
   de1.addr.push_back(m_accounts[ALICE_ACC_IDX].get_public_address());
   de1.addr.push_back(m_accounts[BOB_ACC_IDX].get_public_address());
-  de1.amount = amount1 + TX_DEFAULT_FEE;
+  de1.amount = amount1 + TESTS_DEFAULT_FEE;
   de1.minimum_sigs = de1.addr.size();
   tx_destination_entry de2 = AUTO_VAL_INIT(de2);
   de2.addr.push_back(m_accounts[CAROL_ACC_IDX].get_public_address());
   de2.addr.push_back(m_accounts[DAN_ACC_IDX].get_public_address());
-  de2.amount = amount2 + TX_DEFAULT_FEE;
+  de2.amount = amount2 + TESTS_DEFAULT_FEE;
   de2.minimum_sigs = de2.addr.size();
   tx_destination_entry de3 = AUTO_VAL_INIT(de3);
   de3.addr.push_back(m_accounts[ALICE_ACC_IDX].get_public_address());
   de3.addr.push_back(m_accounts[DAN_ACC_IDX].get_public_address());
-  de3.amount = amount3 + TX_DEFAULT_FEE;
+  de3.amount = amount3 + TESTS_DEFAULT_FEE;
   de3.minimum_sigs = de3.addr.size();
   tx_destination_entry de4 = AUTO_VAL_INIT(de4);
   de4.addr.push_back(m_accounts[CAROL_ACC_IDX].get_public_address());
   de4.addr.push_back(m_accounts[BOB_ACC_IDX].get_public_address());
-  de4.amount = amount4 + TX_DEFAULT_FEE;
+  de4.amount = amount4 + TESTS_DEFAULT_FEE;
   de4.minimum_sigs = de4.addr.size();
   tx_destination_entry de5 = AUTO_VAL_INIT(de5);
   de5.addr.push_back(m_accounts[ALICE_ACC_IDX].get_public_address());
-  de5.amount = amount5 + TX_DEFAULT_FEE;
+  de5.amount = amount5 + TESTS_DEFAULT_FEE;
   de5.minimum_sigs = de5.addr.size();
   tx_destination_entry de6 = AUTO_VAL_INIT(de6);
   de6.addr.push_back(m_accounts[DAN_ACC_IDX].get_public_address());
-  de6.amount = amount6 + TX_DEFAULT_FEE;
+  de6.amount = amount6 + TESTS_DEFAULT_FEE;
   de6.minimum_sigs = de6.addr.size();
 
   // Send multisig tx
   transaction ms_tx = AUTO_VAL_INIT(ms_tx);
   miner_wlt->transfer(std::vector<tx_destination_entry>({ de1, de2, de3, de4, de5, de6 }),
-    0, 0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), ms_tx);
+    0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), ms_tx);
 
   // calculate multisig hashes for further usage
   crypto::hash ms1_hash = currency::get_multisig_out_id(ms_tx, get_tx_out_index_by_amount(ms_tx, de1.amount));
@@ -437,7 +434,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, false, "Incorrect numbers of blocks fetched");
-  r = check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", amount5 + TX_DEFAULT_FEE);
+  r = check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", amount5 + TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_MES(r, false, "Invalid wallet balance");
   tools::wallet2::multisig_transfer_container alice_mstc;
   alice_wlt->get_multisig_transfers(alice_mstc);
@@ -467,7 +464,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   std::shared_ptr<tools::wallet2> dan_wlt = init_playtime_test_wallet(events, c, m_accounts[DAN_ACC_IDX]);
   dan_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, false, "Incorrect numbers of blocks fetched");
-  r = check_balance_via_wallet(*dan_wlt.get(), "dan_wlt", amount6 + TX_DEFAULT_FEE);
+  r = check_balance_via_wallet(*dan_wlt.get(), "dan_wlt", amount6 + TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_MES(r, false, "Invalid wallet balance");
   tools::wallet2::multisig_transfer_container dan_mstc;
   dan_wlt->get_multisig_transfers(dan_mstc);
@@ -484,7 +481,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
 
   currency::transaction tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*alice_wlt.get(), std::list<account_keys>({ m_accounts[BOB_ACC_IDX].get_keys() }), ms1_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount1, receiver_acc.get_public_address()) }),
-    0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
@@ -499,7 +496,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   {
     // as 'false' means don't send to network. This should fail during preparation, not during sending/processing
     transfer_multisig(*bob_wlt.get(), std::list<account_keys>({ m_accounts[ALICE_ACC_IDX].get_keys() }), ms1_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount1, receiver_acc.get_public_address()) }),
-      0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
+      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
   }
   catch (tools::error::wallet_internal_error&)
   {
@@ -518,7 +515,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
 
   tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*carol_wlt.get(), std::list<account_keys>({ m_accounts[DAN_ACC_IDX].get_keys() }), ms2_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount2, receiver_acc.get_public_address()) }),
-    0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
@@ -530,7 +527,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   {
     // as 'false' means don't send to network. This should fail during preparation, not during sending/processing
     transfer_multisig(*dan_wlt.get(), std::list<account_keys>({ m_accounts[CAROL_ACC_IDX].get_keys() }), ms2_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount2, receiver_acc.get_public_address()) }),
-      0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
+      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
   }
   catch (tools::error::wallet_internal_error&)
   {
@@ -546,7 +543,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
 
   // Re-try spending Carol-Dan multisig out on behalf of Dan. It should be OK now
   transfer_multisig(*dan_wlt.get(), std::list<account_keys>({ m_accounts[CAROL_ACC_IDX].get_keys() }), ms2_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount2, receiver_acc.get_public_address()) }),
-    0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
@@ -564,7 +561,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
 
   tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*alice_wlt.get(), std::list<account_keys>({ m_accounts[DAN_ACC_IDX].get_keys() }), ms3_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount3, receiver_acc.get_public_address()) }),
-    0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
@@ -575,7 +572,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   {
     // last 'false' means don't send to network. This should fail during preparation, not during sending/processing
     transfer_multisig(*dan_wlt.get(), std::list<account_keys>({ m_accounts[ALICE_ACC_IDX].get_keys() }), ms3_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount3, receiver_acc.get_public_address()) }),
-      0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
+      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
   }
   catch (tools::error::wallet_internal_error&)
   {
@@ -605,7 +602,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   try
   {
     transfer_multisig(*dan_wlt.get(), std::list<account_keys>({ m_accounts[ALICE_ACC_IDX].get_keys() }), ms3_hash, std::vector<tx_destination_entry>({ tx_destination_entry(amount3, receiver_acc.get_public_address()) }),
-      0, TX_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
+      0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, 0, true, false);
   }
   catch (tools::error::wallet_internal_error&)
   {
@@ -671,7 +668,7 @@ bool multisig_wallet_same_dst_addr::c1(currency::core& c, size_t ev_index, const
   size_t blocks_fetched = 0;
   bool received_money = false, r = false;
   std::atomic<bool> atomic_false(false);
-  static const uint64_t amount = TX_DEFAULT_FEE * 13;
+  static const uint64_t amount = TESTS_DEFAULT_FEE * 13;
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
@@ -680,12 +677,12 @@ bool multisig_wallet_same_dst_addr::c1(currency::core& c, size_t ev_index, const
   tx_destination_entry de = AUTO_VAL_INIT(de);
   de.addr.push_back(m_accounts[ALICE_ACC_IDX].get_public_address());
   de.addr.push_back(m_accounts[ALICE_ACC_IDX].get_public_address()); // multisig to the same address
-  de.amount = amount + TX_DEFAULT_FEE;
+  de.amount = amount + TESTS_DEFAULT_FEE;
   de.minimum_sigs = de.addr.size();
 
   // transfer multisig to Alice
   transaction ms_tx = AUTO_VAL_INIT(ms_tx);
-  miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TX_DEFAULT_FEE, empty_extra, empty_attachment, ms_tx);
+  miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, ms_tx);
 
   // mine the next PoW and make sure everythig is allright
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
@@ -704,7 +701,7 @@ bool multisig_wallet_same_dst_addr::c1(currency::core& c, size_t ev_index, const
   transaction tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*alice_wlt.get(), std::list<account_keys>({ m_accounts[ALICE_ACC_IDX].get_keys() }), ms_hash,
     std::vector<tx_destination_entry>({ tx_destination_entry(amount, m_accounts[BOB_ACC_IDX].get_public_address()) }),
-    0, TX_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
@@ -760,7 +757,7 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
   size_t blocks_fetched = 0;
   bool received_money = false, r = false;
   std::atomic<bool> atomic_false(false);
-  static const uint64_t amount = TX_DEFAULT_FEE * 13;
+  static const uint64_t amount = TESTS_DEFAULT_FEE * 13;
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
@@ -769,12 +766,12 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
   tx_destination_entry de = AUTO_VAL_INIT(de);
   de.addr.push_back(m_accounts[ALICE_ACC_IDX].get_public_address());
   de.addr.push_back(m_accounts[BOB_ACC_IDX].get_public_address());
-  de.amount = amount + TX_DEFAULT_FEE;
+  de.amount = amount + TESTS_DEFAULT_FEE;
   de.minimum_sigs = de.addr.size();
 
   // transfer multisig to Alice + Bob
   transaction ms_tx = AUTO_VAL_INIT(ms_tx);
-  miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TX_DEFAULT_FEE, empty_extra, empty_attachment, ms_tx);
+  miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, ms_tx);
 
   // mine the next PoW and make sure everythig is allright
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
@@ -798,7 +795,7 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
   transaction ms_tx2 = AUTO_VAL_INIT(ms_tx2);
   transfer_multisig(*alice_wlt.get(), std::list<account_keys>({ m_accounts[BOB_ACC_IDX].get_keys() }), ms_hash,
     std::vector<tx_destination_entry>({ de }),
-    0, TX_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), ms_tx2);
+    0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), ms_tx2);
 
   // check the pool and mine a block
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
@@ -814,8 +811,8 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
   // spend the last multisig(Miner, Bob) and transfer to Bob
   transaction tx = AUTO_VAL_INIT(tx);
   transfer_multisig(*miner_wlt.get(), std::list<account_keys>({ m_accounts[BOB_ACC_IDX].get_keys() }), ms_hash2,
-    std::vector<tx_destination_entry>({ tx_destination_entry(amount - TX_DEFAULT_FEE, m_accounts[BOB_ACC_IDX].get_public_address()) }),
-    0, TX_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+    std::vector<tx_destination_entry>({ tx_destination_entry(amount - TESTS_DEFAULT_FEE, m_accounts[BOB_ACC_IDX].get_public_address()) }),
+    0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of tx in the pool");
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
@@ -827,7 +824,7 @@ bool multisig_wallet_ms_to_ms::c1(currency::core& c, size_t ev_index, const std:
   bob_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3, false, "Incorrect number of blocks fetched.");
 
-  r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", amount - TX_DEFAULT_FEE);
+  r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", amount - TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_MES(r, false, "check_balance_via_wallet failed");
 
   return true;
@@ -863,14 +860,14 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   bool r = false;
-  uint64_t amount = TX_DEFAULT_FEE * 17;
+  uint64_t amount = TESTS_DEFAULT_FEE * 17;
 
   std::list<account_public_address> ms_addr_list({ miner_acc.get_public_address(), alice_acc.get_public_address(), bob_acc.get_public_address() });
 
   // Case 1. Create multisig for three participants (Miner, Alice, Bob) and specify minimum_sigs == 4 (should fail on construction)
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 4);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 4);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx = AUTO_VAL_INIT(tx);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx, 0);
@@ -882,7 +879,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   // 2.2. Spend using 2 keys (Alice, Bob) by sending money to Bob
   sources.clear();
   destinations.clear();
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 2);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 2);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
@@ -906,7 +903,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[se.real_output_in_tx_index].target).keys.size();
   se.ms_sigs_count = 2;
 
-  tx_destination_entry de(se.amount - TX_DEFAULT_FEE, bob_acc.get_public_address());
+  tx_destination_entry de(se.amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
 
   // Transaction should be successfully created, but rejected by the core
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
@@ -940,7 +937,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = 2;
 
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
-  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TX_DEFAULT_FEE, bob_acc.get_public_address()) }), empty_attachment, tx_3, 0);
+  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address()) }), empty_attachment, tx_3, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   r = sign_multisig_input_in_tx(tx_3, 0, bob_acc.get_keys(), tx_1, &tx_fully_signed);
   CHECK_AND_ASSERT_MES(r && !tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed : " << tx_fully_signed);
@@ -955,7 +952,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   // create source tx: tx_4
   sources.clear();
   destinations.clear();
-  r = fill_tx_sources_and_destinations(events, blk_2, miner_acc.get_keys(), ms_addr_list, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_2, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_4 = AUTO_VAL_INIT(tx_4);
@@ -977,7 +974,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = 3;
 
   transaction tx_5 = AUTO_VAL_INIT(tx_5);
-  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TX_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_5, 0);
+  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_5, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   // use sign_multisig_input_in_tx_custom to create tx with more signatures (3) than minimum_sigs (1)
@@ -998,7 +995,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   // Case 5. Spending multisig output using more keys than required and, moreover, add some fake keys
   sources.clear();
   destinations.clear();
-  r = fill_tx_sources_and_destinations(events, blk_4, miner_acc.get_keys(), ms_addr_list, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_4, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_6 = AUTO_VAL_INIT(tx_6);
@@ -1021,7 +1018,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = 4;
 
   transaction tx_7 = AUTO_VAL_INIT(tx_7);
-  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TX_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_7, 0);
+  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_7, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   // use sign_multisig_input_in_tx_custom to create tx with more signatures (4) than minimum_sigs (1)
@@ -1040,7 +1037,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   // Case 6. Spending multisig using too many redundant keys
   sources.clear();
   destinations.clear();
-  r = fill_tx_sources_and_destinations(events, blk_5, miner_acc.get_keys(), ms_addr_list, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_5, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_8 = AUTO_VAL_INIT(tx_8);
@@ -1064,7 +1061,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = redundant_keys_count;
 
   transaction tx_9 = AUTO_VAL_INIT(tx_9);
-  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TX_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_9, 0);
+  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_9, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   tx_9.signatures[0].resize(redundant_keys_count, invalid_signature);
@@ -1110,7 +1107,7 @@ bool multisig_and_fake_outputs::generate(std::vector<test_event_entry>& events) 
   // tx_1: 1 real + 2 fake inputs => 1 multisig output (Miner + Alice, minimum_sigs = 1)
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TX_DEFAULT_FEE, 2, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 2, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   // Make sure tx_1 is successfully created
@@ -1141,7 +1138,7 @@ bool multisig_and_fake_outputs::generate(std::vector<test_event_entry>& events) 
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_1);
 
   destinations.clear();
-  destinations.push_back(tx_destination_entry(amount - TX_DEFAULT_FEE, alice_acc.get_public_address()));
+  destinations.push_back(tx_destination_entry(amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()));
 
   // Make sure tx is successfully created
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
@@ -1157,7 +1154,7 @@ bool multisig_and_fake_outputs::generate(std::vector<test_event_entry>& events) 
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx_2);
 
   // Finally, check the balance of Alice's wallet
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, amount - TX_DEFAULT_FEE));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, amount - TESTS_DEFAULT_FEE));
 
   return true;
 }
@@ -1182,13 +1179,13 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   test_core_time::adjust(blk_0r.timestamp); // adjust gentime time to blockchain timestamps
 
   bool r = false;
-  uint64_t amount = TX_DEFAULT_FEE * 9;
+  uint64_t amount = TESTS_DEFAULT_FEE * 9;
   std::list<account_public_address> ms_addr_list({ miner_acc.get_public_address(), alice_acc.get_public_address() });
 
   // noramal input -> multisig output with unlock time
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TX_DEFAULT_FEE, 1, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 1, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   uint64_t unlock_time = blk_0r.timestamp + DIFFICULTY_TOTAL_TARGET * 3 + CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS;
@@ -1218,7 +1215,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   se.ms_sigs_count = 1;
   sources.assign({ se });
 
-  destinations.assign({ tx_destination_entry(amount - TX_DEFAULT_FEE, alice_acc.get_public_address()) });
+  destinations.assign({ tx_destination_entry(amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) });
 
   ADJUST_TEST_CORE_TIME(unlock_time - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS - 1);
 
@@ -1245,13 +1242,13 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   ADJUST_TEST_CORE_TIME(unlock_time_2 - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS - 1);
 
   DO_CALLBACK(events, "mark_invalid_tx");
-  MAKE_TX(events, tx_3, alice_acc, bob_acc, amount - TX_DEFAULT_FEE * 2, blk_2);
+  MAKE_TX(events, tx_3, alice_acc, bob_acc, amount - TESTS_DEFAULT_FEE * 2, blk_2);
 
   ADJUST_TEST_CORE_TIME(unlock_time_2 - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS + 1);
   events.push_back(tx_3);
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_3);
 
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TX_DEFAULT_FEE * 2));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TESTS_DEFAULT_FEE * 2));
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, 0));
 
   // Expiration time
@@ -1260,7 +1257,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   uint64_t expiration_time = generator.get_timestamps_median(get_block_hash(blk_3), TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW) - DIFFICULTY_TOTAL_TARGET * 3;
   sources.clear();
   destinations.clear();
-  r = fill_tx_sources_and_destinations(events, blk_3, miner_acc.get_keys(), ms_addr_list, amount, TX_DEFAULT_FEE, 1, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_3, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 1, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_4 = AUTO_VAL_INIT(tx_4);
@@ -1296,7 +1293,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   se.ms_sigs_count = 1;
   sources.assign({ se });
 
-  destinations.assign({ tx_destination_entry(amount - TX_DEFAULT_FEE, alice_acc.get_public_address()) });
+  destinations.assign({ tx_destination_entry(amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) });
 
   expiration_time = generator.get_timestamps_median(get_block_hash(blk_4), TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW) - DIFFICULTY_TOTAL_TARGET * 3;
   extra_expiration_time = AUTO_VAL_INIT(extra_expiration_time);
@@ -1412,7 +1409,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = 1;
   sources.assign({ se });
 
-  destinations.assign({ tx_destination_entry(se.amount - TX_DEFAULT_FEE, bob_acc.get_public_address()) });
+  destinations.assign({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address()) });
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
@@ -1425,7 +1422,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, 0));
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, se.amount - TX_DEFAULT_FEE));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, se.amount - TESTS_DEFAULT_FEE));
 
   //
   // Part 2. The same for PoW
@@ -1442,7 +1439,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
     std::list<account_public_address> ms_addr_list({ miner_acc.get_public_address(), alice_acc.get_public_address() });
     std::vector<tx_source_entry> sources;
     std::vector<tx_destination_entry> destinations;
-    r = fill_tx_sources_and_destinations(events, prev_block, miner_acc.get_keys(), ms_addr_list, blk_2_reward, TX_DEFAULT_FEE, 0, sources, destinations, false, false, 1);
+    r = fill_tx_sources_and_destinations(events, prev_block, miner_acc.get_keys(), ms_addr_list, blk_2_reward, TESTS_DEFAULT_FEE, 0, sources, destinations, false, false, 1);
     CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
     transaction miner_tx = AUTO_VAL_INIT(miner_tx);
     r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, miner_tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1478,7 +1475,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = 1;
 
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TX_DEFAULT_FEE, alice_acc.get_public_address()) }),
+  r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }),
     empty_attachment, tx_2, 0);
 
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
@@ -1488,7 +1485,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
 
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3r, miner_acc, tx_2);
 
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, se.amount - TX_DEFAULT_FEE));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, se.amount - TESTS_DEFAULT_FEE));
 
   return true;
 }
@@ -1515,7 +1512,7 @@ bool multisig_with_same_id_in_pool::generate(std::vector<test_event_entry>& even
   uint64_t amount_many_out_have = 0, stub = 0;
   r = calculate_amounts_many_outs_have_and_no_outs_have(generator.get_base_reward_for_next_block(get_block_hash(blk_0r)), amount_many_out_have, stub); // this amount corresponds to many outs, so no changeback will be generated
   CHECK_AND_ASSERT_MES(r, false, "calculate_amounts_many_outs_have_and_no_outs_have failed");
-  uint64_t amount = amount_many_out_have - TX_DEFAULT_FEE;
+  uint64_t amount = amount_many_out_have - TESTS_DEFAULT_FEE;
 
   std::list<account_public_address> to_addrs({ alice_acc.get_public_address(), alice_acc.get_public_address() }); // multisig to same account, mentioned twice
 
@@ -1523,7 +1520,7 @@ bool multisig_with_same_id_in_pool::generate(std::vector<test_event_entry>& even
   std::vector<tx_destination_entry> destinations;
 
   // tx_1: normal input -> multisig output
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true);
   CHECK_AND_ASSERT_MES(r && sources.size() == 1 && destinations.size() == 1, false, "fill_tx_sources_and_destinations failed"); // we selected such good amount so sources.size() and destinations.size() should be eq 1
 
   // create tx_1 manually in order to have access to its one-time key
@@ -1541,7 +1538,7 @@ bool multisig_with_same_id_in_pool::generate(std::vector<test_event_entry>& even
   // prepare sources and destinations for tx_2, using the same amount
   std::vector<tx_source_entry> sources2;
   std::vector<tx_destination_entry> destinations2;
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE, 0, sources2, destinations2, true, true);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources2, destinations2, true, true);
   CHECK_AND_ASSERT_MES(r && sources2.size() == 1 && destinations2.size() == 1, false, "fill_tx_sources_and_destinations failed"); // we selected such good amount so sources.size() and destinations.size() should be eq 1
 
   // tx_2 differs in inputs but should have the same outputs
@@ -1582,7 +1579,7 @@ bool multisig_with_same_id_in_pool::generate(std::vector<test_event_entry>& even
   se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[se.real_output_in_tx_index].target).keys.size();
   se.ms_sigs_count = 1;
 
-  tx_destination_entry de(amount - TX_DEFAULT_FEE, bob_acc.get_public_address());
+  tx_destination_entry de(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
 
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
   r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_3, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1625,7 +1622,7 @@ multisig_and_checkpoints::multisig_and_checkpoints()
 bool multisig_and_checkpoints::set_cp(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   currency::checkpoints checkpoints;
-  checkpoints.add_checkpoint(15, "46f45b849160be33937c60fa564e820792b0aaa6cf4a080e6002b6f25d84d688");
+  checkpoints.add_checkpoint(15, "f7543a7ac52a864dd3782a99229840a38e82fd31b64c6b197a2f41f74bd5bacc");
   c.set_checkpoints(std::move(checkpoints));
 
   return true;
@@ -1668,11 +1665,11 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   DO_CALLBACK(events, "set_cp");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
 
-  uint64_t amount = TX_DEFAULT_FEE * 99;
+  uint64_t amount = TESTS_DEFAULT_FEE * 99;
   std::list<account_public_address> to_addrs({ alice_acc.get_public_address(), alice_acc.get_public_address() }); // multisig to same account, mentioned twice
 
   // tx_1: normal input -> multisig output
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1690,7 +1687,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[se.real_output_in_tx_index].target).keys.size();
   se.ms_sigs_count = 1;
 
-  tx_destination_entry de(amount - TX_DEFAULT_FEE, bob_acc.get_public_address());
+  tx_destination_entry de(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
 
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_2, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1706,7 +1703,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
 
 
   // tx_3: normal input -> multisig output
-  r = fill_tx_sources_and_destinations(events, blk_2, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_2, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_3, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1728,7 +1725,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   se.ms_keys_count = boost::get<txout_multisig>(tx_3.vout[se.real_output_in_tx_index].target).keys.size();
   se.ms_sigs_count = 1;
 
-  de = tx_destination_entry(amount - TX_DEFAULT_FEE, bob_acc.get_public_address());
+  de = tx_destination_entry(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
 
   transaction tx_4 = AUTO_VAL_INIT(tx_4);
   r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_4, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1739,7 +1736,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_4);
 
   // tx_5: normal input -> multisig output
-  r = fill_tx_sources_and_destinations(events, blk_4, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_4, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_5 = AUTO_VAL_INIT(tx_5);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_5, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1757,7 +1754,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   se.ms_keys_count = boost::get<txout_multisig>(tx_5.vout[se.real_output_in_tx_index].target).keys.size();
   se.ms_sigs_count = 1;
 
-  de = tx_destination_entry(amount - TX_DEFAULT_FEE, bob_acc.get_public_address());
+  de = tx_destination_entry(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
 
   transaction tx_6 = AUTO_VAL_INIT(tx_6);
   r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_6, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1809,11 +1806,11 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
 
-  uint64_t amount = TX_DEFAULT_FEE * 99;
+  uint64_t amount = TESTS_DEFAULT_FEE * 99;
   std::list<account_public_address> to_addrs({ alice_acc.get_public_address(), alice_acc.get_public_address() }); // multisig to same account, mentioned twice
 
   // tx_1: normal key to multisig transaction
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1849,7 +1846,7 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   events.push_back(tx_3);
 
   // tx_4: zero ms out keys (should FAIL)
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   tx_builder txb = AUTO_VAL_INIT(txb);
   txb.step1_init();
@@ -1887,7 +1884,7 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
 
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_7);
 
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TX_DEFAULT_FEE)); // Bob finally got the money
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TESTS_DEFAULT_FEE)); // Bob finally got the money
 
   return true;
 }
@@ -1919,11 +1916,11 @@ bool multisig_and_altchains::generate(std::vector<test_event_entry>& events) con
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
 
-  uint64_t amount = TX_DEFAULT_FEE * 99;
+  uint64_t amount = TESTS_DEFAULT_FEE * 99;
   std::list<account_public_address> to_addrs({ alice_acc.get_public_address(), alice_acc.get_public_address() }); // multisig to same account, mentioned twice
 
   // tx_1: normal key to multisig transaction
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -1979,7 +1976,7 @@ bool multisig_and_altchains::generate(std::vector<test_event_entry>& events) con
   //           |-  (1c)-  (2c)-  (3c)-                <- becomes main chain
   //               tx_1          tx_2
 
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TX_DEFAULT_FEE));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TESTS_DEFAULT_FEE));
 
   DO_CALLBACK(events, "mark_invalid_tx"); // tx_3 should be rejected by the pool, as spending already spent ms output in tx_2
   events.push_back(tx_3);
@@ -2001,7 +1998,7 @@ bool multisig_and_altchains::generate(std::vector<test_event_entry>& events) con
   //               tx_1          tx_2 
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(CAROL_ACC_IDX, 0)); // tx_3 was rejected, thus zero
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TX_DEFAULT_FEE));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TESTS_DEFAULT_FEE));
   DO_CALLBACK_PARAMS(events, "check_tx_pool", params_tx_pool(0));
 
 
@@ -2019,12 +2016,12 @@ bool multisig_and_altchains::generate(std::vector<test_event_entry>& events) con
   //           |   tx_1                 tx_2
   //                         \-  (3d)-  (4d)-  (5d)-
 
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TX_DEFAULT_FEE, 0, 0, amount - TX_DEFAULT_FEE));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TESTS_DEFAULT_FEE, 0, 0, amount - TESTS_DEFAULT_FEE));
 
   MAKE_NEXT_BLOCK_TX1(events, blk_6d, blk_5d, miner_acc, tx_2);
   DO_CALLBACK_PARAMS(events, "check_tx_pool", params_tx_pool(0));
 
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TX_DEFAULT_FEE, 0, 0, 0, 0));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TESTS_DEFAULT_FEE, 0, 0, 0, 0));
 
   return true;
 }
@@ -2080,9 +2077,9 @@ bool ref_by_id_basics::generate(std::vector<test_event_entry>& events) const
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
 
-  uint64_t amount = TX_DEFAULT_FEE * 90;
+  uint64_t amount = TESTS_DEFAULT_FEE * 90;
                                                                                                         
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, amount, TX_DEFAULT_FEE, 4, sources, destinations, true, true, true);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, amount, TESTS_DEFAULT_FEE, 4, sources, destinations, true, true, true);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -2097,7 +2094,7 @@ bool ref_by_id_basics::generate(std::vector<test_event_entry>& events) const
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, amount, 0, 0, 0, 0));
 
-  r = fill_tx_sources_and_destinations(events, blk_1, alice_acc, bob_acc, amount - TX_DEFAULT_FEE, TX_DEFAULT_FEE, 0, sources, destinations, true, true, true);
+  r = fill_tx_sources_and_destinations(events, blk_1, alice_acc, bob_acc, amount - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, true);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -2107,7 +2104,7 @@ bool ref_by_id_basics::generate(std::vector<test_event_entry>& events) const
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx_2);
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, 0, 0, 0, 0, 0));
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TX_DEFAULT_FEE, 0, 0, 0, 0));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TESTS_DEFAULT_FEE, 0, 0, 0, 0));
 
   return true;
 }
@@ -2143,9 +2140,9 @@ bool ref_by_id_mixed_inputs_types::generate(std::vector<test_event_entry>& event
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, amount * 3, 0, 0, 0, 0));
 
-  r = fill_tx_sources_and_destinations(events, blk_1, alice_acc, bob_acc, amount * 3 - TX_DEFAULT_FEE, TX_DEFAULT_FEE, 0, sources, destinations, true, true, false); // normal inputs
+  r = fill_tx_sources_and_destinations(events, blk_1, alice_acc, bob_acc, amount * 3 - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, false); // normal inputs
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
-  r = fill_tx_sources_and_destinations(events, blk_1, alice_acc, bob_acc, amount * 3 - TX_DEFAULT_FEE, TX_DEFAULT_FEE, 0, sources2, destinations2, true, true, true); // ref_by_id
+  r = fill_tx_sources_and_destinations(events, blk_1, alice_acc, bob_acc, amount * 3 - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, 0, sources2, destinations2, true, true, true); // ref_by_id
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   // mix sources to achive mixed normal and ref_by_id inputs
@@ -2177,7 +2174,7 @@ bool ref_by_id_mixed_inputs_types::generate(std::vector<test_event_entry>& event
 
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, 0, 0, 0, 0, 0));
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount * 3 - TX_DEFAULT_FEE, 0, 0, 0, 0));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount * 3 - TESTS_DEFAULT_FEE, 0, 0, 0, 0));
 
 
   return true;
@@ -2212,7 +2209,7 @@ bool multisig_n_participants_seq_signing::generate(std::vector<test_event_entry>
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // prepare ms data: amount and list of participants' adresses (belived to be publicly available)
-  uint64_t ms_amount = TX_DEFAULT_FEE * 17;
+  uint64_t ms_amount = TESTS_DEFAULT_FEE * 17;
   std::list<account_public_address> ms_addr_list;
   for(auto &p : m_participants)
     ms_addr_list.push_back(p.get_public_address());
@@ -2220,7 +2217,7 @@ bool multisig_n_participants_seq_signing::generate(std::vector<test_event_entry>
   // Miner makes a tx with ms output to all the participants (with minimum_sigs == m_minimum_signs_to_spend)
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, ms_amount, TX_DEFAULT_FEE, 0, sources, destinations, true, true, m_minimum_signs_to_spend);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, ms_amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, m_minimum_signs_to_spend);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
@@ -2248,7 +2245,7 @@ bool multisig_n_participants_seq_signing::generate(std::vector<test_event_entry>
   se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[ms_out_index].target).keys.size();
   sources.push_back(se);
 
-  tx_destination_entry de(ms_amount - TX_DEFAULT_FEE, alice_acc.get_public_address());
+  tx_destination_entry de(ms_amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address());
   destinations.push_back(de);
 
   // construct a transaction (no participants keys are provided, thus no signs for ms input are created)
@@ -2275,7 +2272,7 @@ bool multisig_n_participants_seq_signing::generate(std::vector<test_event_entry>
   r = generator.refresh_test_wallet(events, alice_wlt.get(), get_block_hash(blk_2), CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
   CHECK_AND_ASSERT_MES(r, false, "refresh_test_wallet failed");
 
-  r = check_balance_via_wallet(*alice_wlt.get(), "alice", ms_amount - TX_DEFAULT_FEE, 0, 0, 0, 0);
+  r = check_balance_via_wallet(*alice_wlt.get(), "alice", ms_amount - TESTS_DEFAULT_FEE, 0, 0, 0, 0);
   CHECK_AND_ASSERT_MES(r, false, "invalid balance");
 
   return true;
@@ -2312,11 +2309,11 @@ bool multisig_out_make_and_spent_in_altchain::generate(std::vector<test_event_en
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
 
-  uint64_t amount = TX_DEFAULT_FEE * 33;
+  uint64_t amount = TESTS_DEFAULT_FEE * 33;
   std::list<account_public_address> to_addrs({ alice_acc.get_public_address(), alice_acc.get_public_address() }); // multisig to same account, mentioned twice
 
   // tx_1: normal key to multisig transaction
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE * 7, 0, sources, destinations, true, true, 2);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE * 7, 0, sources, destinations, true, true, 2);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -2341,7 +2338,7 @@ bool multisig_out_make_and_spent_in_altchain::generate(std::vector<test_event_en
   
   // tx_2
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = make_tx_multisig_to_key(tx_1, get_multisig_out_index(tx_1.vout), std::list<account_keys>({ alice_acc.get_keys(), alice_acc.get_keys() }), bob_acc.get_public_address(), tx_2, TX_DEFAULT_FEE * 13);
+  r = make_tx_multisig_to_key(tx_1, get_multisig_out_index(tx_1.vout), std::list<account_keys>({ alice_acc.get_keys(), alice_acc.get_keys() }), bob_acc.get_public_address(), tx_2, TESTS_DEFAULT_FEE * 13);
   CHECK_AND_ASSERT_MES(r, false, "make_tx_multisig_to_key failed");
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // simulate 
   events.push_back(tx_2);
@@ -2351,7 +2348,7 @@ bool multisig_out_make_and_spent_in_altchain::generate(std::vector<test_event_en
 
   // tx_3 spends the same ms out
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
-  r = make_tx_multisig_to_key(tx_1, get_multisig_out_index(tx_1.vout), std::list<account_keys>({ alice_acc.get_keys(), alice_acc.get_keys() }), bob_acc.get_public_address(), tx_3, TX_DEFAULT_FEE * 13);
+  r = make_tx_multisig_to_key(tx_1, get_multisig_out_index(tx_1.vout), std::list<account_keys>({ alice_acc.get_keys(), alice_acc.get_keys() }), bob_acc.get_public_address(), tx_3, TESTS_DEFAULT_FEE * 13);
   CHECK_AND_ASSERT_MES(r, false, "make_tx_multisig_to_key failed");
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // simulate 
   events.push_back(tx_3);
@@ -2391,11 +2388,11 @@ bool multisig_out_spent_in_altchain_case_b4::generate(std::vector<test_event_ent
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
 
-  uint64_t amount = TX_DEFAULT_FEE * 22;
+  uint64_t amount = TESTS_DEFAULT_FEE * 22;
   std::list<account_public_address> to_addrs({ alice_acc.get_public_address(), alice_acc.get_public_address() }); // multisig to same account, mentioned twice
 
   // tx_1: normal key to multisig transaction
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TX_DEFAULT_FEE * 5, 0, sources, destinations, true, true, 2);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE * 5, 0, sources, destinations, true, true, 2);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
@@ -2418,7 +2415,7 @@ bool multisig_out_spent_in_altchain_case_b4::generate(std::vector<test_event_ent
   
   // tx_2
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = make_tx_multisig_to_key(tx_1, get_multisig_out_index(tx_1.vout), std::list<account_keys>({ alice_acc.get_keys(), alice_acc.get_keys() }), bob_acc.get_public_address(), tx_2, TX_DEFAULT_FEE * 13);
+  r = make_tx_multisig_to_key(tx_1, get_multisig_out_index(tx_1.vout), std::list<account_keys>({ alice_acc.get_keys(), alice_acc.get_keys() }), bob_acc.get_public_address(), tx_2, TESTS_DEFAULT_FEE * 13);
   CHECK_AND_ASSERT_MES(r, false, "make_tx_multisig_to_key failed");
   events.push_back(tx_2);
   
@@ -2467,7 +2464,7 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
   auto& alice_acc = m_accounts[ALICE_ACC_IDX];
   auto& bob_acc   = m_accounts[BOB_ACC_IDX];
   
-  uint64_t ms_amount = TX_DEFAULT_FEE * 13;
+  uint64_t ms_amount = TESTS_DEFAULT_FEE * 13;
 
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   size_t blocks_fetched = 0;
@@ -2485,10 +2482,10 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
   // to_key => multisig
   dst.back().addr.push_back(miner_acc.get_public_address());
   dst.back().addr.push_back(alice_acc.get_public_address());
-  dst.back().amount = ms_amount + TX_DEFAULT_FEE;
+  dst.back().amount = ms_amount + TESTS_DEFAULT_FEE;
   dst.back().minimum_sigs = dst.back().addr.size();
   transaction key_to_ms_tx = AUTO_VAL_INIT(key_to_ms_tx);
-  miner_wlt->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), key_to_ms_tx);
+  miner_wlt->transfer(dst, 0, 0, TESTS_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), key_to_ms_tx);
 
   bool r = mine_next_pow_blocks_in_playtime(miner_acc.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
@@ -2525,10 +2522,10 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
     multisig_id,
     dst2,
     0,
-    TX_DEFAULT_FEE,
+    TESTS_DEFAULT_FEE,
     extra,
     attachments,
-    tools::detail::digit_split_strategy,
+    tools::detail::ssi_digit,
     tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD),
     tx);
 

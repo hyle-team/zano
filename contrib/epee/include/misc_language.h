@@ -389,22 +389,27 @@ namespace misc_utils
     auto res = container.insert(typename t_container_type::value_type(key, AUTO_VAL_INIT(typename t_container_type::mapped_type())));
     return res.first->second;
   } 
-}
-}
+} // namespace misc_utils
+} // namespace epee
 
 template<typename T>
 std::ostream& print_container_content(std::ostream& out, const T& v);
 
-template<typename T>
-std::ostream& operator<< (std::ostream& out, const std::vector<T>& v)
+namespace std
 {
-  return print_container_content(out, v);
-}
-template<typename T>
-std::ostream& operator<< (std::ostream& out, const std::list<T>& v)
-{
-  return print_container_content(out, v);
-}
+  template<typename T>
+  std::ostream& operator<< (std::ostream& out, const std::vector<T>& v)
+  {
+    return print_container_content(out, v);
+  }
+
+  template<typename T>
+  std::ostream& operator<< (std::ostream& out, const std::list<T>& v)
+  {
+    return print_container_content(out, v);
+  }
+
+} // namespace std
 
 template<typename T>
 std::ostream& print_container_content(std::ostream& out, const T& v)

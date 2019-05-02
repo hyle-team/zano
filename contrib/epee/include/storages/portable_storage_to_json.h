@@ -37,23 +37,23 @@ namespace epee
   {
 
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const array_entry& ae, size_t indent);
+    void dump_as_json(t_stream& strm, const array_entry& ae, size_t indent, end_of_line_t eol = eol_crlf);
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const storage_entry& se, size_t indent);
+    void dump_as_json(t_stream& strm, const storage_entry& se, size_t indent, end_of_line_t eol = eol_crlf);
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const std::string& v, size_t indent);
+    void dump_as_json(t_stream& strm, const std::string& v, size_t indent, end_of_line_t eol = eol_crlf);
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const int8_t& v, size_t indent);
+    void dump_as_json(t_stream& strm, const int8_t& v, size_t indent, end_of_line_t eol = eol_crlf);
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const uint8_t& v, size_t indent);
+    void dump_as_json(t_stream& strm, const uint8_t& v, size_t indent, end_of_line_t eol = eol_crlf);
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const bool& v, size_t indent);
+    void dump_as_json(t_stream& strm, const bool& v, size_t indent, end_of_line_t eol = eol_crlf);
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const double& v, size_t indent);
+    void dump_as_json(t_stream& strm, const double& v, size_t indent, end_of_line_t eol = eol_crlf);
     template<class t_stream, class t_type>
-    void dump_as_json(t_stream& strm, const t_type& v, size_t indent);
+    void dump_as_json(t_stream& strm, const t_type& v, size_t indent, end_of_line_t eol = eol_crlf);
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const section& sec, size_t indent);
+    void dump_as_json(t_stream& strm, const section& sec, size_t indent, end_of_line_t eol = eol_crlf);
 
 
     inline std::string make_indent(size_t indent)
@@ -66,7 +66,13 @@ namespace epee
     {
       t_stream& m_strm;
       size_t m_indent;
-      array_entry_store_to_json_visitor(t_stream& strm, size_t indent):m_strm(strm), m_indent(indent){}
+      end_of_line_t m_eol;
+
+      array_entry_store_to_json_visitor(t_stream& strm, size_t indent, end_of_line_t eol)
+        : m_strm(strm)
+        , m_indent(indent)
+        , m_eol(eol)
+      {}
 
       template<class t_type>
       void operator()(const array_entry_t<t_type>& a)
@@ -77,7 +83,7 @@ namespace epee
           auto last_it = --a.m_array.end();
           for(auto it = a.m_array.begin(); it != a.m_array.end(); it++)
           {
-            dump_as_json(m_strm, *it, m_indent);
+            dump_as_json(m_strm, *it, m_indent, m_eol);
             if(it != last_it)
               m_strm << ",";
           }
@@ -91,50 +97,56 @@ namespace epee
     {
       t_stream& m_strm;
       size_t m_indent;
-      storage_entry_store_to_json_visitor(t_stream& strm, size_t indent):m_strm(strm), m_indent(indent)
+      end_of_line_t m_eol;
+
+      storage_entry_store_to_json_visitor(t_stream& strm, size_t indent, end_of_line_t eol)
+        : m_strm(strm)
+        , m_indent(indent)
+        , m_eol(eol)
       {}
+
       //section, array_entry
       template<class visited_type>
       void operator()(const visited_type& v)
       { 
-        dump_as_json(m_strm, v, m_indent);
+        dump_as_json(m_strm, v, m_indent, m_eol);
       }
     };
 
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const array_entry& ae, size_t indent)
+    void dump_as_json(t_stream& strm, const array_entry& ae, size_t indent, end_of_line_t eol)
     {
-      array_entry_store_to_json_visitor<t_stream> aesv(strm, indent);
+      array_entry_store_to_json_visitor<t_stream> aesv(strm, indent, eol);
       boost::apply_visitor(aesv, ae);
     }
 
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const storage_entry& se, size_t indent)
+    void dump_as_json(t_stream& strm, const storage_entry& se, size_t indent, end_of_line_t eol)
     {
-      storage_entry_store_to_json_visitor<t_stream> sv(strm, indent);
+      storage_entry_store_to_json_visitor<t_stream> sv(strm, indent, eol);
       boost::apply_visitor(sv, se);
     }
 
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const std::string& v, size_t indent)
+    void dump_as_json(t_stream& strm, const std::string& v, size_t indent, end_of_line_t eol)
     {
       strm << "\"" << misc_utils::parse::transform_to_json_escape_sequence(v) << "\"";
     }
 
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const int8_t& v, size_t indent)
+    void dump_as_json(t_stream& strm, const int8_t& v, size_t indent, end_of_line_t eol)
     {
       strm << static_cast<int32_t>(v);
     }
 
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const uint8_t& v, size_t indent)
+    void dump_as_json(t_stream& strm, const uint8_t& v, size_t indent, end_of_line_t eol)
     {
       strm << static_cast<int32_t>(v);
     }
 
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const bool& v, size_t indent)
+    void dump_as_json(t_stream& strm, const bool& v, size_t indent, end_of_line_t eol)
     {
       if(v)
         strm << "true";
@@ -143,23 +155,34 @@ namespace epee
     }
 
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const double& v, size_t indent)
+    void dump_as_json(t_stream& strm, const double& v, size_t indent, end_of_line_t eol)
     {
       strm.precision(8);
       strm << std::fixed << v;
     }
 
     template<class t_stream, class t_type>
-    void dump_as_json(t_stream& strm, const t_type& v, size_t /*indent*/)
+    void dump_as_json(t_stream& strm, const t_type& v, size_t indent, end_of_line_t eol)
     {
       strm << v;
     }
 
     template<class t_stream>
-    void dump_as_json(t_stream& strm, const section& sec, size_t indent)
+    void dump_as_json(t_stream& strm, const section& sec, size_t indent, end_of_line_t eol)
     {
+      auto put_eol = [&]() {
+        switch (eol)
+        {
+        case eol_lf:    strm << "\n";   break;
+        case eol_cr:    strm << "\r";   break;
+        case eol_space: strm << " ";    break;
+        default:        strm << "\r\n"; break;
+        }
+      };
+
       size_t local_indent = indent + 1;
-      strm << "{\r\n";
+      strm << "{";
+      put_eol();
       std::string indent_str = make_indent(local_indent);
       if(sec.m_entries.size())
       {
@@ -167,10 +190,10 @@ namespace epee
         for(auto it = sec.m_entries.begin(); it!= sec.m_entries.end();it++)
         {
           strm << indent_str << "\"" << misc_utils::parse::transform_to_json_escape_sequence(it->first) << "\"" << ": ";
-          dump_as_json(strm, it->second, local_indent);
+          dump_as_json(strm, it->second, local_indent, eol);
           if(it_last != it)
             strm << ",";
-          strm << "\r\n";
+          put_eol();
         }
       }
       strm << make_indent(indent) <<  "}";

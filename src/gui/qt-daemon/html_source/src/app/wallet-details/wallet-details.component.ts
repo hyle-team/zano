@@ -33,11 +33,10 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
   constructor(
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private ngZone: NgZone,
     private location: Location
-  ) {
-  }
+  ) {}
 
   ngOnInit() {
     this.showSeed = false;
