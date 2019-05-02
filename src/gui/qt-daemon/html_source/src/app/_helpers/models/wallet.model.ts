@@ -1,4 +1,6 @@
 import {Contract} from './contract.model';
+import {Transaction} from './transaction.model';
+import {BigNumber} from 'bignumber.js';
 
 export class Wallet {
   wallet_id: number;
@@ -6,25 +8,35 @@ export class Wallet {
   pass: string;
   path: string;
   address: string;
-  balance: number;
-  unlocked_balance: number;
+  balance: BigNumber;
+  unlocked_balance: BigNumber;
   mined_total: number;
   tracking_hey: string;
+  alias_available: boolean;
 
-  alias?: string;
+  alias?: object;
+  wakeAlias?: boolean;
   staking?: boolean;
   new_messages?: number;
   new_contracts?: number;
 
-  history: any[];
-  excluded_history: any[];
+  history: Array<Transaction> = [];
+  excluded_history: Array<Transaction> = [];
 
   contracts: Array<Contract> = [];
 
   progress?: number;
   loaded?: boolean;
 
-  constructor(id, name, pass, path, address, balance = 0, unlocked_balance = 0, mined = 0, tracking = '') {
+  send_data?: any = {
+    address: null,
+    amount: null,
+    comment: null,
+    mixin: null,
+    fee: null
+  };
+
+  constructor(id, name, pass, path, address, balance, unlocked_balance, mined = 0, tracking = '') {
     this.wallet_id = id;
     this.name = name;
     this.pass = pass;
@@ -35,7 +47,7 @@ export class Wallet {
     this.mined_total = mined;
     this.tracking_hey = tracking;
 
-    this.alias = '';
+    this.alias = {};
     this.staking = false;
     this.new_messages = 0;
     this.new_contracts = 0;
@@ -48,7 +60,7 @@ export class Wallet {
   }
 
   getMoneyEquivalent(equivalent) {
-    return this.balance * equivalent;
+    return this.balance.multipliedBy(equivalent).toFixed(0);
   }
 
   havePass(): boolean {
@@ -59,19 +71,19 @@ export class Wallet {
     return this.wallet_id === id;
   }
 
-  prepareHistoryItem(item: any): any {
+  prepareHistoryItem(item: Transaction): any {
     if (item.tx_type === 4) {
-      item.sortFee = -(item.amount + item.fee);
-      item.sortAmount = 0;
+      item.sortFee = item.amount.plus(item.fee).negated();
+      item.sortAmount = new BigNumber(0);
     } else if (item.tx_type === 3) {
-      item.sortFee = 0;
+      item.sortFee = new BigNumber(0);
     } else if ((item.hasOwnProperty('contract') && (item.contract[0].state === 3 || item.contract[0].state === 6 || item.contract[0].state === 601) && !item.contract[0].is_a)) {
-      item.sortFee = -item.fee;
+      item.sortFee = item.fee.negated();
       item.sortAmount = item.amount;
     } else {
       if (!item.is_income) {
-        item.sortFee = -item.fee;
-        item.sortAmount = -item.amount;
+        item.sortFee = item.fee.negated();
+        item.sortAmount = item.amount.negated();
       } else {
         item.sortAmount = item.amount;
       }
@@ -79,9 +91,9 @@ export class Wallet {
     return item;
   }
 
-  prepareHistory(items: any[]): void {
+  prepareHistory(items: Transaction[]): void {
     for (let i = 0; i < items.length; i++) {
-      if ((items[i].tx_type === 7 && items[i].is_income) || (items[i].tx_type === 11 && items[i].is_income) || (items[i].amount === 0 && items[i].fee === 0)) {
+      if ((items[i].tx_type === 7 && items[i].is_income) || (items[i].tx_type === 11 && items[i].is_income) || (items[i].amount.eq(0) && items[i].fee.eq(0))) {
         let exists = false;
         for (let j = 0; j < this.excluded_history.length; j++) {
           if (this.excluded_history[j].tx_hash === items[i].tx_hash) {
@@ -107,7 +119,7 @@ export class Wallet {
           }
         }
         if (!exists) {
-          if (this.history.length && items[i].timestamp > this.history[0].timestamp) {
+          if (this.history.length && items[i].timestamp >= this.history[0].timestamp) {
             this.history.unshift(this.prepareHistoryItem(items[i]));
           } else {
             this.history.push(this.prepareHistoryItem(items[i]));
@@ -117,16 +129,25 @@ export class Wallet {
     }
   }
 
+  removeFromHistory(hash: string): void {
+    for (let i = 0; i < this.history.length; i++) {
+      if (this.history[i].tx_hash === hash) {
+        this.history.splice(i, 1);
+        break;
+      }
+    }
+  }
+
   prepareContractsAfterOpen(items: any[], exp_med_ts, height_app, viewedContracts, notViewedContracts): void {
-    const safe = this;
+    const wallet = this;
     for (let i = 0; i < items.length; i++) {
       const contract = items[i];
       let contractTransactionExist = false;
-      if (safe && safe.history) {
-        contractTransactionExist = safe.history.some(elem => elem.contract && elem.contract.length && elem.contract[0].contract_id === contract.contract_id);
+      if (wallet && wallet.history) {
+        contractTransactionExist = wallet.history.some(elem => elem.contract && elem.contract.length && elem.contract[0].contract_id === contract.contract_id);
       }
-      if (!contractTransactionExist && safe && safe.excluded_history) {
-        contractTransactionExist = safe.excluded_history.some(elem => elem.contract && elem.contract.length && elem.contract[0].contract_id === contract.contract_id);
+      if (!contractTransactionExist && wallet && wallet.excluded_history) {
+        contractTransactionExist = wallet.excluded_history.some(elem => elem.contract && elem.contract.length && elem.contract[0].contract_id === contract.contract_id);
       }
 
       if (!contractTransactionExist) {
@@ -191,9 +212,10 @@ export class Wallet {
       }
       const searchResult = viewedContracts.some(elem => elem.state === contract.state && elem.is_a === contract.is_a && elem.contract_id === contract.contract_id);
       contract.is_new = !searchResult;
-      contract['private_detailes'].a_pledge += contract['private_detailes'].to_pay;
 
-      safe.contracts.push(contract);
+      contract['private_detailes'].a_pledge = contract['private_detailes'].a_pledge.plus(contract['private_detailes'].to_pay);
+
+      wallet.contracts.push(contract);
     }
     this.recountNewContracts();
   }

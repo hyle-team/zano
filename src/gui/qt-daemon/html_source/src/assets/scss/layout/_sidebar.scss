@@ -41,6 +41,13 @@ app-sidebar {
             }
           }
 
+          .icon {
+
+            @include themify($themes) {
+              background-color: themed(blueTextColor);
+            }
+          }
+
           .indicator {
 
             @include themify($themes) {
@@ -131,16 +138,37 @@ app-sidebar {
       border-bottom: 0.2rem solid themed(sidebarBorderColor);
     }
 
-    button {
+    .wrap-button {
 
-      @include themify($themes) {
-        color: themed(mainTextColor);
-      }
-
-      .icon {
+      button {
 
         @include themify($themes) {
-          background-color: themed(blueTextColor);
+          color: themed(mainTextColor);
+        }
+
+        .icon {
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+        }
+      }
+
+      &.active {
+
+        button {
+
+          @include themify($themes) {
+            background-color: themed(accountBackgroundColor)!important;
+            color: themed(accountMainTextColor)!important;
+          }
+
+          .icon {
+
+            @include themify($themes) {
+              background-color: themed(accountIndicatorBackgroundColor)!important;
+            }
+          }
         }
       }
     }
@@ -165,6 +193,13 @@ app-sidebar {
 
         @include themify($themes) {
           background-color: themed(onlineColor);
+        }
+      }
+
+      .testnet {
+
+        @include themify($themes) {
+          color: themed(mainTextColor);
         }
       }
     }

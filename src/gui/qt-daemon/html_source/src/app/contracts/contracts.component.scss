@@ -64,14 +64,14 @@
           span {
             text-overflow: ellipsis;
             overflow: hidden;
-            max-width: 20vw;
           }
         }
 
         .status, .comment {
+          display: inline-block;
           text-overflow: ellipsis;
           overflow: hidden;
-          max-width: 20vw;
+          max-width: 100%;
         }
       }
     }

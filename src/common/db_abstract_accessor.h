@@ -15,8 +15,8 @@
 #include "cache_helper.h"
 #include "profile_tools.h"
 #include "../serialization/serialization.h"
-#include "epee/include/readwrite_lock.h"
-#include "epee/include/math_helper.h"
+#include "readwrite_lock.h"
+#include "math_helper.h"
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "db"
@@ -75,15 +75,18 @@ namespace tools
       std::map<std::thread::id, std::vector<bool> > m_transactions_stack;
       std::atomic<bool> m_is_open;
       epee::shared_recursive_mutex& m_rwlock;
-
     public:      
       struct performance_data
       {
         epee::math_helper::average<uint64_t, 10> backend_set_pod_time;
         epee::math_helper::average<uint64_t, 10> backend_set_t_time;
         epee::math_helper::average<uint64_t, 10> set_serialize_t_time;
+        epee::math_helper::average<uint64_t, 10> backend_get_pod_time;
+        epee::math_helper::average<uint64_t, 10> backend_get_t_time;
+        epee::math_helper::average<uint64_t, 10> get_serialize_t_time;
       };
     private:
+      mutable performance_data m_gperformance_data;
       mutable std::unordered_map<container_handle, performance_data> m_performance_data_map;
     public:
       basic_db_accessor(std::shared_ptr<i_db_backend> backend, epee::shared_recursive_mutex& rwlock) :m_backend(backend), m_rwlock(rwlock), m_is_open(false)
@@ -93,7 +96,8 @@ namespace tools
         close();
       }
 
-      const performance_data& get_performance_data_for_handle(container_handle h) const  { return m_performance_data_map[h]; }
+      performance_data& get_performance_data_for_handle(container_handle h) const  { return m_performance_data_map[h]; }
+      performance_data& get_performance_data_global() const { return m_gperformance_data; }
 
 
       bool bind_parent_container(i_db_parent_to_container_callabck* pcontainer)
@@ -270,15 +274,23 @@ namespace tools
       template<class t_pod_key, class t_object>
       bool get_t_object(container_handle h, const t_pod_key& k, t_object& obj) const
       {
+        performance_data& m_performance_data = m_gperformance_data;
         //TRY_ENTRY();
         std::string res_buff;
         size_t sk = 0;
         const char* pk = key_to_ptr(k, sk);
 
+        TIME_MEASURE_START_PD(backend_get_t_time);
         if (!m_backend->get(h, pk, sk, res_buff))
           return false;
+        TIME_MEASURE_FINISH_PD(backend_get_t_time);
 
-        return t_unserializable_object_from_blob(obj, res_buff);
+
+        TIME_MEASURE_START_PD(get_serialize_t_time);
+        bool res = t_unserializable_object_from_blob(obj, res_buff);
+        TIME_MEASURE_FINISH_PD(get_serialize_t_time);
+
+        return res;
         //CATCH_ENTRY_L0("get_t_object_from_db", false);
       }
 
@@ -310,15 +322,18 @@ namespace tools
       bool get_pod_object(container_handle h, const t_pod_key& k, t_pod_object& obj) const
       {
         static_assert(std::is_pod<t_pod_object>::value, "t_pod_object must be a POD type.");
-
+        performance_data& m_performance_data = m_gperformance_data;
 
         //TRY_ENTRY();
         std::string res_buff;
         size_t sk = 0;
         const char* pk = key_to_ptr(k, sk);
 
+        TIME_MEASURE_START_PD(backend_get_pod_time);
         if (!m_backend->get(h, pk, sk, res_buff))
           return false;
+        TIME_MEASURE_FINISH_PD(backend_get_pod_time);
+
 
         CHECK_AND_ASSERT_MES(sizeof(t_pod_object) == res_buff.size(), false, "sizes missmath at get_pod_object_from_db(). returned size = "
           << res_buff.size() << "expected: " << sizeof(t_pod_object));
@@ -784,14 +799,19 @@ namespace tools
         m_cache.erase(k);
       }
        
-      const performance_data& get_performance_data() const 
+      performance_data& get_performance_data() const 
       {
         return m_performance_data;
       }
-      const typename basic_db_accessor::performance_data& get_performance_data_native() const
+      typename basic_db_accessor::performance_data& get_performance_data_native() const
       {
         return base_class::bdb.get_performance_data_for_handle(base_class::m_h);
       }
+      typename basic_db_accessor::performance_data& get_performance_data_global() const
+      {
+        return base_class::bdb.get_performance_data_global();
+      }
+
     private:
       mutable performance_data m_performance_data;
     };

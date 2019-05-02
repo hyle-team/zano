@@ -226,7 +226,7 @@ bool mix_in_spent_outs::generate(std::vector<test_event_entry>& events) const
   DO_CALLBACK_PARAMS_STR(events, "check_outs_count", epee::serialization::store_t_to_json(check_outs_count_params(m_test_amount, 4)));
 
   // spend 2 of 3 Alice's outputs with direct transfer (not mixins)
-  MAKE_TX(events, tx_1, alice_acc, miner_acc, m_test_amount * 2 - TX_DEFAULT_FEE, blk_2); // mix_attr == 0
+  MAKE_TX(events, tx_1, alice_acc, miner_acc, m_test_amount * 2 - TESTS_DEFAULT_FEE, blk_2); // mix_attr == 0
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_1);
 
   // despite the fact all Alice's outputs are spent now, total number of outputs with such amount should not changed
@@ -262,7 +262,7 @@ bool mix_in_spent_outs::c1(currency::core& c, size_t ev_index, const std::vector
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are txs in the pool");
 
-  std::vector<tx_destination_entry> destinations({ tx_destination_entry(m_test_amount - TX_DEFAULT_FEE, m_accounts[MINER_ACC_IDX].get_public_address()) });
+  std::vector<tx_destination_entry> destinations({ tx_destination_entry(m_test_amount - TESTS_DEFAULT_FEE, m_accounts[MINER_ACC_IDX].get_public_address()) });
   
   // check that mixing in 3 or 2 fake outputs fails because of using already spend outputs
   for(size_t fake_outputs_to_mixin = 2; fake_outputs_to_mixin >= 2; fake_outputs_to_mixin--)
@@ -270,7 +270,7 @@ bool mix_in_spent_outs::c1(currency::core& c, size_t ev_index, const std::vector
     r = false;
     try
     {
-      bob_wlt->transfer(destinations, fake_outputs_to_mixin, 0, TX_DEFAULT_FEE, empty_extra, empty_attachment);
+      bob_wlt->transfer(destinations, fake_outputs_to_mixin, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment);
     }
     catch (tools::error::not_enough_outs_to_mix& e)
     {
@@ -282,14 +282,14 @@ bool mix_in_spent_outs::c1(currency::core& c, size_t ev_index, const std::vector
   }
 
   transaction tx = AUTO_VAL_INIT(tx);
-  bob_wlt->transfer(destinations, 1, 0, TX_DEFAULT_FEE, empty_extra, empty_attachment, tx); // mixing in 1 fake output should be okay as Alice did not spend it
+  bob_wlt->transfer(destinations, 1, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tx); // mixing in 1 fake output should be okay as Alice did not spend it
   
   CHECK_AND_ASSERT_MES(tx.vin.size() == 1, false, "tx vin.size() is not 1");
   CHECK_AND_ASSERT_MES(tx.vin[0].type() == typeid(txin_to_key) && boost::get<txin_to_key>(tx.vin[0]).key_offsets.size() == 2, false, "Incorrect vin[0] type of key_offsets"); // make sure 1 fake output was used
   
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect number of txs in the pool");
 
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "There are txs in the pool");

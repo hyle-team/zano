@@ -4,6 +4,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#define KEEP_WALLET_LOG_MACROS
 #include "wallet2.h"
 #include "currency_core/currency_format_utils.h"
 
@@ -21,7 +22,7 @@ bool wallet2::validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& w
   bc_services::contract_private_details& cpd           /* OUT */
 )
 {
-#define LOC_CHK(cond, mes) CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow proposal: " << mes << ". tx: " << get_transaction_hash(wti.tx));
+#define LOC_CHK(cond, mes) WLT_CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow proposal: " << mes << ". tx: " << get_transaction_hash(wti.tx));
 
   // I. validate escrow proposal tx
   const transaction& escrow_proposal_tx = wti.tx;
@@ -123,10 +124,10 @@ bool wallet2::validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& w
 // bool wallet2::handle_proposal(const currency::transaction& escrow_proposal_tx, wallet_rpc::wallet_transfer_info& wti, const bc_services::proposal_body& prop)
 //----------------------------------------------------------------------------------------------------
 
-bool validate_escrow_release(const transaction& tx, bool release_type_normal, const bc_services::contract_private_details& cpd,
-  const txout_multisig& source_ms_out, const crypto::hash& ms_id, size_t source_ms_out_index, const transaction& source_tx, const currency::account_keys& a_keys)
+bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_normal, const bc_services::contract_private_details& cpd,
+  const txout_multisig& source_ms_out, const crypto::hash& ms_id, size_t source_ms_out_index, const transaction& source_tx, const currency::account_keys& a_keys) const
 {
-#define LOC_CHK(cond, mes) CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow " << (release_type_normal ? "normal" : "burn") << " release template: " << mes);
+#define LOC_CHK(cond, mes) WLT_CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow " << (release_type_normal ? "normal" : "burn") << " release template: " << mes);
 
   // (1/5) inputs
   LOC_CHK(tx.vin.size() == 1, "vin size expected to be 1, actual is " << tx.vin.size());
@@ -246,7 +247,7 @@ bool wallet2::validate_escrow_contract(const wallet_rpc::wallet_transfer_info& w
   crypto::hash& ms_id,                             /* OUT */
   bc_services::escrow_relese_templates_body& rtb   /* OUT */)
 {
-#define LOC_CHK(cond, mes) CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow contract: " << mes << ". Escrow party: " << (is_a ? "A" : "B") << ". tx: " << get_transaction_hash(wti.tx));
+#define LOC_CHK(cond, mes) WLT_CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow contract: " << mes << ". Escrow party: " << (is_a ? "A" : "B") << ". tx: " << get_transaction_hash(wti.tx));
   bool r = false;
 
   // TODO: validate A-part of transaction?
@@ -294,7 +295,7 @@ uint64_t wallet2::get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id
   auto it = m_multisig_transfers.find(ms_id);
   if (it == m_multisig_transfers.end())
   {
-    LOG_ERROR("get_minimum_allowed_fee_for_contract called with unknown id: " << ms_id << ", assuming TX_MINIMUM_FEE=" << TX_MINIMUM_FEE);
+    WLT_LOG_ERROR("get_minimum_allowed_fee_for_contract called with unknown id: " << ms_id << ", assuming TX_MINIMUM_FEE=" << TX_MINIMUM_FEE);
     return TX_MINIMUM_FEE;
   }
   uint64_t tx_fee = get_tx_fee(it->second.m_ptx_wallet_info->m_tx);
@@ -304,11 +305,11 @@ uint64_t wallet2::get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id
 // TODO move here:
 // bool wallet2::handle_contract()
 //----------------------------------------------------------------------------------------------------
-bool validate_escrow_cancel_release(const currency::transaction& tx, const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
+bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
   const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd, const currency::transaction& source_tx,
-  size_t source_ms_out_index, const currency::account_keys& b_keys, uint64_t minimum_release_fee)
+  size_t source_ms_out_index, const currency::account_keys& b_keys, uint64_t minimum_release_fee) const
 {
-#define LOC_CHK(cond, mes) CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow cancel release template: " << mes);
+#define LOC_CHK(cond, mes) WLT_CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow cancel release template: " << mes);
 
   // (1/5) inputs
   LOC_CHK(tx.vin.size() == 1, "vin size expected to be 1, actual is " << tx.vin.size());
@@ -402,7 +403,7 @@ bool validate_escrow_cancel_release(const currency::transaction& tx, const walle
 bool wallet2::validate_escrow_cancel_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
   const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd, const currency::transaction& proposal_template_tx)
 {
-#define LOC_CHK(cond, mes) CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow cancellation request: " << mes << ". ms id: " << ms_id << ", tx: " << get_transaction_hash(wti.tx));
+#define LOC_CHK(cond, mes) WLT_CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow cancellation request: " << mes << ". ms id: " << ms_id << ", tx: " << get_transaction_hash(wti.tx));
 
   const transaction& cancellation_request_tx = wti.tx;
 

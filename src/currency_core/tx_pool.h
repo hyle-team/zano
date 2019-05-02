@@ -92,7 +92,7 @@ namespace currency
 
     bool have_tx(const crypto::hash &id)const;
     bool have_tx_keyimg_as_spent(const crypto::key_image& key_im)const;
-    bool have_tx_keyimges_as_spent(const transaction& tx)const;
+    bool have_tx_keyimges_as_spent(const transaction& tx, crypto::key_image* p_spent_ki = nullptr) const;
     const performnce_data& get_performnce_data() const { return m_performance_data; }
 
 
@@ -116,7 +116,7 @@ namespace currency
     // load/store operations
     bool init(const std::string& config_folder);
     bool deinit();
-    bool fill_block_template(block &bl, bool pos, size_t median_size, uint64_t already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
+    bool fill_block_template(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
     bool get_transactions(std::list<transaction>& txs) const;
     bool get_all_transactions_details(std::list<tx_rpc_extended_info>& txs)const;
     bool get_all_transactions_brief_details(std::list<tx_rpc_brief_info>& txs)const;
@@ -134,9 +134,8 @@ namespace currency
     uint64_t get_core_time() const;
     bool get_aliases_from_tx_pool(std::list<extra_alias_entry>& aliases)const;
     bool get_aliases_from_tx_pool(std::map<std::string, size_t>& aliases)const;
-    //crypto::hash get_last_core_hash() {return m_last_core_top_hash;}
-    //void set_last_core_hash(const crypto::hash& h) { m_last_core_top_hash = h; }
-
+    
+    bool remove_stuck_transactions(); // made public to be called from coretests
 
   private:
     bool on_tx_add(const transaction& tx, bool kept_by_block);
@@ -148,7 +147,6 @@ namespace currency
 
     bool is_valid_contract_finalization_tx(const transaction &tx)const;
     void initialize_db_solo_options_values();
-    bool remove_stuck_transactions();
     bool is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const;
     bool validate_alias_info(const transaction& tx, bool is_in_block)const;
     bool get_key_images_from_tx_pool(std::unordered_set<crypto::key_image>& key_images)const;
@@ -181,7 +179,6 @@ namespace currency
     address_to_aliases_container m_db_alias_addresses;
     solo_options_container m_db_solo_options;
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_major_compatibility_version;
-    //crypto::hash m_last_core_top_hash;
 
 
     epee::math_helper::once_a_time_seconds<30> m_remove_stuck_tx_interval;

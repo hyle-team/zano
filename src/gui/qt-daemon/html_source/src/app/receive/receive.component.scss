@@ -18,10 +18,21 @@
     line-height: 2.7rem;
 
     .btn-copy-address {
-      mask: url(../../assets/icons/copy.svg) no-repeat center;
       margin-left: 1.2rem;
       width: 1.7rem;
       height: 1.7rem;
+
+      &.copy {
+        mask: url(../../assets/icons/copy.svg) no-repeat center;
+
+        &:hover {
+          opacity: 0.75;
+        }
+      }
+
+      &.copied {
+        mask: url(../../assets/icons/complete-testwallet.svg) no-repeat center;
+      }
     }
   }
 }

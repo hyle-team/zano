@@ -25,7 +25,7 @@ struct pos_block_builder
     uint64_t timestamp_step = POS_SCAN_STEP);
   
   void step4_generate_coinbase_tx(size_t median_size,
-    uint64_t already_generated_coins,
+    const boost::multiprecision::uint128_t& already_generated_coins,
     const currency::account_public_address &reward_receiver_address,
     const currency::blobdata& extra_nonce = currency::blobdata(),
     size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
@@ -44,7 +44,7 @@ struct pos_block_builder
   uint64_t                m_pos_stake_amount;
 };
 
-bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, uint64_t already_generated_coins,
+bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
   size_t current_block_size,
   uint64_t fee,
   uint64_t pos_stake_amount,

@@ -1,12 +1,16 @@
 import {Pipe, PipeTransform} from '@angular/core';
+import {VariablesService} from '../services/variables.service';
+import {BigNumber} from 'bignumber.js';
 
 @Pipe({
   name: 'moneyToInt'
 })
 export class MoneyToIntPipe implements PipeTransform {
 
+  constructor(private variablesService: VariablesService) {}
+
   transform(value: any, args?: any): any {
-    const CURRENCY_DISPLAY_DECIMAL_POINT = 8;
+    const CURRENCY_DISPLAY_DECIMAL_POINT = this.variablesService.digits;
     let result;
     if (value) {
       let am_str = value.toString().trim();
@@ -33,7 +37,7 @@ export class MoneyToIntPipe implements PipeTransform {
           am_str = am_str + '0';
         }
       }
-      result = parseInt(am_str, 10);
+      result = (new BigNumber(am_str)).integerValue();
     }
     return result;
   }

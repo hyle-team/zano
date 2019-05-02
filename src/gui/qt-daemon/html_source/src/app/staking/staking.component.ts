@@ -4,6 +4,8 @@ import {Chart} from 'angular-highcharts';
 import {BackendService} from '../_helpers/services/backend.service';
 import {ActivatedRoute} from '@angular/router';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
+import {TranslateService} from '@ngx-translate/core';
+import {BigNumber} from 'bignumber.js';
 
 @Component({
   selector: 'app-staking',
@@ -18,24 +20,57 @@ export class StakingComponent implements OnInit, OnDestroy {
 
   periods = [
     {
-      title: '1 day',
+      title: this.translate.instant('STAKING.PERIOD.WEEK1'),
+      key: '1 week',
       active: false
     },
     {
-      title: '1 week',
+      title: this.translate.instant('STAKING.PERIOD.WEEK2'),
+      key: '2 week',
       active: false
     },
     {
-      title: '1 month',
+      title: this.translate.instant('STAKING.PERIOD.MONTH1'),
+      key: '1 month',
       active: false
     },
     {
-      title: '1 year',
+      title: this.translate.instant('STAKING.PERIOD.MONTH3'),
+      key: '3 month',
       active: false
     },
     {
-      title: 'All',
+      title: this.translate.instant('STAKING.PERIOD.MONTH6'),
+      key: '6 month',
+      active: false
+    },
+    {
+      title: this.translate.instant('STAKING.PERIOD.YEAR'),
+      key: '1 year',
+      active: false
+    },
+    {
+      title: this.translate.instant('STAKING.PERIOD.ALL'),
+      key: 'All',
       active: true
+    }
+  ];
+
+  groups = [
+    {
+      title: this.translate.instant('STAKING.GROUP.DAY'),
+      key: 'day',
+      active: true
+    },
+    {
+      title: this.translate.instant('STAKING.GROUP.WEEK'),
+      key: 'week',
+      active: false
+    },
+    {
+      title: this.translate.instant('STAKING.GROUP.MONTH'),
+      key: 'month',
+      active: false
     }
   ];
 
@@ -48,10 +83,10 @@ export class StakingComponent implements OnInit, OnDestroy {
 
   chart: Chart;
 
-  total = 0;
+  total = new BigNumber(0);
   pending = {
     list: [],
-    total: 0
+    total: new BigNumber(0)
   };
 
   constructor(
@@ -59,17 +94,27 @@ export class StakingComponent implements OnInit, OnDestroy {
     private variablesService: VariablesService,
     private backend: BackendService,
     private ngZone: NgZone,
-    private intToMoneyPipe: IntToMoneyPipe
+    private intToMoneyPipe: IntToMoneyPipe,
+    private translate: TranslateService
   ) {
   }
 
+  static makeGroupTime(key, date) {
+    if (key === 'day') {
+      return date.setHours(0, 0, 0, 0);
+    } else if (key === 'week') {
+      return new Date(date.setDate(date.getDate() - date.getDay())).setHours(0, 0, 0, 0);
+    } else {
+      return new Date(date.setDate(1)).setHours(0, 0, 0, 0);
+    }
+  }
 
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(() => {
       this.getMiningHistory();
     });
     this.heightAppEvent = this.variablesService.getHeightAppEvent.subscribe((newHeight: number) => {
-      if (this.pending.total) {
+      if (!this.pending.total.isZero()) {
         const pendingCount = this.pending.list.length;
         for (let i = pendingCount - 1; i >= 0; i--) {
           if (newHeight - this.pending.list[i].h >= 10) {
@@ -77,9 +122,9 @@ export class StakingComponent implements OnInit, OnDestroy {
           }
         }
         if (pendingCount !== this.pending.list.length) {
-          this.pending.total = 0;
+          this.pending.total = new BigNumber(0);
           for (let i = 0; i < this.pending.list.length; i++) {
-            this.pending.total += this.pending.list[i].a;
+            this.pending.total = this.pending.total.plus(this.pending.list[i].a);
           }
         }
       }
@@ -102,7 +147,12 @@ export class StakingComponent implements OnInit, OnDestroy {
         type: 'line',
         backgroundColor: 'transparent',
         height: null,
-        zoomType: null
+        zoomType: null,
+        events: {
+          load: () => {
+            this.changePeriod();
+          }
+        }
       },
 
       yAxis: {
@@ -208,9 +258,9 @@ export class StakingComponent implements OnInit, OnDestroy {
   getMiningHistory() {
     if (this.variablesService.currentWallet.loaded) {
       this.backend.getMiningHistory(this.variablesService.currentWallet.wallet_id, (status, data) => {
-        this.total = 0;
+        this.total = new BigNumber(0);
         this.pending.list = [];
-        this.pending.total = 0;
+        this.pending.total = new BigNumber(0);
         this.originalData = [];
         if (data.mined_entries) {
           data.mined_entries.forEach((item, key) => {
@@ -219,10 +269,10 @@ export class StakingComponent implements OnInit, OnDestroy {
             }
           });
           data.mined_entries.forEach((item) => {
-            this.total += item.a;
+            this.total = this.total.plus(item.a);
             if (this.variablesService.height_app - item.h < 10) {
               this.pending.list.push(item);
-              this.pending.total += item.a;
+              this.pending.total = this.pending.total.plus(item.a);
             }
             this.originalData.push([parseInt(item.t, 10), parseFloat(this.intToMoneyPipe.transform(item.a))]);
           });
@@ -231,65 +281,94 @@ export class StakingComponent implements OnInit, OnDestroy {
           });
         }
         this.ngZone.run(() => {
-          this.drawChart(JSON.parse(JSON.stringify(this.originalData)));
+          this.drawChart([]);
         });
       });
     }
-
   }
 
-  changePeriod(period) {
-    this.periods.forEach((p) => {
-      p.active = false;
-    });
-    period.active = true;
+  changePeriod(period?) {
+    if (period) {
+      this.periods.forEach((p) => {
+        p.active = false;
+      });
+      period.active = true;
+    } else {
+      period = this.periods.find((p) => p.active);
+    }
 
     const d = new Date();
     let min = null;
     const newData = [];
 
-    if (period.title === '1 day') {
+    const group = this.groups.find((g) => g.active);
+
+    if (period.key === '1 week') {
       this.originalData.forEach((item) => {
-        const time = (new Date(item[0])).setUTCMinutes(0, 0, 0);
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
-          find[1] += item[1];
-        } else {
-          newData.push([time, item[1]]);
-        }
-      });
-      this.chart.ref.series[0].setData(newData, true);
-      min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 1, 0, 0, 0, 0);
-    } else if (period.title === '1 week') {
-      this.originalData.forEach((item) => {
-        const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
-        const find = newData.find(itemNew => itemNew[0] === time);
-        if (find) {
-          find[1] += item[1];
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
         } else {
           newData.push([time, item[1]]);
         }
       });
       this.chart.ref.series[0].setData(newData, true);
       min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 7, 0, 0, 0, 0);
-    } else if (period.title === '1 month') {
+    } else if (period.key === '2 week') {
       this.originalData.forEach((item) => {
-        const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
-          find[1] += item[1];
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
+        } else {
+          newData.push([time, item[1]]);
+        }
+      });
+      this.chart.ref.series[0].setData(newData, true);
+      min = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - 14, 0, 0, 0, 0);
+    } else if (period.key === '1 month') {
+      this.originalData.forEach((item) => {
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
+        const find = newData.find(itemNew => itemNew[0] === time);
+        if (find) {
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
         } else {
           newData.push([time, item[1]]);
         }
       });
       this.chart.ref.series[0].setData(newData, true);
       min = Date.UTC(d.getFullYear(), d.getMonth() - 1, d.getDate(), 0, 0, 0, 0);
-    } else if (period.title === '1 year') {
+    } else if (period.key === '3 month') {
       this.originalData.forEach((item) => {
-        const time = (new Date(item[0])).setUTCHours(0, 0, 0, 0);
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
         const find = newData.find(itemNew => itemNew[0] === time);
         if (find) {
-          find[1] += item[1];
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
+        } else {
+          newData.push([time, item[1]]);
+        }
+      });
+      this.chart.ref.series[0].setData(newData, true);
+      min = Date.UTC(d.getFullYear(), d.getMonth() - 3, d.getDate(), 0, 0, 0, 0);
+    } else if (period.key === '6 month') {
+      this.originalData.forEach((item) => {
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
+        const find = newData.find(itemNew => itemNew[0] === time);
+        if (find) {
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
+        } else {
+          newData.push([time, item[1]]);
+        }
+      });
+      this.chart.ref.series[0].setData(newData, true);
+      min = Date.UTC(d.getFullYear(), d.getMonth() - 6, d.getDate(), 0, 0, 0, 0);
+    } else if (period.key === '1 year') {
+      this.originalData.forEach((item) => {
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
+        const find = newData.find(itemNew => itemNew[0] === time);
+        if (find) {
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
         } else {
           newData.push([time, item[1]]);
         }
@@ -297,12 +376,28 @@ export class StakingComponent implements OnInit, OnDestroy {
       this.chart.ref.series[0].setData(newData, true);
       min = Date.UTC(d.getFullYear() - 1, d.getMonth(), d.getDate(), 0, 0, 0, 0);
     } else {
-      this.chart.ref.series[0].setData(this.originalData, true);
+      this.originalData.forEach((item) => {
+        const time = StakingComponent.makeGroupTime(group.key, new Date(item[0]));
+        const find = newData.find(itemNew => itemNew[0] === time);
+        if (find) {
+          find[1] = new BigNumber(find[1]).plus(item[1]).toNumber();
+        } else {
+          newData.push([time, item[1]]);
+        }
+      });
+      this.chart.ref.series[0].setData(newData, true);
     }
 
     this.chart.ref.xAxis[0].setExtremes(min, null);
   }
 
+  changeGroup(group) {
+    this.groups.forEach((g) => {
+      g.active = false;
+    });
+    group.active = true;
+    this.changePeriod();
+  }
 
   ngOnDestroy() {
     this.parentRouting.unsubscribe();

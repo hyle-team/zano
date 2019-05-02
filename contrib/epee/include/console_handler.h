@@ -422,7 +422,6 @@ namespace epee
     std::string get_usage()
     {
       std::stringstream ss;
-      ss << "Commands: " << ENDL;
       size_t max_command_len = 0;
       for(auto& x:m_command_handlers)
         if(x.first.size() > max_command_len)
@@ -430,8 +429,7 @@ namespace epee
 
       for(auto& x:m_command_handlers)
       {
-        ss.width(max_command_len + 3);
-        ss << "  " << std::left <<  x.first << " " << x.second.second << ENDL;
+        ss << "  " << std::left << std::setw(max_command_len + 3) << x.first << " " << x.second.second << ENDL;
       }
       return ss.str();
     }

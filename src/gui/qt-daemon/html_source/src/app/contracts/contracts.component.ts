@@ -1,5 +1,5 @@
 import {Component, OnInit, OnDestroy} from '@angular/core';
-import {ActivatedRoute, Router} from '@angular/router';
+import {ActivatedRoute} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
 
 @Component({
@@ -14,9 +14,26 @@ export class ContractsComponent implements OnInit, OnDestroy {
 
   constructor(
     private route: ActivatedRoute,
-    private router: Router,
-    private variablesService: VariablesService
+    public variablesService: VariablesService
   ) {
+  }
+
+  public get sortedArrayContracts(): any[] {
+    return this.variablesService.currentWallet.contracts.sort((a, b) => {
+      if (a.is_new < b.is_new) {
+        return 1;
+      }
+      if (a.is_new > b.is_new) {
+        return -1;
+      }
+      if (a.timestamp < b.timestamp) {
+        return 1;
+      }
+      if (a.timestamp > b.timestamp) {
+        return -1;
+      }
+      return 0;
+    });
   }
 
   ngOnInit() {

@@ -237,3 +237,10 @@ struct wallet_unconfirmed_tx_expiration : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct wallet_chain_switch_with_spending_the_same_ki : public wallet_test
+{
+  wallet_chain_switch_with_spending_the_same_ki();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

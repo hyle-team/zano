@@ -37,6 +37,7 @@
 #include "currency_core/offers_services_helpers.h"
 #include "currency_core/bc_offers_serialization.h"
 #include "currency_core/bc_escrow_service.h"
+#include "common/pod_array_file_container.h"
 
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
@@ -45,6 +46,23 @@
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet");
+
+// wallet-specific logging functions
+#define WLT_LOG_L0(msg) LOG_PRINT_L0("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_L1(msg) LOG_PRINT_L1("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_L2(msg) LOG_PRINT_L2("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_L3(msg) LOG_PRINT_L3("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_L4(msg) LOG_PRINT_L4("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_ERROR(msg) LOG_ERROR("[W:" << m_log_prefix << "]" << msg)
+#define WLT_LOG_BLUE(msg, log_level)    LOG_PRINT_BLUE("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_CYAN(msg, log_level)    LOG_PRINT_CYAN("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_GREEN(msg, log_level)   LOG_PRINT_GREEN("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_MAGENTA(msg, log_level) LOG_PRINT_MAGENTA("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_RED(msg, log_level)     LOG_PRINT_RED("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_LOG_YELLOW(msg, log_level)  LOG_PRINT_YELLOW("[W:" << m_log_prefix << "]" << msg, log_level)
+#define WLT_CHECK_AND_ASSERT_MES(expr, ret, msg) CHECK_AND_ASSERT_MES(expr, ret, "[W:" << m_log_prefix << "]" << msg)
+#define WLT_CHECK_AND_ASSERT_MES_NO_RET(expr, msg) CHECK_AND_ASSERT_MES_NO_RET(expr, "[W:" << m_log_prefix << "]" << msg)
+#define WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, "[W:" << m_log_prefix << "]" << msg)
 
 namespace tools
 {
@@ -68,6 +86,8 @@ namespace tools
   class i_wallet2_callback
   {
   public:
+    virtual ~i_wallet2_callback() = default;
+
     virtual void on_new_block(uint64_t /*height*/, const currency::block& /*block*/) {}
     virtual void on_transfer2(const wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) {}
     virtual void on_pos_block_found(const currency::block& /*block*/) {}
@@ -87,14 +107,201 @@ namespace tools
       , addr_for_dust(an_addr_for_dust)
     {
     }
-  };  
 
-
-
-
-
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(dust_threshold)
+      FIELD(add_to_fee)
+      FIELD(addr_for_dust)
+    END_SERIALIZE()
+  };
 
   class test_generator;
+
+#pragma pack(push, 1)
+  struct out_key_to_ki
+  {
+    out_key_to_ki() {}
+    out_key_to_ki(const crypto::public_key& out_key, const crypto::key_image& key_image) : out_key(out_key), key_image(key_image) {}
+    crypto::public_key out_key;
+    crypto::key_image  key_image;
+  };
+#pragma pack(pop)
+
+  typedef tools::pod_array_file_container<out_key_to_ki> pending_ki_file_container_t;
+
+  namespace detail
+  {
+    //----------------------------------------------------------------------------------------------------
+    inline void digit_split_strategy(const std::vector<currency::tx_destination_entry>& dsts,
+      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
+      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
+    {
+      splitted_dsts.clear();
+      dust = 0;
+
+      for(auto& de : dsts)
+      {
+        if (de.addr.size() > 1)
+        {
+          //for multisig we don't split
+          splitted_dsts.push_back(de);
+        }
+        else
+        {
+          currency::decompose_amount_into_digits(de.amount, dust_threshold,
+            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, de.addr)); },
+            [&](uint64_t a_dust) { splitted_dsts.push_back(currency::tx_destination_entry(a_dust, de.addr)); }, max_output_allowed);
+        }
+      }
+
+      if (change_dst.amount > 0)
+      {
+        if (change_dst.addr.size() > 1)
+        {
+          //for multisig we don't split
+          splitted_dsts.push_back(change_dst);
+        }
+        else
+        {
+          currency::decompose_amount_into_digits(change_dst.amount, dust_threshold,
+            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, change_dst.addr)); },
+            [&](uint64_t a_dust) { dust = a_dust; }, max_output_allowed);
+        }
+      }
+    }
+    //----------------------------------------------------------------------------------------------------
+    inline void null_split_strategy(const std::vector<currency::tx_destination_entry>& dsts,
+      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
+      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
+    {
+      splitted_dsts = dsts;
+
+      dust = 0;
+      uint64_t change = change_dst.amount;
+      if (0 < dust_threshold)
+      {
+        for (uint64_t order = 10; order <= 10 * dust_threshold; order *= 10)
+        {
+          uint64_t dust_candidate = change_dst.amount % order;
+          uint64_t change_candidate = (change_dst.amount / order) * order;
+          if (dust_candidate <= dust_threshold)
+          {
+            dust = dust_candidate;
+            change = change_candidate;
+          }
+          else
+          {
+            break;
+          }
+        }
+      }
+
+      if (0 != change)
+      {
+        splitted_dsts.push_back(currency::tx_destination_entry(change, change_dst.addr));
+      }
+    }
+    //----------------------------------------------------------------------------------------------------
+    inline void void_split_strategy(const std::vector<currency::tx_destination_entry>& dsts,
+      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
+      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
+    {
+      splitted_dsts = dsts;
+      if (change_dst.amount > 0)
+        splitted_dsts.push_back(change_dst);
+    }
+    //----------------------------------------------------------------------------------------------------
+    enum split_strategy_id_t { ssi_none = 0, ssi_digit = 1, ssi_null = 2, ssi_void = 3 };
+    //----------------------------------------------------------------------------------------------------
+    inline bool apply_split_strategy_by_id(split_strategy_id_t id, const std::vector<currency::tx_destination_entry>& dsts,
+      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
+      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
+    {
+      switch (id)
+      {
+      case ssi_digit:
+        digit_split_strategy(dsts, change_dst, dust_threshold, splitted_dsts, dust, max_output_allowed);
+        return true;
+      case ssi_null:
+        null_split_strategy(dsts, change_dst, dust_threshold, splitted_dsts, dust, max_output_allowed);
+        return true;
+      case ssi_void:
+        void_split_strategy(dsts, change_dst, dust_threshold, splitted_dsts, dust, max_output_allowed);
+        return true;
+      default:
+        return false;
+      }
+    }
+
+  } // namespace detail
+
+  struct construct_tx_param
+  {
+    // preparing data for tx
+    std::vector<currency::tx_destination_entry> dsts;
+    size_t fake_outputs_count;
+    uint64_t fee;
+    tx_dust_policy dust_policy;
+    crypto::hash multisig_id;
+    uint8_t flags;
+    uint8_t split_strategy_id;
+    bool mark_tx_as_complete;
+
+    // constructing tx
+    uint64_t unlock_time;
+    std::vector<currency::extra_v> extra;
+    std::vector<currency::attachment_v> attachments;
+    currency::account_public_address crypt_address;
+    uint8_t tx_outs_attr;
+    bool shuffle;
+  };
+
+  struct finalize_tx_param
+  {
+    uint64_t unlock_time;
+    std::vector<currency::extra_v> extra;
+    std::vector<currency::attachment_v> attachments;
+    currency::account_public_address crypt_address;
+    uint8_t tx_outs_attr;
+    bool shuffle;
+    uint8_t flags;
+    crypto::hash multisig_id;
+    std::vector<currency::tx_source_entry> sources;
+    std::vector<uint64_t> selected_transfers;
+    std::vector<currency::tx_destination_entry> prepared_destinations;
+
+    crypto::public_key spend_pub_key;  // only for validations
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(unlock_time)
+      FIELD(extra)
+      FIELD(attachments)
+      FIELD(crypt_address)
+      FIELD(tx_outs_attr)
+      FIELD(shuffle)
+      FIELD(flags)
+      FIELD(multisig_id)
+      FIELD(sources)
+      FIELD(selected_transfers)
+      FIELD(prepared_destinations)
+      FIELD(spend_pub_key)
+    END_SERIALIZE()
+  };
+
+  struct finalized_tx
+  {
+    currency::transaction tx;
+    crypto::secret_key    one_time_key;
+    finalize_tx_param     ftp;
+    std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(tx)
+      FIELD(one_time_key)
+      FIELD(ftp)
+      FIELD(outs_key_images)
+    END_SERIALIZE()
+  };
 
   class wallet2
   {
@@ -102,7 +309,8 @@ namespace tools
                               m_wcallback(new i_wallet2_callback()), 
                               m_height_of_start_sync(0), 
                               m_last_sync_percent(0), 
-                              m_do_rise_transfer(false)
+                              m_do_rise_transfer(false),
+                              m_watch_only(false)
     {};
   public:
     wallet2() : m_stop(false), 
@@ -112,16 +320,20 @@ namespace tools
                 m_height_of_start_sync(0), 
                 m_last_sync_percent(0), 
                 m_fake_outputs_count(0),
-                m_do_rise_transfer(false)
+                m_do_rise_transfer(false),
+                m_log_prefix("???"),
+                m_watch_only(false)
     {
       m_core_runtime_config = currency::get_default_core_runtime_config();
     };
 
-#define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            0x00000001
-#define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          0x00000002       
-#define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      0x00000004
-#define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   0x00000008
-    
+#define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            uint32_t(1 << 0)
+#define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          uint32_t(1 << 1)       
+#define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
+#define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
+#define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
+
+    static std::string transfer_flags_to_str(uint32_t flags);
     static std::string transform_tx_to_str(const currency::transaction& tx);
     static currency::transaction transform_str_to_tx(const std::string& tx_str);
 
@@ -156,9 +368,10 @@ namespace tools
 
       uint64_t amount() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index].amount; }
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
+      bool is_spendable() const { return (m_flags & (~WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)) == 0; } // spenable = has no flags or mined flag only
+      bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
 
       BEGIN_KV_SERIALIZE_MAP()
-        //KV_SERIALIZE(*m_ptx_wallet_info)
         KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)
         KV_SERIALIZE(m_internal_output_index)
         KV_SERIALIZE(m_spent_height)
@@ -235,8 +448,12 @@ namespace tools
     void load(const std::wstring& wallet, const std::string& password);    
     void store();
     void store(const std::wstring& path);
+    void store(const std::wstring& path, const std::string& password);
+    void store_watch_only(const std::wstring& path, const std::string& password) const;
+    bool store_keys(std::string& buff, const std::string& password, bool store_as_watch_only = false);
     std::wstring get_wallet_path(){ return m_wallet_file; }
-    currency::account_base& get_account(){return m_account;}
+    currency::account_base& get_account() { return m_account; }
+    const currency::account_base& get_account() const { return m_account; }
 
     void get_recent_transfers_history(std::vector<wallet_rpc::wallet_transfer_info>& trs, size_t offset, size_t count);
     uint64_t get_recent_transfers_total_count();
@@ -278,44 +495,43 @@ namespace tools
 
     void transfer(uint64_t amount, const currency::account_public_address& acc);
 
-    template<typename T>
     void transfer(const std::vector<currency::tx_destination_entry>& dsts,
                   size_t fake_outputs_count, 
                   uint64_t unlock_time, 
                   uint64_t fee, 
                   const std::vector<currency::extra_v>& extra, 
-                  const std::vector<currency::attachment_v> attachments, 
-                  T destination_split_strategy, 
+                  const std::vector<currency::attachment_v>& attachments, 
+                  detail::split_strategy_id_t destination_split_strategy_id,
                   const tx_dust_policy& dust_policy);
 
-    template<typename destination_split_strategy_t>
     void transfer(const std::vector<currency::tx_destination_entry>& dsts,
       size_t fake_outputs_count,
       uint64_t unlock_time,
       uint64_t fee,
       const std::vector<currency::extra_v>& extra,
-      const std::vector<currency::attachment_v> attachments,
-      destination_split_strategy_t destination_split_strategy,
+      const std::vector<currency::attachment_v>& attachments,
+      detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
       currency::transaction &tx,
       uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED,
       bool shuffle = true,
       uint8_t flags = 0,
-      bool send_to_network = true);
+      bool send_to_network = true,
+      std::string* p_signed_tx_blob_str = nullptr);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts, 
                   size_t fake_outputs_count, 
                   uint64_t unlock_time, 
                   uint64_t fee, 
                   const std::vector<currency::extra_v>& extra, 
-                  const std::vector<currency::attachment_v> attachments);
+                  const std::vector<currency::attachment_v>& attachments);
     
     void transfer(const std::vector<currency::tx_destination_entry>& dsts, 
                   size_t fake_outputs_count, 
                   uint64_t unlock_time, 
                   uint64_t fee, 
                   const std::vector<currency::extra_v>& extra, 
-                  const std::vector<currency::attachment_v> attachments, 
+                  const std::vector<currency::attachment_v>& attachments, 
                   currency::transaction& tx);
 
     template<typename destination_split_strategy_t>
@@ -327,7 +543,7 @@ namespace tools
       uint64_t unlock_time,
       uint64_t fee,
       const std::vector<currency::extra_v>& extra,
-      const std::vector<currency::attachment_v> attachments,
+      const std::vector<currency::attachment_v>& attachments,
       destination_split_strategy_t destination_split_strategy,
       const tx_dust_policy& dust_policy,
       currency::transaction &tx,
@@ -358,7 +574,7 @@ namespace tools
       const std::string& payment_id,
       currency::transaction& tx, 
       std::vector<uint64_t>& selected_transfers, 
-      currency::keypair& one_time_key);
+      crypto::secret_key& one_time_key);
 
     void send_escrow_proposal(const bc_services::contract_private_details& ecrow_detaild,
       size_t fake_outputs_count,
@@ -368,37 +584,59 @@ namespace tools
       uint64_t b_release_fee,
       const std::string& payment_id,
       currency::transaction &proposal_tx,
-      currency::transaction &escrow_template_tx /*,
-      crypto::hash& contract_id*/ );
+      currency::transaction &escrow_template_tx);
 
     bool check_connection();
     template<typename idle_condition_cb_t> //do refresh as external callback
     static bool scan_pos(mining_context& cxt, std::atomic<bool>& stop, idle_condition_cb_t idle_condition_cb, const currency::core_runtime_config &runtime_config);
     bool fill_mining_context(mining_context& ctx);
     void get_transfers(wallet2::transfer_container& incoming_transfers) const;
-    
+    std::string get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const;
+
     // Returns all payments by given id in unspecified order
-    void get_payments(const std::string& payment_id, std::list<payment_details>& payments) const;
-    
+    void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;
+
+    bool is_watch_only() const { return m_watch_only; }
+    void sign_transfer(const std::string& tx_sources_blob, std::string& signed_tx_blob, currency::transaction& tx);
+    void sign_transfer_files(const std::string& tx_sources_file, const std::string& signed_tx_file, currency::transaction& tx);
+    void submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx);
+    void submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx);
+
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
     uint64_t get_blockchain_current_height() const { return m_blockchain.size(); }
+
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
     {
-      if (ver < WALLET_FILE_SERIALIZATION_VERSION)
+      // do not load wallet if data version is greather than the code version 
+      if (ver > WALLET_FILE_SERIALIZATION_VERSION)
         return;
+
       a & m_blockchain;
       a & m_transfers;
       a & m_multisig_transfers;
       a & m_key_images;
+      
       a & m_unconfirmed_txs;
+      if (ver < 144) //reset unconfirmed due to "coinbase relay bug" 
+      {
+        m_unconfirmed_txs.clear();
+      }
+
       a & m_unconfirmed_multisig_transfers;
       a & m_payments;
       a & m_transfer_history;
       a & m_unconfirmed_in_transfers;
       a & m_contracts;
       a & m_money_expirations;
+      if (ver >= 144)
+      {
+        a & m_pending_key_images;
+        a & m_tx_keys;
+      }
+
     }
+
     bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count);
@@ -457,31 +695,16 @@ namespace tools
 
     bool get_contracts(escrow_contracts_container& contracts);
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
+    bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
-    template<typename destination_split_strategy_t>
-    void prepare_transaction(const std::vector<currency::tx_destination_entry>& dsts,
-      size_t fake_outputs_count,
-      uint64_t unlock_time,
-      uint64_t fee,
-      const std::vector<currency::extra_v>& extra,
-      const std::vector<currency::attachment_v> attachments,
-      destination_split_strategy_t destination_split_strategy,
-      const tx_dust_policy& dust_policy,
-      const currency::account_public_address& crypt_address,
-      currency::transaction &tx,
-      uint8_t tx_outs_attr,
-      bool shuffle,
-      bool mark_tx_as_complete,
-      uint8_t flags,
-      std::vector<uint64_t>& selected_transfers,
-      currency::keypair& one_time_key,
-      std::vector<currency::tx_destination_entry>& prepared_destinations,
-      crypto::hash multisig_id = currency::null_hash);
+    void prepare_transaction(const construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
+    void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx);
+
+    std::string get_log_prefix() const { return m_log_prefix; }
 
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
-    bool store_keys(std::string& buff, const std::string& password);
     void load_keys(const std::string& keys_file_name, const std::string& password);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b);
     void detach_blockchain(uint64_t height);
@@ -498,7 +721,7 @@ private:
     uint64_t select_transfers(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust, std::vector<uint64_t>& selected_indicies);
     void add_transfers_to_transfers_cache(const std::vector<uint64_t>& indexs);
     void add_transfer_to_transfers_cache(uint64_t amount, uint64_t index);
-    bool prepare_file_names(const std::string& file_path);
+    bool prepare_file_names(const std::wstring& file_path);
     void process_unconfirmed(const currency::transaction& tx, std::vector<std::string>& recipients, std::vector<std::string>& recipients_aliases);
     void add_sent_unconfirmed_tx(const currency::transaction& tx,
                                  const std::vector<std::string>& recipients, 
@@ -535,10 +758,9 @@ private:
     bool prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     uint64_t get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
-    template<class destination_split_strategy_t>
     void prepare_tx_destinations(uint64_t needed_money,
       uint64_t found_money,
-      destination_split_strategy_t destination_split_strategy,
+      detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
       const std::vector<currency::tx_destination_entry>& dsts,
       std::vector<currency::tx_destination_entry>& final_detinations);
@@ -548,67 +770,57 @@ private:
     bool handle_expiration_list(uint64_t tx_expiration_ts_median);
     void handle_contract_expirations(uint64_t tx_expiration_ts_median);
 
+    void change_contract_state(wallet_rpc::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_rpc::wallet_transfer_info& wti) const;
+    void change_contract_state(wallet_rpc::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
+
+
     uint64_t get_tx_expiration_median() const;
 
-    void print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee);
+    void print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee = UINT64_MAX);
 
     // Validates escrow template tx in assumption it's related to wallet's account (wallet's account is either A or B party in escrow process)
     bool validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::proposal_body& prop,
       std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd);
 
+    bool validate_escrow_release(const currency::transaction& tx, bool release_type_normal, const bc_services::contract_private_details& cpd,
+      const currency::txout_multisig& source_ms_out, const crypto::hash& ms_id, size_t source_ms_out_index, const currency::transaction& source_tx, const currency::account_keys& a_keys) const;
+
     bool validate_escrow_contract(const wallet_rpc::wallet_transfer_info& wti, const bc_services::contract_private_details& cpd, bool is_a,
       const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::escrow_relese_templates_body& rtb);
 
+    bool validate_escrow_cancel_release(const currency::transaction& tx, const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
+      const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd, const currency::transaction& source_tx,
+      size_t source_ms_out_index, const currency::account_keys& b_keys, uint64_t minimum_release_fee) const;
+      
     bool validate_escrow_cancel_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
       const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd,
       const currency::transaction& proposal_template_tx);
 
-    struct construct_tx_param
-    {
-      std::vector<currency::tx_destination_entry> dsts;
-      size_t fake_outputs_count;
-      uint64_t unlock_time;
-      uint64_t fee;
-      std::vector<currency::extra_v> extra;
-      std::vector<currency::attachment_v> attachments;
-      tx_dust_policy dust_policy;
-      currency::account_public_address crypt_address;      
-      uint8_t tx_outs_attr;
-      bool shuffle;
-      bool mark_tx_as_complete;
-      uint8_t flags;
-      crypto::hash multisig_id; 
-    };
+    void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_rpc::wallet_transfer_info_details& res_td) const;
+    void print_source_entry(const currency::tx_source_entry& src) const;
 
-    struct constructed_tx_data
-    {
-      std::vector<currency::tx_destination_entry> prepared_destinations;
-      currency::transaction tx;
-      std::vector<uint64_t> selected_transfers;
-      currency::keypair one_time_key;
-    };
-
-
-    template<typename destination_split_strategy_t>
-    void prepare_transaction(const construct_tx_param& construct_tx_data,
-      constructed_tx_data& res, destination_split_strategy_t destination_split_strategy);
-
+    void init_log_prefix();
+    void load_keys2ki(bool create_if_not_exist, bool& need_to_resync);
 
     void send_transaction_to_network(const currency::transaction& tx);
     void add_sent_tx_detailed_info(const currency::transaction& tx,
       const std::vector<currency::tx_destination_entry>& destinations,
       const std::vector<uint64_t>& selected_indicies);
     void mark_transfers_as_spent(const std::vector<uint64_t>& selected_transfers, const std::string& reason = std::string());
-    void mark_transfers_with_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason = std::string());
+    void mark_transfers_with_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason = std::string(), bool throw_if_flag_already_set = false);
     void clear_transfers_from_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason = std::string());
     void exception_handler();
+    void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
 
 
 
 
     currency::account_base m_account;
+    bool m_watch_only;
+    std::string m_log_prefix; // part of pub address, prefix for logging functions
     std::wstring m_wallet_file;
+    std::wstring m_pending_ki_file;
     std::string m_password;
     std::vector<crypto::hash> m_blockchain;
     std::atomic<uint64_t> m_local_bc_height; //temporary workaround 
@@ -619,6 +831,8 @@ private:
     multisig_transfer_container m_multisig_transfers;
     payment_container m_payments;
     std::unordered_map<crypto::key_image, size_t> m_key_images;
+    std::unordered_map<crypto::public_key, crypto::key_image> m_pending_key_images; // (out_pk -> ki) pairs of change outputs to be added in watch-only wallet without spend sec key
+    pending_ki_file_container_t m_pending_key_images_file_container;
     uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
 
     std::atomic<bool> m_stop;
@@ -626,6 +840,7 @@ private:
     std::unordered_map<crypto::hash, currency::transaction> m_unconfirmed_in_transfers;
     std::unordered_map<crypto::hash, tools::wallet_rpc::wallet_transfer_info> m_unconfirmed_txs;
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
+    std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
 
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
@@ -641,10 +856,9 @@ private:
     std::string m_miner_text_info;
 
  
-  };
+  }; // class wallet2
 
-}
-
+} // namespace tools
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
 BOOST_CLASS_VERSION(tools::wallet_rpc::wallet_transfer_info, 9)
@@ -775,329 +989,6 @@ namespace boost
 
 namespace tools
 {
-  namespace detail
-  {
-
-
-
-    //----------------------------------------------------------------------------------------------------
-    inline void digit_split_strategy(const std::vector<currency::tx_destination_entry>& dsts,
-      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
-      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
-    {
-      splitted_dsts.clear();
-      dust = 0;
-
-      BOOST_FOREACH(auto& de, dsts)
-      {
-        if (de.addr.size() > 1)
-        {
-          //for multisig we don't split
-          splitted_dsts.push_back(de);
-        }
-        else
-        {
-          currency::decompose_amount_into_digits(de.amount, dust_threshold,
-            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, de.addr)); },
-            [&](uint64_t a_dust) { splitted_dsts.push_back(currency::tx_destination_entry(a_dust, de.addr)); }, max_output_allowed);
-        }
-      }
-
-      if (change_dst.amount > 0)
-      {
-        if (change_dst.addr.size() > 1)
-        {
-          //for multisig we don't split
-          splitted_dsts.push_back(change_dst);
-        }
-        else
-        {
-          currency::decompose_amount_into_digits(change_dst.amount, dust_threshold,
-            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, change_dst.addr)); },
-            [&](uint64_t a_dust) { dust = a_dust; }, max_output_allowed);
-
-        }
-      }
-    }
-    //----------------------------------------------------------------------------------------------------
-
-    inline void null_split_strategy(const std::vector<currency::tx_destination_entry>& dsts,
-      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
-      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
-    {
-      splitted_dsts = dsts;
-
-      dust = 0;
-      uint64_t change = change_dst.amount;
-      if (0 < dust_threshold)
-      {
-        for (uint64_t order = 10; order <= 10 * dust_threshold; order *= 10)
-        {
-          uint64_t dust_candidate = change_dst.amount % order;
-          uint64_t change_candidate = (change_dst.amount / order) * order;
-          if (dust_candidate <= dust_threshold)
-          {
-            dust = dust_candidate;
-            change = change_candidate;
-          }
-          else
-          {
-            break;
-          }
-        }
-      }
-
-      if (0 != change)
-      {
-        splitted_dsts.push_back(currency::tx_destination_entry(change, change_dst.addr));
-      }
-    }
-    //----------------------------------------------------------------------------------------------------
-    inline void void_split_strategy(const std::vector<currency::tx_destination_entry>& dsts,
-      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
-      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
-    {
-      splitted_dsts = dsts;
-      if (change_dst.amount > 0)
-        splitted_dsts.push_back(change_dst);
-    }
-    //----------------------------------------------------------------------------------------------------
-    inline void print_source_entry(const currency::tx_source_entry& src)
-    {
-      std::ostringstream indexes;
-      std::for_each(src.outputs.begin(), src.outputs.end(), [&](const currency::tx_source_entry::output_entry& s_e) { indexes << s_e.first << " "; });
-      LOG_PRINT_L0("amount=" << currency::print_money(src.amount) << ", real_output=" <<src.real_output << ", real_output_in_tx_index=" << src.real_output_in_tx_index << ", indexes: " << indexes.str());
-    }
-    //----------------------------------------------------------------------------------------------------
-  }
-  //----------------------------------------------------------------------------------------------------
-  template<typename T>
-  void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts, size_t fake_outputs_count,
-    uint64_t unlock_time, uint64_t fee, const std::vector<currency::extra_v>& extra, const std::vector<currency::attachment_v> attachments, T destination_split_strategy, const tx_dust_policy& dust_policy)
-  {
-    currency::transaction tx;
-    transfer(dsts, fake_outputs_count, unlock_time, fee, extra, attachments, destination_split_strategy, dust_policy, tx);
-  }
-  //----------------------------------------------------------------------------------------------------
-  template<typename destination_split_strategy_t>
-  void wallet2::prepare_tx_destinations(uint64_t needed_money,
-    uint64_t found_money,
-    destination_split_strategy_t destination_split_strategy,
-    const tx_dust_policy& dust_policy,
-    const std::vector<currency::tx_destination_entry>& dsts,
-    std::vector<currency::tx_destination_entry>& final_detinations)
-  {
-    currency::tx_destination_entry change_dts = AUTO_VAL_INIT(change_dts);
-    if (needed_money < found_money)
-    {
-      change_dts.addr.push_back(m_account.get_keys().m_account_address);
-      change_dts.amount = found_money - needed_money;
-    }
-    THROW_IF_FALSE_WALLET_EX(found_money >= needed_money, error::wallet_internal_error, "needed_money(" + std::to_string(needed_money)
-      + ") < found_money(" + std::to_string(found_money) + ") ");
-
-    uint64_t dust = 0;
-    destination_split_strategy(dsts, change_dts, dust_policy.dust_threshold, final_detinations, dust, WALLET_MAX_ALLOWED_OUTPUT_AMOUNT);
-    THROW_IF_FALSE_WALLET_EX(dust_policy.dust_threshold >= dust, error::wallet_internal_error, "invalid dust value: dust = " +
-      std::to_string(dust) + ", dust_threshold = " + std::to_string(dust_policy.dust_threshold));
-    
-    //@#@
-#ifdef _DEBUG
-    if (final_detinations.size() > 10)
-    {
-      LOG_PRINT_L0("final_detinations.size()=" << final_detinations.size());
-    }
-#endif
-    //@#@
-
-    if (0 != dust && !dust_policy.add_to_fee)
-    {
-      final_detinations.push_back(currency::tx_destination_entry(dust, dust_policy.addr_for_dust));
-    }
-  }
-
-  //----------------------------------------------------------------------------------------------------
-  template<typename destination_split_strategy_t>
-  void wallet2::prepare_transaction(const std::vector<currency::tx_destination_entry>& dsts,
-    size_t fake_outputs_count,
-    uint64_t unlock_time,
-    uint64_t fee,
-    const std::vector<currency::extra_v>& extra,
-    const std::vector<currency::attachment_v> attachments,
-    destination_split_strategy_t destination_split_strategy,
-    const tx_dust_policy& dust_policy,
-    const currency::account_public_address& crypt_address,
-    currency::transaction &tx,
-    uint8_t tx_outs_attr,
-    bool shuffle,
-    bool mark_tx_as_complete,
-    uint8_t flags,
-    std::vector<uint64_t>& selected_transfers,
-    currency::keypair& one_time_key,
-    std::vector<currency::tx_destination_entry>& prepared_destinations,
-    crypto::hash multisig_id)
-  {
-    TIME_MEASURE_START_MS(get_needed_money_time);
-    uint64_t needed_money = get_needed_money(fee, dsts);
-    if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vout.size())
-    {      
-      needed_money += (currency::get_outs_money_amount(tx) - get_inputs_money_amount(tx));
-    }
-    TIME_MEASURE_FINISH_MS(get_needed_money_time);
-
-    std::vector<currency::tx_source_entry> sources;
-    uint64_t found_money = 0;
-
-    TIME_MEASURE_START_MS(prepare_tx_sources_time);
-    if (multisig_id == currency::null_hash)
-    {
-      prepare_tx_sources(needed_money, fake_outputs_count, dust_policy.dust_threshold, sources, selected_transfers, found_money);
-    }
-    else
-    {
-      prepare_tx_sources(multisig_id, sources, found_money);
-    }
-    TIME_MEASURE_FINISH_MS(prepare_tx_sources_time);
-
-    TIME_MEASURE_START_MS(prepare_tx_destinations_time);
-    prepare_tx_destinations(needed_money, found_money, destination_split_strategy, dust_policy, dsts, prepared_destinations);
-    TIME_MEASURE_FINISH_MS(prepare_tx_destinations_time);
-
-    if (mark_tx_as_complete && !sources.empty())
-      sources.back().separately_signed_tx_complete = true;
-
-    TIME_MEASURE_START_MS(construct_tx_time);
-    bool r = currency::construct_tx(m_account.get_keys(),
-      sources,
-      prepared_destinations,
-      extra,
-      attachments,
-      tx,
-      one_time_key.sec,
-      unlock_time,
-      crypt_address, 
-      0,
-      tx_outs_attr,
-      shuffle,
-      flags);
-    TIME_MEASURE_FINISH_MS(construct_tx_time);
-    THROW_IF_TRUE_WALLET_EX(!r, error::tx_not_constructed, sources, prepared_destinations, unlock_time);
-
-    TIME_MEASURE_START_MS(sign_ms_input_time);
-    if (multisig_id != currency::null_hash)
-    {
-        // In case there's multisig input is used -- sign it partially with this wallet's keys (we don't have any others here).
-        // NOTE: this tx will not be ready to send until all other necessary signs for ms input would made.
-        auto it = m_multisig_transfers.find(multisig_id);
-        THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_multisig_transfers.end(), "can't find multisig_id: " << multisig_id);
-        const currency::transaction& ms_source_tx = it->second.m_ptx_wallet_info->m_tx;
-        bool is_tx_input_fully_signed = false;
-        r = sign_multisig_input_in_tx(tx, 0, m_account.get_keys(), ms_source_tx, &is_tx_input_fully_signed);
-        THROW_IF_FALSE_WALLET_INT_ERR_EX(r && !is_tx_input_fully_signed, "sign_multisig_input_in_tx failed: r = " << r << ", is_tx_input_fully_signed = " << is_tx_input_fully_signed);
-    }
-    TIME_MEASURE_FINISH_MS(sign_ms_input_time);
-
-    THROW_IF_TRUE_WALLET_EX(CURRENCY_MAX_TRANSACTION_BLOB_SIZE <= get_object_blobsize(tx), error::tx_too_big, tx, m_upper_transaction_size_limit);
-    LOG_PRINT_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"
-      << ", prepare_tx_sources_time: " << prepare_tx_sources_time << " ms"
-      << ", prepare_tx_destinations_time: " << prepare_tx_destinations_time << " ms"
-      << ", construct_tx_time: " << construct_tx_time << " ms"
-      << ", sign_ms_input_time: " << sign_ms_input_time << " ms",
-      LOG_LEVEL_0);
-  }
-
-  template<typename destination_split_strategy_t>
-  void wallet2::prepare_transaction(const construct_tx_param& construct_tx_data, constructed_tx_data& res, 
-    destination_split_strategy_t destination_split_strategy)
-  {
-    return prepare_transaction(construct_tx_data.dsts,
-      construct_tx_data.fake_outputs_count,
-      construct_tx_data.unlock_time,
-      construct_tx_data.fee,
-      construct_tx_data.extra,
-      construct_tx_data.attachments,
-      destination_split_strategy,
-      construct_tx_data.dust_policy,
-      construct_tx_data.crypt_address,
-      res.tx,
-      construct_tx_data.tx_outs_attr,
-      construct_tx_data.shuffle,
-      construct_tx_data.mark_tx_as_complete,
-      construct_tx_data.flags,
-      res.selected_transfers,
-      res.one_time_key,
-      res.prepared_destinations,
-      construct_tx_data.multisig_id);
-  }
-
-
-  //----------------------------------------------------------------------------------------------------
-  template<typename destination_split_strategy_t>
-  void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts, 
-                         size_t fake_outputs_count,
-                         uint64_t unlock_time, 
-                         uint64_t fee, 
-                         const std::vector<currency::extra_v>& extra, 
-                         const std::vector<currency::attachment_v> attachments, 
-                         destination_split_strategy_t destination_split_strategy,
-                         const tx_dust_policy& dust_policy, 
-                         currency::transaction &tx,
-                         uint8_t tx_outs_attr, 
-                         bool shuffle, 
-                         uint8_t flags, 
-                         bool send_to_network)
-  {
-    TIME_MEASURE_START(precalculation_time);
-    using namespace currency;
-    std::vector<uint64_t> selected_transfers;
-    std::vector<currency::tx_destination_entry> prepared_destinations;
-    account_public_address crypt_address = currency::get_crypt_address_from_destinations(m_account.get_keys(), dsts);
-    currency::keypair onetime_keys = AUTO_VAL_INIT(onetime_keys);
-    TIME_MEASURE_FINISH(precalculation_time);
-
-    TIME_MEASURE_START(prepare_transaction_time);
-    prepare_transaction(dsts,
-      fake_outputs_count,
-      unlock_time,
-      fee,
-      extra,
-      attachments,
-      destination_split_strategy,
-      dust_policy,
-      crypt_address,
-      tx,
-      tx_outs_attr,
-      shuffle,
-      false,
-      flags,
-      selected_transfers, 
-      onetime_keys,
-      prepared_destinations);
-    TIME_MEASURE_FINISH(prepare_transaction_time);
-
-    TIME_MEASURE_START(send_transaction_to_network_time);
-    if (send_to_network)
-      send_transaction_to_network(tx);
-    TIME_MEASURE_FINISH(send_transaction_to_network_time);
-
-    TIME_MEASURE_START(mark_transfers_as_spent_time);
-    mark_transfers_as_spent(selected_transfers, std::string("money transfer"));
-    TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
-
-    TIME_MEASURE_START(add_sent_tx_detailed_info_time);
-    add_sent_tx_detailed_info(tx, prepared_destinations, selected_transfers);
-    TIME_MEASURE_FINISH(add_sent_tx_detailed_info_time);
-
-    LOG_PRINT_GREEN("[wallet::transfer] prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
-      << ", precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
-      << ", send_transaction_to_network_time: " << print_fixed_decimal_point(send_transaction_to_network_time, 3)
-      << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
-      << ", add_sent_tx_detailed_info_time: " << print_fixed_decimal_point(add_sent_tx_detailed_info_time, 3),
-      LOG_LEVEL_0);
-    
-    //print_tx_sent_message(tx, std::string() + "(transaction)", fee);
-  }
-  //----------------------------------------------------------------------------------------------------
   template<typename idle_condition_cb_t> //do refresh as external callback
   bool wallet2::scan_pos(mining_context& cxt,
     std::atomic<bool>& stop,
@@ -1199,8 +1090,26 @@ namespace tools
     return false;
   }
 
+} // namespace tools
 
-}
+#if !defined(KEEP_WALLET_LOG_MACROS)
+#undef WLT_LOG_L0
+#undef WLT_LOG_L1
+#undef WLT_LOG_L2
+#undef WLT_LOG_L3
+#undef WLT_LOG_L4
+#undef WLT_LOG_ERROR
+#undef WLT_LOG_BLUE
+#undef WLT_LOG_CYAN
+#undef WLT_LOG_GREEN
+#undef WLT_LOG_MAGENTA
+#undef WLT_LOG_RED
+#undef WLT_LOG_YELLOW
+#undef WLT_CHECK_AND_ASSERT_MES
+#undef WLT_CHECK_AND_ASSERT_MES_NO_RET
+// TODO update this list
+#endif
+
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"

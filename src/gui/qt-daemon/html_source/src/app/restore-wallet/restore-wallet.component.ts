@@ -35,30 +35,31 @@ export class RestoreWalletComponent implements OnInit {
   };
 
   walletSaved = false;
+  walletSavedName = '';
+  progressWidth = '9rem';
 
   constructor(
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone,
     private translate: TranslateService
-  ) {
-  }
+  ) {}
 
-  ngOnInit() {
-  }
-
+  ngOnInit() {}
 
   createWallet() {
-    this.router.navigate(['/seed-phrase'], {queryParams: {wallet_id: this.wallet.id}});
+    this.ngZone.run(() => {
+      this.progressWidth = '100%';
+      this.router.navigate(['/seed-phrase'], {queryParams: {wallet_id: this.wallet.id}});
+    });
   }
 
   saveWallet() {
-    if (this.restoreForm.valid) {
+    if (this.restoreForm.valid && this.restoreForm.get('name').value.length <= this.variablesService.maxWalletNameLength) {
       this.backend.isValidRestoreWalletText(this.restoreForm.get('key').value, (valid_status, valid_data) => {
-
-        if (valid_data === 'FALSE') {
+        if (valid_data !== 'TRUE') {
           this.ngZone.run(() => {
             this.restoreForm.get('key').setErrors({key_not_valid: true});
           });
@@ -66,6 +67,7 @@ export class RestoreWalletComponent implements OnInit {
           this.backend.saveFileDialog(this.translate.instant('RESTORE_WALLET.CHOOSE_PATH'), '*', this.variablesService.settings.default_path, (save_status, save_data) => {
             if (save_status) {
               this.variablesService.settings.default_path = save_data.path.substr(0, save_data.path.lastIndexOf('/'));
+              this.walletSavedName = save_data.path.substr(save_data.path.lastIndexOf('/') + 1, save_data.path.length - 1);
               this.backend.restoreWallet(save_data.path, this.restoreForm.get('password').value, this.restoreForm.get('key').value, (restore_status, restore_data) => {
                 if (restore_status) {
                   this.wallet.id = restore_data.wallet_id;
@@ -80,6 +82,7 @@ export class RestoreWalletComponent implements OnInit {
                     restore_data['wi'].mined_total,
                     restore_data['wi'].tracking_hey
                   );
+                  this.variablesService.opening_wallet.alias = this.backend.getWalletAlias(this.variablesService.opening_wallet.address);
                   if (restore_data.recent_history && restore_data.recent_history.history) {
                     this.variablesService.opening_wallet.prepareHistory(restore_data.recent_history.history);
                   }
@@ -92,6 +95,7 @@ export class RestoreWalletComponent implements OnInit {
                   });
                   this.ngZone.run(() => {
                     this.walletSaved = true;
+                    this.progressWidth = '50%';
                   });
                 } else {
                   this.modalService.prepareModal('error', 'RESTORE_WALLET.NOT_CORRECT_FILE_OR_PASSWORD');

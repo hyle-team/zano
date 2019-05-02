@@ -52,7 +52,7 @@ bool gen_chain_switch_pow_pos::generate(std::vector<test_event_entry>& events) c
   for(size_t i = 0; i < CURRENCY_MINED_MONEY_UNLOCK_WINDOW; ++i)
   {
     block blk = AUTO_VAL_INIT(blk);
-    uint64_t ts = blk_0r.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN / 3; // to increase main chain difficulty
+    uint64_t ts = blk_0r.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN / 2; // to increase main chain difficulty
     bool r = generator.construct_block_manually(blk, blk_0r, miner_acc,test_generator::bf_timestamp, 0, 0, ts);
     CHECK_AND_ASSERT_MES(r, false, "construct_block_manually failed");
     events.push_back(blk);
@@ -61,8 +61,8 @@ bool gen_chain_switch_pow_pos::generate(std::vector<test_event_entry>& events) c
   
   uint64_t buttloads_of_money = currency::get_outs_money_amount(blk_0.miner_tx);
   m_premine_amount = buttloads_of_money;
-  MAKE_TX_FEE(events, tx_1, miner_acc, alice, buttloads_of_money - TX_DEFAULT_FEE, TX_DEFAULT_FEE, blk_0r);  // N+5
-  buttloads_of_money -= TX_DEFAULT_FEE;
+  MAKE_TX_FEE(events, tx_1, miner_acc, alice, buttloads_of_money - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, blk_0r);  // N+5
+  buttloads_of_money -= TESTS_DEFAULT_FEE;
 
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);                                // N+6
 

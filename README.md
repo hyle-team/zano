@@ -1,10 +1,21 @@
 Building
 --------
 
+### Cloning
+
+Be sure to properly clone the repository:
+
+`$ git clone --recursive https://github.com/hyle-team/zano.git`
+
+or, if already cloned:
+
+`$ cd zano/ && git submodule init && git submodule update`
+
 ### Dependencies
 | component / version | minimum <br>(not recommended but may work) | recommended | most recent of what we have ever tested |
 |--|--|--|--|
-| gcc (Linux) | 5.4.0 | 7.2.0 | 7.2.0 |
+| gcc (Linux) | 5.4.0 | 7.2.0 | 8.3.0 |
+| llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
 | [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2015 (14.0 update 1) | 2015 (14.0 update 3) | 2017 (15.5.7) |
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 7.3.1 | 9.2 | 9.2 |
 | [CMake](https://cmake.org/download/) | 2.8.6 | 3.4.1 | 3.11.0 |
@@ -12,12 +23,16 @@ Building
 | [Qt](https://download.qt.io/archive/qt/) (only for GUI) | 5.8.0 | 5.9.1 | 5.10.1 |
 
 ### Linux
+
 Recommended OS version: Ubuntu 17.04 LTS.
- 1. Install dependencies: `sudo apt-get install build-essential git cmake unzip libicu-dev ocl-icd-opencl-dev mesa-common-dev libglu1-mesa-dev`
- 2. Install Qt and Boost
- 3. Set `BOOST_ROOT` and `QT_PREFIX_PATH` environment variables
- 4. `mkdir build` <br> `cd build` <br> `cmake -DBUILD_GUI=FALSE -DSTATIC=TRUE ..` <br> `make`
-5. In order to build GUI, revise and run script at `/utils/build_script_linux.sh`
+
+1. For server version: \
+`$ sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git libboost-all-dev screen`\
+For GUI version:\
+`$ sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git libboost-all-dev screen mesa-common-dev libglu1-mesa-dev qt5-default qtwebengine5-dev`
+
+2. `$ cd zano/ && make -j$(nproc) gui`
+3. Look for the binaries, including the `Zano` GUI, in the build directory
 
 ### Windows
 Recommended OS version: Windows 7 x64.

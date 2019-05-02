@@ -1039,6 +1039,7 @@ namespace nodetool
     rsp.connections_count = m_net_server.get_config_object().get_connections_count();
     rsp.incoming_connections_count = rsp.connections_count - get_outgoing_connections_count();
     rsp.version = PROJECT_VERSION_LONG;
+    rsp.current_log_size = tools::get_log_file_size();
     m_payload_handler.get_stat_info(arg.pr, rsp.payload_info);
     return 1;
   }
@@ -1061,7 +1062,9 @@ namespace nodetool
       ce.time_started = cntxt.m_started;
       ce.last_recv = cntxt.m_last_recv;
       ce.last_send = cntxt.m_last_send;
-      ce.version = cntxt.m_remote_version;
+      size_t len = std::min(sizeof(ce.version) - 1, cntxt.m_remote_version.size());
+      std::strncpy(ce.version, cntxt.m_remote_version.c_str(), len);
+      ce.version[len] = 0; //null terminating just to be sure
       rsp.connections_list.push_back(ce);
       return true;
     });
@@ -1079,7 +1082,44 @@ namespace nodetool
     rsp.my_id = m_config.m_peer_id;
     return 1;
   }
-#endif
+  //-----------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+  int node_server<t_payload_net_handler>::handle_request_log(int command, COMMAND_REQUEST_LOG::request& req, COMMAND_REQUEST_LOG::response& rsp, p2p_connection_context& context)
+  {
+    if (!check_trust(req.tr))
+    {
+      drop_connection(context);
+      return 1;
+    }
+
+    rsp.current_log_level = static_cast<int64_t>(log_space::get_set_log_detalisation_level());
+    tools::get_log_chunk_gzipped(req.log_chunk_offset, req.log_chunk_size, rsp.log_chunk, rsp.error);
+    rsp.current_log_size = tools::get_log_file_size();
+
+    return 1;
+  }
+  //-----------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+  int node_server<t_payload_net_handler>::handle_set_log_level(int command, COMMAND_SET_LOG_LEVEL::request& req, COMMAND_SET_LOG_LEVEL::response& rsp, p2p_connection_context& context)
+  {
+    if (!check_trust(req.tr))
+    {
+      drop_connection(context);
+      return 1;
+    }
+
+    rsp.old_log_level = static_cast<int64_t>(log_space::get_set_log_detalisation_level());
+    log_space::get_set_log_detalisation_level(true, static_cast<int>(req.new_log_level));
+    rsp.current_log_level = static_cast<int64_t>(log_space::get_set_log_detalisation_level());
+
+    if (rsp.old_log_level != rsp.current_log_level)
+    {
+      LOG_PRINT_CC(context, "log level changed by debug command: " << rsp.old_log_level << " -> " << rsp.current_log_level, LOG_LEVEL_0);
+    }
+
+    return 1;
+  }
+#endif // #ifdef ALLOW_DEBUG_COMMANDS
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   void node_server<t_payload_net_handler>::request_callback(const epee::net_utils::connection_context_base& context)

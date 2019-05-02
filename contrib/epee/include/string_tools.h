@@ -648,9 +648,6 @@ POP_WARNINGS
 		return res;
 	}
 	//----------------------------------------------------------------------------
-
-
-
 	inline std::string cut_off_extension(const std::string& str)
 	{
 		std::string res;
@@ -661,7 +658,17 @@ POP_WARNINGS
 		res = str.substr(0, pos);
 		return res;
 	}
+  //----------------------------------------------------------------------------
+  inline std::wstring cut_off_extension(const std::wstring& str)
+  {
+    std::wstring res;
+    std::wstring::size_type pos = str.rfind('.');
+    if (std::wstring::npos == pos)
+      return str;
 
+    res = str.substr(0, pos);
+    return res;
+  }
   //----------------------------------------------------------------------------
   // replaces all non-ascii characters with mask_character
   inline std::string mask_non_ascii_chars(const std::string& str, const char mask_character = '?')

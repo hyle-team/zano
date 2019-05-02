@@ -1,0 +1,50 @@
+.progress-bar-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  padding: 0 3rem;
+  width: 100%;
+  height: 3rem;
+
+  .progress-bar {
+    position: absolute;
+    top: -0.7rem;
+    left: 0;
+    margin: 0 3rem;
+    width: calc(100% - 6rem);
+    height: 0.7rem;
+
+    .progress-bar-full {
+      height: 0.7rem;
+    }
+  }
+
+  .progress-labels {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 1.2rem;
+    height: 100%;
+
+    span {
+      flex: 1 0 0;
+      text-align: center;
+
+      &:first-child {
+        text-align: left;
+      }
+
+      &:last-child {
+        text-align: right;
+      }
+    }
+  }
+
+  .progress-time {
+    position: absolute;
+    top: -3rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.2rem;
+  }
+}

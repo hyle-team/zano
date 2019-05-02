@@ -138,7 +138,7 @@ bool gen_checkpoints_invalid_keyimage::generate(std::vector<test_event_entry>& e
 
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
-  bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, miner_acc, MK_TEST_COINS(1), TX_DEFAULT_FEE, 0, sources, destinations);
+  bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, miner_acc, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");  
   tx_builder tb;
   tb.step1_init();
@@ -597,7 +597,7 @@ gen_no_attchments_in_coinbase::gen_no_attchments_in_coinbase()
   // NOTE: This test is made deterministic to be able to correctly set up checkpoint.
   random_state_test_restorer::reset_random(); // random generator's state was previously stored, will be restore on dtor (see also m_random_state_test_restorer)
 
-  bool r = m_miner_acc.restore_keys_from_braindata("confusion reason crash guess dude scatter rabbit view story protect trickle gather");
+  bool r = m_miner_acc.restore_keys_from_braindata("battle harsh arrow gain best doubt nose raw protect salty apart tell distant final yeah stubborn true stop shoulder breathe throne problem everyone stranger only");
   CHECK_AND_ASSERT_THROW_MES(r, "gen_no_attchments_in_coinbase: Can't restore account from braindata");
 
   REGISTER_CALLBACK_METHOD(gen_no_attchments_in_coinbase, c1);
@@ -628,7 +628,7 @@ bool gen_no_attchments_in_coinbase::init_config_set_cp(currency::core& c, size_t
   crc.pos_minimum_heigh = 1;
   c.get_blockchain_storage().set_core_runtime_config(crc);
 
-  m_checkpoints.add_checkpoint(12, "d34f992c250cad590b474bf0096273fb9beb0d5540a258b46bbbe6e99632fc1a");
+  m_checkpoints.add_checkpoint(12, "ea03a5c99aeedc2050ca5dae011a6c411b31f8b7fb9d0b82735c403b5c608b7b");
   c.set_checkpoints(currency::checkpoints(m_checkpoints));
 
   return true;
@@ -683,19 +683,19 @@ bool gen_no_attchments_in_coinbase::c1(currency::core& c, size_t ev_index, const
   test_core_time::adjust(blk_0r.timestamp + DIFFICULTY_TOTAL_TARGET);
 
   block blk_a;
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_miner_acc.get_public_address(), c, &blk_a);
+  r = mine_next_pow_block_in_playtime(m_miner_acc.get_public_address(), c, &blk_a);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   test_core_time::adjust(blk_a.timestamp + DIFFICULTY_TOTAL_TARGET);
 
   block blk_b;
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_miner_acc.get_public_address(), c, &blk_b);
+  r = mine_next_pow_block_in_playtime(m_miner_acc.get_public_address(), c, &blk_b);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   test_core_time::adjust(blk_b.timestamp + DIFFICULTY_TOTAL_TARGET);
 
   block blk_c;
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_miner_acc.get_public_address(), c, &blk_c);
+  r = mine_next_pow_block_in_playtime(m_miner_acc.get_public_address(), c, &blk_c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   // make sure the checkpoint zone is successfully left behind

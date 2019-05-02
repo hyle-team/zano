@@ -1,3 +1,7 @@
+:host {
+  position: relative;
+}
+
 .seed-phrase-title {
   line-height: 2.2rem;
   padding: 2.2rem 0;
@@ -17,8 +21,19 @@
   }
 }
 
-button {
-  margin: 2.8rem 0;
-  width: 25%;
-  min-width: 1.5rem;
+.wrap-buttons {
+  display: flex;
+
+  .seed-phrase-button {
+    margin: 2.8rem 0;
+    width: 25%;
+    min-width: 1.5rem;
+  }
+
+  .copy-button {
+    margin: 2.8rem 1rem;
+    width: 25%;
+    min-width: 1.5rem;
+  }
 }
+

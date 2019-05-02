@@ -1,3 +1,16 @@
+.app-content {
+
+  .preloader {
+
+    .loading-bar {
+
+      @include themify($themes) {
+        background-color: themed(progressBarFullBackgroundColor);
+      }
+    }
+  }
+}
+
 button {
   border: none;
   font-family: OpenSans, sans-serif;
@@ -20,6 +33,13 @@ button {
         background-color: themed(disabledButtonHoverColor);
       }
     }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(disabledButtonFocusColor);
+      }
+    }
   }
 
   &.blue-button:not(:disabled) {
@@ -33,6 +53,13 @@ button {
 
       @include themify($themes) {
         background-color: themed(blueButtonHoverColor);
+      }
+    }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(blueButtonFocusColor);
       }
     }
   }
@@ -50,6 +77,13 @@ button {
         background-color: themed(greenButtonHoverColor);
       }
     }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(greenButtonFocusColor);
+      }
+    }
   }
 
   &.turquoise-button:not(:disabled) {
@@ -63,6 +97,13 @@ button {
 
       @include themify($themes) {
         background-color: themed(turquoiseButtonHoverColor);
+      }
+    }
+
+    &:focus {
+
+      @include themify($themes) {
+        background-color: themed(turquoiseButtonFocusColor);
       }
     }
   }
@@ -98,7 +139,6 @@ button {
   flex-direction: column;
   align-items: flex-start;
   margin-bottom: 0.4rem;
-  height: 6.6rem;
 
   .wrap-label {
     display: flex;
@@ -122,7 +162,7 @@ button {
     outline: none;
     padding: 0 1rem;
     width: 100%;
-    height: 100%;
+    height: 4.2rem;
 
     @include themify($themes) {
       background-color: themed(inputBackgroundColor);
@@ -142,9 +182,9 @@ button {
       width: 100%;
       min-width: 100%;
       height: 100%;
-      min-height: 7rem;
-      max-height: 7rem;
-      overflow: hidden;
+      min-height: 7.5rem;
+      max-height: 7.5rem;
+      overflow: auto;
       resize: none;
 
       @include themify($themes) {
@@ -152,6 +192,23 @@ button {
         color: themed(mainTextColor);
       }
     }
+  }
+
+  .error-block {
+    font-size: 1rem;
+    line-height: 1.4rem;
+    align-self: flex-end;
+    text-align: right;
+
+    @include themify($themes) {
+      color: themed(redTextColor);
+    }
+  }
+}
+
+.error-text {
+  @include themify($themes) {
+    color: themed(redTextColor);
   }
 }
 
@@ -297,17 +354,7 @@ input[type='checkbox'].style-checkbox {
   }
 }
 
-.error-block {
-  font-size: 1.2rem;
-  text-align: right;
-
-  @include themify($themes) {
-    color: themed(redTextColor);
-  }
-}
-
-.history-tooltip {
-  font-size: 1.3rem;
+.table-tooltip {
   padding: 1rem 2rem;
 
   @include themify($themes) {
@@ -316,10 +363,33 @@ input[type='checkbox'].style-checkbox {
     color: themed(mainTextColor);
   }
 
+  .tooltip-inner {
+    font-size: 1.3rem;
+    line-height: 1.8rem;
+    white-space: pre-wrap;
+  }
+
   &.ng-tooltip-top {
     margin-top: -1rem;
 
-    &:before {
+    &:after {
+      content: "";
+      position: absolute;
+      bottom: -2rem;
+      left: calc(50% - 1rem);
+      border-width: 1rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: themed(tooltipBackgroundColor) transparent transparent transparent;
+      }
+    }
+  }
+
+  &.ng-tooltip-top-left {
+    margin-top: -1rem;
+
+    &:after {
       content: "";
       position: absolute;
       bottom: -1rem;
@@ -333,7 +403,41 @@ input[type='checkbox'].style-checkbox {
     }
   }
 
+  &.ng-tooltip-top-right {
+    margin-top: -1rem;
+
+    &:after {
+      content: "";
+      position: absolute;
+      bottom: -1rem;
+      right: 0.7rem;
+      border-width: 0.5rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: themed(tooltipBackgroundColor) themed(tooltipBackgroundColor) transparent transparent;
+      }
+    }
+  }
+
   &.ng-tooltip-bottom {
+    margin-top: 1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      top: -2rem;
+      left: calc(50% - 1rem);
+      border-width: 1rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: transparent transparent themed(tooltipBackgroundColor) transparent;
+      }
+    }
+  }
+
+  &.ng-tooltip-bottom-left {
     margin-top: 1rem;
 
     &:before {
@@ -341,11 +445,28 @@ input[type='checkbox'].style-checkbox {
       position: absolute;
       top: -1rem;
       left: 0.7rem;
-      border-width: 1rem 0 0 1rem;
+      border-width: 0.5rem;
       border-style: solid;
 
       @include themify($themes) {
-        border-color: transparent transparent transparent themed(tooltipBackgroundColor);
+        border-color: transparent transparent themed(tooltipBackgroundColor) themed(tooltipBackgroundColor);
+      }
+    }
+  }
+
+  &.ng-tooltip-bottom-right {
+    margin-top: 1rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      top: -1rem;
+      right: 0.7rem;
+      border-width: 0.5rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: transparent themed(tooltipBackgroundColor) themed(tooltipBackgroundColor) transparent;
       }
     }
   }
@@ -353,7 +474,7 @@ input[type='checkbox'].style-checkbox {
   &.ng-tooltip-left {
     margin-left: -1rem;
 
-    &:before {
+    &:after {
       content: "";
       position: absolute;
       top: 0;
@@ -385,53 +506,86 @@ input[type='checkbox'].style-checkbox {
   }
 }
 
-.modal {
+.table-tooltip-dimensions {
+
+  .tooltip-inner {
+    overflow: auto;
+    max-width: 20rem;
+    max-height: 10rem;
+  }
+}
+
+.balance-tooltip {
+  padding: 1.3rem;
 
   @include themify($themes) {
-    background: themed(modalBackground);
+    background: themed(tooltipBackgroundColor);
+    box-shadow: themed(tooltipShadow);
     color: themed(mainTextColor);
   }
 
-  .content {
+  .tooltip-inner {
+    display: flex;
+    flex-direction: column;
+    font-size: 1.3rem;
 
-    .icon.error {
+    .available {
+      margin-bottom: 1.7rem;
 
-      @include themify($themes) {
-        background-color: themed(redTextColor);
+      b {
+        font-weight: 600;
       }
     }
 
-    .icon.success {
+    .locked {
+      margin-bottom: 0.7rem;
 
-      @include themify($themes) {
-        background-color: themed(greenTextColor);
+      b {
+        font-weight: 600;
       }
     }
 
-    .icon.info {
+    .link {
+      cursor: pointer;
 
       @include themify($themes) {
-        background-color: themed(blueTextColor);
+        color: themed(blueTextColor);
       }
     }
   }
 
-  .action-button {
-
-    @include themify($themes) {
-      background-color: themed(blueTextColor);
-      color: themed(alternativeTextColor);
-    }
+  &.ng-tooltip-top {
+    margin-top: -1rem;
   }
 
-  .close-button {
+  &.ng-tooltip-bottom {
+    margin-top: 1rem;
+  }
 
-    .icon {
+  &.ng-tooltip-left {
+    margin-left: -1rem;
+  }
 
-      @include themify($themes) {
-        background-color: themed(closeButtonColor);
-      }
-    }
+  &.ng-tooltip-right {
+    margin-left: 1rem;
+  }
+}
+
+.account-tooltip {
+
+  .tooltip-inner {
+    word-break: break-word;
+    max-width: 18rem;
+  }
+}
+
+.comment-tooltip {
+
+  .tooltip-inner {
+    overflow: auto;
+    word-break: break-word;
+    max-width: 50rem;
+    max-height: 25rem;
   }
 }
 
@@ -469,6 +623,198 @@ input[type='checkbox'].style-checkbox {
         background-color: themed(chartOptionsHoverColor);
         color: themed(mainTextColor);
       }
+    }
+  }
+}
+
+.ng-select {
+
+  &.lock-selection-select {
+    width: 100%;
+
+    .ng-select-container {
+      border: none;
+      border-radius: 0;
+      cursor: pointer;
+      font-size: 1.4rem;
+      outline: none;
+      padding: 0 1rem;
+      height: 4.2rem;
+
+      @include themify($themes) {
+        background-color: themed(inputBackgroundColor);
+        color: themed(mainTextColor);
+      }
+
+      .ng-value-container {
+        padding: 0;
+
+        .ng-input {
+          top: auto;
+        }
+      }
+    }
+
+    .ng-dropdown-panel {
+      border: none;
+
+      @include themify($themes) {
+        background-color: themed(inputBackgroundColor);
+      }
+
+      .ng-dropdown-panel-items {
+
+        .ng-option {
+          font-size: 1.4rem;
+          padding: 1rem;
+
+          @include themify($themes) {
+            background-color: themed(inputBackgroundColor);
+            color: themed(mainTextColor);
+          }
+
+          &.ng-option-marked {
+
+            @include themify($themes) {
+              background-color: themed(selectHoverColor);
+              color: themed(mainTextColor);
+            }
+          }
+
+          &.ng-option-selected {
+
+            @include themify($themes) {
+              background-color: themed(selectSelectedColor);
+              color: themed(mainTextColor);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+app-modal-container {
+
+  .modal {
+
+    @include themify($themes) {
+      background: themed(modalBackground);
+      color: themed(mainTextColor);
+    }
+
+    .content {
+
+      .icon.error {
+
+        @include themify($themes) {
+          background-color: themed(redTextColor);
+        }
+      }
+
+      .icon.success {
+
+        @include themify($themes) {
+          background-color: themed(greenTextColor);
+        }
+      }
+
+      .icon.info {
+
+        @include themify($themes) {
+          background-color: themed(blueTextColor);
+        }
+      }
+    }
+
+    .action-button {
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+        color: themed(alternativeTextColor);
+      }
+    }
+
+    .close-button {
+
+      .icon {
+
+        @include themify($themes) {
+          background-color: themed(closeButtonColor);
+        }
+      }
+    }
+  }
+}
+
+app-transaction-details {
+
+  .table {
+
+    @include themify($themes) {
+      border-top: 0.2rem solid themed(transparentButtonBorderColor);
+    }
+
+    .row {
+
+      .cell {
+
+        &.label {
+
+          @include themify($themes) {
+            color: themed(optionalTextColor);
+          }
+        }
+
+        &.value {
+
+          @include themify($themes) {
+            color: themed(mainTextColor);
+          }
+        }
+
+        &.key-value {
+
+          @include themify($themes) {
+            color: themed(blueTextColor);
+          }
+        }
+      }
+    }
+  }
+}
+
+app-progress-container {
+
+  .progress-bar-container {
+
+    @include themify($themes) {
+      color: themed(mainTextColor);
+    }
+
+    .progress-bar {
+
+      @include themify($themes) {
+        background-color: themed(progressBarBackgroundColor);
+      }
+
+      .progress-bar-full {
+
+        @include themify($themes) {
+          background-color: themed(progressBarFullBackgroundColor);
+        }
+      }
+    }
+  }
+}
+
+app-open-wallet-modal {
+
+  .modal {
+
+    @include themify($themes) {
+      background: themed(modalBackground);
+      color: themed(mainTextColor);
     }
   }
 }

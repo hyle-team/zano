@@ -101,15 +101,59 @@
 
   .purchase-buttons {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     margin: 2.4rem -0.5rem;
-    width: calc(100% + 1rem);
 
     button {
       flex: 0 1 33%;
       margin: 0 0.5rem;
     }
   }
+
+  .nullify-block-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    .nullify-block-buttons {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 1rem 0;
+      width: 100%;
+
+      button {
+        flex: 0 1 25%;
+        margin: 0 0.5rem;
+      }
+    }
+  }
+
+  .time-cancel-block-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    .input-block {
+      width: 25%;
+    }
+
+    .time-cancel-block-buttons {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 1rem 0;
+      width: 100%;
+
+      button {
+        flex: 0 1 25%;
+        margin: 0 0.5rem;
+      }
+    }
+  }
+
 }
 
 .progress-bar-container {

@@ -509,14 +509,8 @@ public:
 
   struct start_backend_params
   {
-    bool configure_for_remote_node;
-    std::string remote_node_host;
-    uint64_t remote_node_port;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(configure_for_remote_node)
-      KV_SERIALIZE(remote_node_host)
-      KV_SERIALIZE(remote_node_port)
     END_KV_SERIALIZE_MAP()
   };
 

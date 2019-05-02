@@ -145,9 +145,10 @@ namespace currency
     //check key images for transaction if it is not kept by block
     if(!from_core && !kept_by_block)
     {
-      if(have_tx_keyimges_as_spent(tx))
+      crypto::key_image spent_ki = AUTO_VAL_INIT(spent_ki);
+      if(have_tx_keyimges_as_spent(tx, &spent_ki))
       {
-        LOG_ERROR("Transaction with id= "<< id << " used already spent key images");
+        LOG_ERROR("Transaction " << id << " uses already spent key image " << spent_ki);
         tvc.m_verification_failed = true;
         return false;
       }
@@ -511,7 +512,7 @@ namespace currency
         return true;
 
       // maximum age check - remove too old
-      uint64_t tx_age = get_core_time() - tx_entry.receive_time;
+      int64_t tx_age = get_core_time() - tx_entry.receive_time;
       if ((tx_age > CURRENCY_MEMPOOL_TX_LIVETIME ))
       {
 
@@ -735,15 +736,19 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::have_tx_keyimges_as_spent(const transaction& tx) const
+  bool tx_memory_pool::have_tx_keyimges_as_spent(const transaction& tx, crypto::key_image* p_spent_ki /* = nullptr */) const
   {
     for(const auto& in : tx.vin)
     {
       if (in.type() == typeid(txin_to_key))
       {
         CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, true);//should never fail
-        if(have_tx_keyimg_as_spent(tokey_in.k_image))
-           return true;
+        if (have_tx_keyimg_as_spent(tokey_in.k_image))
+        {
+          if (p_spent_ki)
+            *p_spent_ki = tokey_in.k_image;
+          return true;
+        }
 
       }
     }
@@ -761,8 +766,10 @@ namespace currency
         auto ki_entry_ptr = m_db_key_images_set.get(tokey_in.k_image);
         if (ki_entry_ptr.get())
           count = *ki_entry_ptr;
+        uint64_t count_before = count;
         ++count;
         m_db_key_images_set.set(tokey_in.k_image, count);
+        LOG_PRINT_L2("tx pool: key image added: " << tokey_in.k_image << ", from tx " << get_transaction_hash(tx) << ", counter: " << count_before << " -> " << count);
       }
     }
     return false;
@@ -770,16 +777,14 @@ namespace currency
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::on_tx_add(const transaction& tx, bool kept_by_block)
   {
-    if (!kept_by_block)
-      insert_key_images(tx, kept_by_block); // take into account only key images from txs that are not 'kept_by_block'
+    insert_key_images(tx, kept_by_block);
     insert_alias_info(tx);
     return true;
   }
   //--------------------------------------------------------------------------------- 
   bool tx_memory_pool::on_tx_remove(const transaction& tx, bool kept_by_block)
   {
-    if (!kept_by_block)
-      remove_key_images(tx, kept_by_block); // take into account only key images from txs that are not 'kept_by_block'
+    remove_key_images(tx, kept_by_block);
     remove_alias_info(tx);
     return true;
   }
@@ -828,11 +833,13 @@ namespace currency
           continue;
         }
         count = *ki_entry_ptr;
+        uint64_t count_before = count;
         --count;
         if (count)
           m_db_key_images_set.set(tokey_in.k_image, count);
         else
           m_db_key_images_set.erase(tokey_in.k_image);
+        LOG_PRINT_L2("tx pool: key image removed: " << tokey_in.k_image << ", from tx " << get_transaction_hash(tx) << ", counter: " << count_before << " -> " << count);
       }
     }
     return false;
@@ -935,8 +942,11 @@ namespace currency
       }
     }
     //if we here, transaction seems valid, but, anyway, check for key_images collisions with blockchain, just to be sure
-    if(m_blockchain.have_tx_keyimges_as_spent(txd.tx))
+    if (m_blockchain.have_tx_keyimges_as_spent(txd.tx))
+    {
       return false;
+    }
+      
 
     if (!check_tx_multisig_ins_and_outs(txd.tx, false))
       return false;
@@ -1037,7 +1047,7 @@ namespace currency
   bool tx_memory_pool::fill_block_template(block &bl, 
     bool pos, 
     size_t median_size, 
-    uint64_t already_generated_coins, 
+    const boost::multiprecision::uint128_t& already_generated_coins,
     size_t &total_size, 
     uint64_t &fee, 
     uint64_t height)

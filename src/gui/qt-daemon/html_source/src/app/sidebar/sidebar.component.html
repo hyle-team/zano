@@ -5,16 +5,21 @@
   <div class="sidebar-accounts-list scrolled-content">
     <div class="sidebar-account" *ngFor="let wallet of variablesService.wallets" [class.active]="wallet?.wallet_id === walletActive" [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">
       <div class="sidebar-account-row account-title-balance">
-        <span class="title">{{wallet.name}}</span>
-        <span class="balance">{{wallet.unlocked_balance | intToMoney}} {{variablesService.defaultCurrency}}</span>
+        <span class="title" tooltip="{{ wallet.name }}" placement="top-left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{wallet.name}}</span>
+        <span class="balance">{{wallet.balance | intToMoney : '3' }} {{variablesService.defaultCurrency}}</span>
       </div>
       <div class="sidebar-account-row account-alias">
-        <span>{{wallet.alias}}</span>
-        <span>$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>
+        <div class="name">
+          <span tooltip="{{wallet.alias['name']}}" placement="top-left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{wallet.alias['name']}}</span>
+          <ng-container *ngIf="wallet.alias['comment'] && wallet.alias['comment'].length">
+            <i class="icon comment" tooltip="{{wallet.alias['comment']}}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500"></i>
+          </ng-container>
+        </div>
+        <span class="price">$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>
       </div>
       <div class="sidebar-account-row account-staking" *ngIf="!(!wallet.loaded && variablesService.daemon_state === 2)">
         <span class="text">{{ 'SIDEBAR.ACCOUNT.STAKING' | translate }}</span>
-        <app-staking-switch [(wallet_id)]="wallet.wallet_id" [(staking)]="wallet.staking"></app-staking-switch>
+        <app-staking-switch [wallet_id]="wallet.wallet_id" [(staking)]="wallet.staking"></app-staking-switch>
       </div>
       <div class="sidebar-account-row account-messages" *ngIf="!(!wallet.loaded && variablesService.daemon_state === 2)">
         <span class="text">{{ 'SIDEBAR.ACCOUNT.MESSAGES' | translate }}</span>
@@ -33,23 +38,39 @@
   </div>
 </div>
 <div class="sidebar-settings">
-  <button [routerLink]="['/settings']" routerLinkActive="active">
-    <i class="icon settings"></i>
-    <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>
-  </button>
-  <button (click)="logOut()">
-    <i class="icon logout"></i>
-    <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
-  </button>
+  <div class="wrap-button" routerLinkActive="active">
+    <button [routerLink]="['/settings']">
+      <i class="icon settings"></i>
+      <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>
+    </button>
+  </div>
+  <div class="wrap-button">
+    <button (click)="logOut()">
+      <i class="icon logout"></i>
+      <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
+    </button>
+  </div>
 </div>
 <div class="sidebar-synchronization-status">
   <div class="status-container">
-    <span class="offline" *ngIf="variablesService.daemon_state === 0">{{ 'SIDEBAR.SYNCHRONIZATION.OFFLINE' | translate }}</span>
-    <span class="syncing" *ngIf="variablesService.daemon_state === 1">{{ 'SIDEBAR.SYNCHRONIZATION.SYNCING' | translate }}</span>
-    <span class="online" *ngIf="variablesService.daemon_state === 2">{{ 'SIDEBAR.SYNCHRONIZATION.ONLINE' | translate }}</span>
-    <span class="loading" *ngIf="variablesService.daemon_state === 3">{{ 'SIDEBAR.SYNCHRONIZATION.LOADING' | translate }}</span>
-    <span class="offline" *ngIf="variablesService.daemon_state === 4">{{ 'SIDEBAR.SYNCHRONIZATION.ERROR' | translate }}</span>
-    <span class="online" *ngIf="variablesService.daemon_state === 5">{{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }}</span>
+    <span class="offline" *ngIf="variablesService.daemon_state === 0">
+      {{ 'SIDEBAR.SYNCHRONIZATION.OFFLINE' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>
+    </span>
+    <span class="syncing" *ngIf="variablesService.daemon_state === 1">
+      {{ 'SIDEBAR.SYNCHRONIZATION.SYNCING' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>
+    </span>
+    <span class="online" *ngIf="variablesService.daemon_state === 2">
+      {{ 'SIDEBAR.SYNCHRONIZATION.ONLINE' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>
+    </span>
+    <span class="loading" *ngIf="variablesService.daemon_state === 3">
+      {{ 'SIDEBAR.SYNCHRONIZATION.LOADING' | translate }}
+    </span>
+    <span class="offline" *ngIf="variablesService.daemon_state === 4">
+      {{ 'SIDEBAR.SYNCHRONIZATION.ERROR' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>
+    </span>
+    <span class="online" *ngIf="variablesService.daemon_state === 5">
+      {{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }} <span class="testnet">{{ 'SIDEBAR.SYNCHRONIZATION.TESTNET' | translate }}</span>
+    </span>
   </div>
   <div class="progress-bar-container">
     <div class="syncing" *ngIf="variablesService.daemon_state === 1">

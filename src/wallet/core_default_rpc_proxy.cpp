@@ -154,6 +154,16 @@ namespace tools
   {
     return tools::get_transfer_address(adr_str, addr, payment_id, this);
   }
+  //------------------------------------------------------------------------------------------------------------------------------
+  void default_http_core_proxy::set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected)
+  {
+    CRITICAL_REGION_LOCAL(m_lock);
+    m_plast_daemon_is_disconnected = plast_daemon_is_disconnected ? plast_daemon_is_disconnected : &m_last_daemon_is_disconnected_stub;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  default_http_core_proxy::default_http_core_proxy():m_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected_stub)
+  {
 
+  }
 }
 

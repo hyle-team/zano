@@ -383,7 +383,7 @@ void decompose_amount_into_exact_number_of_pos_entries(uint64_t amount, size_t p
   {
     for (auto it = pos_amounts_list.begin(); it != pos_amounts_list.end() && pos_amounts_list.size() < pos_entries_count; /* nothing */)
     {
-      if (*it >= 2 * TX_DEFAULT_FEE)
+      if (*it >= 2 * TESTS_DEFAULT_FEE)
       {
         // each iteration pops one element 'a' and pushes two elements: c1 and c2, so that a == c1 + c2 (sum is invariant)
         uint64_t a = *it;
@@ -442,7 +442,7 @@ bool populate_wallet_with_stake_coins(std::shared_ptr<tools::wallet2> w, std::sh
   uint64_t balance_unlocked = 0;
   uint64_t balance = w->balance(balance_unlocked);
   CHECK_AND_ASSERT_MES(balance == balance_unlocked, false, "WARNING: balance is " << balance << " NOT EQUAL TO unlocked balance, which is " << balance_unlocked);
-  if (balance_unlocked > TX_DEFAULT_FEE)
+  if (balance_unlocked > TESTS_DEFAULT_FEE)
     WALLET_TRY_CATCH(w->transfer(balance_unlocked, money_source_w->get_account().get_public_address()));
 
   uint64_t sum = 0;
@@ -453,7 +453,7 @@ bool populate_wallet_with_stake_coins(std::shared_ptr<tools::wallet2> w, std::sh
   // populate current wallet with pos entries from scratch
   money_source_w->refresh();
   balance = money_source_w->balance(balance_unlocked);
-  CHECK_AND_ASSERT_MES(balance_unlocked > amount + TX_DEFAULT_FEE * pos_entries_count, false, "source wallet has not enough money: balance_unlocked: " << balance_unlocked << ", balance: " << balance << ", required amount: " << amount + TX_DEFAULT_FEE * pos_entries_count);
+  CHECK_AND_ASSERT_MES(balance_unlocked > amount + TESTS_DEFAULT_FEE * pos_entries_count, false, "source wallet has not enough money: balance_unlocked: " << balance_unlocked << ", balance: " << balance << ", required amount: " << amount + TESTS_DEFAULT_FEE * pos_entries_count);
 
   const account_public_address& wallet_address = w->get_account().get_public_address();
   std::vector<tx_destination_entry> destinations;
@@ -461,7 +461,7 @@ bool populate_wallet_with_stake_coins(std::shared_ptr<tools::wallet2> w, std::sh
   for(auto pos_amount : pos_amounts)
     destinations.push_back(tx_destination_entry(pos_amount, wallet_address));
 
-  WALLET_TRY_CATCH(money_source_w->transfer(destinations, 0, 0, TX_DEFAULT_FEE, empty_extra, empty_attachment));
+  WALLET_TRY_CATCH(money_source_w->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment));
 
   return true;
 
@@ -495,7 +495,7 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_0(currency::core&
     r = populate_wallet_with_stake_coins(w.w, alice_wlt, w.pos_entries_count, m_wallet_stake_amount, pos_amounts);
     CHECK_AND_ASSERT_MES(r, false, "populate_wallet_with_stake_coins failed");
 
-    r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, alice_wlt->get_account().get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE + 1); // to preventing run out of the money for Alice
+    r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE + 1); // to preventing run out of the money for Alice
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
     c.get_blockchain_storage().get_top_block(b);
     uint64_t ts = b.timestamp;
@@ -552,7 +552,7 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_1(currency::core&
     r = populate_wallet_with_stake_coins(w.w, alice_wlt, w.pos_entries_count, m_wallet_stake_amount, pos_amounts);
     CHECK_AND_ASSERT_MES(r, false, "populate_wallet_with_stake_coins failed");
 
-    r = mine_next_pow_blocks_in_playtime(m_scratchpad_keeper, alice_wlt->get_account().get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE + 1); // to preventing run out of the money for Alice
+    r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE + 1); // to preventing run out of the money for Alice
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
     c.get_blockchain_storage().get_top_block(b);
     uint64_t ts = b.timestamp;
@@ -662,7 +662,7 @@ bool pos_wallet_minting_same_amount_diff_outs::c1(currency::core& c, size_t ev_i
       ts = ideal_next_pow_block_ts; // "wait" until ideal_next_pow_block_ts if it was not already happened (fast forward but don't wayback the time)
     test_core_time::adjust(ts);
     size_t tx_count_before = c.get_pool_transactions_count();
-    r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c);
+    r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
     CHECK_AND_ASSERT_MES(tx_count_before == 0 || c.get_pool_transactions_count() < tx_count_before, false, "invalid number of txs in tx pool: " << c.get_pool_transactions_count() << ", was: " << tx_count_before);
     last_pow_block_ts = ts;
@@ -885,7 +885,7 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
       stake_tx_out_id = i;
   }
 
-  MAKE_TX_FEE(events, tx_0, alice_acc, alice_acc, alice_money - TX_DEFAULT_FEE * 17, TX_DEFAULT_FEE * 17, blk_2);
+  MAKE_TX_FEE(events, tx_0, alice_acc, alice_acc, alice_money - TESTS_DEFAULT_FEE * 17, TESTS_DEFAULT_FEE * 17, blk_2);
   // tx_0 transfers all Alice's money, so it effectevily spends all outputs in stake_ts, make sure it does
   CHECK_AND_ASSERT_MES(tx_0.vin.size() == stake_tx.vout.size(), false, "probably, tx_0 doesn't spend all Alice's money as expected, tx_0.vin.size()=" << tx_0.vin.size() << ", stake_tx.vout.size()=" << stake_tx.vout.size());
 
@@ -989,7 +989,7 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   //          ||         \-  (2a)-   #3a#-                 |                     <- alt chain
   //          |+--------------+ \     |                    \                     PoS block 2a uses stake already spent in main chain (okay)
   //          +---------------|-------+                     \                    PoS block 3a uses stake already spent in current alt chain (fail)
-  //                          |   \                          \  
+  //                          |   \                          \
   //                          |    \ ...... (2br)-   (3b)-   #4b#                <- alt chain
   //                          |                       |
   //                          +-----------------------+                          PoS block 3b uses as stake an output, created in current alt chain (2a)

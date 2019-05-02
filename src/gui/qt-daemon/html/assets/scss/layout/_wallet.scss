@@ -19,6 +19,16 @@ app-wallet {
         }
       }
     }
+
+    .alias {
+
+      .icon {
+
+        @include themify($themes) {
+          background-color: themed(blueTextColor);
+        }
+      }
+    }
   }
 
   .address {
@@ -64,6 +74,13 @@ app-wallet {
 
           @include themify($themes) {
             background-color: themed(contentBackgroundColor);
+          }
+        }
+
+        &:hover:not(.active):not(.disabled) {
+
+          @include themify($themes) {
+            background-color: themed(tabHoverBackgroundColor);
           }
         }
       }
@@ -123,6 +140,34 @@ app-history {
 
       tr {
 
+        &:nth-child(4n+1) {
+
+          @include themify($themes) {
+            background-color: themed(tableBackgroundColor);
+          }
+        }
+
+        &:nth-child(4n+2) {
+
+          @include themify($themes) {
+            background-color: themed(tableBackgroundColor);
+          }
+        }
+
+        &:nth-child(4n+3) {
+
+          @include themify($themes) {
+            background-color: transparent;
+          }
+        }
+
+        &:nth-child(4n+4) {
+
+          @include themify($themes) {
+            background-color: transparent;
+          }
+        }
+
         .status {
 
           .confirmation {
@@ -140,7 +185,7 @@ app-history {
           }
         }
 
-        .status.send  {
+        .status.send {
 
           .icon {
             background-color: #ff5252;
@@ -381,6 +426,34 @@ app-staking {
           @include themify($themes) {
             background-color: themed(chartOptionsHoverColor);
           }
+        }
+      }
+    }
+  }
+}
+
+.input-block-alias {
+  position: relative;
+
+  .alias-dropdown {
+    position: absolute;
+    top: 6.5rem;
+    max-height: 10rem;
+    overflow: auto;
+    width: 100%;
+
+    @include themify($themes) {
+      background-color: themed(inputBackgroundColor);
+      color: themed(mainTextColor);
+    }
+
+    div {
+      font-size: 1.4rem;
+      padding: 1rem;
+
+      &:hover {
+        @include themify($themes) {
+          background-color: themed(selectHoverColor);
         }
       }
     }

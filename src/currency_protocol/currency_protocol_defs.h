@@ -104,7 +104,7 @@ namespace currency
     {
       std::list<blobdata>              txs;
       std::list<block_complete_entry>  blocks;
-      std::list<crypto::hash>               missed_ids;
+      std::list<crypto::hash>          missed_ids;
       uint64_t                         current_blockchain_height;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -168,3 +168,5 @@ namespace currency
   };
 
 }
+
+#include "currency_protocol_defs_print.h"

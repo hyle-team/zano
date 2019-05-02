@@ -263,22 +263,22 @@ bool offers_expiration_test::generate(std::vector<test_event_entry>& events) con
   od.expiration_time = 0;
   attachment.clear();
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_0, miner_acc, alice_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_0, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
 
   od.expiration_time = 1;
   attachment.clear();
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_1, miner_acc, alice_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_1, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
 
   od.expiration_time = 2;
   attachment.clear();
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_2, miner_acc, alice_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_2, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
 
   od.expiration_time = 3;
   attachment.clear();
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_3, miner_acc, alice_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+  MAKE_TX_ATTACH(events, tx_3, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
 
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1, tx_2, tx_3 }));
   m_offers_ts = blk_1.timestamp;
@@ -378,7 +378,7 @@ bool offers_filtering_1::generate(std::vector<test_event_entry>& events) const
     fill_test_offer(od);
     std::vector<currency::attachment_v> attachment;
     bc_services::put_offer_into_attachment(od, attachment);
-    MAKE_TX_LIST_ATTACH(events, txs, miner_acc, miner_acc, TX_DEFAULT_FEE, blk_0r, attachment);
+    MAKE_TX_LIST_ATTACH(events, txs, miner_acc, miner_acc, TESTS_DEFAULT_FEE, blk_0r, attachment);
   }
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, txs);
   
@@ -389,7 +389,7 @@ bool offers_filtering_1::generate(std::vector<test_event_entry>& events) const
     fill_test_offer(od);
     std::vector<currency::attachment_v> attachment;
     bc_services::put_offer_into_attachment(od, attachment);
-    MAKE_TX_LIST_ATTACH(events, txs, miner_acc, miner_acc, TX_DEFAULT_FEE, blk_1, attachment);
+    MAKE_TX_LIST_ATTACH(events, txs, miner_acc, miner_acc, TESTS_DEFAULT_FEE, blk_1, attachment);
   }
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, txs);
 
@@ -526,7 +526,7 @@ bool offers_handling_on_chain_switching::generate(std::vector<test_event_entry>&
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());                                               // 0
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                        // 2N (N == CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
 
-  MAKE_TX(events, tx_0, miner_acc, alice_acc, TX_DEFAULT_FEE * 70, blk_0r);                                          // 2N+1
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, TESTS_DEFAULT_FEE * 70, blk_0r);                                          // 2N+1
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);                                                            // 2N+2
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                        // 4N+2
@@ -535,7 +535,7 @@ bool offers_handling_on_chain_switching::generate(std::vector<test_event_entry>&
   fill_test_offer(od);
   std::vector<currency::attachment_v> attachment;
   bc_services::put_offer_into_attachment(od, attachment);
-  MAKE_TX_ATTACH(events, tx_1, alice_acc, alice_acc, TX_DEFAULT_FEE, blk_1r, attachment);                            // 4N+3
+  MAKE_TX_ATTACH(events, tx_1, alice_acc, alice_acc, TESTS_DEFAULT_FEE, blk_1r, attachment);                            // 4N+3
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);                                                                      // 4N+4
   //MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);                                                            // 4N+4
@@ -567,7 +567,7 @@ bool offers_handling_on_chain_switching::c1(currency::core& c, size_t ev_index, 
   uint64_t blk_1r_height = c.get_current_blockchain_size() - 2;
   crypto::hash blk_1r_id = c.get_block_id_by_height(blk_1r_height);
   block blk_2a = AUTO_VAL_INIT(blk_2a);
-  r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), blk_1r_id, blk_1r_height + 1, &blk_2a);
+  r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), blk_1r_id, blk_1r_height + 1, &blk_2a);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -577,7 +577,7 @@ bool offers_handling_on_chain_switching::c1(currency::core& c, size_t ev_index, 
 
   // mine second alt block (include offer tx) -- this should trigger chain switching
   block blk_3a = AUTO_VAL_INIT(blk_3a);
-  r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({tx_1}), get_block_hash(blk_2a), blk_1r_height + 2, &blk_3a);
+  r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({tx_1}), get_block_hash(blk_2a), blk_1r_height + 2, &blk_3a);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -673,7 +673,7 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
   crypto::hash create_offer_tx_id = get_transaction_hash(create_offer_tx);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   refresh_wallet_and_check_balance("offer's put into the blockchain", "Alice", alice_wlt, alice_start_balance - od.fee, true, 1);
@@ -699,7 +699,7 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
 
   // add it to the blockchain
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // Alice's banace should not change
@@ -925,7 +925,7 @@ bool offers_updating_hack::update_foreign_offer(currency::core& c, size_t ev_ind
   // make a tx with this attachment (note: tsa.security is signed using Bob's keys, can be resign later using Alice's public address)
   transaction tx = AUTO_VAL_INIT(tx);
   bob_wlt->transfer(std::vector<tx_destination_entry>({ tx_destination_entry(TESTS_DEFAULT_FEE * 3, m_accounts[BOB_ACC_IDX].get_public_address()) }), 0, 0, TESTS_DEFAULT_FEE * 81, empty_extra, attachments,
-    tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, true, 0, false);
+    tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, 0, true, 0, false);
 
   // don't resign yet
 
@@ -937,7 +937,7 @@ bool offers_updating_hack::update_foreign_offer(currency::core& c, size_t ev_ind
 
   // put in a block 'tx', leave Alice's tx in the pool
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx })), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx })), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   LOG_PRINT_L0(ENDL << c.get_tx_pool().print_pool(true));
 
@@ -999,13 +999,13 @@ bool offers_updating_hack::delete_foreign_offer(currency::core& c, size_t ev_ind
   // make a tx with this attachment (note: tsa.security is signed using Bob's keys, can be resign later using Alice's public address)
   transaction tx_c = AUTO_VAL_INIT(tx_c);
   bob_wlt->transfer(std::vector<tx_destination_entry>({ tx_destination_entry(TESTS_DEFAULT_FEE * 3, m_accounts[BOB_ACC_IDX].get_public_address()) }), 0, 0, TESTS_DEFAULT_FEE * 19, empty_extra, attachments,
-    tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx_c, 0, true, 0, true);
+    tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx_c, 0, true, 0, true);
 
   LOG_PRINT_L0(ENDL << c.get_tx_pool().print_pool(true));
 
   // put in a block 'tx', leave Alice's tx in the pool
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx_c })), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx_c })), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   LOG_PRINT_L0(ENDL << c.get_tx_pool().print_pool(true));
@@ -1255,7 +1255,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   bc_services::offer_details_ex od = AUTO_VAL_INIT(od);
   fill_test_offer(od);
   od.comment = "1";
-  od.fee = TX_DEFAULT_FEE * 3;
+  od.fee = TESTS_DEFAULT_FEE * 3;
 
   // create an offer
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
@@ -1264,7 +1264,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CATCH_ENTRY2(false);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, some_addr, c);
+  r = mine_next_pow_block_in_playtime(some_addr, c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
 
@@ -1280,7 +1280,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CATCH_ENTRY2(false);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, some_addr, c);
+  r = mine_next_pow_block_in_playtime(some_addr, c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
 
@@ -1297,7 +1297,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CATCH_ENTRY2(false);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, some_addr, c);
+  r = mine_next_pow_block_in_playtime(some_addr, c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
 
@@ -1313,7 +1313,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CATCH_ENTRY2(false);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
-  r = mine_next_pow_block_in_playtime(m_scratchpad_keeper, some_addr, c);
+  r = mine_next_pow_block_in_playtime(some_addr, c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
 

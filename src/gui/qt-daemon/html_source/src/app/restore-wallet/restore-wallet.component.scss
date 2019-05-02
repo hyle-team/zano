@@ -1,8 +1,12 @@
+:host {
+  position: relative;
+}
+
 .form-restore {
   margin: 2.4rem 0;
   width: 100%;
 
-  .input-block, .error-block {
+  .input-block {
 
     &.half-block {
       width: 50%;

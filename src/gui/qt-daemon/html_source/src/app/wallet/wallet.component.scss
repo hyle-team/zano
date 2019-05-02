@@ -27,6 +27,11 @@
   h3 {
     font-size: 1.7rem;
     font-weight: 600;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 50rem;
+    line-height: 2.7rem;
   }
 
   button {
@@ -57,6 +62,27 @@
       }
     }
   }
+
+  .alias {
+    display: flex;
+    align-items: center;
+    font-size: 1.3rem;
+
+    .icon {
+      cursor: pointer;
+      margin-right: 1.2rem;
+      width: 1.7rem;
+      height: 1.7rem;
+
+      &.edit {
+        mask: url(../../assets/icons/details.svg) no-repeat center;
+      }
+
+      &.transfer {
+        mask: url(../../assets/icons/send.svg) no-repeat center;
+      }
+    }
+  }
 }
 
 .address {
@@ -74,6 +100,14 @@
 
     &.copy {
       mask: url(../../assets/icons/copy.svg) no-repeat center;
+
+      &:hover {
+        opacity: 0.75;
+      }
+    }
+
+    &.copied {
+      mask: url(../../assets/icons/complete-testwallet.svg) no-repeat center;
     }
   }
 }
@@ -162,7 +196,7 @@
       }
 
       &.disabled {
-        cursor: not-allowed;
+        cursor: url(../../assets/icons/not-allowed.svg), not-allowed;
       }
 
       &:not(:last-child) {

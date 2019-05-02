@@ -137,6 +137,7 @@ namespace net_utils
 			bool m_is_stop_handling;
 			http::http_request_info m_query_info;
 			size_t m_len_summary, m_len_remain;
+      size_t m_precommand_line_chars;
 			config_type& m_config;
 			bool m_want_close;
 		protected:

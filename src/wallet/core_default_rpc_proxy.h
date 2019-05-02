@@ -16,9 +16,10 @@
 
 namespace tools
 {
-  class default_http_core_proxy: public i_core_proxy
+  class default_http_core_proxy final : public i_core_proxy
   {
   public:
+
 
     bool set_connection_addr(const std::string& url) override;
     bool call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(const currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& rqt, currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& rsp) override;
@@ -46,12 +47,8 @@ namespace tools
     bool check_connection() override;
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
 
-    void set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected)
-    {
-      CRITICAL_REGION_LOCAL(m_lock);
-      m_plast_daemon_is_disconnected = plast_daemon_is_disconnected ? plast_daemon_is_disconnected : &m_last_daemon_is_disconnected_stub;
-    }
-
+    void set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected);
+    default_http_core_proxy();
   private:
 
     template <class t_method>

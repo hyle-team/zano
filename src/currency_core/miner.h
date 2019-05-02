@@ -14,26 +14,17 @@
 #include "difficulty.h"
 #include "math_helper.h"
 #include "blockchain_storage.h"
+#include "basic_pow_helpers.h"
 
-#define CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET    1
+
 
 namespace currency
 {
 
-  inline uint64_t& access_nonce_in_block_blob(blobdata& bd)
-  {
-    return *reinterpret_cast<uint64_t*>(&bd[CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET]);
-  }
-
-  inline const uint64_t& access_nonce_in_block_blob(const blobdata& bd)
-  {
-    return *reinterpret_cast<const uint64_t*>(&bd[CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET]);
-  }
-
   struct i_miner_handler
   {
     virtual bool handle_block_found(const block& b, block_verification_context* p_verification_result = nullptr) = 0;
-    virtual bool get_block_template(block& b, crypto::hash& seed, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry()) = 0;
+    virtual bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry()) = 0;
   protected:
     ~i_miner_handler(){};
   };
@@ -63,17 +54,17 @@ namespace currency
     void do_print_hashrate(bool do_hr);
 
     inline
-    static bool find_nonce_for_given_block(block& bl, const wide_difficulty_type& diffic, uint64_t height, const crypto::hash& seed, scratchpad_keeper& sk)
+    static bool find_nonce_for_given_block(block& bl, const wide_difficulty_type& diffic, uint64_t height)
     {      
+      bl.nonce = 0;
       blobdata bd = get_block_hashing_blob(bl);
-      uint64_t& nonce_ref = access_nonce_in_block_blob(bd);
-      nonce_ref = 0;
+      crypto::hash bd_hash = crypto::cn_fast_hash(bd.data(), bd.size());
+      //uint64_t& nonce_ref = access_nonce_in_block_blob(bd);
+      //nonce_ref = 0;
 
       for(; bl.nonce != std::numeric_limits<uint64_t>::max(); bl.nonce++)
       {
-        nonce_ref = bl.nonce;
-
-        crypto::hash h = sk.get_pow_hash(bd, height, seed);
+        crypto::hash h = get_block_longhash(height, bd_hash, bl.nonce);
         if(check_hash(h, diffic))
         {
           LOG_PRINT_L0("Found nonce for block: " << get_block_hash(bl) << "[" << height << "]: PoW:" << h << "(diff:" << diffic << "), ts: " << bl.timestamp);
@@ -106,8 +97,6 @@ namespace currency
     std::atomic<uint32_t> m_starter_nonce;
     wide_difficulty_type m_diffic;
     std::atomic<uint64_t> m_height;
-    scratchpad_keeper m_scratchpad;
-    crypto::hash m_seed;
     volatile uint32_t m_thread_index; 
     volatile uint32_t m_threads_total;
     std::atomic<int32_t> m_pausers_count;

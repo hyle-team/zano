@@ -11,6 +11,10 @@
 
       tr {
 
+        td {
+          min-width: 10rem;
+        }
+
         .status {
           position: relative;
           display: flex;
@@ -56,6 +60,29 @@
           overflow: hidden;
           text-overflow: ellipsis;
           max-width: 25vw;
+        }
+
+        &:not(.transaction-details) {
+          cursor: pointer;
+        }
+
+        &.transaction-details {
+          -webkit-transition: 0.5s height linear, 0s font-size;
+          transition: 0.5s height linear, 0s font-size;
+          transition-delay: 0s, 0.5s;
+          height: 0;
+
+          &.open {
+            height: 13.2rem;
+          }
+
+          td {
+            position: relative;
+            overflow: hidden;
+            line-height: inherit;
+            padding-top: 0;
+            padding-bottom: 0;
+          }
         }
       }
     }

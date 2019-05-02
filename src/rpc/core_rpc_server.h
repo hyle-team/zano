@@ -177,6 +177,7 @@ namespace currency
     bc_services::bc_offers_service& m_of;
     std::string m_port;
     std::string m_bind_ip;
+    bool m_ignore_status;
     //mining stuff
     epee::critical_section m_session_jobs_lock;
     std::map<std::string, currency::block> m_session_jobs; //session id -> blob

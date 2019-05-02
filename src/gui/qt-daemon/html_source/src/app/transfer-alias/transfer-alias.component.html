@@ -1,0 +1,57 @@
+<div class="content">
+
+  <div class="head">
+    <div class="breadcrumbs">
+      <span [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">{{ wallet.name }}</span>
+      <span>{{ 'BREADCRUMBS.TRANSFER_ALIAS' | translate }}</span>
+    </div>
+    <button type="button" class="back-btn" (click)="back()">
+      <i class="icon back"></i>
+      <span>{{ 'COMMON.BACK' | translate }}</span>
+    </button>
+  </div>
+
+  <form class="form-transfer">
+
+    <div class="input-block alias-name">
+      <label for="alias-name">
+        {{ 'EDIT_ALIAS.NAME.LABEL' | translate }}
+      </label>
+      <input type="text" id="alias-name" [value]="alias.name" placeholder="{{ 'EDIT_ALIAS.NAME.PLACEHOLDER' | translate }}" readonly>
+    </div>
+
+    <div class="input-block textarea">
+      <label for="alias-comment">
+        {{ 'EDIT_ALIAS.COMMENT.LABEL' | translate }}
+      </label>
+      <textarea id="alias-comment" [value]="alias.comment" placeholder="{{ 'EDIT_ALIAS.COMMENT.PLACEHOLDER' | translate }}" readonly></textarea>
+    </div>
+
+    <div class="input-block alias-transfer-address">
+      <label for="alias-transfer">
+        {{ 'TRANSFER_ALIAS.ADDRESS.LABEL' | translate }}
+      </label>
+      <input type="text" id="alias-transfer" [(ngModel)]="transferAddress" [ngModelOptions]="{standalone: true}" (ngModelChange)="changeAddress()" placeholder="{{ 'TRANSFER_ALIAS.ADDRESS.PLACEHOLDER' | translate }}" (contextmenu)="variablesService.onContextMenu($event)">
+      <div class="error-block" *ngIf="transferAddress.length > 0 && (transferAddressAlias || !transferAddressValid || (transferAddressValid && !permissionSend) || notEnoughMoney)">
+        <div *ngIf="!transferAddressValid">
+          {{ 'TRANSFER_ALIAS.FORM_ERRORS.WRONG_ADDRESS' | translate }}
+        </div>
+        <div *ngIf="transferAddressAlias || (transferAddressValid && !permissionSend)">
+          {{ 'TRANSFER_ALIAS.FORM_ERRORS.ALIAS_EXISTS' | translate }}
+        </div>
+        <div *ngIf="notEnoughMoney">
+          {{ 'TRANSFER_ALIAS.FORM_ERRORS.NO_MONEY' | translate }}
+        </div>
+      </div>
+    </div>
+
+    <div class="alias-cost">{{ "TRANSFER_ALIAS.COST" | translate : {value: variablesService.default_fee, currency: variablesService.defaultCurrency} }}</div>
+
+    <div class="wrap-buttons">
+      <button type="button" class="blue-button" (click)="transferAlias()" [disabled]="transferAddressAlias || !transferAddressValid || notEnoughMoney">{{ 'TRANSFER_ALIAS.BUTTON_TRANSFER' | translate }}</button>
+      <button type="button" class="blue-button" (click)="back()">{{ 'TRANSFER_ALIAS.BUTTON_CANCEL' | translate }}</button>
+    </div>
+
+  </form>
+
+</div>

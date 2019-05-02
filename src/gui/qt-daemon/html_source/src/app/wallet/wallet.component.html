@@ -1,41 +1,44 @@
 <div class="header">
   <div>
-    <h3>{{variablesService.currentWallet.name}}</h3>
-    <button (click)="openInBrowser()">
+    <h3 tooltip="{{ variablesService.currentWallet.name }}" placement="bottom-left" tooltipClass="table-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{variablesService.currentWallet.name}}</h3>
+    <button [routerLink]="['/assign-alias']" *ngIf="!variablesService.currentWallet.alias.hasOwnProperty('name') && variablesService.currentWallet.loaded && variablesService.daemon_state === 2 && variablesService.currentWallet.alias_available">
       <i class="icon account"></i>
       <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>
     </button>
+    <div class="alias" *ngIf="variablesService.currentWallet.alias.hasOwnProperty('name') && variablesService.currentWallet.loaded && variablesService.daemon_state === 2">
+      <span>{{variablesService.currentWallet.alias['name']}}</span>
+      <ng-container *ngIf="variablesService.currentWallet.alias_available">
+        <i class="icon edit" [routerLink]="['/edit-alias']"></i>
+        <i class="icon transfer" [routerLink]="['/transfer-alias']"></i>
+      </ng-container>
+    </div>
   </div>
   <div>
     <button [routerLink]="['/details']" routerLinkActive="active">
       <i class="icon details"></i>
       <span>{{ 'WALLET.DETAILS' | translate }}</span>
     </button>
-    <!--<button (click)="closeWallet()">
-      <i class="icon lock"></i>
-      <span>{{ 'WALLET.LOCK' | translate }}</span>
-    </button>-->
   </div>
 </div>
 <div class="address">
   <span>{{variablesService.currentWallet.address}}</span>
-  <i class="icon copy" (click)="copyAddress()"></i>
+  <i class="icon" [class.copy]="!copyAnimation" [class.copied]="copyAnimation" (click)="copyAddress()"></i>
 </div>
 <div class="balance">
-  <span>{{variablesService.currentWallet.unlocked_balance | intToMoney}} {{variablesService.defaultCurrency}}</span>
+  <span [tooltip]="getTooltip()" [placement]="'bottom'" [tooltipClass]="'balance-tooltip'" [delay]="300" [timeout]="0">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>
   <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>
 </div>
 <div class="tabs">
   <div class="tabs-header">
     <ng-container *ngFor="let tab of tabs; let index = index">
-      <div class="tab" [class.active]="tab.active" [class.disabled]="(tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2" (click)="changeTab(index)">
+      <div class="tab" [class.active]="tab.active" [class.disabled]="(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2" (click)="changeTab(index)">
         <i class="icon" [ngClass]="tab.icon"></i>
         <span>{{ tab.title | translate }}</span>
         <span class="indicator" *ngIf="tab.indicator">{{variablesService.currentWallet.new_contracts}}</span>
       </div>
     </ng-container>
   </div>
-  <div class="tabs-content scrolled-content">
+  <div #scrolledContent class="tabs-content scrolled-content">
     <router-outlet></router-outlet>
   </div>
 </div>

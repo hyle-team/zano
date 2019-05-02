@@ -17,8 +17,12 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
   detailsForm = new FormGroup({
     name: new FormControl('', [Validators.required, (g: FormControl) => {
       for (let i = 0; i < this.variablesService.wallets.length; i++) {
-        if (g.value === this.variablesService.wallets[i].name && this.variablesService.wallets[i].wallet_id !== this.variablesService.currentWallet.wallet_id) {
-          return {'duplicate': true};
+        if (g.value === this.variablesService.wallets[i].name) {
+          if (this.variablesService.wallets[i].wallet_id === this.variablesService.currentWallet.wallet_id) {
+            return {'same': true};
+          } else {
+            return {'duplicate': true};
+          }
         }
       }
       return null;
@@ -29,17 +33,16 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
   constructor(
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private ngZone: NgZone,
     private location: Location
-  ) {
-  }
+  ) {}
 
   ngOnInit() {
     this.showSeed = false;
     this.detailsForm.get('name').setValue(this.variablesService.currentWallet.name);
     this.detailsForm.get('path').setValue(this.variablesService.currentWallet.path);
-    this.backend.getSmartSafeInfo(this.variablesService.currentWallet.wallet_id, (status, data) => {
+    this.backend.getSmartWalletInfo(this.variablesService.currentWallet.wallet_id, (status, data) => {
       if (data.hasOwnProperty('restore_key')) {
         this.ngZone.run(() => {
           this.seedPhrase = data['restore_key'].trim();
@@ -55,7 +58,9 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
   onSubmitEdit() {
     if (this.detailsForm.value) {
       this.variablesService.currentWallet.name = this.detailsForm.get('name').value;
-      this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
+      this.ngZone.run(() => {
+        this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
+      });
     }
   }
 
@@ -66,16 +71,17 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
           this.variablesService.wallets.splice(i, 1);
         }
       }
-      this.backend.storeSecureAppData(() => {
-        this.ngZone.run(() => {
-          if (this.variablesService.wallets.length) {
-            this.variablesService.currentWallet = this.variablesService.wallets[0];
-            this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
-          } else {
-            this.router.navigate(['/']);
-          }
-        });
+      this.ngZone.run(() => {
+        if (this.variablesService.wallets.length) {
+          this.variablesService.currentWallet = this.variablesService.wallets[0];
+          this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
+        } else {
+          this.router.navigate(['/']);
+        }
       });
+      if (this.variablesService.appPass) {
+        this.backend.storeSecureAppData();
+      }
     });
   }
 

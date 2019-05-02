@@ -137,8 +137,8 @@ public:
   void subscribe_to_core_events(currency::i_core_event_handler* pevents_handler);
   void unsubscribe_to_core_events();
   void get_gui_options(view::gui_options& opt);
-  bool is_remote_node_mode() { return m_remote_node_mode; }
-  bool configure_for_remote_node(const std::string& remote_host);
+  std::string get_wallet_log_prefix(size_t wallet_id) const;
+
 private:
   void main_worker(const po::variables_map& vm);
   bool init_local_daemon();
@@ -163,7 +163,7 @@ private:
   view::i_view m_view_stub;
   view::i_view* m_pview;
   std::shared_ptr<tools::i_core_proxy> m_rpc_proxy;
-  critical_section m_wallets_lock;
+  mutable critical_section m_wallets_lock;
   po::variables_map m_vm;
 
   std::atomic<uint64_t> m_last_daemon_height;

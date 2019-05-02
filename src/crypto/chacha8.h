@@ -78,10 +78,7 @@ namespace crypto {
     buff = decrypted_buff;
     return true;
   }
-//  inline bool chacha_decrypt(std::string& buff, const std::string& pass)
-//  {
-//    return chacha_crypt(buff, pass);
-//  }
+
   template<typename pod_to_encrypt, typename pod_pass>
   inline bool chacha_crypt(pod_to_encrypt& crypt, const pod_pass& pass)
   {
@@ -91,6 +88,7 @@ namespace crypto {
     memcpy(&crypt, buff.data(), sizeof(crypt));
     return true;
   }
+
   template<typename pod_pass>
   inline bool chacha_crypt(std::string& buff, const pod_pass& pass)
   {
@@ -101,6 +99,15 @@ namespace crypto {
     return true;
   }
 
+  template<typename pod_pass>
+  inline std::string chacha_crypt(const std::string& input, const pod_pass& pass)
+  {
+    std::string result;
+    result.resize(input.size());
+    if (chacha_crypt(input.data(), input.size(), (void*)result.data(), &pass, sizeof pass))
+      return result;
+    return "";
+  }
 
 }
 

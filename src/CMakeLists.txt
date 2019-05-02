@@ -49,6 +49,7 @@ file(GLOB_RECURSE DAEMON daemon/*)
 
 file(GLOB_RECURSE P2P p2p/*)
 file(GLOB_RECURSE RPC rpc/*)
+file(GLOB_RECURSE STRATUM stratum/*)
 file(GLOB_RECURSE SIMPLEWALLET simplewallet/*)
 file(GLOB_RECURSE CONN_TOOL connectivity_tool/*)
 file(GLOB_RECURSE WALLET wallet/*)
@@ -73,6 +74,7 @@ source_group(currency_protocol FILES ${CURRENCY_PROTOCOL})
 source_group(daemon FILES ${DAEMON})
 source_group(p2p FILES ${P2P})
 source_group(rpc FILES ${RPC})
+source_group(stratum FILES ${STRATUM})
 source_group(simplewallet FILES ${SIMPLEWALLET})
 source_group(connectivity-tool FILES ${CONN_TOOL})
 source_group(wallet FILES ${WALLET})
@@ -92,14 +94,11 @@ add_library(common ${COMMON})
 add_dependencies(common version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(COMMON)
 
-if(NOT MSVC AND NOT APPLE)
+if(NOT MSVC AND NOT APPLE AND NOT CLANG)  # TODO(unassigned): do we really need the clang equivalent?
    target_compile_options(common PRIVATE -fno-var-tracking-assignments)
 endif()
 
 add_library(crypto ${CRYPTO})
-
-MESSAGE( STATUS "INCLUDING OpenCL_INCLUDE_DIRS:         " ${OpenCL_INCLUDE_DIRS} )
-include_directories( ${OpenCL_INCLUDE_DIRS} )
 
 add_library(currency_core ${CURRENCY_CORE})
 add_dependencies(currency_core version rpc ${PCH_LIB_NAME})
@@ -109,6 +108,10 @@ add_library(rpc ${RPC})
 add_dependencies(rpc version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(RPC)
 
+add_library(stratum ${STRATUM})
+add_dependencies(stratum version ${PCH_LIB_NAME})
+ENABLE_SHARED_PCH(STRATUM)
+
 add_library(wallet ${WALLET})
 add_dependencies(wallet version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(WALLET)
@@ -117,23 +120,23 @@ target_link_libraries(currency_core lmdb)
 
 add_executable(daemon ${DAEMON} ${P2P} ${CURRENCY_PROTOCOL})
 add_dependencies(daemon version)
-target_link_libraries(daemon rpc currency_core crypto common upnpc-static zlibstatic ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+target_link_libraries(daemon rpc stratum currency_core crypto common libminiupnpc-static zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 ENABLE_SHARED_PCH(DAEMON)
 ENABLE_SHARED_PCH_EXECUTABLE(daemon)
                      
 add_executable(connectivity_tool ${CONN_TOOL})
 add_dependencies(connectivity_tool version)
-target_link_libraries(connectivity_tool currency_core crypto common zlibstatic ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+target_link_libraries(connectivity_tool currency_core crypto common zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 ENABLE_SHARED_PCH(CONN_TOOL)
 ENABLE_SHARED_PCH_EXECUTABLE(connectivity_tool)
 
 add_executable(simplewallet ${SIMPLEWALLET})
 add_dependencies(simplewallet version)
-target_link_libraries(simplewallet wallet rpc currency_core crypto common zlibstatic ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+target_link_libraries(simplewallet wallet rpc currency_core crypto common zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 ENABLE_SHARED_PCH(SIMPLEWALLET)
 ENABLE_SHARED_PCH_EXECUTABLE(simplewallet)
 
-set_property(TARGET common crypto currency_core rpc wallet PROPERTY FOLDER "libs")
+set_property(TARGET common crypto currency_core rpc stratum wallet PROPERTY FOLDER "libs")
 set_property(TARGET daemon simplewallet connectivity_tool PROPERTY FOLDER "prog")
 set_property(TARGET daemon PROPERTY OUTPUT_NAME "zanod")
 
@@ -153,7 +156,7 @@ if(BUILD_GUI)
   QT5_USE_MODULES(Zano WebEngineWidgets WebChannel)
   find_package(Qt5PrintSupport REQUIRED)
 
-  target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic Qt5::WebEngineWidgets Qt5::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+  target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic ethash Qt5::WebEngineWidgets Qt5::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 
   if(APPLE)
     target_link_libraries(Zano ${COCOA_LIBRARY})
@@ -165,7 +168,15 @@ if(BUILD_GUI)
   set_property(TARGET Zano PROPERTY FOLDER "prog")
   set_target_properties(Zano PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/Info.plist.in)
 
+  set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/html)
+  set_target_properties(Zano PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "--html-path=${HTML_DIR}")
+
   set(CMAKE_AUTOMOC OFF)
+
+  # GUI convenience "bundle"
+  # set(GUI_DIR ${CMAKE_CURRENT_BINARY_DIR}/gui)
+  # set_target_properties(Zano PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${GUI_DIR})
+  # add_custom_command(TARGET Zano POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${HTML_DIR} ${GUI_DIR}/html)
 endif()
 
 if(APPLE)

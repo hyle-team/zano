@@ -160,7 +160,7 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
 
   size_t small_outs_to_transfer = MAX_ALIAS_PER_BLOCK + 10;
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  bool r = construct_tx_with_many_outputs(events, blk_0, preminer_account.get_keys(), miner_account.get_public_address(), small_outs_to_transfer * TX_DEFAULT_FEE * 11, small_outs_to_transfer, TX_DEFAULT_FEE, tx_1);
+  bool r = construct_tx_with_many_outputs(events, blk_0, preminer_account.get_keys(), miner_account.get_public_address(), small_outs_to_transfer * TESTS_DEFAULT_FEE * 11, small_outs_to_transfer, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);                                                                                              // 4N+4
   MAKE_NEXT_BLOCK_TX1(events, blk_a, blk_0r, miner_account, tx_1);                                                     // 4N+5
@@ -381,8 +381,7 @@ bool gen_alias_tests::check_too_many_aliases_registration(currency::core& c, siz
   wide_difficulty_type diff;
   uint64_t height;
   blobdata extra = AUTO_VAL_INIT(extra);
-  crypto::hash seed = currency::null_hash;
-  bool r = c.get_block_template(b, seed, ai.m_address, ai.m_address, diff, height, extra);
+  bool r = c.get_block_template(b, ai.m_address, ai.m_address, diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
   CHECK_AND_ASSERT_MES(b.tx_hashes.empty(), false, "block template has some txs, expected--none");
   
@@ -399,7 +398,7 @@ bool gen_alias_tests::check_too_many_aliases_registration(currency::core& c, siz
       ai.m_address = someone.get_public_address();
       ai.m_alias = gen_random_alias(random_in_range(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED + 20));
       transaction alias_reg_tx = AUTO_VAL_INIT(alias_reg_tx);
-      miner_wlt->request_alias_registration(ai, alias_reg_tx, TX_DEFAULT_FEE, estimated_alias_cost);
+      miner_wlt->request_alias_registration(ai, alias_reg_tx, TESTS_DEFAULT_FEE, estimated_alias_cost);
       
       b.tx_hashes.push_back(get_transaction_hash(alias_reg_tx)); // add this tx to block template
     }
@@ -413,7 +412,7 @@ bool gen_alias_tests::check_too_many_aliases_registration(currency::core& c, siz
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == total_alias_to_gen, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count() << ", expected: " << total_alias_to_gen);
 
   // complete block template and try to process it
-  r = miner::find_nonce_for_given_block(b, diff, height, seed, m_scratchpad_keeper);
+  r = miner::find_nonce_for_given_block(b, diff, height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -816,7 +815,7 @@ bool gen_alias_blocking_reg_by_invalid_tx::generate(std::vector<test_event_entry
   ai.m_address = attacker.get_public_address();
   ai.m_sign.push_back(invalid_signature); // it's an invalid sign, so effectivly it's an update alias request
   std::vector<currency::extra_v> ex(1, ai);
-  MAKE_TX_FEE_MIX_ATTR_EXTRA(events, tx_0, attacker, attacker, TX_DEFAULT_FEE, TX_DEFAULT_FEE, 0, blk_1, CURRENCY_TO_KEY_OUT_RELAXED, ex, false);
+  MAKE_TX_FEE_MIX_ATTR_EXTRA(events, tx_0, attacker, attacker, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, 0, blk_1, CURRENCY_TO_KEY_OUT_RELAXED, ex, false);
 
   // No one can't include this tx into a block
   DO_CALLBACK(events, "mark_invalid_block");
@@ -923,7 +922,7 @@ bool gen_alias_reg_with_locked_money::generate(std::vector<test_event_entry>& ev
 
   currency::tx_source_entry se = AUTO_VAL_INIT(se);
   se.amount = blk_0.miner_tx.vout[0].amount;
-  se.outputs.push_back(std::make_pair(0, boost::get<currency::txout_to_key>(blk_0.miner_tx.vout[0].target).key));
+  se.outputs.push_back(make_serializable_pair<txout_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(blk_0.miner_tx.vout[0].target).key));
   se.real_output = 0;
   se.real_output_in_tx_index = 0;
   se.real_out_tx_key = currency::get_tx_pub_key_from_extra(blk_0.miner_tx);
@@ -1062,7 +1061,7 @@ bool gen_alias_too_small_reward::generate(std::vector<test_event_entry>& events)
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), 3 * aliases_count * TX_DEFAULT_FEE * 100, 3 * aliases_count, TX_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), 3 * aliases_count * TESTS_DEFAULT_FEE * 100, 3 * aliases_count, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
@@ -1075,12 +1074,12 @@ bool gen_alias_too_small_reward::generate(std::vector<test_event_entry>& events)
 
     transaction tx = AUTO_VAL_INIT(tx);
     DO_CALLBACK(events, "mark_invalid_tx"); // should be rejected, because it's paid TX_POOL_MINIMUM_FEE / 10
-    if (!make_tx_reg_alias(events, generator, blk_1, aliases[i].name, aliases[i].addr, TX_DEFAULT_FEE / 10, miner_acc, tx, used_sources))
+    if (!make_tx_reg_alias(events, generator, blk_1, aliases[i].name, aliases[i].addr, ALIAS_VERY_INITAL_COAST / 10, miner_acc, tx, used_sources))
       return false;
 
 //     this block commented due to new fee median rules, TODO: review
 //     DO_CALLBACK(events, "mark_invalid_tx"); // should be rejected, because it's paid TX_POOL_MINIMUM_FEE / 10 less then required
-//     if (!make_tx_reg_alias(events, generator, blk_1, aliases[i].name, aliases[i].addr, alias_reward - TX_DEFAULT_FEE / 10, miner_acc, tx, used_sources))
+//     if (!make_tx_reg_alias(events, generator, blk_1, aliases[i].name, aliases[i].addr, alias_reward - TESTS_DEFAULT_FEE / 10, miner_acc, tx, used_sources))
 //       return false;
 
     // should be accepted
@@ -1193,7 +1192,7 @@ bool gen_alias_tx_no_outs::generate(std::vector<test_event_entry>& events) const
 
   currency::tx_source_entry se = AUTO_VAL_INIT(se);
   se.amount = blk_0.miner_tx.vout[0].amount;
-  se.outputs.push_back(std::make_pair(0, boost::get<currency::txout_to_key>(blk_0.miner_tx.vout[0].target).key));
+  se.outputs.push_back(make_serializable_pair<txout_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(blk_0.miner_tx.vout[0].target).key));
   se.real_output = 0;
   se.real_output_in_tx_index = 0;
   se.real_out_tx_key = currency::get_tx_pub_key_from_extra(blk_0.miner_tx);
@@ -1266,7 +1265,7 @@ bool gen_alias_switch_and_check_block_template::generate(std::vector<test_event_
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   std::vector<currency::extra_v> extra(1, ai);
 
-  MAKE_TX_FEE_MIX_ATTR_EXTRA(events, tx_0, miner_acc, miner_acc, 1, TX_DEFAULT_FEE, 0, blk_2, CURRENCY_TO_KEY_OUT_RELAXED, extra, true); // 2N+6
+  MAKE_TX_FEE_MIX_ATTR_EXTRA(events, tx_0, miner_acc, miner_acc, 1, TESTS_DEFAULT_FEE, 0, blk_2, CURRENCY_TO_KEY_OUT_RELAXED, extra, true); // 2N+6
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_0);                                                // 2N+7
 
   // split the chain
@@ -1289,12 +1288,11 @@ bool gen_alias_switch_and_check_block_template::add_block_from_template(currency
   currency::block b;
   wide_difficulty_type diff;
   uint64_t height;
-  crypto::hash seed = currency::null_hash;
   blobdata extra = AUTO_VAL_INIT(extra);
-  bool r = c.get_block_template(b, seed, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
+  bool r = c.get_block_template(b, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
-  r = miner::find_nonce_for_given_block(b, diff, height, seed, m_scratchpad_keeper);
+  r = miner::find_nonce_for_given_block(b, diff, height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -1346,10 +1344,10 @@ bool gen_alias_too_many_regs_in_block_template::generate(std::vector<test_event_
   uint64_t total_alias_cost = 0;
   for(size_t i = 0; i < m_total_alias_to_gen; ++i)
   {
-    destinations.push_back(tx_destination_entry(m_estimated_alias_cost + TX_DEFAULT_FEE, alice_acc.get_public_address()));
-    total_alias_cost += m_estimated_alias_cost + TX_DEFAULT_FEE;
+    destinations.push_back(tx_destination_entry(m_estimated_alias_cost + TESTS_DEFAULT_FEE, alice_acc.get_public_address()));
+    total_alias_cost += m_estimated_alias_cost + TESTS_DEFAULT_FEE;
   }
-  total_alias_cost += TX_DEFAULT_FEE;
+  total_alias_cost += TESTS_DEFAULT_FEE;
   r = fill_tx_sources(sources, events, blk_0r, preminer_acc.get_keys(), total_alias_cost, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   uint64_t sources_amount = get_sources_total_amount(sources);
@@ -1392,7 +1390,7 @@ bool gen_alias_too_many_regs_in_block_template::add_block_from_template(currency
       ai.m_address = someone.get_public_address();
       ai.m_alias = gen_random_alias(random_in_range(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED + 20));
       transaction alias_reg_tx = AUTO_VAL_INIT(alias_reg_tx);
-      alice_wlt->request_alias_registration(ai, alias_reg_tx, TX_DEFAULT_FEE, m_estimated_alias_cost);
+      alice_wlt->request_alias_registration(ai, alias_reg_tx, TESTS_DEFAULT_FEE, m_estimated_alias_cost);
     }
   }
   catch (std::exception& e)
@@ -1409,12 +1407,11 @@ bool gen_alias_too_many_regs_in_block_template::add_block_from_template(currency
   currency::block b;
   wide_difficulty_type diff;
   uint64_t height;
-  crypto::hash seed = currency::null_hash;
   blobdata extra = AUTO_VAL_INIT(extra);
-  bool r = c.get_block_template(b, seed, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
+  bool r = c.get_block_template(b, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
-  r = miner::find_nonce_for_given_block(b, diff, height, seed, m_scratchpad_keeper);
+  r = miner::find_nonce_for_given_block(b, diff, height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -1453,13 +1450,13 @@ bool gen_alias_update_for_free::generate(std::vector<test_event_entry>& events) 
   // create a tx with chargeback, paying only the minimum required fee
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
-  r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), TX_DEFAULT_FEE, 0, true, true);
+  r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), TESTS_DEFAULT_FEE, 0, true, true);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   uint64_t input_amount = 0;
   for (auto se : sources)
     input_amount += se.amount;
-  if (input_amount > TX_DEFAULT_FEE)
-    destinations.push_back(tx_destination_entry(input_amount - TX_DEFAULT_FEE, miner_acc.get_public_address()));
+  if (input_amount > TESTS_DEFAULT_FEE)
+    destinations.push_back(tx_destination_entry(input_amount - TESTS_DEFAULT_FEE, miner_acc.get_public_address()));
 
   tx_builder tb;
   tb.step1_init();

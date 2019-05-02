@@ -85,7 +85,7 @@ bool escrow_altchain_meta_impl::generate(std::vector<test_event_entry>& events) 
 bool escrow_altchain_meta_impl::mine_next_block_with_tx(currency::core& c, const currency::transaction& tx)
 {
   block b = AUTO_VAL_INIT(b);
-  bool r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx }), m_last_block_hash, m_last_block_height + 1, &b);
+  bool r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>({ tx }), m_last_block_hash, m_last_block_height + 1, &b);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
   m_last_block_hash = get_block_hash(b);
   m_last_block_height = get_block_height(b);
@@ -95,7 +95,7 @@ bool escrow_altchain_meta_impl::mine_next_block_with_tx(currency::core& c, const
 bool escrow_altchain_meta_impl::mine_next_block_with_no_tx(currency::core& c)
 {
   block b = AUTO_VAL_INIT(b);
-  bool r = mine_next_pow_block_in_playtime_with_given_txs(m_scratchpad_keeper, m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), m_last_block_hash, m_last_block_height + 1, &b);
+  bool r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), m_last_block_hash, m_last_block_height + 1, &b);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
   m_last_block_hash = get_block_hash(b);
   m_last_block_height = get_block_height(b);
@@ -318,6 +318,7 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
       size_t blocks_fetched = 0;
       alice_wlt->refresh(blocks_fetched);
       CHECK_AND_ASSERT_MES(blocks_fetched == se.expected_blocks, false, "Alice got " << blocks_fetched << " after refresh, but " << se.expected_blocks << " is expected");
+      LOG_PRINT_GREEN("Alice's transfers:" << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_1);
       if (se.a_balance != UINT64_MAX)
       {
         uint64_t alice_balance = alice_wlt->balance();
@@ -329,13 +330,13 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
         alice_wlt->get_contracts(contracts);
         CHECK_AND_ASSERT_MES(check_contract_state(contracts, m_etd.cpd, static_cast<tools::wallet_rpc::escrow_contract_details_basic::contract_state>(se.a_state), "Alice"), false, "");
       }
-      LOG_PRINT_GREEN("Alice's transfers:" << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_1);
 
       LOG_PRINT_GREEN("Bob's wallet is refreshing...", LOG_LEVEL_1);
       bob_wlt->scan_tx_pool(stub);
       blocks_fetched = 0;
       bob_wlt->refresh(blocks_fetched);
       CHECK_AND_ASSERT_MES(blocks_fetched == se.expected_blocks, false, "Bob got " << blocks_fetched << " after refresh, but " << se.expected_blocks << " is expected");
+      LOG_PRINT_GREEN("Bob's transfers:" << ENDL << bob_wlt->dump_trunsfers(), LOG_LEVEL_1);
       if (se.b_balance != UINT64_MAX)
       {
         uint64_t bob_balance = bob_wlt->balance();
@@ -347,7 +348,6 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
         bob_wlt->get_contracts(contracts);
         CHECK_AND_ASSERT_MES(check_contract_state(contracts, m_etd.cpd, static_cast<tools::wallet_rpc::escrow_contract_details_basic::contract_state>(se.b_state), "Bob"), false, "");
       }
-      LOG_PRINT_GREEN("Bob's transfers:" << ENDL << bob_wlt->dump_trunsfers(), LOG_LEVEL_1);
 
       mine_empty_block = true;
     }
@@ -397,7 +397,7 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
 
       currency::transaction tx = AUTO_VAL_INIT(tx);
       std::vector<tx_destination_entry> destinations{ tx_destination_entry(se.amount, wlt_to->get_account().get_public_address()) };
-      wlt_from->transfer(destinations, 0, 0, se.fee, empty_extra, empty_attachment, tools::detail::digit_split_strategy, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
+      wlt_from->transfer(destinations, 0, 0, se.fee, empty_extra, empty_attachment, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx);
 
       CHECK_AND_NO_ASSERT_MES(mine_next_block_with_tx(c, tx), false, "mine_next_block_with_tx failed");
       mine_empty_block = false;
@@ -413,7 +413,7 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
       }
     }
 
-    // c.get_tx_pool().remove_stuck_transactions(); ?
+    c.get_tx_pool().remove_stuck_transactions();
 
 
   }

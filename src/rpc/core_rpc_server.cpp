@@ -24,23 +24,29 @@ namespace currency
   {
     const command_line::arg_descriptor<std::string> arg_rpc_bind_ip   = {"rpc-bind-ip", "", "127.0.0.1"};
     const command_line::arg_descriptor<std::string> arg_rpc_bind_port = {"rpc-bind-port", "", std::to_string(RPC_DEFAULT_PORT)};
+    const command_line::arg_descriptor<bool> arg_rpc_ignore_status    = {"rpc-ignore-offline", "Let rpc calls despite online/offline status", false, true };
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)
   {
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
+    command_line::add_arg(desc, arg_rpc_ignore_status);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   core_rpc_server::core_rpc_server(core& cr, nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& p2p,
     bc_services::bc_offers_service& of
-    ) :m_core(cr), m_p2p(p2p), m_of(of), m_session_counter(0)
+    ) :m_core(cr), m_p2p(p2p), m_of(of), m_session_counter(0), m_ignore_status(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::handle_command_line(const boost::program_options::variables_map& vm)
   {
     m_bind_ip = command_line::get_arg(vm, arg_rpc_bind_ip);
     m_port = command_line::get_arg(vm, arg_rpc_bind_port);
+    if (command_line::has_arg(vm, arg_rpc_ignore_status))
+    {
+      m_ignore_status = command_line::get_arg(vm, arg_rpc_ignore_status);
+    }
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -55,6 +61,8 @@ namespace currency
   bool core_rpc_server::check_core_ready_(const std::string& calling_method)
   {
 #ifndef TESTNET
+    if (m_ignore_status)
+      return true;
     if(!m_p2p.get_payload_object().is_synchronized())
     {
       LOG_PRINT_L0("[" << calling_method << "]Core busy cz is_synchronized");
@@ -131,8 +139,12 @@ namespace currency
       if (pow_bl_ptr)
         res.last_pow_timestamp = pow_bl_ptr->bl.timestamp;
     }
+    boost::multiprecision::uint128_t total_coins = 0;
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS)
-      res.total_coins = m_core.get_blockchain_storage().total_coins();
+    {
+      total_coins = m_core.get_blockchain_storage().total_coins();
+      res.total_coins = boost::lexical_cast<std::string>(total_coins);
+    }
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_LAST_BLOCK_SIZE)
     {
       std::vector<size_t> sz;
@@ -151,11 +163,13 @@ namespace currency
       res.pow_sequence_factor = m_core.get_blockchain_storage().get_current_sequence_factor(false);
     if (req.flags&(COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY | COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS))
     {
-      res.block_reward = currency::get_base_block_reward(true, res.total_coins, res.height);
+      res.block_reward = currency::get_base_block_reward(true, total_coins, res.height);
       currency::block b = AUTO_VAL_INIT(b);
       m_core.get_blockchain_storage().get_top_block(b);
       res.last_block_total_reward = currency::get_reward_from_miner_tx(b.miner_tx);
-      res.pos_diff_total_coins_rate = (pos_diff / (res.total_coins - PREMINE_AMOUNT + 1)).convert_to<uint64_t>();
+      res.pos_diff_total_coins_rate = (pos_diff / (total_coins - PREMINE_AMOUNT + 1)).convert_to<uint64_t>();
+      res.last_block_timestamp = b.timestamp;
+      res.last_block_hash = string_tools::pod_to_hex(get_block_hash(b));
     }
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_POS_BLOCK_TS_SHIFT_VS_ACTUAL)
     {
@@ -179,6 +193,8 @@ namespace currency
       res.performance_data.etc_stuff_6 = pd.etc_stuff_6.get_avg();
       res.performance_data.insert_time_4 = pd.insert_time_4.get_avg();
       res.performance_data.raise_block_core_event = pd.raise_block_core_event.get_avg();
+      res.performance_data.target_calculating_enum_blocks = pd.target_calculating_enum_blocks.get_avg();
+      res.performance_data.target_calculating_calc = pd.target_calculating_calc.get_avg();
       //tx processing zone
       res.performance_data.tx_check_inputs_time = pd.tx_check_inputs_time.get_avg();
       res.performance_data.tx_add_one_tx_time = pd.tx_add_one_tx_time.get_avg();
@@ -781,17 +797,22 @@ namespace currency
     //pe.keyimage key image will be set in the wallet
     //pe.wallet_index is not included in serialization map, TODO: refactoring here
 
-    if (!m_core.get_block_template(b, res.seed, miner_address, stakeholder_address, dt, res.height, req.extra_text, req.pos_block, pe))
+    if (!m_core.get_block_template(b, miner_address, stakeholder_address, dt, res.height, req.extra_text, req.pos_block, pe))
     {
       error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
       error_resp.message = "Internal error: failed to create block template";
       LOG_ERROR("Failed to create block template");
       return false;
     }
-    res.difficulty = dt.convert_to<uint64_t>();
+    res.difficulty = dt.convert_to<std::string>();
     blobdata block_blob = t_serializable_object_to_blob(b);
 
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
+    res.prev_hash = string_tools::pod_to_hex(b.prev_id);
+
+    //calculate epoch seed
+    res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
+
     res.status = CORE_RPC_STATUS_OK;
 
     return true;
@@ -872,7 +893,7 @@ namespace currency
     response.height = get_block_height(blk);
     response.depth = m_core.get_current_blockchain_size() - response.height - 1;
     response.hash = string_tools::pod_to_hex(get_block_hash(blk));
-    response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<uint64_t>();
+    response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<std::string>();
     response.reward = get_block_reward(blk);
     return true;
   }
@@ -1091,7 +1112,7 @@ namespace currency
     set_session_blob(job_id, b);
     job.blob = string_tools::buff_to_hex_nodelimer(currency::get_block_hashing_blob(b));
     //TODO: set up share difficulty here!
-    job.difficulty = std::to_string(bt_res.difficulty); //difficulty leaved as string field since it will be refactored into 128 bit format
+    job.difficulty = bt_res.difficulty; //difficulty leaved as string field since it will be refactored into 128 bit format
     job.job_id = "SOME_JOB_ID";
     get_current_hi(job.prev_hi);
     return true;

@@ -111,6 +111,7 @@ namespace misc_utils
 
 #if defined(__GNUC__)
 #include <execinfo.h>
+#include <boost/core/demangle.hpp>
 #endif
   inline std::string print_trace()
   {
@@ -125,9 +126,9 @@ namespace misc_utils
     stack_depth = backtrace(stack_addrs, max_depth);
     stack_strings = backtrace_symbols(stack_addrs, stack_depth);
 
-
-    for (size_t i = 1; i < stack_depth; i++) {
-      ss << stack_strings[i] << std::endl;
+    for (size_t i = 1; i < stack_depth; i++) 
+    {      
+      ss << boost::core::demangle(stack_strings[i]) << std::endl;
     }
     free(stack_strings); // malloc()ed by backtrace_symbols
 #endif

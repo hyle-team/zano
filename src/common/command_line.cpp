@@ -16,8 +16,11 @@ namespace command_line
 
   const arg_descriptor<std::string> arg_config_file =  { "config-file", "Specify configuration file", std::string(CURRENCY_NAME_SHORT ".conf") };
   const arg_descriptor<bool>        arg_os_version =   { "os-version", "" };
+
   const arg_descriptor<std::string> arg_log_dir =      { "log-dir", "", "", true};
-  const arg_descriptor<int>         arg_log_level =    { "log-level", "", LOG_LEVEL_0, true};
+  const arg_descriptor<std::string> arg_log_file =     { "log-file", "", "" };
+  const arg_descriptor<int>         arg_log_level =    { "log-level", "", LOG_LEVEL_0, true };
+
   const arg_descriptor<bool>        arg_console =      { "no-console", "Disable daemon console commands" };
   const arg_descriptor<bool>        arg_show_details = { "currency-details", "Display currency details" };
   const arg_descriptor<bool>        arg_show_rpc_autodoc = { "show_rpc_autodoc", "Display rpc auto-generated documentation template" };

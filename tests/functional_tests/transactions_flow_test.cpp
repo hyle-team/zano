@@ -71,7 +71,7 @@ bool do_send_money(tools::wallet2& w1, tools::wallet2& w2, size_t mix_in_factor,
   try
   {  
     uint64_t ticks = epee::misc_utils::get_tick_count();
-    w1.transfer(dsts, mix_in_factor, 0, w1.get_core_runtime_config().tx_default_fee, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::null_split_strategy, tools::tx_dust_policy(w1.get_core_runtime_config().tx_default_fee), tx);
+    w1.transfer(dsts, mix_in_factor, 0, w1.get_core_runtime_config().tx_default_fee, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(w1.get_core_runtime_config().tx_default_fee), tx);
     uint64_t ticks_for_tx = epee::misc_utils::get_tick_count() - ticks;
     LOG_PRINT_GREEN("Send tx took " << ticks_for_tx << "ms", LOG_LEVEL_0);
     return true;
@@ -143,7 +143,7 @@ bool do_register_offer(tools::wallet2& w1, transaction& tx)
 
 
 
-#define ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP CURRENCY_TX_MAX_ALLOWED_OUTS
+#define ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP (CURRENCY_TX_MAX_ALLOWED_OUTS - 4)
 
 bool do_send_money_by_fractions(tools::wallet2& w1, tools::wallet2& w2, size_t mix_in_factor, uint64_t amount_to_transfer, transaction& tx, uint64_t fraction_size)
 {
@@ -179,12 +179,13 @@ bool do_send_money_by_fractions(tools::wallet2& w1, tools::wallet2& w2, size_t m
 
   try
   {
-    w1.transfer(dsts, mix_in_factor, 0, w1.get_core_runtime_config().tx_default_fee, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::null_split_strategy, tools::tx_dust_policy(w1.get_core_runtime_config().tx_default_fee), tx);
+    w1.transfer(dsts, mix_in_factor, 0, w1.get_core_runtime_config().tx_default_fee, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(w1.get_core_runtime_config().tx_default_fee), tx);
     LOG_PRINT_GREEN("Split transaction sent " << get_transaction_hash(tx) <<  ", destinations: " << dsts.size() << ", blob size: " << get_object_blobsize(tx), LOG_LEVEL_0);
     return true;
   }
-  catch (const std::exception&)
+  catch (const std::exception& e)
   {
+    LOG_ERROR("exception while sending transfer: " << e.what());
     return false;
   }
 }
@@ -589,7 +590,7 @@ bool transactions_flow_test(
     if (action == TRANSACTIONS_FLOW_TESTACTION_MIXED)
     {
       current_action++;
-      if (current_action > TRANSACTIONS_FLOW_TESTACTION_OFFERS)
+      if (current_action >= TRANSACTIONS_FLOW_TESTACTION_OFFERS)
         current_action = TRANSACTIONS_FLOW_TESTACTION_DEFAULT;
     }
   }

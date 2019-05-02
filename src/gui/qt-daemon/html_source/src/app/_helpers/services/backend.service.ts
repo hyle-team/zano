@@ -4,6 +4,8 @@ import {TranslateService} from '@ngx-translate/core';
 import {VariablesService} from './variables.service';
 import {ModalService} from './modal.service';
 import {MoneyToIntPipe} from '../pipes/money-to-int.pipe';
+import JSONBigNumber from 'json-bignumber';
+import {BigNumber} from 'bignumber.js';
 
 @Injectable()
 export class BackendService {
@@ -11,9 +13,27 @@ export class BackendService {
   backendObject: any;
   backendLoaded = false;
 
-  constructor(private translate: TranslateService, private variablesService: VariablesService, private modalService: ModalService, private moneyToIntPipe: MoneyToIntPipe) {}
+  constructor(
+    private translate: TranslateService,
+    private variablesService: VariablesService,
+    private modalService: ModalService,
+    private moneyToIntPipe: MoneyToIntPipe
+  ) {
+  }
 
-  private Debug(type, message) {
+  static bigNumberParser(key, val) {
+    if (val.constructor.name === 'BigNumber' && ['balance', 'unlocked_balance', 'amount', 'fee', 'b_fee', 'to_pay', 'a_pledge', 'b_pledge', 'coast', 'a'].indexOf(key) === -1) {
+      return val.toNumber();
+    }
+    if (key === 'rcv' || key === 'spn') {
+      for (let i = 0; i < val.length; i++) {
+        val[i] = new BigNumber(val[i]);
+      }
+    }
+    return val;
+  }
+
+  static Debug(type, message) {
     switch (type) {
       case 0:
         console.error(message);
@@ -54,11 +74,11 @@ export class BackendService {
       case 'INTERNAL_ERROR:NOT_ENOUGH_MONEY':
         if (command === 'cancel_offer') {
           error_translate = this.translate.instant('ERRORS.NO_MONEY_REMOVE_OFFER', {
-            'fee': '0.01',
-            'currency': 'ZAN'
+            'fee': this.variablesService.default_fee,
+            'currency': this.variablesService.defaultCurrency
           });
         } else {
-          error_translate = 'INFORMER.NO_MONEY';
+          error_translate = 'ERRORS.NO_MONEY';
         }
         break;
       case 'INTERNAL_ERROR:not enough outputs to mix':
@@ -110,6 +130,15 @@ export class BackendService {
           }
         }
         break;
+      case 'NOT_FOUND':
+        if (command !== 'open_wallet' && command !== 'get_alias_info_by_name' && command !== 'get_alias_info_by_address') {
+          error_translate = this.translate.instant('ERRORS.FILE_NOT_FOUND');
+          params = JSON.parse(params);
+          if (params.path) {
+            error_translate += ': ' + params.path;
+          }
+        }
+        break;
       case 'CANCELED':
       case '':
         break;
@@ -127,6 +156,9 @@ export class BackendService {
     if (error.indexOf('FAIL:failed to save file') > -1) {
       error_translate = 'ERRORS.FILE_NOT_SAVED';
     }
+    if (error.indexOf('FAILED:failed to open binary wallet file for saving') > -1 && command === 'generate_wallet') {
+      error_translate = '';
+    }
     if (error_translate !== '') {
       this.modalService.prepareModal('error', error_translate);
     }
@@ -134,21 +166,17 @@ export class BackendService {
 
 
   private commandDebug(command, params, result) {
-    this.Debug(2, '----------------- ' + command + ' -----------------');
+    BackendService.Debug(2, '----------------- ' + command + ' -----------------');
     const debug = {
       _send_params: params,
       _result: result
     };
-    this.Debug(2, debug);
+    BackendService.Debug(2, debug);
     try {
-      this.Debug(2, JSON.parse(result));
+      BackendService.Debug(2, JSONBigNumber.parse(result, BackendService.bigNumberParser));
     } catch (e) {
-      this.Debug(2, {response_data: result, error_code: 'OK'});
+      BackendService.Debug(2, {response_data: result, error_code: 'OK'});
     }
-  }
-
-  private asVal(data) {
-    return {v: data};
   }
 
   private backendCallback(resultStr, params, callback, command) {
@@ -158,7 +186,7 @@ export class BackendService {
         Result = {};
       } else {
         try {
-          Result = JSON.parse(resultStr);
+          Result = JSONBigNumber.parse(resultStr, BackendService.bigNumberParser);
         } catch (e) {
           Result = {response_data: resultStr, error_code: 'OK'};
         }
@@ -173,7 +201,7 @@ export class BackendService {
     const Status = (Result.error_code === 'OK' || Result.error_code === 'TRUE');
 
     if (!Status && Status !== undefined && Result.error_code !== undefined) {
-      this.Debug(1, 'API error for command: "' + command + '". Error code: ' + Result.error_code);
+      BackendService.Debug(1, 'API error for command: "' + command + '". Error code: ' + Result.error_code);
     }
     const data = ((typeof Result === 'object') && 'response_data' in Result) ? Result.response_data : Result;
 
@@ -199,10 +227,10 @@ export class BackendService {
     if (this.backendObject) {
       const Action = this.backendObject[command];
       if (!Action) {
-        this.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
+        BackendService.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
       } else {
         const that = this;
-        params = (typeof params === 'string') ? params : JSON.stringify(params);
+        params = (typeof params === 'string') ? params : JSONBigNumber.stringify(params);
         if (params === undefined || params === '{}') {
           Action(function (resultStr) {
             that.commandDebug(command, params, resultStr);
@@ -224,7 +252,7 @@ export class BackendService {
       this.backendObject[command].connect(callback);
     } else {
       this.backendObject[command].connect((str) => {
-        callback(JSON.parse(str));
+        callback(JSONBigNumber.parse(str, BackendService.bigNumberParser));
       });
     }
   }
@@ -264,6 +292,12 @@ export class BackendService {
   }
 
   storeAppData(callback?) {
+    if (this.variablesService.wallets.length) {
+      this.variablesService.settings.wallets = [];
+      this.variablesService.wallets.forEach((wallet) => {
+        this.variablesService.settings.wallets.push({name: wallet.name, path: wallet.path});
+      });
+    }
     this.runCommand('store_app_data', this.variablesService.settings, callback);
   }
 
@@ -271,16 +305,19 @@ export class BackendService {
     this.runCommand('get_secure_app_data', pass, callback);
   }
 
-  storeSecureAppData(callback) {
-    if (this.variablesService.appPass === '') {
-      return callback(false);
-    }
+  storeSecureAppData(callback?) {
     const wallets = [];
     this.variablesService.wallets.forEach((wallet) => {
       wallets.push({name: wallet.name, pass: wallet.pass, path: wallet.path});
     });
     this.backendObject['store_secure_app_data'](JSON.stringify(wallets), this.variablesService.appPass, (dataStore) => {
       this.backendCallback(dataStore, {}, callback, 'store_secure_app_data');
+    });
+  }
+
+  dropSecureAppData(callback?) {
+    this.backendObject['drop_secure_app_data']((dataStore) => {
+      this.backendCallback(dataStore, {}, callback, 'drop_secure_app_data');
     });
   }
 
@@ -325,15 +362,15 @@ export class BackendService {
     this.runCommand('open_wallet', params, callback);
   }
 
-  closeWallet(wallet_id, callback) {
-    this.runCommand('close_wallet', {wallet_id: wallet_id}, callback);
+  closeWallet(wallet_id, callback?) {
+    this.runCommand('close_wallet', {wallet_id: +wallet_id}, callback);
   }
 
-  getSmartSafeInfo(wallet_id, callback) {
-    this.runCommand('get_smart_safe_info', {wallet_id: +wallet_id}, callback);
+  getSmartWalletInfo(wallet_id, callback) {
+    this.runCommand('get_smart_wallet_info', {wallet_id: +wallet_id}, callback);
   }
 
-  runWallet(wallet_id, callback) {
+  runWallet(wallet_id, callback?) {
     this.runCommand('run_wallet', {wallet_id: +wallet_id}, callback);
   }
 
@@ -349,7 +386,6 @@ export class BackendService {
     };
     this.runCommand('restore_wallet', params, callback);
   }
-
 
   sendMoney(from_wallet_id, to_address, amount, fee, mixin, comment, callback) {
     const params = {
@@ -390,15 +426,15 @@ export class BackendService {
         a_addr: a_addr,
         b_addr: b_addr,
         to_pay: this.moneyToIntPipe.transform(to_pay),
-        a_pledge: this.moneyToIntPipe.transform(a_pledge) - this.moneyToIntPipe.transform(to_pay),
+        a_pledge: this.moneyToIntPipe.transform((new BigNumber(a_pledge)).minus(to_pay).toString()),
         b_pledge: this.moneyToIntPipe.transform(b_pledge)
       },
       payment_id: payment_id,
       expiration_period: parseInt(time, 10) * 60 * 60,
-      fee: this.moneyToIntPipe.transform('0.01'),
-      b_fee: this.moneyToIntPipe.transform('0.01')
+      fee: this.variablesService.default_fee_big,
+      b_fee: this.variablesService.default_fee_big
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('create_proposal', params, callback);
   }
 
@@ -406,7 +442,7 @@ export class BackendService {
     const params = {
       wallet_id: parseInt(wallet_id, 10)
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('get_contracts', params, callback);
   }
 
@@ -415,7 +451,7 @@ export class BackendService {
       wallet_id: parseInt(wallet_id, 10),
       contract_id: contract_id
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('accept_proposal', params, callback);
   }
 
@@ -425,7 +461,7 @@ export class BackendService {
       contract_id: contract_id,
       release_type: release_type // "normal" or "burn"
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('release_contract', params, callback);
   }
 
@@ -433,10 +469,10 @@ export class BackendService {
     const params = {
       wallet_id: parseInt(wallet_id, 10),
       contract_id: contract_id,
-      fee: this.moneyToIntPipe.transform('0.01'),
+      fee: this.variablesService.default_fee_big,
       expiration_period: parseInt(time, 10) * 60 * 60
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('request_cancel_contract', params, callback);
   }
 
@@ -445,7 +481,7 @@ export class BackendService {
       wallet_id: parseInt(wallet_id, 10),
       contract_id: contract_id
     };
-    this.Debug(1, params);
+    BackendService.Debug(1, params);
     this.runCommand('accept_cancel_contract', params, callback);
   }
 
@@ -465,31 +501,116 @@ export class BackendService {
     this.runCommand('open_url_in_browser', url, callback);
   }
 
+  start_backend(node, host, port, callback) {
+    const params = {
+      configure_for_remote_node: node,
+      remote_node_host: host,
+      remote_node_port: parseInt(port, 10)
+    };
+    this.runCommand('start_backend', params, callback);
+  }
+
+  getDefaultFee(callback) {
+    this.runCommand('get_default_fee', {}, callback);
+  }
+
+  setBackendLocalization(stringsArray, title, callback?) {
+    const params = {
+      strings: stringsArray,
+      language_title: title
+    };
+    this.runCommand('set_localization_strings', params, callback);
+  }
+
+  registerAlias(wallet_id, alias, address, fee, comment, reward, callback) {
+    const params = {
+      wallet_id: wallet_id,
+      alias: {
+        alias: alias,
+        address: address,
+        tracking_key: '',
+        comment: comment
+      },
+      fee: this.moneyToIntPipe.transform(fee),
+      reward: this.moneyToIntPipe.transform(reward)
+    };
+    this.runCommand('request_alias_registration', params, callback);
+  }
+
+  updateAlias(wallet_id, alias, fee, callback) {
+    const params = {
+      wallet_id: wallet_id,
+      alias: {
+        alias: alias.name.replace('@', ''),
+        address: alias.address,
+        tracking_key: '',
+        comment: alias.comment
+      },
+      fee: this.moneyToIntPipe.transform(fee)
+    };
+    this.runCommand('request_alias_update', params, callback);
+  }
+
+  getAllAliases(callback) {
+    this.runCommand('get_all_aliases', {}, callback);
+  }
+
+  getAliasByName(value, callback) {
+    return this.runCommand('get_alias_info_by_name', value, callback);
+  }
+
+  getAliasByAddress(value, callback) {
+    return this.runCommand('get_alias_info_by_address', value, callback);
+  }
+
+  getAliasCoast(alias, callback) {
+    this.runCommand('get_alias_coast', {v: alias}, callback);
+  }
+
+  getWalletAlias(address) {
+    if (address !== null && this.variablesService.daemon_state === 2) {
+      if (this.variablesService.aliasesChecked[address] == null) {
+        this.variablesService.aliasesChecked[address] = {};
+        if (this.variablesService.aliases.length) {
+          for (let i = 0, length = this.variablesService.aliases.length; i < length; i++) {
+            if (i in this.variablesService.aliases && this.variablesService.aliases[i]['address'] === address) {
+              this.variablesService.aliasesChecked[address]['name'] = this.variablesService.aliases[i].name;
+              this.variablesService.aliasesChecked[address]['address'] = this.variablesService.aliases[i].address;
+              this.variablesService.aliasesChecked[address]['comment'] = this.variablesService.aliases[i].comment;
+              return this.variablesService.aliasesChecked[address];
+            }
+          }
+        }
+        this.getAliasByAddress(address, (status, data) => {
+          if (status) {
+            this.variablesService.aliasesChecked[data.address]['name'] = '@' + data.alias;
+            this.variablesService.aliasesChecked[data.address]['address'] = data.address;
+            this.variablesService.aliasesChecked[data.address]['comment'] = data.comment;
+          }
+        });
+      }
+      return this.variablesService.aliasesChecked[address];
+    }
+    return {};
+  }
+
+  getPoolInfo(callback) {
+    this.runCommand('get_tx_pool_info', {}, callback);
+  }
+
+  getVersion(callback) {
+    this.runCommand('get_version', {}, (status, version) => {
+      callback(version);
+    });
+  }
+
 }
 
 
 /*
 
-    var deferred = null;
-
-    var Service = {
-
-
-
-
-
-
-
-      /!*  API  *!/
-
       toggleAutoStart: function (value) {
         return this.runCommand('toggle_autostart', asVal(value));
-      },
-
-
-
-      getDefaultFee: function (callback) {
-        return this.runCommand('get_default_fee', {}, callback);
       },
 
       getOptions: function (callback) {
@@ -500,8 +621,6 @@ export class BackendService {
         return this.runCommand('is_file_exist', path, callback);
       },
 
-
-
       isAutoStartEnabled: function (callback) {
         this.runCommand('is_autostart_enabled', {}, function (status, data) {
           if (angular.isFunction(callback)) {
@@ -509,8 +628,6 @@ export class BackendService {
           }
         });
       },
-
-
 
       setLogLevel: function (level) {
         return this.runCommand('set_log_level', asVal(level))
@@ -520,11 +637,7 @@ export class BackendService {
         this.runCommand('reset_wallet_password', {wallet_id: wallet_id, pass: pass}, callback);
       },
 
-      getVersion: function (callback) {
-        this.runCommand('get_version', {}, function (status, version) {
-          callback(version)
-        })
-      },
+
 
       getOsVersion: function (callback) {
         this.runCommand('get_os_version', {}, function (status, version) {
@@ -538,66 +651,8 @@ export class BackendService {
         })
       },
 
-
       resync_wallet: function (wallet_id, callback) {
         this.runCommand('resync_wallet', {wallet_id: wallet_id}, callback);
-      },
-
-
-
-
-
-      registerAlias: function (wallet_id, alias, address, fee, comment, reward, callback) {
-        var params = {
-          "wallet_id": wallet_id,
-          "alias": {
-            "alias": alias,
-            "address": address,
-            "tracking_key": "",
-            "comment": comment
-          },
-          "fee": $filter('money_to_int')(fee),
-          "reward": $filter('money_to_int')(reward)
-        };
-        this.runCommand('request_alias_registration', params, callback);
-      },
-
-      updateAlias: function (wallet_id, alias, fee, callback) {
-        var params = {
-          wallet_id: wallet_id,
-          alias: {
-            "alias": alias.name.replace("@", ""),
-            "address": alias.address,
-            "tracking_key": "",
-            "comment": alias.comment
-          },
-          fee: $filter('money_to_int')(fee)
-        };
-        this.runCommand('request_alias_update', params, callback);
-      },
-
-      getAllAliases: function (callback) {
-        this.runCommand('get_all_aliases', {}, callback);
-      },
-
-      getAliasByName: function (value, callback) {
-        return this.runCommand('get_alias_info_by_name', value, callback);
-      },
-
-      getAliasByAddress: function (value, callback) {
-        return this.runCommand('get_alias_info_by_address', value, callback);
-      },
-
-      getPoolInfo: function (callback) {
-        this.runCommand('get_tx_pool_info', {}, callback);
-      },
-
-      localization: function (stringsArray, title, callback) {
-        var data = {
-          strings: stringsArray,
-          language_title: title
-        };
-        this.runCommand('set_localization_strings', data, callback);
       },
 
       storeFile: function (path, buff, callback) {
@@ -605,10 +660,6 @@ export class BackendService {
           backendCallback(data, {}, callback, 'store_to_file');
         });
       },
-
-
-
-
 
       getMiningEstimate: function (amount_coins, time, callback) {
         var params = {
@@ -626,28 +677,14 @@ export class BackendService {
         this.runCommand('backup_wallet_keys', params, callback);
       },
 
-
-      getAliasCoast: function (alias, callback) {
-        this.runCommand('get_alias_coast', asVal(alias), callback);
-      },
-
-
-
-
       setBlockedIcon: function (enabled, callback) {
         var mode = (enabled) ? "blocked" : "normal";
         Service.runCommand('bool_toggle_icon', mode, callback);
       },
 
-
-
-
-
       getWalletInfo: function (wallet_id, callback) {
         this.runCommand('get_wallet_info', {wallet_id: wallet_id}, callback);
       },
-
-
 
       printText: function (content) {
         return this.runCommand('print_text', {html_text: content});
@@ -656,18 +693,6 @@ export class BackendService {
       printLog: function (msg, log_level) {
         return this.runCommand('print_log', {msg: msg, log_level: log_level});
       },
-
-
-
-
-
-      /!*  API END  *!/
-
-    };
-    return Service;
-  }]);
-
-})();
 
 */
 

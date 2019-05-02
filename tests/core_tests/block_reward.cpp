@@ -31,7 +31,7 @@ bool block_template_against_txs_size::generate(std::vector<test_event_entry>& ev
 
 static size_t g_block_txs_total_size = 0;
 static uint64_t g_block_txs_fee = 0;
-bool custom_fill_block_template_func(block &bl, bool pos, size_t median_size, uint64_t already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height)
+bool custom_fill_block_template_func(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height)
 {
   total_size = g_block_txs_total_size;
   fee = g_block_txs_fee;
@@ -72,7 +72,7 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
   uint64_t base_block_reward_pow = get_base_block_reward(false, bcs.total_coins(), top_block_height + 1);
   uint64_t base_block_reward_pos = get_base_block_reward(true, bcs.total_coins(), top_block_height + 1);
 
-  g_block_txs_fee = TX_DEFAULT_FEE; // passing an argument to custom_fill_block_template_func via global variable (not perfect but works well)
+  g_block_txs_fee = TESTS_DEFAULT_FEE; // passing an argument to custom_fill_block_template_func via global variable (not perfect but works well)
 
   CHECK_AND_ASSERT_MES(blocksize_limit > CURRENCY_COINBASE_BLOB_RESERVED_SIZE, false, "internal invariant failed");
 
@@ -87,8 +87,7 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
       wide_difficulty_type diff = 0;
       uint64_t height = 0;
       g_block_txs_total_size = txs_total_size; // passing an argument to custom_fill_block_template_func via global variable (not perfect but works well)
-      crypto::hash seed = currency::null_hash;
-      r = bcs.create_block_template(b, seed, miner_addr, miner_addr, diff, height, ex_nonce, is_pos != 0, pe, &custom_fill_block_template_func);
+      r = bcs.create_block_template(b, miner_addr, miner_addr, diff, height, ex_nonce, is_pos != 0, pe, &custom_fill_block_template_func);
       CHECK_AND_ASSERT_MES(r, false, "create_block_template failed, txs_total_size = " << txs_total_size);
       CHECK_AND_ASSERT_MES(height == top_block_height + 1, false, "Incorrect height: " << height << ", expected: " << top_block_height + 1 << ", txs_total_size = " << txs_total_size);
 

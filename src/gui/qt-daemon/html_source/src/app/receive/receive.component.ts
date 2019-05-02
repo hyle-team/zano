@@ -12,13 +12,14 @@ import {ActivatedRoute} from '@angular/router';
 export class ReceiveComponent implements OnInit, OnDestroy {
   qrImageSrc: string;
   parentRouting;
+  copyAnimation = false;
+  copyAnimationTimeout;
 
   constructor(
     private route: ActivatedRoute,
     private backend: BackendService,
-    private variablesService: VariablesService
-  ) {
-  }
+    public variablesService: VariablesService
+  ) {}
 
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(() => {
@@ -35,10 +36,15 @@ export class ReceiveComponent implements OnInit, OnDestroy {
 
   public copyAddress() {
     this.backend.setClipboard(this.variablesService.currentWallet.address);
+    this.copyAnimation = true;
+    this.copyAnimationTimeout = window.setTimeout(() => {
+      this.copyAnimation = false;
+    }, 2000);
   }
 
   ngOnDestroy() {
     this.parentRouting.unsubscribe();
+    clearTimeout(this.copyAnimationTimeout);
   }
 
 }

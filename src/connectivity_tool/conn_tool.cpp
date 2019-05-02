@@ -54,6 +54,9 @@ namespace
   const command_line::arg_descriptor<std::string> arg_generate_genesis   = {"generate-genesis", "Generate genesis coinbase based on config file", "", true };
   const command_line::arg_descriptor<uint64_t>    arg_genesis_split_amount = { "genesis-split-amount", "Set split amount for generating genesis block", 0, true };
   const command_line::arg_descriptor<std::string> arg_get_info_flags     = { "getinfo-flags-hex", "Set of bits for rpc-get-daemon-info", "", true };
+  const command_line::arg_descriptor<int64_t>    arg_set_peer_log_level = { "set-peer-log-level", "Set log level for remote peer", 0, true };
+  const command_line::arg_descriptor<uint64_t>    arg_download_peer_log =  { "download-peer-log", "Download log from remote peer (starting offset)", 0, true };
+  const command_line::arg_descriptor<bool>        arg_do_consloe_log    = { "do-console-log", "Tool generates debug console output(debug purposes)", "", true };
 }
 
 typedef COMMAND_REQUEST_STAT_INFO_T<t_currency_protocol_handler<core>::stat_info> COMMAND_REQUEST_STAT_INFO;
@@ -104,7 +107,7 @@ struct response_schema
           "\"time_started\": "  << ce.time_started << ", "
           "\"last_recv\": "     << ce.last_recv << ", "
           "\"last_send\": "     << ce.last_send << ", "
-          "\"version\": "       << ce.version << ", "
+          "\"version\": \""       << ce.version << "\", "
           "\"is_income\": "     << ce.is_income << "}";
         if(rs.ns_rsp.v.connections_list.size()-1 != i)
           ss << ",";
@@ -266,7 +269,7 @@ struct payment_method_summary
 void process_payment_entrie(payment_method_summary& pms, const std::string& amount_in_coin, uint64_t amount_in_this, const std::string& to_usd_rate)
 {
   double d_amount_in_coin = std::stod(amount_in_coin);
-  double d_to_usd_rate = std::stod(to_usd_rate);
+  // double d_to_usd_rate = std::stod(to_usd_rate);
   //CHECK_AND_ASSERT_THROW_MES(d_amount_in_coin, "unable to parse amount_in_coin: " << amount_in_coin);
   CHECK_AND_ASSERT_THROW_MES(amount_in_this, "unable to parse amount_this");
   //CHECK_AND_ASSERT_THROW_MES(d_to_usd_rate, "unable to parse to_usd_rate: " << to_usd_rate);
@@ -538,7 +541,7 @@ bool handle_get_daemon_info(po::variables_map& vm)
     << "pow_sequence_factor: " << res.pow_sequence_factor << ENDL
     << "last_pos_timestamp: " << res.last_pos_timestamp << ENDL
     << "last_pow_timestamp: " << res.last_pow_timestamp << ENDL
-    << "total_coins: " << res.total_coins / COIN << ENDL
+    << "total_coins: " << res.total_coins << ENDL
     << "pos_difficulty_in_coins: " << currency::wide_difficulty_type(res.pos_difficulty) / COIN << ENDL
     << "block_reward: " << res.block_reward << ENDL
     << "last_block_total_reward: " << res.last_block_total_reward << ENDL
@@ -564,6 +567,8 @@ bool handle_get_daemon_info(po::variables_map& vm)
     << "longhash_calculating_time_3: " << res.performance_data.longhash_calculating_time_3 << ENDL
     << "raise_block_core_event: " << res.performance_data.raise_block_core_event << ENDL
     << "target_calculating_time_2: " << res.performance_data.target_calculating_time_2 << ENDL
+    << "target_calculating_enum_blocks: " << res.performance_data.target_calculating_enum_blocks << ENDL
+    << "target_calculating_calc: " << res.performance_data.target_calculating_calc << ENDL
     << "all_txs_insert_time_5: " << res.performance_data.all_txs_insert_time_5 << ENDL
     << "tx_add_one_tx_time: " << res.performance_data.tx_add_one_tx_time << ENDL
     << "tx_check_inputs_time: " << res.performance_data.tx_check_inputs_time << ENDL
@@ -839,12 +844,170 @@ bool generate_and_print_keys()
     << "PRIVATE KEY: " << epee::string_tools::pod_to_hex(sk);
   return true;
 }
+//---------------------------------------------------------------------------------------------------------------
+template<class command_t>
+bool invoke_debug_command(po::variables_map& vm, const crypto::secret_key& sk, levin::levin_client_impl2& transport, peerid_type& peer_id, typename command_t::request& req, typename command_t::response& rsp)
+{
+  if (!transport.is_connected())
+  {
+    if (!transport.connect(command_line::get_arg(vm, arg_ip), static_cast<int>(command_line::get_arg(vm, arg_port)), static_cast<int>(command_line::get_arg(vm, arg_timeout))))
+    {
+      std::cout << "{" << ENDL << "  \"status\": \"ERROR: " << "Failed to connect to " << command_line::get_arg(vm, arg_ip) << ":" << command_line::get_arg(vm, arg_port) << "\"" << ENDL << "}" << ENDL;
+      return false;
+    }
+  }
 
+  if (!peer_id)
+  {
+    COMMAND_REQUEST_PEER_ID::request id_req = AUTO_VAL_INIT(id_req);
+    COMMAND_REQUEST_PEER_ID::response id_rsp = AUTO_VAL_INIT(id_rsp);
+    if (!net_utils::invoke_remote_command2(COMMAND_REQUEST_PEER_ID::ID, id_req, id_rsp, transport))
+    {
+      std::cout << "{" << ENDL << "  \"status\": \"ERROR: " << "Failed to connect to " << command_line::get_arg(vm, arg_ip) << ":" << command_line::get_arg(vm, arg_port) << "\"" << ENDL << "}" << ENDL;
+      return false;
+    }
+    else
+    {
+      peer_id = id_rsp.my_id;
+    }
+  }
+
+  nodetool::proof_of_trust pot = AUTO_VAL_INIT(pot);
+  pot.peer_id = peer_id;
+  pot.time = time(NULL);
+  crypto::public_key pubk = AUTO_VAL_INIT(pubk);
+  string_tools::hex_to_pod(P2P_MAINTAINERS_PUB_KEY, pubk);
+  crypto::hash h = tools::get_proof_of_trust_hash(pot);
+  crypto::generate_signature(h, pubk, sk, pot.sign);
+
+  req.tr = pot;
+
+  return net_utils::invoke_remote_command2(command_t::ID, req, rsp, transport);
+}
+
+//---------------------------------------------------------------------------------------------------------------
+bool handle_set_peer_log_level(po::variables_map& vm)
+{
+  crypto::secret_key sk = AUTO_VAL_INIT(sk);
+  if (!get_private_key(sk, vm))
+  {
+    std::cout << "ERROR: secret key error" << ENDL;
+    return false;
+  }
+
+  int64_t log_level = command_line::get_arg(vm, arg_set_peer_log_level);
+  if (log_level < LOG_LEVEL_0 || log_level > LOG_LEVEL_MAX)
+  {
+    std::cout << "Error: invalid log level value: " << log_level << ENDL;
+    return false;
+  }
+
+  levin::levin_client_impl2 transport;
+  peerid_type peer_id = 0;
+
+  COMMAND_SET_LOG_LEVEL::request req = AUTO_VAL_INIT(req);
+  req.new_log_level = log_level;
+  
+  COMMAND_SET_LOG_LEVEL::response rsp = AUTO_VAL_INIT(rsp);
+  if (!invoke_debug_command<COMMAND_SET_LOG_LEVEL>(vm, sk, transport, peer_id, req, rsp))
+  {
+    std::cout << "ERROR: invoking COMMAND_SET_LOG_LEVEL failed" << ENDL;
+    return false;
+  }
+
+  std::cout << "OK! Log level changed: " << rsp.old_log_level << " -> " << rsp.current_log_level << ENDL;
+
+  return true;
+}
+//---------------------------------------------------------------------------------------------------------------
+bool handle_download_peer_log(po::variables_map& vm)
+{
+  crypto::secret_key sk = AUTO_VAL_INIT(sk);
+  if (!get_private_key(sk, vm))
+  {
+    std::cout << "ERROR: secret key error" << ENDL;
+    return false;
+  }
+
+  uint64_t start_offset = command_line::get_arg(vm, arg_download_peer_log);
+
+  levin::levin_client_impl2 transport;
+  peerid_type peer_id = 0;
+
+  COMMAND_REQUEST_LOG::request req = AUTO_VAL_INIT(req);
+  COMMAND_REQUEST_LOG::response rsp = AUTO_VAL_INIT(rsp);
+  if (!invoke_debug_command<COMMAND_REQUEST_LOG>(vm, sk, transport, peer_id, req, rsp) || !rsp.error.empty())
+  {
+    std::cout << "ERROR: invoking COMMAND_REQUEST_LOG failed: " << rsp.error << ENDL;
+    return false;
+  }
+
+  std::cout << "Current log level: " << rsp.current_log_level << ENDL;
+  std::cout << "Current log size:  " << rsp.current_log_size << ENDL;
+
+  if (start_offset >= rsp.current_log_size)
+  {
+    std::cout << "ERROR: invalid start offset: " << start_offset << ", log size: " << rsp.current_log_size << ENDL;
+    return false;
+  }
+
+  std::cout << "Downloading..." << ENDL;
+
+  std::string local_filename = tools::get_default_data_dir() + "/log_" + epee::string_tools::num_to_string_fast(peer_id) + ".log";
+  std::ofstream log{ local_filename, std::ifstream::binary };
+  if (!log)
+  {
+    std::cout << "Couldn't open " << local_filename << " for writing." << ENDL;
+    return false;
+  }
+
+  const uint64_t chunk_size = 1024 * 1024 * 5;
+  uint64_t end_offset = start_offset;
+  while (true)
+  {
+    req.log_chunk_offset = end_offset;
+    req.log_chunk_size = std::min(chunk_size, rsp.current_log_size - req.log_chunk_offset);
+    if (req.log_chunk_size == 0)
+      break;
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    if (!invoke_debug_command<COMMAND_REQUEST_LOG>(vm, sk, transport, peer_id, req, rsp) || !rsp.error.empty())
+    {
+      std::cout << "ERROR: invoking COMMAND_REQUEST_LOG failed: " << rsp.error << ENDL;
+      return false;
+    }
+
+    if (!epee::zlib_helper::unpack(rsp.log_chunk))
+    {
+      std::cout << "ERROR: zip unpack failed" << ENDL;
+      return false;
+    }
+
+    if (rsp.log_chunk.size() != req.log_chunk_size)
+    {
+      std::cout << "ERROR: unpacked size: " << rsp.log_chunk.size() << ", requested: " << req.log_chunk_size << ENDL;
+      return false;
+    }
+
+    log.write(rsp.log_chunk.c_str(), rsp.log_chunk.size());
+    
+    end_offset += req.log_chunk_size;
+
+    std::cout << end_offset - start_offset << " bytes downloaded" << ENDL;
+  }
+
+  std::cout << "Remote log from offset " << start_offset << " to offset " << end_offset << " (" << end_offset - start_offset << " bytes) " <<
+    "was successfully downloaded to " << local_filename << ENDL;
+
+  return true;
+}
+//---------------------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
 
   string_tools::set_module_name_and_folder(argv[0]);
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_4);
+  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
@@ -874,7 +1037,11 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_genesis_split_amount);
   command_line::add_arg(desc_params, arg_get_info_flags);
   command_line::add_arg(desc_params, arg_log_journal_len);
+  command_line::add_arg(desc_params, arg_set_peer_log_level);
+  command_line::add_arg(desc_params, arg_download_peer_log);
+  command_line::add_arg(desc_params, arg_do_consloe_log);
   
+
     
 
   po::options_description desc_all;
@@ -897,6 +1064,11 @@ int main(int argc, char* argv[])
   });
   if (!r)
     return 1;
+  if (command_line::has_arg(vm, arg_do_consloe_log) && command_line::get_arg(vm, arg_do_consloe_log))
+  {
+    log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
+  }
+
 
   if (command_line::get_arg(vm, command_line::arg_version))
   {
@@ -930,6 +1102,14 @@ int main(int argc, char* argv[])
   else if (command_line::has_arg(vm, arg_generate_genesis))
   {
     return generate_genesis(command_line::get_arg(vm, arg_generate_genesis), 10000000000000000) ? 0 : 1;
+  }
+  else if (command_line::has_arg(vm, arg_set_peer_log_level))
+  {
+    return handle_set_peer_log_level(vm) ? 0 : 1;
+  }
+  else if (command_line::has_arg(vm, arg_download_peer_log))
+  {
+    return handle_download_peer_log(vm) ? 0 : 1;
   }
   else
   {

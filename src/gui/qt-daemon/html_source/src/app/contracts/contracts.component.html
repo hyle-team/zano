@@ -3,6 +3,7 @@
 </div>
 
 <div class="wrap-table scrolled-content" *ngIf="variablesService.currentWallet.contracts.length">
+
   <table class="contracts-table">
     <thead>
     <tr>
@@ -14,30 +15,35 @@
     </tr>
     </thead>
     <tbody>
-    <tr *ngFor="let item of variablesService.currentWallet.contracts" [routerLink]="'/wallet/' + walletId + '/purchase/' + item.contract_id">
+    <tr *ngFor="let item of sortedArrayContracts" [routerLink]="'/wallet/' + walletId + '/purchase/' + item.contract_id">
       <td>
         <div class="contract">
           <i class="icon alert" *ngIf="!item.is_new"></i>
           <i class="icon new" *ngIf="item.is_new"></i>
           <i class="icon" [class.purchase]="item.is_a" [class.sell]="!item.is_a"></i>
-          <span>{{item.private_detailes.t}}</span>
-        </div>
-      </td>
-      <td>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</td>
-      <td>{{item.private_detailes.to_pay | intToMoney}} {{variablesService.defaultCurrency}}</td>
-      <td>
-        <div class="status">
-          {{item | contractStatusMessages}}
+          <span tooltip="{{ item.private_detailes.t }}" placement="top-left" tooltipClass="table-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{item.private_detailes.t}}</span>
         </div>
       </td>
       <td>
-        <div class="comment">
+        <div>{{item.timestamp * 1000 | date : 'dd-MM-yyyy HH:mm'}}</div>
+      </td>
+      <td>
+        <div>{{item.private_detailes.to_pay | intToMoney}} {{variablesService.defaultCurrency}}</div>
+      </td>
+      <td>
+        <div class="status" [class.error-text]="item.state === 4" tooltip="{{item.state | contractStatusMessages : item.is_a}}" placement="top" tooltipClass="table-tooltip" [delay]="500">
+          {{item.state | contractStatusMessages : item.is_a}}
+        </div>
+      </td>
+      <td>
+        <div class="comment" tooltip="{{ item.private_detailes.c }}" placement="top-right" tooltipClass="table-tooltip" [delay]="500" [showWhenNoOverflow]="false">
           {{item.private_detailes.c}}
         </div>
       </td>
     </tr>
     </tbody>
   </table>
+
 </div>
 
 <div class="contracts-buttons">

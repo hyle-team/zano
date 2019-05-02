@@ -1,16 +1,25 @@
 import {Pipe, PipeTransform} from '@angular/core';
+import {VariablesService} from '../services/variables.service';
+import {BigNumber} from 'bignumber.js';
 
 @Pipe({
   name: 'intToMoney'
 })
 export class IntToMoneyPipe implements PipeTransform {
 
+  constructor(private variablesService: VariablesService) {}
+
   transform(value: any, args?: any): any {
     if (value === 0 || value === undefined) {
       return '0';
     }
-    const power = Math.pow(10, 8);
-    let str = (value / power).toFixed(8);
+    let maxFraction = this.variablesService.digits;
+    if (args) {
+      maxFraction = parseInt(args, 10);
+    }
+    const power = Math.pow(10, this.variablesService.digits);
+    let str = (new BigNumber(value)).div(power).toFixed(maxFraction);
+
     for (let i = str.length - 1; i >= 0; i--) {
       if (str[i] !== '0') {
         str = str.substr(0, i + 1);

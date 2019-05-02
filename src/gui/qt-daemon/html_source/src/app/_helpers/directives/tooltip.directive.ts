@@ -1,29 +1,36 @@
-import {Directive, Input, ElementRef, HostListener, Renderer2, HostBinding} from '@angular/core';
+import {Directive, Input, ElementRef, HostListener, Renderer2, HostBinding, OnDestroy} from '@angular/core';
+import {ActivatedRoute} from '@angular/router';
 
 @Directive({
   selector: '[tooltip]'
 })
 
-export class TooltipDirective {
+export class TooltipDirective implements OnDestroy {
 
-  @HostBinding('style.cursor') cursor = 'pointer';
+  @HostBinding('style.cursor') cursor;
 
-  @Input('tooltip') tooltipTitle: string;
+  @Input('tooltip') tooltipInner: any;
   @Input() placement: string;
   @Input() tooltipClass: string;
-  @Input() delay: number;
+  @Input() timeout = 0;
+  @Input() delay = 0;
+  @Input() showWhenNoOverflow = true;
   tooltip: HTMLElement;
 
   removeTooltipTimeout;
+  removeTooltipTimeoutInner;
 
-  constructor(private el: ElementRef, private renderer: Renderer2) {
+  constructor(private el: ElementRef, private renderer: Renderer2, private route: ActivatedRoute) {
   }
 
   @HostListener('mouseenter') onMouseEnter() {
-    if (!this.tooltip) {
-      this.show();
-    } else {
-      this.cancelHide();
+    if (this.showWhenNoOverflow || (!this.showWhenNoOverflow && this.el.nativeElement.offsetWidth < this.el.nativeElement.scrollWidth)) {
+      this.cursor = 'pointer';
+      if (!this.tooltip) {
+        this.show();
+      } else {
+        this.cancelHide();
+      }
     }
   }
 
@@ -35,79 +42,166 @@ export class TooltipDirective {
 
   show() {
     this.create();
-    this.setPosition();
+    this.placement = this.placement === null ? 'top' : this.placement;
+    this.setPosition(this.placement);
   }
 
   hide() {
-    this.renderer.setStyle(this.tooltip, 'opacity', '0');
     this.removeTooltipTimeout = setTimeout(() => {
-      this.renderer.removeChild(document.body, this.tooltip);
-      this.tooltip = null;
-    }, this.delay);
+      this.renderer.setStyle(this.tooltip, 'opacity', '0');
+      this.removeTooltipTimeoutInner = setTimeout(() => {
+        this.renderer.removeChild(document.body, this.tooltip);
+        this.tooltip = null;
+      }, this.delay);
+    }, this.timeout);
   }
 
   cancelHide() {
     clearTimeout(this.removeTooltipTimeout);
+    clearTimeout(this.removeTooltipTimeoutInner);
     this.renderer.setStyle(this.tooltip, 'opacity', '1');
   }
 
   create() {
-    this.tooltip = this.renderer.createElement('span');
-    this.renderer.appendChild(this.tooltip, this.renderer.createText(this.tooltipTitle));
+    this.tooltip = this.renderer.createElement('div');
+    let innerBlock = this.renderer.createElement('div');
+    if (typeof this.tooltipInner === 'string') {
+      innerBlock.innerHTML = this.tooltipInner;
+    } else {
+      innerBlock = this.tooltipInner;
+    }
+    this.renderer.addClass(innerBlock, 'tooltip-inner');
+    this.renderer.addClass(innerBlock, 'scrolled-content');
+    this.renderer.appendChild(this.tooltip, innerBlock);
     this.renderer.appendChild(document.body, this.tooltip);
+
+    this.tooltip.addEventListener('mouseenter', () => {
+      this.cancelHide();
+    });
+    this.tooltip.addEventListener('mouseleave', () => {
+      if (this.tooltip) {
+        this.hide();
+      }
+    });
+
     this.renderer.setStyle(document.body, 'position', 'relative');
     this.renderer.setStyle(this.tooltip, 'position', 'absolute');
     if (this.tooltipClass !== null) {
-      this.renderer.addClass(this.tooltip, this.tooltipClass);
-    }
-    if (this.placement !== null) {
-      this.renderer.addClass(this.tooltip, 'ng-tooltip-' + this.placement);
-    } else {
-      this.placement = 'top';
-      this.renderer.addClass(this.tooltip, 'ng-tooltip-top');
-    }
-    if (this.delay !== null) {
-      this.renderer.setStyle(this.tooltip, 'opacity', '0');
-      this.renderer.setStyle(this.tooltip, '-webkit-transition', `opacity ${this.delay}ms`);
-      this.renderer.setStyle(this.tooltip, '-moz-transition', `opacity ${this.delay}ms`);
-      this.renderer.setStyle(this.tooltip, '-o-transition', `opacity ${this.delay}ms`);
-      this.renderer.setStyle(this.tooltip, 'transition', `opacity ${this.delay}ms`);
-      window.setTimeout(() => {
-        this.renderer.setStyle(this.tooltip, 'opacity', '1');
-      }, 0);
-    }
-  }
-
-  setPosition() {
-    const hostPos = this.el.nativeElement.getBoundingClientRect();
-    const tooltipPos = this.tooltip.getBoundingClientRect();
-    // const scrollPos = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-
-    if (this.placement === 'top') {
-      this.renderer.setStyle(this.tooltip, 'top', hostPos.top - tooltipPos.height + 'px');
-      this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
-    }
-
-    if (this.placement === 'bottom') {
-      if (window.innerHeight < hostPos.bottom + this.tooltip.offsetHeight + parseInt(getComputedStyle(this.tooltip).marginTop, 10)) {
-        this.renderer.removeClass(this.tooltip, 'ng-tooltip-bottom');
-        this.renderer.addClass(this.tooltip, 'ng-tooltip-top');
-        this.renderer.setStyle(this.tooltip, 'top', hostPos.top - tooltipPos.height + 'px');
-        this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
-      } else {
-        this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
-        this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+      const classes = this.tooltipClass.split(' ');
+      for (let i = 0; i < classes.length; i++) {
+        this.renderer.addClass(this.tooltip, classes[i]);
       }
     }
+    this.renderer.setStyle(this.tooltip, 'opacity', '0');
+    this.renderer.setStyle(this.tooltip, '-webkit-transition', `opacity ${this.delay}ms`);
+    this.renderer.setStyle(this.tooltip, '-moz-transition', `opacity ${this.delay}ms`);
+    this.renderer.setStyle(this.tooltip, '-o-transition', `opacity ${this.delay}ms`);
+    this.renderer.setStyle(this.tooltip, 'transition', `opacity ${this.delay}ms`);
+    window.setTimeout(() => {
+      this.renderer.setStyle(this.tooltip, 'opacity', '1');
+    }, 0);
+  }
 
-    if (this.placement === 'left') {
-      this.renderer.setStyle(this.tooltip, 'top', hostPos.top + 'px');
-      this.renderer.setStyle(this.tooltip, 'left', hostPos.left - tooltipPos.width + 'px');
-    }
+  setPosition(placement) {
+    const hostPos = this.el.nativeElement.getBoundingClientRect();
+    this.renderer.addClass(this.tooltip, 'ng-tooltip-' + placement);
+    const topExit = hostPos.top - this.tooltip.getBoundingClientRect().height - parseInt(getComputedStyle(this.tooltip).marginTop, 10) < 0;
+    const bottomExit = window.innerHeight < hostPos.bottom + this.tooltip.getBoundingClientRect().height + parseInt(getComputedStyle(this.tooltip).marginTop, 10);
 
-    if (this.placement === 'right') {
-      this.renderer.setStyle(this.tooltip, 'top', hostPos.top + 'px');
-      this.renderer.setStyle(this.tooltip, 'left', hostPos.right + 'px');
+    switch (placement) {
+      case 'top':
+        if (topExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('bottom');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.left + (hostPos.right - hostPos.left) / 2 - this.tooltip.getBoundingClientRect().width / 2 + 'px');
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'top-left':
+        if (topExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('bottom-left');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'top-right':
+        if (topExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('bottom-right');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.right - this.tooltip.offsetWidth + 'px');
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.top - this.tooltip.getBoundingClientRect().height + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'bottom':
+        if (bottomExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('top');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.left + (hostPos.right - hostPos.left) / 2 - this.tooltip.getBoundingClientRect().width / 2 + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'bottom-left':
+        if (bottomExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('top-left');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.left + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'bottom-right':
+        if (bottomExit) {
+          this.renderer.removeClass(this.tooltip, 'ng-tooltip-' + placement);
+          this.setPosition('top-right');
+          return;
+        } else {
+          this.renderer.setStyle(this.tooltip, 'top', hostPos.bottom + 'px');
+          this.renderer.setStyle(this.tooltip, 'left', hostPos.right - this.tooltip.offsetWidth + 'px');
+          this.checkSides();
+        }
+        break;
+      case 'left':
+        this.renderer.setStyle(this.tooltip, 'top', hostPos.top + 'px');
+        this.renderer.setStyle(this.tooltip, 'left', hostPos.left - this.tooltip.getBoundingClientRect().width + 'px');
+        break;
+      case 'right':
+        this.renderer.setStyle(this.tooltip, 'top', hostPos.top + 'px');
+        this.renderer.setStyle(this.tooltip, 'left', hostPos.right + 'px');
+        break;
     }
   }
+
+  checkSides() {
+    if (this.tooltip.getBoundingClientRect().left < 0) {
+      this.renderer.setStyle(this.tooltip, 'left', 0);
+    }
+    if (this.tooltip.getBoundingClientRect().right > window.innerWidth) {
+      this.renderer.setStyle(this.tooltip, 'left', window.innerWidth - this.tooltip.getBoundingClientRect().width + 'px');
+    }
+  }
+
+  ngOnDestroy() {
+    clearTimeout(this.removeTooltipTimeout);
+    clearTimeout(this.removeTooltipTimeoutInner);
+    if (this.tooltip) {
+      this.renderer.removeChild(document.body, this.tooltip);
+      this.tooltip = null;
+    }
+  }
+
 }

@@ -401,14 +401,9 @@ namespace currency
     return m_mempool.add_tx(tx, tx_hash, blob_size, tvc, kept_by_block);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_block_template(block& b, crypto::hash& seed, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe)
-  {
-    return m_blockchain_storage.create_block_template(b, seed, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
-  }
   bool core::get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe)
   {
-    crypto::hash seed_subst = currency::null_hash;
-    return m_blockchain_storage.create_block_template(b, seed_subst, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
+    return m_blockchain_storage.create_block_template(b, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
   }
   //-----------------------------------------------------------------------------------------------
   bool core::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp) const 
@@ -456,7 +451,7 @@ namespace currency
     m_miner.resume();
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::handle_block_found(const block& b, block_verification_context* p_verification_result /* = nullptr */)
+  bool core::handle_block_found(const block& b, block_verification_context* p_verification_result, bool need_update_miner_block_template)
   {
     TIME_MEASURE_START_MS(time_total_ms);
     block_verification_context bvc = boost::value_initialized<block_verification_context>();
@@ -476,7 +471,8 @@ namespace currency
 
     //anyway - update miner template
     TIME_MEASURE_START_MS(time_update_block_template_ms);
-    update_miner_block_template();
+    if (need_update_miner_block_template)
+      update_miner_block_template();
     TIME_MEASURE_FINISH_MS(time_update_block_template_ms);
 
     uint64_t time_pack_txs_ms = 0, time_relay_ms = 0;
@@ -533,6 +529,11 @@ namespace currency
     LOG_PRINT_L2("handle_block_found timings (ms): total: " << time_total_ms << ", add new block: " << time_add_new_block_ms << ", update template: " << time_update_block_template_ms << ", pack txs: " << time_pack_txs_ms << ", relay: " << time_relay_ms);
 
     return p_verification_result->m_added_to_main_chain;
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool core::handle_block_found(const block& b, block_verification_context* p_verification_result /* = nullptr */)
+  {
+    return handle_block_found(b, p_verification_result, true);
   }
   //-----------------------------------------------------------------------------------------------
   void core::on_synchronized()

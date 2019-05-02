@@ -10,9 +10,9 @@
 #include "crypto/crypto.h"
 #include "serialization/keyvalue_serialization.h"
 
-
+#define BRAINWALLET_DEFAULT_SEED_SIZE 32 
 #define ACCOUNT_RESTORE_DATA_SIZE     BRAINWALLET_DEFAULT_SEED_SIZE    
-
+#define BRAINWALLET_DEFAULT_WORDS_COUNT 25
 
 
 
@@ -50,7 +50,7 @@ namespace currency
     void generate();
     const account_keys& get_keys() const;
     const account_public_address& get_public_address() const { return m_keys.m_account_address; };
-    std::string get_public_address_str();
+    std::string get_public_address_str() const;
     std::string get_restore_data() const;
     std::string get_restore_braindata() const;
 
@@ -62,6 +62,8 @@ namespace currency
 
     bool load(const std::string& file_path);
     bool store(const std::string& file_path);
+
+    void make_account_watch_only();
 
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int /*ver*/)

@@ -1,5 +1,4 @@
 // Copyright (c) 2014-2018 Zano Project
-// Copyright (c) 2014-2018 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -8,7 +7,7 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      75
+#define CURRENCY_FORMATION_VERSION                      81
                                                         
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -16,7 +15,7 @@
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
 #define CURRENCY_PUBLIC_ADDRESS_TEXTBLOB_VER            0
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           197   // addresses start with 'Z'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // addresses start with 'iZ'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     1
 #define CURRENT_BLOCK_MAJOR_VERSION                     1
@@ -47,21 +46,14 @@
 #define BASE_REWARD_DUST_THRESHOLD                      ((uint64_t)1000000) // pow(10, 6) - change this will cause hard-fork!
 #define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)//((uint64_t)100000) // pow(10, 5)
 
-//#define CURRENCY_SCRATCHPAD_BASE_SIZE                   16777216 //count in crypto::hash, to get size in bytes x32
-#define CURRENCY_SCRATCHPAD_BASE_SIZE                   167 //count in crypto::hash, to get size in bytes x32
-#define CURRENCY_SCRATCHPAD_REBUILD_INTERVAL            720 //once a day if block goes once in 2 minute
-#define CURRENCY_SCRATCHPAD_BASE_INDEX_ID_OFFSET        20  //offset down from last rebuild height to block id, that used for indexing seed blocks in CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW
-#define CURRENCY_SCRATCHPAD_SEED_BLOCKS_WINDOW          700 //window for addressing seed block ids 
-#define CURRENCY_SCRATCHPAD_GENESIS_SEED                "4c98962ddce32c7763bb9326933a4692975ca29a76349ae7a139faa3430cc5ab"
-
-#define TX_DEFAULT_FEE                                  ((uint64_t)100000) // pow(10, 5)
+#define TX_DEFAULT_FEE                                  ((uint64_t)10000000000) // pow(10, 5)
 #define TX_MINIMUM_FEE                                  ((uint64_t)100000) // pow(10, 5)
 
 // #define CURRENCY_FIXED_REWARD_ZONE_HEIGHT               300                   // blocks will have fixed reward up to this height (including) 
 // #define CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT        ((uint64_t)100000000) // should be TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER
 // #define CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER       1000                  // reward in minimum fees for a block in the zone
 
-#define CURRENCY_TESTNET_CONST_REWARD                   1000000000
+#define CURRENCY_BLOCK_REWARD                   1000000000000 // 1.0 coin
 
 
 #define WALLET_MAX_ALLOWED_OUTPUT_AMOUNT                ((uint64_t)0xffffffffffffffffLL)
@@ -99,7 +91,8 @@
 #define BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT          2000      //by default, blocks ids count in synchronizing
 #define BLOCKS_SYNCHRONIZING_DEFAULT_COUNT              200       //by default, blocks count in blocks downloading
 #define BLOCKS_SYNCHRONIZING_DEFAULT_SIZE               2000000   //by default keep synchronizing packets not bigger then 2MB
-#define CURRENCY_PROTOCOL_HOP_RELAX_COUNT               3         //value of hop, after which we use only announce of new block
+#define CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT      500     
+#define CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT         500    
 
 
 #define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week
@@ -155,6 +148,10 @@
 #define WALLET_FILE_SIGNATURE                           0x1111012101101011LL  //Bender's nightmare
 #define WALLET_FILE_MAX_BODY_SIZE                       0x88888888L //2GB
 #define WALLET_FILE_MAX_KEYS_SIZE                       10000 //
+#define WALLET_BRAIN_DATE_OFFSET                        1543622400
+#define WALLET_BRAIN_DATE_QUANTUM                       604800 //by last word we encode a number of week since launch of the project, 
+                                                               //which let us to address tools::mnemonic_encoding::NUMWORDS weeks after project launch
+                                                               //which is about 30 years
 
 #define OFFER_MAXIMUM_LIFE_TIME                         (60*60*24*30)  // 30 days
 
@@ -177,7 +174,7 @@
 #endif
 
 //premine
-#define PREMINE_AMOUNT                                  (2000000000000000000)
+#define PREMINE_AMOUNT                                  (17517203000000000000U) // 13827203.0 reserved for coinswap, 3690000.0 - premine  
 
 //alias registration wallet
 #define ALIAS_REWARDS_ACCOUNT_SPEND_PUB_KEY             "0000000000000000000000000000000000000000000000000000000000000000" //burn alias money
@@ -215,7 +212,7 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+62)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+63)
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 

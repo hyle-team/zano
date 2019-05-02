@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+﻿// Copyright (c) 2014-2018 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -70,6 +70,8 @@ namespace currency
     {
       NOTIFY_REQUEST_CHAIN::request r = boost::value_initialized<NOTIFY_REQUEST_CHAIN::request>();
       m_core.get_short_chain_history(r.block_ids);
+      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN(on_callback): m_block_ids.size()=" << r.block_ids.size());
+      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN(on_callback): " << ENDL << print_kv_structure(r));
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
     }
 
@@ -145,8 +147,6 @@ namespace currency
       << (0 <= diff ? std::string("behind") : std::string("ahead"))
       << "] " << ENDL << "SYNCHRONIZATION started", (is_inital ? LOG_LEVEL_0 : LOG_LEVEL_1), (is_inital ? epee::log_space::console_color_yellow : epee::log_space::console_color_magenta));
     LOG_PRINT_L1("Remote top block height: " << hshd.current_height << ", id: " << hshd.top_id);
-//    m_synchronized = false;
-    LOG_PRINT_MAGENTA("Synchronized set to FALSE (process_payload_sync_data)", LOG_LEVEL_0);
     /*check if current height is in remote's checkpoints zone*/
     if(hshd.last_checkpoint_height 
       && m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height 
@@ -235,7 +235,7 @@ namespace currency
     if (it != m_blocks_id_que.end())
     {
       //already have this block handler in que
-      LOG_PRINT("Block " << block_id << " already in processing que", LOG_LEVEL_2);
+      LOG_PRINT("Block " << block_id << " already in processing que", LOG_LEVEL_3);
       return 1;
     }
     else
@@ -310,7 +310,8 @@ namespace currency
       NOTIFY_REQUEST_CHAIN::request r = boost::value_initialized<NOTIFY_REQUEST_CHAIN::request>();
       m_core.get_short_chain_history(r.block_ids);
       LOG_PRINT_MAGENTA("State changed to state_synchronizing.", LOG_LEVEL_2);
-      LOG_PRINT_L2("[REQUEST]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size() );
+      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN(on_orphaned): m_block_ids.size()=" << r.block_ids.size() );
+      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN(on_orphaned): " << ENDL << print_kv_structure(r));
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
     }
       
@@ -357,14 +358,28 @@ namespace currency
   template<class t_core> 
   int t_currency_protocol_handler<t_core>::handle_request_get_objects(int command, NOTIFY_REQUEST_GET_OBJECTS::request& arg, currency_connection_context& context)
   {
+    LOG_PRINT_L2("[HANDLE]NOTIFY_REQUEST_GET_OBJECTS: arg.blocks.size() = " << arg.blocks.size() << ", arg.txs.size()="<< arg.txs.size());
+    LOG_PRINT_L3("[HANDLE]NOTIFY_REQUEST_GET_OBJECTS: " << ENDL << currency::print_kv_structure(arg));
+
+    if (arg.blocks.size() > CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT ||
+      arg.txs.size() > CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT)
+    {
+      LOG_ERROR_CCONTEXT("Requested objects count is to big (" << arg.blocks.size() <<")expected not more then " << CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT);
+      m_p2p->drop_connection(context);
+    }
+
     NOTIFY_RESPONSE_GET_OBJECTS::request rsp;
     if(!m_core.handle_get_objects(arg, rsp, context))
     {
       LOG_ERROR_CCONTEXT("failed to handle request NOTIFY_REQUEST_GET_OBJECTS, dropping connection");
       m_p2p->drop_connection(context);
     }
-    LOG_PRINT_L2("[HANDLE]NOTIFY_RESPONSE_GET_OBJECTS: blocks.size()=" << rsp.blocks.size() << ", txs.size()=" << rsp.txs.size() 
+
+    LOG_PRINT_L2("[NOTIFY]NOTIFY_RESPONSE_GET_OBJECTS: blocks.size()=" << rsp.blocks.size() << ", txs.size()=" << rsp.txs.size() 
                             << ", rsp.m_current_blockchain_height=" << rsp.current_blockchain_height << ", missed_ids.size()=" << rsp.missed_ids.size());
+
+
+    LOG_PRINT_L3("[NOTIFY]NOTIFY_RESPONSE_GET_OBJECTS: " << ENDL << currency::print_kv_structure(rsp));
     post_notify<NOTIFY_RESPONSE_GET_OBJECTS>(rsp, context);
     return 1;
   }
@@ -379,12 +394,17 @@ namespace currency
     }
     return false;
   }
+
+
+
+
 #define CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(ret_v, msg) if (check_stop_flag_and_drop_cc(context)) { LOG_PRINT_YELLOW("Stop flag detected within NOTIFY_RESPONSE_GET_OBJECTS. " << msg, LOG_LEVEL_0); return ret_v; }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core>
   int t_currency_protocol_handler<t_core>::handle_response_get_objects(int command, NOTIFY_RESPONSE_GET_OBJECTS::request& arg, currency_connection_context& context)
   {
-    LOG_PRINT_L2("NOTIFY_RESPONSE_GET_OBJECTS");
+    LOG_PRINT_L2("[HANDLE]NOTIFY_RESPONSE_GET_OBJECTS: arg.blocks.size()=" << arg.blocks.size() << ", arg.missed_ids.size()=" << arg.missed_ids.size() << ", arg.txs.size()=" << arg.txs.size());
+    LOG_PRINT_L3("[HANDLE]NOTIFY_RESPONSE_GET_OBJECTS: " << ENDL << currency::print_kv_structure(arg));
     if(context.m_last_response_height > arg.current_blockchain_height)
     {
       LOG_ERROR_CCONTEXT("sent wrong NOTIFY_HAVE_OBJECTS: arg.m_current_blockchain_height=" << arg.current_blockchain_height 
@@ -461,7 +481,7 @@ namespace currency
       m_core.pause_mine();
       misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
         boost::bind(&t_core::resume_mine, &m_core));
-
+      size_t count = 0;
       for (const block_complete_entry& block_entry : arg.blocks)
       {
         CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Blocks processing interrupted, connection dropped");
@@ -489,6 +509,14 @@ namespace currency
         block_verification_context bvc = boost::value_initialized<block_verification_context>();
 
         m_core.handle_incoming_block(block_entry.block, bvc, false);
+        if (count > 2 && bvc.m_already_exists)
+        {
+          context.m_state = currency_connection_context::state_idle;
+          context.m_priv.m_needed_objects.clear();
+          context.m_priv.m_requested_objects.clear();
+          LOG_PRINT_L1("Connection set to idle state.");
+          return 1;
+        }
 
         if(bvc.m_verification_failed)
         {
@@ -499,7 +527,8 @@ namespace currency
         }
         if(bvc.m_marked_as_orphaned)
         {
-          LOG_PRINT_L0("Block received at sync phase was marked as orphaned, dropping connection");
+          LOG_PRINT_L0("Block received at sync phase was marked as orphaned, dropping connection, details on response: " << ENDL << print_kv_structure(arg));
+          
           m_p2p->drop_connection(context);
           m_p2p->add_ip_fail(context.m_remote_ip);
           return 1;
@@ -507,6 +536,7 @@ namespace currency
 
         TIME_MEASURE_FINISH(block_process_time);
         LOG_PRINT_L2("Block process time: " << block_process_time + transactions_process_time << "(" << transactions_process_time << "/" << block_process_time << ")ms");
+        ++count;
       }
     }
     uint64_t current_size = m_core.get_blockchain_storage().get_current_blockchain_size();
@@ -552,13 +582,16 @@ namespace currency
   template<class t_core>
   int t_currency_protocol_handler<t_core>::handle_request_chain(int command, NOTIFY_REQUEST_CHAIN::request& arg, currency_connection_context& context)
   {
+    LOG_PRINT_L2("[HANDLE]NOTIFY_REQUEST_CHAIN: block_ids.size()=" << arg.block_ids.size());
+    LOG_PRINT_L3("[HANDLE]NOTIFY_REQUEST_CHAIN: " << print_kv_structure(arg));
     NOTIFY_RESPONSE_CHAIN_ENTRY::request r;
     if(!m_core.find_blockchain_supplement(arg.block_ids, r))
     {
       LOG_ERROR_CCONTEXT("Failed to handle NOTIFY_REQUEST_CHAIN.");
       return 1;
     }
-    LOG_PRINT_L2("[HANDLE]NOTIFY_RESPONSE_CHAIN_ENTRY: m_start_height=" << r.start_height << ", m_total_height=" << r.total_height << ", m_block_ids.size()=" << r.m_block_ids.size());
+    LOG_PRINT_L2("[NOTIFY]NOTIFY_RESPONSE_CHAIN_ENTRY: m_start_height=" << r.start_height << ", m_total_height=" << r.total_height << ", m_block_ids.size()=" << r.m_block_ids.size());
+    LOG_PRINT_L3("[NOTIFY]NOTIFY_RESPONSE_CHAIN_ENTRY: " << print_kv_structure(r));
     post_notify<NOTIFY_RESPONSE_CHAIN_ENTRY>(r, context);
     return 1;
   }
@@ -586,14 +619,16 @@ namespace currency
         context.m_priv.m_needed_objects.erase(it++);
       }
 
-      LOG_PRINT_L2("[REQUESTING]NOTIFY_REQUEST_GET_OBJECTS: requested_cumulative_size=" << requested_cumulative_size << ", blocks.size()=" << req.blocks.size() << ", txs.size()=" << req.txs.size());
+      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_GET_OBJECTS(req_missing): requested_cumulative_size=" << requested_cumulative_size << ", blocks.size()=" << req.blocks.size() << ", txs.size()=" << req.txs.size());
+      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_GET_OBJECTS(req_missing): " << ENDL << currency::print_kv_structure(req));
       post_notify<NOTIFY_REQUEST_GET_OBJECTS>(req, context);    
     }else if(context.m_last_response_height < context.m_remote_blockchain_height-1)
     {//we have to fetch more objects ids, request blockchain entry
      
       NOTIFY_REQUEST_CHAIN::request r = boost::value_initialized<NOTIFY_REQUEST_CHAIN::request>();
       m_core.get_short_chain_history(r.block_ids);
-      LOG_PRINT_L2("[REQUESTING]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size() );
+      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size() );
+      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN: " << ENDL << print_kv_structure(r) );
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
     }else
     { 
@@ -607,7 +642,7 @@ namespace currency
                            << "\r\non connection [" << net_utils::print_connection_context_short(context)<< "]");
       
       context.m_state = currency_connection_context::state_normal;
-      LOG_PRINT_GREEN("[HANDLE]NOTIFY_REQUEST_GET_OBJECTS: SYNCHRONIZED OK", LOG_LEVEL_0);
+      LOG_PRINT_GREEN("[REQUEST_MISSING_OBJECTS]: SYNCHRONIZED OK", LOG_LEVEL_0);
       on_connection_synchronized();
     }
     return true;
@@ -712,8 +747,9 @@ namespace currency
   template<class t_core> 
   int t_currency_protocol_handler<t_core>::handle_response_chain_entry(int command, NOTIFY_RESPONSE_CHAIN_ENTRY::request& arg, currency_connection_context& context)
   {
-    LOG_PRINT_L2("NOTIFY_RESPONSE_CHAIN_ENTRY: m_block_ids.size()=" << arg.m_block_ids.size() 
+    LOG_PRINT_L2("[HANDLE]NOTIFY_RESPONSE_CHAIN_ENTRY: m_block_ids.size()=" << arg.m_block_ids.size() 
       << ", m_start_height=" << arg.start_height << ", m_total_height=" << arg.total_height);
+    LOG_PRINT_L3("[HANDLE]NOTIFY_RESPONSE_CHAIN_ENTRY: " << ENDL << currency::print_kv_structure(arg));
     
     if(!arg.m_block_ids.size())
     {

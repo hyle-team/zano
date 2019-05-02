@@ -16,14 +16,14 @@ export class LoginComponent implements OnInit, OnDestroy {
   queryRouting;
 
   regForm = new FormGroup({
-    password: new FormControl('', Validators.required),
-    confirmation: new FormControl('', Validators.required)
+    password: new FormControl(''),
+    confirmation: new FormControl('')
   }, function (g: FormGroup) {
     return g.get('password').value === g.get('confirmation').value ? null : {'mismatch': true};
   });
 
   authForm = new FormGroup({
-    password: new FormControl('', Validators.required)
+    password: new FormControl('')
   });
 
   type = 'reg';
@@ -32,11 +32,10 @@ export class LoginComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone
-  ) {
-  }
+  ) {}
 
   ngOnInit() {
     this.queryRouting = this.route.queryParams.subscribe(params => {
@@ -51,6 +50,8 @@ export class LoginComponent implements OnInit, OnDestroy {
       this.variablesService.appPass = this.regForm.get('password').value;
       this.backend.storeSecureAppData((status, data) => {
         if (status) {
+          this.variablesService.appLogin = true;
+          this.variablesService.startCountdown();
           this.ngZone.run(() => {
             this.router.navigate(['/']);
           });
@@ -61,11 +62,20 @@ export class LoginComponent implements OnInit, OnDestroy {
     }
   }
 
+  onSkipCreatePass(): void {
+    this.variablesService.appPass = '';
+    this.ngZone.run(() => {
+      this.variablesService.appLogin = true;
+      this.router.navigate(['/']);
+    });
+  }
+
   onSubmitAuthPass(): void {
     if (this.authForm.valid) {
       const appPass = this.authForm.get('password').value;
       this.backend.getSecureAppData({pass: appPass}, (status, data) => {
         if (!data.error_code) {
+          this.variablesService.appLogin = true;
           this.variablesService.startCountdown();
           this.variablesService.appPass = appPass;
           if (this.variablesService.wallets.length) {
@@ -78,47 +88,46 @@ export class LoginComponent implements OnInit, OnDestroy {
             let openWallets = 0;
             let runWallets = 0;
             data.forEach((wallet, wallet_index) => {
-              this.backend.openWallet(wallet.path, wallet.pass, true, (open_status, open_data) => {
-                if (open_status) {
+              this.backend.openWallet(wallet.path, wallet.pass, true, (open_status, open_data, open_error) => {
+                if (open_status || open_error === 'FILE_RESTORED') {
                   openWallets++;
+                  this.ngZone.run(() => {
+                    const new_wallet = new Wallet(
+                      open_data.wallet_id,
+                      wallet.name,
+                      wallet.pass,
+                      open_data['wi'].path,
+                      open_data['wi'].address,
+                      open_data['wi'].balance,
+                      open_data['wi'].unlocked_balance,
+                      open_data['wi'].mined_total,
+                      open_data['wi'].tracking_hey
+                    );
+                    new_wallet.alias = this.backend.getWalletAlias(new_wallet.address);
+                    if (open_data.recent_history && open_data.recent_history.history) {
+                      new_wallet.prepareHistory(open_data.recent_history.history);
+                    }
+                    this.backend.getContracts(open_data.wallet_id, (contracts_status, contracts_data) => {
+                      if (contracts_status && contracts_data.hasOwnProperty('contracts')) {
+                        this.ngZone.run(() => {
+                          new_wallet.prepareContractsAfterOpen(contracts_data.contracts, this.variablesService.exp_med_ts, this.variablesService.height_app, this.variablesService.settings.viewedContracts, this.variablesService.settings.notViewedContracts);
+                        });
+                      }
+                    });
+                    this.variablesService.wallets.push(new_wallet);
+                    if (this.variablesService.wallets.length === 1) {
+                      this.router.navigate(['/wallet/' + this.variablesService.wallets[0].wallet_id]);
+                    }
+                  });
                   this.backend.runWallet(open_data.wallet_id, (run_status) => {
                     if (run_status) {
                       runWallets++;
-                      this.ngZone.run(() => {
-                        const new_wallet = new Wallet(
-                          open_data.wallet_id,
-                          wallet.name,
-                          wallet.pass,
-                          open_data['wi'].path,
-                          open_data['wi'].address,
-                          open_data['wi'].balance,
-                          open_data['wi'].unlocked_balance,
-                          open_data['wi'].mined_total,
-                          open_data['wi'].tracking_hey
-                        );
-                        if (open_data.recent_history && open_data.recent_history.history) {
-                          new_wallet.prepareHistory(open_data.recent_history.history);
-                        }
-                        this.backend.getContracts(open_data.wallet_id, (contracts_status, contracts_data) => {
-                          if (contracts_status && contracts_data.hasOwnProperty('contracts')) {
-                            this.ngZone.run(() => {
-                              new_wallet.prepareContractsAfterOpen(contracts_data.contracts, this.variablesService.exp_med_ts, this.variablesService.height_app, this.variablesService.settings.viewedContracts, this.variablesService.settings.notViewedContracts);
-                            });
-                          }
-                        });
-
-                        this.variablesService.wallets.push(new_wallet);
-                        if (this.variablesService.wallets.length === 1) {
-                          this.router.navigate(['/wallet/' + this.variablesService.wallets[0].wallet_id]);
-                        }
-                      });
                     } else {
                       if (wallet_index === data.length - 1 && runWallets === 0) {
                         this.ngZone.run(() => {
                           this.router.navigate(['/']);
                         });
                       }
-                      // console.log(run_data['error_code']);
                     }
                   });
                 } else {
