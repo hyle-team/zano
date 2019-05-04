@@ -1,6 +1,8 @@
+// Copyright (c) 2019, anonimal <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 // * Redistributions of source code must retain the above copyright
@@ -11,7 +13,7 @@
 // * Neither the name of the Andrey N. Sabelnikov nor the
 // names of its contributors may be used to endorse or promote products
 // derived from this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 // ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 // WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -22,132 +24,82 @@
 // ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 
+#ifndef CONTRIB_EPEE_INCLUDE_ZLIB_HELPER_H_
+#define CONTRIB_EPEE_INCLUDE_ZLIB_HELPER_H_
 
-#pragma once
-extern "C" { 
-#include "zlib/zlib.h"
-}
+#include "misc_log_ex.h"
 
-namespace epee 
+#include <boost/iostreams/copy.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
+
+#include <exception>
+#include <sstream>
+#include <string>
+
+namespace epee
 {
 namespace zlib_helper
 {
-	inline 	bool pack(const std::string& target, std::string& result_packed_buff)
+inline bool pack(const std::string& input, std::string& output)
 {
-		result_packed_buff.clear();
+  TRY_ENTRY();
 
-		z_stream    zstream = {0};
-		int ret = deflateInit(&zstream, Z_DEFAULT_COMPRESSION);
-		if(target.size())
-		{
+  std::stringstream compressed;
+  boost::iostreams::filtering_streambuf<boost::iostreams::output> out;
+  out.push(boost::iostreams::zlib_compressor());
+  out.push(compressed);
 
-			
-			result_packed_buff.resize(target.size()*2, 'X');
+  std::stringstream decompressed(input);
+  boost::iostreams::copy(decompressed, out);
+  output = compressed.str();
 
-			zstream.next_in = (Bytef*)target.data();
-			zstream.avail_in = (uInt)target.size();
-			zstream.next_out = (Bytef*)result_packed_buff.data();
-			zstream.avail_out = (uInt)result_packed_buff.size();
+  CATCH_ENTRY(__func__, false);  // TODO(anonimal): exception dispatcher
+  return true;
+}
 
-			ret = deflate(&zstream, Z_FINISH);
-			CHECK_AND_ASSERT_MES(ret>=0, false, "Failed to deflate. err = " << ret);
+inline bool pack(std::string& data)
+{
+  std::string result;
+  if (pack(data, result))
+    {
+      data.swap(result);
+      return true;
+    }
+  return false;
+}
 
-			if(result_packed_buff.size() != zstream.avail_out)
-				result_packed_buff.resize(result_packed_buff.size()-zstream.avail_out);
+inline bool unpack(const std::string& input, std::string& output)
+{
+  TRY_ENTRY();
 
-			
-			result_packed_buff.erase(0, 2);
-		}
+  std::stringstream decompressed;
+  boost::iostreams::filtering_streambuf<boost::iostreams::output> out;
+  out.push(boost::iostreams::zlib_decompressor());
+  out.push(decompressed);
 
-		deflateEnd(& zstream );
-		return true;
-	}
+  std::stringstream compressed(input);
+  boost::iostreams::copy(compressed, out);
+  output = decompressed.str();
 
-	inline 	bool pack(std::string& target)
-	{
-		std::string result_packed_buff;
-		bool r = pack(target, result_packed_buff);
-		if (r)
-			result_packed_buff.swap(target);
-		return r;
-	}
+  CATCH_ENTRY(__func__, false);  // TODO(anonimal): exception dispatcher
+  return true;
+}
 
-	inline bool unpack(const std::string& target, std::string& decode_summary_buff)
-	{
-		z_stream    zstream = {0};
-		int ret = inflateInit(&zstream);//
+inline bool unpack(std::string& data)
+{
+  std::string result;
+  if (unpack(data, result))
+    {
+      data.swap(result);
+      return true;
+    }
+  return false;
+}
 
-		decode_summary_buff.clear();
-		size_t	ungzip_buff_size = target.size() * 0x30;
-		std::string current_decode_buff(ungzip_buff_size, 'X');
+}  // namespace zlib_helper
+}  // namespace epee
 
-    uInt current_offset = 0;
-
-    while (target.size() > current_offset)
-		{
-			zstream.next_out = (Bytef*)current_decode_buff.data();
-			zstream.avail_out = (uInt)ungzip_buff_size;
-			
-			static char dummy_head[2] =
-			{
-				0x8 + 0x7 * 0x10,
-				(((0x8 + 0x7 * 0x10) * 0x100 + 30) / 31 * 31) & 0xFF,
-			};
-			zstream.next_in = (Bytef*) dummy_head;
-			zstream.avail_in = sizeof(dummy_head);
-			ret = inflate(&zstream, Z_NO_FLUSH);
-			if (ret != Z_OK)
-			{
-				LOCAL_ASSERT(0);
-				return false;
-			}
-			
-      zstream.next_in = (Bytef*)target.data() + current_offset;
-      zstream.avail_in = (uInt)target.size() - current_offset;
-
-			ret = inflate(&zstream, Z_SYNC_FLUSH);
-			if (ret != Z_OK && ret != Z_STREAM_END)
-			{
-				LOCAL_ASSERT(0);
-				return false;
-			}
-
-			
-			//target.erase(0, target.size()-zstream.avail_in);
-      current_offset += zstream.total_in;
-			
-			if(ungzip_buff_size == zstream.avail_out)
-			{
-				LOG_ERROR("Can't unpack buffer");
-				return false;
-			}
-
-			
-			current_decode_buff.resize(ungzip_buff_size - zstream.avail_out);
-			if(decode_summary_buff.size())
-				decode_summary_buff += current_decode_buff;
-			else
-				current_decode_buff.swap(decode_summary_buff);
-
-			current_decode_buff.resize(ungzip_buff_size);
-		}
-
-		inflateEnd(&zstream );
-
-		
-		return true;
-	}
-
-	inline 	bool unpack(std::string& target)
-	{
-		std::string decode_summary_buff;
-		bool r = unpack(target, decode_summary_buff);
-		if (r)
-			decode_summary_buff.swap(target);
-		return r;
-	}
-
-};
-}//namespace epee
+#endif  // CONTRIB_EPEE_INCLUDE_ZLIB_HELPER_H_
