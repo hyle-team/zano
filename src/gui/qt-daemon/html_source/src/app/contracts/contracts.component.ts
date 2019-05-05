@@ -32,6 +32,12 @@ export class ContractsComponent implements OnInit, OnDestroy {
       if (a.timestamp > b.timestamp) {
         return -1;
       }
+      if (a.contract_id < b.contract_id) {
+        return 1;
+      }
+      if (a.contract_id > b.contract_id) {
+        return -1;
+      }
       return 0;
     });
   }
