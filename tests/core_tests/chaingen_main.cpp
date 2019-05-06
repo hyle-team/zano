@@ -809,6 +809,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(mined_balance_wallet_test);
     GENERATE_AND_PLAY(wallet_outputs_with_same_key_image);
     GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
+    GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
 
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
     GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
