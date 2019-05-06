@@ -41,6 +41,9 @@ export class AppComponent implements OnInit, OnDestroy {
     translate.setDefaultLang('en');
     // const browserLang = translate.getBrowserLang();
     // translate.use(browserLang.match(/en|fr/) ? browserLang : 'en');
+    translate.use('en').subscribe(() => {
+      console.warn('use');
+    });
   }
 
   setBackendLocalization() {
@@ -505,6 +508,8 @@ export class AppComponent implements OnInit, OnDestroy {
         }
 
         this.setBackendLocalization();
+
+        this.backend.setLogLevel(this.variablesService.settings.appLog);
 
         if (this.router.url !== '/login') {
           this.backend.haveSecureAppData((statusPass) => {

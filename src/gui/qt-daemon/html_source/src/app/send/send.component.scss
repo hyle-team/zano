@@ -66,6 +66,14 @@
         padding-right: 1.5rem;
       }
     }
+
+    .checkbox-block {
+      flex-basis: 50%;
+
+      > label {
+        top: 3.5rem;
+      }
+    }
   }
 
   button {

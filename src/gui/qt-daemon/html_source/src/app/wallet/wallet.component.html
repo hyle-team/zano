@@ -31,7 +31,7 @@
 <div class="tabs">
   <div class="tabs-header">
     <ng-container *ngFor="let tab of tabs; let index = index">
-      <div class="tab" [class.active]="tab.active" [class.disabled]="(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && variablesService.daemon_state !== 2" (click)="changeTab(index)">
+      <div class="tab" [class.active]="tab.active" [class.disabled]="(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && (variablesService.daemon_state !== 2 || !variablesService.currentWallet.loaded)" (click)="changeTab(index)">
         <i class="icon" [ngClass]="tab.icon"></i>
         <span>{{ tab.title | translate }}</span>
         <span class="indicator" *ngIf="tab.indicator">{{variablesService.currentWallet.new_contracts}}</span>

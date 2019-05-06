@@ -2120,7 +2120,7 @@ uint64_t wallet2::balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& aw
   
   for(auto& td : m_transfers)
   {
-    if (td.is_spendable())
+    if (td.is_spendable() || td.is_reserved_for_escrow())
     {
       balance_total += td.amount();
       if (is_transfer_unlocked(td))
