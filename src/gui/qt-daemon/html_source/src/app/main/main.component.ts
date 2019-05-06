@@ -37,7 +37,7 @@ export class MainComponent implements OnInit {
   }
 
   openInBrowser() {
-    this.backend.openUrlInBrowser('docs.zano.org/v1.0/docs/how-to-create-wallet');
+    this.backend.openUrlInBrowser('docs.zano.org/docs/getting-started-1#section-create-new-wallet');
   }
 
   back() {
