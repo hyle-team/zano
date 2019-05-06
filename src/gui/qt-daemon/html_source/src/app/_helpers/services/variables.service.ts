@@ -21,7 +21,7 @@ export class VariablesService {
   public exp_med_ts = 0;
   public height_app = 0;
   public last_build_available = '';
-  public daemon_state = 0;
+  public daemon_state = 3;
   public sync = {
     progress_value: 0,
     progress_value_text: '0'
@@ -31,6 +31,7 @@ export class VariablesService {
 
   public settings = {
     appLockTime: 15,
+    appLog: 0,
     theme: '',
     scale: 10,
     language: 'en',

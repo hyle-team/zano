@@ -50,6 +50,26 @@ export class SettingsComponent implements OnInit {
       name: '150% scale'
     }
   ];
+  appLogOptions = [
+    {
+      id: -1
+    },
+    {
+      id: 0
+    },
+    {
+      id: 1
+    },
+    {
+      id: 2
+    },
+    {
+      id: 3
+    },
+    {
+      id: 4
+    }
+  ];
 
   currentBuild = '';
 
@@ -115,6 +135,11 @@ export class SettingsComponent implements OnInit {
     if (this.variablesService.appLogin) {
       this.variablesService.restartCountdown();
     }
+    this.backend.storeAppData();
+  }
+
+  onLogChange() {
+    this.backend.setLogLevel(this.variablesService.settings.appLog);
     this.backend.storeAppData();
   }
 

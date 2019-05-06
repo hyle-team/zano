@@ -146,7 +146,8 @@
       "PASS_NOT_MATCH": "Old password not match.",
       "CONFIRM_NOT_MATCH": "Confirm password not match."
     },
-    "LAST_BUILD": "Current build: {{value}}"
+    "LAST_BUILD": "Current build: {{value}}",
+    "APP_LOG_TITLE": "Log level:"
   },
   "WALLET": {
     "REGISTER_ALIAS": "Register an alias",
@@ -249,6 +250,7 @@
     "DETAILS": "Additional details",
     "MIXIN": "Mixin",
     "FEE": "Fee",
+    "HIDE": "Hide your wallet address from receiver",
     "BUTTON": "Send",
     "SUCCESS_SENT": "Transaction sent",
     "FORM_ERRORS": {

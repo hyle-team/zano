@@ -14,7 +14,7 @@
   <form class="form-assign" [formGroup]="assignForm">
 
     <div class="input-block alias-name">
-      <label for="alias-name" tooltip="{{ 'ASSIGN_ALIAS.NAME.TOOLTIP' | translate }}" placement="bottom-left" tooltipClass="table-tooltip assign-alias-tooltip" [delay]="500">
+      <label for="alias-name" tooltip="{{ 'ASSIGN_ALIAS.NAME.TOOLTIP' | translate }}" placement="bottom-left" tooltipClass="table-tooltip assign-alias-tooltip" [delay]="50">
         {{ 'ASSIGN_ALIAS.NAME.LABEL' | translate }}
       </label>
       <input type="text" id="alias-name" formControlName="name" placeholder="{{ 'ASSIGN_ALIAS.NAME.PLACEHOLDER' | translate }}" (contextmenu)="variablesService.onContextMenu($event)">
@@ -42,7 +42,7 @@
     </div>
 
     <div class="input-block textarea">
-      <label for="alias-comment" tooltip="{{ 'ASSIGN_ALIAS.COMMENT.TOOLTIP' | translate }}" placement="bottom-left" tooltipClass="table-tooltip assign-alias-tooltip" [delay]="500">
+      <label for="alias-comment" tooltip="{{ 'ASSIGN_ALIAS.COMMENT.TOOLTIP' | translate }}" placement="bottom-left" tooltipClass="table-tooltip assign-alias-tooltip" [delay]="50">
         {{ 'ASSIGN_ALIAS.COMMENT.LABEL' | translate }}
       </label>
       <textarea id="alias-comment"
