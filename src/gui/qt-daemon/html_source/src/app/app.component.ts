@@ -509,6 +509,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
         this.setBackendLocalization();
 
+        this.backend.setLogLevel(this.variablesService.settings.appLog);
+
         if (this.router.url !== '/login') {
           this.backend.haveSecureAppData((statusPass) => {
             if (statusPass) {

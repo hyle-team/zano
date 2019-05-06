@@ -604,6 +604,10 @@ export class BackendService {
     });
   }
 
+  setLogLevel(level) {
+    return this.runCommand('set_log_level', {v: level});
+  }
+
 }
 
 
@@ -627,10 +631,6 @@ export class BackendService {
             callback('error_code' in data && data.error_code !== 'FALSE')
           }
         });
-      },
-
-      setLogLevel: function (level) {
-        return this.runCommand('set_log_level', asVal(level))
       },
 
       resetWalletPass: function (wallet_id, pass, callback) {
