@@ -2102,9 +2102,9 @@ uint64_t wallet2::balance(uint64_t& unloked) const
   return balance(unloked, fake, fake, fake);
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const
+uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const
 {
-  unloked = 0;
+  unlocked = 0;
   uint64_t balance_total = 0;
   awaiting_in = 0;
   awaiting_out = 0;
@@ -2124,7 +2124,7 @@ uint64_t wallet2::balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& aw
     {
       balance_total += td.amount();
       if (is_transfer_unlocked(td))
-        unloked += td.amount();
+        unlocked += td.amount();
       if (td.m_flags & WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
         mined += td.amount();
 //      bool pos_coinbase = false;
