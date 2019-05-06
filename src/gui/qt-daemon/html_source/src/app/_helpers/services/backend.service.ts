@@ -387,7 +387,7 @@ export class BackendService {
     this.runCommand('restore_wallet', params, callback);
   }
 
-  sendMoney(from_wallet_id, to_address, amount, fee, mixin, comment, callback) {
+  sendMoney(from_wallet_id, to_address, amount, fee, mixin, comment, hide, callback) {
     const params = {
       wallet_id: parseInt(from_wallet_id, 10),
       destinations: [
@@ -400,7 +400,7 @@ export class BackendService {
       lock_time: 0,
       fee: this.moneyToIntPipe.transform(fee),
       comment: comment,
-      push_payer: true
+      push_payer: !hide
     };
     this.runCommand('transfer', params, callback);
   }

@@ -250,6 +250,7 @@
     "DETAILS": "Additional details",
     "MIXIN": "Mixin",
     "FEE": "Fee",
+    "HIDE": "Hide your wallet address from receiver",
     "BUTTON": "Send",
     "SUCCESS_SENT": "Transaction sent",
     "FORM_ERRORS": {

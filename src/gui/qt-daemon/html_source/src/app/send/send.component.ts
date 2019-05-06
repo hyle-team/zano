@@ -86,7 +86,8 @@ export class SendComponent implements OnInit, OnDestroy {
         return {'less_min': true};
       }
       return null;
-    }])
+    }]),
+    hide: new FormControl(false)
   });
   additionalOptions = false;
 
@@ -146,6 +147,7 @@ export class SendComponent implements OnInit, OnDestroy {
               this.sendForm.get('fee').value,
               this.sendForm.get('mixin').value,
               this.sendForm.get('comment').value,
+              this.sendForm.get('hide').value,
               (send_status) => {
                 if (send_status) {
                   this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
@@ -170,6 +172,7 @@ export class SendComponent implements OnInit, OnDestroy {
                 this.sendForm.get('fee').value,
                 this.sendForm.get('mixin').value,
                 this.sendForm.get('comment').value,
+                this.sendForm.get('hide').value,
                 (send_status) => {
                   if (send_status) {
                     this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
