@@ -304,7 +304,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     << "last block: " << m_db_blocks.size() - 1 << ", " << misc_utils::get_time_interval_string(timestamp_diff) << " time ago" << ENDL
     << "current pos difficulty: " << get_next_diff_conditional(true) << ENDL
     << "current pow difficulty: " << get_next_diff_conditional(false) << ENDL
-    << "total tansactions: " << m_db_transactions.size(),
+    << "total transactions: " << m_db_transactions.size(),
     LOG_LEVEL_0);
    
 
