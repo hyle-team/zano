@@ -246,10 +246,9 @@
     </div>
   </div>
 
-  <div class="time-cancel-block-row" *ngIf="showTimeSelect && !newPurchase && currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
-    <div>{{ 'PURCHASE.WAITING_TIME_QUESTION' | translate }}</div>
+  <div class="time-cancel-block-row" *ngIf="'showTimeSelect && !newPurchase && currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)'">
+    <div class="time-cancel-block-question">{{ 'PURCHASE.WAITING_TIME_QUESTION' | translate }}</div>
     <div class="input-block">
-      <label for="purchase-timeCancel">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
       <ng-select id="purchase-timeCancel" class="lock-selection-select"
                  [clearable]="false"
                  [searchable]="false"
@@ -260,6 +259,7 @@
         </ng-option>
       </ng-select>
     </div>
+    <label for="purchase-timeCancel">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
     <div class="time-cancel-block-buttons">
       <button type="button" class="blue-button" (click)="showTimeSelect = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
       <button type="button" class="blue-button" (click)="dealsDetailsCancel();">{{ 'PURCHASE.BUTTON_CANCEL_BUYER' | translate }}</button>

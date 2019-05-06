@@ -32,7 +32,7 @@ export class AppComponent implements OnInit, OnDestroy {
     public translate: TranslateService,
     private backend: BackendService,
     private router: Router,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private ngZone: NgZone,
     private intToMoneyPipe: IntToMoneyPipe,
     private modalService: ModalService
