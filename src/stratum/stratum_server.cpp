@@ -1085,7 +1085,7 @@ struct stratum_server_impl
 };
 //------------------------------------------------------------------------------------------------------------------------------
 stratum_server::stratum_server(core* c)
-  : m_p_core(c)
+  : m_p_core(c), m_threads_count{}
 {
   m_impl = new stratum_server_impl();
 }
