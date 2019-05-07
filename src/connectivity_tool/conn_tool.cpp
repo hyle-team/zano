@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -1037,6 +1037,9 @@ bool handle_download_peer_log(po::variables_map& vm)
 //---------------------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
+  try
+    {
+      TRY_ENTRY();
 
   string_tools::set_module_name_and_folder(argv[0]);
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
@@ -1072,9 +1075,6 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_set_peer_log_level);
   command_line::add_arg(desc_params, arg_download_peer_log);
   command_line::add_arg(desc_params, arg_do_consloe_log);
-  
-
-    
 
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
@@ -1148,6 +1148,13 @@ int main(int argc, char* argv[])
     std::cerr << "Not enough arguments." << ENDL;
     std::cerr << desc_all << ENDL;
   }
+
+      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
+    }
+  catch (...)
+    {
+      return EXIT_FAILURE;
+    }
 
   return 1;
 }
