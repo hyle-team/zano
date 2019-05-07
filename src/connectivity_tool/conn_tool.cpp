@@ -24,6 +24,7 @@ using namespace epee;
 #include "net/http_client.h"
 #include "currency_core/genesis_acc.h"
 
+#include <cstdlib>
 
 namespace po = boost::program_options;
 using namespace currency;
@@ -1095,7 +1096,7 @@ int main(int argc, char* argv[])
     return true;
   });
   if (!r)
-    return 1;
+    return EXIT_FAILURE;
   if (command_line::has_arg(vm, arg_do_consloe_log) && command_line::get_arg(vm, arg_do_consloe_log))
   {
     log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
@@ -1105,43 +1106,43 @@ int main(int argc, char* argv[])
   if (command_line::get_arg(vm, command_line::arg_version))
   {
     std::cout << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ENDL;
-    return 0;
+    return EXIT_SUCCESS;
   }
   if(command_line::has_arg(vm, arg_request_stat_info) || command_line::has_arg(vm, arg_request_net_state))
   {
-    return handle_request_stat(vm, command_line::get_arg(vm, arg_peer_id)) ? 0:1;
+    return handle_request_stat(vm, command_line::get_arg(vm, arg_peer_id)) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   if(command_line::has_arg(vm, arg_get_daemon_info))
   {
-    return handle_get_daemon_info(vm) ? 0:1;
+    return handle_get_daemon_info(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if(command_line::has_arg(vm, arg_generate_keys))
   {
-    return  generate_and_print_keys() ? 0:1;
+    return  generate_and_print_keys() ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if(command_line::has_arg(vm, arg_get_aliases))
   {
-    return handle_get_aliases(vm) ? 0:1;
+    return handle_get_aliases(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if(command_line::has_arg(vm, arg_upate_maintainers_info))
   {
-    return handle_update_maintainers_info(vm) ? 0:1;
+    return handle_update_maintainers_info(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_increment_build_no))
   {
-    return handle_increment_build_no(vm) ? 0 : 1;
+    return handle_increment_build_no(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_generate_genesis))
   {
-    return generate_genesis(command_line::get_arg(vm, arg_generate_genesis), 10000000000000000) ? 0 : 1;
+    return generate_genesis(command_line::get_arg(vm, arg_generate_genesis), 10000000000000000) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_set_peer_log_level))
   {
-    return handle_set_peer_log_level(vm) ? 0 : 1;
+    return handle_set_peer_log_level(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_download_peer_log))
   {
-    return handle_download_peer_log(vm) ? 0 : 1;
+    return handle_download_peer_log(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else
   {
@@ -1156,6 +1157,6 @@ int main(int argc, char* argv[])
       return EXIT_FAILURE;
     }
 
-  return 1;
+  return EXIT_FAILURE;
 }
 
