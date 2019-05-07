@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal <anonimal@sekreta.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 //
@@ -1637,6 +1638,22 @@ POP_WARNINGS
 #define CATCH_ENTRY_L3(location, return_val) CATCH_ENTRY(location, return_val)
 #define CATCH_ENTRY_L4(location, return_val) CATCH_ENTRY(location, return_val)
 
+/// @brief Catches TRY_ENTRY without returning
+/// @details Useful within a dtor - but only if nested within another try block
+///    (since we can still potentially throw here)
+/// @todo Exception dispatcher class
+#define CATCH_ENTRY_NO_RETURN(location, custom_code) } \
+  catch(const std::exception& ex) \
+{ \
+  (void)(ex); \
+  LOG_ERROR("Exception at [" << location << "], what=" << ex.what()); \
+  custom_code; \
+} \
+  catch(...) \
+{ \
+  LOG_ERROR("Exception at [" << location << "], generic exception \"...\""); \
+  custom_code; \
+}
 
 #define ASSERT_MES_AND_THROW(message) {LOG_ERROR(message); std::stringstream ss; ss << message; throw std::runtime_error(ss.str());}
 
