@@ -20,6 +20,7 @@ export class AppComponent implements OnInit, OnDestroy {
   expMedTsEvent;
   onQuitRequest = false;
   firstOnlineState = false;
+  translateUsed = false;
 
   needOpenWallets = [];
 
@@ -32,7 +33,7 @@ export class AppComponent implements OnInit, OnDestroy {
     public translate: TranslateService,
     private backend: BackendService,
     private router: Router,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private ngZone: NgZone,
     private intToMoneyPipe: IntToMoneyPipe,
     private modalService: ModalService
@@ -41,23 +42,33 @@ export class AppComponent implements OnInit, OnDestroy {
     translate.setDefaultLang('en');
     // const browserLang = translate.getBrowserLang();
     // translate.use(browserLang.match(/en|fr/) ? browserLang : 'en');
+    translate.use('en').subscribe(() => {
+      this.translateUsed = true;
+    });
   }
 
   setBackendLocalization() {
-    const stringsArray = [
-      this.translate.instant('BACKEND_LOCALIZATION.QUIT'),
-      this.translate.instant('BACKEND_LOCALIZATION.IS_RECEIVED'),
-      this.translate.instant('BACKEND_LOCALIZATION.IS_CONFIRMED'),
-      this.translate.instant('BACKEND_LOCALIZATION.INCOME_TRANSFER_UNCONFIRMED'),
-      this.translate.instant('BACKEND_LOCALIZATION.INCOME_TRANSFER_CONFIRMED'),
-      this.translate.instant('BACKEND_LOCALIZATION.MINED'),
-      this.translate.instant('BACKEND_LOCALIZATION.LOCKED'),
-      this.translate.instant('BACKEND_LOCALIZATION.IS_MINIMIZE'),
-      this.translate.instant('BACKEND_LOCALIZATION.RESTORE'),
-      this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_SHOW'),
-      this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_MINIMIZE')
-    ];
-    this.backend.setBackendLocalization(stringsArray, 'en');
+    if (this.translateUsed) {
+      const stringsArray = [
+        this.translate.instant('BACKEND_LOCALIZATION.QUIT'),
+        this.translate.instant('BACKEND_LOCALIZATION.IS_RECEIVED'),
+        this.translate.instant('BACKEND_LOCALIZATION.IS_CONFIRMED'),
+        this.translate.instant('BACKEND_LOCALIZATION.INCOME_TRANSFER_UNCONFIRMED'),
+        this.translate.instant('BACKEND_LOCALIZATION.INCOME_TRANSFER_CONFIRMED'),
+        this.translate.instant('BACKEND_LOCALIZATION.MINED'),
+        this.translate.instant('BACKEND_LOCALIZATION.LOCKED'),
+        this.translate.instant('BACKEND_LOCALIZATION.IS_MINIMIZE'),
+        this.translate.instant('BACKEND_LOCALIZATION.RESTORE'),
+        this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_SHOW'),
+        this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_MINIMIZE')
+      ];
+      this.backend.setBackendLocalization(stringsArray, 'en');
+    } else {
+      console.warn('wait translate use');
+      setTimeout(() => {
+        this.setBackendLocalization();
+      }, 10000);
+    }
   }
 
   ngOnInit() {
@@ -141,7 +152,7 @@ export class AppComponent implements OnInit, OnDestroy {
         const wallet = this.variablesService.getWallet(data.wallet_id);
         if (wallet) {
           this.ngZone.run(() => {
-            wallet.progress = data.progress;
+            wallet.progress = (data.progress < 0) ? 0 : ((data.progress > 100) ? 100 : data.progress);
             if (wallet.progress === 0) {
               wallet.loaded = false;
             } else if (wallet.progress === 100) {
@@ -505,6 +516,8 @@ export class AppComponent implements OnInit, OnDestroy {
         }
 
         this.setBackendLocalization();
+
+        this.backend.setLogLevel(this.variablesService.settings.appLog);
 
         if (this.router.url !== '/login') {
           this.backend.haveSecureAppData((statusPass) => {

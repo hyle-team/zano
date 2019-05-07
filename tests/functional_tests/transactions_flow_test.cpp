@@ -599,50 +599,6 @@ bool transactions_flow_test(
   w1.store();
   LOG_PRINT_GREEN("Wallet stored OK", LOG_LEVEL_0);
 
-
-// 
-// 
-//   LOG_PRINT_L0( "waiting some new blocks...");
-//   misc_utils::sleep_no_w(DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN*20*1000);//wait two blocks before sync on another wallet on another daemon
-//   LOG_PRINT_L0( "Refreshing...");
-//   bool recvd_money = false;
-//   while(w2.refresh(blocks_fetched, recvd_money, ok, stop) && ( (blocks_fetched && recvd_money) || !blocks_fetched  ) )
-//   {
-//     misc_utils::sleep_no_w(DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN*1000);//wait two blocks before sync on another wallet on another daemon
-//   }
-// 
-//   uint64_t money_2 = w2.balance();
-//   if(money_2 == transfered_money)
-//   {
-//     LOG_PRINT_GREEN("-----------------------FINISHING TRANSACTIONS FLOW TEST OK-----------------------", LOG_LEVEL_0);
-//     LOG_PRINT_GREEN("transferred " << print_money(transfered_money) << " via " << i << " transactions" , LOG_LEVEL_0);
-//     return true;
-//   }else
-//   {
-//     tools::wallet2::transfer_container tc;
-//     w2.get_transfers(tc);
-//     BOOST_FOREACH(tools::wallet2::transfer_details& td, tc)
-//     {
-//       auto it = txs.find(get_transaction_hash(td.m_ptx_wallet_info->m_tx));
-//       CHECK_AND_ASSERT_MES(it != txs.end(), false, "transaction not found in local cache");
-//       it->second.m_received_count += 1;
-//     }
-// 
-//     BOOST_FOREACH(auto& tx_pair, txs)
-//     {
-//       if(tx_pair.second.m_received_count != 1)
-//       {
-//         LOG_PRINT_RED_L0("Transaction lost: " << get_transaction_hash(tx_pair.second.tx));
-//       }
-// 
-//     }
-// 
-//     LOG_PRINT_RED_L0("-----------------------FINISHING TRANSACTIONS FLOW TEST FAILED-----------------------" );
-//     LOG_PRINT_RED_L0("income " << print_money(money_2) << " via " << i << " transactions, expected money = " << print_money(transfered_money) );
-//     LOCAL_ASSERT(false);
-//     return false;
-//  }
-
   return true;
 }
 

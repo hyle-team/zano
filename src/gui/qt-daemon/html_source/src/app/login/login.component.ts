@@ -1,5 +1,5 @@
 import {Component, NgZone, OnInit, OnDestroy} from '@angular/core';
-import {FormGroup, FormControl, Validators} from '@angular/forms';
+import {FormGroup, FormControl} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';

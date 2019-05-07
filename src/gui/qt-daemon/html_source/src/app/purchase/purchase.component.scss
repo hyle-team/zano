@@ -136,8 +136,16 @@
     align-items: center;
     justify-content: center;
 
+    .time-cancel-block-question {
+      margin-bottom: 1rem;
+    }
+
     .input-block {
       width: 25%;
+    }
+
+    label {
+      margin-bottom: 1rem;
     }
 
     .time-cancel-block-buttons {
