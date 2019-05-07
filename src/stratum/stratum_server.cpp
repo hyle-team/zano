@@ -323,13 +323,23 @@ namespace
 
     ~stratum_protocol_handler_config()
     {
-      LOG_PRINT_L4("stratum_protocol_handler_config::dtor()");
-      
-      m_stop_flag = true;
-      m_blocktemplate_update_thread.join();
+      try
+        {
+          TRY_ENTRY();
 
-      if (m_p_core)
-        m_p_core->remove_blockchain_update_listener(this);
+          LOG_PRINT_L4("stratum_protocol_handler_config::dtor()");
+
+          m_stop_flag = true;
+          m_blocktemplate_update_thread.join();
+
+          if (m_p_core)
+            m_p_core->remove_blockchain_update_listener(this);
+
+          CATCH_ENTRY_NO_RETURN(__func__, {});
+        }
+      catch (...)
+        {
+        }
     }
 
     void add_protocol_handler(protocol_handler_t* p_ph)
