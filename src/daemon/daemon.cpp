@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -26,6 +26,8 @@ using namespace epee;
 #include "common/miniupnp_helper.h"
 #include "version.h"
 #include "currency_core/core_tools.h"
+
+#include <cstdlib>
 
 #if defined(WIN32)
 #include <crtdbg.h>
@@ -126,7 +128,7 @@ int main(int argc, char* argv[])
     return true;
   });
   if (!r)
-    return 1;
+    return EXIT_FAILURE;
 
   //set up logging options
   std::string log_dir;
@@ -146,7 +148,7 @@ int main(int argc, char* argv[])
 
   if (command_line_preprocessor(vm))
   {
-    return 0;
+    return EXIT_SUCCESS;
   }
 
 
@@ -303,9 +305,9 @@ int main(int argc, char* argv[])
   cprotocol.set_p2p_endpoint(NULL);
 
   LOG_PRINT("Node stopped.", LOG_LEVEL_0);
-  return 0;
+  return EXIT_SUCCESS;
 
-      CATCH_ENTRY_L0("main", 1);
+      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
     }
   catch (...)
     {
