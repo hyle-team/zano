@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal <anonimal@sekreta.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -124,17 +125,27 @@ namespace profile_tools
 		{
 			m_call_time = boost::posix_time::microsec_clock::local_time();
 		}
-		
-		~call_frame()
-		{			
-			boost::posix_time::ptime now_t(boost::posix_time::microsec_clock::local_time());
-			boost::posix_time::time_duration delta_microsec = now_t - m_call_time;
-      uint64_t microseconds_used = delta_microsec.total_microseconds();
-      m_cc.m_summary_time_used += microseconds_used;
-      m_cc.m_count_of_call++;
-		}
-		
-	private:
+
+                ~call_frame()
+                {
+                  try
+                    {
+                      TRY_ENTRY();
+
+                      boost::posix_time::ptime now_t(boost::posix_time::microsec_clock::local_time());
+                      boost::posix_time::time_duration delta_microsec = now_t - m_call_time;
+                      uint64_t microseconds_used = delta_microsec.total_microseconds();
+                      m_cc.m_summary_time_used += microseconds_used;
+                      m_cc.m_count_of_call++;
+
+                      CATCH_ENTRY_NO_RETURN(__func__, {});
+                    }
+                  catch (...)
+                    {
+                    }
+                }
+
+        private:
 		local_call_account& m_cc;
 		boost::posix_time::ptime m_call_time;
 	};
