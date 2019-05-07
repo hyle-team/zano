@@ -1,4 +1,5 @@
-﻿// Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
+﻿// Copyright (c) 2019, anonimal, <anonimal@sekreta.org>
+// Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
@@ -604,8 +605,20 @@ namespace epee
 
     ~guarded_critical_region_t()
     {
-      unlock();
+      try
+        {
+          // TODO(unassigned): because one cannot forward-declare macros,
+          //   the circular dependency created by misc_log_ex will not
+          //   allow us to actually use these substitutions.
+          //TRY_ENTRY();
 
+          unlock();
+
+          //CATCH_ENTRY_NO_RETURN(__func__, {});
+        }
+      catch (...)
+        {
+        }
     }
 
     void unlock()
