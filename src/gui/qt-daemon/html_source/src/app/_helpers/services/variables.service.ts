@@ -16,7 +16,7 @@ export class VariablesService {
   public appLogin = false;
   public moneyEquivalent = 0;
   public defaultTheme = 'dark';
-  public defaultCurrency = 'ZAN';
+  public defaultCurrency = 'ZANO';
   public opening_wallet: Wallet;
   public exp_med_ts = 0;
   public height_app = 0;
