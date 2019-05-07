@@ -253,6 +253,10 @@ public:
 
   virtual ~async_protocol_handler()
   {
+    try
+      {
+        TRY_ENTRY();
+
     m_deletion_initiated = true;
     if(m_connection_initialized)
     {
@@ -271,6 +275,12 @@ public:
     VALIDATE_MUTEX_IS_FREE(m_send_lock);
     VALIDATE_MUTEX_IS_FREE(m_call_lock);
     VALIDATE_MUTEX_IS_FREE(m_invoke_response_handlers_lock);
+
+        CATCH_ENTRY_NO_RETURN(__func__, {});
+      }
+    catch (...)
+      {
+      }
   }
 
   bool start_outer_call()
