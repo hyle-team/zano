@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal, <anonimal@sekreta.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -104,9 +105,19 @@ namespace net_utils
 		inline
 			~blocked_mode_client()
 		{
+                  try
+                    {
+                      TRY_ENTRY();
+
 			//profile_tools::local_coast lc("~blocked_mode_client()", 3);
 			shutdown();
-		}
+
+                      CATCH_ENTRY_NO_RETURN(__func__, {});
+                    }
+                  catch (...)
+                    {
+                    }
+                }
 
 		inline void set_recv_timeout(int reciev_timeout)
 		{
