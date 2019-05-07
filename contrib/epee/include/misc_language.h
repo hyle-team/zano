@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal, <anonimal@sekreta.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -313,7 +314,17 @@ namespace misc_utils
     {}
     ~call_befor_die()
     {
-      m_func();
+      try
+        {
+          TRY_ENTRY();
+
+          m_func();
+
+          CATCH_ENTRY_NO_RETURN(__func__, {});
+        }
+      catch (...)
+        {
+        }
     }
   };
 
