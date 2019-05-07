@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -41,7 +41,17 @@ namespace tools
     }
     ~miniupnp_helper()
     {
-      deinit();
+      try
+        {
+          TRY_ENTRY();
+
+          deinit();
+
+          CATCH_ENTRY_NO_RETURN(__func__, {});
+        }
+      catch (...)
+        {
+        }
     }
 
     bool start_regular_mapping(uint32_t internal_port, uint32_t external_port, uint32_t period_ms)
