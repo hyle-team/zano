@@ -21,6 +21,8 @@
 #include "version.h"
 #include "string_coding.h"
 
+#include <cstdlib>
+
 #if defined(WIN32)
 #include <crtdbg.h>
 #endif
@@ -1478,7 +1480,7 @@ int main(int argc, char* argv[])
     return true;
   });
   if (!r)
-    return 1;
+    return EXIT_FAILURE;
 
   //set up logging options
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
@@ -1513,19 +1515,19 @@ int main(int argc, char* argv[])
     if (!command_line::has_arg(vm, arg_wallet_file) || command_line::get_arg(vm, arg_wallet_file).empty())
     {
       LOG_ERROR("Wallet file is not set.");
-      return 1;
+      return EXIT_FAILURE;
     }
 
     if (!command_line::has_arg(vm, arg_daemon_address) && !command_line::has_arg(vm, arg_offline_mode))
     {
       LOG_ERROR("Daemon address is not set.");
-      return 1;
+      return EXIT_FAILURE;
     }
 
     if (!command_line::has_arg(vm, arg_password) )
     {
       LOG_ERROR("Wallet password is not set.");
-      return 1;
+      return EXIT_FAILURE;
     }
 
     std::string wallet_file     = command_line::get_arg(vm, arg_wallet_file);
@@ -1556,7 +1558,7 @@ int main(int argc, char* argv[])
       catch (const std::exception& e)
       {
         LOG_ERROR("Wallet initialize failed: " << e.what());
-        return 1;
+        return EXIT_FAILURE;
       }
       break;
     }
@@ -1568,7 +1570,7 @@ int main(int argc, char* argv[])
         LOG_PRINT_L0("Initializing wallet...");
         wal.init(daemon_address);
         if (command_line::get_arg(vm, arg_generate_new_wallet).size())
-          return 1;
+          return EXIT_FAILURE;
         if (!offline_mode)
           wal.refresh();
         LOG_PRINT_GREEN("Loaded ok", LOG_LEVEL_0);
@@ -1576,7 +1578,7 @@ int main(int argc, char* argv[])
       catch (const std::exception& e)
       {
         LOG_ERROR("Wallet initialize failed: " << e.what());
-        return 1;
+        return EXIT_FAILURE;
       }
       break;
     }
@@ -1584,7 +1586,7 @@ int main(int argc, char* argv[])
 
     tools::wallet_rpc_server wrpc(wal);
     bool r = wrpc.init(vm);
-    CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet rpc server");
+    CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to initialize wallet rpc server");
 
     tools::signal_handler::install([&wrpc/*, &wal*/ /* TODO(unassigned): use? */] {
       wrpc.send_stop_signal();
@@ -1601,7 +1603,7 @@ int main(int argc, char* argv[])
     catch (const std::exception& e)
     {
       LOG_ERROR("Failed to store wallet: " << e.what());
-      return 1;
+      return EXIT_FAILURE;
     }
   }else
   {
@@ -1610,7 +1612,7 @@ int main(int argc, char* argv[])
     r = sw->init(vm);
     CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet");
     if (command_line::get_arg(vm, arg_generate_new_wallet).size())
-      return 1;
+      return EXIT_FAILURE;
 
 
     std::vector<std::string> command = command_line::get_arg(vm, arg_command);
@@ -1631,7 +1633,7 @@ int main(int argc, char* argv[])
     }
   }
 
-      CATCH_ENTRY_L0("main", 1);
+      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
     }
   catch (...)
     {
