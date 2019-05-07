@@ -513,7 +513,7 @@
     "MINED": "Mined",
     "LOCKED": "Blocked",
     "IS_MINIMIZE": "Zano application is minimized to the system tray",
-    "RESTORE": "You can recover it by double-clicking or using the context menu",
+    "RESTORE": "You can recover it by clicking or using the context menu",
     "TRAY_MENU_SHOW": "Resize",
     "TRAY_MENU_MINIMIZE": "Minimize"
   }
