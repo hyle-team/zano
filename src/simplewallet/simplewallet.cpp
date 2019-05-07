@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -1408,6 +1408,10 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
+  try
+    {
+      TRY_ENTRY();
+
 #ifdef WIN32
   _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
@@ -1418,8 +1422,6 @@ int main(int argc, char* argv[])
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
     std::fflush(nullptr);
   });
-
-  //TRY_ENTRY();
 
   string_tools::set_module_name_and_folder(argv[0]);
 
@@ -1444,7 +1446,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_log_file);
   command_line::add_arg(desc_params, command_line::arg_log_level);
 
-  
+
   tools::wallet_rpc_server::init_options(desc_params);
 
   po::positional_options_description positional_options;
@@ -1498,7 +1500,7 @@ int main(int argc, char* argv[])
     LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
     log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, command_line::arg_log_level));
   }
-  
+
   bool offline_mode = command_line::get_arg(vm, arg_offline_mode);
 
   if(command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
@@ -1603,7 +1605,7 @@ int main(int argc, char* argv[])
     }
   }else
   {
-    //runs wallet with console interface 
+    //runs wallet with console interface
     sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
     CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet");
@@ -1628,6 +1630,12 @@ int main(int argc, char* argv[])
       sw->deinit();
     }
   }
-  return 1;
-  //CATCH_ENTRY_L0("main", 1);
+
+      CATCH_ENTRY_L0("main", 1);
+    }
+  catch (...)
+    {
+      return EXIT_FAILURE;
+    }
+  return EXIT_SUCCESS;
 }
