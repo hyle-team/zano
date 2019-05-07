@@ -4512,7 +4512,7 @@ var MainComponent = /** @class */ (function () {
         });
     };
     MainComponent.prototype.openInBrowser = function () {
-        this.backend.openUrlInBrowser('docs.zano.org/v1.0/docs/how-to-create-wallet');
+        this.backend.openUrlInBrowser('docs.zano.org/docs/getting-started-1#section-create-new-wallet');
     };
     MainComponent.prototype.back = function () {
         this.location.back();

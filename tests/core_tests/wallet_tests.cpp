@@ -24,11 +24,11 @@ const currency::account_base null_account = AUTO_VAL_INIT(null_account);
 
 struct wlt_lambda_on_transfer2_wrapper : public tools::i_wallet2_callback
 {
-  typedef std::function<bool(const tools::wallet_rpc::wallet_transfer_info&)> Func;
+  typedef std::function<bool(const tools::wallet_rpc::wallet_transfer_info&, uint64_t, uint64_t, uint64_t)> Func;
   wlt_lambda_on_transfer2_wrapper(Func callback) : m_result(false), m_callback(callback) {}
   virtual void on_transfer2(const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override
   {
-    m_result = m_callback(wti);
+    m_result = m_callback(wti, balance, unlocked_balance, total_mined);
   }
   bool m_result;
   Func m_callback;
@@ -1777,7 +1777,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
 
   uint64_t biggest_alias_reward = get_alias_coast_from_fee("a", TESTS_DEFAULT_FEE);
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [biggest_alias_reward](const tools::wallet_rpc::wallet_transfer_info& wti) -> bool {
+    [biggest_alias_reward](const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
       return std::count(wti.recipients_aliases.begin(), wti.recipients_aliases.end(), "minerminer") == 1 &&
         wti.amount == biggest_alias_reward;
     }
@@ -3211,6 +3211,89 @@ bool wallet_chain_switch_with_spending_the_same_ki::c1(currency::core& c, size_t
   alice_wlt->refresh();
   // DO NOT scan_tx_pool here intentionally
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(0)), false, "");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+wallet_unconfimed_tx_balance::wallet_unconfimed_tx_balance()
+{
+  REGISTER_CALLBACK_METHOD(wallet_unconfimed_tx_balance, c1);
+}
+
+bool wallet_unconfimed_tx_balance::generate(std::vector<test_event_entry>& events) const
+{
+  // Test outline:
+  // 1. Miner sends 100 coins to Alice (50 + 50)
+  // 2. Alice sends 30 back to Miner (tx is unconfirmed)
+  // 3. Make sure Alice's wallet has correct balance, when it is checked from wallet's callback
+  // 4. Few blocks are mined so the tx is get confirmed
+  // 5. Make sure Alice's balance has changed correctly
+
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(50), blk_0r);
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(50), blk_0r);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1 }));
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_unconfimed_tx_balance::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(100), false, UINT64_MAX, MK_TEST_COINS(100)), false, "");
+
+  bool callback_is_ok = false;
+  // this callback will ba called from within wallet2::transfer() below
+  std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
+    [&callback_is_ok](const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool
+    {
+      CHECK_AND_ASSERT_MES(balance == MK_TEST_COINS(70), false, "invalid balance: " << print_money_brief(balance));
+      CHECK_AND_ASSERT_MES(unlocked_balance == MK_TEST_COINS(50), false, "invalid unlocked_balance: " << print_money_brief(unlocked_balance));
+      CHECK_AND_ASSERT_MES(total_mined == 0, false, "invalid total_mined: " << print_money_brief(total_mined));
+      callback_is_ok = true;
+      return true;
+    }
+  ));
+  alice_wlt->callback(l);
+
+  uint64_t fee = TESTS_DEFAULT_FEE * 3;
+  std::vector<tx_destination_entry> destinations{ tx_destination_entry(MK_TEST_COINS(30) - fee, m_accounts[MINER_ACC_IDX].get_public_address()) };
+  try
+  {
+    alice_wlt->transfer(destinations, 0, 0, fee, empty_extra, empty_attachment);
+  }
+  catch (std::exception &e)
+  {
+    CHECK_AND_ASSERT_MES(false, false, "alice_wlt->transfer() caused an exception: " << e.what());
+  }
+
+  CHECK_AND_NO_ASSERT_MES(callback_is_ok, false, "callback failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
+
+  // 50 coins should be locked and 50 - unlocked
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(70), false, UINT64_MAX, MK_TEST_COINS(50), 0, 0, MK_TEST_COINS(30) - fee), false, "");
+
+  // mine WALLET_DEFAULT_TX_SPENDABLE_AGE blocks so the tx get confirmed and coins get unlocked
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE), false, "");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(70), false, UINT64_MAX, MK_TEST_COINS(70), 0, 0, 0), false, "");
 
   return true;
 }
