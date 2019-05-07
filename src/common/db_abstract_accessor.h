@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -725,7 +725,17 @@ namespace tools
       }
       ~cached_key_value_accessor()
       {
-        m_cache.clear(); //will clear cache isolated
+        try
+          {
+            TRY_ENTRY();
+
+            m_cache.clear();  //will clear cache isolated
+
+            CATCH_ENTRY_NO_RETURN(__func__, {});
+          }
+        catch (...)
+          {
+          }
       }
 
       void clear_cache() const 
