@@ -610,30 +610,46 @@ namespace tools
     {
       // do not load wallet if data version is greather than the code version 
       if (ver > WALLET_FILE_SERIALIZATION_VERSION)
+      {
+        LOG_PRINT_MAGENTA("Wallet file truncated due to WALLET_FILE_SERIALIZATION_VERSION is more then curren build", LOG_LEVEL_0);
         return;
+      }
+
+      if (ver < 147)
+      {
+        LOG_PRINT_MAGENTA("Wallet file truncated due to old version", LOG_LEVEL_0);
+        return;
+      }
+
+      if (t_archive::is_saving::value)
+      {
+        uint64_t formation_ver = CURRENCY_FORMATION_VERSION;
+        a & formation_ver;
+      }
+      else
+      {
+        uint64_t formation_ver = 0;
+        a & formation_ver;
+        if (formation_ver != CURRENCY_FORMATION_VERSION)
+        {
+          LOG_PRINT_MAGENTA("Wallet file truncated due to mismatch CURRENCY_FORMATION_VERSION", LOG_LEVEL_0);
+          return;
+        }
+      }
 
       a & m_blockchain;
       a & m_transfers;
       a & m_multisig_transfers;
-      a & m_key_images;
-      
+      a & m_key_images;      
       a & m_unconfirmed_txs;
-      if (ver < 144) //reset unconfirmed due to "coinbase relay bug" 
-      {
-        m_unconfirmed_txs.clear();
-      }
-
       a & m_unconfirmed_multisig_transfers;
       a & m_payments;
       a & m_transfer_history;
       a & m_unconfirmed_in_transfers;
       a & m_contracts;
       a & m_money_expirations;
-      if (ver >= 144)
-      {
-        a & m_pending_key_images;
-        a & m_tx_keys;
-      }
+      a & m_pending_key_images;
+      a & m_tx_keys;
 
     }
 
