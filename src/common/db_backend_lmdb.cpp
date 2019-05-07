@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project 
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -26,7 +26,17 @@ namespace tools
     }
     lmdb_db_backend::~lmdb_db_backend()
     {
-      close(); 
+      try
+        {
+          TRY_ENTRY();
+
+          close();
+
+          CATCH_ENTRY_NO_RETURN(__func__, {});
+        }
+      catch (...)
+        {
+        }
     }
 
     bool lmdb_db_backend::open(const std::string& path_, uint64_t cache_sz)
