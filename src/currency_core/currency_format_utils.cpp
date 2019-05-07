@@ -1873,11 +1873,9 @@ namespace currency
     bl.minor_version = CURRENT_BLOCK_MINOR_VERSION;
     bl.timestamp = 0;
     bl.nonce = 101010121 + CURRENCY_FORMATION_VERSION; //bender's nightmare
-    //miner::find_nonce_for_given_block(bl, 1, 0,);
     LOG_PRINT_GREEN("Generated genesis: " << get_block_hash(bl), LOG_LEVEL_0);
     return true;
   }
-  //---------------------------------------------------------------
   //----------------------------------------------------------------------------------------------------
   const crypto::hash& get_genesis_hash(bool need_to_set, const crypto::hash& h)
   {
