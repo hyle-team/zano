@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal <anonimal@sekreta.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -458,8 +459,18 @@ DISABLE_VS_WARNINGS(4355)
   template<class t_protocol_handler>
   boosted_tcp_server<t_protocol_handler>::~boosted_tcp_server()
   {
-    this->send_stop_signal();
-    timed_wait_server_stop(10000);
+    try
+      {
+        TRY_ENTRY();
+
+        this->send_stop_signal();
+        timed_wait_server_stop(10000);
+
+        CATCH_ENTRY_NO_RETURN(__func__, {});
+      }
+    catch (...)
+      {
+      }
   }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
