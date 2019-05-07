@@ -6,7 +6,6 @@ import {VariablesService} from '../_helpers/services/variables.service';
 import {ModalService} from '../_helpers/services/modal.service';
 import {Location} from '@angular/common';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
-import {TranslateService} from '@ngx-translate/core';
 import {BigNumber} from 'bignumber.js';
 
 @Component({
@@ -60,9 +59,12 @@ export class PurchaseComponent implements OnInit, OnDestroy {
           if (!(/^@?[a-z0-9\.\-]{6,25}$/.test(g.value))) {
             g.setErrors(Object.assign({'alias_not_valid': true}, g.errors));
           } else {
-            this.backend.getAliasByName(g.value.replace('@', ''), (alias_status) => {
+            this.backend.getAliasByName(g.value.replace('@', ''), (alias_status, alias_data) => {
               this.ngZone.run(() => {
                 if (alias_status) {
+                  if (alias_data.address === this.variablesService.currentWallet.address) {
+                    g.setErrors(Object.assign({'address_same': true}, g.errors));
+                  }
                   if (g.hasError('alias_not_valid')) {
                     delete g.errors['alias_not_valid'];
                     if (Object.keys(g.errors).length === 0) {
@@ -107,7 +109,8 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     private ngZone: NgZone,
     private location: Location,
     private intToMoneyPipe: IntToMoneyPipe
-  ) {}
+  ) {
+  }
 
   checkAndChangeHistory() {
     if (this.currentContract.state === 201) {
@@ -166,7 +169,6 @@ export class PurchaseComponent implements OnInit, OnDestroy {
           if (this.currentContract.state === 130 && this.currentContract.cancel_expiration_time !== 0 && this.currentContract.cancel_expiration_time < this.variablesService.exp_med_ts) {
             this.currentContract.state = 2;
           }
-
           this.variablesService.settings.viewedContracts = (this.variablesService.settings.viewedContracts) ? this.variablesService.settings.viewedContracts : [];
           let findViewedCont = false;
           for (let j = 0; j < this.variablesService.settings.viewedContracts.length; j++) {
@@ -184,13 +186,11 @@ export class PurchaseComponent implements OnInit, OnDestroy {
             });
           }
           this.currentContract.is_new = false;
-
           setTimeout(() => {
             this.variablesService.currentWallet.recountNewContracts();
           }, 0);
         }
         this.checkAndChangeHistory();
-
       } else {
         this.newPurchase = true;
       }
@@ -205,7 +205,6 @@ export class PurchaseComponent implements OnInit, OnDestroy {
         this.currentContract.is_new = true;
         this.variablesService.currentWallet.recountNewContracts();
       }
-
     });
   }
 
@@ -381,7 +380,6 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     this.currentContract.is_new = true;
     this.currentContract.state = 130;
     this.currentContract.time = this.currentContract.cancel_expiration_time;
-
     this.variablesService.currentWallet.recountNewContracts();
     this.modalService.prepareModal('info', 'PURCHASE.IGNORED_CANCEL');
     this.back();

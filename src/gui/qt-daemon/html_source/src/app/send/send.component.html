@@ -76,6 +76,11 @@
       </div>
     </div>
 
+    <div class="checkbox-block">
+      <input type="checkbox" id="send-hide" class="style-checkbox" formControlName="hide">
+      <label for="send-hide">{{ 'SEND.HIDE' | translate }}</label>
+    </div>
+
   </div>
 
   <button type="submit" class="blue-button" [disabled]="!sendForm.valid || !variablesService.currentWallet.loaded">{{ 'SEND.BUTTON' | translate }}</button>

@@ -104,7 +104,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   changeTab(index) {
-    if ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts' || this.tabs[index].link === '/staking') && this.variablesService.daemon_state !== 2) {
+    if ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts' || this.tabs[index].link === '/staking') && (this.variablesService.daemon_state !== 2 || !this.variablesService.currentWallet.loaded)) {
       return;
     }
     this.tabs.forEach((tab) => {

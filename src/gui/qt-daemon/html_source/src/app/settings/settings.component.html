@@ -50,6 +50,19 @@
       </ng-select>
     </div>
 
+    <div class="lock-selection">
+      <label class="lock-selection-title">{{ 'SETTINGS.APP_LOG_TITLE' | translate }}</label>
+      <ng-select class="lock-selection-select"
+                 [items]="appLogOptions"
+                 bindValue="id"
+                 bindLabel="id"
+                 [(ngModel)]="variablesService.settings.appLog"
+                 [clearable]="false"
+                 [searchable]="false"
+                 (change)="onLogChange()">
+      </ng-select>
+    </div>
+
     <form class="master-password" [formGroup]="changeForm" (ngSubmit)="onSubmitChangePass()">
 
       <span class="master-password-title">{{ 'SETTINGS.MASTER_PASSWORD.TITLE' | translate }}</span>

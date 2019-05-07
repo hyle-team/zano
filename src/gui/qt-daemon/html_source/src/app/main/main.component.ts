@@ -1,5 +1,5 @@
 import {Component, NgZone, OnInit} from '@angular/core';
-import {Location} from "@angular/common";
+import {Location} from '@angular/common';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {Router} from '@angular/router';
@@ -19,9 +19,11 @@ export class MainComponent implements OnInit {
     private variablesService: VariablesService,
     private ngZone: NgZone,
     private translate: TranslateService
-  ) {}
+  ) {
+  }
 
-  ngOnInit() {}
+  ngOnInit() {
+  }
 
   openWallet() {
     this.backend.openFileDialog(this.translate.instant('MAIN.CHOOSE_PATH'), '*', this.variablesService.settings.default_path, (file_status, file_data) => {
@@ -37,11 +39,11 @@ export class MainComponent implements OnInit {
   }
 
   openInBrowser() {
-    this.backend.openUrlInBrowser('docs.zano.org/v1.0/docs/how-to-create-wallet');
+    this.backend.openUrlInBrowser('docs.zano.org/docs/getting-started-1#section-create-new-wallet');
   }
 
   back() {
-    this.location.back()
+    this.location.back();
   }
 
 }
