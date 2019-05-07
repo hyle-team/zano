@@ -4507,7 +4507,8 @@ var MainComponent = /** @class */ (function () {
         this.ngZone = ngZone;
         this.translate = translate;
     }
-    MainComponent.prototype.ngOnInit = function () { };
+    MainComponent.prototype.ngOnInit = function () {
+    };
     MainComponent.prototype.openWallet = function () {
         var _this = this;
         this.backend.openFileDialog(this.translate.instant('MAIN.CHOOSE_PATH'), '*', this.variablesService.settings.default_path, function (file_status, file_data) {
@@ -4906,7 +4907,7 @@ var OpenWalletComponent = /** @class */ (function () {
                         });
                         if (exists_1) {
                             _this.modalService.prepareModal('error', 'OPEN_WALLET.WITH_ADDRESS_ALREADY_OPEN');
-                            _this.backend.closeWallet(open_data.wallet_id, function (close_status, close_data) {
+                            _this.backend.closeWallet(open_data.wallet_id, function () {
                                 _this.ngZone.run(function () {
                                     _this.router.navigate(['/']);
                                 });
@@ -5080,9 +5081,12 @@ var PurchaseComponent = /** @class */ (function () {
                                 g.setErrors(Object.assign({ 'alias_not_valid': true }, g.errors));
                             }
                             else {
-                                _this.backend.getAliasByName(g.value.replace('@', ''), function (alias_status) {
+                                _this.backend.getAliasByName(g.value.replace('@', ''), function (alias_status, alias_data) {
                                     _this.ngZone.run(function () {
                                         if (alias_status) {
+                                            if (alias_data.address === _this.variablesService.currentWallet.address) {
+                                                g.setErrors(Object.assign({ 'address_same': true }, g.errors));
+                                            }
                                             if (g.hasError('alias_not_valid')) {
                                                 delete g.errors['alias_not_valid'];
                                                 if (Object.keys(g.errors).length === 0) {
