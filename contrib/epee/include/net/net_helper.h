@@ -86,7 +86,9 @@ namespace net_utils
                             m_initialized(false), 
                             m_connected(false), 
                             m_deadline(m_io_service), 
-                            m_shutdowned(0)
+                            m_shutdowned(0),
+                            m_connect_timeout{},
+                            m_reciev_timeout{}
 		{
 			
 			
