@@ -53,7 +53,8 @@ connection<t_protocol_handler>::connection(boost::asio::io_service& io_service,
       m_want_close_connection(0),
       m_was_shutdown(0),
       m_ref_sockets_count(sock_count),
-      m_pfilter(pfilter)
+      m_pfilter(pfilter),
+      m_is_multithreaded(false)
 {
   boost::interprocess::ipcdetail::atomic_inc32(&m_ref_sockets_count);
 }
