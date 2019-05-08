@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -190,8 +190,6 @@ namespace nodetool
     }
     if(command_line::has_arg(vm, arg_p2p_use_only_priority_nodes))
       m_use_only_priority_peers = true;
-    else
-      m_use_only_priority_peers = false;
 
 
     if (command_line::has_arg(vm, arg_p2p_seed_node))

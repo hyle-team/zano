@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -70,7 +70,17 @@ namespace nodetool
                                                         m_alert_mode(0), 
                                                         m_maintainers_entry_local(AUTO_VAL_INIT(m_maintainers_entry_local)),
                                                         m_maintainers_info_local(AUTO_VAL_INIT(m_maintainers_info_local)), 
-                                                        m_startup_time(time(nullptr))
+                                                        m_startup_time(time(nullptr)),
+                                                        m_config{},
+                                                        m_have_address(false),
+                                                        m_first_connection_maker_call(false),
+                                                        m_listenning_port{},
+                                                        m_external_port{},
+                                                        m_ip_address{},
+                                                        m_last_stat_request_time{},
+                                                        m_use_only_priority_peers(false),
+                                                        m_peer_livetime{}
+
     {}
 
     static void init_options(boost::program_options::options_description& desc);
