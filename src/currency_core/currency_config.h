@@ -7,8 +7,9 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      81
-                                                        
+#define CURRENCY_FORMATION_VERSION                      84
+#define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + some_number_here)// <-- will be changed to another nightmare*/; //bender's nightmare
+
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
 #define CURRENCY_MAX_BLOCK_SIZE                         500000000  // block header blob limit, never used!
@@ -53,7 +54,7 @@
 // #define CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT        ((uint64_t)100000000) // should be TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER
 // #define CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER       1000                  // reward in minimum fees for a block in the zone
 
-#define CURRENCY_BLOCK_REWARD                   1000000000000 // 1.0 coin
+#define CURRENCY_BLOCK_REWARD                           1000000000000 // 1.0 coin
 
 
 #define WALLET_MAX_ALLOWED_OUTPUT_AMOUNT                ((uint64_t)0xffffffffffffffffLL)
@@ -99,12 +100,12 @@
 #define CURRENCY_MEMPOOL_TX_LIVETIME                    345600 //seconds, 4 days
 
 #ifndef TESTNET
-#define P2P_DEFAULT_PORT                                (CURRENCY_FORMATION_VERSION+11121)
+#define P2P_DEFAULT_PORT                                ---
 #define RPC_DEFAULT_PORT                                11211
 #define STRATUM_DEFAULT_PORT                            11777
 #define P2P_NETWORK_ID_TESTNET_FLAG                     0
 #else 
-#define P2P_DEFAULT_PORT                                (CURRENCY_FORMATION_VERSION+11112)
+#define P2P_DEFAULT_PORT                                (11112)
 #define RPC_DEFAULT_PORT                                12111
 #define STRATUM_DEFAULT_PORT                            11888
 #define STRARUM_DEFAULT_PORT                            51113
@@ -126,7 +127,7 @@
 #define P2P_DEFAULT_PING_CONNECTION_TIMEOUT             2000       //2 seconds
 #define P2P_DEFAULT_INVOKE_TIMEOUT                      60*2*1000  //2 minutes
 #define P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT            10000      //10 seconds
-#define P2P_MAINTAINERS_PUB_KEY                         "888db12b7e0cd325880c815ea13d7062f4c4a89dafc355f4d7b93a7f18342df3"
+#define P2P_MAINTAINERS_PUB_KEY                         "8f138bb73f6d663a3746a542770781a09579a7b84cb4125249e95530824ee607"
 #define P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT       70
 #define P2P_FAILED_ADDR_FORGET_SECONDS                  (60*5)     //5 minutes
 
@@ -162,7 +163,7 @@
 
 
 
-#define CURRENCY_NAME_ABR                               "ZAN"
+#define CURRENCY_NAME_ABR                               "ZANO"
 #define CURRENCY_NAME_BASE                              "Zano"
 #define CURRENCY_NAME_SHORT_BASE                        "Zano"
 #ifndef TESTNET
@@ -182,7 +183,7 @@
 #define ALIAS_REWARDS_ACCOUNT_VIEW_SEC_KEY              "0000000000000000000000000000000000000000000000000000000000000000" //burn alias money
 
 #define ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED         6
-#define ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY            "3b63cb2f3d425053f4120b10bced73d87e98c27b6e4bcfd123a5cfac688c551f" 
+#define ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY            "37947f7b6a5268c5d0a48bde73d7a426f0b5f24648f74024279540207dc70031" 
 
 
 #define ALIAS_NAME_MAX_LEN                              255
@@ -212,7 +213,7 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+63)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+64)
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
@@ -221,4 +222,4 @@
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");
 static_assert(PREMINE_AMOUNT / WALLET_MAX_ALLOWED_OUTPUT_AMOUNT < CURRENCY_MINER_TX_MAX_OUTS, "Premine can't be divided into reasonable number of outs");
-//static_assert(CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT == TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER, "CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT is incorrect with regard to TX_MINIMUM_FEE");
+

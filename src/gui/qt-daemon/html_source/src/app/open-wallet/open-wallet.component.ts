@@ -79,7 +79,7 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
 
             if (exists) {
               this.modalService.prepareModal('error', 'OPEN_WALLET.WITH_ADDRESS_ALREADY_OPEN');
-              this.backend.closeWallet(open_data.wallet_id, (close_status, close_data) => {
+              this.backend.closeWallet(open_data.wallet_id, () => {
                 this.ngZone.run(() => {
                   this.router.navigate(['/']);
                 });

@@ -67,7 +67,7 @@ app-sidebar {
               .fill {
 
                 @include themify($themes) {
-                  background-color: themed(progressBarFullBackgroundColor);
+                  background-color: themed(blueTextColor);
                 }
               }
             }
@@ -128,6 +128,13 @@ app-sidebar {
             background-color: themed(accountHoverBackgroundColor);
           }
         }
+      }
+    }
+
+    &:after {
+
+      @include themify($themes) {
+        background: linear-gradient(to bottom, transparent 0%, themed(sidebarBackgroundColor) 100%);
       }
     }
   }

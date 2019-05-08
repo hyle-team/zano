@@ -2102,21 +2102,13 @@ uint64_t wallet2::balance(uint64_t& unloked) const
   return balance(unloked, fake, fake, fake);
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const
+uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const
 {
-  unloked = 0;
+  unlocked = 0;
   uint64_t balance_total = 0;
   awaiting_in = 0;
   awaiting_out = 0;
   mined = 0;
-  
-//   struct pos_coinbase_tx_t
-//   {
-//     pos_coinbase_tx_t() : tx(nullptr), unspent_sum(0) {}
-//     const currency::transaction* tx;
-//     uint64_t unspent_sum;
-//   };
-//   std::unordered_map<crypto::hash, pos_coinbase_tx_t> pos_coinbase_txs;
   
   for(auto& td : m_transfers)
   {
@@ -2124,30 +2116,11 @@ uint64_t wallet2::balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& aw
     {
       balance_total += td.amount();
       if (is_transfer_unlocked(td))
-        unloked += td.amount();
+        unlocked += td.amount();
       if (td.m_flags & WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
         mined += td.amount();
-//      bool pos_coinbase = false;
-//       if (is_coinbase(td.m_ptx_wallet_info->m_tx, pos_coinbase))
-//         mined += td.amount();
-//       if (pos_coinbase)
-//       {
-//         auto& el = pos_coinbase_txs[get_transaction_hash(td.m_ptx_wallet_info->m_tx)];
-//         el.tx = &td.m_ptx_wallet_info->m_tx;
-//         el.unspent_sum += td.amount();
-//       }
     }
   }
-
-//   for(auto pt : pos_coinbase_txs)
-//   {
-//     uint64_t mined_prev = mined;
-//     THROW_IF_FALSE_WALLET_INT_ERR_EX(pt.second.tx->vin.size() == 2, "Invalid coinbase tx in the container");
-//     uint64_t coinbase_stake_amount = boost::get<txin_to_key>(pt.second.tx->vin[1]).amount;
-//     if (coinbase_stake_amount <= pt.second.unspent_sum)
-//       mined -= coinbase_stake_amount;
-//     THROW_IF_FALSE_WALLET_INT_ERR_EX(mined <= mined_prev, "");
-//   }
 
   for(auto& utx : m_unconfirmed_txs)
   {
@@ -2165,11 +2138,6 @@ uint64_t wallet2::balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& aw
       awaiting_out += utx.second.amount;
     }
   }
-  //collect escrow proposals change
-//  for (auto& exp: m_money_expirations)
-//  {
-//    balance_total += exp.change_amount;
-//  }
 
   return balance_total;
 }
@@ -4082,15 +4050,23 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
     return;
   }
 
-  TIME_MEASURE_START(finalize_transaction_time);
-  crypto::secret_key sk = AUTO_VAL_INIT(sk);
-  finalize_transaction(ftp, tx, sk, send_to_network);
-  TIME_MEASURE_FINISH(finalize_transaction_time);
-
-  // unlock transfers at the very end
   TIME_MEASURE_START(mark_transfers_as_spent_time);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
   TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
+
+  TIME_MEASURE_START(finalize_transaction_time);
+  try
+  {
+    crypto::secret_key sk = AUTO_VAL_INIT(sk);
+    finalize_transaction(ftp, tx, sk, send_to_network);
+  }
+  catch (...)
+  {
+    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception on money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
+    throw;
+  }
+  TIME_MEASURE_FINISH(finalize_transaction_time);
+
 
   WLT_LOG_GREEN("[wallet::transfer]"
     << "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)

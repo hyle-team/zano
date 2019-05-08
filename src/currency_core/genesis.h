@@ -9,10 +9,9 @@
 namespace currency
 {
 #pragma pack(push, 1)
-#pragma pack(push, 1)
   struct genesis_tx_raw_data
   {
-    uint64_t const v[136];
+    uint64_t const v[161];
     uint8_t const r[7];
   };
 #pragma pack(pop)
