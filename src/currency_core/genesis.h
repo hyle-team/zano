@@ -11,8 +11,8 @@ namespace currency
 #pragma pack(push, 1)
   struct genesis_tx_raw_data
   {
-    uint64_t const v[156];
-    uint8_t const r[0];
+    uint64_t const v[161];
+    uint8_t const r[7];
   };
 #pragma pack(pop)
   extern const genesis_tx_raw_data ggenesis_tx_raw;

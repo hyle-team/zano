@@ -1865,6 +1865,11 @@ namespace currency
     std::string genesis_coinbase_tx_hex = "";
 #endif
 
+    //genesis proof phrase: "Liverpool beat Barcelona: Greatest Champions League comebacks of all time"
+    //taken from: https://www.bbc.com/sport/football/48163330
+    //sha3-256 from proof phrase:  a074236b1354901d5dbc029c0ac4c05c948182c34f3030f32b0c93aee7ba275c (included in genesis block)
+
+
     blobdata tx_bl((const char*)&ggenesis_tx_raw, sizeof(ggenesis_tx_raw));
     //string_tools::parse_hexstr_to_binbuff(genesis_coinbase_tx_hex, tx_bl);
     bool r = parse_and_validate_tx_from_blob(tx_bl, bl.miner_tx);
@@ -1872,7 +1877,7 @@ namespace currency
     bl.major_version = CURRENT_BLOCK_MAJOR_VERSION;
     bl.minor_version = CURRENT_BLOCK_MINOR_VERSION;
     bl.timestamp = 0;
-    bl.nonce = 101010121 + CURRENCY_FORMATION_VERSION; //bender's nightmare
+    bl.nonce = CURRENCY_GENESIS_NONCE;
     LOG_PRINT_GREEN("Generated genesis: " << get_block_hash(bl), LOG_LEVEL_0);
     return true;
   }
