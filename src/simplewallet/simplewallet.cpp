@@ -97,6 +97,7 @@ namespace
 #endif
       , m_color(std::move(rhs.m_color))
       , m_log_level(std::move(rhs.m_log_level))
+      , m_bright(false)
     {
       rhs.m_flush = false;
     }
