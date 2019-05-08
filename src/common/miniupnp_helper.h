@@ -35,7 +35,8 @@ namespace tools
     miniupnp_helper():m_devlist(nullptr),
       m_urls(AUTO_VAL_INIT(m_urls)), 
       m_data(AUTO_VAL_INIT(m_data)),
-      m_IGD(0)
+      m_IGD(0),
+      m_external_port{}
     {
       m_lanaddr[0] = 0;
     }
