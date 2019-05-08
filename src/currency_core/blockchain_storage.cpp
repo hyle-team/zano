@@ -58,7 +58,7 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT          0
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT              1
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_LAST_WORKED_VERSION                   2
-#define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION   3 //mismatch here means full resync
+#define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION   4 //mismatch here means full resync
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MINOR_COMPATIBILITY_VERSION   4 //mismatch here means some reinitializations
 
 #define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
@@ -903,8 +903,8 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   //skip genesis timestamp
   TIME_MEASURE_START_PD(target_calculating_enum_blocks);
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = pos ? m_pos_targetdata_cache : m_pow_targetdata_cache;
-  if (targetdata_cache.empty())
-    load_targetdata_cache(pos);
+  //if (targetdata_cache.empty())
+  load_targetdata_cache(pos);
 
   size_t count = 0;
   for (auto it = targetdata_cache.rbegin(); it != targetdata_cache.rend() && count < DIFFICULTY_WINDOW; it++)
@@ -4259,7 +4259,11 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
 
-  get_block_height(bl);
+  uint64_t h = get_block_height(bl);
+  if (h == 221)
+  {
+    LOG_PRINT_L0("dddd");
+  }
 
   if(!check_block_timestamp_main(bl))
   {
@@ -4293,6 +4297,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   //check proof of work
   TIME_MEASURE_START_PD(target_calculating_time_2);
   wide_difficulty_type current_diffic = get_next_diff_conditional(is_pos_bl);
+  LOG_PRINT_L0("Difficulty: " << current_diffic);
   CHECK_AND_ASSERT_MES_CUSTOM(current_diffic, false, bvc.m_verification_failed = true, "!!!!!!!!! difficulty overhead !!!!!!!!!");
  TIME_MEASURE_FINISH_PD(target_calculating_time_2);
 
