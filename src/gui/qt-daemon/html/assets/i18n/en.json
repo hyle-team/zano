@@ -45,8 +45,7 @@
       "ERROR": "System error",
       "COMPLETE": "Completion",
       "SYNCING": "Syncing blockchain",
-      "LOADING": "Loading blockchain data",
-      "TESTNET": "(testnet)"
+      "LOADING": "Loading blockchain data"
     }
   },
   "MAIN": {
