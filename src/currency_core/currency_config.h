@@ -8,7 +8,7 @@
 
 
 #define CURRENCY_FORMATION_VERSION                      84
-#define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + some_number_here)// <-- will be changed to another nightmare*/; //bender's nightmare
+#define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121)// <-- will be changed to another nightmare*/; //bender's nightmare
 
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -100,7 +100,7 @@
 #define CURRENCY_MEMPOOL_TX_LIVETIME                    345600 //seconds, 4 days
 
 #ifndef TESTNET
-#define P2P_DEFAULT_PORT                                ---
+#define P2P_DEFAULT_PORT                                11121
 #define RPC_DEFAULT_PORT                                11211
 #define STRATUM_DEFAULT_PORT                            11777
 #define P2P_NETWORK_ID_TESTNET_FLAG                     0

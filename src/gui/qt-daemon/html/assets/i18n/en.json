@@ -46,7 +46,7 @@
       "COMPLETE": "Completion",
       "SYNCING": "Syncing blockchain",
       "LOADING": "Loading blockchain data",
-      "TESTNET": "(testnet)"
+      "TESTNET": ""
     }
   },
   "MAIN": {
