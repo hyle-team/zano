@@ -8,6 +8,7 @@
 }
 
 .sidebar-accounts {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -167,6 +168,15 @@
         outline: none;
       }
     }
+  }
+
+  &:after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: -3rem;
+    width: calc(100% + 6rem);
+    height: 5rem;
   }
 }
 
