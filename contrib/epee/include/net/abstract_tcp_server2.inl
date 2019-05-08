@@ -717,7 +717,7 @@ bool boosted_tcp_server<t_protocol_handler>::connect(const std::string& adr, con
 //---------------------------------------------------------------------------------
 template<class t_protocol_handler>
 template<class t_callback>
-bool boosted_tcp_server<t_protocol_handler>::connect_async(const std::string& adr, const std::string& port, uint32_t conn_timeout, t_callback cb, const std::string& bind_ip)
+bool boosted_tcp_server<t_protocol_handler>::connect_async(const std::string& adr, const std::string& port, uint32_t conn_timeout, const t_callback& cb, const std::string& bind_ip)
 {
   TRY_ENTRY();
   connection_ptr new_connection_l(new connection<t_protocol_handler>(io_service_, m_config, m_sockets_count, m_pfilter));
