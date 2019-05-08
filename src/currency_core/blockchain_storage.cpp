@@ -4259,12 +4259,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
 
-  uint64_t h = get_block_height(bl);
-  if (h == 221)
-  {
-    LOG_PRINT_L0("dddd");
-  }
-
   if(!check_block_timestamp_main(bl))
   {
     LOG_PRINT_L0("Block with id: " << id << ENDL
@@ -4297,7 +4291,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   //check proof of work
   TIME_MEASURE_START_PD(target_calculating_time_2);
   wide_difficulty_type current_diffic = get_next_diff_conditional(is_pos_bl);
-  LOG_PRINT_L0("Difficulty: " << current_diffic);
   CHECK_AND_ASSERT_MES_CUSTOM(current_diffic, false, bvc.m_verification_failed = true, "!!!!!!!!! difficulty overhead !!!!!!!!!");
  TIME_MEASURE_FINISH_PD(target_calculating_time_2);
 
