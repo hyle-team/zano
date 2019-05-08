@@ -236,6 +236,8 @@ public:
   async_protocol_handler(net_utils::i_service_endpoint* psnd_hndlr, 
     config_type& config, 
     t_connection_context& conn_context):
+            m_invoke_buf_ready{},
+            m_invoke_result_code{},
             m_current_head(bucket_head2()),
             m_pservice_endpoint(psnd_hndlr), 
             m_config(config), 
