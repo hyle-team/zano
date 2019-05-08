@@ -198,7 +198,7 @@ namespace nodetool
     bool is_peer_used(const peerlist_entry& peer);
     bool is_addr_connected(const net_address& peer);  
     template<class t_callback>
-    bool try_ping(basic_node_data& node_data, p2p_connection_context& context, t_callback cb);
+    bool try_ping(basic_node_data& node_data, p2p_connection_context& context, const t_callback& cb);
     bool make_expected_connections_count(bool white_list, size_t expected_connections);
     void cache_connect_fail_info(const net_address& addr);
     bool is_addr_recently_failed(const net_address& addr);
