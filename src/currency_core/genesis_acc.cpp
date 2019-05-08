@@ -9,9 +9,8 @@
 
 namespace currency
 {
-  const std::string ggenesis_tx_pub_key_str = "ee6c8c9d954d4482803f6112ecff3db02464cbdfe422b07129bf01149acf61f3";
+  const std::string ggenesis_tx_pub_key_str = "88bad574f43d16719a44152089f88672b4ecd93333c922b3ebdfbd1655fa6403";
   const crypto::public_key ggenesis_tx_pub_key = epee::string_tools::parse_tpod_from_hex_string<crypto::public_key>(ggenesis_tx_pub_key_str);
-
   const genesis_tx_dictionary_entry ggenesis_dict[26] = {
     { 898363347618325980ULL,7 },
     { 1234271292339965434ULL,1 },
@@ -40,6 +39,7 @@ namespace currency
     { 17146058209502212345ULL,14 },
     { 17472133472787764818ULL,10 }
   };
+
 }
 
 
