@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal, <anonimal@sekreta.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -195,7 +196,7 @@ namespace net_utils
                                                           m_timer(io_serice)
       {}
       boost::asio::deadline_timer m_timer;
-      uint64_t m_period;
+      uint64_t m_period{};
     };
 
     template <class t_handler>
