@@ -879,7 +879,7 @@ namespace log_space
         m_log_streams.push_back(streams_container::value_type(ls, log_level_limit));
         return true;
       }
-      return ls ? true:false;
+      return false;
     }
     bool add_logger( ibase_log_stream* pstream, int log_level_limit = LOG_LEVEL_4 )
     {
