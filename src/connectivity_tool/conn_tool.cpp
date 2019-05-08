@@ -793,6 +793,7 @@ bool handle_increment_build_no(po::variables_map& vm)
 //---------------------------------------------------------------------------------------------------------------
 bool handle_update_maintainers_info(po::variables_map& vm)
 {
+  log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
   if(!command_line::has_arg(vm, arg_rpc_port))
   {
     std::cout << "ERROR: rpc port not set" << ENDL;
