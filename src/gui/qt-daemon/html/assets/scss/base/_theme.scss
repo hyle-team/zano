@@ -1,7 +1,7 @@
 $themes: (
   dark: (
     bodyBackgroundColor: #131921,
-    sidebarBackgroundColor: rgba(23, 31, 39, 0.5),
+    sidebarBackgroundColor: rgba(23, 31, 39, 1),
     sidebarBorderColor: #1f2833,
     onlineColor: #5cda9d,
     offlineColor: #ff5252,
@@ -52,7 +52,7 @@ $themes: (
   ),
   gray: (
     bodyBackgroundColor: #101417,
-    sidebarBackgroundColor: rgba(28, 30, 33, 0.5),
+    sidebarBackgroundColor: rgba(28, 30, 33, 1),
     sidebarBorderColor: #2e3337,
     onlineColor: #47cf8d,
     offlineColor: #ff5252,
@@ -103,7 +103,7 @@ $themes: (
   ),
   white: (
     bodyBackgroundColor: #eeeeee,
-    sidebarBackgroundColor: rgba(255, 255, 255, 0.5),
+    sidebarBackgroundColor: rgba(255, 255, 255, 1),
     sidebarBorderColor: #ebebeb,
     onlineColor: #46c172,
     offlineColor: #ff5252,

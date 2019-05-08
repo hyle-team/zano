@@ -4082,15 +4082,23 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
     return;
   }
 
-  TIME_MEASURE_START(finalize_transaction_time);
-  crypto::secret_key sk = AUTO_VAL_INIT(sk);
-  finalize_transaction(ftp, tx, sk, send_to_network);
-  TIME_MEASURE_FINISH(finalize_transaction_time);
-
-  // unlock transfers at the very end
   TIME_MEASURE_START(mark_transfers_as_spent_time);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
   TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
+
+  TIME_MEASURE_START(finalize_transaction_time);
+  try
+  {
+    crypto::secret_key sk = AUTO_VAL_INIT(sk);
+    finalize_transaction(ftp, tx, sk, send_to_network);
+  }
+  catch (...)
+  {
+    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception on money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
+    throw;
+  }
+  TIME_MEASURE_FINISH(finalize_transaction_time);
+
 
   WLT_LOG_GREEN("[wallet::transfer]"
     << "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
