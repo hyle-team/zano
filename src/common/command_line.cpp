@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -25,4 +25,5 @@ namespace command_line
   const arg_descriptor<bool>        arg_show_details = { "currency-details", "Display currency details" };
   const arg_descriptor<bool>        arg_show_rpc_autodoc = { "show_rpc_autodoc", "Display rpc auto-generated documentation template" };
 
+  const arg_descriptor<bool> arg_disable_upnp = { "disable-upnp", "Disable UPnP (enhances local network privacy)", false, true };
 }
