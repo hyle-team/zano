@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -45,6 +45,7 @@ namespace currency
 
     bool new_wallet(const std::string &wallet_file, const std::string& password);
     bool open_wallet(const std::string &wallet_file, const std::string& password);
+    bool restore_wallet(const std::string& wallet_file, const std::string& password, const std::string& seed);
     bool close_wallet();
 
     bool help(const std::vector<std::string> &args = std::vector<std::string>());
@@ -147,6 +148,9 @@ namespace currency
     std::string m_wallet_file;
     std::string m_generate_new;
     std::string m_import_path;
+
+    std::string m_restore_wallet;
+    std::string m_restore_seed;
 
     std::string m_daemon_address;
     std::string m_daemon_host;
