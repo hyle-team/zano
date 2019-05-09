@@ -902,6 +902,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
     return DIFFICULTY_STARTER;
   //skip genesis timestamp
   TIME_MEASURE_START_PD(target_calculating_enum_blocks);
+  CRITICAL_REGION_BEGIN(m_targetdata_cache_lock);
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = pos ? m_pos_targetdata_cache : m_pow_targetdata_cache;
   //if (targetdata_cache.empty())
   load_targetdata_cache(pos);
@@ -913,6 +914,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
     commulative_difficulties.push_back(it->first);
     ++count;
   }
+  CRITICAL_REGION_END();
 
   wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
   TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
@@ -4594,6 +4596,7 @@ void blockchain_storage::on_block_removed(const block_extended_info& bei)
 //------------------------------------------------------------------
 void blockchain_storage::update_targetdata_cache_on_block_added(const block_extended_info& bei)
 {
+  CRITICAL_REGION_LOCAL(m_targetdata_cache_lock);
   if (bei.height == 0)
     return; //skip genesis
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = is_pos_block(bei.bl) ? m_pos_targetdata_cache : m_pow_targetdata_cache;
@@ -4604,6 +4607,7 @@ void blockchain_storage::update_targetdata_cache_on_block_added(const block_exte
 //------------------------------------------------------------------
 void blockchain_storage::update_targetdata_cache_on_block_removed(const block_extended_info& bei)
 {
+  CRITICAL_REGION_LOCAL(m_targetdata_cache_lock);
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = is_pos_block(bei.bl) ? m_pos_targetdata_cache : m_pow_targetdata_cache;
   if (targetdata_cache.size())
     targetdata_cache.pop_back();
@@ -4613,6 +4617,7 @@ void blockchain_storage::update_targetdata_cache_on_block_removed(const block_ex
 //------------------------------------------------------------------
 void blockchain_storage::load_targetdata_cache(bool is_pos)const
 {
+  CRITICAL_REGION_LOCAL(m_targetdata_cache_lock);
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = is_pos? m_pos_targetdata_cache: m_pow_targetdata_cache;
   targetdata_cache.clear();
   uint64_t stop_ind = 0;
