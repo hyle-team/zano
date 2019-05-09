@@ -695,8 +695,8 @@ namespace tools
       typedef basic_key_value_accessor<t_key, t_value, is_t_access_strategy> base_class;
 
       
-      typedef epee::misc_utils::cache_with_write_isolation<is_ordered_type, t_key, std::shared_ptr<const t_value>, 10000> cache_container_type;
-      //typedef epee::misc_utils::cache_dummy<is_ordered_type, t_key, std::shared_ptr<const t_value>, 100000> cache_container_type;
+      //typedef epee::misc_utils::cache_with_write_isolation<is_ordered_type, t_key, std::shared_ptr<const t_value>, 10000> cache_container_type;
+      typedef epee::misc_utils::cache_dummy<is_ordered_type, t_key, std::shared_ptr<const t_value>, 100000> cache_container_type;
       mutable cache_container_type m_cache;
 
 
