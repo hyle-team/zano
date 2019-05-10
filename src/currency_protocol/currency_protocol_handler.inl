@@ -298,7 +298,7 @@ namespace currency
     }
     LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK EXTRA: id: " << block_id 
       << ",bvc.m_added_to_main_chain " << bvc.m_added_to_main_chain
-      << ",prevalidate_result " << prevalidate_relayed
+      //<< ",prevalidate_result " << prevalidate_relayed
       << ",bvc.added_to_altchain " << bvc.added_to_altchain
       << ",bvc.m_marked_as_orphaned " << bvc.m_marked_as_orphaned, LOG_LEVEL_2);
 
