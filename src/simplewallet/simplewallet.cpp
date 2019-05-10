@@ -368,12 +368,6 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
     std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_view_secret_key) << std::endl << std::flush;
     if(m_do_not_set_date)
       m_wallet->reset_creation_time(0);
-
-    if (m_print_brain_wallet)
-    {
-      std::cout << "Brain wallet: " << m_wallet->get_account().get_restore_braindata() << std::endl << std::flush;
-    }
-
   }
   catch (const std::exception& e)
   {
@@ -383,7 +377,6 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
 
   m_wallet->init(m_daemon_address);
 
-
   success_msg_writer() <<
     "**********************************************************************\n" <<
     "Your wallet has been generated.\n" <<
@@ -392,6 +385,16 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
     "Always use \"exit\" command when closing simplewallet to save\n" <<
     "current session's state. Otherwise, you will possibly need to synchronize \n" <<
     "your wallet again. Your wallet key is NOT under risk anyway.\n" <<
+    "**********************************************************************";
+
+  success_msg_writer(true) <<
+    "\nPLEASE NOTE: the following mnemonic seed can be used to recover your wallet.\n" <<
+    "Please, write these words down and store them somewhere safe and secure. Also,\n" <<
+    "do not store them in your email or on file storage outside of your immediate control.\n";
+
+  std::cout << m_wallet->get_account().get_restore_braindata() << "\n" << std::endl << std::flush;
+
+  success_msg_writer() <<
     "**********************************************************************";
   return true;
 }
