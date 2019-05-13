@@ -24,6 +24,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   needOpenWallets = [];
 
+  currenciesFromNet = {
+    ZANO_bitmesh: null,
+    ZANO_qtrade: null,
+    BTC_bitmesh: null
+  };
+
   @ViewChild('allContextMenu') public allContextMenu: ContextMenuComponent;
   @ViewChild('onlyCopyContextMenu') public onlyCopyContextMenu: ContextMenuComponent;
 
@@ -547,18 +553,52 @@ export class AppComponent implements OnInit, OnDestroy {
     this.getMoneyEquivalent();
   }
 
+  recountMoneyEquivalent() {
+    let sum = 0;
+    let count = 0;
+    if (this.currenciesFromNet.BTC_bitmesh) {
+      if (this.currenciesFromNet.ZANO_qtrade) {
+        sum += this.currenciesFromNet.ZANO_qtrade;
+        count++;
+      }
+      if (this.currenciesFromNet.ZANO_bitmesh) {
+        sum += this.currenciesFromNet.ZANO_bitmesh;
+        count++;
+      }
+    }
+    this.variablesService.moneyEquivalent = (sum / count) / this.currenciesFromNet.BTC_bitmesh;
+  }
+
   getMoneyEquivalent() {
-    this.http.get('https://api.coinmarketcap.com/v2/ticker/406').subscribe(
-      result => {
-        if (result.hasOwnProperty('data')) {
-          this.variablesService.moneyEquivalent = result['data']['quotes']['USD']['price'];
-        }
+    this.http.get('https://blockchain.info/tobtc?currency=USD&value=1').subscribe(
+      result1 => {
+        this.currenciesFromNet.BTC_bitmesh = result1;
+        this.http.get('https://api.qtrade.io/v1/ticker/ZANO_BTC').subscribe(
+          result2 => {
+            if (result2.hasOwnProperty('data')) {
+              this.currenciesFromNet.ZANO_qtrade = (parseFloat(result2['data']['ask']) + parseFloat(result2['data']['bid'])) / 2;
+            }
+            this.recountMoneyEquivalent();
+          },
+          () => {
+          }
+        );
+        this.http.get('https://api.bitmesh.com/?api=market.statistics&params={"market":"btc_zano"}').subscribe(
+          result3 => {
+            if (result3.hasOwnProperty('data')) {
+              this.currenciesFromNet.ZANO_bitmesh = parseFloat(result3['data']['price']);
+            }
+            this.recountMoneyEquivalent();
+          },
+          () => {
+          }
+        );
       },
       error => {
         setTimeout(() => {
           this.getMoneyEquivalent();
         }, 60000);
-        console.warn('Error coinmarketcap', error);
+        console.warn('Error', error);
       }
     );
   }
