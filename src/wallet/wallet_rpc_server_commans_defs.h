@@ -277,9 +277,11 @@ namespace wallet_rpc
     struct request
     {
       std::string payment_id; // hex-encoded
+      bool allow_locked_transactions;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(payment_id)
+        KV_SERIALIZE(allow_locked_transactions)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -299,10 +301,12 @@ namespace wallet_rpc
     {
       std::vector<std::string> payment_ids;
       uint64_t min_block_height;
+      bool allow_locked_transactions;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(payment_ids)
         KV_SERIALIZE(min_block_height)
+        KV_SERIALIZE(allow_locked_transactions)
       END_KV_SERIALIZE_MAP()
     };
 

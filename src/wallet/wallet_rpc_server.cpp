@@ -226,6 +226,13 @@ namespace tools
     m_wallet.get_payments(payment_id, payment_list);
     for (auto payment : payment_list)
     {
+      if (payment.m_unlock_time && !req.allow_locked_transactions)
+      {
+        //check that transaction don't have locking for time longer then 10 blocks ahead
+        //TODO: add code for "unlock_time" set as timestamp, now it's all being filtered
+        if (payment.m_unlock_time > payment.m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE)
+          continue;
+      }
       wallet_rpc::payment_details rpc_payment;
       rpc_payment.payment_id   = req.payment_id;
       rpc_payment.tx_hash      = epee::string_tools::pod_to_hex(payment.m_tx_hash);
@@ -257,6 +264,14 @@ namespace tools
 
       for (auto & payment : payment_list)
       {
+        if (payment.m_unlock_time && !req.allow_locked_transactions)
+        {
+          //check that transaction don't have locking for time longer then 10 blocks ahead
+          //TODO: add code for "unlock_time" set as timestamp, now it's all being filtered
+          if (payment.m_unlock_time > payment.m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE)
+            continue;
+        }
+
         wallet_rpc::payment_details rpc_payment;
         rpc_payment.payment_id = payment_id_str;
         rpc_payment.tx_hash = epee::string_tools::pod_to_hex(payment.m_tx_hash);

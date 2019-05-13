@@ -402,14 +402,14 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::on_maintainers_entry_update()
   {
-    LOG_PRINT_MAGENTA("Fresh maintainers info recieved(timestamp: " << m_maintainers_info_local.timestamp << ")", LOG_LEVEL_0);
+    LOG_PRINT_CHANNEL_COLOR2(NULL, NULL, "Fresh maintainers info recieved(timestamp: " << m_maintainers_info_local.timestamp << ")", LOG_LEVEL_0, epee::log_space::console_color_magenta);
     if(PROJECT_VERSION_BUILD_NO < m_maintainers_info_local.build_no)
     {
-      LOG_PRINT_MAGENTA("Newer version avaliable: " << static_cast<uint32_t>(m_maintainers_info_local.ver_major) <<
+      LOG_PRINT_CHANNEL_COLOR2(NULL, NULL, "Newer version avaliable: " << static_cast<uint32_t>(m_maintainers_info_local.ver_major) <<
                                                 "." << static_cast<uint32_t>(m_maintainers_info_local.ver_minor) <<
                                                 "." << static_cast<uint32_t>(m_maintainers_info_local.ver_revision) <<
                                                 "." << static_cast<uint32_t>(m_maintainers_info_local.build_no) <<
-                                                ", current version: " <<  PROJECT_VERSION_LONG, LOG_LEVEL_0);
+                                                ", current version: " <<  PROJECT_VERSION_LONG, LOG_LEVEL_0, epee::log_space::console_color_magenta);
     }
     handle_alert_conditions();
 
@@ -893,7 +893,7 @@ namespace nodetool
     if(m_alert_mode != ALERT_TYPE_CALM)
       return true;
 
-    LOG_PRINT_L0("This software is old, please update.");
+    LOG_PRINT_CHANNEL2(NULL, NULL, "This software is outdated, please update.", LOG_LEVEL_0);
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -903,7 +903,7 @@ namespace nodetool
     if(m_alert_mode  != ALERT_TYPE_URGENT)
       return true;
 
-    LOG_PRINT_CYAN("[URGENT]:This software is old, please update.", LOG_LEVEL_0);
+    LOG_PRINT_CHANNEL_COLOR2(NULL, NULL, "[URGENT]:This software is dramatically outdated, please update to latest version.", LOG_LEVEL_0, epee::log_space::console_color_cyan);
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -913,7 +913,7 @@ namespace nodetool
     if(m_alert_mode  != ALERT_TYPE_CRITICAL)
       return true;
 
-    LOG_PRINT_RED("[CRITICAL]:This software is old, please update.", LOG_LEVEL_0);
+    LOG_PRINT_CHANNEL_COLOR2(NULL, NULL, "[CRITICAL]:This software is critically outdated, please update to latest version.", LOG_LEVEL_0, epee::log_space::console_color_red);
     return true;
   }
   //-----------------------------------------------------------------------------------

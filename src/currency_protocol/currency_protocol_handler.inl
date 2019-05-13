@@ -258,6 +258,11 @@ namespace currency
     }
     
     //pre-validate block here, and propagate it to network asap to avoid latency of handling big block (tx flood)
+    //########################################################
+    /*
+    problem with prevalidation: in case of pre_validate_block() is passed but handle_incoming_tx() is failed
+    network got spammed with notifications about this broken block and then connections got closed.
+    temporary disabled to more investigation
     bool prevalidate_relayed = false; 
     if (m_core.pre_validate_block(b, bvc, block_id) && bvc.m_added_to_main_chain)
     {
@@ -266,6 +271,8 @@ namespace currency
       relay_block(arg, context);
       prevalidate_relayed = true;
     }
+    */
+    //########################################################
 
     //now actually process block
     for(auto tx_blob_it = arg.b.txs.begin(); tx_blob_it!=arg.b.txs.end();tx_blob_it++)
@@ -291,13 +298,13 @@ namespace currency
     }
     LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK EXTRA: id: " << block_id 
       << ",bvc.m_added_to_main_chain " << bvc.m_added_to_main_chain
-      << ",prevalidate_result " << prevalidate_relayed
+      //<< ",prevalidate_result " << prevalidate_relayed
       << ",bvc.added_to_altchain " << bvc.added_to_altchain
       << ",bvc.m_marked_as_orphaned " << bvc.m_marked_as_orphaned, LOG_LEVEL_2);
 
     if (bvc.m_added_to_main_chain || (bvc.added_to_altchain && bvc.height_difference < 2))
     { 
-      if (!prevalidate_relayed)
+      if (true/*!prevalidate_relayed*/)
       {
         // pre-validation failed prevoiusly, but complete check was success, not an alternative block
         ++arg.hop;

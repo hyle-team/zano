@@ -511,6 +511,7 @@ namespace currency
     mutable wide_difficulty_type m_cached_next_pow_difficulty;
     mutable wide_difficulty_type m_cached_next_pos_difficulty;
 
+    mutable critical_section m_targetdata_cache_lock;
     mutable std::list <std::pair<wide_difficulty_type, uint64_t>> m_pos_targetdata_cache;
     mutable std::list <std::pair<wide_difficulty_type, uint64_t>> m_pow_targetdata_cache;
     //work like a cache to avoid recalculation on read operations
