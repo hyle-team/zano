@@ -929,6 +929,7 @@ bool handle_download_peer_log(po::variables_map& vm)
   {
     std::cout << "ERROR: secret key error" << ENDL;
     return false;
+  }
 
   int64_t start_offset = 0;
   int64_t count = -1;
