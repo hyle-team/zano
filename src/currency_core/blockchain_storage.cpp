@@ -2213,31 +2213,6 @@ bool blockchain_storage::is_multisig_output_spent(const crypto::hash& multisig_i
   return source_tx_ptr->m_spent_flags[ms_out_index];
 }
 //------------------------------------------------------------------
-// bool blockchain_storage::resync_spent_tx_flags()
-// {
-//   LOG_PRINT_L0("Started re-building spent tx outputs data...");
-//   CRITICAL_REGION_LOCAL(m_blockchain_lock);
-//   for(auto& tx: m_db_transactions)
-//   {
-//     if(is_coinbase(tx.second.tx))
-//       continue;
-// 
-//     for(auto& in: tx.second.tx.vin)
-//     {      
-//       CHECKED_GET_SPECIFIC_VARIANT(in, txin_to_key, in_to_key, false);
-//       if(in_to_key.key_offsets.size() != 1)
-//         continue;
-// 
-//       //direct spending
-//       if(!update_spent_tx_flags_for_input(in_to_key.amount, in_to_key.key_offsets[0], true))
-//         return false;
-// 
-//     }
-//   }
-//   LOG_PRINT_L0("Finished re-building spent tx outputs data");
-//   return true;
-// }
-//------------------------------------------------------------------
 bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, uint64_t& starter_offset)const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
