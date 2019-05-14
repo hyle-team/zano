@@ -55,7 +55,7 @@ namespace
   const command_line::arg_descriptor<uint64_t>    arg_genesis_split_amount = { "genesis-split-amount", "Set split amount for generating genesis block", 0, true };
   const command_line::arg_descriptor<std::string> arg_get_info_flags     = { "getinfo-flags-hex", "Set of bits for rpc-get-daemon-info", "", true };
   const command_line::arg_descriptor<int64_t>    arg_set_peer_log_level = { "set-peer-log-level", "Set log level for remote peer", 0, true };
-  const command_line::arg_descriptor<uint64_t>    arg_download_peer_log =  { "download-peer-log", "Download log from remote peer (starting offset)", 0, true };
+  const command_line::arg_descriptor<std::string> arg_download_peer_log =  { "download-peer-log", "Download log from remote peer <starting_offset>[,<count>]", "", true };
   const command_line::arg_descriptor<bool>        arg_do_consloe_log    = { "do-console-log", "Tool generates debug console output(debug purposes)", "", true };
 }
 
@@ -929,9 +929,28 @@ bool handle_download_peer_log(po::variables_map& vm)
   {
     std::cout << "ERROR: secret key error" << ENDL;
     return false;
+
+  int64_t start_offset = 0;
+  int64_t count = -1;
+
+  std::string arg_str = command_line::get_arg(vm, arg_download_peer_log);
+  size_t comma_pos = arg_str.find(',');
+  if (comma_pos != std::string::npos)
+  {
+    // count is specified
+    if (!epee::string_tools::string_to_num_fast(arg_str.substr(comma_pos + 1), count) || count < 0)
+    {
+      std::cout << "ERROR: invalid argument: " << arg_str << ENDL;
+      return false;
+    }
+    arg_str.erase(comma_pos);
+  }
+  if (!epee::string_tools::string_to_num_fast(arg_str, start_offset) || start_offset < 0)
+  {
+    std::cout << "ERROR: couldn't parse start_offset: " << arg_str << ENDL;
+    return false;
   }
 
-  uint64_t start_offset = command_line::get_arg(vm, arg_download_peer_log);
 
   levin::levin_client_impl2 transport;
   peerid_type peer_id = 0;
@@ -946,6 +965,9 @@ bool handle_download_peer_log(po::variables_map& vm)
 
   std::cout << "Current log level: " << rsp.current_log_level << ENDL;
   std::cout << "Current log size:  " << rsp.current_log_size << ENDL;
+
+  if (start_offset == 0 && count == 0)
+    return true; // a caller wanted to just get the info, end of story
 
   if (start_offset >= rsp.current_log_size)
   {
@@ -969,6 +991,13 @@ bool handle_download_peer_log(po::variables_map& vm)
   {
     req.log_chunk_offset = end_offset;
     req.log_chunk_size = std::min(chunk_size, rsp.current_log_size - req.log_chunk_offset);
+
+    if (count > 0)
+    {
+      uint64_t bytes_left = count + start_offset - end_offset;
+      req.log_chunk_size = std::min(req.log_chunk_size, bytes_left);
+    }
+
     if (req.log_chunk_size == 0)
       break;
 
