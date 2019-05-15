@@ -1546,7 +1546,7 @@ void daemon_backend::wallet_vs_options::worker_func()
           {
             w->get()->build_minted_block(ctx.sp, ctx.rsp);
           }
-          LOG_PRINT_L1(w->get()->get_log_prefix() + " PoS mint iteration finished(" << ctx.rsp.status << ")");
+          LOG_PRINT_L1(w->get()->get_log_prefix() + " PoS mint iteration finished(iterations: " << ctx.rsp.iterations_processed << "," << ctx.rsp.status << ")");
           return true;
         });
       }
