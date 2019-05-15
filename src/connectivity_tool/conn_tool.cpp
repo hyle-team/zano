@@ -931,7 +931,7 @@ bool handle_download_peer_log(po::variables_map& vm)
     return false;
   }
 
-  int64_t start_offset = 0;
+  int64_t start_offset_signed = 0;
   int64_t count = -1;
 
   std::string arg_str = command_line::get_arg(vm, arg_download_peer_log);
@@ -946,12 +946,12 @@ bool handle_download_peer_log(po::variables_map& vm)
     }
     arg_str.erase(comma_pos);
   }
-  if (!epee::string_tools::string_to_num_fast(arg_str, start_offset) || start_offset < 0)
+  if (!epee::string_tools::string_to_num_fast(arg_str, start_offset_signed) || start_offset_signed < 0)
   {
     std::cout << "ERROR: couldn't parse start_offset: " << arg_str << ENDL;
     return false;
   }
-
+  uint64_t start_offset = static_cast<uint64_t>(start_offset_signed);
 
   levin::levin_client_impl2 transport;
   peerid_type peer_id = 0;
