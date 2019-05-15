@@ -902,9 +902,10 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
     return DIFFICULTY_STARTER;
   //skip genesis timestamp
   TIME_MEASURE_START_PD(target_calculating_enum_blocks);
+  CRITICAL_REGION_BEGIN(m_targetdata_cache_lock);
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = pos ? m_pos_targetdata_cache : m_pow_targetdata_cache;
-  if (targetdata_cache.empty())
-    load_targetdata_cache(pos);
+  //if (targetdata_cache.empty())
+  load_targetdata_cache(pos);
 
   size_t count = 0;
   for (auto it = targetdata_cache.rbegin(); it != targetdata_cache.rend() && count < DIFFICULTY_WINDOW; it++)
@@ -913,6 +914,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
     commulative_difficulties.push_back(it->first);
     ++count;
   }
+  CRITICAL_REGION_END();
 
   wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
   TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
@@ -2210,31 +2212,6 @@ bool blockchain_storage::is_multisig_output_spent(const crypto::hash& multisig_i
 
   return source_tx_ptr->m_spent_flags[ms_out_index];
 }
-//------------------------------------------------------------------
-// bool blockchain_storage::resync_spent_tx_flags()
-// {
-//   LOG_PRINT_L0("Started re-building spent tx outputs data...");
-//   CRITICAL_REGION_LOCAL(m_blockchain_lock);
-//   for(auto& tx: m_db_transactions)
-//   {
-//     if(is_coinbase(tx.second.tx))
-//       continue;
-// 
-//     for(auto& in: tx.second.tx.vin)
-//     {      
-//       CHECKED_GET_SPECIFIC_VARIANT(in, txin_to_key, in_to_key, false);
-//       if(in_to_key.key_offsets.size() != 1)
-//         continue;
-// 
-//       //direct spending
-//       if(!update_spent_tx_flags_for_input(in_to_key.amount, in_to_key.key_offsets[0], true))
-//         return false;
-// 
-//     }
-//   }
-//   LOG_PRINT_L0("Finished re-building spent tx outputs data");
-//   return true;
-// }
 //------------------------------------------------------------------
 bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, uint64_t& starter_offset)const
 {
@@ -4259,8 +4236,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
 
-  get_block_height(bl);
-
   if(!check_block_timestamp_main(bl))
   {
     LOG_PRINT_L0("Block with id: " << id << ENDL
@@ -4596,6 +4571,7 @@ void blockchain_storage::on_block_removed(const block_extended_info& bei)
 //------------------------------------------------------------------
 void blockchain_storage::update_targetdata_cache_on_block_added(const block_extended_info& bei)
 {
+  CRITICAL_REGION_LOCAL(m_targetdata_cache_lock);
   if (bei.height == 0)
     return; //skip genesis
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = is_pos_block(bei.bl) ? m_pos_targetdata_cache : m_pow_targetdata_cache;
@@ -4606,6 +4582,7 @@ void blockchain_storage::update_targetdata_cache_on_block_added(const block_exte
 //------------------------------------------------------------------
 void blockchain_storage::update_targetdata_cache_on_block_removed(const block_extended_info& bei)
 {
+  CRITICAL_REGION_LOCAL(m_targetdata_cache_lock);
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = is_pos_block(bei.bl) ? m_pos_targetdata_cache : m_pow_targetdata_cache;
   if (targetdata_cache.size())
     targetdata_cache.pop_back();
@@ -4615,6 +4592,7 @@ void blockchain_storage::update_targetdata_cache_on_block_removed(const block_ex
 //------------------------------------------------------------------
 void blockchain_storage::load_targetdata_cache(bool is_pos)const
 {
+  CRITICAL_REGION_LOCAL(m_targetdata_cache_lock);
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = is_pos? m_pos_targetdata_cache: m_pow_targetdata_cache;
   targetdata_cache.clear();
   uint64_t stop_ind = 0;
