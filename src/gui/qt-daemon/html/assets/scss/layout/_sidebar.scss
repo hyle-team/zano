@@ -202,31 +202,93 @@ app-sidebar {
           background-color: themed(onlineColor);
         }
       }
-    }
 
-    .progress-bar-container {
+      .progress-bar-container {
 
-      .syncing {
+        .syncing {
 
-        .progress-bar {
-
-          @include themify($themes) {
-            background-color: themed(progressBarBackgroundColor);
-          }
-
-          .fill {
+          .progress-bar {
 
             @include themify($themes) {
-              background-color: themed(progressBarFullBackgroundColor);
+              background-color: themed(progressBarBackgroundColor);
+            }
+
+            .fill {
+
+              @include themify($themes) {
+                background-color: themed(progressBarFullBackgroundColor);
+              }
             }
           }
         }
-      }
 
-      .loading {
+        .loading {
+
+          @include themify($themes) {
+            background-color: themed(progressBarFullBackgroundColor);
+          }
+        }
+      }
+    }
+
+    .update-container {
+
+      .standard {
 
         @include themify($themes) {
-          background-color: themed(progressBarFullBackgroundColor);
+          color: themed(blueTextColor);
+        }
+      }
+
+      .important {
+
+        @include themify($themes) {
+          color: themed(orangeTextColor);
+        }
+      }
+
+      .critical {
+
+        @include themify($themes) {
+          color: themed(redTextColor);
+        }
+      }
+
+      .time {
+
+        @include themify($themes) {
+          color: themed(orangeTextColor);
+        }
+      }
+
+      .icon {
+
+        &.standard {
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+        }
+
+        &.important {
+
+          @include themify($themes) {
+            background-color: themed(orangeTextColor);
+          }
+        }
+
+        &.critical {
+
+          @include themify($themes) {
+            background-color: themed(redTextColor);
+          }
+        }
+
+        &.time {
+
+          @include themify($themes) {
+            background-color: themed(orangeTextColor);
+          }
         }
       }
     }
