@@ -236,7 +236,7 @@ DISABLE_VS_WARNINGS(4100)
 
 /// @brief Catches TRY_ENTRY without returning
 /// @details Useful within a dtor - but only if nested within another try block
-///    (since we can still potentially throw here)
+///    (since we can still potentially throw here). See NESTED_*ENTRY()
 /// @todo Exception dispatcher class
 #define CATCH_ENTRY_NO_RETURN(location, custom_code) } \
   catch(const std::exception& ex) \
@@ -250,6 +250,12 @@ DISABLE_VS_WARNINGS(4100)
   LOG_ERROR("Exception at [" << location << "], generic exception \"...\""); \
   custom_code; \
 }
+
+#define NESTED_TRY_ENTRY() try { TRY_ENTRY();
+
+#define NESTED_CATCH_ENTRY(location) \
+  CATCH_ENTRY_NO_RETURN(location, {}); \
+  } catch (...) {}
 
 #define ASSERT_MES_AND_THROW(message) {LOG_ERROR(message); std::stringstream ss; ss << message; throw std::runtime_error(ss.str());}
 
