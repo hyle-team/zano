@@ -26,17 +26,11 @@ namespace tools
     }
     lmdb_db_backend::~lmdb_db_backend()
     {
-      try
-        {
-          TRY_ENTRY();
+      NESTED_TRY_ENTRY();
 
-          close();
+      close();
 
-          CATCH_ENTRY_NO_RETURN(__func__, {});
-        }
-      catch (...)
-        {
-        }
+      NESTED_CATCH_ENTRY(__func__);
     }
 
     bool lmdb_db_backend::open(const std::string& path_, uint64_t cache_sz)
