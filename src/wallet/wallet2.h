@@ -1014,7 +1014,7 @@ namespace tools
     cxt.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
     uint64_t timstamp_start = runtime_config.get_core_time();
     uint64_t timstamp_last_idle_call = runtime_config.get_core_time();
-
+    cxt.rsp.iterations_processed = 0;
 
     for (size_t i = 0; i != cxt.sp.pos_entries.size(); i++)
     {
@@ -1080,6 +1080,7 @@ namespace tools
         {
           PROFILE_FUNC("check_hash");
           check_hash_res = currency::check_hash(kernel_hash, this_coin_diff);
+          ++cxt.rsp.iterations_processed;
         }
         if (check_hash_res)
         {
