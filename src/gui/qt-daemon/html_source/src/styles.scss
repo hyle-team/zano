@@ -80,3 +80,13 @@ body {
     height: 100%;
   }
 }
+
+.update-tooltip {
+
+  .tooltip-inner {
+
+    .icon {
+      mask: url(assets/icons/update-alert.svg) no-repeat center;
+    }
+  }
+}

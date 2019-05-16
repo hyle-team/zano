@@ -19,8 +19,10 @@ export class VariablesService {
   public defaultCurrency = 'ZANO';
   public opening_wallet: Wallet;
   public exp_med_ts = 0;
+  public ts_diff = 0;
   public height_app = 0;
   public last_build_available = '';
+  public last_build_displaymode = 0;
   public daemon_state = 3;
   public sync = {
     progress_value: 0,
@@ -75,6 +77,7 @@ export class VariablesService {
   setExpMedTs(timestamp: number) {
     if (timestamp !== this.exp_med_ts) {
       this.exp_med_ts = timestamp;
+      this.ts_diff = Math.abs(new Date().getTime() - (timestamp * 1000));
       this.getExpMedTsEvent.next(timestamp);
     }
   }
