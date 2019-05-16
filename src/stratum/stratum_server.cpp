@@ -801,24 +801,18 @@ namespace
 
     ~stratum_protocol_handler()
     {
-      try
+      NESTED_TRY_ENTRY();
+
+      if (m_connection_initialized)
         {
-          TRY_ENTRY();
-
-          if (m_connection_initialized)
-            {
-              m_config.remove_protocol_handler(this);
-              m_connection_initialized = false;
-            }
-
-          LOG_PRINT_CC(
-              m_context, "stratum_protocol_handler::dtor()", LOG_LEVEL_4);
-
-          CATCH_ENTRY_NO_RETURN(__func__, {});
+          m_config.remove_protocol_handler(this);
+          m_connection_initialized = false;
         }
-      catch (...)
-        {
-        }
+
+      LOG_PRINT_CC(
+          m_context, "stratum_protocol_handler::dtor()", LOG_LEVEL_4);
+
+      NESTED_CATCH_ENTRY(__func__);
     }
 
     // required member for epee::net_utils::boosted_tcp_server concept
