@@ -42,17 +42,11 @@ namespace tools
     }
     ~miniupnp_helper()
     {
-      try
-        {
-          TRY_ENTRY();
+      NESTED_TRY_ENTRY();
 
-          deinit();
+      deinit();
 
-          CATCH_ENTRY_NO_RETURN(__func__, {});
-        }
-      catch (...)
-        {
-        }
+      NESTED_CATCH_ENTRY(__func__);
     }
 
     bool start_regular_mapping(uint32_t internal_port, uint32_t external_port, uint32_t period_ms)
