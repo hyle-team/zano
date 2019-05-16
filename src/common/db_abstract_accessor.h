@@ -725,17 +725,11 @@ namespace tools
       }
       ~cached_key_value_accessor()
       {
-        try
-          {
-            TRY_ENTRY();
+        NESTED_TRY_ENTRY();
 
-            m_cache.clear();  //will clear cache isolated
+        m_cache.clear();  //will clear cache isolated
 
-            CATCH_ENTRY_NO_RETURN(__func__, {});
-          }
-        catch (...)
-          {
-          }
+        NESTED_CATCH_ENTRY(__func__);
       }
 
       void clear_cache() const 
