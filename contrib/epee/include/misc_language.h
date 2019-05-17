@@ -314,17 +314,11 @@ namespace misc_utils
     {}
     ~call_befor_die()
     {
-      try
-        {
-          TRY_ENTRY();
+      NESTED_TRY_ENTRY();
 
-          m_func();
+      m_func();
 
-          CATCH_ENTRY_NO_RETURN(__func__, {});
-        }
-      catch (...)
-        {
-        }
+      NESTED_CATCH_ENTRY(__func__);
     }
   };
 
