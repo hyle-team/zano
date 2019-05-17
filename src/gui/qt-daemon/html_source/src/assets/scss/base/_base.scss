@@ -375,9 +375,9 @@ input[type='checkbox'].style-checkbox {
     &:after {
       content: "";
       position: absolute;
-      bottom: -2rem;
-      left: calc(50% - 1rem);
-      border-width: 1rem;
+      bottom: -1rem;
+      left: calc(50% - 0.5rem);
+      border-width: 0.5rem;
       border-style: solid;
 
       @include themify($themes) {
@@ -394,11 +394,11 @@ input[type='checkbox'].style-checkbox {
       position: absolute;
       bottom: -1rem;
       left: 0.7rem;
-      border-width: 1rem 1rem 0 0;
+      border-width: 0.5rem;
       border-style: solid;
 
       @include themify($themes) {
-        border-color: themed(tooltipBackgroundColor) transparent transparent transparent;
+        border-color: themed(tooltipBackgroundColor) transparent transparent themed(tooltipBackgroundColor);
       }
     }
   }
@@ -426,9 +426,9 @@ input[type='checkbox'].style-checkbox {
     &:before {
       content: "";
       position: absolute;
-      top: -2rem;
-      left: calc(50% - 1rem);
-      border-width: 1rem;
+      top: -1rem;
+      left: calc(50% - 0.5rem);
+      border-width: 0.5rem;
       border-style: solid;
 
       @include themify($themes) {
@@ -477,13 +477,13 @@ input[type='checkbox'].style-checkbox {
     &:after {
       content: "";
       position: absolute;
-      top: 0;
+      top: calc(50% - 0.5rem);
       right: -1rem;
-      border-width: 1rem 1rem 0 0;
+      border-width: 0.5rem;
       border-style: solid;
 
       @include themify($themes) {
-        border-color: themed(tooltipBackgroundColor) transparent transparent transparent;
+        border-color: transparent transparent transparent themed(tooltipBackgroundColor);
       }
     }
   }
@@ -494,13 +494,13 @@ input[type='checkbox'].style-checkbox {
     &:before {
       content: "";
       position: absolute;
-      top: 0;
+      top: calc(50% - 0.5rem);
       left: -1rem;
-      border-width: 1rem 0 0 1rem;
+      border-width: 0.5rem;
       border-style: solid;
 
       @include themify($themes) {
-        border-color: themed(tooltipBackgroundColor) transparent transparent transparent;
+        border-color: transparent themed(tooltipBackgroundColor) transparent transparent;
       }
     }
   }
@@ -586,6 +586,162 @@ input[type='checkbox'].style-checkbox {
     word-break: break-word;
     max-width: 50rem;
     max-height: 25rem;
+  }
+}
+
+.update-tooltip {
+  padding: 1.5rem;
+
+  @include themify($themes) {
+    background: themed(tooltipBackgroundColor);
+    box-shadow: themed(tooltipShadow);
+    color: themed(mainTextColor);
+  }
+
+  &.important {
+
+    @include themify($themes) {
+      background: themed(tooltipImportantBackgroundColor);
+      color: themed(accountMainTextColor);
+    }
+
+    &.ng-tooltip-left-bottom {
+
+      &:after {
+
+        @include themify($themes) {
+          border-color: transparent transparent themed(tooltipImportantBackgroundColor) themed(tooltipImportantBackgroundColor);
+        }
+      }
+    }
+
+    &.ng-tooltip-right-bottom {
+
+      &:before {
+
+        @include themify($themes) {
+          border-color: transparent themed(tooltipImportantBackgroundColor) themed(tooltipImportantBackgroundColor) transparent;
+        }
+      }
+    }
+  }
+
+  &.critical {
+    padding: 2.5rem;
+
+    @include themify($themes) {
+      background: themed(tooltipCriticalBackgroundColor);
+      color: themed(accountMainTextColor);
+    }
+
+    .tooltip-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    &.ng-tooltip-left-bottom {
+
+      &:after {
+
+        @include themify($themes) {
+          border-color: transparent transparent themed(tooltipCriticalBackgroundColor) themed(tooltipCriticalBackgroundColor);
+        }
+      }
+    }
+
+    &.ng-tooltip-right-bottom {
+
+      &:before {
+
+        @include themify($themes) {
+          border-color: transparent themed(tooltipCriticalBackgroundColor) themed(tooltipCriticalBackgroundColor) transparent;
+        }
+      }
+    }
+  }
+
+  .tooltip-inner {
+    font-size: 1.3rem;
+    line-height: 1.8rem;
+    white-space: pre-wrap;
+
+    .standard-update {
+      font-size: 1.5rem;
+      line-height: 2.7rem;
+
+      @include themify($themes) {
+        color: themed(blueTextColor);
+      }
+    }
+
+    .important-update {
+      font-size: 1.5rem;
+      line-height: 2.7rem;
+
+      @include themify($themes) {
+        color: themed(tooltipImportantTextColor);
+      }
+    }
+
+    .critical-update {
+      font-size: 1.5rem;
+      line-height: 2.7rem;
+      text-align: center;
+    }
+
+    .wrong-time {
+      font-size: 1.5rem;
+      line-height: 2.7rem;
+
+      @include themify($themes) {
+        color: themed(tooltipImportantTextColor);
+      }
+    }
+
+    .icon {
+      margin: 1.5rem 0;
+      width: 5rem;
+      height: 5rem;
+
+      @include themify($themes) {
+        background-color: themed(tooltipCriticalTextColor);
+      }
+    }
+  }
+
+  &.ng-tooltip-left-bottom {
+    margin-left: -1.5rem;
+
+    &:after {
+      content: "";
+      position: absolute;
+      bottom: 0.6rem;
+      right: -1rem;
+      border-width: 0.5rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: transparent transparent themed(tooltipBackgroundColor) themed(tooltipBackgroundColor);
+      }
+    }
+  }
+
+  &.ng-tooltip-right-bottom {
+    margin-left: 1.5rem;
+
+    &:before {
+      content: "";
+      position: absolute;
+      bottom: 0.6rem;
+      left: -1rem;
+      border-width: 0.5rem;
+      border-style: solid;
+
+      @include themify($themes) {
+        border-color: transparent themed(tooltipBackgroundColor) themed(tooltipBackgroundColor) transparent;
+      }
+    }
   }
 }
 

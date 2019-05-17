@@ -1,6 +1,7 @@
 import {Component, NgZone, OnInit, OnDestroy} from '@angular/core';
 import {ActivatedRoute, NavigationStart, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
+import {BackendService} from '../_helpers/services/backend.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -16,6 +17,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     public variablesService: VariablesService,
+    private backend: BackendService,
     private ngZone: NgZone
   ) {}
 
@@ -45,6 +47,10 @@ export class SidebarComponent implements OnInit, OnDestroy {
         }
       }
     });
+  }
+
+  getUpdate() {
+    this.backend.openUrlInBrowser('docs.zano.org/docs/zano-wallet');
   }
 
   logOut() {
