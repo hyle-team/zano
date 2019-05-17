@@ -67,9 +67,7 @@ DISABLE_VS_WARNINGS(4355)
   template<class t_protocol_handler>
   connection<t_protocol_handler>::~connection()
   {
-    try
-      {
-        TRY_ENTRY();
+    NESTED_TRY_ENTRY();
 
     if(!m_was_shutdown)
     {
@@ -82,11 +80,7 @@ DISABLE_VS_WARNINGS(4355)
     VALIDATE_MUTEX_IS_FREE(m_send_que_lock);
     VALIDATE_MUTEX_IS_FREE(m_self_refs_lock);
 
-        CATCH_ENTRY_NO_RETURN(__func__, {});
-      }
-    catch (...)
-      {
-      }
+    NESTED_CATCH_ENTRY(__func__);
   }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
@@ -470,18 +464,12 @@ DISABLE_VS_WARNINGS(4355)
   template<class t_protocol_handler>
   boosted_tcp_server<t_protocol_handler>::~boosted_tcp_server()
   {
-    try
-      {
-        TRY_ENTRY();
+    NESTED_TRY_ENTRY();
 
-        this->send_stop_signal();
-        timed_wait_server_stop(10000);
+    this->send_stop_signal();
+    timed_wait_server_stop(10000);
 
-        CATCH_ENTRY_NO_RETURN(__func__, {});
-      }
-    catch (...)
-      {
-      }
+    NESTED_CATCH_ENTRY(__func__);
   }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
