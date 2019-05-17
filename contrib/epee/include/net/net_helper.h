@@ -107,18 +107,12 @@ namespace net_utils
 		inline
 			~blocked_mode_client()
 		{
-                  try
-                    {
-                      TRY_ENTRY();
+                        NESTED_TRY_ENTRY();
 
 			//profile_tools::local_coast lc("~blocked_mode_client()", 3);
 			shutdown();
 
-                      CATCH_ENTRY_NO_RETURN(__func__, {});
-                    }
-                  catch (...)
-                    {
-                    }
+                        NESTED_CATCH_ENTRY(__func__);
                 }
 
 		inline void set_recv_timeout(int reciev_timeout)
