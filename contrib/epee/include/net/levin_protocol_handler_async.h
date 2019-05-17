@@ -91,18 +91,12 @@ public:
   {}
   ~async_protocol_handler_config()
   {
-    try
-      {
-        TRY_ENTRY();
+    NESTED_TRY_ENTRY();
 
-        CRITICAL_REGION_LOCAL(m_connects_lock);
-        m_connects.clear();
+    CRITICAL_REGION_LOCAL(m_connects_lock);
+    m_connects.clear();
 
-        CATCH_ENTRY_NO_RETURN(__func__, {});
-      }
-    catch (...)
-      {
-      }
+    NESTED_CATCH_ENTRY(__func__);
   }
 };
 
@@ -255,9 +249,7 @@ public:
 
   virtual ~async_protocol_handler()
   {
-    try
-      {
-        TRY_ENTRY();
+    NESTED_TRY_ENTRY();
 
     m_deletion_initiated = true;
     if(m_connection_initialized)
@@ -278,11 +270,7 @@ public:
     VALIDATE_MUTEX_IS_FREE(m_call_lock);
     VALIDATE_MUTEX_IS_FREE(m_invoke_response_handlers_lock);
 
-        CATCH_ENTRY_NO_RETURN(__func__, {});
-      }
-    catch (...)
-      {
-      }
+    NESTED_CATCH_ENTRY(__func__);
   }
 
   bool start_outer_call()
