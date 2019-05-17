@@ -107,20 +107,14 @@ namespace profile_tools
     }
 		~local_call_account()
 		{
-                  try
-                    {
-                      TRY_ENTRY();
+                  NESTED_TRY_ENTRY();
 
       LOG_PRINT2("profile_details.log", "PROFILE "<< std::left << std::setw(50) << (m_name + ":")
         << "av_time:" << std::setw(15) << epee::string_tools::print_fixed_decimal_point (m_count_of_call ? (m_summary_time_used / m_count_of_call) : 0, 3)
         << "sum_time: " << std::setw(15) << epee::string_tools::print_fixed_decimal_point(m_summary_time_used, 3)
         << "call_count: " << std::setw(15) << m_count_of_call, LOG_LEVEL_0);
 
-                      CATCH_ENTRY_NO_RETURN(__func__, {});
-                    }
-                  catch (...)
-                    {
-                    }
+                  NESTED_CATCH_ENTRY(__func__);
                 }
 
 		size_t m_count_of_call;
@@ -138,9 +132,7 @@ namespace profile_tools
 
                 ~call_frame()
                 {
-                  try
-                    {
-                      TRY_ENTRY();
+                  NESTED_TRY_ENTRY();
 
                       boost::posix_time::ptime now_t(boost::posix_time::microsec_clock::local_time());
                       boost::posix_time::time_duration delta_microsec = now_t - m_call_time;
@@ -148,11 +140,7 @@ namespace profile_tools
                       m_cc.m_summary_time_used += microseconds_used;
                       m_cc.m_count_of_call++;
 
-                      CATCH_ENTRY_NO_RETURN(__func__, {});
-                    }
-                  catch (...)
-                    {
-                    }
+                  NESTED_CATCH_ENTRY(__func__);
                 }
 
         private:
