@@ -1609,13 +1609,10 @@ POP_WARNINGS
     }
     ~log_frame()
     {
-      try
-        {
-          TRY_ENTRY();
+      NESTED_TRY_ENTRY();
 #ifdef _MSC_VER
       int lasterr=::GetLastError();
 #endif
-
       if (m_level <= log_singletone::get_log_detalisation_level() )
       {
         std::stringstream ss;
@@ -1625,11 +1622,7 @@ POP_WARNINGS
 #ifdef _MSC_VER
       ::SetLastError(lasterr);
 #endif
-          CATCH_ENTRY_NO_RETURN(__func__, {});
-        }
-      catch (...)
-        {
-        }
+      NESTED_CATCH_ENTRY(__func__);
     }
   };
 
