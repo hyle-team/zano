@@ -919,7 +919,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
   TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
   TIME_MEASURE_START_PD(target_calculating_calc);
-  dif = next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET, pos);
+  dif = next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
   TIME_MEASURE_FINISH_PD(target_calculating_calc);
   return dif;
 }
@@ -947,7 +947,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
     return true;
   };
   enum_blockchain(cb, alt_chain, split_height);
-  return next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET, pos);
+  return next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
 }
 //------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_cached_next_difficulty(bool pos) const
