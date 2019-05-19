@@ -63,6 +63,8 @@ DISABLE_VS_WARNINGS(4355)
 template<class t_protocol_handler>
 connection<t_protocol_handler>::~connection()
 {
+  NESTED_TRY_ENTRY();
+
   if(!m_was_shutdown) {
     LOG_PRINT_L3("[sock " << socket_.native_handle() << "] Socket destroyed without shutdown.");
     shutdown();
@@ -72,6 +74,8 @@ connection<t_protocol_handler>::~connection()
   boost::interprocess::ipcdetail::atomic_dec32(&m_ref_sockets_count);
   VALIDATE_MUTEX_IS_FREE(m_send_que_lock);
   VALIDATE_MUTEX_IS_FREE(m_self_refs_lock);
+
+  NESTED_CATCH_ENTRY(__func__);
 }
 //---------------------------------------------------------------------------------
 template<class t_protocol_handler>
@@ -436,8 +440,12 @@ boosted_tcp_server<t_protocol_handler>::boosted_tcp_server(boost::asio::io_servi
 template<class t_protocol_handler>
 boosted_tcp_server<t_protocol_handler>::~boosted_tcp_server()
 {
+  NESTED_TRY_ENTRY();
+
   this->send_stop_signal();
   timed_wait_server_stop(10000);
+
+  NESTED_CATCH_ENTRY(__func__);
 }
 //---------------------------------------------------------------------------------
 template<class t_protocol_handler>
