@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -70,6 +70,7 @@ int main(int argc, char* argv[])
   // tools::get_default_data_dir() can't be called during static initialization
   command_line::add_arg(desc_cmd_only, command_line::arg_data_dir, tools::get_default_data_dir());
   command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
+  command_line::add_arg(desc_cmd_only, command_line::arg_disable_upnp);
 
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_dir);
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
@@ -162,7 +163,6 @@ int main(int argc, char* argv[])
   cprotocol.set_p2p_endpoint(&p2psrv);
   ccore.set_currency_protocol(&cprotocol);
   daemon_cmmands_handler dch(p2psrv, rpc_server);
-  tools::miniupnp_helper upnp_helper;
   //ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
   std::shared_ptr<currency::stratum_server> stratum_server_ptr;
   if (stratum_enabled)
@@ -193,8 +193,12 @@ int main(int argc, char* argv[])
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize p2p server.");
   LOG_PRINT_L0("P2p server initialized OK on port: " << p2psrv.get_this_peer_port());
 
-  LOG_PRINT_L0("Starting UPnP");
-  upnp_helper.start_regular_mapping(p2psrv.get_this_peer_port(), p2psrv.get_this_peer_port(), 20*60*1000);
+  if (!command_line::get_arg(vm, command_line::arg_disable_upnp))
+  {
+    tools::miniupnp_helper upnp_helper;
+    LOG_PRINT_L0("Starting UPnP");
+    upnp_helper.start_regular_mapping(p2psrv.get_this_peer_port(), p2psrv.get_this_peer_port(), 20*60*1000);
+  }
 
   LOG_PRINT_L0("Initializing currency protocol...");
   res = cprotocol.init(vm);
