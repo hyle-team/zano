@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal, <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -85,7 +86,9 @@ namespace net_utils
                             m_initialized(false), 
                             m_connected(false), 
                             m_deadline(m_io_service), 
-                            m_shutdowned(0)
+                            m_shutdowned(0),
+                            m_connect_timeout{},
+                            m_reciev_timeout{}
 		{
 			
 			
@@ -104,9 +107,13 @@ namespace net_utils
 		inline
 			~blocked_mode_client()
 		{
+                        NESTED_TRY_ENTRY();
+
 			//profile_tools::local_coast lc("~blocked_mode_client()", 3);
 			shutdown();
-		}
+
+                        NESTED_CATCH_ENTRY(__func__);
+                }
 
 		inline void set_recv_timeout(int reciev_timeout)
 		{

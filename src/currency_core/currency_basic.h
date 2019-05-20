@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2014-2015 The Boolberry developers
@@ -389,7 +389,7 @@ namespace currency
   {
   public:
     // tx version information
-    size_t   version;
+    size_t   version{};
     //extra
     std::vector<extra_v> extra;  
     std::vector<txin_v> vin;

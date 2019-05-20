@@ -323,13 +323,17 @@ namespace
 
     ~stratum_protocol_handler_config()
     {
+      NESTED_TRY_ENTRY();
+
       LOG_PRINT_L4("stratum_protocol_handler_config::dtor()");
-      
+
       m_stop_flag = true;
       m_blocktemplate_update_thread.join();
 
       if (m_p_core)
         m_p_core->remove_blockchain_update_listener(this);
+
+      NESTED_CATCH_ENTRY(__func__);
     }
 
     void add_protocol_handler(protocol_handler_t* p_ph)
@@ -797,13 +801,18 @@ namespace
 
     ~stratum_protocol_handler()
     {
-      if (m_connection_initialized)
-      {
-        m_config.remove_protocol_handler(this);
-        m_connection_initialized = false;
-      }
+      NESTED_TRY_ENTRY();
 
-      LOG_PRINT_CC(m_context, "stratum_protocol_handler::dtor()", LOG_LEVEL_4);
+      if (m_connection_initialized)
+        {
+          m_config.remove_protocol_handler(this);
+          m_connection_initialized = false;
+        }
+
+      LOG_PRINT_CC(
+          m_context, "stratum_protocol_handler::dtor()", LOG_LEVEL_4);
+
+      NESTED_CATCH_ENTRY(__func__);
     }
 
     // required member for epee::net_utils::boosted_tcp_server concept
@@ -1085,7 +1094,7 @@ struct stratum_server_impl
 };
 //------------------------------------------------------------------------------------------------------------------------------
 stratum_server::stratum_server(core* c)
-  : m_p_core(c)
+  : m_p_core(c), m_threads_count{}
 {
   m_impl = new stratum_server_impl();
 }

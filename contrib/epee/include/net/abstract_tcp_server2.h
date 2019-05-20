@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal, <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 //
@@ -185,7 +186,7 @@ class boosted_tcp_server
 
   bool connect(const std::string& adr, const std::string& port, uint32_t conn_timeot, t_connection_context& cn, const std::string& bind_ip = "0.0.0.0");
   template<class t_callback>
-  bool connect_async(const std::string& adr, const std::string& port, uint32_t conn_timeot, t_callback cb, const std::string& bind_ip = "0.0.0.0");
+  bool connect_async(const std::string& adr, const std::string& port, uint32_t conn_timeot, const t_callback& cb, const std::string& bind_ip = "0.0.0.0");
 
   typename t_protocol_handler::config_type& get_config_object()
   {

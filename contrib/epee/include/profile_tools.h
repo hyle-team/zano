@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -106,16 +107,20 @@ namespace profile_tools
     }
 		~local_call_account()
 		{
+                  NESTED_TRY_ENTRY();
+
       LOG_PRINT2("profile_details.log", "PROFILE "<< std::left << std::setw(50) << (m_name + ":")
         << "av_time:" << std::setw(15) << epee::string_tools::print_fixed_decimal_point (m_count_of_call ? (m_summary_time_used / m_count_of_call) : 0, 3)
         << "sum_time: " << std::setw(15) << epee::string_tools::print_fixed_decimal_point(m_summary_time_used, 3)
         << "call_count: " << std::setw(15) << m_count_of_call, LOG_LEVEL_0);
-		}
+
+                  NESTED_CATCH_ENTRY(__func__);
+                }
 
 		size_t m_count_of_call;
 		uint64_t m_summary_time_used;
 		std::string m_name;
-	};
+        };
 	
 	struct call_frame
 	{
@@ -124,17 +129,21 @@ namespace profile_tools
 		{
 			m_call_time = boost::posix_time::microsec_clock::local_time();
 		}
-		
-		~call_frame()
-		{			
-			boost::posix_time::ptime now_t(boost::posix_time::microsec_clock::local_time());
-			boost::posix_time::time_duration delta_microsec = now_t - m_call_time;
-      uint64_t microseconds_used = delta_microsec.total_microseconds();
-      m_cc.m_summary_time_used += microseconds_used;
-      m_cc.m_count_of_call++;
-		}
-		
-	private:
+
+                ~call_frame()
+                {
+                  NESTED_TRY_ENTRY();
+
+                      boost::posix_time::ptime now_t(boost::posix_time::microsec_clock::local_time());
+                      boost::posix_time::time_duration delta_microsec = now_t - m_call_time;
+                      uint64_t microseconds_used = delta_microsec.total_microseconds();
+                      m_cc.m_summary_time_used += microseconds_used;
+                      m_cc.m_count_of_call++;
+
+                  NESTED_CATCH_ENTRY(__func__);
+                }
+
+        private:
 		local_call_account& m_cc;
 		boost::posix_time::ptime m_call_time;
 	};

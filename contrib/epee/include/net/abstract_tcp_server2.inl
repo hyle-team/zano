@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 //
@@ -53,7 +54,8 @@ connection<t_protocol_handler>::connection(boost::asio::io_service& io_service,
       m_want_close_connection(0),
       m_was_shutdown(0),
       m_ref_sockets_count(sock_count),
-      m_pfilter(pfilter)
+      m_pfilter(pfilter),
+      m_is_multithreaded(false)
 {
   boost::interprocess::ipcdetail::atomic_inc32(&m_ref_sockets_count);
 }
@@ -62,6 +64,8 @@ DISABLE_VS_WARNINGS(4355)
 template<class t_protocol_handler>
 connection<t_protocol_handler>::~connection()
 {
+  NESTED_TRY_ENTRY();
+
   if(!m_was_shutdown) {
     LOG_PRINT_L3("[sock " << socket_.native_handle() << "] Socket destroyed without shutdown.");
     shutdown();
@@ -71,6 +75,8 @@ connection<t_protocol_handler>::~connection()
   boost::interprocess::ipcdetail::atomic_dec32(&m_ref_sockets_count);
   VALIDATE_MUTEX_IS_FREE(m_send_que_lock);
   VALIDATE_MUTEX_IS_FREE(m_self_refs_lock);
+
+  NESTED_CATCH_ENTRY(__func__);
 }
 //---------------------------------------------------------------------------------
 template<class t_protocol_handler>
@@ -435,8 +441,12 @@ boosted_tcp_server<t_protocol_handler>::boosted_tcp_server(boost::asio::io_servi
 template<class t_protocol_handler>
 boosted_tcp_server<t_protocol_handler>::~boosted_tcp_server()
 {
+  NESTED_TRY_ENTRY();
+
   this->send_stop_signal();
   timed_wait_server_stop(10000);
+
+  NESTED_CATCH_ENTRY(__func__);
 }
 //---------------------------------------------------------------------------------
 template<class t_protocol_handler>
@@ -716,7 +726,7 @@ bool boosted_tcp_server<t_protocol_handler>::connect(const std::string& adr, con
 //---------------------------------------------------------------------------------
 template<class t_protocol_handler>
 template<class t_callback>
-bool boosted_tcp_server<t_protocol_handler>::connect_async(const std::string& adr, const std::string& port, uint32_t conn_timeout, t_callback cb, const std::string& bind_ip)
+bool boosted_tcp_server<t_protocol_handler>::connect_async(const std::string& adr, const std::string& port, uint32_t conn_timeout, const t_callback& cb, const std::string& bind_ip)
 {
   TRY_ENTRY();
   connection_ptr new_connection_l(new connection<t_protocol_handler>(io_service_, m_config, m_sockets_count, m_pfilter));

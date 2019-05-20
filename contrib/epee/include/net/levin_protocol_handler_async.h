@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -76,7 +77,7 @@ public:
   void on_send_stop_signal();
   int invoke(int command, const std::string& in_buff, std::string& buff_out, boost::uuids::uuid connection_id);
   template<class callback_t>
-  int invoke_async(int command, const std::string& in_buff, boost::uuids::uuid connection_id, callback_t cb, size_t timeout = LEVIN_DEFAULT_TIMEOUT_PRECONFIGURED);
+  int invoke_async(int command, const std::string& in_buff, boost::uuids::uuid connection_id, const callback_t& cb, size_t timeout = LEVIN_DEFAULT_TIMEOUT_PRECONFIGURED);
 
   int notify(int command, const std::string& in_buff, boost::uuids::uuid connection_id);
   bool close(boost::uuids::uuid connection_id);
@@ -86,14 +87,17 @@ public:
   bool foreach_connection(callback_t cb);
   size_t get_connections_count();
 
-  async_protocol_handler_config() :m_pcommands_handler(NULL), m_max_packet_size(LEVIN_DEFAULT_MAX_PACKET_SIZE), m_is_in_sendstop_loop(false)
+  async_protocol_handler_config() :m_pcommands_handler(NULL), m_max_packet_size(LEVIN_DEFAULT_MAX_PACKET_SIZE), m_is_in_sendstop_loop(false), m_invoke_timeout{}
   {}
   ~async_protocol_handler_config()
   {
+    NESTED_TRY_ENTRY();
+
     CRITICAL_REGION_LOCAL(m_connects_lock);
     m_connects.clear();
+
+    NESTED_CATCH_ENTRY(__func__);
   }
-  
 };
 
 
@@ -213,7 +217,7 @@ public:
   std::list<boost::shared_ptr<invoke_response_handler_base> > m_invoke_response_handlers;
   
   template<class callback_t>
-  bool add_invoke_response_handler(callback_t cb, uint64_t timeout,  async_protocol_handler& con, int command)
+  bool add_invoke_response_handler(const callback_t& cb, uint64_t timeout,  async_protocol_handler& con, int command)
   {
     CRITICAL_REGION_LOCAL(m_invoke_response_handlers_lock);
     boost::shared_ptr<invoke_response_handler_base> handler(boost::make_shared<invoke_handler<callback_t>>(cb, timeout, con, command));
@@ -226,6 +230,8 @@ public:
   async_protocol_handler(net_utils::i_service_endpoint* psnd_hndlr, 
     config_type& config, 
     t_connection_context& conn_context):
+            m_invoke_buf_ready{},
+            m_invoke_result_code{},
             m_current_head(bucket_head2()),
             m_pservice_endpoint(psnd_hndlr), 
             m_config(config), 
@@ -243,6 +249,8 @@ public:
 
   virtual ~async_protocol_handler()
   {
+    NESTED_TRY_ENTRY();
+
     m_deletion_initiated = true;
     if(m_connection_initialized)
     {
@@ -261,6 +269,8 @@ public:
     VALIDATE_MUTEX_IS_FREE(m_send_lock);
     VALIDATE_MUTEX_IS_FREE(m_call_lock);
     VALIDATE_MUTEX_IS_FREE(m_invoke_response_handlers_lock);
+
+    NESTED_CATCH_ENTRY(__func__);
   }
 
   bool start_outer_call()
@@ -529,7 +539,7 @@ public:
   }
 
   template<class callback_t>
-  bool async_invoke(int command, const std::string& in_buff, callback_t cb, size_t timeout = LEVIN_DEFAULT_TIMEOUT_PRECONFIGURED)
+  bool async_invoke(int command, const std::string& in_buff, const callback_t& cb, size_t timeout = LEVIN_DEFAULT_TIMEOUT_PRECONFIGURED)
   {
     misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
       boost::bind(&async_protocol_handler::finish_outer_call, this));
@@ -784,7 +794,7 @@ int async_protocol_handler_config<t_connection_context>::invoke(int command, con
 }
 //------------------------------------------------------------------------------------------
 template<class t_connection_context> template<class callback_t>
-int async_protocol_handler_config<t_connection_context>::invoke_async(int command, const std::string& in_buff, boost::uuids::uuid connection_id, callback_t cb, size_t timeout)
+int async_protocol_handler_config<t_connection_context>::invoke_async(int command, const std::string& in_buff, boost::uuids::uuid connection_id, const callback_t& cb, size_t timeout)
 {
   async_protocol_handler<t_connection_context>* aph;
   int r = find_and_lock_connection(connection_id, aph);

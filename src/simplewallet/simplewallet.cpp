@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -20,6 +20,8 @@
 #include "wallet/wallet_rpc_server.h"
 #include "version.h"
 #include "string_coding.h"
+
+#include <cstdlib>
 
 #if defined(WIN32)
 #include <crtdbg.h>
@@ -95,6 +97,7 @@ namespace
 #endif
       , m_color(std::move(rhs.m_color))
       , m_log_level(std::move(rhs.m_log_level))
+      , m_bright(false)
     {
       rhs.m_flush = false;
     }
@@ -108,24 +111,28 @@ namespace
 
     ~message_writer()
     {
+      NESTED_TRY_ENTRY();
+
       if (m_flush)
-      {
-        m_flush = false;
-
-        LOG_PRINT(m_oss.str(), m_log_level)
-
-        if (epee::log_space::console_color_default == m_color)
         {
-          std::cout << m_oss.str();
+          m_flush = false;
+
+          LOG_PRINT(m_oss.str(), m_log_level)
+
+          if (epee::log_space::console_color_default == m_color)
+            {
+              std::cout << m_oss.str();
+            }
+          else
+            {
+              epee::log_space::set_console_color(m_color, m_bright);
+              std::cout << m_oss.str();
+              epee::log_space::reset_console_color();
+            }
+          std::cout << std::endl;
         }
-        else
-        {
-          epee::log_space::set_console_color(m_color, m_bright);
-          std::cout << m_oss.str();
-          epee::log_space::reset_console_color();
-        }
-        std::cout << std::endl;
-      }
+
+      NESTED_CATCH_ENTRY(__func__);
     }
 
   private:
@@ -1408,6 +1415,10 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
+  try
+    {
+      TRY_ENTRY();
+
 #ifdef WIN32
   _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
@@ -1418,8 +1429,6 @@ int main(int argc, char* argv[])
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
     std::fflush(nullptr);
   });
-
-  //TRY_ENTRY();
 
   string_tools::set_module_name_and_folder(argv[0]);
 
@@ -1444,7 +1453,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_log_file);
   command_line::add_arg(desc_params, command_line::arg_log_level);
 
-  
+
   tools::wallet_rpc_server::init_options(desc_params);
 
   po::positional_options_description positional_options;
@@ -1476,7 +1485,7 @@ int main(int argc, char* argv[])
     return true;
   });
   if (!r)
-    return 1;
+    return EXIT_FAILURE;
 
   //set up logging options
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
@@ -1498,7 +1507,7 @@ int main(int argc, char* argv[])
     LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
     log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, command_line::arg_log_level));
   }
-  
+
   bool offline_mode = command_line::get_arg(vm, arg_offline_mode);
 
   if(command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
@@ -1511,19 +1520,19 @@ int main(int argc, char* argv[])
     if (!command_line::has_arg(vm, arg_wallet_file) || command_line::get_arg(vm, arg_wallet_file).empty())
     {
       LOG_ERROR("Wallet file is not set.");
-      return 1;
+      return EXIT_FAILURE;
     }
 
     if (!command_line::has_arg(vm, arg_daemon_address) && !command_line::has_arg(vm, arg_offline_mode))
     {
       LOG_ERROR("Daemon address is not set.");
-      return 1;
+      return EXIT_FAILURE;
     }
 
     if (!command_line::has_arg(vm, arg_password) )
     {
       LOG_ERROR("Wallet password is not set.");
-      return 1;
+      return EXIT_FAILURE;
     }
 
     std::string wallet_file     = command_line::get_arg(vm, arg_wallet_file);
@@ -1554,7 +1563,7 @@ int main(int argc, char* argv[])
       catch (const std::exception& e)
       {
         LOG_ERROR("Wallet initialize failed: " << e.what());
-        return 1;
+        return EXIT_FAILURE;
       }
       break;
     }
@@ -1566,7 +1575,7 @@ int main(int argc, char* argv[])
         LOG_PRINT_L0("Initializing wallet...");
         wal.init(daemon_address);
         if (command_line::get_arg(vm, arg_generate_new_wallet).size())
-          return 1;
+          return EXIT_FAILURE;
         if (!offline_mode)
           wal.refresh();
         LOG_PRINT_GREEN("Loaded ok", LOG_LEVEL_0);
@@ -1574,7 +1583,7 @@ int main(int argc, char* argv[])
       catch (const std::exception& e)
       {
         LOG_ERROR("Wallet initialize failed: " << e.what());
-        return 1;
+        return EXIT_FAILURE;
       }
       break;
     }
@@ -1582,7 +1591,7 @@ int main(int argc, char* argv[])
 
     tools::wallet_rpc_server wrpc(wal);
     bool r = wrpc.init(vm);
-    CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet rpc server");
+    CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to initialize wallet rpc server");
 
     tools::signal_handler::install([&wrpc/*, &wal*/ /* TODO(unassigned): use? */] {
       wrpc.send_stop_signal();
@@ -1599,16 +1608,16 @@ int main(int argc, char* argv[])
     catch (const std::exception& e)
     {
       LOG_ERROR("Failed to store wallet: " << e.what());
-      return 1;
+      return EXIT_FAILURE;
     }
   }else
   {
-    //runs wallet with console interface 
+    //runs wallet with console interface
     sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
     CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet");
     if (command_line::get_arg(vm, arg_generate_new_wallet).size())
-      return 1;
+      return EXIT_FAILURE;
 
 
     std::vector<std::string> command = command_line::get_arg(vm, arg_command);
@@ -1628,6 +1637,12 @@ int main(int argc, char* argv[])
       sw->deinit();
     }
   }
-  return 1;
-  //CATCH_ENTRY_L0("main", 1);
+
+      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
+    }
+  catch (...)
+    {
+      return EXIT_FAILURE;
+    }
+  return EXIT_SUCCESS;
 }

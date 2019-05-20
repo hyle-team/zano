@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -35,13 +35,18 @@ namespace tools
     miniupnp_helper():m_devlist(nullptr),
       m_urls(AUTO_VAL_INIT(m_urls)), 
       m_data(AUTO_VAL_INIT(m_data)),
-      m_IGD(0)
+      m_IGD(0),
+      m_external_port{}
     {
       m_lanaddr[0] = 0;
     }
     ~miniupnp_helper()
     {
+      NESTED_TRY_ENTRY();
+
       deinit();
+
+      NESTED_CATCH_ENTRY(__func__);
     }
 
     bool start_regular_mapping(uint32_t internal_port, uint32_t external_port, uint32_t period_ms)

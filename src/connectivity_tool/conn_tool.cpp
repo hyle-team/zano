@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -24,6 +24,7 @@ using namespace epee;
 #include "net/http_client.h"
 #include "currency_core/genesis_acc.h"
 
+#include <cstdlib>
 
 namespace po = boost::program_options;
 using namespace currency;
@@ -1037,6 +1038,9 @@ bool handle_download_peer_log(po::variables_map& vm)
 //---------------------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
+  try
+    {
+      TRY_ENTRY();
 
   string_tools::set_module_name_and_folder(argv[0]);
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
@@ -1072,9 +1076,6 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_set_peer_log_level);
   command_line::add_arg(desc_params, arg_download_peer_log);
   command_line::add_arg(desc_params, arg_do_consloe_log);
-  
-
-    
 
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
@@ -1095,7 +1096,7 @@ int main(int argc, char* argv[])
     return true;
   });
   if (!r)
-    return 1;
+    return EXIT_FAILURE;
   if (command_line::has_arg(vm, arg_do_consloe_log) && command_line::get_arg(vm, arg_do_consloe_log))
   {
     log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
@@ -1105,43 +1106,43 @@ int main(int argc, char* argv[])
   if (command_line::get_arg(vm, command_line::arg_version))
   {
     std::cout << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ENDL;
-    return 0;
+    return EXIT_SUCCESS;
   }
   if(command_line::has_arg(vm, arg_request_stat_info) || command_line::has_arg(vm, arg_request_net_state))
   {
-    return handle_request_stat(vm, command_line::get_arg(vm, arg_peer_id)) ? 0:1;
+    return handle_request_stat(vm, command_line::get_arg(vm, arg_peer_id)) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   if(command_line::has_arg(vm, arg_get_daemon_info))
   {
-    return handle_get_daemon_info(vm) ? 0:1;
+    return handle_get_daemon_info(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if(command_line::has_arg(vm, arg_generate_keys))
   {
-    return  generate_and_print_keys() ? 0:1;
+    return  generate_and_print_keys() ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if(command_line::has_arg(vm, arg_get_aliases))
   {
-    return handle_get_aliases(vm) ? 0:1;
+    return handle_get_aliases(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if(command_line::has_arg(vm, arg_upate_maintainers_info))
   {
-    return handle_update_maintainers_info(vm) ? 0:1;
+    return handle_update_maintainers_info(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_increment_build_no))
   {
-    return handle_increment_build_no(vm) ? 0 : 1;
+    return handle_increment_build_no(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_generate_genesis))
   {
-    return generate_genesis(command_line::get_arg(vm, arg_generate_genesis), 10000000000000000) ? 0 : 1;
+    return generate_genesis(command_line::get_arg(vm, arg_generate_genesis), 10000000000000000) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_set_peer_log_level))
   {
-    return handle_set_peer_log_level(vm) ? 0 : 1;
+    return handle_set_peer_log_level(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_download_peer_log))
   {
-    return handle_download_peer_log(vm) ? 0 : 1;
+    return handle_download_peer_log(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else
   {
@@ -1149,6 +1150,13 @@ int main(int argc, char* argv[])
     std::cerr << desc_all << ENDL;
   }
 
-  return 1;
+      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
+    }
+  catch (...)
+    {
+      return EXIT_FAILURE;
+    }
+
+  return EXIT_FAILURE;
 }
 
