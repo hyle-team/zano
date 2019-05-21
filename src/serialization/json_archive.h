@@ -1,3 +1,4 @@
+// Copyright (c) 2014-2019 The Zano Project
 // Copyright (c) 2014-2017 The The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -73,7 +74,7 @@ struct json_archive;
 template <>
 struct json_archive<true> : public json_archive_base<std::ostream, true>
 {
-  json_archive(stream_type &s, bool indent = false) : base_type(s, indent) { }
+  json_archive(stream_type &s, bool indent = false) : base_type(s, indent), inner_array_size_{} { }
 
   template<typename T>
   static auto promote_to_printable_integer_type(T v) -> decltype(+v)

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -27,6 +27,8 @@ using namespace epee;
 #include "version.h"
 #include "currency_core/core_tools.h"
 
+#include <cstdlib>
+
 #if defined(WIN32)
 #include <crtdbg.h>
 #pragma comment(lib, "ntdll") // <-- why do we need this?
@@ -43,6 +45,10 @@ bool command_line_preprocessor(const boost::program_options::variables_map& vm);
 
 int main(int argc, char* argv[])
 {
+  try
+    {
+      TRY_ENTRY();
+
   string_tools::set_module_name_and_folder(argv[0]);
 #ifdef WIN32
   _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
@@ -59,8 +65,6 @@ int main(int argc, char* argv[])
     std::fflush(nullptr); // all open output streams are flushed
   });
 
-  TRY_ENTRY();
-
   po::options_description desc_cmd_only("Command line options");
   po::options_description desc_cmd_sett("Command line options and settings options", 130, 83);
 
@@ -70,13 +74,14 @@ int main(int argc, char* argv[])
   // tools::get_default_data_dir() can't be called during static initialization
   command_line::add_arg(desc_cmd_only, command_line::arg_data_dir, tools::get_default_data_dir());
   command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
+  command_line::add_arg(desc_cmd_only, command_line::arg_disable_upnp);
 
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_dir);
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
   command_line::add_arg(desc_cmd_sett, command_line::arg_show_details);
   command_line::add_arg(desc_cmd_sett, command_line::arg_show_rpc_autodoc);
-  
+
 
   arg_market_disable.default_value = true;
   arg_market_disable.not_use_default = false;
@@ -124,7 +129,7 @@ int main(int argc, char* argv[])
     return true;
   });
   if (!r)
-    return 1;
+    return EXIT_FAILURE;
 
   //set up logging options
   std::string log_dir;
@@ -144,7 +149,7 @@ int main(int argc, char* argv[])
 
   if (command_line_preprocessor(vm))
   {
-    return 0;
+    return EXIT_SUCCESS;
   }
 
 
@@ -162,7 +167,6 @@ int main(int argc, char* argv[])
   cprotocol.set_p2p_endpoint(&p2psrv);
   ccore.set_currency_protocol(&cprotocol);
   daemon_cmmands_handler dch(p2psrv, rpc_server);
-  tools::miniupnp_helper upnp_helper;
   //ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
   std::shared_ptr<currency::stratum_server> stratum_server_ptr;
   if (stratum_enabled)
@@ -173,7 +177,7 @@ int main(int argc, char* argv[])
     LOG_PRINT_L0("Dumping RPC auto-generated documents!");
     epee::net_utils::http::http_request_info query_info;
     epee::net_utils::http::http_response_info response_info;
-    epee::net_utils::connection_context_base conn_context; 
+    epee::net_utils::connection_context_base conn_context;
     std::string generate_reference = std::string("RPC_COMMANDS_LIST:\n");
     bool call_found = false;
     rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, generate_reference);
@@ -193,8 +197,12 @@ int main(int argc, char* argv[])
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize p2p server.");
   LOG_PRINT_L0("P2p server initialized OK on port: " << p2psrv.get_this_peer_port());
 
-  LOG_PRINT_L0("Starting UPnP");
-  upnp_helper.start_regular_mapping(p2psrv.get_this_peer_port(), p2psrv.get_this_peer_port(), 20*60*1000);
+  if (!command_line::get_arg(vm, command_line::arg_disable_upnp))
+  {
+    tools::miniupnp_helper upnp_helper;
+    LOG_PRINT_L0("Starting UPnP");
+    upnp_helper.start_regular_mapping(p2psrv.get_this_peer_port(), p2psrv.get_this_peer_port(), 20*60*1000);
+  }
 
   LOG_PRINT_L0("Initializing currency protocol...");
   res = cprotocol.init(vm);
@@ -220,7 +228,7 @@ int main(int argc, char* argv[])
   }
 
 
-  
+
   auto& bcs = ccore.get_blockchain_storage();
   if (!offers_service.is_disabled() && bcs.get_current_blockchain_size() > 1 && bcs.get_top_block_id() != offers_service.get_last_seen_block_id())
   {
@@ -301,9 +309,14 @@ int main(int argc, char* argv[])
   cprotocol.set_p2p_endpoint(NULL);
 
   LOG_PRINT("Node stopped.", LOG_LEVEL_0);
-  return 0;
+  return EXIT_SUCCESS;
 
-  CATCH_ENTRY_L0("main", 1);
+      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
+    }
+  catch (...)
+    {
+      return EXIT_FAILURE;
+    }
 }
 
 bool command_line_preprocessor(const boost::program_options::variables_map& vm)

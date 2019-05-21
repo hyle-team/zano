@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -141,8 +141,11 @@ namespace crypto {
   {
     ge_p3 A = ge_p3();
     ge_p2 R = ge_p2();
-    // maybe use assert instead?
-    ge_frombytes_vartime(&A, reinterpret_cast<const unsigned char*>(&P));
+    if (ge_frombytes_vartime(&A, reinterpret_cast<const unsigned char*>(&P)) != 0)
+      {
+        assert(false);
+        throw std::runtime_error(__func__);
+      }
     ge_scalarmult(&R, reinterpret_cast<const unsigned char*>(&a), &A);
     key_image a_p = key_image();
     ge_tobytes(reinterpret_cast<unsigned char*>(&a_p), &R);

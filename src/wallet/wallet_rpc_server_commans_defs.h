@@ -214,7 +214,7 @@ namespace wallet_rpc
       std::list<trnsfer_destination> destinations;
       uint64_t fee;
       uint64_t mixin;
-      uint64_t unlock_time;
+      //uint64_t unlock_time;
       std::string payment_id; // hex-encoded
       std::string comment; 
 
@@ -222,7 +222,7 @@ namespace wallet_rpc
         KV_SERIALIZE(destinations)
         KV_SERIALIZE(fee)
         KV_SERIALIZE(mixin)
-        KV_SERIALIZE(unlock_time)
+        //KV_SERIALIZE(unlock_time)
         KV_SERIALIZE(payment_id)
         KV_SERIALIZE(comment)
       END_KV_SERIALIZE_MAP()

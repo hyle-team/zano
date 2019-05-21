@@ -1,3 +1,4 @@
+// Copyright (c) 2019, anonimal, <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -313,7 +314,11 @@ namespace misc_utils
     {}
     ~call_befor_die()
     {
+      NESTED_TRY_ENTRY();
+
       m_func();
+
+      NESTED_CATCH_ENTRY(__func__);
     }
   };
 

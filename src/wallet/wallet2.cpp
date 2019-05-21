@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -2216,7 +2216,14 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
 
   // calculate key images for each change output
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-  crypto::generate_key_derivation(m_account.get_keys().m_account_address.m_view_public_key, ft.one_time_key, derivation);
+  CHECK_AND_ASSERT_THROW_MES(
+      crypto::generate_key_derivation(
+          m_account.get_keys().m_account_address.m_view_public_key,
+          ft.one_time_key,
+          derivation),
+      "internal error: sign_transfer: failed to generate key derivation("
+          << m_account.get_keys().m_account_address.m_view_public_key
+          << ", view secret key: " << ft.one_time_key << ")");
 
   for (size_t i = 0; i < ft.tx.vout.size(); ++i)
   {

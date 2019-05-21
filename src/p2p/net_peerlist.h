@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -140,7 +140,7 @@ namespace nodetool
     friend class boost::serialization::access;
     epee::critical_section m_peerlist_lock;
     std::string m_config_folder;
-    bool m_allow_local_ip;
+    bool m_allow_local_ip = false;
 
 
     peers_indexed m_peers_gray;

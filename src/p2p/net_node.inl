@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -190,8 +190,6 @@ namespace nodetool
     }
     if(command_line::has_arg(vm, arg_p2p_use_only_priority_nodes))
       m_use_only_priority_peers = true;
-    else
-      m_use_only_priority_peers = false;
 
 
     if (command_line::has_arg(vm, arg_p2p_seed_node))
@@ -1182,7 +1180,7 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler> template<class t_callback>
-  bool node_server<t_payload_net_handler>::try_ping(basic_node_data& node_data, p2p_connection_context& context, t_callback cb)
+  bool node_server<t_payload_net_handler>::try_ping(basic_node_data& node_data, p2p_connection_context& context, const t_callback& cb)
   {
     if(!node_data.my_port)
       return false;
