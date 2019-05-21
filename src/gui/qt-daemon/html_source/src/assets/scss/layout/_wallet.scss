@@ -140,6 +140,13 @@ app-history {
 
       tr {
 
+        &.locked-transaction {
+
+          @include themify($themes) {
+            color: themed(optionalTextColor);
+          }
+        }
+
         &:nth-child(4n+1) {
 
           @include themify($themes) {
@@ -185,17 +192,30 @@ app-history {
           }
         }
 
+        .lock-transaction {
+
+          @include themify($themes) {
+            background-color: themed(orangeTextColor);
+          }
+        }
+
         .status.send {
 
-          .icon {
-            background-color: #ff5252;
+          .status-transaction {
+
+            @include themify($themes) {
+              background-color: themed(redTextColor);
+            }
           }
         }
 
         .status.received {
 
-          .icon {
-            background-color: #00c853;
+          .status-transaction {
+
+            @include themify($themes) {
+              background-color: themed(greenTextColor);
+            }
           }
         }
       }
