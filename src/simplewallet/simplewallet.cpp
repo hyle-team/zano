@@ -114,23 +114,23 @@ namespace
       NESTED_TRY_ENTRY();
 
       if (m_flush)
+      {
+        m_flush = false;
+
+        LOG_PRINT(m_oss.str(), m_log_level)
+
+        if (epee::log_space::console_color_default == m_color)
         {
-          m_flush = false;
-
-          LOG_PRINT(m_oss.str(), m_log_level)
-
-          if (epee::log_space::console_color_default == m_color)
-            {
-              std::cout << m_oss.str();
-            }
-          else
-            {
-              epee::log_space::set_console_color(m_color, m_bright);
-              std::cout << m_oss.str();
-              epee::log_space::reset_console_color();
-            }
-          std::cout << std::endl;
+          std::cout << m_oss.str();
         }
+        else
+        {
+          epee::log_space::set_console_color(m_color, m_bright);
+          std::cout << m_oss.str();
+          epee::log_space::reset_console_color();
+        }
+        std::cout << std::endl;
+      }
 
       NESTED_CATCH_ENTRY(__func__);
     }

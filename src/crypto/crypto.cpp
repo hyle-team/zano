@@ -142,10 +142,10 @@ namespace crypto {
     ge_p3 A = ge_p3();
     ge_p2 R = ge_p2();
     if (ge_frombytes_vartime(&A, reinterpret_cast<const unsigned char*>(&P)) != 0)
-      {
-        assert(false);
-        throw std::runtime_error(__func__);
-      }
+    {
+      assert(false);
+      throw std::runtime_error(__func__);
+    }
     ge_scalarmult(&R, reinterpret_cast<const unsigned char*>(&a), &A);
     key_image a_p = key_image();
     ge_tobytes(reinterpret_cast<unsigned char*>(&a_p), &R);
