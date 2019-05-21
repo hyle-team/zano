@@ -103,4 +103,4 @@ POP_WARNINGS
 // contrib
 //
 #include "eos_portable_archive/eos/portable_archive.hpp"
-#include "db/lmdb/libraries/liblmdb/lmdb.h
+#include "db/lmdb/libraries/liblmdb/lmdb.h"
