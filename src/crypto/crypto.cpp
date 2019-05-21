@@ -18,6 +18,12 @@
 #include "crypto.h"
 #include "hash.h"
 
+#if !defined(NDEBUG)
+#  define crypto_assert(expression) assert(expression)
+#else
+#  define crypto_assert(expression) ((void)0)
+#endif
+
 namespace crypto {
 
   DISABLE_GCC_AND_CLANG_WARNING(strict-aliasing)
@@ -142,10 +148,10 @@ namespace crypto {
     ge_p3 A = ge_p3();
     ge_p2 R = ge_p2();
     if (ge_frombytes_vartime(&A, reinterpret_cast<const unsigned char*>(&P)) != 0)
-      {
-        assert(false);
-        throw std::runtime_error(__func__);
-      }
+    {
+      crypto_assert(false);
+      throw std::runtime_error(__func__);
+    }
     ge_scalarmult(&R, reinterpret_cast<const unsigned char*>(&a), &A);
     key_image a_p = key_image();
     ge_tobytes(reinterpret_cast<unsigned char*>(&a_p), &R);
@@ -175,7 +181,7 @@ namespace crypto {
     ge_p3 point;
     ge_p2 point2;
     ge_p1p1 point3;
-    assert(sc_check(&key2) == 0);
+    crypto_assert(sc_check(&key2) == 0);
     if (ge_frombytes_vartime(&point, &key1) != 0) {
       return false;
     }
@@ -194,7 +200,11 @@ namespace crypto {
     char *end = buf.output_index;
     buf.derivation = derivation;
     tools::write_varint(end, output_index);
-    assert(end <= buf.output_index + sizeof buf.output_index);
+    if (!(end <= buf.output_index + sizeof buf.output_index))
+    {
+      crypto_assert(false);
+      return;
+    }
     hash_to_scalar(&buf, end - reinterpret_cast<char *>(&buf), res);
   }
 
@@ -221,7 +231,7 @@ namespace crypto {
   void crypto_ops::derive_secret_key(const key_derivation &derivation, size_t output_index,
     const secret_key &base, secret_key &derived_key) {
     ec_scalar scalar;
-    assert(sc_check(&base) == 0);
+    crypto_assert(sc_check(&base) == 0);
     derivation_to_scalar(derivation, output_index, scalar);
     sc_add(&derived_key, &base, &scalar);
   }
@@ -241,10 +251,10 @@ namespace crypto {
     {
       ge_p3 t;
       public_key t2;
-      assert(sc_check(&sec) == 0);
+      crypto_assert(sc_check(&sec) == 0);
       ge_scalarmult_base(&t, &sec);
       ge_p3_tobytes(&t2, &t);
-      assert(pub == t2);
+      crypto_assert(pub == t2);
     }
 #endif
     buf.h = prefix_hash;
@@ -261,7 +271,7 @@ namespace crypto {
     ge_p3 tmp3;
     ec_scalar c;
     s_comm buf;
-    assert(check_key(pub));
+    crypto_assert(check_key(pub));
     buf.h = prefix_hash;
     buf.key = pub;
     if (ge_frombytes_vartime(&tmp3, &pub) != 0) {
@@ -290,7 +300,7 @@ namespace crypto {
   void crypto_ops::generate_key_image(const public_key &pub, const secret_key &sec, key_image &image) {
     ge_p3 point;
     ge_p2 point2;
-    assert(sc_check(&sec) == 0);
+    crypto_assert(sc_check(&sec) == 0);
     hash_to_ec(pub, point);
     ge_scalarmult(&point2, &sec, &point);
     ge_tobytes(&image, &point2);
@@ -322,20 +332,24 @@ POP_WARNINGS
     ge_dsmp image_pre;
     ec_scalar sum, k, h;
     rs_comm *const buf = reinterpret_cast<rs_comm *>(alloca(rs_comm_size(pubs_count)));
-    assert(sec_index < pubs_count);
+    if (!(sec_index < pubs_count))
+    {
+      crypto_assert(false);
+      return;
+    }
 #if !defined(NDEBUG)
     {
       ge_p3 t;
       public_key t2;
       key_image t3;
-      assert(sc_check(&sec) == 0);
+      crypto_assert(sc_check(&sec) == 0);
       ge_scalarmult_base(&t, &sec);
       ge_p3_tobytes(&t2, &t);
-      assert(*pubs[sec_index] == t2);
+      crypto_assert(*pubs[sec_index] == t2);
       generate_key_image(*pubs[sec_index], sec, t3);
-      assert(image == t3);
+      crypto_assert(image == t3);
       for (i = 0; i < pubs_count; i++) {
-        assert(check_key(*pubs[i]));
+        crypto_assert(check_key(*pubs[i]));
       }
     }
 #endif
@@ -384,7 +398,7 @@ POP_WARNINGS
     rs_comm *const buf = reinterpret_cast<rs_comm *>(alloca(rs_comm_size(pubs_count)));
 #if !defined(NDEBUG)
     for (i = 0; i < pubs_count; i++) {
-      assert(check_key(*pubs[i]));
+      crypto_assert(check_key(*pubs[i]));
     }
 #endif
     if (ge_frombytes_vartime(&image_unp, &image) != 0) {

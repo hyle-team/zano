@@ -15,7 +15,7 @@ export class HistoryComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   constructor(
     private route: ActivatedRoute,
-    private variablesService: VariablesService
+    public variablesService: VariablesService
   ) {}
 
   ngOnInit() {

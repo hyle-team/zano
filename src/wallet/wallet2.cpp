@@ -2216,7 +2216,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
 
   // calculate key images for each change output
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-  CHECK_AND_ASSERT_THROW_MES(
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(
       crypto::generate_key_derivation(
           m_account.get_keys().m_account_address.m_view_public_key,
           ft.one_time_key,

@@ -139,7 +139,7 @@ namespace net_utils
 				m_http_ver_hi(0), 
 				m_http_ver_lo(0), 
 				m_have_to_block(false),
-                                m_full_request_buf_size{}
+				m_full_request_buf_size(0)
 			{}
 
 			http_method			  m_http_method;
