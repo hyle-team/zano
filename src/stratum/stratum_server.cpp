@@ -804,13 +804,12 @@ namespace
       NESTED_TRY_ENTRY();
 
       if (m_connection_initialized)
-        {
-          m_config.remove_protocol_handler(this);
-          m_connection_initialized = false;
-        }
+      {
+        m_config.remove_protocol_handler(this);
+        m_connection_initialized = false;
+      }
 
-      LOG_PRINT_CC(
-          m_context, "stratum_protocol_handler::dtor()", LOG_LEVEL_4);
+      LOG_PRINT_CC(m_context, "stratum_protocol_handler::dtor()", LOG_LEVEL_4);
 
       NESTED_CATCH_ENTRY(__func__);
     }
@@ -1094,7 +1093,8 @@ struct stratum_server_impl
 };
 //------------------------------------------------------------------------------------------------------------------------------
 stratum_server::stratum_server(core* c)
-  : m_p_core(c), m_threads_count{}
+  : m_p_core(c)
+  , m_threads_count(0)
 {
   m_impl = new stratum_server_impl();
 }
