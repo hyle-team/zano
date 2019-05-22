@@ -33,7 +33,8 @@ export class Wallet {
     amount: null,
     comment: null,
     mixin: null,
-    fee: null
+    fee: null,
+    hide: null
   };
 
   constructor(id, name, pass, path, address, balance, unlocked_balance, mined = 0, tracking = '') {

@@ -866,7 +866,8 @@ var Wallet = /** @class */ (function () {
             amount: null,
             comment: null,
             mixin: null,
-            fee: null
+            fee: null,
+            hide: null
         };
         this.wallet_id = id;
         this.name = name;
@@ -6037,7 +6038,8 @@ var SendComponent = /** @class */ (function () {
                 amount: _this.variablesService.currentWallet.send_data['amount'],
                 comment: _this.variablesService.currentWallet.send_data['comment'],
                 mixin: _this.variablesService.currentWallet.send_data['mixin'] || 0,
-                fee: _this.variablesService.currentWallet.send_data['fee'] || _this.variablesService.default_fee
+                fee: _this.variablesService.currentWallet.send_data['fee'] || _this.variablesService.default_fee,
+                hide: _this.variablesService.currentWallet.send_data['hide'] || false
             });
         });
     };
@@ -6055,8 +6057,8 @@ var SendComponent = /** @class */ (function () {
                         _this.backend.sendMoney(_this.currentWalletId, _this.sendForm.get('address').value, _this.sendForm.get('amount').value, _this.sendForm.get('fee').value, _this.sendForm.get('mixin').value, _this.sendForm.get('comment').value, _this.sendForm.get('hide').value, function (send_status) {
                             if (send_status) {
                                 _this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
-                                _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null };
-                                _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 0, fee: _this.variablesService.default_fee });
+                                _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null, hide: null };
+                                _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 0, fee: _this.variablesService.default_fee, hide: false });
                             }
                         });
                     }
@@ -6075,8 +6077,8 @@ var SendComponent = /** @class */ (function () {
                             _this.sendForm.get('amount').value, _this.sendForm.get('fee').value, _this.sendForm.get('mixin').value, _this.sendForm.get('comment').value, _this.sendForm.get('hide').value, function (send_status) {
                                 if (send_status) {
                                     _this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
-                                    _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null };
-                                    _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 0, fee: _this.variablesService.default_fee });
+                                    _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null, hide: null };
+                                    _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 0, fee: _this.variablesService.default_fee, hide: false });
                                 }
                             });
                         }
@@ -6095,7 +6097,8 @@ var SendComponent = /** @class */ (function () {
             amount: this.sendForm.get('amount').value,
             comment: this.sendForm.get('comment').value,
             mixin: this.sendForm.get('mixin').value,
-            fee: this.sendForm.get('fee').value
+            fee: this.sendForm.get('fee').value,
+            hide: this.sendForm.get('hide').value
         };
     };
     __decorate([
