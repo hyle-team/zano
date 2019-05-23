@@ -15,9 +15,19 @@ set(VERSION "1.0")
 
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
-#set(CMAKE_BUILD_TYPE "Debug")
 
+# build types
+if (UNIX AND NOT APPLE)
+  # single configurations, defaults to Release
+  if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+  endif()
+else()
+  # multi configurations for MSVC and XCode
+  set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
+endif()
+message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}, and built type: ${CMAKE_BUILD_TYPE}")
+ 
 enable_testing()
 
 
