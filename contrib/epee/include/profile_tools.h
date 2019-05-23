@@ -107,20 +107,20 @@ namespace profile_tools
     }
 		~local_call_account()
 		{
-                  NESTED_TRY_ENTRY();
+			NESTED_TRY_ENTRY();
 
       LOG_PRINT2("profile_details.log", "PROFILE "<< std::left << std::setw(50) << (m_name + ":")
         << "av_time:" << std::setw(15) << epee::string_tools::print_fixed_decimal_point (m_count_of_call ? (m_summary_time_used / m_count_of_call) : 0, 3)
         << "sum_time: " << std::setw(15) << epee::string_tools::print_fixed_decimal_point(m_summary_time_used, 3)
         << "call_count: " << std::setw(15) << m_count_of_call, LOG_LEVEL_0);
 
-                  NESTED_CATCH_ENTRY(__func__);
-                }
+			NESTED_CATCH_ENTRY(__func__);
+		}
 
 		size_t m_count_of_call;
 		uint64_t m_summary_time_used;
 		std::string m_name;
-        };
+	};
 	
 	struct call_frame
 	{

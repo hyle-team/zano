@@ -10,7 +10,7 @@
 #include "include_base_utils.h"
 
 #include "db_backend_base.h"
-#include "db/lmdb/libraries/liblmdb/lmdb.h"
+#include "db/liblmdb/lmdb.h"
 
 
 namespace tools

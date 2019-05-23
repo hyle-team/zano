@@ -278,6 +278,7 @@
   "HISTORY": {
     "STATUS": "Status",
     "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
+    "LOCK_TOOLTIP": "Locked till {{date}}",
     "SEND": "Sent",
     "RECEIVED": "Received",
     "DATE": "Date",
@@ -301,7 +302,8 @@
       "COMPLETE_SELLER": "Successfully complete contract, receive payment on contract, and return pledge",
       "CREATE_ALIAS": "Fee for assigning alias",
       "UPDATE_ALIAS": "Fee for editing alias",
-      "MINED": "Mined funds",
+      "POW_REWARD": "POW reward",
+      "POS_REWARD": "POS reward",
       "CREATE_CONTRACT": "Send contract offer",
       "PLEDGE_CONTRACT": "Make pledge on offer",
       "NULLIFY_CONTRACT": "Nullify pledges for contract",
