@@ -47,8 +47,8 @@
 #define BASE_REWARD_DUST_THRESHOLD                      ((uint64_t)1000000) // pow(10, 6) - change this will cause hard-fork!
 #define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)//((uint64_t)100000) // pow(10, 5)
 
-#define TX_DEFAULT_FEE                                  ((uint64_t)10000000000) // pow(10, 5)
-#define TX_MINIMUM_FEE                                  ((uint64_t)100000) // pow(10, 5)
+#define TX_DEFAULT_FEE                                  ((uint64_t)10000000000) // .01
+#define TX_MINIMUM_FEE                                  ((uint64_t)10000000000) // .01
 
 // #define CURRENCY_FIXED_REWARD_ZONE_HEIGHT               300                   // blocks will have fixed reward up to this height (including) 
 // #define CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT        ((uint64_t)100000000) // should be TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER
