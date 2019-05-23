@@ -46,6 +46,18 @@
       "COMPLETE": "Completion",
       "SYNCING": "Syncing blockchain",
       "LOADING": "Loading blockchain data"
+    },
+    "UPDATE": {
+      "STANDARD": "Update available",
+      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Get new update.</span><br><span>Update is recommended!</span>",
+      "IMPORTANT": "Update available",
+      "IMPORTANT_HINT": "Important update!",
+      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Get new update.</span><br><span>Important update!</span>",
+      "CRITICAL": "Update available",
+      "CRITICAL_HINT": "Critical update!",
+      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
+      "TIME": "System time differs from network",
+      "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
     }
   },
   "MAIN": {
@@ -266,6 +278,7 @@
   "HISTORY": {
     "STATUS": "Status",
     "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
+    "LOCK_TOOLTIP": "Locked till {{date}}",
     "SEND": "Sent",
     "RECEIVED": "Received",
     "DATE": "Date",
@@ -289,7 +302,8 @@
       "COMPLETE_SELLER": "Successfully complete contract, receive payment on contract, and return pledge",
       "CREATE_ALIAS": "Fee for assigning alias",
       "UPDATE_ALIAS": "Fee for editing alias",
-      "MINED": "Mined funds",
+      "POW_REWARD": "POW reward",
+      "POS_REWARD": "POS reward",
       "CREATE_CONTRACT": "Send contract offer",
       "PLEDGE_CONTRACT": "Make pledge on offer",
       "NULLIFY_CONTRACT": "Nullify pledges for contract",

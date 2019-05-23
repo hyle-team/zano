@@ -126,7 +126,8 @@ export class SendComponent implements OnInit, OnDestroy {
         amount: this.variablesService.currentWallet.send_data['amount'],
         comment: this.variablesService.currentWallet.send_data['comment'],
         mixin: this.variablesService.currentWallet.send_data['mixin'] || 0,
-        fee: this.variablesService.currentWallet.send_data['fee'] || this.variablesService.default_fee
+        fee: this.variablesService.currentWallet.send_data['fee'] || this.variablesService.default_fee,
+        hide: this.variablesService.currentWallet.send_data['hide'] || false
       });
     });
   }
@@ -151,8 +152,8 @@ export class SendComponent implements OnInit, OnDestroy {
               (send_status) => {
                 if (send_status) {
                   this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
-                  this.variablesService.currentWallet.send_data = {address: null, amount: null, comment: null, mixin: null, fee: null};
-                  this.sendForm.reset({address: null, amount: null, comment: null, mixin: 0, fee: this.variablesService.default_fee});
+                  this.variablesService.currentWallet.send_data = {address: null, amount: null, comment: null, mixin: null, fee: null, hide: null};
+                  this.sendForm.reset({address: null, amount: null, comment: null, mixin: 0, fee: this.variablesService.default_fee, hide: false});
                 }
               });
           }
@@ -176,8 +177,8 @@ export class SendComponent implements OnInit, OnDestroy {
                 (send_status) => {
                   if (send_status) {
                     this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
-                    this.variablesService.currentWallet.send_data = {address: null, amount: null, comment: null, mixin: null, fee: null};
-                    this.sendForm.reset({address: null, amount: null, comment: null, mixin: 0, fee: this.variablesService.default_fee});
+                    this.variablesService.currentWallet.send_data = {address: null, amount: null, comment: null, mixin: null, fee: null, hide: null};
+                    this.sendForm.reset({address: null, amount: null, comment: null, mixin: 0, fee: this.variablesService.default_fee, hide: false});
                   }
                 });
             }
@@ -198,7 +199,8 @@ export class SendComponent implements OnInit, OnDestroy {
       amount: this.sendForm.get('amount').value,
       comment: this.sendForm.get('comment').value,
       mixin: this.sendForm.get('mixin').value,
-      fee: this.sendForm.get('fee').value
+      fee: this.sendForm.get('fee').value,
+      hide: this.sendForm.get('hide').value
     };
   }
 

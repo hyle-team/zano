@@ -184,4 +184,5 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_console;
   extern const arg_descriptor<bool>        arg_show_details;
   extern const arg_descriptor<bool>        arg_show_rpc_autodoc;
+  extern const arg_descriptor<bool>        arg_disable_upnp;
 }

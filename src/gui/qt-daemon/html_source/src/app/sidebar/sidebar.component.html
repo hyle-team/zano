@@ -71,14 +71,44 @@
     <span class="online" *ngIf="variablesService.daemon_state === 5">
       {{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }}
     </span>
-  </div>
-  <div class="progress-bar-container">
-    <div class="syncing" *ngIf="variablesService.daemon_state === 1">
-      <div class="progress-bar">
-        <div class="fill" [style.width]="variablesService.sync.progress_value + '%'"></div>
+    <div class="progress-bar-container" *ngIf="variablesService.daemon_state === 1 || variablesService.daemon_state === 3">
+      <div class="syncing" *ngIf="variablesService.daemon_state === 1">
+        <div class="progress-bar">
+          <div class="fill" [style.width]="variablesService.sync.progress_value + '%'"></div>
+        </div>
+        <div class="progress-percent">{{ variablesService.sync.progress_value_text }}%</div>
       </div>
-      <div class="progress-percent">{{ variablesService.sync.progress_value_text }}%</div>
+      <div class="loading" *ngIf="variablesService.daemon_state === 3"></div>
     </div>
-    <div class="loading" *ngIf="variablesService.daemon_state === 3"></div>
+  </div>
+  <div class="update-container" *ngIf="(variablesService.daemon_state === 0 || variablesService.daemon_state === 2) && [2, 3, 4].indexOf(variablesService.last_build_displaymode) !== -1">
+    <ng-container *ngIf="variablesService.last_build_displaymode === 2">
+      <div class="update-text standard">
+        <span [style.cursor]="'pointer'" (click)="getUpdate()">{{ 'SIDEBAR.UPDATE.STANDARD' | translate }}</span>
+      </div>
+      <i class="icon update standard" tooltip="{{ 'SIDEBAR.UPDATE.STANDARD_TOOLTIP' | translate }}" placement="right-bottom" tooltipClass="update-tooltip" [delay]="500"></i>
+    </ng-container>
+    <ng-container *ngIf="variablesService.last_build_displaymode === 3">
+      <div class="update-text important">
+        <span [style.cursor]="'pointer'" (click)="getUpdate()">{{ 'SIDEBAR.UPDATE.IMPORTANT' | translate }}</span>
+        <br>
+        <span style="font-size: 1rem">{{ 'SIDEBAR.UPDATE.IMPORTANT_HINT' | translate }}</span>
+      </div>
+      <i class="icon update important" tooltip="{{ 'SIDEBAR.UPDATE.IMPORTANT_TOOLTIP' | translate }}" placement="right-bottom" tooltipClass="update-tooltip important" [delay]="500"></i>
+    </ng-container>
+    <ng-container *ngIf="variablesService.last_build_displaymode === 4">
+      <div class="update-text critical">
+        <span [style.cursor]="'pointer'" (click)="getUpdate()">{{ 'SIDEBAR.UPDATE.CRITICAL' | translate }}</span>
+        <br>
+        <span style="font-size: 1rem">{{ 'SIDEBAR.UPDATE.IMPORTANT_HINT' | translate }}</span>
+      </div>
+      <i class="icon update critical" tooltip="{{ 'SIDEBAR.UPDATE.CRITICAL_TOOLTIP' | translate }}" placement="right-bottom" tooltipClass="update-tooltip critical" [delay]="500"></i>
+    </ng-container>
+  </div>
+  <div class="update-container" *ngIf="variablesService.daemon_state === 2 && variablesService.ts_diff > (10 * 60 * 1000)">
+    <div class="update-text time">
+      <span>{{ 'SIDEBAR.UPDATE.TIME' | translate }}</span>
+    </div>
+    <i class="icon time" tooltip="{{ 'SIDEBAR.UPDATE.TIME_TOOLTIP' | translate }}" placement="right-bottom" tooltipClass="update-tooltip important" [delay]="500"></i>
   </div>
 </div>

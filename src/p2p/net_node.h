@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -70,7 +70,17 @@ namespace nodetool
                                                         m_alert_mode(0), 
                                                         m_maintainers_entry_local(AUTO_VAL_INIT(m_maintainers_entry_local)),
                                                         m_maintainers_info_local(AUTO_VAL_INIT(m_maintainers_info_local)), 
-                                                        m_startup_time(time(nullptr))
+                                                        m_startup_time(time(nullptr)),
+                                                        m_config{},
+                                                        m_have_address(false),
+                                                        m_first_connection_maker_call(false),
+                                                        m_listenning_port{},
+                                                        m_external_port{},
+                                                        m_ip_address{},
+                                                        m_last_stat_request_time{},
+                                                        m_use_only_priority_peers(false),
+                                                        m_peer_livetime{}
+
     {}
 
     static void init_options(boost::program_options::options_description& desc);
@@ -188,7 +198,7 @@ namespace nodetool
     bool is_peer_used(const peerlist_entry& peer);
     bool is_addr_connected(const net_address& peer);  
     template<class t_callback>
-    bool try_ping(basic_node_data& node_data, p2p_connection_context& context, t_callback cb);
+    bool try_ping(basic_node_data& node_data, p2p_connection_context& context, const t_callback& cb);
     bool make_expected_connections_count(bool white_list, size_t expected_connections);
     void cache_connect_fail_info(const net_address& addr);
     bool is_addr_recently_failed(const net_address& addr);

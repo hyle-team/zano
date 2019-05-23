@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -190,8 +190,6 @@ namespace nodetool
     }
     if(command_line::has_arg(vm, arg_p2p_use_only_priority_nodes))
       m_use_only_priority_peers = true;
-    else
-      m_use_only_priority_peers = false;
 
 
     if (command_line::has_arg(vm, arg_p2p_seed_node))
@@ -275,6 +273,10 @@ namespace nodetool
 #ifndef TESTNET
     //TODO:
     //ADD_HARDCODED_SEED_NODE(std::string("0.0.0.0:") + std::to_string(P2P_DEFAULT_PORT));
+    ADD_HARDCODED_SEED_NODE("95.217.43.225", P2P_DEFAULT_PORT);
+    ADD_HARDCODED_SEED_NODE("94.130.137.230", P2P_DEFAULT_PORT);
+    ADD_HARDCODED_SEED_NODE("95.217.42.247", P2P_DEFAULT_PORT);
+    ADD_HARDCODED_SEED_NODE("94.130.160.115", P2P_DEFAULT_PORT);
     ADD_HARDCODED_SEED_NODE("207.154.237.82", P2P_DEFAULT_PORT);
     ADD_HARDCODED_SEED_NODE("207.154.240.198", P2P_DEFAULT_PORT);
     ADD_HARDCODED_SEED_NODE("207.154.255.10", P2P_DEFAULT_PORT);
@@ -1182,7 +1184,7 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler> template<class t_callback>
-  bool node_server<t_payload_net_handler>::try_ping(basic_node_data& node_data, p2p_connection_context& context, t_callback cb)
+  bool node_server<t_payload_net_handler>::try_ping(basic_node_data& node_data, p2p_connection_context& context, const t_callback& cb)
   {
     if(!node_data.my_port)
       return false;

@@ -163,7 +163,7 @@ namespace tools
       currency::transaction tx;
       std::vector<currency::extra_v> extra;
       std::string signed_tx_blob_str;
-      m_wallet.transfer(dsts, req.mixin, req.unlock_time, req.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, CURRENCY_TO_KEY_OUT_RELAXED, true, 0, true, &signed_tx_blob_str);
+      m_wallet.transfer(dsts, req.mixin, 0/*req.unlock_time*/, req.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, CURRENCY_TO_KEY_OUT_RELAXED, true, 0, true, &signed_tx_blob_str);
       if (m_wallet.is_watch_only())
       {
         res.tx_unsigned_hex = epee::string_tools::buff_to_hex_nodelimer(signed_tx_blob_str); // watch-only wallets can't sign and relay transactions

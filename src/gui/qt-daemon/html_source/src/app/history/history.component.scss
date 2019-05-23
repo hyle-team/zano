@@ -35,7 +35,17 @@
             }
           }
 
-          .icon {
+          .lock-transaction {
+            position: absolute;
+            top: 50%;
+            left: -2rem;
+            transform: translateY(-50%);
+            mask: url(../../assets/icons/lock-transaction.svg) no-repeat center;
+            width: 1.2rem;
+            height: 1.2rem;
+          }
+
+          .status-transaction {
             margin-right: 1rem;
             width: 1.7rem;
             height: 1.7rem;
@@ -43,14 +53,14 @@
 
           &.send  {
 
-            .icon {
+            .status-transaction {
               mask: url(../../assets/icons/send.svg) no-repeat center;
             }
           }
 
           &.received {
 
-            .icon {
+            .status-transaction {
               mask: url(../../assets/icons/receive.svg) no-repeat center;
             }
           }
