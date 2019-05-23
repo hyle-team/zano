@@ -117,7 +117,6 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   tools::wallet_rpc::COMMAND_RPC_TRANSFER::request  req = AUTO_VAL_INIT(req);
   req.fee = TESTS_DEFAULT_FEE;
   req.mixin = 0;
-  req.unlock_time = 0;
   tools::wallet_rpc::trnsfer_destination tds = AUTO_VAL_INIT(tds);
   tds.address = alice_integrated_address;
   tds.amount = MK_TEST_COINS(3);
