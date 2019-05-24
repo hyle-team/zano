@@ -66,6 +66,3 @@ To build GUI application:
     h. Unfold the certificate in Keychain Access window and double click underlying private key "Zano". Select "Access Control" tab, then select "Allow all applications to access this item". Click "Save Changes".
 2. Revise building script, comment out unwanted steps and run it:  `utils/build_script_mac_osx.sh`
 3. The application should be here: `/buid_mac_osx_64/release/src`
-
-
-Good luck!
