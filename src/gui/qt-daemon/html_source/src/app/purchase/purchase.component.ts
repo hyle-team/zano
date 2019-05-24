@@ -82,7 +82,12 @@ export class PurchaseComponent implements OnInit, OnDestroy {
       }
       return null;
     }]),
-    amount: new FormControl(null, Validators.required),
+    amount: new FormControl(null, [Validators.required, (g: FormControl) => {
+      if (parseInt(g.value, 10) === 0) {
+        return {'amount_zero': true};
+      }
+      return null;
+    }]),
     yourDeposit: new FormControl(null, Validators.required),
     sellerDeposit: new FormControl(null, Validators.required),
     sameAmount: new FormControl({value: false, disabled: false}),
@@ -91,8 +96,6 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     time: new FormControl({value: 12, disabled: false}),
     timeCancel: new FormControl({value: 12, disabled: false}),
     payment: new FormControl('')
-  }, function (g: FormGroup) {
-    return (new BigNumber(g.get('yourDeposit').value)).isLessThan(g.get('amount').value) ? {'your_deposit_too_small': true} : null;
   });
 
   additionalOptions = false;
