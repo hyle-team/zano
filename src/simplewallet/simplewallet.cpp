@@ -155,7 +155,7 @@ namespace
 
     message_writer success_msg_writer(epee::log_space::console_colors color)
   {
-    return message_writer(color, false, std::string(), LOG_LEVEL_2);
+    return message_writer(color, true, std::string(), LOG_LEVEL_2);
   }
 
   message_writer fail_msg_writer()
@@ -1584,7 +1584,7 @@ int main(int argc, char* argv[])
 
         if (command_line::get_arg(vm, arg_do_pos_mining))
         {
-          success_msg_writer(epee::log_space::console_color_cyan) << "IMORTANT NOTICE! Instance started with \"do-pos-mining\" parameter, running copy of this wallet on other host at the same time may cause key image conflicts";
+          message_writer(epee::log_space::console_color_magenta, true, "", 4) << "IMORTANT NOTICE! Instance started with \"do-pos-mining\" parameter, running copy of this wallet on other host at the same time may cause key image conflicts";
         }
 
         if (!offline_mode)
