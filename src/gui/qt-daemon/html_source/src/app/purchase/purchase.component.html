@@ -70,9 +70,6 @@
           {{ 'PURCHASE.FORM_ERRORS.YOUR_DEPOSIT_REQUIRED' | translate }}
         </div>
       </div>
-      <div class="error-block" *ngIf="purchaseForm.invalid && (purchaseForm.controls['yourDeposit'].dirty || purchaseForm.controls['amount'].touched) && purchaseForm.errors && purchaseForm.errors['your_deposit_too_small']">
-        {{ 'PURCHASE.FORM_ERRORS.YOUR_DEPOSIT_TOO_SMALL' | translate }}
-      </div>
     </div>
 
     <div class="input-block">
@@ -116,7 +113,7 @@
     </div>
     <div class="input-block" *ngIf="newPurchase">
       <label for="purchase-time">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
-      <ng-select id="purchase-time" class="lock-selection-select"
+      <ng-select id="purchase-time" class="custom-select"
                  [clearable]="false"
                  [searchable]="false"
                  formControlName="time">
@@ -158,7 +155,6 @@
       <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.WAITING_SELLER' | translate }}</span>
 
       <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.COMPLETED' | translate }}</span>
-      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.RECEIVED' | translate }}</span>
 
       <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NOT_RECEIVED' | translate }}</span>
       <span *ngIf="currentContract.state == 4" class="error-text">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
@@ -169,7 +165,6 @@
       <span *ngIf="currentContract.state == 601">{{ 'PURCHASE.BEING_CANCELLED' | translate }}</span>
 
       <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.CANCELLED' | translate }}</span>
-      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.PLEDGES_RETURNED' | translate }}</span>
     </ng-container>
 
     <ng-container *ngIf="!currentContract.is_a">
@@ -185,10 +180,8 @@
       <span *ngIf="currentContract.state == 201">{{ 'PURCHASE.WAIT' | translate }}</span>
 
       <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.BUYER_WAIT' | translate }}</span>
-      <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.PLEDGES_MADE' | translate }}</span>
 
       <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.COMPLETED' | translate }}</span>
-      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.RECEIVED' | translate }}</span>
 
       <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NOT_RECEIVED' | translate }}</span>
       <span *ngIf="currentContract.state == 4" class="error-text">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
@@ -199,7 +192,6 @@
       <span *ngIf="currentContract.state == 601">{{ 'PURCHASE.BEING_CANCELLED' | translate }}</span>
 
       <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.CANCELLED' | translate }}</span>
-      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.PLEDGES_RETURNED' | translate }}</span>
     </ng-container>
 
     <ng-container *ngIf="currentContract.state == 201 || currentContract.state == 601">
@@ -248,8 +240,9 @@
 
   <div class="time-cancel-block-row" *ngIf="showTimeSelect && !newPurchase && currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
     <div class="time-cancel-block-question">{{ 'PURCHASE.WAITING_TIME_QUESTION' | translate }}</div>
+    <label for="purchase-timeCancel">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
     <div class="input-block">
-      <ng-select id="purchase-timeCancel" class="lock-selection-select"
+      <ng-select id="purchase-timeCancel" class="custom-select"
                  [clearable]="false"
                  [searchable]="false"
                  formControlName="timeCancel">
@@ -259,7 +252,6 @@
         </ng-option>
       </ng-select>
     </div>
-    <label for="purchase-timeCancel">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
     <div class="time-cancel-block-buttons">
       <button type="button" class="blue-button" (click)="showTimeSelect = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
       <button type="button" class="blue-button" (click)="dealsDetailsCancel();">{{ 'PURCHASE.BUTTON_CANCEL_BUYER' | translate }}</button>

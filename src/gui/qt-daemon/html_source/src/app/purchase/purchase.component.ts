@@ -91,8 +91,6 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     time: new FormControl({value: 12, disabled: false}),
     timeCancel: new FormControl({value: 12, disabled: false}),
     payment: new FormControl('')
-  }, function (g: FormGroup) {
-    return (new BigNumber(g.get('yourDeposit').value)).isLessThan(g.get('amount').value) ? {'your_deposit_too_small': true} : null;
   });
 
   additionalOptions = false;

@@ -785,7 +785,7 @@ input[type='checkbox'].style-checkbox {
 
 .ng-select {
 
-  &.lock-selection-select {
+  &.custom-select {
     width: 100%;
 
     .ng-select-container {
@@ -844,6 +844,28 @@ input[type='checkbox'].style-checkbox {
               color: themed(mainTextColor);
             }
           }
+        }
+
+        &::-webkit-scrollbar {
+          background-color: transparent;
+          cursor: default;
+          width: 1rem;
+          height: 1rem;
+        }
+
+        &::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          background-color: #556576;
+          background-clip: padding-box;
+          border: 0.25rem solid transparent;
+          border-radius: 0.5rem;
+        }
+
+        &::-webkit-scrollbar-thumb:hover {
+          background-color: #556576;
         }
       }
     }
