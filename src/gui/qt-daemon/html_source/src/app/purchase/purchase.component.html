@@ -57,6 +57,9 @@
         <div *ngIf="purchaseForm.controls['amount'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}
         </div>
+        <div *ngIf="purchaseForm.controls['amount'].errors['amount_zero']">
+          {{ 'PURCHASE.FORM_ERRORS.AMOUNT_ZERO' | translate }}
+        </div>
       </div>
     </div>
   </div>
@@ -99,8 +102,6 @@
       </div>
     </div>
   </div>
-
-
 
   <button type="button" class="purchase-select" (click)="toggleOptions()">
     <span>{{ 'PURCHASE.DETAILS' | translate }}</span><i class="icon arrow" [class.down]="!additionalOptions" [class.up]="additionalOptions"></i>

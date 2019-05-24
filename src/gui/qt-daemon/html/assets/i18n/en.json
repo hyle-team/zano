@@ -387,6 +387,7 @@
       "SELLER_NOT_VALID": "Invalid address.",
       "ALIAS_NOT_VALID": "Alias not valid.",
       "AMOUNT_REQUIRED": "Amount is required.",
+      "AMOUNT_ZERO": "Amount cannot be zero.",
       "YOUR_DEPOSIT_REQUIRED": "Deposit required.",
       "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required.",
       "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract.",
