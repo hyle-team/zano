@@ -153,6 +153,11 @@ namespace
     return message_writer(color ? epee::log_space::console_color_green : epee::log_space::console_color_default, false, std::string(), LOG_LEVEL_2);
   }
 
+    message_writer success_msg_writer(epee::log_space::console_colors color)
+  {
+    return message_writer(color, false, std::string(), LOG_LEVEL_2);
+  }
+
   message_writer fail_msg_writer()
   {
     return message_writer(epee::log_space::console_color_red, true, "Error: ", LOG_LEVEL_0);
@@ -1576,6 +1581,12 @@ int main(int argc, char* argv[])
         wal.init(daemon_address);
         if (command_line::get_arg(vm, arg_generate_new_wallet).size())
           return EXIT_FAILURE;
+
+        if (command_line::get_arg(vm, arg_do_pos_mining))
+        {
+          success_msg_writer(epee::log_space::console_color_cyan) << "IMORTANT NOTICE! Instance started with \"do-pos-mining\" parameter, running copy of this wallet on other host at the same time may cause key image conflicts";
+        }
+
         if (!offline_mode)
           wal.refresh();
         LOG_PRINT_GREEN("Loaded ok", LOG_LEVEL_0);
