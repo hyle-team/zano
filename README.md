@@ -7,10 +7,6 @@ Be sure to properly clone the repository:
 
 `$ git clone --recursive https://github.com/hyle-team/zano.git`
 
-or, if already cloned:
-
-`$ cd zano/ && git submodule init && git submodule update`
-
 ### Dependencies
 | component / version | minimum <br>(not recommended but may work) | recommended | most recent of what we have ever tested |
 |--|--|--|--|
