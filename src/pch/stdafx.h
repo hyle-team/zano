@@ -68,7 +68,7 @@ POP_WARNINGS
 #include <boost/spirit/home/support/detail/endian/endian.hpp>
 #include <boost/spirit/home/support/detail/math/fpclassify.hpp>
 #include <boost/thread.hpp>
-#include <boost/timer.hpp>
+#include <boost/timer/timer.hpp>
 #include <boost/type_traits/is_arithmetic.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
 #include <boost/type_traits/is_integral.hpp>
