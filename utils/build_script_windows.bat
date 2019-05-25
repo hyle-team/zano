@@ -12,6 +12,10 @@ IF [%build_prefix%] == [] (
   SET ACHIVE_NAME_PREFIX=%ACHIVE_NAME_PREFIX%%build_prefix%-
 )
 
+IF NOT [%testnet%] == [] (
+  SET TESTNET_DEF=-D TESTNET=TRUE
+)
+
 SET PARAM=%~1
 IF "%PARAM%"=="--skip-build" ( GOTO skip_build )
 
@@ -43,7 +47,7 @@ IF %ERRORLEVEL% NEQ 0 (
 rmdir build /s /q
 mkdir build
 cd build
-cmake -D CMAKE_PREFIX_PATH="%QT_PREFIX_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -G "Visual Studio 15 2017 Win64" -T host=x64 ..
+cmake %TESTNET_DEF% -D CMAKE_PREFIX_PATH="%QT_PREFIX_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -G "Visual Studio 15 2017 Win64" -T host=x64 ..
 IF %ERRORLEVEL% NEQ 0 (
   goto error
 )
