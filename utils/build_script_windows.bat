@@ -8,6 +8,10 @@ SET LOCAL_BOOST_LIB_PATH=C:\dev\_sdk\boost_1_68_0\lib64-msvc-14.1
 SET MY_PATH=%~dp0
 SET SOURCES_PATH=%MY_PATH:~0,-7%
 
+IF [%build_prefix%] == [] (
+  SET ACHIVE_NAME_PREFIX=%ACHIVE_NAME_PREFIX%%build_prefix%-
+)
+
 SET PARAM=%~1
 IF "%PARAM%"=="--skip-build" ( GOTO skip_build )
 
