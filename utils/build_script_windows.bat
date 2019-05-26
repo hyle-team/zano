@@ -14,6 +14,7 @@ IF [%build_prefix%] == [] (
 
 IF NOT [%testnet%] == [] (
   SET TESTNET_DEF=-D TESTNET=TRUE
+  SET ACHIVE_NAME_PREFIX=%ACHIVE_NAME_PREFIX%testnet-
 )
 
 SET PARAM=%~1
