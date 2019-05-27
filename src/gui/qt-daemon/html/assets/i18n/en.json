@@ -7,9 +7,9 @@
     "BUTTON_SKIP": "Skip",
     "INCORRECT_PASSWORD": "Invalid password",
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required.",
-      "CONFIRM_REQUIRED": "Confirmation is required.",
-      "MISMATCH": "Mismatch."
+      "PASS_REQUIRED": "Password is required",
+      "CONFIRM_REQUIRED": "Confirmation is required",
+      "MISMATCH": "Mismatch"
     }
   },
   "COMMON": {
@@ -78,10 +78,10 @@
     "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
     "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate.",
-      "MAX_LENGTH": "Maximum name length reached.",
-      "CONFIRM_NOT_MATCH": "Confirm password not match."
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUPLICATE": "Name is duplicate",
+      "MAX_LENGTH": "Maximum name length reached",
+      "CONFIRM_NOT_MATCH": "Confirm password not match"
     }
   },
   "OPEN_WALLET": {
@@ -92,9 +92,9 @@
     "FILE_NOT_FOUND1": "Wallet file not found",
     "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate.",
-      "MAX_LENGTH": "Maximum name length reached."
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUPLICATE": "Name is duplicate",
+      "MAX_LENGTH": "Maximum name length reached"
     },
     "MODAL": {
       "TITLE": "Type wallet password",
@@ -114,12 +114,12 @@
     "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
     "CHOOSE_PATH": "Please choose a path",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate.",
-      "MAX_LENGTH": "Maximum name length reached.",
-      "CONFIRM_NOT_MATCH": "Confirm password not match.",
-      "KEY_REQUIRED": "Key is required.",
-      "KEY_NOT_VALID": "Key not valid."
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUPLICATE": "Name is duplicate",
+      "MAX_LENGTH": "Maximum name length reached",
+      "CONFIRM_NOT_MATCH": "Confirm password not match",
+      "KEY_REQUIRED": "Key is required",
+      "KEY_NOT_VALID": "Key not valid"
     }
   },
   "SEED_PHRASE": {
@@ -153,9 +153,9 @@
       "BUTTON": "Save"
     },
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required.",
-      "PASS_NOT_MATCH": "Old password not match.",
-      "CONFIRM_NOT_MATCH": "Confirm password not match."
+      "PASS_REQUIRED": "Password is required",
+      "PASS_NOT_MATCH": "Old password not match",
+      "CONFIRM_NOT_MATCH": "Confirm password not match"
     },
     "LAST_BUILD": "Current build: {{value}}",
     "APP_LOG_TITLE": "Log level:"
@@ -184,9 +184,9 @@
     "BUTTON_SAVE": "Save",
     "BUTTON_REMOVE": "Close wallet",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate.",
-      "MAX_LENGTH": "Maximum name length reached."
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUPLICATE": "Name is duplicate",
+      "MAX_LENGTH": "Maximum name length reached"
     }
   },
   "ASSIGN_ALIAS": {
@@ -265,14 +265,14 @@
     "BUTTON": "Send",
     "SUCCESS_SENT": "Transaction sent",
     "FORM_ERRORS": {
-      "ADDRESS_REQUIRED": "Address is required.",
-      "ADDRESS_NOT_VALID": "Address not valid.",
-      "ALIAS_NOT_VALID": "Alias not valid.",
-      "AMOUNT_REQUIRED": "Amount is required.",
-      "AMOUNT_ZERO": "Amount is zero.",
-      "FEE_REQUIRED": "Fee is required.",
+      "ADDRESS_REQUIRED": "Address is required",
+      "ADDRESS_NOT_VALID": "Address not valid",
+      "ALIAS_NOT_VALID": "Alias not valid",
+      "AMOUNT_REQUIRED": "Amount is required",
+      "AMOUNT_ZERO": "Amount is zero",
+      "FEE_REQUIRED": "Fee is required",
       "FEE_MINIMUM": "Minimum fee: {{fee}}",
-      "MAX_LENGTH": "Maximum comment length reached."
+      "MAX_LENGTH": "Maximum comment length reached"
     }
   },
   "HISTORY": {
@@ -298,8 +298,8 @@
     "TYPE_MESSAGES": {
       "HIDDEN": "hidden",
       "UNDEFINED": "Undefined",
-      "COMPLETE_BUYER": "Successfully complete contract, return remaining pledge",
-      "COMPLETE_SELLER": "Successfully complete contract, receive payment on contract, and return pledge",
+      "COMPLETE_BUYER": "Contract completed",
+      "COMPLETE_SELLER": "Contract completed",
       "CREATE_ALIAS": "Fee for assigning alias",
       "UPDATE_ALIAS": "Fee for editing alias",
       "POW_REWARD": "POW reward",
@@ -354,7 +354,6 @@
         "WAITING": "Waiting for response",
         "PLEDGE_RESERVED": "Pledge amount reserved",
         "IGNORED": "The seller ignored your contract proposal",
-        "PLEDGE_UNBLOCKED": "Pledge amount unblocked",
         "ACCEPTED": "The seller accepted your contract proposal",
         "WAIT": "Waiting for deposits confirmation",
         "WAITING_SELLER": "Waiting for delivery",
@@ -381,17 +380,17 @@
     "DETAILS": "Additional details",
     "SEND_BUTTON": "Send",
     "FORM_ERRORS": {
-      "DESC_REQUIRED": "Description is required.",
-      "DESC_MAXIMUM": "Maximum field length reached.",
-      "SELLER_REQUIRED": "Address required.",
-      "SELLER_NOT_VALID": "Invalid address.",
-      "ALIAS_NOT_VALID": "Alias not valid.",
-      "AMOUNT_REQUIRED": "Amount is required.",
-      "AMOUNT_ZERO": "Amount cannot be zero.",
-      "YOUR_DEPOSIT_REQUIRED": "Deposit required.",
-      "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required.",
-      "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract.",
-      "COMMENT_MAXIMUM": "Maximum field length reached."
+      "DESC_REQUIRED": "Description is required",
+      "DESC_MAXIMUM": "Maximum field length reached",
+      "SELLER_REQUIRED": "Address required",
+      "SELLER_NOT_VALID": "Invalid address",
+      "ALIAS_NOT_VALID": "Alias not valid",
+      "AMOUNT_REQUIRED": "Amount is required",
+      "AMOUNT_ZERO": "Amount cannot be zero",
+      "YOUR_DEPOSIT_REQUIRED": "Deposit required",
+      "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required",
+      "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract",
+      "COMMENT_MAXIMUM": "Maximum field length reached"
     },
     "PROGRESS_NEW": "New purchase",
     "PROGRESS_WAIT": "Awaiting reply",
@@ -408,10 +407,9 @@
     "DEALS_CANCELED_WAIT": "Cancellation in progress",
     "WAITING_TIME": "Response time",
     "NEED_MONEY": "There are insufficient funds in the wallet. Add funds to the wallet to continue",
-    "WAITING_SELLER": "Waiting for seller respond to contract proposal",
+    "WAITING_SELLER": "Waiting for response",
     "IGNORED_SELLER": "The seller ignored your contract proposal",
-    "PLEDGE_UNBLOCKED": "Pledge amount unblocked",
-    "WAITING_SHIP": "Waiting for seller to ship item",
+    "WAITING_SHIP": "Waiting for delivery",
     "IGNORED_CANCEL_SELLER": "The seller ignored your proposal to cancel the contract",
     "EXPIRED": "The contract proposal has expired",
     "WAIT": "Waiting for deposits confirmation",
@@ -424,7 +422,7 @@
     "WAITING_BUYER": "Contract proposal received",
     "IGNORED_BUYER": "Contract proposal ignored",
     "IGNORED_CANCEL_BUYER": "You ignored the proposal to cancel the contract",
-    "BUYER_WAIT": "The buyer is waiting for the item to be delivered",
+    "BUYER_WAIT": "Waiting for delivery",
     "PROPOSAL_CANCEL_BUYER": "Cancellation request received",
     "BUTTON_MAKE_PLEDGE": "Accept and make deposit",
     "BUTTON_IGNORE": "Ignore and hide offer",
