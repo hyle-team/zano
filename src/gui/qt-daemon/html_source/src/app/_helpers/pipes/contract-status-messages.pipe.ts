@@ -58,7 +58,6 @@ export class ContractStatusMessagesPipe implements PipeTransform {
         break;
       case 110:
         state.part1 = this.translate.instant('CONTRACTS.STATUS_MESSAGES.BUYER.IGNORED');
-        state.part2 = this.translate.instant('CONTRACTS.STATUS_MESSAGES.BUYER.PLEDGE_UNBLOCKED');
         break;
       case 201:
         state.part1 = this.translate.instant('CONTRACTS.STATUS_MESSAGES.BUYER.ACCEPTED');
