@@ -83,7 +83,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
       return null;
     }]),
     amount: new FormControl(null, [Validators.required, (g: FormControl) => {
-      if (parseInt(g.value, 10) === 0) {
+      if (parseFloat(g.value) === 0) {
         return {'amount_zero': true};
       }
       return null;
@@ -241,10 +241,8 @@ export class PurchaseComponent implements OnInit, OnDestroy {
 
   createPurchase() {
     if (this.purchaseForm.valid) {
+      const sellerDeposit = this.purchaseForm.get('sameAmount').value ? this.purchaseForm.get('amount').value : this.purchaseForm.get('sellerDeposit').value;
       if (this.purchaseForm.get('seller').value.indexOf('@') !== 0) {
-        if (this.purchaseForm.get('sameAmount').value) {
-          this.purchaseForm.get('sellerDeposit').setValue(this.purchaseForm.get('amount').value);
-        }
         this.backend.createProposal(
           this.variablesService.currentWallet.wallet_id,
           this.purchaseForm.get('description').value,
@@ -253,7 +251,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
           this.purchaseForm.get('seller').value,
           this.purchaseForm.get('amount').value,
           this.purchaseForm.get('yourDeposit').value,
-          this.purchaseForm.get('sellerDeposit').value,
+          sellerDeposit,
           this.purchaseForm.get('time').value,
           this.purchaseForm.get('payment').value,
           (create_status) => {
@@ -277,7 +275,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
                 alias_data.address,
                 this.purchaseForm.get('amount').value,
                 this.purchaseForm.get('yourDeposit').value,
-                this.purchaseForm.get('sellerDeposit').value,
+                sellerDeposit,
                 this.purchaseForm.get('time').value,
                 this.purchaseForm.get('payment').value,
                 (create_status) => {

@@ -5148,7 +5148,7 @@ var PurchaseComponent = /** @class */ (function () {
                     return null;
                 }]),
             amount: new _angular_forms__WEBPACK_IMPORTED_MODULE_2__["FormControl"](null, [_angular_forms__WEBPACK_IMPORTED_MODULE_2__["Validators"].required, function (g) {
-                    if (parseInt(g.value, 10) === 0) {
+                    if (parseFloat(g.value) === 0) {
                         return { 'amount_zero': true };
                     }
                     return null;
@@ -5291,11 +5291,9 @@ var PurchaseComponent = /** @class */ (function () {
     PurchaseComponent.prototype.createPurchase = function () {
         var _this = this;
         if (this.purchaseForm.valid) {
+            var sellerDeposit_1 = this.purchaseForm.get('sameAmount').value ? this.purchaseForm.get('amount').value : this.purchaseForm.get('sellerDeposit').value;
             if (this.purchaseForm.get('seller').value.indexOf('@') !== 0) {
-                if (this.purchaseForm.get('sameAmount').value) {
-                    this.purchaseForm.get('sellerDeposit').setValue(this.purchaseForm.get('amount').value);
-                }
-                this.backend.createProposal(this.variablesService.currentWallet.wallet_id, this.purchaseForm.get('description').value, this.purchaseForm.get('comment').value, this.variablesService.currentWallet.address, this.purchaseForm.get('seller').value, this.purchaseForm.get('amount').value, this.purchaseForm.get('yourDeposit').value, this.purchaseForm.get('sellerDeposit').value, this.purchaseForm.get('time').value, this.purchaseForm.get('payment').value, function (create_status) {
+                this.backend.createProposal(this.variablesService.currentWallet.wallet_id, this.purchaseForm.get('description').value, this.purchaseForm.get('comment').value, this.variablesService.currentWallet.address, this.purchaseForm.get('seller').value, this.purchaseForm.get('amount').value, this.purchaseForm.get('yourDeposit').value, sellerDeposit_1, this.purchaseForm.get('time').value, this.purchaseForm.get('payment').value, function (create_status) {
                     if (create_status) {
                         _this.back();
                     }
@@ -5310,7 +5308,7 @@ var PurchaseComponent = /** @class */ (function () {
                             });
                         }
                         else {
-                            _this.backend.createProposal(_this.variablesService.currentWallet.wallet_id, _this.purchaseForm.get('description').value, _this.purchaseForm.get('comment').value, _this.variablesService.currentWallet.address, alias_data.address, _this.purchaseForm.get('amount').value, _this.purchaseForm.get('yourDeposit').value, _this.purchaseForm.get('sellerDeposit').value, _this.purchaseForm.get('time').value, _this.purchaseForm.get('payment').value, function (create_status) {
+                            _this.backend.createProposal(_this.variablesService.currentWallet.wallet_id, _this.purchaseForm.get('description').value, _this.purchaseForm.get('comment').value, _this.variablesService.currentWallet.address, alias_data.address, _this.purchaseForm.get('amount').value, _this.purchaseForm.get('yourDeposit').value, sellerDeposit_1, _this.purchaseForm.get('time').value, _this.purchaseForm.get('payment').value, function (create_status) {
                                 if (create_status) {
                                     _this.back();
                                 }
