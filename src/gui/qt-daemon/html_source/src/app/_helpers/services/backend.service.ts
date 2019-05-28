@@ -426,7 +426,7 @@ export class BackendService {
         a_addr: a_addr,
         b_addr: b_addr,
         to_pay: this.moneyToIntPipe.transform(to_pay),
-        a_pledge: this.moneyToIntPipe.transform((new BigNumber(a_pledge)).minus(to_pay).toString()),
+        a_pledge: this.moneyToIntPipe.transform(a_pledge),
         b_pledge: this.moneyToIntPipe.transform(b_pledge)
       },
       payment_id: payment_id,

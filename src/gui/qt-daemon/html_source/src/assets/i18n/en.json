@@ -352,7 +352,6 @@
       },
       "BUYER": {
         "WAITING": "Waiting for response",
-        "PLEDGE_RESERVED": "Pledge amount reserved",
         "IGNORED": "The seller ignored your contract proposal",
         "ACCEPTED": "The seller accepted your contract proposal",
         "WAIT": "Waiting for deposits confirmation",

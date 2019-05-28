@@ -1048,7 +1048,6 @@ var Wallet = /** @class */ (function () {
             }
             var searchResult = viewedContracts.some(function (elem) { return elem.state === contract.state && elem.is_a === contract.is_a && elem.contract_id === contract.contract_id; });
             contract.is_new = !searchResult;
-            contract['private_detailes'].a_pledge = contract['private_detailes'].a_pledge.plus(contract['private_detailes'].to_pay);
             wallet.contracts.push(contract);
         };
         for (var i = 0; i < items.length; i++) {
@@ -1979,7 +1978,7 @@ var BackendService = /** @class */ (function () {
                 a_addr: a_addr,
                 b_addr: b_addr,
                 to_pay: this.moneyToIntPipe.transform(to_pay),
-                a_pledge: this.moneyToIntPipe.transform((new bignumber_js__WEBPACK_IMPORTED_MODULE_7__["BigNumber"](a_pledge)).minus(to_pay).toString()),
+                a_pledge: this.moneyToIntPipe.transform(a_pledge),
                 b_pledge: this.moneyToIntPipe.transform(b_pledge)
             },
             payment_id: payment_id,
@@ -3023,7 +3022,6 @@ var AppComponent = /** @class */ (function () {
                             }
                             var searchResult = _this.variablesService.settings.viewedContracts.some(function (elem) { return elem.state === contract_1.state && elem.is_a === contract_1.is_a && elem.contract_id === contract_1.contract_id; });
                             contract_1.is_new = !searchResult;
-                            contract_1['private_detailes'].a_pledge = contract_1['private_detailes'].a_pledge.plus(contract_1['private_detailes'].to_pay);
                             var findContract = false;
                             for (var i = 0; i < wallet.contracts.length; i++) {
                                 if (wallet.contracts[i].contract_id === contract_1.contract_id && wallet.contracts[i].is_a === contract_1.is_a) {
