@@ -188,22 +188,9 @@
   .progress-labels {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     font-size: 1.2rem;
     height: 100%;
-
-    span {
-      flex: 1 0 0;
-      text-align: center;
-
-      &:first-child {
-        text-align: left;
-      }
-
-      &:last-child {
-        text-align: right;
-      }
-    }
   }
 
   .progress-time {
