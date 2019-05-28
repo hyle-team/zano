@@ -216,13 +216,23 @@ export class PurchaseComponent implements OnInit, OnDestroy {
   }
 
   getProgressBarWidth() {
-    let progress = '9rem';
+    let progress = '0';
     if (!this.newPurchase) {
       if (this.currentContract) {
-        if ([110, 3, 4, 6, 140].indexOf(this.currentContract.state) !== -1) {
-          progress = '100%';
-        } else {
+        if (this.currentContract.state === 1) {
+          progress = '10%';
+        }
+        if (this.currentContract.state === 201) {
+          progress = '25%';
+        }
+        if ([120, 2].indexOf(this.currentContract.state) !== -1) {
           progress = '50%';
+        }
+        if ([5, 601].indexOf(this.currentContract.state) !== -1) {
+          progress = '75%';
+        }
+        if ([110, 130, 140, 3, 4, 6].indexOf(this.currentContract.state) !== -1) {
+          progress = '100%';
         }
       }
     }
@@ -330,7 +340,6 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     this.modalService.prepareModal('info', 'PURCHASE.IGNORED_ACCEPT');
     this.back();
   }
-
 
   productNotGot() {
     this.backend.releaseProposal(this.currentWalletId, this.currentContract.contract_id, 'REL_B', (release_status) => {

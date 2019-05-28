@@ -317,8 +317,6 @@ export class AppComponent implements OnInit, OnDestroy {
               const searchResult = this.variablesService.settings.viewedContracts.some(elem => elem.state === contract.state && elem.is_a === contract.is_a && elem.contract_id === contract.contract_id);
               contract.is_new = !searchResult;
 
-              contract['private_detailes'].a_pledge = contract['private_detailes'].a_pledge.plus(contract['private_detailes'].to_pay);
-
               let findContract = false;
               for (let i = 0; i < wallet.contracts.length; i++) {
                 if (wallet.contracts[i].contract_id === contract.contract_id && wallet.contracts[i].is_a === contract.is_a) {
