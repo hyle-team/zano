@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # Environment prerequisites:
 # 1) QT_PREFIX_PATH should be set to Qt libs folder
@@ -19,7 +19,7 @@ if [ -n "$build_prefix" ]; then
 fi
 
 if [ -n "$testnet" ]; then
-  testnet_def=-D TESTNET=TRUE
+  testnet_def="-D TESTNET=TRUE"
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
 fi
 
@@ -64,7 +64,7 @@ fi
 
 
 
-read version_str <<< $(./src/zanod --version | awk '/^Zano / { print $2 }')
+read version_str <<< $(./src/zanod --version | awk '/^Zano/ { print $2 }')
 version_str=${version_str}
 echo $version_str
 
