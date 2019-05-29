@@ -1875,7 +1875,7 @@ var BackendService = /** @class */ (function () {
         var _this = this;
         var wallets = [];
         this.variablesService.wallets.forEach(function (wallet) {
-            wallets.push({ name: wallet.name, pass: wallet.pass, path: wallet.path });
+            wallets.push({ name: wallet.name, pass: wallet.pass, path: wallet.path, staking: wallet.staking });
         });
         this.backendObject['store_secure_app_data'](JSON.stringify(wallets), this.variablesService.appPass, function (dataStore) {
             _this.backendCallback(dataStore, {}, callback, 'store_secure_app_data');
@@ -4417,6 +4417,13 @@ var LoginComponent = /** @class */ (function () {
                                     _this.ngZone.run(function () {
                                         var new_wallet = new _helpers_models_wallet_model__WEBPACK_IMPORTED_MODULE_6__["Wallet"](open_data.wallet_id, wallet.name, wallet.pass, open_data['wi'].path, open_data['wi'].address, open_data['wi'].balance, open_data['wi'].unlocked_balance, open_data['wi'].mined_total, open_data['wi'].tracking_hey);
                                         new_wallet.alias = _this.backend.getWalletAlias(new_wallet.address);
+                                        if (wallet.staking) {
+                                            new_wallet.staking = true;
+                                            _this.backend.startPosMining(new_wallet.wallet_id);
+                                        }
+                                        else {
+                                            new_wallet.staking = false;
+                                        }
                                         if (open_data.recent_history && open_data.recent_history.history) {
                                             new_wallet.prepareHistory(open_data.recent_history.history);
                                         }

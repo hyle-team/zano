@@ -104,6 +104,12 @@ export class LoginComponent implements OnInit, OnDestroy {
                       open_data['wi'].tracking_hey
                     );
                     new_wallet.alias = this.backend.getWalletAlias(new_wallet.address);
+                    if (wallet.staking) {
+                      new_wallet.staking = true;
+                      this.backend.startPosMining(new_wallet.wallet_id);
+                    } else {
+                      new_wallet.staking = false;
+                    }
                     if (open_data.recent_history && open_data.recent_history.history) {
                       new_wallet.prepareHistory(open_data.recent_history.history);
                     }
