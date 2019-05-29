@@ -308,7 +308,7 @@ export class BackendService {
   storeSecureAppData(callback?) {
     const wallets = [];
     this.variablesService.wallets.forEach((wallet) => {
-      wallets.push({name: wallet.name, pass: wallet.pass, path: wallet.path});
+      wallets.push({name: wallet.name, pass: wallet.pass, path: wallet.path, staking: wallet.staking});
     });
     this.backendObject['store_secure_app_data'](JSON.stringify(wallets), this.variablesService.appPass, (dataStore) => {
       this.backendCallback(dataStore, {}, callback, 'store_secure_app_data');
