@@ -14,11 +14,11 @@ ARCHIVE_NAME_PREFIX=zano-linux-x64-
 : "${BOOST_ROOT:?BOOST_ROOT should be set to the root of Boost, ex.: /home/user/boost_1_66_0}"
 : "${QT_PREFIX_PATH:?QT_PREFIX_PATH should be set to Qt libs folder, ex.: /home/user/Qt5.10.1/5.10.1/gcc_64}"
 
-if [-n "$build_prefix"]; then
+if [ -n "$build_prefix" ]; then
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}${build_prefix}-
 fi
 
-if [-n "$testnet"]; then
+if [ -n "$testnet" ]; then
   testnet_def=-D TESTNET=TRUE
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
 fi
