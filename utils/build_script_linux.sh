@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # Environment prerequisites:
 # 1) QT_PREFIX_PATH should be set to Qt libs folder
@@ -9,12 +9,24 @@
 # export BOOST_ROOT=/home/user/boost_1_66_0
 # export QT_PREFIX_PATH=/home/user/Qt5.10.1/5.10.1/gcc_64
 
+ARCHIVE_NAME_PREFIX=zano-linux-x64-
+
 : "${BOOST_ROOT:?BOOST_ROOT should be set to the root of Boost, ex.: /home/user/boost_1_66_0}"
 : "${QT_PREFIX_PATH:?QT_PREFIX_PATH should be set to Qt libs folder, ex.: /home/user/Qt5.10.1/5.10.1/gcc_64}"
 
+if [ -n "$build_prefix" ]; then
+  ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}${build_prefix}-
+fi
+
+if [ -n "$testnet" ]; then
+  testnet_def="-D TESTNET=TRUE"
+  ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
+fi
+
+
 prj_root=$(pwd)
 
-git pull
+git pull --ff-only
 if [ $? -ne 0 ]; then
     echo "Failed to pull"
     exit $?
@@ -26,7 +38,7 @@ echo "--------------------------------------------------"
 echo "Building...." 
 
 rm -rf build; mkdir -p build/release; cd build/release; 
-cmake -D STATIC=true -D ARCH=x86-64 -D BUILD_GUI=TRUE -D CMAKE_PREFIX_PATH="$QT_PREFIX_PATH" -D CMAKE_BUILD_TYPE=Release ../..
+cmake $testnet_def -D STATIC=true -D ARCH=x86-64 -D BUILD_GUI=TRUE -D CMAKE_PREFIX_PATH="$QT_PREFIX_PATH" -D CMAKE_BUILD_TYPE=Release ../..
 if [ $? -ne 0 ]; then
     echo "Failed to run cmake"
     exit 1
@@ -52,7 +64,7 @@ fi
 
 
 
-read version_str <<< $(./src/zanod --version | awk '/^Zano / { print $2 }')
+read version_str <<< $(./src/zanod --version | awk '/^Zano/ { print $2 }')
 version_str=${version_str}
 echo $version_str
 
@@ -98,7 +110,7 @@ cp $QT_PREFIX_PATH/plugins/xcbglintegrations/libqxcb-glx-integration.so ./Zano/x
 
 cp -Rv src/zanod src/Zano src/simplewallet  src/connectivity_tool ./Zano
 
-package_filename=zano-linux-x64-$version_str.tar.bz2
+package_filename=${ARCHIVE_NAME_PREFIX}${version_str}.tar.bz2
 
 rm -f ./$package_filename
 tar -cjvf $package_filename Zano
