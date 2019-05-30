@@ -131,14 +131,16 @@ echo "Build success"
 
 echo "############### Uploading... ################"
 
-scp $ZANO_BUILD_DIR/release/src/$package_filename zano_build_server:/var/www/html/builds/
+package_filepath=$ZANO_BUILD_DIR/release/src/$package_filename
+
+scp $package_filepath zano_build_server:/var/www/html/builds/
 if [ $? -ne 0 ]; then
     echo "Failed to upload to remote server"
     exit 1
 fi
 
 
-read checksum <<< $(shasum -a 256 $package_filename | awk '/^/ { print $1 }' )
+read checksum <<< $( shasum -a 256 $package_filepath | awk '/^/ { print $1 }' )
 
 mail_msg="New ${build_prefix_label}${testnet_label}build for macOS-x64:<br>
 http://build.zano.org:8081/builds/$package_filename<br>
