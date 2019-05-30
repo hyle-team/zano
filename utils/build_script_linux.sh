@@ -26,12 +26,6 @@ fi
 
 prj_root=$(pwd)
 
-git pull --ff-only
-if [ $? -ne 0 ]; then
-    echo "Failed to pull"
-    exit $?
-fi
-
 echo "---------------- BUILDING PROJECT ----------------"
 echo "--------------------------------------------------"
 
