@@ -138,9 +138,12 @@ if [ $? -ne 0 ]; then
 fi
 
 
-mail_msg="New build for macOS-x64 available at http://build.zano.org:8081/builds/$package_filename"
+read checksum <<< $(shasum -a 256 $package_filename | awk '/^/ { print $1 }' )
 
-echo $mail_msg
+mail_msg="New ${build_prefix_label}${testnet_label}build for macOS-x64:<br>
+http://build.zano.org:8081/builds/$package_filename<br>
+sha256: $checksum"
 
-echo $mail_msg | mail -s "Zano macOS-x64 build $version_str" ${emails}
+echo "$mail_msg"
 
+echo "$mail_msg" | mail -s "Zano macOS-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}
