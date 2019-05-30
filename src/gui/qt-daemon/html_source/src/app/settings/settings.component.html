@@ -33,7 +33,7 @@
 
     <div class="lock-selection">
       <label class="lock-selection-title">{{ 'SETTINGS.APP_LOCK.TITLE' | translate }}</label>
-      <ng-select class="lock-selection-select"
+      <ng-select class="custom-select"
                  [items]="appLockOptions"
                  bindValue="id"
                  bindLabel="name"
@@ -52,7 +52,7 @@
 
     <div class="lock-selection">
       <label class="lock-selection-title">{{ 'SETTINGS.APP_LOG_TITLE' | translate }}</label>
-      <ng-select class="lock-selection-select"
+      <ng-select class="custom-select"
                  [items]="appLogOptions"
                  bindValue="id"
                  bindLabel="id"

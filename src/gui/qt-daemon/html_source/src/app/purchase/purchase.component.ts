@@ -82,7 +82,12 @@ export class PurchaseComponent implements OnInit, OnDestroy {
       }
       return null;
     }]),
-    amount: new FormControl(null, Validators.required),
+    amount: new FormControl(null, [Validators.required, (g: FormControl) => {
+      if (parseFloat(g.value) === 0) {
+        return {'amount_zero': true};
+      }
+      return null;
+    }]),
     yourDeposit: new FormControl(null, Validators.required),
     sellerDeposit: new FormControl(null, Validators.required),
     sameAmount: new FormControl({value: false, disabled: false}),
@@ -91,8 +96,6 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     time: new FormControl({value: 12, disabled: false}),
     timeCancel: new FormControl({value: 12, disabled: false}),
     payment: new FormControl('')
-  }, function (g: FormGroup) {
-    return (new BigNumber(g.get('yourDeposit').value)).isLessThan(g.get('amount').value) ? {'your_deposit_too_small': true} : null;
   });
 
   additionalOptions = false;
@@ -213,13 +216,23 @@ export class PurchaseComponent implements OnInit, OnDestroy {
   }
 
   getProgressBarWidth() {
-    let progress = '9rem';
+    let progress = '0';
     if (!this.newPurchase) {
       if (this.currentContract) {
-        if ([110, 3, 4, 6, 140].indexOf(this.currentContract.state) !== -1) {
-          progress = '100%';
-        } else {
+        if (this.currentContract.state === 1) {
+          progress = '10%';
+        }
+        if (this.currentContract.state === 201) {
+          progress = '25%';
+        }
+        if ([120, 2].indexOf(this.currentContract.state) !== -1) {
           progress = '50%';
+        }
+        if ([5, 601].indexOf(this.currentContract.state) !== -1) {
+          progress = '75%';
+        }
+        if ([110, 130, 140, 3, 4, 6].indexOf(this.currentContract.state) !== -1) {
+          progress = '100%';
         }
       }
     }
@@ -238,10 +251,8 @@ export class PurchaseComponent implements OnInit, OnDestroy {
 
   createPurchase() {
     if (this.purchaseForm.valid) {
+      const sellerDeposit = this.purchaseForm.get('sameAmount').value ? this.purchaseForm.get('amount').value : this.purchaseForm.get('sellerDeposit').value;
       if (this.purchaseForm.get('seller').value.indexOf('@') !== 0) {
-        if (this.purchaseForm.get('sameAmount').value) {
-          this.purchaseForm.get('sellerDeposit').setValue(this.purchaseForm.get('amount').value);
-        }
         this.backend.createProposal(
           this.variablesService.currentWallet.wallet_id,
           this.purchaseForm.get('description').value,
@@ -250,7 +261,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
           this.purchaseForm.get('seller').value,
           this.purchaseForm.get('amount').value,
           this.purchaseForm.get('yourDeposit').value,
-          this.purchaseForm.get('sellerDeposit').value,
+          sellerDeposit,
           this.purchaseForm.get('time').value,
           this.purchaseForm.get('payment').value,
           (create_status) => {
@@ -274,7 +285,7 @@ export class PurchaseComponent implements OnInit, OnDestroy {
                 alias_data.address,
                 this.purchaseForm.get('amount').value,
                 this.purchaseForm.get('yourDeposit').value,
-                this.purchaseForm.get('sellerDeposit').value,
+                sellerDeposit,
                 this.purchaseForm.get('time').value,
                 this.purchaseForm.get('payment').value,
                 (create_status) => {
@@ -329,7 +340,6 @@ export class PurchaseComponent implements OnInit, OnDestroy {
     this.modalService.prepareModal('info', 'PURCHASE.IGNORED_ACCEPT');
     this.back();
   }
-
 
   productNotGot() {
     this.backend.releaseProposal(this.currentWalletId, this.currentContract.contract_id, 'REL_B', (release_status) => {

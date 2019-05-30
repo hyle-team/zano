@@ -7,10 +7,6 @@ Be sure to properly clone the repository:
 
 `$ git clone --recursive https://github.com/hyle-team/zano.git`
 
-or, if already cloned:
-
-`$ cd zano/ && git submodule init && git submodule update`
-
 ### Dependencies
 | component / version | minimum <br>(not recommended but may work) | recommended | most recent of what we have ever tested |
 |--|--|--|--|
@@ -66,6 +62,3 @@ To build GUI application:
     h. Unfold the certificate in Keychain Access window and double click underlying private key "Zano". Select "Access Control" tab, then select "Allow all applications to access this item". Click "Save Changes".
 2. Revise building script, comment out unwanted steps and run it:  `utils/build_script_mac_osx.sh`
 3. The application should be here: `/buid_mac_osx_64/release/src`
-
-
-Good luck!
