@@ -12,10 +12,12 @@ ARCHIVE_NAME_PREFIX=zano-macos-x64-
 
 if [ -n "$build_prefix" ]; then
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}${build_prefix}-
+  build_prefix_label="$build_prefix "
 fi
 
 if [ -n "$testnet" ]; then
   testnet_def="-D TESTNET=TRUE"
+  testnet_label="testnet "
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
 fi
 
@@ -131,16 +133,21 @@ echo "Build success"
 
 echo "############### Uploading... ################"
 
-scp $ZANO_BUILD_DIR/release/src/$package_filename zano_build_server:/var/www/html/builds/
+package_filepath=$ZANO_BUILD_DIR/release/src/$package_filename
+
+scp $package_filepath zano_build_server:/var/www/html/builds/
 if [ $? -ne 0 ]; then
     echo "Failed to upload to remote server"
     exit 1
 fi
 
 
-mail_msg="New build for macOS-x64 available at http://build.zano.org:8081/builds/$package_filename"
+read checksum <<< $( shasum -a 256 $package_filepath | awk '/^/ { print $1 }' )
 
-echo $mail_msg
+mail_msg="New ${build_prefix_label}${testnet_label}build for macOS-x64:<br>
+http://build.zano.org:8081/builds/$package_filename<br>
+sha256: $checksum"
 
-echo $mail_msg | mail -s "Zano macOS-x64 build $version_str" ${emails}
+echo "$mail_msg"
 
+echo "$mail_msg" | mail -s "Zano macOS-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}
