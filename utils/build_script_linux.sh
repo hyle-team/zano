@@ -16,21 +16,17 @@ ARCHIVE_NAME_PREFIX=zano-linux-x64-
 
 if [ -n "$build_prefix" ]; then
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}${build_prefix}-
+  build_prefix_label="$build_prefix "
 fi
 
 if [ -n "$testnet" ]; then
   testnet_def="-D TESTNET=TRUE"
+  testnet_label="testnet "
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
 fi
 
 
 prj_root=$(pwd)
-
-git pull --ff-only
-if [ $? -ne 0 ]; then
-    echo "Failed to pull"
-    exit $?
-fi
 
 echo "---------------- BUILDING PROJECT ----------------"
 echo "--------------------------------------------------"
@@ -130,11 +126,14 @@ if [ $? -ne 0 ]; then
     exit $?
 fi
 
+read checksum <<< $(sha256sum $package_filename | awk '/^/ { print $1 }' )
 
-mail_msg="New build for linux-x64 available at http://build.zano.org:8081/builds/$package_filename"
+mail_msg="New ${build_prefix_label}${testnet_label}build for linux-x64:<br>
+http://build.zano.org:8081/builds/$package_filename<br>
+sha256: $checksum"
 
-echo $mail_msg
+echo "$mail_msg"
 
-echo $mail_msg | mail -s "Zano linux-x64 build $version_str" ${emails}
+echo "$mail_msg" | mail -s "Zano linux-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}
 
 exit 0
