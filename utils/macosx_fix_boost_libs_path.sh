@@ -28,6 +28,7 @@ function fix_boost_libs_in_binary() # $1 - path to boost libs, $2 - binary to fi
   install_name_tool -change libboost_program_options.dylib $1/libboost_program_options.dylib $2
   install_name_tool -change libboost_locale.dylib          $1/libboost_locale.dylib          $2
   install_name_tool -change libboost_timer.dylib           $1/libboost_timer.dylib           $2
+  install_name_tool -change libboost_chrono.dylib          $1/libboost_chrono.dylib          $2
   return 0
 }
 
