@@ -5210,7 +5210,10 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx, s
 
     // TODO: consider checking p->tx for unlock time validity as it's checked in get_output_keys_for_input_with_checks()
     // make sure it was actually found
-    CHECK_AND_ASSERT_MES(pk != null_pkey, false, "Can't determine output public key for offset " << pk_n);
+    
+    // let's disable this check due to missing equal check in main chain validation code
+    //TODO: implement more strict validation with next hard fork
+    //CHECK_AND_ASSERT_MES(pk != null_pkey, false, "Can't determine output public key for offset " << pk_n << " in related tx: " << tx_id << ", out_n = " << out_n);
     pub_key_pointers.push_back(&pk);
   }
 
