@@ -25,7 +25,7 @@
   <i class="icon" [class.copy]="!copyAnimation" [class.copied]="copyAnimation" (click)="copyAddress()"></i>
 </div>
 <div class="balance">
-  <span [tooltip]="getTooltip()" [placement]="'bottom'" [tooltipClass]="'balance-tooltip'" [delay]="300" [timeout]="0">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>
+  <span [tooltip]="getTooltip()" [placement]="'bottom'" [tooltipClass]="'balance-tooltip'" [delay]="150" [timeout]="0" (onHide)="onHideTooltip()">{{variablesService.currentWallet.balance | intToMoney  : '3'}} {{variablesService.defaultCurrency}}</span>
   <span>$ {{variablesService.currentWallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>
 </div>
 <div class="tabs">

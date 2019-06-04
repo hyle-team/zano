@@ -1,4 +1,4 @@
-import {Directive, Input, ElementRef, HostListener, Renderer2, HostBinding, OnDestroy} from '@angular/core';
+import {Directive, Input, Output, ElementRef, HostListener, Renderer2, HostBinding, OnDestroy, EventEmitter} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 
 @Directive({
@@ -15,7 +15,10 @@ export class TooltipDirective implements OnDestroy {
   @Input() timeout = 0;
   @Input() delay = 0;
   @Input() showWhenNoOverflow = true;
+  @Output() onHide = new EventEmitter<boolean>();
   tooltip: HTMLElement;
+  private enter: (event: MouseEvent) => void;
+  private leave: (event: MouseEvent) => void;
 
   removeTooltipTimeout;
   removeTooltipTimeoutInner;
@@ -51,7 +54,10 @@ export class TooltipDirective implements OnDestroy {
       this.renderer.setStyle(this.tooltip, 'opacity', '0');
       this.removeTooltipTimeoutInner = setTimeout(() => {
         this.renderer.removeChild(document.body, this.tooltip);
+        this.tooltip.removeEventListener('mouseenter', this.enter);
+        this.tooltip.removeEventListener('mouseleave', this.leave);
         this.tooltip = null;
+        this.onHide.emit(true);
       }, this.delay);
     }, this.timeout);
   }
@@ -75,14 +81,16 @@ export class TooltipDirective implements OnDestroy {
     this.renderer.appendChild(this.tooltip, innerBlock);
     this.renderer.appendChild(document.body, this.tooltip);
 
-    this.tooltip.addEventListener('mouseenter', () => {
+    this.enter = () => {
       this.cancelHide();
-    });
-    this.tooltip.addEventListener('mouseleave', () => {
+    };
+    this.tooltip.addEventListener('mouseenter', this.enter);
+    this.leave = () => {
       if (this.tooltip) {
         this.hide();
       }
-    });
+    };
+    this.tooltip.addEventListener('mouseleave', this.leave);
 
     this.renderer.setStyle(document.body, 'position', 'relative');
     this.renderer.setStyle(this.tooltip, 'position', 'absolute');

@@ -8,9 +8,23 @@ curr_path=${BASH_SOURCE%/*}
 : "${ZANO_BUILD_DIR:?variable not set, see also macosx_build_config.command}"
 : "${CMAKE_OSX_SYSROOT:?CMAKE_OSX_SYSROOT should be set to macOS SDK path, e.g.: /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk}"
 
+ARCHIVE_NAME_PREFIX=zano-macos-x64-
+
+if [ -n "$build_prefix" ]; then
+  ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}${build_prefix}-
+  build_prefix_label="$build_prefix "
+fi
+
+if [ -n "$testnet" ]; then
+  testnet_def="-D TESTNET=TRUE"
+  testnet_label="testnet "
+  ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
+fi
+
+
 rm -rf $ZANO_BUILD_DIR; mkdir -p "$ZANO_BUILD_DIR/release"; cd "$ZANO_BUILD_DIR/release"
 
-cmake -D CMAKE_OSX_SYSROOT=$CMAKE_OSX_SYSROOT -D BUILD_GUI=TRUE -D CMAKE_PREFIX_PATH="$ZANO_QT_PATH/clang_64" -D CMAKE_BUILD_TYPE=Release -D BOOST_ROOT="$ZANO_BOOST_ROOT" -D BOOST_LIBRARYDIR="$ZANO_BOOST_LIBS_PATH" ../..
+cmake $testnet_def -D CMAKE_OSX_SYSROOT=$CMAKE_OSX_SYSROOT -D BUILD_GUI=TRUE -D CMAKE_PREFIX_PATH="$ZANO_QT_PATH/clang_64" -D CMAKE_BUILD_TYPE=Release -D BOOST_ROOT="$ZANO_BOOST_ROOT" -D BOOST_LIBRARYDIR="$ZANO_BOOST_LIBS_PATH" ../..
 if [ $? -ne 0 ]; then
     echo "Failed to cmake"
     exit 1
@@ -87,7 +101,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-read version_str <<< $(DYLD_LIBRARY_PATH=$ZANO_BOOST_LIBS_PATH ./connectivity_tool --version | awk '/^Zano / { print $2 }')
+read version_str <<< $(DYLD_LIBRARY_PATH=$ZANO_BOOST_LIBS_PATH ./connectivity_tool --version | awk '/^Zano/ { print $2 }')
 version_str=${version_str}
 echo $version_str
 
@@ -105,7 +119,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-package_filename="zano-macos-x64-$version_str.dmg"
+package_filename=${ARCHIVE_NAME_PREFIX}${version_str}.dmg
 
 source ../../../utils/macosx_dmg_builder.sh
 build_fancy_dmg package_folder $package_filename
@@ -119,16 +133,21 @@ echo "Build success"
 
 echo "############### Uploading... ################"
 
-scp $ZANO_BUILD_DIR/release/src/$package_filename zano_build_server:/var/www/html/builds/
+package_filepath=$ZANO_BUILD_DIR/release/src/$package_filename
+
+scp $package_filepath zano_build_server:/var/www/html/builds/
 if [ $? -ne 0 ]; then
     echo "Failed to upload to remote server"
     exit 1
 fi
 
 
-mail_msg="New build for macOS-x64 available at http://build.zano.org:8081/builds/$package_filename"
+read checksum <<< $( shasum -a 256 $package_filepath | awk '/^/ { print $1 }' )
 
-echo $mail_msg
+mail_msg="New ${build_prefix_label}${testnet_label}build for macOS-x64:<br>
+http://build.zano.org:8081/builds/$package_filename<br>
+sha256: $checksum"
 
-echo $mail_msg | mail -s "Zano macOS-x64 build $version_str" ${emails}
+echo "$mail_msg"
 
+echo "$mail_msg" | mail -s "Zano macOS-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}

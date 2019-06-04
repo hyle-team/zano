@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # Environment prerequisites:
 # 1) QT_PREFIX_PATH should be set to Qt libs folder
@@ -9,16 +9,24 @@
 # export BOOST_ROOT=/home/user/boost_1_66_0
 # export QT_PREFIX_PATH=/home/user/Qt5.10.1/5.10.1/gcc_64
 
+ARCHIVE_NAME_PREFIX=zano-linux-x64-
+
 : "${BOOST_ROOT:?BOOST_ROOT should be set to the root of Boost, ex.: /home/user/boost_1_66_0}"
 : "${QT_PREFIX_PATH:?QT_PREFIX_PATH should be set to Qt libs folder, ex.: /home/user/Qt5.10.1/5.10.1/gcc_64}"
 
-prj_root=$(pwd)
-
-git pull
-if [ $? -ne 0 ]; then
-    echo "Failed to pull"
-    exit $?
+if [ -n "$build_prefix" ]; then
+  ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}${build_prefix}-
+  build_prefix_label="$build_prefix "
 fi
+
+if [ -n "$testnet" ]; then
+  testnet_def="-D TESTNET=TRUE"
+  testnet_label="testnet "
+  ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
+fi
+
+
+prj_root=$(pwd)
 
 echo "---------------- BUILDING PROJECT ----------------"
 echo "--------------------------------------------------"
@@ -26,7 +34,7 @@ echo "--------------------------------------------------"
 echo "Building...." 
 
 rm -rf build; mkdir -p build/release; cd build/release; 
-cmake -D STATIC=true -D ARCH=x86-64 -D BUILD_GUI=TRUE -D CMAKE_PREFIX_PATH="$QT_PREFIX_PATH" -D CMAKE_BUILD_TYPE=Release ../..
+cmake $testnet_def -D STATIC=true -D ARCH=x86-64 -D BUILD_GUI=TRUE -D CMAKE_PREFIX_PATH="$QT_PREFIX_PATH" -D CMAKE_BUILD_TYPE=Release ../..
 if [ $? -ne 0 ]; then
     echo "Failed to run cmake"
     exit 1
@@ -52,7 +60,7 @@ fi
 
 
 
-read version_str <<< $(./src/zanod --version | awk '/^Zano / { print $2 }')
+read version_str <<< $(./src/zanod --version | awk '/^Zano/ { print $2 }')
 version_str=${version_str}
 echo $version_str
 
@@ -98,7 +106,7 @@ cp $QT_PREFIX_PATH/plugins/xcbglintegrations/libqxcb-glx-integration.so ./Zano/x
 
 cp -Rv src/zanod src/Zano src/simplewallet  src/connectivity_tool ./Zano
 
-package_filename=zano-linux-x64-$version_str.tar.bz2
+package_filename=${ARCHIVE_NAME_PREFIX}${version_str}.tar.bz2
 
 rm -f ./$package_filename
 tar -cjvf $package_filename Zano
@@ -118,11 +126,14 @@ if [ $? -ne 0 ]; then
     exit $?
 fi
 
+read checksum <<< $(sha256sum $package_filename | awk '/^/ { print $1 }' )
 
-mail_msg="New build for linux-x64 available at http://build.zano.org:8081/builds/$package_filename"
+mail_msg="New ${build_prefix_label}${testnet_label}build for linux-x64:<br>
+http://build.zano.org:8081/builds/$package_filename<br>
+sha256: $checksum"
 
-echo $mail_msg
+echo "$mail_msg"
 
-echo $mail_msg | mail -s "Zano linux-x64 build $version_str" ${emails}
+echo "$mail_msg" | mail -s "Zano linux-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}
 
 exit 0

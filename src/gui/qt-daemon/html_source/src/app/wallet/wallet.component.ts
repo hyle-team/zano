@@ -17,6 +17,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   walletID;
   copyAnimation = false;
   copyAnimationTimeout;
+  balanceTooltip;
 
   @ViewChild('scrolledContent') private scrolledContent: ElementRef;
 
@@ -126,23 +127,27 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   getTooltip() {
-    const tooltip = document.createElement('div');
+    this.balanceTooltip = document.createElement('div');
     const available = document.createElement('span');
     available.setAttribute('class', 'available');
     available.innerHTML = this.translate.instant('WALLET.AVAILABLE_BALANCE', {available: this.intToMoneyPipe.transform(this.variablesService.currentWallet.unlocked_balance), currency: this.variablesService.defaultCurrency});
-    tooltip.appendChild(available);
+    this.balanceTooltip.appendChild(available);
     const locked = document.createElement('span');
     locked.setAttribute('class', 'locked');
     locked.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE', {locked: this.intToMoneyPipe.transform(this.variablesService.currentWallet.balance.minus(this.variablesService.currentWallet.unlocked_balance)), currency: this.variablesService.defaultCurrency});
-    tooltip.appendChild(locked);
+    this.balanceTooltip.appendChild(locked);
     const link = document.createElement('span');
     link.setAttribute('class', 'link');
     link.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE_LINK');
     link.addEventListener('click', () => {
       this.openInBrowser('docs.zano.org/docs/locked-balance');
     });
-    tooltip.appendChild(link);
-    return tooltip;
+    this.balanceTooltip.appendChild(link);
+    return this.balanceTooltip;
+  }
+
+  onHideTooltip() {
+    this.balanceTooltip = null;
   }
 
   openInBrowser(link) {
