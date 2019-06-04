@@ -7,9 +7,9 @@
     "BUTTON_SKIP": "Skip",
     "INCORRECT_PASSWORD": "Invalid password",
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required.",
-      "CONFIRM_REQUIRED": "Confirmation is required.",
-      "MISMATCH": "Mismatch."
+      "PASS_REQUIRED": "Password is required",
+      "CONFIRM_REQUIRED": "Confirmation is required",
+      "MISMATCH": "Mismatch"
     }
   },
   "COMMON": {
@@ -78,10 +78,10 @@
     "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
     "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate.",
-      "MAX_LENGTH": "Maximum name length reached.",
-      "CONFIRM_NOT_MATCH": "Confirm password not match."
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUPLICATE": "Name is duplicate",
+      "MAX_LENGTH": "Maximum name length reached",
+      "CONFIRM_NOT_MATCH": "Confirm password not match"
     }
   },
   "OPEN_WALLET": {
@@ -92,9 +92,9 @@
     "FILE_NOT_FOUND1": "Wallet file not found",
     "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate.",
-      "MAX_LENGTH": "Maximum name length reached."
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUPLICATE": "Name is duplicate",
+      "MAX_LENGTH": "Maximum name length reached"
     },
     "MODAL": {
       "TITLE": "Type wallet password",
@@ -114,12 +114,12 @@
     "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
     "CHOOSE_PATH": "Please choose a path",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate.",
-      "MAX_LENGTH": "Maximum name length reached.",
-      "CONFIRM_NOT_MATCH": "Confirm password not match.",
-      "KEY_REQUIRED": "Key is required.",
-      "KEY_NOT_VALID": "Key not valid."
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUPLICATE": "Name is duplicate",
+      "MAX_LENGTH": "Maximum name length reached",
+      "CONFIRM_NOT_MATCH": "Confirm password not match",
+      "KEY_REQUIRED": "Key is required",
+      "KEY_NOT_VALID": "Key not valid"
     }
   },
   "SEED_PHRASE": {
@@ -153,9 +153,9 @@
       "BUTTON": "Save"
     },
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required.",
-      "PASS_NOT_MATCH": "Old password not match.",
-      "CONFIRM_NOT_MATCH": "Confirm password not match."
+      "PASS_REQUIRED": "Password is required",
+      "PASS_NOT_MATCH": "Old password not match",
+      "CONFIRM_NOT_MATCH": "Confirm password not match"
     },
     "LAST_BUILD": "Current build: {{value}}",
     "APP_LOG_TITLE": "Log level:"
@@ -184,9 +184,9 @@
     "BUTTON_SAVE": "Save",
     "BUTTON_REMOVE": "Close wallet",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required.",
-      "NAME_DUPLICATE": "Name is duplicate.",
-      "MAX_LENGTH": "Maximum name length reached."
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUPLICATE": "Name is duplicate",
+      "MAX_LENGTH": "Maximum name length reached"
     }
   },
   "ASSIGN_ALIAS": {
@@ -261,18 +261,18 @@
     "DETAILS": "Additional details",
     "MIXIN": "Mixin",
     "FEE": "Fee",
-    "HIDE": "Hide your wallet address from receiver",
+    "HIDE": "Hide your wallet address from recipient",
     "BUTTON": "Send",
     "SUCCESS_SENT": "Transaction sent",
     "FORM_ERRORS": {
-      "ADDRESS_REQUIRED": "Address is required.",
-      "ADDRESS_NOT_VALID": "Address not valid.",
-      "ALIAS_NOT_VALID": "Alias not valid.",
-      "AMOUNT_REQUIRED": "Amount is required.",
-      "AMOUNT_ZERO": "Amount is zero.",
-      "FEE_REQUIRED": "Fee is required.",
+      "ADDRESS_REQUIRED": "Address is required",
+      "ADDRESS_NOT_VALID": "Address not valid",
+      "ALIAS_NOT_VALID": "Alias not valid",
+      "AMOUNT_REQUIRED": "Amount is required",
+      "AMOUNT_ZERO": "Amount is zero",
+      "FEE_REQUIRED": "Fee is required",
       "FEE_MINIMUM": "Minimum fee: {{fee}}",
-      "MAX_LENGTH": "Maximum comment length reached."
+      "MAX_LENGTH": "Maximum comment length reached"
     }
   },
   "HISTORY": {
@@ -298,21 +298,21 @@
     "TYPE_MESSAGES": {
       "HIDDEN": "hidden",
       "UNDEFINED": "Undefined",
-      "COMPLETE_BUYER": "Successfully complete contract, return remaining pledge",
-      "COMPLETE_SELLER": "Successfully complete contract, receive payment on contract, and return pledge",
+      "COMPLETE_BUYER": "Contract completed",
+      "COMPLETE_SELLER": "Contract completed",
       "CREATE_ALIAS": "Fee for assigning alias",
       "UPDATE_ALIAS": "Fee for editing alias",
       "POW_REWARD": "POW reward",
       "POS_REWARD": "POS reward",
-      "CREATE_CONTRACT": "Send contract offer",
-      "PLEDGE_CONTRACT": "Make pledge on offer",
-      "NULLIFY_CONTRACT": "Nullify pledges for contract",
-      "PROPOSAL_CANCEL_CONTRACT": "Send proposal to cancel contract",
-      "CANCEL_CONTRACT": "Cancel contract, return pledges"
+      "CREATE_CONTRACT": "Contract proposal",
+      "PLEDGE_CONTRACT": "Contract deposit",
+      "NULLIFY_CONTRACT": "Burn deposits",
+      "PROPOSAL_CANCEL_CONTRACT": "Cancellation request",
+      "CANCEL_CONTRACT": "Cancel and return deposits"
     }
   },
   "CONTRACTS": {
-    "EMPTY": "No active contracts.",
+    "EMPTY": "No active contracts",
     "CONTRACTS": "Contracts",
     "PURCHASE": "Purchase",
     "SELL": "Sell",
@@ -324,52 +324,44 @@
     "LISTING_BUTTON": "Create listing",
     "TIME_LEFT": {
       "REMAINING_LESS_ONE": "Less than an hour to respond",
-      "REMAINING_ONE": "Remaining {{time}} hour",
-      "REMAINING_MANY": "Remaining {{time}} hours",
-      "REMAINING_MANY_ALT": "Remaining {{time}} hours",
-      "REMAINING_ONE_RESPONSE": "Remaining {{time}} hour for response",
-      "REMAINING_MANY_RESPONSE": "Remaining {{time}} hours for response",
-      "REMAINING_MANY_ALT_RESPONSE": "Remaining {{time}} hours for response",
-      "REMAINING_ONE_WAITING": "Remaining {{time}} hour waiting",
-      "REMAINING_MANY_WAITING": "Remaining {{time}} hours waiting",
-      "REMAINING_MANY_ALT_WAITING": "Remaining {{time}} hours waiting"
+      "REMAINING_ONE": "{{time}} hour remains",
+      "REMAINING_MANY": "{{time}} hours remain",
+      "REMAINING_MANY_ALT": "{{time}} hours remain",
+      "REMAINING_ONE_RESPONSE": "{{time}} hour remains",
+      "REMAINING_MANY_RESPONSE": "{{time}} hours remain",
+      "REMAINING_MANY_ALT_RESPONSE": "{{time}} hours remain",
+      "REMAINING_ONE_WAITING": "Waiting for {{time}} hour",
+      "REMAINING_MANY_WAITING": "Waiting for {{time}} hours",
+      "REMAINING_MANY_ALT_WAITING": "Waiting for {{time}} hours"
     },
     "STATUS_MESSAGES": {
       "SELLER": {
         "NEW_CONTRACT": "New contract proposal",
-        "IGNORED": "You ignored the contract proposal",
-        "ACCEPTED": "You have accepted the contract proposal",
-        "WAIT": "Please wait for the pledges to be made",
-        "BUYER_WAIT": "The buyer is waiting for the item to be delivered",
-        "PLEDGES_MADE": "Pledges made",
-        "COMPLETED": "Contract completed successfully",
-        "RECEIVED": "Item received, payment transferred, pledges returned",
-        "NOT_RECEIVED": "Item not received",
-        "NULLIFIED": "All pledges nullified",
-        "PROPOSAL_CANCEL": "New proposal to cancel contract and return pledges",
-        "BEING_CANCELLED": "The contract is being cancelled. Please wait for the pledge to be returned",
+        "IGNORED": "You ignored contract proposal",
+        "ACCEPTED": "Contract started",
+        "WAIT": "Waiting for contract confirmation",
+        "WAITING_BUYER": "Waiting for delivery",
+        "COMPLETED": "Contract completed",
+        "NOT_RECEIVED": "Delivery failed",
+        "NULLIFIED": "All deposits burned",
+        "PROPOSAL_CANCEL": "New proposal to cancel contract and return deposits",
+        "BEING_CANCELLED": "Cancellation in progress",
         "CANCELLED": "Contract canceled",
-        "PLEDGES_RETURNED": "Pledges returned",
-        "IGNORED_CANCEL": "You ignored the proposal to cancel the contract",
-        "EXPIRED": "The contract proposal has expired"
+        "IGNORED_CANCEL": "You ignored cancellation proposal",
+        "EXPIRED": "Contract proposal has expired"
       },
       "BUYER": {
-        "WAITING": "Waiting for seller respond to contract proposal",
-        "PLEDGE_RESERVED": "Pledge amount reserved",
-        "IGNORED": "The seller ignored your contract proposal",
-        "PLEDGE_UNBLOCKED": "Pledge amount unblocked",
-        "ACCEPTED": "The seller accepted your contract proposal",
-        "WAIT": "Please wait for the pledges to be made",
-        "PLEDGES_MADE": "Pledges made",
-        "WAITING_SELLER": "Waiting for seller to ship item",
-        "COMPLETED": "Contract completed successfully",
-        "RECEIVED": "Item received, payment transferred, pledges returned",
-        "NOT_RECEIVED": "Item not received",
-        "NULLIFIED": "All pledges nullified",
-        "WAITING_CANCEL": "Waiting for seller to respond to proposal to cancel contract and return pledges",
-        "BEING_CANCELLED": "The contract is being cancelled. Please wait for the pledge to be returned",
+        "WAITING": "Waiting for response",
+        "IGNORED": "Seller ignored your contract proposal",
+        "ACCEPTED": "Seller accepted your contract proposal",
+        "WAIT": "Waiting for deposits confirmation",
+        "WAITING_SELLER": "Waiting for delivery",
+        "COMPLETED": "Contract completed",
+        "NOT_RECEIVED": "Delivery failed",
+        "NULLIFIED": "All deposits burned",
+        "WAITING_CANCEL": "Waiting for contract cancellation",
+        "BEING_CANCELLED": "Cancellation in progress",
         "CANCELLED": "Contract canceled",
-        "PLEDGES_RETURNED": "Pledges returned",
         "IGNORED_CANCEL": "The seller ignored your proposal to cancel the contract",
         "EXPIRED": "The contract proposal has expired"
       }
@@ -387,17 +379,17 @@
     "DETAILS": "Additional details",
     "SEND_BUTTON": "Send",
     "FORM_ERRORS": {
-      "DESC_REQUIRED": "Description is required.",
-      "DESC_MAXIMUM": "Maximum field length reached.",
-      "SELLER_REQUIRED": "Seller is required.",
-      "SELLER_NOT_VALID": "Seller not valid.",
-      "ALIAS_NOT_VALID": "Alias not valid.",
-      "AMOUNT_REQUIRED": "Amount is required.",
-      "YOUR_DEPOSIT_REQUIRED": "Your deposit is required.",
-      "YOUR_DEPOSIT_TOO_SMALL": "Your deposit should be equal or greater than amount.",
-      "SELLER_DEPOSIT_REQUIRED": "Seller deposit is required.",
-      "SELLER_SAME": "The seller's and buyer's accounts are identical. The seller and buyer must use different wallet for the contract.",
-      "COMMENT_MAXIMUM": "Maximum field length reached."
+      "DESC_REQUIRED": "Description required",
+      "DESC_MAXIMUM": "Maximum field length reached",
+      "SELLER_REQUIRED": "Address required",
+      "SELLER_NOT_VALID": "Invalid address",
+      "ALIAS_NOT_VALID": "Invalid alias",
+      "AMOUNT_REQUIRED": "Amount required",
+      "AMOUNT_ZERO": "Amount cannot be zero",
+      "YOUR_DEPOSIT_REQUIRED": "Deposit required",
+      "SELLER_DEPOSIT_REQUIRED": "Seller deposit required",
+      "SELLER_SAME": "Use separate account",
+      "COMMENT_MAXIMUM": "Maximum field length reached"
     },
     "PROGRESS_NEW": "New purchase",
     "PROGRESS_WAIT": "Awaiting reply",
@@ -405,48 +397,46 @@
     "PROGRESS_COMPLETE": "Completed",
     "FEE": "Fee",
     "PAYMENT": "Payment ID",
-    "ACCEPT_STATE_WAIT_BIG": "You have accepted the contract proposal. Please wait for the deposits to be made",
-    "IGNORED_ACCEPT": "You have ignored the contract proposal",
-    "BURN_PROPOSAL": "The deposits have been voided.",
-    "SUCCESS_FINISH_PROPOSAL": "The contract is complete. The payment has been sent.",
-    "SEND_CANCEL_PROPOSAL": "Proposal to cancel contract sent to seller",
-    "IGNORED_CANCEL": "You have ignored the proposal to cancel the contract",
-    "DEALS_CANCELED_WAIT": "The contract is being cancelled. Please wait for the deposit to be returned",
-    "WAITING_TIME": "Time until response",
-    "NEED_MONEY": "There are insufficient funds in the wallet. Add funds to the wallet to continue",
-    "WAITING_SELLER": "Waiting for seller respond to contract proposal",
-    "IGNORED_SELLER": "The seller ignored your contract proposal",
-    "PLEDGE_UNBLOCKED": "Pledge amount unblocked",
-    "WAITING_SHIP": "Waiting for seller to ship item",
-    "IGNORED_CANCEL_SELLER": "The seller ignored your proposal to cancel the contract",
-    "EXPIRED": "The contract proposal has expired",
-    "WAIT": "Please wait for the pledges to be made",
-    "COMPLETED": "Contract completed successfully",
-    "RECEIVED": "Item received, payment transferred, pledges returned",
-    "NOT_RECEIVED": "Item not received",
-    "NULLIFIED": "All pledges nullified",
-    "PROPOSAL_CANCEL_SELLER": "You have made a proposal to cancel the contract",
-    "BEING_CANCELLED": "The contract is being cancelled. Please wait for the pledge to be returned",
-    "CANCELLED": "Contract canceled",
-    "PLEDGES_RETURNED": "Pledges returned",
-    "WAITING_BUYER": "The buyer is proposing a contract",
-    "IGNORED_BUYER": "You ignored the contract proposal",
-    "IGNORED_CANCEL_BUYER": "You ignored the proposal to cancel the contract",
-    "BUYER_WAIT": "The buyer is waiting for the item to be delivered",
-    "PLEDGES_MADE": "Pledges made",
-    "PROPOSAL_CANCEL_BUYER": "The buyer is offering to cancel the contract and return the pledge",
+    "STATUS_MESSAGES": {
+      "NEW_PURCHASE": "New purchase",
+      "WAITING_SELLER": "Waiting for response",
+      "WAITING_BUYER": "Contract proposal received",
+      "WAITING_CONFIRMATION": "Waiting for deposits confirmation",
+      "WAITING_DELIVERY": "Waiting for delivery",
+      "COMPLETED": "Contract completed",
+      "IGNORED_BUYER": "Contract proposal ignored",
+      "IGNORED_SELLER": "The seller ignored your contract proposal",
+      "PROPOSAL_CANCEL_SELLER": "Cancellation request sent",
+      "PROPOSAL_CANCEL_BUYER": "Cancellation request received",
+      "BEING_CANCELLED": "Cancellation in progress",
+      "IGNORED_CANCEL_SELLER": "The seller ignored your proposal to cancel the contract",
+      "IGNORED_CANCEL_BUYER": "Contract cancellation proposal ignored",
+      "CANCELLED": "Contract canceled",
+      "EXPIRED": "Contract proposal expired",
+      "NOT_RECEIVED": "Delivery failed",
+      "NULLIFIED": "All deposits burned"
+    },
+    "ACCEPT_STATE_WAIT_BIG": "Contract started",
+    "IGNORED_ACCEPT": "Contract proposal ignored",
+    "BURN_PROPOSAL": "Deposits burned",
+    "SUCCESS_FINISH_PROPOSAL": "Contract completed",
+    "SEND_CANCEL_PROPOSAL": "Cancellation request sent",
+    "IGNORED_CANCEL": "Contract cancellation proposal ignored",
+    "DEALS_CANCELED_WAIT": "Cancellation in progress",
+    "WAITING_TIME": "Response time",
+    "NEED_MONEY": "Insufficient funds",
     "BUTTON_MAKE_PLEDGE": "Accept and make deposit",
     "BUTTON_IGNORE": "Ignore and hide offer",
     "BUTTON_NULLIFY": "Terminate and burn deposits",
     "BUTTON_RECEIVED": "Complete and release deposits",
     "BUTTON_CANCEL_BUYER": "Cancel and return deposits",
-    "BUTTON_NOT_CANCEL": "Do not cancel (Item shipped)",
-    "BUTTON_CANCEL_SELLER": "Cancel contract (Return pledge)",
+    "BUTTON_NOT_CANCEL": "Ignore request",
+    "BUTTON_CANCEL_SELLER": "Confirm and return deposits",
     "HOUR": "hour",
     "HOURS": "hours",
     "CANCEL": "Cancel",
-    "NULLIFY_QUESTION": "Are you sure you want to nullify your pledge and the seller's pledge?",
-    "BUTTON_NULLIFY_SHORT": "Nullify",
+    "NULLIFY_QUESTION": "Are you sure you want to burn both deposits?",
+    "BUTTON_NULLIFY_SHORT": "Burn",
     "WAITING_TIME_QUESTION": "Are you sure you want to cancel the contract?"
   },
   "MESSAGES": {
@@ -489,7 +479,7 @@
   "ERRORS": {
     "NO_MONEY": "Not enough money",
     "NOT_ENOUGH_MONEY": "Insufficient funds in account",
-    "CORE_BUSY": "Internal error (core is busy)",
+    "CORE_BUSY": "Internal error: core is busy",
     "DAEMON_BUSY": "Internal error: daemon is busy",
     "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",

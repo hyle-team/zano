@@ -214,8 +214,6 @@ export class Wallet {
       const searchResult = viewedContracts.some(elem => elem.state === contract.state && elem.is_a === contract.is_a && elem.contract_id === contract.contract_id);
       contract.is_new = !searchResult;
 
-      contract['private_detailes'].a_pledge = contract['private_detailes'].a_pledge.plus(contract['private_detailes'].to_pay);
-
       wallet.contracts.push(contract);
     }
     this.recountNewContracts();

@@ -57,6 +57,9 @@
         <div *ngIf="purchaseForm.controls['amount'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.AMOUNT_REQUIRED' | translate }}
         </div>
+        <div *ngIf="purchaseForm.controls['amount'].errors['amount_zero']">
+          {{ 'PURCHASE.FORM_ERRORS.AMOUNT_ZERO' | translate }}
+        </div>
       </div>
     </div>
   </div>
@@ -69,9 +72,6 @@
         <div *ngIf="purchaseForm.controls['yourDeposit'].errors['required']">
           {{ 'PURCHASE.FORM_ERRORS.YOUR_DEPOSIT_REQUIRED' | translate }}
         </div>
-      </div>
-      <div class="error-block" *ngIf="purchaseForm.invalid && (purchaseForm.controls['yourDeposit'].dirty || purchaseForm.controls['amount'].touched) && purchaseForm.errors && purchaseForm.errors['your_deposit_too_small']">
-        {{ 'PURCHASE.FORM_ERRORS.YOUR_DEPOSIT_TOO_SMALL' | translate }}
       </div>
     </div>
 
@@ -103,8 +103,6 @@
     </div>
   </div>
 
-
-
   <button type="button" class="purchase-select" (click)="toggleOptions()">
     <span>{{ 'PURCHASE.DETAILS' | translate }}</span><i class="icon arrow" [class.down]="!additionalOptions" [class.up]="additionalOptions"></i>
   </button>
@@ -116,7 +114,7 @@
     </div>
     <div class="input-block" *ngIf="newPurchase">
       <label for="purchase-time">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
-      <ng-select id="purchase-time" class="lock-selection-select"
+      <ng-select id="purchase-time" class="custom-select"
                  [clearable]="false"
                  [searchable]="false"
                  formControlName="time">
@@ -135,79 +133,9 @@
   <button type="button" class="blue-button send-button" *ngIf="newPurchase" [disabled]="!purchaseForm.valid" (click)="createPurchase()">{{ 'PURCHASE.SEND_BUTTON' | translate }}</button>
 
   <div class="purchase-states" *ngIf="!newPurchase">
-
     <ng-container *ngIf="currentContract.state == 1 && !currentContract.is_a && currentContract.private_detailes.b_pledge.plus(variablesService.default_fee_big).plus(variablesService.default_fee_big).isGreaterThan(variablesService.currentWallet.unlocked_balance)">
       <span>{{ 'PURCHASE.NEED_MONEY' | translate }}</span>
     </ng-container>
-
-    <ng-container *ngIf="currentContract.is_a">
-      <span *ngIf="currentContract.state == 1">{{ 'PURCHASE.WAITING_SELLER' | translate }}</span>
-      <!--<span *ngIf="currentContract.state == 1" ng-bind="'(' + (currentContract.expiration_time | buyingTime : 0) + ')'"></span>-->
-
-      <span *ngIf="currentContract.state == 110">{{ 'PURCHASE.IGNORED_SELLER' | translate }}</span>
-      <span *ngIf="currentContract.state == 110">{{ 'PURCHASE.PLEDGE_UNBLOCKED' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 120">{{ 'PURCHASE.WAITING_SHIP' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 130">{{ 'PURCHASE.IGNORED_CANCEL_SELLER' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 140">{{ 'PURCHASE.EXPIRED' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 201">{{ 'PURCHASE.WAIT' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.WAITING_SELLER' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.COMPLETED' | translate }}</span>
-      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.RECEIVED' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NOT_RECEIVED' | translate }}</span>
-      <span *ngIf="currentContract.state == 4" class="error-text">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 5">{{ 'PURCHASE.PROPOSAL_CANCEL_SELLER' | translate }}</span>
-      <!--<span *ngIf="currentContract.state == 5" ng-bind="'(' + (contract.cancel_expiration_time | buyingTime : 2) + ')'"></span>-->
-
-      <span *ngIf="currentContract.state == 601">{{ 'PURCHASE.BEING_CANCELLED' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.CANCELLED' | translate }}</span>
-      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.PLEDGES_RETURNED' | translate }}</span>
-    </ng-container>
-
-    <ng-container *ngIf="!currentContract.is_a">
-      <span *ngIf="currentContract.state == 1">{{ 'PURCHASE.WAITING_BUYER' | translate }}</span>
-      <!--<span *ngIf="currentContract.state == 1" ng-bind="'(' + (contract.expiration_time | buyingTime : 1) + ')'"></span>-->
-
-      <span *ngIf="currentContract.state == 110">{{ 'PURCHASE.IGNORED_BUYER' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 130">{{ 'PURCHASE.IGNORED_CANCEL_BUYER' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 140">{{ 'PURCHASE.EXPIRED' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 201">{{ 'PURCHASE.WAIT' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.BUYER_WAIT' | translate }}</span>
-      <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.PLEDGES_MADE' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.COMPLETED' | translate }}</span>
-      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.RECEIVED' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 4">{{ 'PURCHASE.NOT_RECEIVED' | translate }}</span>
-      <span *ngIf="currentContract.state == 4" class="error-text">{{ 'PURCHASE.NULLIFIED' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 5">{{ 'PURCHASE.PROPOSAL_CANCEL_BUYER' | translate }}</span>
-      <!--<span *ngIf="currentContract.state == 5" ng-bind="'(' + (contract.cancel_expiration_time | buyingTime : 1) + ')'"></span>-->
-
-      <span *ngIf="currentContract.state == 601">{{ 'PURCHASE.BEING_CANCELLED' | translate }}</span>
-
-      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.CANCELLED' | translate }}</span>
-      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.PLEDGES_RETURNED' | translate }}</span>
-    </ng-container>
-
-    <ng-container *ngIf="currentContract.state == 201 || currentContract.state == 601">
-      <span *ngIf="currentContract.height === 0">0/10</span>
-      <span *ngIf="currentContract.height !== 0 && (variablesService.height_app - currentContract.height) < 10">{{variablesService.height_app - currentContract.height}}/10</span>
-      <span *ngIf="historyBlock && historyBlock.sortAmount && historyBlock.sortAmount.toString() !== '0'">{{(historyBlock.is_income ? '+' : '') + (historyBlock.sortAmount | intToMoney)}} {{variablesService.defaultCurrency}}</span>
-    </ng-container>
-
   </div>
 
   <div class="purchase-buttons" *ngIf="!newPurchase">
@@ -248,8 +176,9 @@
 
   <div class="time-cancel-block-row" *ngIf="showTimeSelect && !newPurchase && currentContract.is_a && (currentContract.state == 201 || currentContract.state == 2 || currentContract.state == 120 || currentContract.state == 130)">
     <div class="time-cancel-block-question">{{ 'PURCHASE.WAITING_TIME_QUESTION' | translate }}</div>
+    <label for="purchase-timeCancel">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
     <div class="input-block">
-      <ng-select id="purchase-timeCancel" class="lock-selection-select"
+      <ng-select id="purchase-timeCancel" class="custom-select"
                  [clearable]="false"
                  [searchable]="false"
                  formControlName="timeCancel">
@@ -259,7 +188,6 @@
         </ng-option>
       </ng-select>
     </div>
-    <label for="purchase-timeCancel">{{ 'PURCHASE.WAITING_TIME' | translate }}</label>
     <div class="time-cancel-block-buttons">
       <button type="button" class="blue-button" (click)="showTimeSelect = false;">{{ 'PURCHASE.CANCEL' | translate }}</button>
       <button type="button" class="blue-button" (click)="dealsDetailsCancel();">{{ 'PURCHASE.BUTTON_CANCEL_BUYER' | translate }}</button>
@@ -273,9 +201,81 @@
     <div class="progress-bar-full" [style.width]="getProgressBarWidth()"></div>
   </div>
   <div class="progress-labels">
-    <span>{{ 'PURCHASE.PROGRESS_NEW' | translate }}</span>
-    <span>{{ 'PURCHASE.PROGRESS_WAIT' | translate }}</span>
-    <span>{{ 'PURCHASE.PROGRESS_COMPLETE' | translate }}</span>
+
+    <ng-container *ngIf="newPurchase">
+      <span>{{ 'PURCHASE.STATUS_MESSAGES.NEW_PURCHASE' | translate }}</span>
+    </ng-container>
+
+    <ng-container *ngIf="!newPurchase && currentContract.is_a">
+      <span *ngIf="currentContract.state == 1">{{ 'PURCHASE.STATUS_MESSAGES.WAITING_SELLER' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 110">{{ 'PURCHASE.STATUS_MESSAGES.IGNORED_SELLER' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 120">{{ 'PURCHASE.STATUS_MESSAGES.WAITING_DELIVERY' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 130">{{ 'PURCHASE.STATUS_MESSAGES.IGNORED_CANCEL_SELLER' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 140">{{ 'PURCHASE.STATUS_MESSAGES.EXPIRED' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.STATUS_MESSAGES.WAITING_SELLER' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 201">
+        {{ 'PURCHASE.STATUS_MESSAGES.WAITING_CONFIRMATION' | translate }}
+        <ng-container *ngIf="currentContract.height === 0">(0/10)</ng-container>
+        <ng-container *ngIf="currentContract.height !== 0 && (variablesService.height_app - currentContract.height) < 10">({{variablesService.height_app - currentContract.height}}/10)</ng-container>
+      </span>
+
+      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.STATUS_MESSAGES.COMPLETED' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 4" class="error-text">
+        {{ 'PURCHASE.STATUS_MESSAGES.NOT_RECEIVED' | translate }}. {{ 'PURCHASE.STATUS_MESSAGES.NULLIFIED' | translate }}
+      </span>
+
+      <span *ngIf="currentContract.state == 5">{{ 'PURCHASE.STATUS_MESSAGES.PROPOSAL_CANCEL_SELLER' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.STATUS_MESSAGES.CANCELLED' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 601">
+        {{ 'PURCHASE.STATUS_MESSAGES.BEING_CANCELLED' | translate }}
+        <ng-container *ngIf="currentContract.height === 0">(0/10)</ng-container>
+        <ng-container *ngIf="currentContract.height !== 0 && (variablesService.height_app - currentContract.height) < 10">({{variablesService.height_app - currentContract.height}}/10)</ng-container>
+      </span>
+    </ng-container>
+
+    <ng-container *ngIf="!newPurchase && !currentContract.is_a">
+      <span *ngIf="currentContract.state == 1">{{ 'PURCHASE.STATUS_MESSAGES.WAITING_BUYER' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 110">{{ 'PURCHASE.STATUS_MESSAGES.IGNORED_BUYER' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 130">{{ 'PURCHASE.STATUS_MESSAGES.IGNORED_CANCEL_BUYER' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 140">{{ 'PURCHASE.STATUS_MESSAGES.EXPIRED' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 2">{{ 'PURCHASE.STATUS_MESSAGES.WAITING_DELIVERY' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 201">
+        {{ 'PURCHASE.STATUS_MESSAGES.WAITING_CONFIRMATION' | translate }}
+        <ng-container *ngIf="currentContract.height === 0">(0/10)</ng-container>
+        <ng-container *ngIf="currentContract.height !== 0 && (variablesService.height_app - currentContract.height) < 10">({{variablesService.height_app - currentContract.height}}/10)</ng-container>
+      </span>
+
+      <span *ngIf="currentContract.state == 3">{{ 'PURCHASE.STATUS_MESSAGES.COMPLETED' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 4" class="error-text">
+        {{ 'PURCHASE.STATUS_MESSAGES.NOT_RECEIVED' | translate }}. {{ 'PURCHASE.STATUS_MESSAGES.NULLIFIED' | translate }}
+      </span>
+
+      <span *ngIf="currentContract.state == 5">{{ 'PURCHASE.STATUS_MESSAGES.PROPOSAL_CANCEL_BUYER' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 6">{{ 'PURCHASE.STATUS_MESSAGES.CANCELLED' | translate }}</span>
+
+      <span *ngIf="currentContract.state == 601">
+        {{ 'PURCHASE.STATUS_MESSAGES.BEING_CANCELLED' | translate }}
+        <ng-container *ngIf="currentContract.height === 0">(0/10)</ng-container>
+        <ng-container *ngIf="currentContract.height !== 0 && (variablesService.height_app - currentContract.height) < 10">({{variablesService.height_app - currentContract.height}}/10)</ng-container>
+      </span>
+    </ng-container>
+
   </div>
   <div class="progress-time" *ngIf="!newPurchase">
     <span *ngIf="currentContract.is_a && currentContract.state == 1">{{currentContract.expiration_time | contractTimeLeft: 0}}</span>
