@@ -37,6 +37,8 @@ function fix_boost_libs_in_libs() # $1 - path to boost libs, $2 - path to libs f
   install_name_tool -change libboost_system.dylib          $1/libboost_system.dylib          $2/libboost_filesystem.dylib
   install_name_tool -change libboost_system.dylib          $1/libboost_system.dylib          $2/libboost_thread.dylib
   install_name_tool -change libboost_system.dylib          $1/libboost_system.dylib          $2/libboost_chrono.dylib
+  install_name_tool -change libboost_system.dylib          $1/libboost_system.dylib          $2/libboost_timer.dylib
+  install_name_tool -change libboost_chrono.dylib          $1/libboost_chrono.dylib          $2/libboost_timer.dylib
   install_name_tool -change libboost_system.dylib          $1/libboost_system.dylib          $2/libboost_locale.dylib
 }
 
