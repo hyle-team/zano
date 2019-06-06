@@ -36,7 +36,7 @@ namespace
 #define VDIFF_TARGET_MAX_DEFAULT 100000000000ull // = 100 Gh
 #define VDIFF_TARGET_TIME_DEFAULT 30 // sec
 #define VDIFF_RETARGET_TIME_DEFAULT 240 // sec
-#define VDIFF_RETARGET_SHARES_COUNT 12 // enforce retargeting if this many shares are be received (huge performace comparing to current difficulty)
+#define VDIFF_RETARGET_SHARES_COUNT 12 // enforce retargeting if this many shares are received (high performace in terms of current difficulty)
 #define VDIFF_VARIANCE_PERCENT_DEFAULT 25 // %
 
   const command_line::arg_descriptor<bool>        arg_stratum               = {"stratum",                   "Stratum server: enable" };
@@ -57,7 +57,7 @@ namespace
   const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_retarget_time = {"stratum-vdiff-retarget-time",  "Stratum server: check to see if we should retarget this often (sec.)",  VDIFF_RETARGET_TIME_DEFAULT };
   const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_retarget_shares = {"stratum-vdiff-retarget-shares",  "Stratum server: enforce retargeting if got this many shares",  VDIFF_RETARGET_SHARES_COUNT };
   const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_variance_percent  = {"stratum-vdiff-variance-percent",  "Stratum server: allow average time to very this % from target without retarget",  VDIFF_VARIANCE_PERCENT_DEFAULT };
-  const command_line::arg_descriptor<bool>        arg_stratum_always_online = { "stratum-always-online",                   "Stratum server consider core as always online, useful for debugging with --offline-mode" };
+  const command_line::arg_descriptor<bool>        arg_stratum_always_online = { "stratum-always-online",                   "Stratum server consider the core being synchronized regardless of online status, useful for debugging with --offline-mode" };
 
 //==============================================================================================================================
 
@@ -80,7 +80,7 @@ namespace
 #define HR_TO_STREAM_IN_MHS_3P(hr) std::fixed << std::setprecision(3) << hr / 1000000.0
 
 // debug stuff
-#define DBG_NETWORK_DIFFICULTY 0 // if non-zero: use this value as net difficulty when checking shares (useful for debugging on testnet, recommended value is 160000000000ull)
+#define DBG_NETWORK_DIFFICULTY 0 // if non-zero: use this value as net difficulty when checking shares (useful for debugging on testnet, recommended value is 1600000000ull)
 #define DBG_CORE_ALWAYS_SYNCRONIZED 0 // if set to 1: allows the server to start even if the core is not syncronized, useful for debugging with --offline-mode
 #define STRINGIZE_DETAIL(x) #x
 #define STRINGIZE(x) STRINGIZE_DETAIL(x)

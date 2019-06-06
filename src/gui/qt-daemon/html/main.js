@@ -6424,7 +6424,7 @@ var SidebarComponent = /** @class */ (function () {
         });
     };
     SidebarComponent.prototype.getUpdate = function () {
-        this.backend.openUrlInBrowser('docs.zano.org/docs/zano-wallet');
+        this.backend.openUrlInBrowser('zano.org/downloads.html');
     };
     SidebarComponent.prototype.logOut = function () {
         var _this = this;
