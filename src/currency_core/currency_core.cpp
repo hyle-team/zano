@@ -32,10 +32,12 @@ namespace currency
               m_blockchain_storage(m_mempool),
               m_miner(this, m_blockchain_storage),
               m_miner_address(boost::value_initialized<account_public_address>()), 
-              m_starter_message_showed(false)
+              m_starter_message_showed(false),
+              m_stop_handler(nullptr)
   {
     set_currency_protocol(pprotocol);
   }
+  //-----------------------------------------------------------------------------------
   void core::set_currency_protocol(i_currency_protocol* pprotocol)
   {
     if(pprotocol)
@@ -44,6 +46,11 @@ namespace currency
       m_pprotocol = &m_protocol_stub;
 
     m_mempool.set_protocol(m_pprotocol);
+  }
+  //-----------------------------------------------------------------------------------
+  void core::set_stop_handler(i_stop_handler *handler)
+  {
+    m_stop_handler = handler;
   }
   //-----------------------------------------------------------------------------------
   bool core::set_checkpoints(checkpoints&& chk_pts)

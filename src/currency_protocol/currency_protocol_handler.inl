@@ -127,7 +127,19 @@ namespace currency
 
     // for outgoing connections -- check time difference
     if (!context.m_is_income)
-      add_time_delta_and_check_time_sync(context.m_time_delta);
+    {
+      if (!add_time_delta_and_check_time_sync(context.m_time_delta))
+      {
+        // serious time sync problem detected
+        std::shared_ptr<i_stop_handler> ish(m_core.get_stop_handler());
+        if (ish != nullptr)
+        {
+          // this is a daemon -- stop immediately
+          ish->stop_handling();
+          return true;
+        }
+      }
+    }
 
     if(context.m_state == currency_connection_context::state_synchronizing)
       return true;
@@ -679,8 +691,7 @@ namespace currency
     {
       std::list<relay_que_entry> local_que;
       {
-        std::unique_lock<std::mutex> lk(m_relay_que_lock);
-        //m_relay_que_cv.wait(lk);
+        CRITICAL_REGION_LOCAL(m_relay_que_lock);
         local_que.swap(m_relay_que);
       }
       if (local_que.size())
@@ -788,7 +799,7 @@ namespace currency
   template<class t_core>
   bool t_currency_protocol_handler<t_core>::add_time_delta_and_check_time_sync(int64_t time_delta)
   {
-    std::unique_lock<std::mutex> lk(m_time_deltas_lock);
+    CRITICAL_REGION_LOCAL(m_time_deltas_lock);
 
     m_time_deltas.push_back(time_delta);
     while (m_time_deltas.size() > TIME_SYNC_DELTA_RING_BUFFER_SIZE)
@@ -834,7 +845,7 @@ namespace currency
   template<class t_core>
   bool t_currency_protocol_handler<t_core>::get_last_time_sync_difference(int64_t& last_median2local_time_difference, int64_t& last_ntp2local_time_difference)
   {
-    std::unique_lock<std::mutex> lk(m_time_deltas_lock);
+    CRITICAL_REGION_LOCAL(m_time_deltas_lock);
     last_median2local_time_difference = m_last_median2local_time_difference;
     last_ntp2local_time_difference = m_last_ntp2local_time_difference;
 
@@ -896,7 +907,7 @@ namespace currency
     {
 #ifdef ASYNC_RELAY_MODE
     {
-      std::unique_lock<std::mutex> lk(m_relay_que_lock);
+      CRITICAL_REGION_LOCAL(m_relay_que_lock);
       m_relay_que.push_back(AUTO_VAL_INIT(relay_que_entry()));
       m_relay_que.back().first = arg;
       m_relay_que.back().second = exclude_context;

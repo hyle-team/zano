@@ -81,6 +81,8 @@ namespace currency
      size_t get_alternative_blocks_count();
 
      void set_currency_protocol(i_currency_protocol* pprotocol);
+     void set_stop_handler(i_stop_handler *handler);
+     i_stop_handler* get_stop_handler() const { return m_stop_handler; }
      bool set_checkpoints(checkpoints&& chk_pts);
 
      bool get_pool_transactions(std::list<transaction>& txs);
@@ -138,6 +140,7 @@ namespace currency
      blockchain_storage m_blockchain_storage;
      tx_memory_pool m_mempool;
      i_currency_protocol* m_pprotocol;
+     i_stop_handler* m_stop_handler;
      critical_section m_incoming_tx_lock;
      miner m_miner;
      account_public_address m_miner_address;

@@ -167,6 +167,7 @@ int main(int argc, char* argv[])
   cprotocol.set_p2p_endpoint(&p2psrv);
   ccore.set_currency_protocol(&cprotocol);
   daemon_cmmands_handler dch(p2psrv, rpc_server);
+  ccore.set_stop_handler(&dch);
   //ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
   std::shared_ptr<currency::stratum_server> stratum_server_ptr;
   if (stratum_enabled)
