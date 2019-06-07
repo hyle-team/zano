@@ -131,11 +131,12 @@ namespace currency
       if (!add_time_delta_and_check_time_sync(context.m_time_delta))
       {
         // serious time sync problem detected
-        std::shared_ptr<i_stop_handler> ish(m_core.get_stop_handler());
+        i_stop_handler* ish(m_core.get_stop_handler());
         if (ish != nullptr)
         {
-          // this is a daemon -- stop immediately
+          // this is daemon -- stop immediately
           ish->stop_handling();
+          LOG_ERROR(ENDL << ENDL << "Serious time sync problem detected, daemon will stop immediately" << ENDL << ENDL);
           return true;
         }
       }
