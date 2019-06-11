@@ -1534,14 +1534,22 @@ int main(int argc, char* argv[])
       return EXIT_FAILURE;
     }
 
-    if (!command_line::has_arg(vm, arg_password) )
+    tools::password_container pwd_container;
+    if (command_line::has_arg(vm, arg_password))
     {
-      LOG_ERROR("Wallet password is not set.");
-      return EXIT_FAILURE;
+      pwd_container.password(command_line::get_arg(vm, arg_password));
+    }
+    else
+    {
+      bool r = pwd_container.read_password();
+      if (!r)
+      {
+        LOG_ERROR("failed to read wallet password");
+        return EXIT_FAILURE;
+      }
     }
 
     std::string wallet_file     = command_line::get_arg(vm, arg_wallet_file);
-    std::string wallet_password = command_line::get_arg(vm, arg_password);
     std::string daemon_address  = command_line::get_arg(vm, arg_daemon_address);
     std::string daemon_host = command_line::get_arg(vm, arg_daemon_host);
     int daemon_port = command_line::get_arg(vm, arg_daemon_port);
@@ -1559,7 +1567,7 @@ int main(int argc, char* argv[])
       try
       {
         LOG_PRINT_L0("Loading wallet...");
-        wal.load(epee::string_encoding::convert_to_unicode(wallet_file), wallet_password);
+        wal.load(epee::string_encoding::convert_to_unicode(wallet_file), pwd_container.password());
       }
       catch (const tools::error::wallet_load_notice_wallet_restored& e)
       {
@@ -1621,7 +1629,8 @@ int main(int argc, char* argv[])
       LOG_ERROR("Failed to store wallet: " << e.what());
       return EXIT_FAILURE;
     }
-  }else
+  }
+  else // if(command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
   {
     //runs wallet with console interface
     sw->set_offline_mode(offline_mode);

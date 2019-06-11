@@ -12,10 +12,12 @@ ARCHIVE_NAME_PREFIX=zano-macos-x64-
 
 if [ -n "$build_prefix" ]; then
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}${build_prefix}-
+  build_prefix_label="$build_prefix "
 fi
 
 if [ -n "$testnet" ]; then
   testnet_def="-D TESTNET=TRUE"
+  testnet_label="testnet "
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
 fi
 

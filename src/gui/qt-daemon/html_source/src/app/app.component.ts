@@ -174,6 +174,7 @@ export class AppComponent implements OnInit, OnDestroy {
         console.log(data);
         // this.variablesService.exp_med_ts = data['expiration_median_timestamp'] + 600 + 1;
         this.variablesService.setExpMedTs(data['expiration_median_timestamp'] + 600 + 1);
+        this.variablesService.net_time_delta_median = data.net_time_delta_median;
         this.variablesService.last_build_available = data.last_build_available;
         this.variablesService.last_build_displaymode = data.last_build_displaymode;
         this.variablesService.setHeightApp(data.height);
