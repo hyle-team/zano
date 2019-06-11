@@ -1565,18 +1565,18 @@ void daemon_backend::wallet_vs_options::worker_func()
 
     catch (const std::exception& e)
     {
-      LOG_PRINT_L0(w->get()->get_log_prefix() + "Failed to refresh wallet: " << e.what());
+      LOG_ERROR(w->get()->get_log_prefix() + " Exception in wallet handler: " << e.what());
       wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_error;
       pview->update_wallet_status(wsi);
-      return;
+      continue;
     }
 
     catch (...)
     {
-      LOG_PRINT_L0(w->get()->get_log_prefix() + "Failed to refresh wallet, unknownk exception");
+      LOG_ERROR(w->get()->get_log_prefix() + " Exception in wallet handler: unknownk exception");
       wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_error;
       pview->update_wallet_status(wsi);
-      return;
+      continue;
     }
     boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
   }
