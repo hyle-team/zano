@@ -116,7 +116,11 @@ namespace currency
 
     //conditional values 
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN)
-      res.net_time_delta_median = m_p2p.get_payload_object().get_net_time_delta_median();
+    {
+      int64_t last_median2local_time_diff, last_ntp2local_time_diff;
+      if (!m_p2p.get_payload_object().get_last_time_sync_difference(last_median2local_time_diff, last_ntp2local_time_diff))
+        res.net_time_delta_median = 1;
+    }
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_CURRENT_NETWORK_HASHRATE_50)
       res.current_network_hashrate_50 = m_core.get_blockchain_storage().get_current_hashrate(50);
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_CURRENT_NETWORK_HASHRATE_350)

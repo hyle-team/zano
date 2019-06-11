@@ -12,26 +12,27 @@ namespace currency
 
   //-----------------------------------------------------------------------------------------------------------------------  
   template<class t_core>
-    t_currency_protocol_handler<t_core>::t_currency_protocol_handler(t_core& rcore, nodetool::i_p2p_endpoint<connection_context>* p_net_layout):m_core(rcore), 
-                                                                                                              m_p2p(p_net_layout),
-                                                                                                              m_syncronized_connections_count(0),
-                                                                                                              m_synchronized(false),
-                                                                                                              m_have_been_synchronized(false),
-                                                                                                              m_max_height_seen(0),
-                                                                                                              m_core_inital_height(0), 
-                                                                                                              m_want_stop(false)
-                                                                                                              
-
+  t_currency_protocol_handler<t_core>::t_currency_protocol_handler(t_core& rcore, nodetool::i_p2p_endpoint<connection_context>* p_net_layout)
+    : m_core(rcore)
+    , m_p2p(p_net_layout)
+    , m_syncronized_connections_count(0)
+    , m_synchronized(false)
+    , m_have_been_synchronized(false)
+    , m_max_height_seen(0)
+    , m_core_inital_height(0)
+    , m_want_stop(false)
+    , m_last_median2local_time_difference(0)
+    , m_last_ntp2local_time_difference(0)
   {
     if(!m_p2p)
       m_p2p = &m_p2p_stub;
   }
   //-----------------------------------------------------------------------------------------------------------------------
-    template<class t_core>
-    t_currency_protocol_handler<t_core>::~t_currency_protocol_handler()
-    {
-      deinit();
-    }
+  template<class t_core>
+  t_currency_protocol_handler<t_core>::~t_currency_protocol_handler()
+  {
+    deinit();
+  }
   //-----------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
   bool t_currency_protocol_handler<t_core>::init(const boost::program_options::variables_map& vm)
@@ -121,7 +122,25 @@ namespace currency
     if(context.m_state == currency_connection_context::state_befor_handshake && !is_inital)
       return true;
 
-    context.m_time_delta = m_core.get_blockchain_storage().get_core_runtime_config().get_core_time() - hshd.core_time;
+    uint64_t local_time = m_core.get_blockchain_storage().get_core_runtime_config().get_core_time();
+    context.m_time_delta = local_time - hshd.core_time;
+
+    // for outgoing connections -- check time difference
+    if (!context.m_is_income)
+    {
+      if (!add_time_delta_and_check_time_sync(context.m_time_delta))
+      {
+        // serious time sync problem detected
+        i_stop_handler* ish(m_core.get_stop_handler());
+        if (ish != nullptr)
+        {
+          // this is daemon -- stop immediately
+          ish->stop_handling();
+          LOG_ERROR(ENDL << ENDL << "Serious time sync problem detected, daemon will stop immediately" << ENDL << ENDL);
+          return true;
+        }
+      }
+    }
 
     if(context.m_state == currency_connection_context::state_synchronizing)
       return true;
@@ -673,8 +692,7 @@ namespace currency
     {
       std::list<relay_que_entry> local_que;
       {
-        std::unique_lock<std::mutex> lk(m_relay_que_lock);
-        //m_relay_que_cv.wait(lk);
+        CRITICAL_REGION_LOCAL(m_relay_que_lock);
         local_que.swap(m_relay_que);
       }
       if (local_que.size())
@@ -751,6 +769,90 @@ namespace currency
     return epee::misc_utils::median(deltas);
   }
   //------------------------------------------------------------------------------------------------------------------------
+  #define TIME_SYNC_DELTA_RING_BUFFER_SIZE         8
+  #define TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE  (60 * 5)               // max acceptable difference between time delta median among peers and local time (seconds)
+  #define TIME_SYNC_NTP_TO_LOCAL_MAX_DIFFERENCE    (60 * 5)               // max acceptable difference between NTP time and local time (seconds)
+  #define TIME_SYNC_NTP_SERVERS                    { "time.google.com", "0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org" }
+  #define TIME_SYNC_NTP_ATTEMPTS_COUNT             3                      // max number of attempts when getting time from NTP server
+
+  static int64_t get_ntp_time()
+  {
+    static const std::vector<std::string> ntp_servers TIME_SYNC_NTP_SERVERS;
+
+    for (size_t att = 0; att < TIME_SYNC_NTP_ATTEMPTS_COUNT; ++att)
+    {
+      size_t i = 0;
+      crypto::generate_random_bytes(sizeof(i), &i);
+      const std::string& ntp_server = ntp_servers[i % ntp_servers.size()];
+      LOG_PRINT_L3("NTP: trying to get time from " << ntp_server);
+      int64_t time = tools::get_ntp_time(ntp_server);
+      if (time > 0)
+      {
+        LOG_PRINT_L2("NTP: " << ntp_server << " responded with " << time << " (" << epee::misc_utils::get_time_str_v2(time) << ")");
+        return time;
+      }
+      LOG_PRINT_L2("NTP: cannot get time from " << ntp_server);
+    }
+
+    return 0; // smth went wrong
+  }
+
+  template<class t_core>
+  bool t_currency_protocol_handler<t_core>::add_time_delta_and_check_time_sync(int64_t time_delta)
+  {
+    CRITICAL_REGION_LOCAL(m_time_deltas_lock);
+
+    m_time_deltas.push_back(time_delta);
+    while (m_time_deltas.size() > TIME_SYNC_DELTA_RING_BUFFER_SIZE)
+      m_time_deltas.pop_front();
+
+    if (m_time_deltas.size() < TIME_SYNC_DELTA_RING_BUFFER_SIZE)
+      return true; // not enough data
+   
+    std::vector<int64_t> time_deltas_copy(m_time_deltas.begin(), m_time_deltas.end());
+
+    m_last_median2local_time_difference = epee::misc_utils::median(time_deltas_copy);
+    LOG_PRINT_MAGENTA("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ")", LOG_LEVEL_2);
+    if (std::abs(m_last_median2local_time_difference) > TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE)
+    {
+      int64_t ntp_time = get_ntp_time();
+      if (ntp_time == 0)
+      {
+        // error geting ntp time
+        LOG_PRINT_RED("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ") but NTP servers did not respond", LOG_LEVEL_0);
+        return false;
+      }
+
+      // got ntp time correctly
+      // update local time, because getting ntp time could be time consuming
+      uint64_t local_time_2 = m_core.get_blockchain_storage().get_core_runtime_config().get_core_time();
+      m_last_ntp2local_time_difference = local_time_2 - ntp_time;
+      if (std::abs(m_last_ntp2local_time_difference) > TIME_SYNC_NTP_TO_LOCAL_MAX_DIFFERENCE)
+      {
+        // local time is out of sync
+        LOG_PRINT_RED("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << "), NTP time difference is " <<
+          m_last_ntp2local_time_difference << " (max is " << TIME_SYNC_NTP_TO_LOCAL_MAX_DIFFERENCE << ")", LOG_LEVEL_0);
+        return false;
+      }
+
+      // NTP time is OK
+      LOG_PRINT_YELLOW("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << "), NTP time difference is " <<
+        m_last_ntp2local_time_difference << " (max is " << TIME_SYNC_NTP_TO_LOCAL_MAX_DIFFERENCE << ")", LOG_LEVEL_1);
+    }
+
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------
+  template<class t_core>
+  bool t_currency_protocol_handler<t_core>::get_last_time_sync_difference(int64_t& last_median2local_time_difference, int64_t& last_ntp2local_time_difference)
+  {
+    CRITICAL_REGION_LOCAL(m_time_deltas_lock);
+    last_median2local_time_difference = m_last_median2local_time_difference;
+    last_ntp2local_time_difference = m_last_ntp2local_time_difference;
+
+    return !(std::abs(m_last_median2local_time_difference) > TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE && std::abs(m_last_ntp2local_time_difference) > TIME_SYNC_NTP_TO_LOCAL_MAX_DIFFERENCE);
+  }
+  //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
   int t_currency_protocol_handler<t_core>::handle_response_chain_entry(int command, NOTIFY_RESPONSE_CHAIN_ENTRY::request& arg, currency_connection_context& context)
   {
@@ -806,7 +908,7 @@ namespace currency
     {
 #ifdef ASYNC_RELAY_MODE
     {
-      std::unique_lock<std::mutex> lk(m_relay_que_lock);
+      CRITICAL_REGION_LOCAL(m_relay_que_lock);
       m_relay_que.push_back(AUTO_VAL_INIT(relay_que_entry()));
       m_relay_que.back().first = arg;
       m_relay_que.back().second = exclude_context;
