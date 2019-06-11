@@ -811,7 +811,7 @@ namespace currency
    
     std::vector<int64_t> time_deltas_copy(m_time_deltas.begin(), m_time_deltas.end());
 
-    int64_t m_last_median2local_time_difference = epee::misc_utils::median(time_deltas_copy);
+    m_last_median2local_time_difference = epee::misc_utils::median(time_deltas_copy);
     LOG_PRINT_MAGENTA("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ")", LOG_LEVEL_2);
     if (std::abs(m_last_median2local_time_difference) > TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE)
     {
@@ -826,7 +826,7 @@ namespace currency
       // got ntp time correctly
       // update local time, because getting ntp time could be time consuming
       uint64_t local_time_2 = m_core.get_blockchain_storage().get_core_runtime_config().get_core_time();
-      int64_t m_last_ntp2local_time_difference = local_time_2 - ntp_time;
+      m_last_ntp2local_time_difference = local_time_2 - ntp_time;
       if (std::abs(m_last_ntp2local_time_difference) > TIME_SYNC_NTP_TO_LOCAL_MAX_DIFFERENCE)
       {
         // local time is out of sync
