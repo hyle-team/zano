@@ -50,7 +50,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   getUpdate() {
-    this.backend.openUrlInBrowser('docs.zano.org/docs/zano-wallet');
+    this.backend.openUrlInBrowser('zano.org/downloads.html');
   }
 
   logOut() {

@@ -11,6 +11,8 @@
 #define BUF_SIZE 1024
 
 #define CHECK_AND_ASSERT_MESS_LMDB_DB(rc, ret, mess) CHECK_AND_ASSERT_MES(res == MDB_SUCCESS, ret, "[DB ERROR]:(" << rc << ")" << mdb_strerror(rc) << ", [message]: " << mess);
+#define CHECK_AND_ASSERT_THROW_MESS_LMDB_DB(rc, mess) CHECK_AND_ASSERT_THROW_MES(res == MDB_SUCCESS, "[DB ERROR]:(" << rc << ")" << mdb_strerror(rc) << ", [message]: " << mess);
+#define ASSERT_MES_AND_THROW_LMDB(rc, mess) ASSERT_MES_AND_THROW("[DB ERROR]:(" << rc << ")" << mdb_strerror(rc) << ", [message]: " << mess);
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "lmdb"
@@ -134,7 +136,13 @@ namespace tools
 
           CHECK_AND_ASSERT_THROW_MES(m_penv, "m_penv==null, db closed");
           res = mdb_txn_begin(m_penv, pparent_tx, flags, &p_new_tx);
-          CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_txn_begin");
+          if(res != MDB_SUCCESS)
+          {
+            //Important: if mdb_txn_begin is failed need to unlock previously locked mutex
+            CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
+            //throw exception to avoid regular code execution 
+            ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
+          }
 
           rtxlist.push_back(tx_entry());
           rtxlist.back().count = read_only ? 1 : 0;
