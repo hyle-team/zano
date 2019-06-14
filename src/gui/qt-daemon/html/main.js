@@ -2764,11 +2764,6 @@ var AppComponent = /** @class */ (function () {
         this.firstOnlineState = false;
         this.translateUsed = false;
         this.needOpenWallets = [];
-        this.currenciesFromNet = {
-            ZANO_bitmesh: null,
-            ZANO_qtrade: null,
-            BTC_bitmesh: null
-        };
         translate.addLangs(['en', 'fr']);
         translate.setDefaultLang('en');
         // const browserLang = translate.getBrowserLang();
@@ -3258,44 +3253,19 @@ var AppComponent = /** @class */ (function () {
         });
         this.getMoneyEquivalent();
     };
-    AppComponent.prototype.recountMoneyEquivalent = function () {
-        var sum = 0;
-        var count = 0;
-        if (this.currenciesFromNet.BTC_bitmesh) {
-            if (this.currenciesFromNet.ZANO_qtrade) {
-                sum += this.currenciesFromNet.ZANO_qtrade;
-                count++;
-            }
-            if (this.currenciesFromNet.ZANO_bitmesh) {
-                sum += this.currenciesFromNet.ZANO_bitmesh;
-                count++;
-            }
-        }
-        this.variablesService.moneyEquivalent = (sum / count) / this.currenciesFromNet.BTC_bitmesh;
-    };
     AppComponent.prototype.getMoneyEquivalent = function () {
         var _this = this;
-        this.http.get('https://blockchain.info/tobtc?currency=USD&value=1').subscribe(function (result1) {
-            _this.currenciesFromNet.BTC_bitmesh = result1;
-            _this.http.get('https://api.qtrade.io/v1/ticker/ZANO_BTC').subscribe(function (result2) {
-                if (result2.hasOwnProperty('data')) {
-                    _this.currenciesFromNet.ZANO_qtrade = (parseFloat(result2['data']['ask']) + parseFloat(result2['data']['bid'])) / 2;
-                }
-                _this.recountMoneyEquivalent();
-            }, function () {
-            });
-            _this.http.get('https://api.bitmesh.com/?api=market.statistics&params={"market":"btc_zano"}').subscribe(function (result3) {
-                if (result3.hasOwnProperty('data')) {
-                    _this.currenciesFromNet.ZANO_bitmesh = parseFloat(result3['data']['price']);
-                }
-                _this.recountMoneyEquivalent();
-            }, function () {
+        this.http.get('https://api.coingecko.com/api/v3/ping').subscribe(function () {
+            _this.http.get('https://api.coingecko.com/api/v3/simple/price?ids=zano&vs_currencies=usd').subscribe(function (data) {
+                _this.variablesService.moneyEquivalent = data['zano']['usd'];
+            }, function (error) {
+                console.warn('api.coingecko.com price error: ', error);
             });
         }, function (error) {
+            console.warn('api.coingecko.com error: ', error);
             setTimeout(function () {
                 _this.getMoneyEquivalent();
             }, 60000);
-            console.warn('Error', error);
         });
     };
     AppComponent.prototype.getAliases = function () {
