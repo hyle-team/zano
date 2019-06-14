@@ -1224,18 +1224,18 @@ bool simple_wallet::integrated_address(const std::vector<std::string> &args)
 
   if (args.size() == 1)
   {
-    std::string addr_or_payment_id = args[0];
+    std::string addr_or_payment_id_hex = args[0];
     currency::account_public_address addr = AUTO_VAL_INIT(addr);
     std::string embedded_payment_id;
-    if (currency::get_account_address_and_payment_id_from_str(addr, embedded_payment_id, addr_or_payment_id))
+    if (currency::get_account_address_and_payment_id_from_str(addr, embedded_payment_id, addr_or_payment_id_hex))
     {
       // address provided
       if (embedded_payment_id.empty())
       {
-        success_msg_writer(false) << addr_or_payment_id << " is a standard address";
+        success_msg_writer(false) << addr_or_payment_id_hex << " is a standard address";
         return true;
       }
-      success_msg_writer(true ) << "integrated address:       " << addr_or_payment_id;
+      success_msg_writer(true ) << "integrated address:       " << addr_or_payment_id_hex;
       success_msg_writer(false) << "standard address:         " << get_account_address_as_str(addr);
       success_msg_writer(false) << "payment id (" << std::setw(3) << embedded_payment_id.size() << " bytes) :  " << epee::string_tools::mask_non_ascii_chars(embedded_payment_id);
       success_msg_writer(false) << "payment id (hex-encoded): " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id);
@@ -1243,15 +1243,22 @@ bool simple_wallet::integrated_address(const std::vector<std::string> &args)
     }
 
     // seems like not a valid address, treat as payment id
-    if (!currency::is_payment_id_size_ok(addr_or_payment_id))
+    std::string payment_id;
+    if (!epee::string_tools::parse_hexstr_to_binbuff(addr_or_payment_id_hex, payment_id))
     {
-      fail_msg_writer() << "payment id is too long: " << addr_or_payment_id.size() << " bytes, max allowed: " << BC_PAYMENT_ID_SERVICE_SIZE_MAX << " bytes";
+      fail_msg_writer() << "invalid payment id given: \'" << addr_or_payment_id_hex << "\', hex-encoded string was expected";
+      return true;
+    }
+
+    if (!currency::is_payment_id_size_ok(payment_id))
+    {
+      fail_msg_writer() << "payment id is too long: " << payment_id.size() << " bytes, max allowed: " << BC_PAYMENT_ID_SERVICE_SIZE_MAX << " bytes";
       return true;
     }
     success_msg_writer(false) << "this wallet standard address: " << m_wallet->get_account().get_public_address_str();
-    success_msg_writer(false) << "payment id: (" << std::setw(3) << addr_or_payment_id.size() << " bytes) :     " << addr_or_payment_id;
-    success_msg_writer(false) << "payment id (hex-encoded):     " << epee::string_tools::buff_to_hex_nodelimer(addr_or_payment_id);
-    success_msg_writer(true ) << "integrated address:           " << get_account_address_and_payment_id_as_str(m_wallet->get_account().get_public_address(), addr_or_payment_id);
+    success_msg_writer(false) << "payment id (" << std::setw(3) << payment_id.size() << " bytes) :      " << epee::string_tools::mask_non_ascii_chars(payment_id);
+    success_msg_writer(false) << "payment id (hex-encoded) :    " << epee::string_tools::buff_to_hex_nodelimer(payment_id);
+    success_msg_writer(true ) << "integrated address:           " << get_account_address_and_payment_id_as_str(m_wallet->get_account().get_public_address(), payment_id);
     return true;
   }
 
