@@ -461,7 +461,7 @@ bool daemon_backend::update_state_info()
 {
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   currency::COMMAND_RPC_GET_INFO::request req = AUTO_VAL_INIT(req);
-  req.flags = COMMAND_RPC_GET_INFO_FLAG_EXPIRATIONS_MEDIAN;
+  req.flags = COMMAND_RPC_GET_INFO_FLAG_EXPIRATIONS_MEDIAN | COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN;
   currency::COMMAND_RPC_GET_INFO::response inf = AUTO_VAL_INIT(inf);
   if (!m_rpc_proxy->call_COMMAND_RPC_GET_INFO(req, inf))
   {

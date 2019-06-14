@@ -66,7 +66,10 @@ namespace currency
     uint64_t get_max_seen_height();
     virtual size_t get_synchronized_connections_count();
     virtual size_t get_synchronizing_connections_count();
+
     int64_t get_net_time_delta_median();
+    bool add_time_delta_and_check_time_sync(int64_t delta);
+    bool get_last_time_sync_difference(int64_t& last_median2local_time_difference, int64_t& last_ntp2local_time_difference); // returns true if differences in allowed bounds
 
   private:
     //----------------- commands handlers ----------------------------------------------
@@ -107,6 +110,11 @@ namespace currency
     std::condition_variable m_relay_que_cv;
     std::thread m_relay_que_thread;
     std::atomic<bool> m_want_stop;
+
+    std::deque<int64_t> m_time_deltas;
+    std::mutex m_time_deltas_lock;
+    int64_t m_last_median2local_time_difference;
+    int64_t m_last_ntp2local_time_difference;
 
     template<class t_parametr>
       bool post_notify(typename t_parametr::request& arg, currency_connection_context& context)

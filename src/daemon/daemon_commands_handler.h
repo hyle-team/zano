@@ -20,7 +20,7 @@
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 
-class daemon_cmmands_handler
+class daemon_cmmands_handler : public currency::i_stop_handler
 {
   typedef nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > srv_type;
   srv_type& m_srv;
@@ -75,7 +75,8 @@ public:
     return true;
   }
 
-  void stop_handling()
+  // interface currency::i_stop_handler
+  virtual void stop_handling() override
   {
     m_cmd_binder.stop_handling();
   }

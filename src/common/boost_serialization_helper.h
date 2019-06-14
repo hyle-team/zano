@@ -30,7 +30,7 @@ namespace tools
     a << obj;
 
     return !data_file.fail();
-    CATCH_ENTRY_L0("serialize_obj_to_file", false);
+    CATCH_ENTRY_L0("serialize_obj_to_file: could not serialize into " << file_path, false);
   }
 
 
@@ -56,7 +56,7 @@ namespace tools
     a << obj;
 
     return !stream.fail();
-    CATCH_ENTRY_L0("serialize_obj_to_file", false);
+    CATCH_ENTRY_L0("portble_serialize_obj_to_stream", false);
   }
 
   template<class t_object>
@@ -72,7 +72,7 @@ namespace tools
 
     a >> obj;
     return !data_file.fail();
-    CATCH_ENTRY_L0("unserialize_obj_from_file", false);
+    CATCH_ENTRY_L0("unserialize_obj_from_file: could not load " << file_path, false);
   }
 
   template<class t_object>
@@ -85,7 +85,7 @@ namespace tools
 
     a >> obj;
     return !ss.fail();
-    CATCH_ENTRY_L0("unserialize_obj_from_obj", false);
+    CATCH_ENTRY_L0("unserialize_obj_from_buff", false);
   }
 
 
@@ -98,6 +98,6 @@ namespace tools
 
     a >> obj;
     return !stream.fail();
-    CATCH_ENTRY_L0("unserialize_obj_from_file", false);
+    CATCH_ENTRY_L0("portable_unserialize_obj_from_stream", false);
   }
 }

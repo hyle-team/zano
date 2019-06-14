@@ -6,6 +6,7 @@ curr_path=${BASH_SOURCE%/*}
 : "${ZANO_BOOST_ROOT:?variable not set, see also macosx_build_config.command}"
 : "${ZANO_BOOST_LIBS_PATH:?variable not set, see also macosx_build_config.command}"
 : "${ZANO_BUILD_DIR:?variable not set, see also macosx_build_config.command}"
+: "${CMAKE_OSX_SYSROOT:?CMAKE_OSX_SYSROOT should be set to macOS SDK path, e.g.: /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk}"
 
 BUILD_DIR=$curr_path/../$ZANO_BUILD_DIR/macos_xcodeproj
 BUILD_TYPE=Release
