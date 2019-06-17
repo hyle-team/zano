@@ -63,6 +63,11 @@ using namespace currency;
 
 #define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
 
+#ifndef TESTNET
+#define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION          57000
+#else
+#define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION          18000
+#endif
 
 DISABLE_VS_WARNINGS(4267)
 
@@ -1507,7 +1512,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     if (abei.height >= m_core_runtime_config.pos_minimum_heigh)
       cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
 
-    if (pos_block && sequence_factor > 20)
+    if (abei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && pos_block && sequence_factor > 20)
     {
       LOG_PRINT_RED_L0("Alternative block " << id << " @ " << abei.height << " has too big sequence factor: " << sequence_factor << ", rejected");
       bvc.m_verification_failed = true;
@@ -4465,7 +4470,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   if (bei.height >= m_core_runtime_config.pos_minimum_heigh)
     cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
   
-  if (is_pos_bl && sequence_factor > 20)
+  if (bei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && is_pos_bl && sequence_factor > 20)
   {
     LOG_PRINT_L0("Block with id: " << id
       << " has too big sequence_factor = " << sequence_factor);
