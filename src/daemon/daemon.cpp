@@ -167,7 +167,7 @@ int main(int argc, char* argv[])
   currency::core_rpc_server rpc_server(ccore, p2psrv, offers_service);
   cprotocol.set_p2p_endpoint(&p2psrv);
   ccore.set_currency_protocol(&cprotocol);
-  daemon_cmmands_handler dch(p2psrv, rpc_server);
+  daemon_commands_handler dch(p2psrv, rpc_server);
   
   if (!command_line::get_arg(vm, command_line::arg_disable_stop_if_time_out_of_sync))
     ccore.set_stop_handler(&dch);
