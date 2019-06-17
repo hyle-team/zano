@@ -333,4 +333,7 @@ namespace tools
     static std::function<void(void)> m_handler;
     static std::function<void(int, void*)>  m_fatal_handler;
   };
+
+
+  int64_t get_ntp_time(const std::string& host_name);
 }

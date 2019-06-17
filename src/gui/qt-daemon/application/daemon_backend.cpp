@@ -461,7 +461,7 @@ bool daemon_backend::update_state_info()
 {
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   currency::COMMAND_RPC_GET_INFO::request req = AUTO_VAL_INIT(req);
-  req.flags = COMMAND_RPC_GET_INFO_FLAG_EXPIRATIONS_MEDIAN;
+  req.flags = COMMAND_RPC_GET_INFO_FLAG_EXPIRATIONS_MEDIAN | COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN;
   currency::COMMAND_RPC_GET_INFO::response inf = AUTO_VAL_INIT(inf);
   if (!m_rpc_proxy->call_COMMAND_RPC_GET_INFO(req, inf))
   {
@@ -1565,18 +1565,18 @@ void daemon_backend::wallet_vs_options::worker_func()
 
     catch (const std::exception& e)
     {
-      LOG_PRINT_L0(w->get()->get_log_prefix() + "Failed to refresh wallet: " << e.what());
+      LOG_ERROR(w->get()->get_log_prefix() + " Exception in wallet handler: " << e.what());
       wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_error;
       pview->update_wallet_status(wsi);
-      return;
+      continue;
     }
 
     catch (...)
     {
-      LOG_PRINT_L0(w->get()->get_log_prefix() + "Failed to refresh wallet, unknownk exception");
+      LOG_ERROR(w->get()->get_log_prefix() + " Exception in wallet handler: unknownk exception");
       wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_error;
       pview->update_wallet_status(wsi);
-      return;
+      continue;
     }
     boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
   }

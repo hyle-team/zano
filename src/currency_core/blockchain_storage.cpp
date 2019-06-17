@@ -1507,6 +1507,13 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     if (abei.height >= m_core_runtime_config.pos_minimum_heigh)
       cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
 
+    if (pos_block && sequence_factor > 20)
+    {
+      LOG_PRINT_RED_L0("Alternative block " << id << " @ " << abei.height << " has too big sequence factor: " << sequence_factor << ", rejected");
+      bvc.m_verification_failed = true;
+      return false;
+    }
+
     abei.cumulative_diff_adjusted += cumulative_diff_delta;
 
     abei.cumulative_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, abei.height, pos_block);
@@ -4458,6 +4465,15 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   if (bei.height >= m_core_runtime_config.pos_minimum_heigh)
     cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
   
+  if (is_pos_bl && sequence_factor > 20)
+  {
+    LOG_PRINT_L0("Block with id: " << id
+      << " has too big sequence_factor = " << sequence_factor);
+    purge_block_data_from_blockchain(bl, tx_processed_count);
+    bvc.m_verification_failed = true;
+    return false;
+  }
+
   bei.cumulative_diff_adjusted += cumulative_diff_delta;
 
   //etc 
