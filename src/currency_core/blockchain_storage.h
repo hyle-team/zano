@@ -537,7 +537,7 @@ namespace currency
     bool handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc);
     std::string print_alt_chain(alt_chain_type alt_chain);
     bool handle_alternative_block(const block& b, const crypto::hash& id, block_verification_context& bvc);
-    bool is_reorganize_required(const block_extended_info& main_chain_bei, const block_extended_info& alt_chain_bei, const crypto::hash& proof_alt);
+    bool is_reorganize_required(const block_extended_info& main_chain_bei, const alt_chain_type& alt_chain, const crypto::hash& proof_alt);
     bool purge_keyimage_from_big_heap(const crypto::key_image& ki, const crypto::hash& id);
     bool purge_altblock_keyimages_from_big_heap(const block& b, const crypto::hash& id);
     bool append_altblock_keyimages_to_big_heap(const crypto::hash& block_id, const std::set<crypto::key_image>& alt_block_keyimages);

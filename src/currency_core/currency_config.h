@@ -19,7 +19,7 @@
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     1
-#define CURRENT_BLOCK_MAJOR_VERSION                     1
+#define CURRENT_BLOCK_MAJOR_VERSION                     2
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2
 #define CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT            60*20

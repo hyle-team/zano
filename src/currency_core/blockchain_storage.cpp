@@ -69,6 +69,16 @@ using namespace currency;
 #define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION          18000
 #endif
 
+#define BLOCK_MAJOR_VERSION_INITAL                     1
+
+#ifndef TESTNET
+#define ZANO_HARDFORK_1_AFTER_HEIGHT               ??
+#else
+#define ZANO_HARDFORK_1_AFTER_HEIGHT               ??
+#endif
+
+
+
 DISABLE_VS_WARNINGS(4267)
 
 namespace 
@@ -1557,7 +1567,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
       << ENDL << "HEIGHT " << abei.height << ", difficulty: " << abei.difficulty << ", cumul_diff_precise: " << abei.cumulative_diff_precise << ", cumul_diff_adj: " << abei.cumulative_diff_adjusted << " (current mainchain cumul_diff_adj: " << m_db_blocks.back()->cumulative_diff_adjusted << ", ki lookup total: " << ki_lookup_total <<")"
       , LOG_LEVEL_0);
 
-    if (is_reorganize_required(*m_db_blocks.back(), abei, proof))
+    if (is_reorganize_required(*m_db_blocks.back(), alt_chain, proof))
     {
       auto a = epee::misc_utils::create_scope_leave_handler([&]() { m_is_reorganize_in_process = false; });
       CHECK_AND_ASSERT_THROW_MES(!m_is_reorganize_in_process, "Detected recursive reorganzie");
@@ -1586,26 +1596,43 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
   CATCH_ENTRY_CUSTOM("blockchain_storage::handle_alternative_block", bvc.m_verification_failed = true, false);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::is_reorganize_required(const block_extended_info& main_chain_bei, const block_extended_info& alt_chain_bei, const crypto::hash& proof_alt)
+bool blockchain_storage::is_reorganize_required(const block_extended_info& main_chain_bei, const alt_chain_type& alt_chain, const crypto::hash& proof_alt)
 {
-  if (main_chain_bei.cumulative_diff_adjusted < alt_chain_bei.cumulative_diff_adjusted)
-    return true;
-  else if (main_chain_bei.cumulative_diff_adjusted > alt_chain_bei.cumulative_diff_adjusted)
-    return false;
-  else // main_chain_bei.cumulative_diff_adjusted == alt_chain_bei.cumulative_diff_adjusted
-  {
-    if (!is_pos_block(main_chain_bei.bl))
-      return false; // do not reorganize on the same cummul diff if it's a PoW block
+  //alt_chain - back is latest(top), first - connection with main chain 
+  const block_extended_info& alt_chain_bei = alt_chain.back()->second;
 
-    //in case of simultaneous PoS blocks are happened on the same height (quite common for PoS) 
-    //we also try to weight them to guarantee consensus in network
-    if (std::memcmp(&main_chain_bei.stake_hash, &proof_alt, sizeof(main_chain_bei.stake_hash)) >= 0)
+  if (alt_chain_bei.bl.major_version == BLOCK_MAJOR_VERSION_INITAL)
+  {
+    if (main_chain_bei.cumulative_diff_adjusted < alt_chain_bei.cumulative_diff_adjusted)
+      return true;
+    else if (main_chain_bei.cumulative_diff_adjusted > alt_chain_bei.cumulative_diff_adjusted)
       return false;
-    
-    LOG_PRINT_L2("[is_reorganize_required]:TRUE, \"by order of memcmp\" main_stake_hash:" << &main_chain_bei.stake_hash  << ", alt_stake_hash" << proof_alt);
-    return true;
+    else // main_chain_bei.cumulative_diff_adjusted == alt_chain_bei.cumulative_diff_adjusted
+    {
+      if (!is_pos_block(main_chain_bei.bl))
+        return false; // do not reorganize on the same cummul diff if it's a PoW block
+
+                      //in case of simultaneous PoS blocks are happened on the same height (quite common for PoS) 
+                      //we also try to weight them to guarantee consensus in network
+      if (std::memcmp(&main_chain_bei.stake_hash, &proof_alt, sizeof(main_chain_bei.stake_hash)) >= 0)
+        return false;
+
+      LOG_PRINT_L2("[is_reorganize_required]:TRUE, \"by order of memcmp\" main_stake_hash:" << &main_chain_bei.stake_hash << ", alt_stake_hash" << proof_alt);
+      return true;
+    }
+  }
+  else if (alt_chain_bei.bl.major_version == CURRENT_BLOCK_MAJOR_VERSION)
+  {
+    //figure out connection point
+    const block_extended_info& connection_point = alt_chain.front()->second;
+
+  }
+  else
+  {
+    ASSERT_MES_AND_THROW("Unknown version of block");
   }
 }
+
 //------------------------------------------------------------------
 bool blockchain_storage::pre_validate_relayed_block(block& bl, block_verification_context& bvc, const crypto::hash& id)const 
 {
@@ -4446,40 +4473,70 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   if (is_pos_bl)
     bei.stake_hash = proof_hash;
 
-  //precise difficulty - difficulty used to calculate next difficulty
-  uint64_t last_x_h = get_last_x_block_height(is_pos_bl);
-  if (!last_x_h)
-    bei.cumulative_diff_precise = current_diffic;
-  else
-    bei.cumulative_diff_precise = m_db_blocks[last_x_h]->cumulative_diff_precise + current_diffic;
 
-  if (m_db_blocks.size())
+
+  //////////////////////////////////////////////////////////////////////////
+  if (bei.bl.major_version == BLOCK_MAJOR_VERSION_INITAL)
   {
-    bei.cumulative_diff_adjusted = m_db_blocks.back()->cumulative_diff_adjusted;
-  }
+    //precise difficulty - difficulty used to calculate next difficulty
+    uint64_t last_x_h = get_last_x_block_height(is_pos_bl);
+    if (!last_x_h)
+      bei.cumulative_diff_precise = current_diffic;
+    else
+      bei.cumulative_diff_precise = m_db_blocks[last_x_h]->cumulative_diff_precise + current_diffic;
 
-  //adjusted difficulty - difficulty used to switch blockchain
-  wide_difficulty_type cumulative_diff_delta = 0;
-  if (is_pos_bl)
-    cumulative_diff_delta = get_adjusted_cumulative_difficulty_for_next_pos(current_diffic);
-  else
-    cumulative_diff_delta = current_diffic;
+    if (m_db_blocks.size())
+    {
+      bei.cumulative_diff_adjusted = m_db_blocks.back()->cumulative_diff_adjusted;
+    }
+
+    //adjusted difficulty - difficulty used to switch blockchain
+    wide_difficulty_type cumulative_diff_delta = 0;
+    if (is_pos_bl)
+      cumulative_diff_delta = get_adjusted_cumulative_difficulty_for_next_pos(current_diffic);
+    else
+      cumulative_diff_delta = current_diffic;
 
 
-  size_t sequence_factor = get_current_sequence_factor(is_pos_bl);
-  if (bei.height >= m_core_runtime_config.pos_minimum_heigh)
-    cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
-  
-  if (bei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && is_pos_bl && sequence_factor > 20)
+    size_t sequence_factor = get_current_sequence_factor(is_pos_bl);
+    if (bei.height >= m_core_runtime_config.pos_minimum_heigh)
+      cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
+
+    if (bei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && is_pos_bl && sequence_factor > 20)
+    {
+      LOG_PRINT_L0("Block with id: " << id
+        << " has too big sequence_factor = " << sequence_factor);
+      purge_block_data_from_blockchain(bl, tx_processed_count);
+      bvc.m_verification_failed = true;
+      return false;
+    }
+
+    bei.cumulative_diff_adjusted += cumulative_diff_delta;
+  }else if(bei.bl.major_version == CURRENT_BLOCK_MAJOR_VERSION)
   {
-    LOG_PRINT_L0("Block with id: " << id
-      << " has too big sequence_factor = " << sequence_factor);
-    purge_block_data_from_blockchain(bl, tx_processed_count);
-    bvc.m_verification_failed = true;
-    return false;
-  }
+    //precise difficulty - difficulty used to calculate next difficulty
+    uint64_t last_x_h = get_last_x_block_height(is_pos_bl);
+    if (!last_x_h)
+      bei.cumulative_diff_precise = current_diffic;
+    else
+      bei.cumulative_diff_precise = m_db_blocks[last_x_h]->cumulative_diff_precise + current_diffic;
 
-  bei.cumulative_diff_adjusted += cumulative_diff_delta;
+    if (m_db_blocks.size())
+    {
+      bei.cumulative_diff_adjusted = m_db_blocks[last_x_h]->cumulative_diff_adjusted;
+    }
+
+    //adjusted difficulty - difficulty used to switch blockchain
+    wide_difficulty_type cumulative_diff_delta = current_diffic;
+
+    size_t sequence_factor = get_current_sequence_factor(is_pos_bl);
+    if (bei.height >= m_core_runtime_config.pos_minimum_heigh)
+      cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
+    
+    bei.cumulative_diff_adjusted += cumulative_diff_delta;
+  }
+  //////////////////////////////////////////////////////////////////////////
+
 
   //etc 
   bei.already_generated_coins = already_generated_coins + base_reward;
