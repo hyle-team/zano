@@ -1396,9 +1396,9 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool check_outs_valid(const transaction& tx)
   {
-    BOOST_FOREACH(const tx_out& out, tx.vout)
+    for(const tx_out& out : tx.vout)
     {
-      CHECK_AND_NO_ASSERT_MES(0 < out.amount, false, "zero amount ouput in transaction id=" << get_transaction_hash(tx));
+      CHECK_AND_NO_ASSERT_MES(0 < out.amount, false, "zero amount output in transaction id=" << get_transaction_hash(tx));
       if (out.target.type() == typeid(txout_to_key))
       {
         if (!check_key(boost::get<txout_to_key>(out.target).key))
