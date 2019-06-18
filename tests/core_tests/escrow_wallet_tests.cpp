@@ -1552,6 +1552,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
     escrow_custom_test_callback_details cd = test_details[0];
     cd.cpd.comment         = "zero B pledge";
     cd.cpd.amount_b_pledge = 0;
+    // note: amount to pay is not zero
     test_details.push_back(cd);
   }
 
@@ -2981,10 +2982,8 @@ escrow_zero_amounts::escrow_zero_amounts()
 
 bool escrow_zero_amounts::generate(std::vector<test_event_entry>& events) const
 {
-  // Try to accept contracts with 
-  // 1) zero a pledge
-  // 2) zero b pledge + amount to pay
-  // Both are invalid and should not be accepted by wallet (ignored), so accepting such contracts is impossible
+  // Try to accept contracts having (b pledge + amount to pay) == 0
+  // It should not be accepted by wallet (ignored), accepting such contracts is impossible
 
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
@@ -3025,11 +3024,11 @@ bool escrow_zero_amounts::c1(currency::core& c, size_t ev_index, const std::vect
   
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
-  // 1/2 a_pledge == 0, b_pledge + amount_to_pay > 0
+  // a_pledge > 0, b_pledge + amount_to_pay = 0
   bc_services::contract_private_details cpd = AUTO_VAL_INIT(cpd);
-  cpd.amount_a_pledge = 0;
+  cpd.amount_a_pledge = MK_TEST_COINS(10);
   cpd.amount_b_pledge = 0;
-  cpd.amount_to_pay = MK_TEST_COINS(10);
+  cpd.amount_to_pay = 0;
   cpd.a_addr = m_accounts[ALICE_ACC_IDX].get_public_address();
   cpd.b_addr = m_accounts[BOB_ACC_IDX].get_public_address();
   cpd.comment = get_random_text(1024);
@@ -3041,7 +3040,7 @@ bool escrow_zero_amounts::c1(currency::core& c, size_t ev_index, const std::vect
 
   crypto::hash ms_id = get_multisig_out_id(escrow_template_tx, get_multisig_out_index(escrow_template_tx.vout));
   CHECK_AND_ASSERT_MES(ms_id != null_hash, false, "Can't obtain multisig id from escrow template tx");
-  LOG_PRINT_L0("contract 1/2: " << ms_id);
+  LOG_PRINT_L0("contract 1: " << ms_id);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
@@ -3053,43 +3052,6 @@ bool escrow_zero_amounts::c1(currency::core& c, size_t ev_index, const std::vect
   bob_wlt->refresh();
 
   bool caught = false;
-  try
-  {
-    bob_wlt->accept_proposal(ms_id, TESTS_DEFAULT_FEE);
-  }
-  catch (tools::error::wallet_internal_error &e)
-  {
-    LOG_PRINT_L0("caught: " << e.what());
-    caught = true;
-  }
-
-  CHECK_AND_ASSERT_MES(caught, false, "incorrect proposal was accepted");
-
-
-  // 2/2 a_pledge > 0, b_pledge + amount_to_pay = 0
-  cpd.amount_a_pledge = MK_TEST_COINS(10);
-  cpd.amount_b_pledge = 0;
-  cpd.amount_to_pay = 0;
-
-  alice_wlt->refresh();
-
-  proposal_tx = AUTO_VAL_INIT(proposal_tx);
-  escrow_template_tx = AUTO_VAL_INIT(escrow_template_tx);
-  alice_wlt->send_escrow_proposal(cpd, 0, 0, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, "", proposal_tx, escrow_template_tx);
-  ms_id = get_multisig_out_id(escrow_template_tx, get_multisig_out_index(escrow_template_tx.vout));
-  CHECK_AND_ASSERT_MES(ms_id != null_hash, false, "Can't obtain multisig id from escrow template tx");
-  LOG_PRINT_L0("contract 2/2: " << ms_id);
-
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
-
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
-  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
-
-  bob_wlt->refresh();
-
-  caught = false;
   try
   {
     bob_wlt->accept_proposal(ms_id, TESTS_DEFAULT_FEE);

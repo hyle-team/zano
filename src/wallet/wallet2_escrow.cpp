@@ -104,7 +104,6 @@ bool wallet2::validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& w
   bool correct_keys = (ms.keys[0] == a_key && ms.keys[1] == b_key) || (ms.keys[0] == b_key && ms.keys[1] == a_key);
   LOC_CHK(correct_keys, "template has mulisig output with invalid keys: 0:" << ms.keys[0] << " 1:" << ms.keys[1]);
 
-  LOC_CHK(cpd.amount_a_pledge > 0, "template has zero a pledge");
   LOC_CHK(cpd.amount_b_pledge + cpd.amount_to_pay > 0, "template has zero (b pledge + amount to pay)");
 
   uint64_t min_ms_amount = cpd.amount_a_pledge + cpd.amount_b_pledge + cpd.amount_to_pay + TX_DEFAULT_FEE;
