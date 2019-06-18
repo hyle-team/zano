@@ -81,6 +81,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
   command_line::add_arg(desc_cmd_sett, command_line::arg_show_details);
   command_line::add_arg(desc_cmd_sett, command_line::arg_show_rpc_autodoc);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_if_time_out_of_sync);
 
 
   arg_market_disable.default_value = true;
@@ -167,6 +168,10 @@ int main(int argc, char* argv[])
   cprotocol.set_p2p_endpoint(&p2psrv);
   ccore.set_currency_protocol(&cprotocol);
   daemon_cmmands_handler dch(p2psrv, rpc_server);
+  
+  if (!command_line::get_arg(vm, command_line::arg_disable_stop_if_time_out_of_sync))
+    ccore.set_stop_handler(&dch);
+
   //ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
   std::shared_ptr<currency::stratum_server> stratum_server_ptr;
   if (stratum_enabled)
@@ -304,7 +309,7 @@ int main(int argc, char* argv[])
   LOG_PRINT_L0("Deinitializing p2p...");
   p2psrv.deinit();
 
-
+  ccore.set_stop_handler(nullptr);
   ccore.set_currency_protocol(NULL);
   cprotocol.set_p2p_endpoint(NULL);
 

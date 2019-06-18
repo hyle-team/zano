@@ -504,7 +504,8 @@ void MainWindow::load_file(const QString &fileName)
 {
   TRY_ENTRY();
   LOG_PRINT_L0("Loading html from path: " << fileName.toStdString());
-  m_view->load(QUrl::fromLocalFile(QFileInfo(fileName).absoluteFilePath()));
+  QUrl url = QUrl::fromLocalFile(QFileInfo(fileName).absoluteFilePath());
+  m_view->load(url);
   CATCH_ENTRY2(void());
 }
 
@@ -770,7 +771,8 @@ bool MainWindow::set_html_path(const std::string& path)
   TRY_ENTRY();
   //init_tray_icon(path);
 #ifdef _MSC_VER
-  load_file(std::string(path + "/index.html").c_str());
+  QString url = QString::fromUtf8(epee::string_encoding::convert_ansii_to_utf8(path).c_str()) + "/index.html";
+  load_file(url);
 #else
 //  load_file(QString((std::string("file://") + path + "/index.html").c_str()));
   load_file(QString((std::string("") + path + "/index.html").c_str()));
@@ -778,6 +780,7 @@ bool MainWindow::set_html_path(const std::string& path)
   return true;
   CATCH_ENTRY2(false);
 }
+
 bool MainWindow::pos_block_found(const currency::block& block_found)
 {
   TRY_ENTRY();
