@@ -28,7 +28,7 @@ import { TypingMessageComponent } from './typing-message/typing-message.componen
 import { StakingComponent } from './staking/staking.component';
 
 import { HttpClient, HttpClientModule } from '@angular/common/http';
-import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
+import { TranslateLoader, TranslateModule } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
@@ -46,24 +46,31 @@ import { StakingSwitchComponent } from './_helpers/directives/staking-switch/sta
 import { ModalContainerComponent } from './_helpers/directives/modal-container/modal-container.component';
 import { TransactionDetailsComponent } from './_helpers/directives/transaction-details/transaction-details.component';
 import { ContextMenuModule } from 'ngx-contextmenu';
+import { ChartModule, HIGHCHARTS_MODULES } from 'angular-highcharts';
+import * as highcharts from 'highcharts';
+import exporting from 'highcharts/modules/exporting.src';
+import { ProgressContainerComponent } from './_helpers/directives/progress-container/progress-container.component';
+import { InputDisableSelectionDirective } from './_helpers/directives/input-disable-selection/input-disable-selection.directive';
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json');
 }
 
 
-import { ChartModule, HIGHCHARTS_MODULES, Highcharts} from 'angular-highcharts';
-import { ProgressContainerComponent } from './_helpers/directives/progress-container/progress-container.component';
-import { InputDisableSelectionDirective } from './_helpers/directives/input-disable-selection/input-disable-selection.directive';
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
 
-Highcharts.setOptions({
-  global: {
-    useUTC: false
-  }
-});
+export function highchartsFactory() {
+  // Default options.
+  highcharts.setOptions({
+    global: {
+      useUTC: false
+    }
+  });
+
+  return [exporting];
+}
 
 @NgModule({
   declarations: [
@@ -125,6 +132,7 @@ Highcharts.setOptions({
     ModalService,
     MoneyToIntPipe,
     IntToMoneyPipe,
+    { provide: HIGHCHARTS_MODULES, useFactory: highchartsFactory }
     // {provide: HIGHCHARTS_MODULES, useFactory: () => [ highstock, more, exporting ] }
   ],
   entryComponents: [
