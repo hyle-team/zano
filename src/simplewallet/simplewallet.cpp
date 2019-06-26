@@ -1597,11 +1597,6 @@ int main(int argc, char* argv[])
         if (command_line::get_arg(vm, arg_generate_new_wallet).size())
           return EXIT_FAILURE;
 
-        if (command_line::get_arg(vm, arg_do_pos_mining))
-        {
-          message_writer(epee::log_space::console_color_magenta, true, "", 4) << "IMORTANT NOTICE! Instance started with \"do-pos-mining\" parameter, running copy of this wallet on other host at the same time may cause key image conflicts";
-        }
-
         if (!offline_mode)
           wal.refresh();
         LOG_PRINT_GREEN("Loaded ok", LOG_LEVEL_0);
