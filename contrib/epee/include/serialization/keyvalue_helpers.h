@@ -64,6 +64,23 @@ namespace epee
 		epee::string_tools::hex_to_pod(a, res);
 		return res;
 	}
+
+  //basic helpers for blob-to-hex serialization 
+  
+  inline std::string transform_binbuf_to_hexstr(const std::string& a)
+  {
+    return epee::string_tools::buff_to_hex_nodelimer(a);
+  }
+
+  inline std::string transform_hexstr_to_binbuff(const std::string& a)
+  {
+    std::string res;
+    if (!epee::string_tools::parse_hexstr_to_binbuff(a, res))
+    {
+      CHECK_AND_ASSERT_THROW_MES(false, "Failed to parse hex string:" << a);
+    }
+    return res;
+  }
 	//-------------------------------------------------------------------------------------------------------------------
 
 
