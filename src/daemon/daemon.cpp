@@ -43,6 +43,49 @@ namespace po = boost::program_options;
 
 bool command_line_preprocessor(const boost::program_options::variables_map& vm);
 
+template<typename p2psrv_t>
+struct core_critical_error_handler_t : public currency::i_critical_error_handler
+{
+  core_critical_error_handler_t(daemon_commands_handler& dch, p2psrv_t& p2psrv, bool dont_stop_on_time_error, bool dont_stop_on_low_space)
+    : dch(dch)
+    , p2psrv(p2psrv)
+    , dont_stop_on_time_error(dont_stop_on_time_error)
+    , dont_stop_on_low_space(dont_stop_on_low_space)
+  {}
+
+  // interface currency::i_critical_error_handler
+  virtual bool on_critical_time_sync_error() override
+  {
+    if (dont_stop_on_time_error)
+      return false; // ignore such errors
+    
+    LOG_ERROR(ENDL << ENDL << "Serious time sync problem detected, daemon will stop immediately" << ENDL << ENDL);
+
+    // stop handling
+    dch.stop_handling();
+    return true; // the caller must stop processing
+  }
+
+  // interface currency::i_critical_error_handler
+  virtual bool on_critical_low_free_space(uint64_t available, uint64_t required) override
+  {
+    if (dont_stop_on_low_space)
+      return false; // ignore such errors
+    
+    LOG_ERROR(ENDL << ENDL << "Free space at data directory is critically low (" << available / (1024 * 1024) << " MB, while " << required / (1024 * 1024) << " MB is required), daemon will stop immediately" << ENDL << ENDL);
+
+    // stop handling
+    dch.stop_handling();
+    p2psrv.send_stop_signal();
+    return true; // the caller must stop processing
+  }
+
+  daemon_commands_handler& dch;
+  p2psrv_t& p2psrv;
+  bool dont_stop_on_time_error;
+  bool dont_stop_on_low_space;
+};
+
 int main(int argc, char* argv[])
 {
   try
@@ -82,6 +125,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_show_details);
   command_line::add_arg(desc_cmd_sett, command_line::arg_show_rpc_autodoc);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_if_time_out_of_sync);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_on_low_free_space);
 
 
   arg_market_disable.default_value = true;
@@ -89,7 +133,8 @@ int main(int argc, char* argv[])
 
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);
-  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
+  typedef nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2psrv_t;
+  p2psrv_t::init_options(desc_cmd_sett);
   currency::miner::init_options(desc_cmd_sett);
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
   currency::stratum_server::init_options(desc_cmd_sett);
@@ -163,14 +208,16 @@ int main(int argc, char* argv[])
   offers_service.set_disabled(true);
   currency::core ccore(NULL);
   currency::t_currency_protocol_handler<currency::core> cprotocol(ccore, NULL );
-  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2psrv(cprotocol);
+  p2psrv_t p2psrv(cprotocol);
   currency::core_rpc_server rpc_server(ccore, p2psrv, offers_service);
   cprotocol.set_p2p_endpoint(&p2psrv);
   ccore.set_currency_protocol(&cprotocol);
   daemon_commands_handler dch(p2psrv, rpc_server);
-  
-  if (!command_line::get_arg(vm, command_line::arg_disable_stop_if_time_out_of_sync))
-    ccore.set_stop_handler(&dch);
+
+  core_critical_error_handler_t<p2psrv_t> cceh(dch, p2psrv,
+    command_line::get_arg(vm, command_line::arg_disable_stop_if_time_out_of_sync),
+    command_line::get_arg(vm, command_line::arg_disable_stop_on_low_free_space));
+  ccore.set_critical_error_handler(&cceh);
 
   //ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
   std::shared_ptr<currency::stratum_server> stratum_server_ptr;
@@ -309,7 +356,7 @@ int main(int argc, char* argv[])
   LOG_PRINT_L0("Deinitializing p2p...");
   p2psrv.deinit();
 
-  ccore.set_stop_handler(nullptr);
+  ccore.set_critical_error_handler(nullptr);
   ccore.set_currency_protocol(NULL);
   cprotocol.set_p2p_endpoint(NULL);
 
