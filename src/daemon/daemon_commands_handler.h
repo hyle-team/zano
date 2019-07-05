@@ -67,6 +67,8 @@ public:
     m_cmd_binder.set_handler("print_deadlock_guard", boost::bind(&daemon_commands_handler::print_deadlock_guard, this, _1), "Print all threads which is blocked or involved in mutex ownership");
     m_cmd_binder.set_handler("print_block_from_hex_blob", boost::bind(&daemon_commands_handler::print_block_from_hex_blob, this, _1), "Unserialize block from hex binary data to json-like representation");
     m_cmd_binder.set_handler("print_tx_from_hex_blob", boost::bind(&daemon_commands_handler::print_tx_from_hex_blob, this, _1), "Unserialize transaction from hex binary data to json-like representation");
+    m_cmd_binder.set_handler("print_tx_outputs_usage", boost::bind(&daemon_commands_handler::print_tx_outputs_usage, this, _1), "Analyse if tx outputs for involved in subsequent transactions");
+
   }
 
   bool start_handling()
@@ -674,6 +676,27 @@ private:
     LOG_PRINT_GREEN(ss.str(), LOG_LEVEL_0);
     return true;
   }
+  //--------------------------------------------------------------------------------
+  bool print_tx_outputs_usage(const std::vector<std::string>& args)
+  {
+    if (args.empty())
+    {
+      std::cout << "expected: print_tx <transaction hash>" << std::endl;
+      return true;
+    }
+
+    const std::string& str_hash = args.front();
+    crypto::hash tx_hash;
+    if (!parse_hash256(str_hash, tx_hash))
+    {
+      return true;
+    }
+
+    m_srv.get_payload_object().get_core().get_blockchain_storage().print_tx_outputs_lookup(tx_hash);
+    return true;
+  }
+
+  
   //--------------------------------------------------------------------------------
   bool print_pool(const std::vector<std::string>& args)
   {

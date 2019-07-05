@@ -429,6 +429,7 @@ namespace currency
     void inspect_blocks_index() const;
     bool rebuild_tx_fee_medians();
     bool validate_all_aliases_for_new_median_mode();
+    bool print_tx_outputs_lookup(const crypto::hash& tx_id) const;
   private:
 
     //-------------- DB containers --------------

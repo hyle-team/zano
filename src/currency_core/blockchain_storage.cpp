@@ -3406,8 +3406,7 @@ uint64_t blockchain_storage::tx_fee_median_for_height(uint64_t h)const
 //------------------------------------------------------------------
 bool blockchain_storage::validate_all_aliases_for_new_median_mode()
 {
-  
-  LOG_PRINT_L0("Started reinitialization of median fee...");
+    LOG_PRINT_L0("Started reinitialization of median fee...");
   math_helper::once_a_time_seconds<10> log_idle;
   uint64_t sz = m_db_blocks.size();
   for (uint64_t i = 0; i != sz; i++)
@@ -3442,6 +3441,79 @@ bool blockchain_storage::validate_all_aliases_for_new_median_mode()
   }
 
   LOG_PRINT_L0("Finished.");
+
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::print_tx_outputs_lookup(const crypto::hash& tx_id)const 
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  auto tx_ptr = m_db_transactions.find(tx_id);
+
+  if (!tx_ptr)
+  {
+    LOG_PRINT_RED_L0("Tx " << tx_id << " not found");
+    return true;
+  }
+
+  //amount -> index -> [{tx_id, rind_count}]
+  std::map<uint64_t, std::map<uint64_t, std::list<std::pair<crypto::hash,uint64_t > > > > usage_stat;
+
+  CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() == tx_ptr->m_global_output_indexes.size(), false, "Internal error: output size missmatch");
+  for (uint64_t i = 0; i!= tx_ptr->tx.vout.size();i++)
+  {
+    if (tx_ptr->tx.vout[i].target.type() != typeid(currency::txout_to_key))
+      continue;
+    
+    usage_stat[tx_ptr->tx.vout[i].amount][tx_ptr->m_global_output_indexes[i]];
+
+  }
+  
+  LOG_PRINT_L0("Lookup in all transactions....");
+  for (uint64_t i = 0; i != m_db_blocks.size(); i++)
+  {
+    auto block_ptr = m_db_blocks[i];
+    for (auto block_tx_id : block_ptr->bl.tx_hashes)
+    {
+      auto block_tx_ptr = m_db_transactions.find(block_tx_id);
+      for (auto txi_in : block_tx_ptr->tx.vin)
+      {
+        if(txi_in.type() != typeid(currency::txin_to_key))
+          continue;
+        currency::txin_to_key& txi_in_tokey = boost::get<currency::txin_to_key>(txi_in);
+        uint64_t amount = txi_in_tokey.amount;
+        auto amount_it = usage_stat.find(amount);
+        if(amount_it == usage_stat.end())
+          continue;
+
+        for (txout_v& off : txi_in_tokey.key_offsets)
+        {
+          if(off.type() != typeid(uint64_t))
+            continue;
+          uint64_t index = boost::get<uint64_t>(off);
+          auto index_it = amount_it->second.find(index);
+          if(index_it == amount_it->second.end())
+            continue;
+          index_it->second.push_back(std::pair<crypto::hash, uint64_t>(block_tx_id, txi_in_tokey.key_offsets.size()));
+        }
+      }
+    }
+  }
+
+  std::stringstream ss;
+  for (auto& amount : usage_stat)
+  {
+    for (auto& index : amount.second)
+    {
+      ss << "[" << print_money(amount.first) << ":" << index.first << "]" << ENDL ;
+      for (auto& list_entry : index.second)
+      {
+        ss << "      " << list_entry.first << ": " << list_entry.second << ENDL; 
+      }
+    }
+  }
+  
+  LOG_PRINT_L0("Results: " << ENDL << ss.str());
 
   return true;
 }
