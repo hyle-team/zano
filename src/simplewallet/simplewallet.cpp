@@ -49,6 +49,7 @@ namespace
   const command_line::arg_descriptor<int> arg_daemon_port = {"daemon-port", "Use daemon instance at port <arg> instead of default", 0};
   const command_line::arg_descriptor<uint32_t> arg_log_level = {"set-log", "", 0, true};
   const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
+  const command_line::arg_descriptor<std::string> arg_restore_wallet = { "restore-wallet", "Restore wallet from the seed phrase and save it to <arg>", "" };
   const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
@@ -204,19 +205,25 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this, _1), "transfer <mixin_count> <addr_1> <amount_1> [<addr_2> <amount_2> ... <addr_N> <amount_N>] [payment_id] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available)");
   m_cmd_binder.set_handler("set_log", boost::bind(&simple_wallet::set_log, this, _1), "set_log <level> - Change current log detalisation level, <level> is a number 0-4");
   m_cmd_binder.set_handler("enable_concole_logger", boost::bind(&simple_wallet::enable_concole_logger, this, _1), "Enables console logging");
-  m_cmd_binder.set_handler("address", boost::bind(&simple_wallet::print_address, this, _1), "Show current wallet public address");
   m_cmd_binder.set_handler("resync", boost::bind(&simple_wallet::resync_wallet, this, _1), "Causes wallet to reset all transfers and re-synchronize wallet");
-  m_cmd_binder.set_handler("save", boost::bind(&simple_wallet::save, this, _1), "Save wallet synchronized data");
   m_cmd_binder.set_handler("help", boost::bind(&simple_wallet::help, this, _1), "Show this help");
   m_cmd_binder.set_handler("get_transfer_info", boost::bind(&simple_wallet::get_transfer_info, this, _1), "displays transfer info by key_image or index");
   m_cmd_binder.set_handler("scan_for_collision", boost::bind(&simple_wallet::scan_for_key_image_collisions, this, _1), "Rescan transfers for key image collisions");
   m_cmd_binder.set_handler("fix_collisions", boost::bind(&simple_wallet::fix_collisions, this, _1), "Rescan transfers for key image collisions");
   m_cmd_binder.set_handler("scan_transfers_for_id", boost::bind(&simple_wallet::scan_transfers_for_id, this, _1), "Rescan transfers for tx_id");
   m_cmd_binder.set_handler("scan_transfers_for_ki", boost::bind(&simple_wallet::scan_transfers_for_ki, this, _1), "Rescan transfers for key image");
+  
+  m_cmd_binder.set_handler("address", boost::bind(&simple_wallet::print_address, this, _1), "Show current wallet public address");
   m_cmd_binder.set_handler("integrated_address", boost::bind(&simple_wallet::integrated_address, this, _1), "integrated_address [<payment_id>|<integrated_address] - encodes given payment_id along with wallet's address into an integrated address (random payment_id will be used if none is provided). Decodes given integrated_address into standard address");
+  m_cmd_binder.set_handler("show_seed", boost::bind(&simple_wallet::show_seed, this, _1), "Display secret 24 word phrase that could be used to recover this wallet");
+  m_cmd_binder.set_handler("spendkey", boost::bind(&simple_wallet::spendkey, this, _1), "Display secret spend key");
+  m_cmd_binder.set_handler("viewkey",  boost::bind(&simple_wallet::viewkey, this, _1), "Display secret view key");
+  
   m_cmd_binder.set_handler("get_tx_key", boost::bind(&simple_wallet::get_tx_key, this, _1), "Get transaction one-time secret key (r) for a given <txid>");
 
+  m_cmd_binder.set_handler("save", boost::bind(&simple_wallet::save, this, _1), "Save wallet synchronized data");
   m_cmd_binder.set_handler("save_watch_only", boost::bind(&simple_wallet::save_watch_only, this, _1), "save_watch_only <filename> <password> - save as watch-only wallet file.");
+
   m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this, _1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this, _1), "submit_transfer <signed_tx_file> - broadcast signed tx");
 }
@@ -262,12 +269,9 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     return false;
   }
 
-  size_t c = 0; 
-  if(!m_generate_new.empty()) ++c;
-  if(!m_wallet_file.empty()) ++c;
-  if (1 != c)
+  if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty())
   {
-    fail_msg_writer() << "you must specify --wallet-file or --generate-new-wallet params";
+    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet or --restore-wallet";
     return false;
   }
 
@@ -310,6 +314,24 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     CHECK_AND_ASSERT_MES(r, false, "account creation failed");
     
   }
+  else if (!m_restore_wallet.empty())
+  {
+    if (boost::filesystem::exists(m_restore_wallet))
+    {
+      fail_msg_writer() << "file " << m_restore_wallet << " already exists";
+      return false;
+    }
+
+    tools::password_container restore_seed_container;
+    if (!restore_seed_container.read_password("please, enter wallet seed phrase:\n"))
+    {
+      fail_msg_writer() << "failed to read seed phrase";
+      return false;
+    }
+    
+    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password());
+    CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
+  }
   else
   {
     bool r = open_wallet(epee::string_encoding::convert_to_ansii(m_wallet_file), pwd_container.password());
@@ -336,6 +358,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_daemon_port     = command_line::get_arg(vm, arg_daemon_port);
   m_do_not_set_date = command_line::get_arg(vm, arg_dont_set_date);
   m_do_pos_mining   = command_line::get_arg(vm, arg_do_pos_mining);
+  m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
 } 
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::try_connect_to_daemon()
@@ -383,6 +406,41 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   success_msg_writer() <<
     "**********************************************************************\n" <<
     "Your wallet has been generated.\n" <<
+    "To start synchronizing with the daemon use \"refresh\" command.\n" <<
+    "Use \"help\" command to see the list of available commands.\n" <<
+    "Always use \"exit\" command when closing simplewallet to save\n" <<
+    "current session's state. Otherwise, you will possibly need to synchronize \n" <<
+    "your wallet again. Your wallet key is NOT under risk anyway.\n" <<
+    "**********************************************************************";
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::restore_wallet(const std::string &wallet_file, const std::string &restore_seed, const std::string& password)
+{
+  m_wallet_file = wallet_file;
+
+  m_wallet.reset(new tools::wallet2());
+  m_wallet->callback(this->shared_from_this());
+  m_wallet->set_do_rise_transfer(false);
+  try
+  {
+    m_wallet->restore(epee::string_encoding::convert_to_unicode(wallet_file), password, restore_seed);
+    message_writer(epee::log_space::console_color_white, true) << "Wallet restored: " << m_wallet->get_account().get_public_address_str();
+    std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_view_secret_key) << std::endl << std::flush;
+    if (m_do_not_set_date)
+      m_wallet->reset_creation_time(0);
+  }
+  catch (const std::exception& e)
+  {
+    fail_msg_writer() << "failed to restore wallet: " << e.what();
+    return false;
+  }
+
+  m_wallet->init(m_daemon_address);
+
+  success_msg_writer() <<
+    "**********************************************************************\n" <<
+    "Your wallet has been restored.\n" <<
     "To start synchronizing with the daemon use \"refresh\" command.\n" <<
     "Use \"help\" command to see the list of available commands.\n" <<
     "Always use \"exit\" command when closing simplewallet to save\n" <<
@@ -1203,6 +1261,38 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool simple_wallet::show_seed(const std::vector<std::string> &args)
+{
+  success_msg_writer() << "Here's your wallet's seed phrase. Write it down and keep in a safe place.";
+  success_msg_writer(true) << "Anyone who knows the following 25 words can access you wallet:";
+  std::cout << m_wallet->get_account().get_restore_braindata() << std::endl << std::flush;
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::spendkey(const std::vector<std::string> &args)
+{
+  message_writer(epee::log_space::console_color_red, true, std::string())
+   << "WARNING! Anyone who knows the following secret key can access you wallet and spend your coins.";
+
+  const account_keys& keys = m_wallet->get_account().get_keys();
+  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_spend_secret_key) << std::endl;
+  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.m_spend_public_key) << std::endl << std::flush;
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::viewkey(const std::vector<std::string> &args)
+{
+  message_writer(epee::log_space::console_color_yellow, false, std::string())
+    << "WARNING! Anyone who knows the following secret key can view you wallet (but can not spend your coins).";
+
+  const account_keys& keys = m_wallet->get_account().get_keys();
+  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_view_secret_key) << std::endl;
+  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.m_view_public_key) << std::endl << std::flush;
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::resync_wallet(const std::vector<std::string> &args/* = std::vector<std::string>()*/)
 {
   m_wallet->reset_history();
@@ -1461,6 +1551,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_dont_set_date);
   command_line::add_arg(desc_params, arg_print_brain_wallet);
   command_line::add_arg(desc_params, arg_do_pos_mining);
+  command_line::add_arg(desc_params, arg_restore_wallet);
   command_line::add_arg(desc_params, arg_offline_mode);
   command_line::add_arg(desc_params, command_line::arg_log_file);
   command_line::add_arg(desc_params, command_line::arg_log_level);
