@@ -1624,7 +1624,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
 
     if (m_invalid_blocks.count(id) != 0)
     {
-      LOG_PRINT_RED_L0("Block recognized as blacklisted (parent " << b.prev_id << " is in blacklist) and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
+      LOG_PRINT_RED_L0("Block recognized as blacklisted and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
     }
     else if (m_invalid_blocks.count(b.prev_id) != 0)
     {
