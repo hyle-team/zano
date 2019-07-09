@@ -71,6 +71,7 @@ public:
 
     std::thread miner_thread;
     void worker_func();
+    std::string get_log_prefix() const { return std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":" + w->get()->get_log_prefix() + "]"; }
     ~wallet_vs_options();
   };
 

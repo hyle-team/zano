@@ -81,8 +81,8 @@ namespace currency
      size_t get_alternative_blocks_count();
 
      void set_currency_protocol(i_currency_protocol* pprotocol);
-     void set_stop_handler(i_stop_handler *handler);
-     i_stop_handler* get_stop_handler() const { return m_stop_handler; }
+     void set_critical_error_handler(i_critical_error_handler *handler);
+     i_critical_error_handler* get_critical_error_handler() const { return m_critical_error_handler; }
      bool set_checkpoints(checkpoints&& chk_pts);
 
      bool get_pool_transactions(std::list<transaction>& txs);
@@ -136,17 +136,20 @@ namespace currency
 
      void notify_blockchain_update_listeners();
 
+     void check_free_space();
+
 
      blockchain_storage m_blockchain_storage;
      tx_memory_pool m_mempool;
      i_currency_protocol* m_pprotocol;
-     i_stop_handler* m_stop_handler;
+     i_critical_error_handler* m_critical_error_handler;
      critical_section m_incoming_tx_lock;
      miner m_miner;
      account_public_address m_miner_address;
      std::string m_config_folder;
      currency_protocol_stub m_protocol_stub;
      math_helper::once_a_time_seconds<60*60*12, false> m_prune_alt_blocks_interval;
+     math_helper::once_a_time_seconds<60, true> m_check_free_space_interval;
      friend class tx_validate_inputs;
      std::atomic<bool> m_starter_message_showed;
 

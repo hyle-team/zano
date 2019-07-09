@@ -2539,14 +2539,17 @@ bool wallet2::fill_mining_context(mining_context& ctx)
 bool wallet2::try_mint_pos()
 {
   mining_context ctx = AUTO_VAL_INIT(ctx);
-  WLT_LOG_L0("Starting PoS mint iteration");
+  WLT_LOG_L1("Starting PoS mining iteration");
   fill_mining_context(ctx);
   if (!ctx.rsp.is_pos_allowed)
   {
-    WLT_LOG_L0("POS MINING NOT ALLOWED YET");
+    WLT_LOG_YELLOW("POS MINING NOT ALLOWED YET", LOG_LEVEL_0);
     return true;
   }
-  WLT_LOG_L0("POS_ENTRIES: " << ctx.sp.pos_entries.size());
+
+  uint64_t pos_entries_amount = 0;
+  for (auto& ent : ctx.sp.pos_entries)
+    pos_entries_amount += ent.amount;
 
   std::atomic<bool> stop(false);
   scan_pos(ctx, stop, [this](){
@@ -2564,7 +2567,8 @@ bool wallet2::try_mint_pos()
   {
     build_minted_block(ctx.sp, ctx.rsp);
   }
-  WLT_LOG_L0("PoS mint iteration finished(" << ctx.rsp.status << ")");
+
+  WLT_LOG_L0("PoS mining iteration finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
 
   return true;
 }

@@ -28,4 +28,5 @@ namespace command_line
   const arg_descriptor<bool>        arg_disable_upnp = { "disable-upnp", "Disable UPnP (enhances local network privacy)", false, true };
 
   const arg_descriptor<bool>        arg_disable_stop_if_time_out_of_sync = { "disable-stop-if-time-out-of-sync", "Do not stop the daemon if serious time synchronization problem is detected", false, true };
+  const arg_descriptor<bool>        arg_disable_stop_on_low_free_space   = { "disable-stop-on-low-free-space", "Do not stop the daemon if free space at data dir is critically low", false, true };
 }

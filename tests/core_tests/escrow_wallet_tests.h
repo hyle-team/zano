@@ -134,3 +134,10 @@ struct escrow_proposal_acceptance_in_alt_chain : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct escrow_zero_amounts : public wallet_test
+{
+  escrow_zero_amounts();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
