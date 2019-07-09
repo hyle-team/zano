@@ -525,6 +525,9 @@ namespace currency
     bool init_tx_fee_median();
     bool update_tx_fee_median();
     void initialize_db_solo_options_values();
+    bool set_lost_tx_unmixable();
+    bool set_lost_tx_unmixable_for_height(uint64_t height);
+    void patch_out_if_needed(txout_to_key& out, const crypto::hash& tx_id, uint64_t n)const ;
     bool switch_to_alternative_blockchain(alt_chain_type& alt_chain);
     void purge_alt_block_txs_hashs(const block& b);
     void add_alt_block_txs_hashs(const block& b);   
@@ -691,7 +694,11 @@ namespace currency
       TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_find_tx);
 
       CHECKED_GET_SPECIFIC_VARIANT(tx_ptr->tx.vout[n].target, const txout_to_key, outtk, false);
+      //explanation of this code will be provided later with public announce
+      patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
       
+
+
       CHECK_AND_ASSERT_MES(tx_in_to_key.key_offsets.size() >= 1, false, "internal error: tx input has empty key_offsets"); // should never happen as input correctness must be handled by the caller
       bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, tx_in_to_key.key_offsets.size() - 1);
       CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << tx_in_to_key.key_offsets.size());

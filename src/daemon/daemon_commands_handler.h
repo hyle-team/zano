@@ -38,7 +38,7 @@ public:
     //m_cmd_binder.set_handler("print_bci", boost::bind(&daemon_commands_handler::print_bci, this, _1));
     m_cmd_binder.set_handler("print_bc_outs", boost::bind(&daemon_commands_handler::print_bc_outs, this, _1));
     m_cmd_binder.set_handler("print_market", boost::bind(&daemon_commands_handler::print_market, this, _1));
-    m_cmd_binder.set_handler("print_bc_outs_stat", boost::bind(&daemon_commands_handler::print_bc_outs_stat, this, _1));    
+    m_cmd_binder.set_handler("print_bc_outs_stat", boost::bind(&daemon_commands_handler::print_bc_outs_stat, this, _1));
     m_cmd_binder.set_handler("print_block", boost::bind(&daemon_commands_handler::print_block, this, _1), "Print block, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_commands_handler::print_block_info, this, _1), "Print block info, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, _1), "Print transaction, print_tx <transaction_hash>");
@@ -85,17 +85,17 @@ public:
 private:
 
 
-//   //--------------------------------------------------------------------------------
-//   std::string get_commands_str()
-//   {
-//     return m_cmd_binder.get_usage();
-//   }
-//   //--------------------------------------------------------------------------------
-//   bool help(const std::vector<std::string>& /*args*/)
-//   {
-//     std::cout << get_commands_str() << ENDL;
-//     return true;
-//   }
+  //   //--------------------------------------------------------------------------------
+  //   std::string get_commands_str()
+  //   {
+  //     return m_cmd_binder.get_usage();
+  //   }
+  //   //--------------------------------------------------------------------------------
+  //   bool help(const std::vector<std::string>& /*args*/)
+  //   {
+  //     std::cout << get_commands_str() << ENDL;
+  //     return true;
+  //   }
   //--------------------------------------------------------------------------------
   bool print_pl(const std::vector<std::string>& args)
   {
@@ -166,23 +166,24 @@ private:
   {
     m_srv.get_payload_object().get_core().get_blockchain_storage().reset_db_cache();
     return true;
-  }  
+  }
   bool clear_altblocks(const std::vector<std::string>& args)
   {
     m_srv.get_payload_object().get_core().get_blockchain_storage().clear_altblocks();
     return true;
   }
-  
+
   //--------------------------------------------------------------------------------
   bool show_hr(const std::vector<std::string>& args)
   {
-  if(!m_srv.get_payload_object().get_core().get_miner().is_mining()) 
-  {
-    std::cout << "Mining is not started. You need start mining before you can see hash rate." << ENDL;
-  } else 
-  {
-    m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(true);
-  }
+    if (!m_srv.get_payload_object().get_core().get_miner().is_mining())
+    {
+      std::cout << "Mining is not started. You need start mining before you can see hash rate." << ENDL;
+    }
+    else
+    {
+      m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(true);
+    }
     return true;
   }
   //--------------------------------------------------------------------------------
@@ -194,7 +195,7 @@ private:
   //--------------------------------------------------------------------------------
   bool print_bc_outs(const std::vector<std::string>& args)
   {
-    if(args.size() != 1)
+    if (args.size() != 1)
     {
       std::cout << "need file path as parameter" << ENDL;
       return true;
@@ -220,25 +221,25 @@ private:
   //--------------------------------------------------------------------------------
   bool print_cn(const std::vector<std::string>& args)
   {
-     m_srv.get_payload_object().log_connections();
-     return true;
+    m_srv.get_payload_object().log_connections();
+    return true;
   }
   //--------------------------------------------------------------------------------
   bool print_bc(const std::vector<std::string>& args)
   {
-    if(!args.size())
+    if (!args.size())
     {
       std::cout << "need block index parameter" << ENDL;
       return false;
     }
     uint64_t start_index = 0;
     uint64_t end_block_parametr = m_srv.get_payload_object().get_core().get_current_blockchain_size();
-    if(!string_tools::get_xtype_from_string(start_index, args[0]))
+    if (!string_tools::get_xtype_from_string(start_index, args[0]))
     {
       std::cout << "wrong starter block index parameter" << ENDL;
       return false;
     }
-    if(args.size() >1 && !string_tools::get_xtype_from_string(end_block_parametr, args[1]))
+    if (args.size() > 1 && !string_tools::get_xtype_from_string(end_block_parametr, args[1]))
     {
       std::cout << "wrong end block index parameter" << ENDL;
       return false;
@@ -274,7 +275,7 @@ private:
   {
     m_srv.get_payload_object().get_core().get_blockchain_storage().print_db_cache_perfeormance_data();
     return true;
-  }  
+  }
   //--------------------------------------------------------------------------------
   bool search_by_id(const std::vector<std::string>& args)
   {
@@ -287,7 +288,7 @@ private:
     crypto::hash id = currency::null_hash;
     if (!parse_hash256(args[0], id))
     {
-      std::cout << "specified ID parameter '"<< args[0] << "' is wrong" << ENDL;
+      std::cout << "specified ID parameter '" << args[0] << "' is wrong" << ENDL;
       return false;
     }
     std::list<std::string> res_list;
@@ -373,7 +374,7 @@ private:
     res = ::serialization::parse_binary(bin_buff, item);
     CHECK_AND_ASSERT_MES(res, false, "failed to parse binary");
 
-    
+
     LOG_PRINT_L0("OBJECT " << typeid(item).name() << ": " << ENDL << obj_to_json_str(item));
     return true;
   }
@@ -416,43 +417,43 @@ private:
   //--------------------------------------------------------------------------------
   bool export_tx_pool_to_json(const std::vector<std::string>& args)
   {
-//     if (!args.size())
-//     {
-//       std::cout << "need block blob parameter" << ENDL;
-//       return false;
-//     }
-//     tx_pool_exported_blobs tx_pool_json;
-//     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
-//     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
-//     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
-// 
-//     bool r = file_io_utils::save_string_to_file(args[0], pool_state);
-//     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
-//     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() <<" transactions)");
+    //     if (!args.size())
+    //     {
+    //       std::cout << "need block blob parameter" << ENDL;
+    //       return false;
+    //     }
+    //     tx_pool_exported_blobs tx_pool_json;
+    //     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
+    //     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
+    //     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
+    // 
+    //     bool r = file_io_utils::save_string_to_file(args[0], pool_state);
+    //     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
+    //     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() <<" transactions)");
     return true;
   }
   //--------------------------------------------------------------------------------
   bool import_tx_pool_to_json(const std::vector<std::string>& args)
   {
-//     if (!args.size())
-//     {
-//       std::cout << "need block blob parameter" << ENDL;
-//       return false;
-//     }
-// 
-//     std::string buff;
-//     bool r = file_io_utils::load_file_to_string(args[0], buff);
-//     
-//     tx_pool_exported_blobs tx_pool_json;
-// 
-// 
-//     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
-//     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
-//     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
-// 
-// 
-//     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
-//     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() << " transactions)");
+    //     if (!args.size())
+    //     {
+    //       std::cout << "need block blob parameter" << ENDL;
+    //       return false;
+    //     }
+    // 
+    //     std::string buff;
+    //     bool r = file_io_utils::load_file_to_string(args[0], buff);
+    //     
+    //     tx_pool_exported_blobs tx_pool_json;
+    // 
+    // 
+    //     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
+    //     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
+    //     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
+    // 
+    // 
+    //     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
+    //     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() << " transactions)");
     return true;
   }
   //--------------------------------------------------------------------------------
@@ -522,7 +523,7 @@ private:
     if (r)
     {
       //      currency::block& block = bei.bl;
-      LOG_PRINT_GREEN("------------------ block_id: " << bei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(bei) , LOG_LEVEL_0);
+      LOG_PRINT_GREEN("------------------ block_id: " << bei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(bei), LOG_LEVEL_0);
     }
     else
     {
@@ -551,7 +552,7 @@ private:
 
     if (r)
     {
-//      currency::block& block = bei.bl;
+      //      currency::block& block = bei.bl;
       LOG_PRINT_GREEN("------------------ block_id: " << get_block_hash(bei.bl) << " ------------------" << ENDL << currency::obj_to_json_str(bei), LOG_LEVEL_0);
       m_srv.get_payload_object().get_core().get_blockchain_storage().calc_tx_cummulative_blob(bei.bl);
     }
@@ -623,11 +624,11 @@ private:
       return true;
     }
 
-//     std::vector<crypto::hash> tx_ids;
-//     tx_ids.push_back(tx_hash);
-//     std::list<currency::transaction> txs;
-//     std::list<crypto::hash> missed_ids;
-//     m_srv.get_payload_object().get_core().get_transactions(tx_ids, txs, missed_ids);
+    //     std::vector<crypto::hash> tx_ids;
+    //     tx_ids.push_back(tx_hash);
+    //     std::list<currency::transaction> txs;
+    //     std::list<crypto::hash> missed_ids;
+    //     m_srv.get_payload_object().get_core().get_transactions(tx_ids, txs, missed_ids);
 
     currency::transaction_chain_entry tx_entry = AUTO_VAL_INIT(tx_entry);
 
@@ -655,10 +656,10 @@ private:
     for (auto at : tx.attachment)
     {
       if (at.type() == typeid(currency::tx_service_attachment))
-      {        
+      {
         const currency::tx_service_attachment& sa = boost::get<currency::tx_service_attachment>(at);
         ss << "++++++++++++++++++++++++++++++++ " << ENDL;
-        ss << "[SERVICE_ATTACHMENT]: ID = \'" << sa.service_id << "\', INSTRUCTION: \'" << sa.instruction << "\'" << ENDL; 
+        ss << "[SERVICE_ATTACHMENT]: ID = \'" << sa.service_id << "\', INSTRUCTION: \'" << sa.instruction << "\'" << ENDL;
 
         if (!(sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY))
         {
@@ -696,7 +697,7 @@ private:
     return true;
   }
 
-  
+
   //--------------------------------------------------------------------------------
   bool print_pool(const std::vector<std::string>& args)
   {
@@ -711,20 +712,20 @@ private:
   }  //--------------------------------------------------------------------------------
   bool start_mining(const std::vector<std::string>& args)
   {
-    if(!args.size())
+    if (!args.size())
     {
       std::cout << "Please, specify wallet address to mine for: start_mining <addr> [threads=1]" << std::endl;
       return true;
     }
 
     currency::account_public_address adr;
-    if(!currency::get_account_address_from_str(adr, args.front()))
+    if (!currency::get_account_address_from_str(adr, args.front()))
     {
       std::cout << "target account address has wrong format" << std::endl;
       return true;
     }
     size_t threads_count = 1;
-    if(args.size() > 1)
+    if (args.size() > 1)
     {
       bool ok = string_tools::get_xtype_from_string(threads_count, args[1]);
       threads_count = (ok && 0 < threads_count) ? threads_count : 1;
@@ -771,7 +772,7 @@ private:
       else
         ss << "              ";
       ss << std::setw(10) << std::left << pow_diffs[i].second;
-      
+
       ss << "      ";
       ss << std::setw(6) << std::left << pos_diffs[i].first;
       if (i == 0)
@@ -791,8 +792,8 @@ private:
     LOG_PRINT_L0(ENDL << epee::deadlock_guard_singleton::get_dlg_state());
     return true;
   }
-    
-  
+
+
 
 
 };

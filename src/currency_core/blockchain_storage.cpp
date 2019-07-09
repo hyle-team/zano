@@ -304,6 +304,10 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   if(!m_db_blocks.back()->bl.timestamp)
     timestamp_diff = m_core_runtime_config.get_core_time() - 1341378000;
 
+  m_db.begin_transaction();
+  set_lost_tx_unmixable();
+  m_db.commit_transaction();
+
   LOG_PRINT_GREEN("Blockchain initialized. (v:" << m_db_storage_major_compatibility_version << ") last block: " << m_db_blocks.size() - 1 << ENDL 
     << "genesis: " << get_block_hash(m_db_blocks[0]->bl) << ENDL
     << "last block: " << m_db_blocks.size() - 1 << ", " << misc_utils::get_time_interval_string(timestamp_diff) << " time ago" << ENDL
@@ -311,9 +315,48 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     << "current pow difficulty: " << get_next_diff_conditional(false) << ENDL
     << "total transactions: " << m_db_transactions.size(),
     LOG_LEVEL_0);
-   
 
   return true;
+}
+
+//------------------------------------------------------------------
+bool blockchain_storage::set_lost_tx_unmixable_for_height(uint64_t height)
+{
+  if (height == 75738)
+    return set_lost_tx_unmixable();  
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::set_lost_tx_unmixable()
+{  
+  if (m_db_blocks.size() > 75738)
+  {
+     crypto::hash tx_id_1 = epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("c2a2229d614e7c026433efbcfdbd0be1f68d9b419220336df3e2c209f5d57314");
+     crypto::hash tx_id_2 = epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("647f936c6ffbd136f5c95d9a90ad554bdb4c01541c6eb5755ad40b984d80da67");
+ 
+     auto tx_ptr_1 = m_db_transactions.find(tx_id_1);
+     CHECK_AND_ASSERT_MES(tx_ptr_1, false, "Internal error: filed to find lost tx");
+     transaction_chain_entry tx1_local_entry(*tx_ptr_1);
+     for (size_t i = 0; i != tx1_local_entry.m_spent_flags.size(); i++)
+     {
+       tx1_local_entry.m_spent_flags[i] = true;
+     }
+     m_db_transactions.set(tx_id_1, tx1_local_entry);
+
+     auto tx_ptr_2 = m_db_transactions.find(tx_id_2);
+     transaction_chain_entry tx2_local_entry(*tx_ptr_2);
+     CHECK_AND_ASSERT_MES(tx_ptr_1, false, "Internal error: filed to find lost tx");
+     for (size_t i = 0; i != tx2_local_entry.m_spent_flags.size(); i++)
+     {
+       tx2_local_entry.m_spent_flags[i] = true;
+     }
+     m_db_transactions.set(tx_id_2, tx2_local_entry);
+  }
+  return true;
+}
+//------------------------------------------------------------------
+void  blockchain_storage::patch_out_if_needed(txout_to_key& out, const crypto::hash& tx_id, uint64_t n) const 
+{
 }
 //------------------------------------------------------------------
 void blockchain_storage::initialize_db_solo_options_values()
@@ -1578,7 +1621,19 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
   {
     //block orphaned
     bvc.m_marked_as_orphaned = true;
-    LOG_PRINT_RED_L0("Block recognized as orphaned and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
+
+    if (m_invalid_blocks.count(id) != 0)
+    {
+      LOG_PRINT_RED_L0("Block recognized as blacklisted (parent " << b.prev_id << " is in blacklist) and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
+    }
+    else if (m_invalid_blocks.count(b.prev_id) != 0)
+    {
+      LOG_PRINT_RED_L0("Block recognized as orphaned (parent " << b.prev_id << " is in blacklist) and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
+    }
+    else
+    {
+      LOG_PRINT_RED_L0("Block recognized as orphaned and rejected, id = " << id << "," << ENDL << "parent id = " << b.prev_id << ENDL << "height = " << coinbase_height);
+    }
   }
   
   CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL!");
@@ -3458,10 +3513,11 @@ bool blockchain_storage::print_tx_outputs_lookup(const crypto::hash& tx_id)const
 
   //amount -> index -> [{tx_id, rind_count}]
   std::map<uint64_t, std::map<uint64_t, std::list<std::pair<crypto::hash,uint64_t > > > > usage_stat;
-
+  std::stringstream strm_tx;
   CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() == tx_ptr->m_global_output_indexes.size(), false, "Internal error: output size missmatch");
   for (uint64_t i = 0; i!= tx_ptr->tx.vout.size();i++)
   {
+    strm_tx << "[" << i << "]: " << print_money(tx_ptr->tx.vout[i].amount) << ENDL;
     if (tx_ptr->tx.vout[i].target.type() != typeid(currency::txout_to_key))
       continue;
     
@@ -3513,7 +3569,7 @@ bool blockchain_storage::print_tx_outputs_lookup(const crypto::hash& tx_id)const
     }
   }
   
-  LOG_PRINT_L0("Results: " << ENDL << ss.str());
+  LOG_PRINT_L0("Results: " << ENDL << strm_tx.str() << ENDL  << ss.str());
 
   return true;
 }
@@ -4619,6 +4675,10 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     powpos_str_entry << "PoW:\t" << proof_hash;
     timestamp_str_entry << ", block ts: " << bei.bl.timestamp << " (diff: " << std::showpos << ts_diff << "s)";
   }
+  //explanation of this code will be provided later with public announce
+  set_lost_tx_unmixable_for_height(bei.height);
+    
+
   LOG_PRINT_L1("+++++ BLOCK SUCCESSFULLY ADDED " << (is_pos_bl ? "[PoS]" : "[PoW]") << " Sq: " << sequence_factor
     << ENDL << "id:\t" << id << timestamp_str_entry.str()
     << ENDL << powpos_str_entry.str()
