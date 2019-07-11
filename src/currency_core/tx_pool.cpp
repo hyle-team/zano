@@ -19,13 +19,11 @@
 #include "misc_language.h"
 #include "warnings.h"
 #include "crypto/hash.h"
-#include "offers_service_basics.h"
 #include "profile_tools.h"
 
 DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated name length exceeded, name was truncated
 
 #define TRANSACTION_POOL_CONTAINER_TRANSACTIONS           "transactions"
-#define TRANSACTION_POOL_CONTAINER_CANCEL_OFFER_HASH      "cancel_offer_hash"
 #define TRANSACTION_POOL_CONTAINER_BLACK_TX_LIST          "black_tx_list"
 #define TRANSACTION_POOL_CONTAINER_ALIAS_NAMES            "alias_names"
 #define TRANSACTION_POOL_CONTAINER_ALIAS_ADDRESSES        "alias_addresses"
@@ -45,7 +43,6 @@ namespace currency
     m_pprotocol(pprotocol),
     m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_dummy_rw_lock),
     m_db_transactions(m_db),
-    m_db_cancel_offer_hash(m_db),
     m_db_black_tx_list(m_db),
     m_db_solo_options(m_db), 
     m_db_key_images_set(m_db),
@@ -157,19 +154,7 @@ namespace currency
       uint64_t tx_fee = inputs_amount - outputs_amount;
       if (tx_fee < m_blockchain.get_core_runtime_config().tx_pool_min_fee)
       {
-        //exception for cancel offer transactions
-        if (process_cancel_offer_rules(tx))
-        {
-          // this tx has valid offer cansellation instructions and thus can go for free
-          // check soft size constrain
-          if (blob_size > CURRENCY_FREE_TX_MAX_BLOB_SIZE)
-          {
-            LOG_ERROR("Blob size (" << blob_size << ") << exceeds limit for transaction " << id << " that contains offer cancellation and has smaller fee (" << tx_fee << ") than expected");
-            tvc.m_verification_failed = true;
-            return false;
-          }
-        }
-        else if (is_valid_contract_finalization_tx(tx))
+        if (is_valid_contract_finalization_tx(tx))
         {
           // that means tx has less fee then allowed by current tx pull rules, but this transaction is actually 
           // a finalization of contract, and template of this contract finalization tx was prepared actually before 
@@ -177,7 +162,7 @@ namespace currency
         }
         else
         {
-          // this tx has no fee OR invalid offer cancellations instructions -- so the exceptions of zero fee is not applicable
+          // this tx has no fee 
           LOG_ERROR("Transaction with id= " << id << " has too small fee: " << tx_fee << ", expected fee: " << m_blockchain.get_core_runtime_config().tx_pool_min_fee);
           tvc.m_verification_failed = false;
           tvc.m_should_be_relayed = false;
@@ -288,80 +273,7 @@ namespace currency
     CRITICAL_REGION_LOCAL(m_taken_txs_lock);
     m_taken_txs.clear();
   }
-  //---------------------------------------------------------------------------------
-  bool tx_memory_pool::process_cancel_offer_rules(const transaction& tx)
-  {
-    //TODO: this code doesn't take into account offer id in source tx
-    //TODO: add scan on tx size for free transaction here
-    m_db_transactions.begin_transaction();
-    misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&](){m_db_transactions.commit_transaction(); });
-
-
-    size_t serv_att_count = 0;
-    std::list<bc_services::cancel_offer> co_list;
-    for (const auto& a: tx.attachment)
-    {
-      if (a.type() == typeid(tx_service_attachment))
-      {
-        const tx_service_attachment& srv_at = boost::get<tx_service_attachment>(a);
-        if (srv_at.service_id == BC_OFFERS_SERVICE_ID && srv_at.instruction == BC_OFFERS_SERVICE_INSTRUCTION_DEL)
-        {
-          if (!m_blockchain.validate_tx_service_attachmens_in_services(srv_at, serv_att_count, tx))
-          {
-            LOG_ERROR("validate_tx_service_attachmens_in_services failed for an offer cancellation transaction");
-            return false;
-          }
-          bc_services::extract_type_and_add<bc_services::cancel_offer>(srv_at.body, co_list);
-          if (m_db_cancel_offer_hash.get(co_list.back().tx_id))
-          {
-            LOG_ERROR("cancellation of offer " << co_list.back().tx_id << " has already been processed earlier; zero fee is disallowed");
-            return false;
-          }
-        }
-        serv_att_count++;
-      }
-    }
-    if (!co_list.size())
-    {
-      LOG_PRINT_L1("No cancel offers found");
-      return false;
-    }
-
-    for (auto co : co_list)
-    {
-      m_db_cancel_offer_hash.set(co.tx_id, true);
-    }
-
-    return true;
-  }
-  //---------------------------------------------------------------------------------
-  bool tx_memory_pool::unprocess_cancel_offer_rules(const transaction& tx)
-  {
-    m_db_transactions.begin_transaction();
-    misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&](){m_db_transactions.commit_transaction(); });
-
-    std::list<bc_services::cancel_offer> co_list;
-    for (const auto& a : tx.attachment)
-    {
-      if (a.type() == typeid(tx_service_attachment))
-      {
-        const tx_service_attachment& srv_at = boost::get<tx_service_attachment>(a);
-        if (srv_at.service_id == BC_OFFERS_SERVICE_ID && srv_at.instruction == BC_OFFERS_SERVICE_INSTRUCTION_DEL)
-        {
-          co_list.clear();
-          bc_services::extract_type_and_add<bc_services::cancel_offer>(srv_at.body, co_list);
-          if (!co_list.size())
-            return false;
-          auto vptr = m_db_cancel_offer_hash.find(co_list.back().tx_id);
-          if (vptr == m_db_cancel_offer_hash.end())
-            return false;
-          m_db_cancel_offer_hash.erase(co_list.back().tx_id);
-        }
-      }
-    }
-    return true;
-  }
-//   //---------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------
   bool tx_memory_pool::get_aliases_from_tx_pool(std::list<extra_alias_entry>& aliases)const
   {
 
@@ -467,7 +379,6 @@ namespace currency
     tx = txe_tr->tx;
     blob_size = txe_tr->blob_size;
     fee = txe_tr->fee;
-    unprocess_cancel_offer_rules(txe_tr->tx);
     m_db_transactions.erase(id);
     on_tx_remove(tx, txe_tr->kept_by_block);
     set_taken(id);
@@ -888,7 +799,6 @@ namespace currency
     m_db.begin_transaction();
     m_db_transactions.clear();
     m_db_key_images_set.clear();
-    m_db_cancel_offer_hash.clear();
     m_db.commit_transaction();
     // should m_db_black_tx_list be cleared here?
   }
@@ -897,7 +807,6 @@ namespace currency
   {
     m_db.begin_transaction();
     m_db_transactions.clear();
-    m_db_cancel_offer_hash.clear();
     m_db_black_tx_list.clear();
     m_db_key_images_set.clear();
     m_db.commit_transaction();
@@ -1223,8 +1132,6 @@ namespace currency
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_key_images_set.init(TRANSACTION_POOL_CONTAINER_KEY_IMAGES);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_cancel_offer_hash.init(TRANSACTION_POOL_CONTAINER_CANCEL_OFFER_HASH);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_black_tx_list.init(TRANSACTION_POOL_CONTAINER_BLACK_TX_LIST);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_alias_names.init(TRANSACTION_POOL_CONTAINER_ALIAS_NAMES);
@@ -1238,7 +1145,6 @@ namespace currency
     m_db_transactions.set_cache_size(1000);
     m_db_alias_names.set_cache_size(10000);
     m_db_alias_addresses.set_cache_size(10000);
-    m_db_cancel_offer_hash.set_cache_size(1000);
     m_db_black_tx_list.set_cache_size(1000);
 
     bool need_reinit = false;
