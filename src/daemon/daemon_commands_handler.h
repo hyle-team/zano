@@ -20,7 +20,7 @@
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 
-class daemon_cmmands_handler : public currency::i_stop_handler
+class daemon_commands_handler
 {
   typedef nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > srv_type;
   srv_type& m_srv;
@@ -28,45 +28,47 @@ class daemon_cmmands_handler : public currency::i_stop_handler
   typedef epee::srv_console_handlers_binder<nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > > cmd_binder_type;
   cmd_binder_type m_cmd_binder;
 public:
-  daemon_cmmands_handler(nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& srv, currency::core_rpc_server& rpc) :m_srv(srv), m_rpc(rpc)
+  daemon_commands_handler(nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& srv, currency::core_rpc_server& rpc) :m_srv(srv), m_rpc(rpc)
   {
     m_cmd_binder.set_handler("help", boost::bind(&console_handlers_binder::help, &m_cmd_binder, _1), "Show this help");
-    m_cmd_binder.set_handler("print_pl", boost::bind(&daemon_cmmands_handler::print_pl, this, _1), "Print peer list");
-    m_cmd_binder.set_handler("print_cn", boost::bind(&daemon_cmmands_handler::print_cn, this, _1), "Print connections");
-    m_cmd_binder.set_handler("print_bc", boost::bind(&daemon_cmmands_handler::print_bc, this, _1), "Print blockchain info in a given blocks range, print_bc <begin_height> [<end_height>]");
-    m_cmd_binder.set_handler("print_bc_tx", boost::bind(&daemon_cmmands_handler::print_bc_tx, this, _1), "Print blockchain info with trnsactions in a given blocks range, print_bc <begin_height> [<end_height>]");
-    //m_cmd_binder.set_handler("print_bci", boost::bind(&daemon_cmmands_handler::print_bci, this, _1));
-    m_cmd_binder.set_handler("print_bc_outs", boost::bind(&daemon_cmmands_handler::print_bc_outs, this, _1));
-    m_cmd_binder.set_handler("print_market", boost::bind(&daemon_cmmands_handler::print_market, this, _1));
-    m_cmd_binder.set_handler("print_bc_outs_stat", boost::bind(&daemon_cmmands_handler::print_bc_outs_stat, this, _1));    
-    m_cmd_binder.set_handler("print_block", boost::bind(&daemon_cmmands_handler::print_block, this, _1), "Print block, print_block <block_hash> | <block_height>");
-    m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_cmmands_handler::print_block_info, this, _1), "Print block info, print_block <block_hash> | <block_height>");
-    m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_cmmands_handler::print_tx, this, _1), "Print transaction, print_tx <transaction_hash>");
-    m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_cmmands_handler::start_mining, this, _1), "Start mining for specified address, start_mining <addr> [threads=1]");
-    m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_cmmands_handler::stop_mining, this, _1), "Stop mining");
-    m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_cmmands_handler::print_pool, this, _1), "Print transaction pool (long format)");
-    m_cmd_binder.set_handler("print_pool_sh", boost::bind(&daemon_cmmands_handler::print_pool_sh, this, _1), "Print transaction pool (short format)");
-    m_cmd_binder.set_handler("show_hr", boost::bind(&daemon_cmmands_handler::show_hr, this, _1), "Start showing hash rate");
-    m_cmd_binder.set_handler("hide_hr", boost::bind(&daemon_cmmands_handler::hide_hr, this, _1), "Stop showing hash rate");
-    m_cmd_binder.set_handler("save", boost::bind(&daemon_cmmands_handler::save, this, _1), "Save blockchain");
-    m_cmd_binder.set_handler("print_daemon_stat", boost::bind(&daemon_cmmands_handler::print_daemon_stat, this, _1), "Print daemon stat");
-    m_cmd_binder.set_handler("print_debug_stat", boost::bind(&daemon_cmmands_handler::print_debug_stat, this, _1), "Print debug stat info");
-    m_cmd_binder.set_handler("get_transactions_statics", boost::bind(&daemon_cmmands_handler::get_transactions_statistics, this, _1), "Calculates transactions statistics");
-    m_cmd_binder.set_handler("force_relay_tx_pool", boost::bind(&daemon_cmmands_handler::force_relay_tx_pool, this, _1), "re-relay all transactions from pool");
-    m_cmd_binder.set_handler("enable_channel", boost::bind(&daemon_cmmands_handler::enable_channel, this, _1), "Enable specified log channel");
-    m_cmd_binder.set_handler("disable_channel", boost::bind(&daemon_cmmands_handler::disable_channel, this, _1), "Enable specified log channel");
-    m_cmd_binder.set_handler("clear_cache", boost::bind(&daemon_cmmands_handler::clear_cache, this, _1), "Clear blockchain storage cache");
-    m_cmd_binder.set_handler("clear_altblocks", boost::bind(&daemon_cmmands_handler::clear_altblocks, this, _1), "Clear blockchain storage cache");
-    m_cmd_binder.set_handler("truncate_bc", boost::bind(&daemon_cmmands_handler::truncate_bc, this, _1), "Truncate blockchain to specified height");
-    m_cmd_binder.set_handler("inspect_block_index", boost::bind(&daemon_cmmands_handler::inspect_block_index, this, _1), "Inspects block index for internal errors");
-    m_cmd_binder.set_handler("print_db_performance_data", boost::bind(&daemon_cmmands_handler::print_db_performance_data, this, _1), "Dumps all db containers performance counters");
-    m_cmd_binder.set_handler("search_by_id", boost::bind(&daemon_cmmands_handler::search_by_id, this, _1), "Search all possible elemets by given id");
-    m_cmd_binder.set_handler("find_key_image", boost::bind(&daemon_cmmands_handler::find_key_image, this, _1), "Try to find tx related to key_image");
-    m_cmd_binder.set_handler("rescan_aliases", boost::bind(&daemon_cmmands_handler::rescan_aliases, this, _1), "Debug function");
-    m_cmd_binder.set_handler("forecast_difficulty", boost::bind(&daemon_cmmands_handler::forecast_difficulty, this, _1), "Prints PoW and PoS difficulties for as many future blocks as possible based on current conditions");
-    m_cmd_binder.set_handler("print_deadlock_guard", boost::bind(&daemon_cmmands_handler::print_deadlock_guard, this, _1), "Print all threads which is blocked or involved in mutex ownership");
-    m_cmd_binder.set_handler("print_block_from_hex_blob", boost::bind(&daemon_cmmands_handler::print_block_from_hex_blob, this, _1), "Unserialize block from hex binary data to json-like representation");
-    m_cmd_binder.set_handler("print_tx_from_hex_blob", boost::bind(&daemon_cmmands_handler::print_tx_from_hex_blob, this, _1), "Unserialize transaction from hex binary data to json-like representation");
+    m_cmd_binder.set_handler("print_pl", boost::bind(&daemon_commands_handler::print_pl, this, _1), "Print peer list");
+    m_cmd_binder.set_handler("print_cn", boost::bind(&daemon_commands_handler::print_cn, this, _1), "Print connections");
+    m_cmd_binder.set_handler("print_bc", boost::bind(&daemon_commands_handler::print_bc, this, _1), "Print blockchain info in a given blocks range, print_bc <begin_height> [<end_height>]");
+    m_cmd_binder.set_handler("print_bc_tx", boost::bind(&daemon_commands_handler::print_bc_tx, this, _1), "Print blockchain info with trnsactions in a given blocks range, print_bc <begin_height> [<end_height>]");
+    //m_cmd_binder.set_handler("print_bci", boost::bind(&daemon_commands_handler::print_bci, this, _1));
+    m_cmd_binder.set_handler("print_bc_outs", boost::bind(&daemon_commands_handler::print_bc_outs, this, _1));
+    m_cmd_binder.set_handler("print_market", boost::bind(&daemon_commands_handler::print_market, this, _1));
+    m_cmd_binder.set_handler("print_bc_outs_stat", boost::bind(&daemon_commands_handler::print_bc_outs_stat, this, _1));
+    m_cmd_binder.set_handler("print_block", boost::bind(&daemon_commands_handler::print_block, this, _1), "Print block, print_block <block_hash> | <block_height>");
+    m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_commands_handler::print_block_info, this, _1), "Print block info, print_block <block_hash> | <block_height>");
+    m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, _1), "Print transaction, print_tx <transaction_hash>");
+    m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_commands_handler::start_mining, this, _1), "Start mining for specified address, start_mining <addr> [threads=1]");
+    m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_commands_handler::stop_mining, this, _1), "Stop mining");
+    m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, _1), "Print transaction pool (long format)");
+    m_cmd_binder.set_handler("print_pool_sh", boost::bind(&daemon_commands_handler::print_pool_sh, this, _1), "Print transaction pool (short format)");
+    m_cmd_binder.set_handler("show_hr", boost::bind(&daemon_commands_handler::show_hr, this, _1), "Start showing hash rate");
+    m_cmd_binder.set_handler("hide_hr", boost::bind(&daemon_commands_handler::hide_hr, this, _1), "Stop showing hash rate");
+    m_cmd_binder.set_handler("save", boost::bind(&daemon_commands_handler::save, this, _1), "Save blockchain");
+    m_cmd_binder.set_handler("print_daemon_stat", boost::bind(&daemon_commands_handler::print_daemon_stat, this, _1), "Print daemon stat");
+    m_cmd_binder.set_handler("print_debug_stat", boost::bind(&daemon_commands_handler::print_debug_stat, this, _1), "Print debug stat info");
+    m_cmd_binder.set_handler("get_transactions_statics", boost::bind(&daemon_commands_handler::get_transactions_statistics, this, _1), "Calculates transactions statistics");
+    m_cmd_binder.set_handler("force_relay_tx_pool", boost::bind(&daemon_commands_handler::force_relay_tx_pool, this, _1), "re-relay all transactions from pool");
+    m_cmd_binder.set_handler("enable_channel", boost::bind(&daemon_commands_handler::enable_channel, this, _1), "Enable specified log channel");
+    m_cmd_binder.set_handler("disable_channel", boost::bind(&daemon_commands_handler::disable_channel, this, _1), "Enable specified log channel");
+    m_cmd_binder.set_handler("clear_cache", boost::bind(&daemon_commands_handler::clear_cache, this, _1), "Clear blockchain storage cache");
+    m_cmd_binder.set_handler("clear_altblocks", boost::bind(&daemon_commands_handler::clear_altblocks, this, _1), "Clear blockchain storage cache");
+    m_cmd_binder.set_handler("truncate_bc", boost::bind(&daemon_commands_handler::truncate_bc, this, _1), "Truncate blockchain to specified height");
+    m_cmd_binder.set_handler("inspect_block_index", boost::bind(&daemon_commands_handler::inspect_block_index, this, _1), "Inspects block index for internal errors");
+    m_cmd_binder.set_handler("print_db_performance_data", boost::bind(&daemon_commands_handler::print_db_performance_data, this, _1), "Dumps all db containers performance counters");
+    m_cmd_binder.set_handler("search_by_id", boost::bind(&daemon_commands_handler::search_by_id, this, _1), "Search all possible elemets by given id");
+    m_cmd_binder.set_handler("find_key_image", boost::bind(&daemon_commands_handler::find_key_image, this, _1), "Try to find tx related to key_image");
+    m_cmd_binder.set_handler("rescan_aliases", boost::bind(&daemon_commands_handler::rescan_aliases, this, _1), "Debug function");
+    m_cmd_binder.set_handler("forecast_difficulty", boost::bind(&daemon_commands_handler::forecast_difficulty, this, _1), "Prints PoW and PoS difficulties for as many future blocks as possible based on current conditions");
+    m_cmd_binder.set_handler("print_deadlock_guard", boost::bind(&daemon_commands_handler::print_deadlock_guard, this, _1), "Print all threads which is blocked or involved in mutex ownership");
+    m_cmd_binder.set_handler("print_block_from_hex_blob", boost::bind(&daemon_commands_handler::print_block_from_hex_blob, this, _1), "Unserialize block from hex binary data to json-like representation");
+    m_cmd_binder.set_handler("print_tx_from_hex_blob", boost::bind(&daemon_commands_handler::print_tx_from_hex_blob, this, _1), "Unserialize transaction from hex binary data to json-like representation");
+    m_cmd_binder.set_handler("print_tx_outputs_usage", boost::bind(&daemon_commands_handler::print_tx_outputs_usage, this, _1), "Analyse if tx outputs for involved in subsequent transactions");
+
   }
 
   bool start_handling()
@@ -75,8 +77,7 @@ public:
     return true;
   }
 
-  // interface currency::i_stop_handler
-  virtual void stop_handling() override
+  void stop_handling()
   {
     m_cmd_binder.stop_handling();
   }
@@ -84,17 +85,17 @@ public:
 private:
 
 
-//   //--------------------------------------------------------------------------------
-//   std::string get_commands_str()
-//   {
-//     return m_cmd_binder.get_usage();
-//   }
-//   //--------------------------------------------------------------------------------
-//   bool help(const std::vector<std::string>& /*args*/)
-//   {
-//     std::cout << get_commands_str() << ENDL;
-//     return true;
-//   }
+  //   //--------------------------------------------------------------------------------
+  //   std::string get_commands_str()
+  //   {
+  //     return m_cmd_binder.get_usage();
+  //   }
+  //   //--------------------------------------------------------------------------------
+  //   bool help(const std::vector<std::string>& /*args*/)
+  //   {
+  //     std::cout << get_commands_str() << ENDL;
+  //     return true;
+  //   }
   //--------------------------------------------------------------------------------
   bool print_pl(const std::vector<std::string>& args)
   {
@@ -165,23 +166,24 @@ private:
   {
     m_srv.get_payload_object().get_core().get_blockchain_storage().reset_db_cache();
     return true;
-  }  
+  }
   bool clear_altblocks(const std::vector<std::string>& args)
   {
     m_srv.get_payload_object().get_core().get_blockchain_storage().clear_altblocks();
     return true;
   }
-  
+
   //--------------------------------------------------------------------------------
   bool show_hr(const std::vector<std::string>& args)
   {
-  if(!m_srv.get_payload_object().get_core().get_miner().is_mining()) 
-  {
-    std::cout << "Mining is not started. You need start mining before you can see hash rate." << ENDL;
-  } else 
-  {
-    m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(true);
-  }
+    if (!m_srv.get_payload_object().get_core().get_miner().is_mining())
+    {
+      std::cout << "Mining is not started. You need start mining before you can see hash rate." << ENDL;
+    }
+    else
+    {
+      m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(true);
+    }
     return true;
   }
   //--------------------------------------------------------------------------------
@@ -193,7 +195,7 @@ private:
   //--------------------------------------------------------------------------------
   bool print_bc_outs(const std::vector<std::string>& args)
   {
-    if(args.size() != 1)
+    if (args.size() != 1)
     {
       std::cout << "need file path as parameter" << ENDL;
       return true;
@@ -219,25 +221,25 @@ private:
   //--------------------------------------------------------------------------------
   bool print_cn(const std::vector<std::string>& args)
   {
-     m_srv.get_payload_object().log_connections();
-     return true;
+    m_srv.get_payload_object().log_connections();
+    return true;
   }
   //--------------------------------------------------------------------------------
   bool print_bc(const std::vector<std::string>& args)
   {
-    if(!args.size())
+    if (!args.size())
     {
       std::cout << "need block index parameter" << ENDL;
       return false;
     }
     uint64_t start_index = 0;
     uint64_t end_block_parametr = m_srv.get_payload_object().get_core().get_current_blockchain_size();
-    if(!string_tools::get_xtype_from_string(start_index, args[0]))
+    if (!string_tools::get_xtype_from_string(start_index, args[0]))
     {
       std::cout << "wrong starter block index parameter" << ENDL;
       return false;
     }
-    if(args.size() >1 && !string_tools::get_xtype_from_string(end_block_parametr, args[1]))
+    if (args.size() > 1 && !string_tools::get_xtype_from_string(end_block_parametr, args[1]))
     {
       std::cout << "wrong end block index parameter" << ENDL;
       return false;
@@ -273,7 +275,7 @@ private:
   {
     m_srv.get_payload_object().get_core().get_blockchain_storage().print_db_cache_perfeormance_data();
     return true;
-  }  
+  }
   //--------------------------------------------------------------------------------
   bool search_by_id(const std::vector<std::string>& args)
   {
@@ -286,7 +288,7 @@ private:
     crypto::hash id = currency::null_hash;
     if (!parse_hash256(args[0], id))
     {
-      std::cout << "specified ID parameter '"<< args[0] << "' is wrong" << ENDL;
+      std::cout << "specified ID parameter '" << args[0] << "' is wrong" << ENDL;
       return false;
     }
     std::list<std::string> res_list;
@@ -372,7 +374,7 @@ private:
     res = ::serialization::parse_binary(bin_buff, item);
     CHECK_AND_ASSERT_MES(res, false, "failed to parse binary");
 
-    
+
     LOG_PRINT_L0("OBJECT " << typeid(item).name() << ": " << ENDL << obj_to_json_str(item));
     return true;
   }
@@ -415,43 +417,43 @@ private:
   //--------------------------------------------------------------------------------
   bool export_tx_pool_to_json(const std::vector<std::string>& args)
   {
-//     if (!args.size())
-//     {
-//       std::cout << "need block blob parameter" << ENDL;
-//       return false;
-//     }
-//     tx_pool_exported_blobs tx_pool_json;
-//     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
-//     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
-//     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
-// 
-//     bool r = file_io_utils::save_string_to_file(args[0], pool_state);
-//     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
-//     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() <<" transactions)");
+    //     if (!args.size())
+    //     {
+    //       std::cout << "need block blob parameter" << ENDL;
+    //       return false;
+    //     }
+    //     tx_pool_exported_blobs tx_pool_json;
+    //     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
+    //     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
+    //     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
+    // 
+    //     bool r = file_io_utils::save_string_to_file(args[0], pool_state);
+    //     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
+    //     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() <<" transactions)");
     return true;
   }
   //--------------------------------------------------------------------------------
   bool import_tx_pool_to_json(const std::vector<std::string>& args)
   {
-//     if (!args.size())
-//     {
-//       std::cout << "need block blob parameter" << ENDL;
-//       return false;
-//     }
-// 
-//     std::string buff;
-//     bool r = file_io_utils::load_file_to_string(args[0], buff);
-//     
-//     tx_pool_exported_blobs tx_pool_json;
-// 
-// 
-//     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
-//     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
-//     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
-// 
-// 
-//     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
-//     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() << " transactions)");
+    //     if (!args.size())
+    //     {
+    //       std::cout << "need block blob parameter" << ENDL;
+    //       return false;
+    //     }
+    // 
+    //     std::string buff;
+    //     bool r = file_io_utils::load_file_to_string(args[0], buff);
+    //     
+    //     tx_pool_exported_blobs tx_pool_json;
+    // 
+    // 
+    //     m_srv.get_payload_object().get_core().get_tx_pool().get_all_transactions_details(tx_pool_json.all_txs_details);
+    //     std::string pool_state = epee::serialization::store_t_to_json(tx_pool_json);
+    //     CHECK_AND_ASSERT_THROW(pool_state.size(), false, "Unable to export pool");
+    // 
+    // 
+    //     CHECK_AND_ASSERT_THROW(r, false, "Unable to export pool");
+    //     LOG_PRINT_GREEN("Exported OK(" << tx_pool_json.all_txs_details.size() << " transactions)");
     return true;
   }
   //--------------------------------------------------------------------------------
@@ -521,7 +523,7 @@ private:
     if (r)
     {
       //      currency::block& block = bei.bl;
-      LOG_PRINT_GREEN("------------------ block_id: " << bei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(bei) , LOG_LEVEL_0);
+      LOG_PRINT_GREEN("------------------ block_id: " << bei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(bei), LOG_LEVEL_0);
     }
     else
     {
@@ -550,7 +552,7 @@ private:
 
     if (r)
     {
-//      currency::block& block = bei.bl;
+      //      currency::block& block = bei.bl;
       LOG_PRINT_GREEN("------------------ block_id: " << get_block_hash(bei.bl) << " ------------------" << ENDL << currency::obj_to_json_str(bei), LOG_LEVEL_0);
       m_srv.get_payload_object().get_core().get_blockchain_storage().calc_tx_cummulative_blob(bei.bl);
     }
@@ -622,11 +624,11 @@ private:
       return true;
     }
 
-//     std::vector<crypto::hash> tx_ids;
-//     tx_ids.push_back(tx_hash);
-//     std::list<currency::transaction> txs;
-//     std::list<crypto::hash> missed_ids;
-//     m_srv.get_payload_object().get_core().get_transactions(tx_ids, txs, missed_ids);
+    //     std::vector<crypto::hash> tx_ids;
+    //     tx_ids.push_back(tx_hash);
+    //     std::list<currency::transaction> txs;
+    //     std::list<crypto::hash> missed_ids;
+    //     m_srv.get_payload_object().get_core().get_transactions(tx_ids, txs, missed_ids);
 
     currency::transaction_chain_entry tx_entry = AUTO_VAL_INIT(tx_entry);
 
@@ -654,10 +656,10 @@ private:
     for (auto at : tx.attachment)
     {
       if (at.type() == typeid(currency::tx_service_attachment))
-      {        
+      {
         const currency::tx_service_attachment& sa = boost::get<currency::tx_service_attachment>(at);
         ss << "++++++++++++++++++++++++++++++++ " << ENDL;
-        ss << "[SERVICE_ATTACHMENT]: ID = \'" << sa.service_id << "\', INSTRUCTION: \'" << sa.instruction << "\'" << ENDL; 
+        ss << "[SERVICE_ATTACHMENT]: ID = \'" << sa.service_id << "\', INSTRUCTION: \'" << sa.instruction << "\'" << ENDL;
 
         if (!(sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY))
         {
@@ -676,6 +678,27 @@ private:
     return true;
   }
   //--------------------------------------------------------------------------------
+  bool print_tx_outputs_usage(const std::vector<std::string>& args)
+  {
+    if (args.empty())
+    {
+      std::cout << "expected: print_tx <transaction hash>" << std::endl;
+      return true;
+    }
+
+    const std::string& str_hash = args.front();
+    crypto::hash tx_hash;
+    if (!parse_hash256(str_hash, tx_hash))
+    {
+      return true;
+    }
+
+    m_srv.get_payload_object().get_core().get_blockchain_storage().print_tx_outputs_lookup(tx_hash);
+    return true;
+  }
+
+
+  //--------------------------------------------------------------------------------
   bool print_pool(const std::vector<std::string>& args)
   {
     LOG_PRINT_L0("Pool state: " << ENDL << m_srv.get_payload_object().get_core().print_pool(false));
@@ -689,20 +712,20 @@ private:
   }  //--------------------------------------------------------------------------------
   bool start_mining(const std::vector<std::string>& args)
   {
-    if(!args.size())
+    if (!args.size())
     {
       std::cout << "Please, specify wallet address to mine for: start_mining <addr> [threads=1]" << std::endl;
       return true;
     }
 
     currency::account_public_address adr;
-    if(!currency::get_account_address_from_str(adr, args.front()))
+    if (!currency::get_account_address_from_str(adr, args.front()))
     {
       std::cout << "target account address has wrong format" << std::endl;
       return true;
     }
     size_t threads_count = 1;
-    if(args.size() > 1)
+    if (args.size() > 1)
     {
       bool ok = string_tools::get_xtype_from_string(threads_count, args[1]);
       threads_count = (ok && 0 < threads_count) ? threads_count : 1;
@@ -749,7 +772,7 @@ private:
       else
         ss << "              ";
       ss << std::setw(10) << std::left << pow_diffs[i].second;
-      
+
       ss << "      ";
       ss << std::setw(6) << std::left << pos_diffs[i].first;
       if (i == 0)
@@ -769,8 +792,8 @@ private:
     LOG_PRINT_L0(ENDL << epee::deadlock_guard_singleton::get_dlg_state());
     return true;
   }
-    
-  
+
+
 
 
 };

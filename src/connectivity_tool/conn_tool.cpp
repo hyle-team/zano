@@ -58,6 +58,7 @@ namespace
   const command_line::arg_descriptor<int64_t>    arg_set_peer_log_level = { "set-peer-log-level", "Set log level for remote peer", 0, true };
   const command_line::arg_descriptor<std::string> arg_download_peer_log =  { "download-peer-log", "Download log from remote peer <starting_offset>[,<count>]", "", true };
   const command_line::arg_descriptor<bool>        arg_do_consloe_log    = { "do-console-log", "Tool generates debug console output(debug purposes)", "", true };
+  const command_line::arg_descriptor<std::string> arg_generate_integrated_address = { "generate-integrated-address", "Tool create integrated address from simple address and payment_id", "", true };
 }
 
 typedef COMMAND_REQUEST_STAT_INFO_T<t_currency_protocol_handler<core>::stat_info> COMMAND_REQUEST_STAT_INFO;
@@ -1035,6 +1036,48 @@ bool handle_download_peer_log(po::variables_map& vm)
 
   return true;
 }
+
+
+bool handle_generate_integrated_address(po::variables_map& vm)
+{
+  std::string add_and_payment_id = command_line::get_arg(vm, arg_generate_integrated_address);
+
+  std::string::size_type off = add_and_payment_id.find(':');
+  if (off == std::string::npos)
+  {
+    std::cout << "ERROR: wrong syntax, delimiter symbol (':') not found " << ENDL;
+    return false;
+  }
+
+  std::string address = add_and_payment_id.substr(0, off);
+  std::string payment_id = add_and_payment_id.substr(off+1, add_and_payment_id.length());
+  std::string payment_id_bin;
+  if (!epee::string_tools::parse_hexstr_to_binbuff(payment_id, payment_id_bin))
+  {
+    payment_id_bin = payment_id;
+  }
+
+  if (address.empty() || payment_id_bin.empty())
+  {
+    std::cout << "ERROR: wrong syntax, address or paymentd_id not set" << ENDL;
+    return false;
+  }
+
+  account_public_address acc_addr = AUTO_VAL_INIT(acc_addr);
+  bool r = currency::get_account_address_from_str(acc_addr, address);
+  if (!r)
+  {
+    std::cout << "ERROR: wrong syntax, address is wrong: " << address << ENDL;
+    return false;
+  }
+
+  std::string integrated_addr = currency::get_account_address_and_payment_id_as_str(acc_addr, payment_id_bin);
+
+
+  std::cout << "Integrated address: " << integrated_addr << ENDL;
+
+  return true;
+}
 //---------------------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
@@ -1076,6 +1119,9 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_set_peer_log_level);
   command_line::add_arg(desc_params, arg_download_peer_log);
   command_line::add_arg(desc_params, arg_do_consloe_log);
+  command_line::add_arg(desc_params, arg_generate_integrated_address);
+  
+
 
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
@@ -1143,6 +1189,10 @@ int main(int argc, char* argv[])
   else if (command_line::has_arg(vm, arg_download_peer_log))
   {
     return handle_download_peer_log(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
+  }
+  else if (command_line::has_arg(vm, arg_generate_integrated_address))
+  {
+    return handle_generate_integrated_address(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else
   {
