@@ -152,8 +152,6 @@ namespace currency
     bool get_key_images_from_tx_pool(std::unordered_set<crypto::key_image>& key_images)const;
     //bool push_alias_info(const transaction& tx);
     //bool pop_alias_info(const transaction& tx);
-    bool process_cancel_offer_rules(const transaction& tx);
-    bool unprocess_cancel_offer_rules(const transaction& tx);
     bool check_is_taken(const crypto::hash& id) const;
     void set_taken(const crypto::hash& id);
     void reset_all_taken();
@@ -172,7 +170,6 @@ namespace currency
     //containers
 
     transactions_container m_db_transactions;
-    hash_container m_db_cancel_offer_hash;
     hash_container  m_db_black_tx_list;
     key_images_container m_db_key_images_set;
     aliases_container m_db_alias_names;

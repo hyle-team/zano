@@ -286,6 +286,7 @@
     "FEE": "Fee",
     "ADDRESS": "Address",
     "DETAILS": {
+      "PAYMENT_ID": "Payment ID",
       "ID": "Transaction ID",
       "SIZE": "Transaction size",
       "SIZE_VALUE": "{{value}} bytes",
