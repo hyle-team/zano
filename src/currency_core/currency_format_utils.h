@@ -672,12 +672,17 @@ namespace currency
   std::string utf8_to_lower(const std::string& s);
   bool utf8_substring_test_case_insensitive(const std::string& match, const std::string& s); // Returns true is 's' contains 'match' (case-insensitive)
   
+  struct difficulties
+  {
+    wide_difficulty_type pos_diff;
+    wide_difficulty_type pow_diff;
+  };
+
   wide_difficulty_type get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
-    const wide_difficulty_type& a_pos_cumulative_difficulty,
-    const wide_difficulty_type& b_pos_cumulative_difficulty,
-    const wide_difficulty_type& a_pow_cumulative_difficulty,
-    const wide_difficulty_type& b_pow_cumulative_difficulty);
+    const difficulties& a_diff, 
+    const difficulties& b_diff
+  );
 
 
 } // namespace currency

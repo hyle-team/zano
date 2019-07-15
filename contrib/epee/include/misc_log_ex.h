@@ -263,7 +263,6 @@ DISABLE_VS_WARNINGS(4100)
 { \
   LOG_ERROR("Exception at [" << LOCATION_SS << "], generic unknown exception \"...\""); \
   throw std::runtime_error("[EXCEPTION FORWARDED]"); \
-  custom_code; \
 }
 
 

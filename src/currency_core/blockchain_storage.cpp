@@ -116,7 +116,9 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(std::share
                                                                  m_current_fee_median(0), 
                                                                  m_current_fee_median_effective_index(0), 
                                                                  m_is_reorganize_in_process(false), 
-                                                                 m_deinit_is_done(false)
+                                                                 m_deinit_is_done(false), 
+                                                                 m_cached_next_pow_difficulty(0), 
+                                                                 m_cached_next_pos_difficulty(0)
 
 
 {
@@ -1505,7 +1507,6 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     CHECK_AND_ASSERT_MES_CUSTOM(!(pos_block && abei.height < m_core_runtime_config.pos_minimum_heigh), false, bvc.m_verification_failed = true, "PoS block is not allowed on this height");
 
 
-    //wide_difficulty_type current_diff = get_next_difficulty_for_alternative_chain(alt_chain, bei, pos_block);
     wide_difficulty_type current_diff = get_next_diff_conditional2(pos_block, alt_chain, connection_height);
     
     CHECK_AND_ASSERT_MES_CUSTOM(current_diff, false, bvc.m_verification_failed = true, "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!");
@@ -1651,13 +1652,37 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
   CATCH_ENTRY_CUSTOM("blockchain_storage::handle_alternative_block", bvc.m_verification_failed = true, false);
 }
 //------------------------------------------------------------------
+wide_difficulty_type blockchain_storage::get_x_difficulty_after_height(uint64_t height, bool is_pos)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  CHECK_AND_ASSERT_THROW_MES(height < m_db_blocks.size(), "Internal error: condition failed: height (" << height << ") < m_db_blocks.size() " << m_db_blocks.size());
+  wide_difficulty_type diff = 0;
+  for (uint64_t i = height + 1; i != m_db_blocks.size(); i++)
+  {
+    auto bei_ptr = m_db_blocks[i];
+    if (is_pos_block(bei_ptr->bl) == is_pos)
+    {
+      diff = bei_ptr->difficulty;
+      break;
+    }
+  }
+  if (diff == 0)
+  {
+    //never met x type of block, that meanst that difficulty is current
+    diff = get_cached_next_difficulty(is_pos);
+  }
+  return diff;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::is_reorganize_required(const block_extended_info& main_chain_bei, const alt_chain_type& alt_chain, const crypto::hash& proof_alt)
 {
   //alt_chain - back is latest(top), first - connection with main chain 
   const block_extended_info& alt_chain_bei = alt_chain.back()->second;
+  const block_extended_info& connection_point = alt_chain.front()->second;
 
-  if (alt_chain_bei.bl.major_version == BLOCK_MAJOR_VERSION_INITAL)
+  if (alt_chain_bei.bl.major_version == BLOCK_MAJOR_VERSION_INITAL || connection_point.height <= ZANO_HARDFORK_1_AFTER_HEIGHT)
   {
+    //use pre-hard fork, old-style comparing
     if (main_chain_bei.cumulative_diff_adjusted < alt_chain_bei.cumulative_diff_adjusted)
       return true;
     else if (main_chain_bei.cumulative_diff_adjusted > alt_chain_bei.cumulative_diff_adjusted)
@@ -1678,9 +1703,53 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
   }
   else if (alt_chain_bei.bl.major_version == CURRENT_BLOCK_MAJOR_VERSION)
   {
-    //figure out connection point
-    const block_extended_info& connection_point = alt_chain.front()->second;
+    //new rules, applied after HARD_FORK_1
+    //to learn this algo please read https://github.com/hyle-team/docs/blob/master/zano/PoS_Analysis_and_improvements_proposal.pdf
 
+    wide_difficulty_type difficulty_pos_at_split_point = get_x_difficulty_after_height(connection_point.height - 1, true);
+    wide_difficulty_type difficulty_pow_at_split_point = get_x_difficulty_after_height(connection_point.height - 1, false);
+
+    difficulties main_cumul_diff = AUTO_VAL_INIT(main_cumul_diff);
+    difficulties alt_cumul_diff = = AUTO_VAL_INIT(alt_cumul_diff);
+    //we use get_last_alt_x_block_cumulative_precise_difficulty for getting both alt chain and main chain diff of given block types
+
+    wide_difficulty_type alt_pos_diff_end = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, alt_chain_bei.height, true);
+    wide_difficulty_type alt_pos_diff_begin = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), connection_point.height-1, true);
+    alt_cumul_diff.pos_diff = alt_pos_diff_end- alt_pos_diff_begin;
+    
+    wide_difficulty_type alt_pow_diff_end = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, alt_chain_bei.height, false);
+    wide_difficulty_type alt_pow_diff_begin = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), connection_point.height - 1, false);
+    alt_cumul_diff.pow_diff = alt_pow_diff_end - alt_pow_diff_begin;
+
+    wide_difficulty_type main_pos_diff_end = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), m_db_blocks.size()-1, true);
+    wide_difficulty_type main_pos_diff_begin = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), connection_point.height - 1, true);
+    main_cumul_diff.pos_diff = main_pos_diff_end - main_pos_diff_begin;
+
+    wide_difficulty_type main_pow_diff_end = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), m_db_blocks.size() - 1, false);
+    wide_difficulty_type main_pow_diff_begin = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), connection_point.height - 1, false);
+    main_cumul_diff.pow_diff = main_pow_diff_end - main_pow_diff_begin;
+
+    //TODO: measurment of precise cumulative difficult
+    wide_difficulty_type alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
+    wide_difficulty_type main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+
+    if (main < alt)
+      return true;
+    else if (main > alt)
+      return false;
+    else
+    {
+      if (!is_pos_block(main_chain_bei.bl))
+        return false; // do not reorganize on the same cummul diff if it's a PoW block
+
+                      //in case of simultaneous PoS blocks are happened on the same height (quite common for PoS) 
+                      //we also try to weight them to guarantee consensus in network
+      if (std::memcmp(&main_chain_bei.stake_hash, &proof_alt, sizeof(main_chain_bei.stake_hash)) >= 0)
+        return false;
+
+      LOG_PRINT_L2("[is_reorganize_required]:TRUE, \"by order of memcmp\" main_stake_hash:" << &main_chain_bei.stake_hash << ", alt_stake_hash" << proof_alt);
+      return true;
+    }
   }
   else
   {
@@ -4368,7 +4437,7 @@ uint64_t blockchain_storage::get_last_x_block_height(bool pos) const
   return 0;
 }
 //------------------------------------------------------------------
-wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type& alt_chain, uint64_t block_height, bool pos) const
+wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos) const
 {
   uint64_t main_chain_first_block = block_height - 1;
   for (auto it = alt_chain.rbegin(); it != alt_chain.rend(); it++)
