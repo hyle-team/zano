@@ -710,6 +710,20 @@ bool handle_request_stat(po::variables_map& vm, peerid_type peer_id)
   return true;
   }
 //---------------------------------------------------------------------------------------------------------------
+std::string get_password(const std::string& promt)
+{
+  std::string res;
+#ifndef WIN32
+  const char* ppass = getpass(promt.c_str());
+  if (ppass)
+    res = ppass;
+#else
+  std::cout << promt;
+  std::getline(std::cin, res);
+#endif
+  return res;
+}
+//---------------------------------------------------------------------------------------------------------------
 bool get_private_key(crypto::secret_key& pk, po::variables_map& vm)
 {
   std::string key_str;
@@ -720,8 +734,7 @@ bool get_private_key(crypto::secret_key& pk, po::variables_map& vm)
   }
   else
   {
-    std::cout << "Enter maintain private key:";
-    std::cin >> key_str;
+    key_str = get_password("Enter maintain private key:");
   }
   
   if(!string_tools::hex_to_pod(key_str, pk))
