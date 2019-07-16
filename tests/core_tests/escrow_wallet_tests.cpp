@@ -1589,6 +1589,35 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
     test_details.push_back(cd);
   }
 
+  {
+    escrow_custom_test_callback_details cd = test_details[0];
+    cd.cpd.comment = "cancellation: zero A pledge";
+    cd.cpd.amount_a_pledge = 0;
+    cd.release_type = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_CANCEL;
+    cd.a_cancel_proposal_fee = 3 * TESTS_DEFAULT_FEE;
+    cd.cancellation_expiration_period = 1000;
+    test_details.push_back(cd);
+  }
+
+  {
+    escrow_custom_test_callback_details cd = test_details[0];
+    cd.cpd.comment = "cancellation: zero B pledge";
+    cd.cpd.amount_b_pledge = 0;
+    cd.release_type = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_CANCEL;
+    cd.a_cancel_proposal_fee = 3 * TESTS_DEFAULT_FEE;
+    cd.cancellation_expiration_period = 1000;
+    test_details.push_back(cd);
+  }
+
+  {
+    escrow_custom_test_callback_details cd = test_details[0];
+    cd.cpd.comment = "cancellation: zero amount to pay";
+    cd.cpd.amount_to_pay = 0;
+    cd.release_type = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_CANCEL;
+    cd.a_cancel_proposal_fee = 3 * TESTS_DEFAULT_FEE;
+    cd.cancellation_expiration_period = 1000;
+    test_details.push_back(cd);
+  }
 
   for(auto cd : test_details)
   {
