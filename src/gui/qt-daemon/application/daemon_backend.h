@@ -189,6 +189,7 @@ private:
 
   std::map<size_t, wallet_vs_options> m_wallets;
   std::vector<std::string> m_wallet_log_prefixes;
+  mutable critical_section m_wallet_log_prefixes_lock;
 };
 
 

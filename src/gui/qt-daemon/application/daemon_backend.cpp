@@ -553,9 +553,12 @@ void daemon_backend::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
     wo.core_conf = m_ccore.get_blockchain_storage().get_core_runtime_config();
 
   // update wallet log prefix for further usage
-  if (m_wallet_log_prefixes.size() <= id)
-    m_wallet_log_prefixes.resize(id + 1);
-  m_wallet_log_prefixes[id] = std::string("[") + epee::string_tools::num_to_string_fast(id) + ":" + wo.w->get()->get_account().get_public_address_str().substr(0, 6) + "] ";
+  {
+    CRITICAL_REGION_LOCAL(m_wallet_log_prefixes_lock);
+    if (m_wallet_log_prefixes.size() <= id)
+      m_wallet_log_prefixes.resize(id + 1);
+    m_wallet_log_prefixes[id] = std::string("[") + epee::string_tools::num_to_string_fast(id) + ":" + wo.w->get()->get_account().get_public_address_str().substr(0, 6) + "] ";
+  }
 }
 
 
@@ -837,7 +840,11 @@ std::string daemon_backend::close_wallet(size_t wallet_id)
 
     it->second.w->get()->store();
     m_wallets.erase(it);
-    m_wallet_log_prefixes[wallet_id] = std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":CLOSED] ";
+
+    {
+      CRITICAL_REGION_LOCAL(m_wallet_log_prefixes_lock);
+      m_wallet_log_prefixes[wallet_id] = std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":CLOSED] ";
+    }
   }
 
   catch (const std::exception& e)
@@ -1441,6 +1448,9 @@ void daemon_backend::on_pos_block_found(size_t wallet_id, const currency::block&
 }
 void daemon_backend::on_sync_progress(size_t wallet_id, const uint64_t& percents)
 {
+  // do not lock m_wallets_lock down the callstack! It will lead to a deadlock, because wallet locked_object is aready locked
+  // and other threads are usually locks m_wallets_lock before locking wallet's locked_object
+
   view::wallet_sync_progres_param wspp = AUTO_VAL_INIT(wspp);
   wspp.progress = percents;
   wspp.wallet_id = wallet_id;
@@ -1605,6 +1615,8 @@ daemon_backend::wallet_vs_options::~wallet_vs_options()
 
 std::string daemon_backend::get_wallet_log_prefix(size_t wallet_id) const
 {
+  CRITICAL_REGION_LOCAL(m_wallet_log_prefixes_lock);
+
   CHECK_AND_ASSERT_MES(wallet_id < m_wallet_log_prefixes.size(), std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":???] ", "wallet prefix is not found for id " << wallet_id);
   return m_wallet_log_prefixes[wallet_id];
 }
