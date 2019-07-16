@@ -39,7 +39,7 @@ static inline uint32_t clz32(uint32_t x)
 
 static inline uint32_t popcount32(uint32_t x)
 {
-    return (uint32_t)__popcnt(x);
+    return (uint32_t)__builtin_popcount(x);
 }
 
 static inline uint32_t mul_hi32(uint32_t x, uint32_t y)
