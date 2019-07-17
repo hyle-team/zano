@@ -1574,9 +1574,15 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     }
 
     abei.cumulative_diff_adjusted += cumulative_diff_delta;
-
-    abei.cumulative_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, abei.height, pos_block);
+    wide_difficulty_type last_x_cumul_dif_precise_adj = 0;
+    abei.cumulative_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, abei.height, pos_block, last_x_cumul_dif_precise_adj);
     abei.cumulative_diff_precise += current_diff;
+    //////////////////////////////////////////////////////////////////////////
+
+    wide_difficulty_type diff_precise_adj = correct_difficulty_with_sequence_factor(sequence_factor, current_diff);
+    abei.cumulative_diff_precise_adjusted = last_x_cumul_dif_precise_adj + diff_precise_adj;
+    
+    //////////////////////////////////////////////////////////////////////////
 
 #ifdef _DEBUG
     auto i_dres = m_alternative_chains.find(id);
@@ -1711,22 +1717,22 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
 
     difficulties main_cumul_diff = AUTO_VAL_INIT(main_cumul_diff);
     difficulties alt_cumul_diff = = AUTO_VAL_INIT(alt_cumul_diff);
-    //we use get_last_alt_x_block_cumulative_precise_difficulty for getting both alt chain and main chain diff of given block types
+    //we use get_last_alt_x_block_cumulative_precise_adj_difficulty for getting both alt chain and main chain diff of given block types
 
-    wide_difficulty_type alt_pos_diff_end = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, alt_chain_bei.height, true);
-    wide_difficulty_type alt_pos_diff_begin = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), connection_point.height-1, true);
+    wide_difficulty_type alt_pos_diff_end = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain, alt_chain_bei.height, true);
+    wide_difficulty_type alt_pos_diff_begin = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), connection_point.height-1, true);
     alt_cumul_diff.pos_diff = alt_pos_diff_end- alt_pos_diff_begin;
     
-    wide_difficulty_type alt_pow_diff_end = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, alt_chain_bei.height, false);
-    wide_difficulty_type alt_pow_diff_begin = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), connection_point.height - 1, false);
+    wide_difficulty_type alt_pow_diff_end = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain, alt_chain_bei.height, false);
+    wide_difficulty_type alt_pow_diff_begin = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), connection_point.height - 1, false);
     alt_cumul_diff.pow_diff = alt_pow_diff_end - alt_pow_diff_begin;
 
-    wide_difficulty_type main_pos_diff_end = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), m_db_blocks.size()-1, true);
-    wide_difficulty_type main_pos_diff_begin = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), connection_point.height - 1, true);
+    wide_difficulty_type main_pos_diff_end = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), m_db_blocks.size()-1, true);
+    wide_difficulty_type main_pos_diff_begin = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), connection_point.height - 1, true);
     main_cumul_diff.pos_diff = main_pos_diff_end - main_pos_diff_begin;
 
-    wide_difficulty_type main_pow_diff_end = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), m_db_blocks.size() - 1, false);
-    wide_difficulty_type main_pow_diff_begin = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), connection_point.height - 1, false);
+    wide_difficulty_type main_pow_diff_end = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), m_db_blocks.size() - 1, false);
+    wide_difficulty_type main_pow_diff_begin = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), connection_point.height - 1, false);
     main_cumul_diff.pow_diff = main_pow_diff_end - main_pow_diff_begin;
 
     //TODO: measurment of precise cumulative difficult
@@ -4437,13 +4443,23 @@ uint64_t blockchain_storage::get_last_x_block_height(bool pos) const
   return 0;
 }
 //------------------------------------------------------------------
-wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos) const
+wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_adj_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos) const
+{
+  wide_difficulty_type res = 0;
+  get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, block_height, pos, res);
+  return res;
+}
+//------------------------------------------------------------------
+wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos, wide_difficulty_type& cumulative_diff_precise_adj) const
 {
   uint64_t main_chain_first_block = block_height - 1;
   for (auto it = alt_chain.rbegin(); it != alt_chain.rend(); it++)
   {
     if (is_pos_block((*it)->second.bl) == pos)
+    {
+      cumulative_diff_precise_adj = (*it)->second.cumulative_diff_precise_adjusted;
       return (*it)->second.cumulative_diff_precise;
+    }
     main_chain_first_block = (*it)->second.height - 1;
   }
 
@@ -4454,8 +4470,12 @@ wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise
   for (uint64_t i = main_chain_first_block; i != 0; i--)
   {
     if (is_pos_block(m_db_blocks[i]->bl) == pos)
+    {
+      cumulative_diff_precise_adj = m_db_blocks[i]->cumulative_diff_precise_adjusted;
       return m_db_blocks[i]->cumulative_diff_precise;
+    }
   }
+  cumulative_diff_precise_adj = 0;
   return 0;
 }
 //------------------------------------------------------------------
@@ -4673,67 +4693,50 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
 
   //////////////////////////////////////////////////////////////////////////
-  if (bei.bl.major_version == BLOCK_MAJOR_VERSION_INITAL)
+
+  //old style cumulative difficulty collecting
+
+  //precise difficulty - difficulty used to calculate next difficulty
+  uint64_t last_x_h = get_last_x_block_height(is_pos_bl);
+  if (!last_x_h)
+    bei.cumulative_diff_precise = current_diffic;
+  else
+    bei.cumulative_diff_precise = m_db_blocks[last_x_h]->cumulative_diff_precise + current_diffic;
+
+  if (m_db_blocks.size())
   {
-    //precise difficulty - difficulty used to calculate next difficulty
-    uint64_t last_x_h = get_last_x_block_height(is_pos_bl);
-    if (!last_x_h)
-      bei.cumulative_diff_precise = current_diffic;
-    else
-      bei.cumulative_diff_precise = m_db_blocks[last_x_h]->cumulative_diff_precise + current_diffic;
-
-    if (m_db_blocks.size())
-    {
-      bei.cumulative_diff_adjusted = m_db_blocks.back()->cumulative_diff_adjusted;
-    }
-
-    //adjusted difficulty - difficulty used to switch blockchain
-    wide_difficulty_type cumulative_diff_delta = 0;
-    if (is_pos_bl)
-      cumulative_diff_delta = get_adjusted_cumulative_difficulty_for_next_pos(current_diffic);
-    else
-      cumulative_diff_delta = current_diffic;
-
-
-    size_t sequence_factor = get_current_sequence_factor(is_pos_bl);
-    if (bei.height >= m_core_runtime_config.pos_minimum_heigh)
-      cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
-
-    if (bei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && is_pos_bl && sequence_factor > 20)
-    {
-      LOG_PRINT_L0("Block with id: " << id
-        << " has too big sequence_factor = " << sequence_factor);
-      purge_block_data_from_blockchain(bl, tx_processed_count);
-      bvc.m_verification_failed = true;
-      return false;
-    }
-
-    bei.cumulative_diff_adjusted += cumulative_diff_delta;
-  }else if(bei.bl.major_version == CURRENT_BLOCK_MAJOR_VERSION)
-  {
-    //precise difficulty - difficulty used to calculate next difficulty
-    uint64_t last_x_h = get_last_x_block_height(is_pos_bl);
-    if (!last_x_h)
-      bei.cumulative_diff_precise = current_diffic;
-    else
-      bei.cumulative_diff_precise = m_db_blocks[last_x_h]->cumulative_diff_precise + current_diffic;
-
-    if (m_db_blocks.size())
-    {
-      bei.cumulative_diff_adjusted = m_db_blocks[last_x_h]->cumulative_diff_adjusted;
-    }
-
-    //adjusted difficulty - difficulty used to switch blockchain
-    wide_difficulty_type cumulative_diff_delta = current_diffic;
-
-    size_t sequence_factor = get_current_sequence_factor(is_pos_bl);
-    if (bei.height >= m_core_runtime_config.pos_minimum_heigh)
-      cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
-    
-    bei.cumulative_diff_adjusted += cumulative_diff_delta;
+    bei.cumulative_diff_adjusted = m_db_blocks.back()->cumulative_diff_adjusted;
   }
-  //////////////////////////////////////////////////////////////////////////
 
+  //adjusted difficulty - difficulty used to switch blockchain
+  wide_difficulty_type cumulative_diff_delta = 0;
+  if (is_pos_bl)
+    cumulative_diff_delta = get_adjusted_cumulative_difficulty_for_next_pos(current_diffic);
+  else
+    cumulative_diff_delta = current_diffic;
+
+
+  size_t sequence_factor = get_current_sequence_factor(is_pos_bl);
+  if (bei.height >= m_core_runtime_config.pos_minimum_heigh)
+    cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
+
+  if (bei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && is_pos_bl && sequence_factor > 20)
+  {
+    LOG_PRINT_L0("Block with id: " << id
+      << " has too big sequence_factor = " << sequence_factor);
+    purge_block_data_from_blockchain(bl, tx_processed_count);
+    bvc.m_verification_failed = true;
+    return false;
+  }
+
+  bei.cumulative_diff_adjusted += cumulative_diff_delta;
+
+  //////////////////////////////////////////////////////////////////////////
+  // rebuild cumulative_diff_precise_adjusted for whole period 
+  wide_difficulty_type diff_precise_adj = correct_difficulty_with_sequence_factor(sequence_factor, current_diffic);
+  bei.cumulative_diff_precise_adjusted = m_db_blocks[last_x_h]->cumulative_diff_precise_adjusted + diff_precise_adj;
+
+  //////////////////////////////////////////////////////////////////////////
 
   //etc 
   bei.already_generated_coins = already_generated_coins + base_reward;

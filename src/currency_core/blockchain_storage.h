@@ -610,7 +610,8 @@ namespace currency
     wide_difficulty_type get_adjusted_cumulative_difficulty_for_next_pos(wide_difficulty_type next_diff)const;
     wide_difficulty_type get_adjusted_cumulative_difficulty_for_next_alt_pos(alt_chain_type& alt_chain, uint64_t block_height, wide_difficulty_type next_diff, uint64_t connection_height)const;
     uint64_t get_last_x_block_height(bool pos)const;
-    wide_difficulty_type get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos)const;
+    wide_difficulty_type get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos, wide_difficulty_type& cumulative_diff_precise_adj)const;
+    wide_difficulty_type get_last_alt_x_block_cumulative_precise_adj_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos) const;
     size_t get_current_sequence_factor_for_alt(alt_chain_type& alt_chain, bool pos, uint64_t connection_height)const;
   };
 
