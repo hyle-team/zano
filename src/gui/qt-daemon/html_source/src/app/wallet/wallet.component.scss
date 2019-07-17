@@ -83,6 +83,22 @@
       }
     }
   }
+
+  .tools .icon {
+    background: white;
+    cursor: pointer;
+    width: 1.7rem;
+    height: 1.7rem;
+
+    &.details {
+      mask: url(../../assets/icons/details-settings.svg) no-repeat center;
+    
+    }
+    &.close{
+      mask: url(../../assets/icons/close.svg) no-repeat center;
+      
+    }
+  }
 }
 
 .address {

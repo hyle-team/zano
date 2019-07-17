@@ -13,11 +13,9 @@
       </ng-container>
     </div>
   </div>
-  <div>
-    <button [routerLink]="['/details']" routerLinkActive="active">
-      <i class="icon details"></i>
-      <span>{{ 'WALLET.DETAILS' | translate }}</span>
-    </button>
+  <div class="tools">
+    <i class="icon details" [routerLink]="['/details']" routerLinkActive="active"></i>
+    <i class="icon close" (click)="closeWallet()"></i>
   </div>
 </div>
 <div class="address">
