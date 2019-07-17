@@ -24,19 +24,9 @@
     }
   }
 
-  h3 {
-    font-size: 1.7rem;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    white-space: nowrap;
-    max-width: 50rem;
-    line-height: 2.7rem;
-  }
-
   button {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -45,7 +35,7 @@
     padding: 0;
 
     .icon {
-      margin-right: 1.2rem;
+      margin-right: 1.4rem;
       width: 1.7rem;
       height: 1.7rem;
 
@@ -63,24 +53,69 @@
     }
   }
 
-  .alias {
-    display: flex;
-    align-items: center;
-    font-size: 1.3rem;
+  > div:last-child {
 
-    .icon {
+    :not(:last-child) {
+      margin-right: 0;
+    }
+
+    > button {
+      display: flex;
+      align-items: flex-end;
+      background: transparent;
+      border: none;
       cursor: pointer;
-      margin-right: 1.2rem;
-      width: 1.7rem;
-      height: 1.7rem;
+      font-weight: 400;
+      outline: none;
+      padding: 0;
 
-      &.edit {
-        mask: url(../../assets/icons/details.svg) no-repeat center;
-      }
+      .icon {
+        margin-right: 1.7rem;
+        width: 1.7rem;
+        height: 1.7rem;
 
-      &.transfer {
-        mask: url(../../assets/icons/send.svg) no-repeat center;
+        &.details-settings {
+          mask: url(../../assets/icons/details-settings.svg) no-repeat center;
+        }
+
+        &.close {
+          mask: url(../../assets/icons/close.svg) no-repeat center;
+          margin-right: 0;
+        }
       }
+    }
+  }
+
+}
+
+h3 {
+  font-size: 1.7rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 50rem;
+  line-height: 2.7rem;
+}
+
+
+.alias {
+  display: flex;
+  align-items: center;
+  font-size: 1.3rem;
+
+  .icon {
+    cursor: pointer;
+    margin-right: 1.2rem;
+    width: 1.7rem;
+    height: 1.7rem;
+
+    &.edit {
+      mask: url(../../assets/icons/details.svg) no-repeat center;
+    }
+
+    &.transfer {
+      mask: url(../../assets/icons/send.svg) no-repeat center;
     }
   }
 }
