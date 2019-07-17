@@ -183,6 +183,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.backend.openUrlInBrowser(link);
   }
 
+<<<<<<< HEAD
   showDialog() {
     this.isModalDialogVisible = true;
   }
@@ -194,6 +195,8 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.isModalDialogVisible = false;
   }
 
+=======
+>>>>>>> test details & close btn
   closeWallet() {
     this.backend.closeWallet(this.variablesService.currentWallet.wallet_id, () => {
       for (let i = this.variablesService.wallets.length - 1; i >= 0; i--) {
