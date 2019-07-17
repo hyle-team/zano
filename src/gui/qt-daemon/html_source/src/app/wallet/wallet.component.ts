@@ -5,6 +5,7 @@ import {BackendService} from '../_helpers/services/backend.service';
 import {TranslateService} from '@ngx-translate/core';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
 import {Subscription} from 'rxjs';
+import { WalletService } from '../_helpers/services/wallet.service';
 
 @Component({
   selector: 'app-wallet',
@@ -74,7 +75,8 @@ export class WalletComponent implements OnInit, OnDestroy {
     public variablesService: VariablesService,
     private ngZone: NgZone,
     private translate: TranslateService,
-    private intToMoneyPipe: IntToMoneyPipe
+    private intToMoneyPipe: IntToMoneyPipe,
+    private walletService: WalletService,
   ) {}
 
   ngOnInit() {

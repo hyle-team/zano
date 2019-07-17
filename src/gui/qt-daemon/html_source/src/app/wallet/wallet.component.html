@@ -13,10 +13,13 @@
       </ng-container>
     </div>
   </div>
-  <div>
+  <div class="wallet-management-buttons">
     <button [routerLink]="['/details']" routerLinkActive="active">
-      <i class="icon details"></i>
-      <span>{{ 'WALLET.DETAILS' | translate }}</span>
+      <i class="icon wallet-details"></i>
+    </button>
+    <button class="wallet-management-buttons__button wallet-management-buttons__button_right"
+            (click)="walletService.closeCurrent()">
+      <i class="icon wallet-close"></i>
     </button>
   </div>
 </div>

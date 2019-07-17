@@ -60,6 +60,17 @@
       &.lock {
         mask: url(../../assets/icons/lock.svg) no-repeat center;
       }
+
+      &.wallet {
+
+        &-details {
+          mask: url(../../assets/icons/details-settings.svg) no-repeat center;
+        }
+
+        &-close {
+          mask: url(../../assets/icons/close.svg) no-repeat center;
+        }
+      }
     }
   }
 
@@ -211,5 +222,16 @@
     flex: 1 1 auto;
     overflow-x: hidden;
     overflow-y: overlay;
+  }
+}
+
+.wallet-management-buttons {
+
+  &__button {
+    display: block;
+
+    &_right {
+      margin-left: -35px;
+    }
   }
 }

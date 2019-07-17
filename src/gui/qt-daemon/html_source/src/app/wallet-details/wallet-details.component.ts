@@ -4,6 +4,7 @@ import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {Router} from '@angular/router';
 import {Location} from '@angular/common';
+import { WalletService } from '../_helpers/services/wallet.service';
 
 @Component({
   selector: 'app-wallet-details',
@@ -35,7 +36,8 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
     private backend: BackendService,
     public variablesService: VariablesService,
     private ngZone: NgZone,
-    private location: Location
+    private location: Location,
+    private walletService: WalletService,
   ) {}
 
   ngOnInit() {
@@ -62,27 +64,6 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
         this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
       });
     }
-  }
-
-  closeWallet() {
-    this.backend.closeWallet(this.variablesService.currentWallet.wallet_id, () => {
-      for (let i = this.variablesService.wallets.length - 1; i >= 0; i--) {
-        if (this.variablesService.wallets[i].wallet_id === this.variablesService.currentWallet.wallet_id) {
-          this.variablesService.wallets.splice(i, 1);
-        }
-      }
-      this.ngZone.run(() => {
-        if (this.variablesService.wallets.length) {
-          this.variablesService.currentWallet = this.variablesService.wallets[0];
-          this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
-        } else {
-          this.router.navigate(['/']);
-        }
-      });
-      if (this.variablesService.appPass) {
-        this.backend.storeSecureAppData();
-      }
-    });
   }
 
   back() {

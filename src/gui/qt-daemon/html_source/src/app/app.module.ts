@@ -35,6 +35,7 @@ import { NgSelectModule } from '@ng-select/ng-select';
 
 import { BackendService } from './_helpers/services/backend.service';
 import { ModalService } from './_helpers/services/modal.service';
+import { WalletService } from './_helpers/services/wallet.service';
 import { MoneyToIntPipe } from './_helpers/pipes/money-to-int.pipe';
 import { IntToMoneyPipe } from './_helpers/pipes/int-to-money.pipe';
 import { HistoryTypeMessagesPipe } from './_helpers/pipes/history-type-messages.pipe';
@@ -130,6 +131,7 @@ export function highchartsFactory() {
   providers: [
     BackendService,
     ModalService,
+    WalletService,
     MoneyToIntPipe,
     IntToMoneyPipe,
     { provide: HIGHCHARTS_MODULES, useFactory: highchartsFactory }
