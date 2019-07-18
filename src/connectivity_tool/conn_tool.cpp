@@ -37,10 +37,10 @@ using namespace nodetool;
 
 namespace
 {
-  const command_line::arg_descriptor<std::string> arg_ip                 = {"ip", "set ip"};
+  const command_line::arg_descriptor<std::string> arg_ip                 = {"ip", "set ip", "127.0.0.1", false};
   const command_line::arg_descriptor<size_t>      arg_port               = {"port", "set port"};
-  const command_line::arg_descriptor<size_t>      arg_rpc_port           = {"rpc-port", "set rpc port", RPC_DEFAULT_PORT};
-  const command_line::arg_descriptor<uint32_t>    arg_timeout            = {"timeout", "set timeout", 5000};
+  const command_line::arg_descriptor<size_t>      arg_rpc_port           = {"rpc-port", "set rpc port", RPC_DEFAULT_PORT, false};
+  const command_line::arg_descriptor<uint32_t>    arg_timeout            = {"timeout", "set timeout", 5000, false};
   const command_line::arg_descriptor<std::string> arg_priv_key           = {"private-key", "private key to subscribe debug command", "", true};
   const command_line::arg_descriptor<uint64_t>    arg_peer_id            = {"peer-id", "peerid if known(if not - will be requested)", 0};
   const command_line::arg_descriptor<bool>        arg_generate_keys      = {"generate-keys-pair", "generate private and public keys pair"};
@@ -710,15 +710,34 @@ bool handle_request_stat(po::variables_map& vm, peerid_type peer_id)
   return true;
   }
 //---------------------------------------------------------------------------------------------------------------
+std::string get_password(const std::string& promt)
+{
+  std::string res;
+#ifndef WIN32
+  const char* ppass = getpass(promt.c_str());
+  if (ppass)
+    res = ppass;
+#else
+  std::cout << promt;
+  std::getline(std::cin, res);
+#endif
+  return res;
+}
+//---------------------------------------------------------------------------------------------------------------
 bool get_private_key(crypto::secret_key& pk, po::variables_map& vm)
 {
-  if(!command_line::has_arg(vm, arg_priv_key))
+  std::string key_str;
+
+  if(command_line::has_arg(vm, arg_priv_key))
   {
-    std::cout << "ERROR: secret key not set" << ENDL;
-    return false;
+    key_str = command_line::get_arg(vm, arg_priv_key);
+  }
+  else
+  {
+    key_str = get_password("Enter maintain private key:");
   }
   
-  if(!string_tools::hex_to_pod(command_line::get_arg(vm, arg_priv_key) , pk))
+  if(!string_tools::hex_to_pod(key_str, pk))
   {
     std::cout << "ERROR: wrong secret key set" << ENDL;
     return false;
@@ -796,17 +815,20 @@ bool handle_increment_build_no(po::variables_map& vm)
 bool handle_update_maintainers_info(po::variables_map& vm)
 {
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
+  size_t rpc_port = RPC_DEFAULT_PORT;
   if(!command_line::has_arg(vm, arg_rpc_port))
   {
     std::cout << "ERROR: rpc port not set" << ENDL;
     return false;
   }
-  crypto::secret_key prvk = AUTO_VAL_INIT(prvk);
+
+   crypto::secret_key prvk = AUTO_VAL_INIT(prvk);
   if(!get_private_key(prvk, vm))
   {
     std::cout << "ERROR: secret key error" << ENDL;
     return false;
   }
+
   std::string path = command_line::get_arg(vm, arg_upate_maintainers_info);
 
   epee::net_utils::http::http_simple_client http_client;
