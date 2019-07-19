@@ -1,5 +1,5 @@
 {
-  "LOGIN" : {
+  "LOGIN": {
     "SETUP_MASTER_PASS": "Setup master password",
     "SETUP_CONFIRM_PASS": "Confirm the password",
     "MASTER_PASS": "Master password",
@@ -124,8 +124,8 @@
   },
   "SEED_PHRASE": {
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
-    "BUTTON_CREATE_ACCOUNT" : "Create wallet",
-    "BUTTON_COPY" : "Copy"
+    "BUTTON_CREATE_ACCOUNT": "Create wallet",
+    "BUTTON_COPY": "Copy"
   },
   "PROGRESS": {
     "ADD_WALLET": "Add wallet",
