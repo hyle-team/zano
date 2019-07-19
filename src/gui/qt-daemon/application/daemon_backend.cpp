@@ -1360,7 +1360,7 @@ std::string daemon_backend::cancel_offer(const view::cancel_offer_param& co, cur
   GET_WALLET_BY_ID(co.wallet_id, w);
   try
   {
-    w->get()->cancel_offer_by_id(co.tx_id, co.no, res_tx);
+    w->get()->cancel_offer_by_id(co.tx_id, co.no, TX_DEFAULT_FEE, res_tx);
     return API_RETURN_CODE_OK;
   }
   catch (const std::exception& e)

@@ -622,9 +622,9 @@ bool offer_removing_and_selected_output::generate(std::vector<test_event_entry>&
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(tx_destination_entry(MK_TEST_COINS(4), alice_acc.get_public_address()));
   destinations.push_back(tx_destination_entry(MK_TEST_COINS(8), alice_acc.get_public_address()));
-  destinations.push_back(tx_destination_entry(MK_TEST_COINS(1) / 5, alice_acc.get_public_address()));   // <- min #2
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(1) * 1.2, alice_acc.get_public_address()));   // <- min #2
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(1) * 1.1, alice_acc.get_public_address()));  // <- min #1
   destinations.push_back(tx_destination_entry(MK_TEST_COINS(3), alice_acc.get_public_address()));
-  destinations.push_back(tx_destination_entry(MK_TEST_COINS(1) / 10, alice_acc.get_public_address()));  // <- min #1
   destinations.push_back(tx_destination_entry(MK_TEST_COINS(2), alice_acc.get_public_address()));
   destinations.push_back(tx_destination_entry(MK_TEST_COINS(5), alice_acc.get_public_address()));
   uint64_t destinations_amount = 0;
@@ -640,10 +640,10 @@ bool offer_removing_and_selected_output::generate(std::vector<test_event_entry>&
 
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
-  uint64_t offer_cancel_tx_selected_amount = MK_TEST_COINS(1) / 10; // min #1
+  uint64_t offer_cancel_tx_selected_amount = MK_TEST_COINS(1) * 1.1; // min #1
   DO_CALLBACK_PARAMS(events, "check_offers", offer_cancel_tx_selected_amount);
 
-  offer_cancel_tx_selected_amount = MK_TEST_COINS(1) / 5; // min #2
+  offer_cancel_tx_selected_amount = MK_TEST_COINS(1) * 1.2; // min #2
   DO_CALLBACK_PARAMS(events, "check_offers", offer_cancel_tx_selected_amount);
 
   return true;
@@ -687,15 +687,15 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
   // cancel offer
   transaction cancel_offer_tx = AUTO_VAL_INIT(cancel_offer_tx);
   LOG_PRINT_CYAN("%%%%% alice_wlt->cancel_offer_by_id()", LOG_LEVEL_0);
-  alice_wlt->cancel_offer_by_id(create_offer_tx_id, 0, cancel_offer_tx);
+  alice_wlt->cancel_offer_by_id(create_offer_tx_id, 0, TESTS_DEFAULT_FEE, cancel_offer_tx);
 
   // make sure used input is the expected one
   CHECK_AND_ASSERT_MES(cancel_offer_tx.vin.size() == 1, false, "cancel_offer_tx.vin.size() == " << cancel_offer_tx.vin.size());
   CHECKED_GET_SPECIFIC_VARIANT(cancel_offer_tx.vin[0], txin_to_key, in, false);
   CHECK_AND_ASSERT_MES(in.amount == offer_cancel_tx_selected_amount, false, "Offer's cancellation tx uses input with amount " << print_money_brief(in.amount) << ", while expected amount to be used is: " << print_money_brief(offer_cancel_tx_selected_amount));
 
-  // make sure offer's cancellation tx has zero fee
-  CHECK_AND_ASSERT_MES(get_tx_fee(cancel_offer_tx) == 0, false, "get_tx_fee(cancel_offer_tx) = " << get_tx_fee(cancel_offer_tx));
+  // make sure offer's cancellation tx has correct fee
+  CHECK_AND_ASSERT_MES(get_tx_fee(cancel_offer_tx) == TESTS_DEFAULT_FEE, false, "get_tx_fee(cancel_offer_tx) = " << get_tx_fee(cancel_offer_tx));
 
   // add it to the blockchain
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -1309,7 +1309,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   // cancel the offer
   transaction tx_4 = AUTO_VAL_INIT(tx_4);
   TRY_ENTRY()
-  miner_wlt->cancel_offer_by_id(get_transaction_hash(tx_3), 0, tx_4);
+  miner_wlt->cancel_offer_by_id(get_transaction_hash(tx_3), 0, TESTS_DEFAULT_FEE, tx_4);
   CATCH_ENTRY2(false);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
@@ -1317,7 +1317,7 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Invalid tx pool count: " << c.get_pool_transactions_count() << ENDL << "tx pool:" << ENDL << c.get_tx_pool().print_pool(true));
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("After offer's cancellation push tx into the blockchain", "miner", miner_wlt, miner_start_balance - od.fee * 3), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("After offer's cancellation push tx into the blockchain", "miner", miner_wlt, miner_start_balance - od.fee * 3 - TESTS_DEFAULT_FEE), false, "");
 
   CHECK_AND_ASSERT_MES(check_offers_count(c, 0, std::vector<test_event_entry>({ callback_entry("", epee::string_tools::pod_to_hex(offers_count_param(0, 3))) })), false, "");
 
