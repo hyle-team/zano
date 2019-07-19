@@ -69,14 +69,6 @@ using namespace currency;
 #define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION          18000
 #endif
 
-#define BLOCK_MAJOR_VERSION_INITAL                     1
-
-#ifndef TESTNET
-#define ZANO_HARDFORK_1_AFTER_HEIGHT               ??
-#else
-#define ZANO_HARDFORK_1_AFTER_HEIGHT               ??
-#endif
-
 
 
 DISABLE_VS_WARNINGS(4267)
@@ -979,12 +971,21 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
   TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
   TIME_MEASURE_START_PD(target_calculating_calc);
-  dif = next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+  if (m_db_blocks.size() > ZANO_HARDFORK_1_AFTER_HEIGHT)
+  {
+    dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+  }
+  else
+  {
+    dif = next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+  }
+  
+
   TIME_MEASURE_FINISH_PD(target_calculating_calc);
   return dif;
 }
 //------------------------------------------------------------------
-wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const
+wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   std::vector<uint64_t> timestamps;
@@ -1007,7 +1008,13 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
     return true;
   };
   enum_blockchain(cb, alt_chain, split_height);
-  return next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+
+  wide_difficulty_type diff = 0;
+  if(abei.height > ZANO_HARDFORK_1_AFTER_HEIGHT)
+    diff = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+  else
+    diff = next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+  return diff;
 }
 //------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_cached_next_difficulty(bool pos) const
@@ -1066,7 +1073,7 @@ wide_difficulty_type blockchain_storage::get_next_difficulty_for_alternative_cha
     commulative_difficulties.push_back(m_db_blocks[i]->cumulative_diff_precise);
   } 
 
-  return next_difficulty(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET:DIFFICULTY_POW_TARGET);
+  return next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET:DIFFICULTY_POW_TARGET);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t height, bool pos) const
@@ -1204,7 +1211,12 @@ bool blockchain_storage::create_block_template(block& b,
   size_t median_size;
   boost::multiprecision::uint128_t already_generated_coins;
   CRITICAL_REGION_BEGIN(m_read_lock);
-  b.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+  height = m_db_blocks.size();
+  if(height <= m_core_runtime_config.hard_fork1_starts_after_height)
+    b.major_version = BLOCK_MAJOR_VERSION_INITAL;
+  else
+    b.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+
   b.minor_version = CURRENT_BLOCK_MINOR_VERSION;
   b.prev_id = get_top_block_id();
   b.timestamp = m_core_runtime_config.get_core_time();
@@ -1221,7 +1233,7 @@ bool blockchain_storage::create_block_template(block& b,
   CHECK_AND_ASSERT_MES(diffic, false, "difficulty owverhead.");
 
 
-  height = m_db_blocks.size();
+  
 
   median_size = m_db_current_block_cumul_sz_limit / 2;
   already_generated_coins = m_db_blocks.back()->already_generated_coins;
@@ -1507,7 +1519,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     CHECK_AND_ASSERT_MES_CUSTOM(!(pos_block && abei.height < m_core_runtime_config.pos_minimum_heigh), false, bvc.m_verification_failed = true, "PoS block is not allowed on this height");
 
 
-    wide_difficulty_type current_diff = get_next_diff_conditional2(pos_block, alt_chain, connection_height);
+    wide_difficulty_type current_diff = get_next_diff_conditional2(pos_block, alt_chain, connection_height, abei);
     
     CHECK_AND_ASSERT_MES_CUSTOM(current_diff, false, bvc.m_verification_failed = true, "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!");
     
@@ -1716,7 +1728,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
     wide_difficulty_type difficulty_pow_at_split_point = get_x_difficulty_after_height(connection_point.height - 1, false);
 
     difficulties main_cumul_diff = AUTO_VAL_INIT(main_cumul_diff);
-    difficulties alt_cumul_diff = = AUTO_VAL_INIT(alt_cumul_diff);
+    difficulties alt_cumul_diff = AUTO_VAL_INIT(alt_cumul_diff);
     //we use get_last_alt_x_block_cumulative_precise_adj_difficulty for getting both alt chain and main chain diff of given block types
 
     wide_difficulty_type alt_pos_diff_end = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain, alt_chain_bei.height, true);
@@ -2466,7 +2478,7 @@ bool blockchain_storage::forecast_difficulty(std::vector<std::pair<uint64_t, wid
    out_height_2_diff_vector.push_back(std::make_pair(height, last_block_diff_for_this_type)); // the first element corresponds to the last block of this type
    for (size_t i = 0; i < DIFFICULTY_CUT; ++i)
    {
-     wide_difficulty_type diff = next_difficulty(timestamps, cumulative_difficulties, target_seconds);
+     wide_difficulty_type diff = next_difficulty_1(timestamps, cumulative_difficulties, target_seconds);
      height += avg_interval;
      out_height_2_diff_vector.push_back(std::make_pair(height, diff));
  
@@ -4912,13 +4924,25 @@ bool blockchain_storage::update_next_comulative_size_limit()
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::add_new_block(const block& bl_, block_verification_context& bvc)
+bool blockchain_storage::prevalidate_block(const block& bl)
+{
+  if (bl.major_version == BLOCK_MAJOR_VERSION_INITAL && get_block_height(bl) <= m_core_runtime_config.hard_fork1_starts_after_height)
+    return true;
+  if (bl.major_version != CURRENT_BLOCK_MAJOR_VERSION)
+  {
+    LOG_ERROR("Failed to prevalidate_block: " << get_block_hash(bl) << ENDL << obj_to_json_str(bl));
+    return false;
+  }
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::add_new_block(const block& bl, block_verification_context& bvc)
 {
   try
   {
     m_db.begin_transaction();
 
-    block bl = bl_;
+    //block bl = bl_;
     crypto::hash id = get_block_hash(bl);
     CRITICAL_REGION_LOCAL(m_tx_pool);
     //CRITICAL_REGION_LOCAL1(m_read_lock);
@@ -4931,7 +4955,18 @@ bool blockchain_storage::add_new_block(const block& bl_, block_verification_cont
       return false;
     }
 
+    if (prevalidate_block(bl))
+    {
+      LOG_PRINT_RED_L0("block with id = " << id << " failed to prevalidate");
+      bvc.m_added_to_main_chain = false;
+      bvc.m_verification_failed = true;
+      m_db.commit_transaction();
+      return false;
+    }
+
+
     //check that block refers to chain tail
+
     
     if (!(bl.prev_id == get_top_block_id()))
     {

@@ -673,7 +673,7 @@ currency::wide_difficulty_type test_generator::get_difficulty_for_next_block(con
     timestamps.push_back(blocks[i]->b.timestamp);
     commulative_difficulties.push_back(blocks[i]->cumul_difficulty);
   }
-  return next_difficulty(timestamps, commulative_difficulties, pow ? DIFFICULTY_POW_TARGET : DIFFICULTY_POS_TARGET);
+  return next_difficulty_1(timestamps, commulative_difficulties, pow ? DIFFICULTY_POW_TARGET : DIFFICULTY_POS_TARGET);
 }
 
 currency::wide_difficulty_type test_generator::get_cumul_difficulty_for_next_block(const crypto::hash& head_id, bool pow) const

@@ -207,6 +207,13 @@
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
+//hard forks section
+#define BLOCK_MAJOR_VERSION_INITAL                     1
+#ifndef TESTNET
+#define ZANO_HARDFORK_1_AFTER_HEIGHT               ??
+#else
+#define ZANO_HARDFORK_1_AFTER_HEIGHT               ??
+#endif
 
 
 

@@ -313,7 +313,7 @@ void run_emulation(const std::string& path)
   PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, BBR_DIFFICULTY_WINDOW, BBR_DIFFICULTY_CUT, BBR_DIFFICULTY_CUT);
   PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, 500, 60, 60);
   PERFORME_SIMULATION_FOR_FUNCTION(bbr_next_difficulty_configurable, 300, 60, 60);
-  PERFORME_SIMULATION_FOR_FUNCTION_NO_WINDOW(currency::next_difficulty);
+  PERFORME_SIMULATION_FOR_FUNCTION_NO_WINDOW(currency::next_difficulty_1);
 
   print_blocks(result_blocks, path + "result.txt");
   LOG_PRINT_L0("Done");

@@ -184,6 +184,7 @@ namespace currency
    
     //------------- modifying members --------------
     bool add_new_block(const block& bl_, block_verification_context& bvc);
+    bool prevalidate_block(const block& bl);
     bool clear();
     bool reset_and_set_genesis_block(const block& b);
     //debug function
@@ -230,7 +231,7 @@ namespace currency
     crypto::hash get_top_block_id(uint64_t& height) const;
     bool get_top_block(block& b) const;
     wide_difficulty_type get_next_diff_conditional(bool pos) const;
-    wide_difficulty_type get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const;
+    wide_difficulty_type get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const;
     wide_difficulty_type get_cached_next_difficulty(bool pos) const;
 
     typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
