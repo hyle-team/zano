@@ -1027,6 +1027,8 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
   m_blockchain.push_back(bl_id);
   ++m_local_bc_height;
   m_last_bc_timestamp = b.timestamp;
+  if (!is_pos_block(b))
+    m_last_pow_block_h = height;
 
   m_wcallback->on_new_block(height, b);
 }
@@ -1761,6 +1763,7 @@ bool wallet2::reset_all()
   m_last_bc_timestamp = 0;
   m_height_of_start_sync = 0;
   m_last_sync_percent = 0;
+  m_last_pow_block_h = 0;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2406,6 +2409,10 @@ bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr)
 
   if (m_blockchain.size() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age)
     return false;
+  
+  if (tr.m_ptx_wallet_info->m_block_height >= m_last_pow_block_h)
+    return false;
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------

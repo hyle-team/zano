@@ -310,7 +310,8 @@ namespace tools
                               m_height_of_start_sync(0), 
                               m_last_sync_percent(0), 
                               m_do_rise_transfer(false),
-                              m_watch_only(false)
+                              m_watch_only(false), 
+                              m_last_pow_block_h(0)
     {};
   public:
     wallet2() : m_stop(false), 
@@ -322,7 +323,8 @@ namespace tools
                 m_fake_outputs_count(0),
                 m_do_rise_transfer(false),
                 m_log_prefix("???"),
-                m_watch_only(false)
+                m_watch_only(false), 
+                m_last_pow_block_h(0)
     {
       m_core_runtime_config = currency::get_default_core_runtime_config();
     };
@@ -615,7 +617,7 @@ namespace tools
         return;
       }
 
-      if (ver < 147)
+      if (ver < 149)
       {
         LOG_PRINT_MAGENTA("Wallet file truncated due to old version", LOG_LEVEL_0);
         return;
@@ -650,6 +652,7 @@ namespace tools
       a & m_money_expirations;
       a & m_pending_key_images;
       a & m_tx_keys;
+      a & m_last_pow_block_h;
 
     }
 
@@ -862,6 +865,7 @@ private:
     std::shared_ptr<i_wallet2_callback> m_wcallback;
     uint64_t m_height_of_start_sync;
     uint64_t m_last_sync_percent;
+    uint64_t m_last_pow_block_h;
     currency::core_runtime_config m_core_runtime_config;
     escrow_contracts_container m_contracts;
     std::list<expiration_entry_info> m_money_expirations;

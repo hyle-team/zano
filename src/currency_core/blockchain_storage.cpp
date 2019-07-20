@@ -971,7 +971,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
   TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
   TIME_MEASURE_START_PD(target_calculating_calc);
-  if (m_db_blocks.size() > ZANO_HARDFORK_1_AFTER_HEIGHT)
+  if (m_db_blocks.size() > m_core_runtime_config.hard_fork1_starts_after_height)
   {
     dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
   }
@@ -1010,7 +1010,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
   enum_blockchain(cb, alt_chain, split_height);
 
   wide_difficulty_type diff = 0;
-  if(abei.height > ZANO_HARDFORK_1_AFTER_HEIGHT)
+  if(abei.height > m_core_runtime_config.hard_fork1_starts_after_height)
     diff = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
   else
     diff = next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
@@ -1698,7 +1698,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
   const block_extended_info& alt_chain_bei = alt_chain.back()->second;
   const block_extended_info& connection_point = alt_chain.front()->second;
 
-  if (alt_chain_bei.bl.major_version == BLOCK_MAJOR_VERSION_INITAL || connection_point.height <= ZANO_HARDFORK_1_AFTER_HEIGHT)
+  if (alt_chain_bei.bl.major_version == BLOCK_MAJOR_VERSION_INITAL || connection_point.height <= m_core_runtime_config.hard_fork1_starts_after_height)
   {
     //use pre-hard fork, old-style comparing
     if (main_chain_bei.cumulative_diff_adjusted < alt_chain_bei.cumulative_diff_adjusted)
@@ -4348,6 +4348,12 @@ bool blockchain_storage::validate_pos_block(const block& b,
     // Txs in alternative PoS blocks (including miner_tx) are validated by validate_alt_block_txs()
     r = check_tx_input(b.miner_tx, 1, coinstake_in, id, b.miner_tx.signatures[0], &max_related_block_height);
     CHECK_AND_ASSERT_MES(r, false, "Failed to validate coinstake input in miner tx, block_id = " << get_block_hash(b));
+
+    if (get_block_height(b) > m_core_runtime_config.hard_fork1_starts_after_height)
+    {
+      uint64_t last_pow_h = get_last_x_block_height(false);
+      CHECK_AND_ASSERT_MES(max_related_block_height < last_pow_h, false, "Failed to failed to validate coinbase in pos block, condition failed: max_related_block_height(" << max_related_block_height << ") < last_pow_h(" << last_pow_h << ")");
+    }
   }
 
   uint64_t block_height = for_altchain ? split_height + alt_chain.size() : m_db_blocks.size();
