@@ -640,10 +640,10 @@ bool offer_removing_and_selected_output::generate(std::vector<test_event_entry>&
 
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
-  uint64_t offer_cancel_tx_selected_amount = MK_TEST_COINS(1) * 1.1; // min #1
+  uint64_t offer_cancel_tx_selected_amount = MK_TEST_COINS(1) * 11 / 10; // min #1
   DO_CALLBACK_PARAMS(events, "check_offers", offer_cancel_tx_selected_amount);
 
-  offer_cancel_tx_selected_amount = MK_TEST_COINS(1) * 1.2; // min #2
+  offer_cancel_tx_selected_amount = MK_TEST_COINS(1) * 12 / 10; // min #2
   DO_CALLBACK_PARAMS(events, "check_offers", offer_cancel_tx_selected_amount);
 
   return true;
@@ -676,7 +676,7 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
   CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
-  refresh_wallet_and_check_balance("offer's put into the blockchain", "Alice", alice_wlt, alice_start_balance - od.fee, true, 1);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("offer's put into the blockchain", "Alice", alice_wlt, alice_start_balance - od.fee, true, 1), false, "");
 
   // check offer, retured by get_actual_offers()
   std::list<bc_services::offer_details_ex> offers;
@@ -687,7 +687,8 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
   // cancel offer
   transaction cancel_offer_tx = AUTO_VAL_INIT(cancel_offer_tx);
   LOG_PRINT_CYAN("%%%%% alice_wlt->cancel_offer_by_id()", LOG_LEVEL_0);
-  alice_wlt->cancel_offer_by_id(create_offer_tx_id, 0, TESTS_DEFAULT_FEE, cancel_offer_tx);
+  uint64_t cancellation_fee = TESTS_DEFAULT_FEE * 11 / 10;
+  alice_wlt->cancel_offer_by_id(create_offer_tx_id, 0, cancellation_fee, cancel_offer_tx);
 
   // make sure used input is the expected one
   CHECK_AND_ASSERT_MES(cancel_offer_tx.vin.size() == 1, false, "cancel_offer_tx.vin.size() == " << cancel_offer_tx.vin.size());
@@ -695,7 +696,7 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
   CHECK_AND_ASSERT_MES(in.amount == offer_cancel_tx_selected_amount, false, "Offer's cancellation tx uses input with amount " << print_money_brief(in.amount) << ", while expected amount to be used is: " << print_money_brief(offer_cancel_tx_selected_amount));
 
   // make sure offer's cancellation tx has correct fee
-  CHECK_AND_ASSERT_MES(get_tx_fee(cancel_offer_tx) == TESTS_DEFAULT_FEE, false, "get_tx_fee(cancel_offer_tx) = " << get_tx_fee(cancel_offer_tx));
+  CHECK_AND_ASSERT_MES(get_tx_fee(cancel_offer_tx) == cancellation_fee, false, "get_tx_fee(cancel_offer_tx) = " << get_tx_fee(cancel_offer_tx));
 
   // add it to the blockchain
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -703,7 +704,7 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // Alice's banace should not change
-  refresh_wallet_and_check_balance("offer has been cancelled, ", "Alice", alice_wlt, alice_start_balance - od.fee, true, 1);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("offer has been cancelled, ", "Alice", alice_wlt, alice_start_balance - od.fee - cancellation_fee, true, 1), false, "");
 
   // get_actual_offers should return empty list
   offers.clear();
@@ -1320,6 +1321,86 @@ bool offer_lifecycle_via_tx_pool::c1(currency::core& c, size_t ev_index, const s
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("After offer's cancellation push tx into the blockchain", "miner", miner_wlt, miner_start_balance - od.fee * 3 - TESTS_DEFAULT_FEE), false, "");
 
   CHECK_AND_ASSERT_MES(check_offers_count(c, 0, std::vector<test_event_entry>({ callback_entry("", epee::string_tools::pod_to_hex(offers_count_param(0, 3))) })), false, "");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+offer_cancellation_with_zero_fee::offer_cancellation_with_zero_fee()
+{
+  REGISTER_CALLBACK_METHOD(offer_cancellation_with_zero_fee, c1);
+}
+
+bool offer_cancellation_with_zero_fee::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure that an offer cannot be cancelled using zero fee
+
+  GENERATE_ACCOUNT(preminer_acc);
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, preminer_acc, test_core_time::get_time());
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool offer_cancellation_with_zero_fee::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
+  miner_wlt->refresh();
+  LOG_PRINT_CYAN("Miners's transfers:" << ENDL << miner_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  uint64_t miner_start_balance = miner_wlt->balance();
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  bc_services::offer_details_ex od = AUTO_VAL_INIT(od);
+  fill_test_offer(od);
+  od.fee = TESTS_DEFAULT_FEE * 2;
+
+  transaction create_offer_tx = AUTO_VAL_INIT(create_offer_tx);
+  LOG_PRINT_CYAN("%%%%% miner_wlt->push_offer()", LOG_LEVEL_0);
+  miner_wlt->push_offer(od, create_offer_tx);
+  crypto::hash create_offer_tx_id = get_transaction_hash(create_offer_tx);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[ALICE_ACC_IDX].get_public_address(), c), false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("offer's put into the blockchain", "Miner", miner_wlt, miner_start_balance - od.fee, true, 1), false, "");
+
+  // check offer, retured by get_actual_offers()
+  std::list<bc_services::offer_details_ex> offers;
+  r = miner_wlt->get_actual_offers(offers);
+  CHECK_AND_ASSERT_MES(r && offers.size() == 1, false, "miner_wlt->get_actual_offers failed, offers.size() == " << offers.size());
+  CHECK_AND_ASSERT_MES(compare_offers(od, offers.front()), false, "");
+  
+  // cancel offer
+  transaction cancel_offer_tx = AUTO_VAL_INIT(cancel_offer_tx);
+  bool exception_caught = false;
+  try
+  {
+    LOG_PRINT_CYAN("%%%%% miner_wlt->cancel_offer_by_id()", LOG_LEVEL_0);
+    miner_wlt->cancel_offer_by_id(create_offer_tx_id, 0, 0 /* <-- zero fee */, cancel_offer_tx);
+  }
+  catch (std::exception& e)
+  {
+    LOG_PRINT_L0("Caught an expected exception: " << e.what());
+    exception_caught = true;
+  }
+
+  CHECK_AND_ASSERT_MES(exception_caught, false, "An exception on calcel_offer_by_id() was not caught as expected");
+
+  // make sure no new txs in the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // Make sure balance was no chaged by incorrect offer cancellation
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("offer has been cancelled, ", "Miner", miner_wlt, miner_start_balance - od.fee, true, 0), false, "");
 
   return true;
 }
