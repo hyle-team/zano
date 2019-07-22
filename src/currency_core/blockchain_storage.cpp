@@ -2215,7 +2215,7 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
     return false;
 
   //check if transaction is unlocked
-  if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx)))
+  if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
     return false;
 
   //use appropriate mix_attr out 
@@ -3833,12 +3833,12 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const txin_to_key
     outputs_visitor(std::vector<crypto::public_key>& results_collector,
                     const blockchain_storage& bch) :m_results_collector(results_collector), m_bch(bch)
     {}
-    bool handle_output(const transaction& tx, const tx_out& out)
+    bool handle_output(const transaction& tx, const tx_out& out, uint64_t out_i)
     {
       //check tx unlock time
-      if (!m_bch.is_tx_spendtime_unlocked(get_tx_unlock_time(tx)))
+      if (!m_bch.is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_i)))
       {
-        LOG_PRINT_L0("One of outputs for one of inputs have wrong tx.unlock_time = " << get_tx_unlock_time(tx));
+        LOG_PRINT_L0("One of outputs for one of inputs have wrong tx.unlock_time = " << get_tx_unlock_time(tx, out_i));
         return false;
       }
 
@@ -3927,7 +3927,7 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
 #define LOC_CHK(cond, msg) CHECK_AND_ASSERT_MES(cond, false, "ms input check failed: ms_id: " << txin.multisig_out_id << ", input #" << in_index << " in tx " << tx_prefix_hash << ", refers to ms output #" << out_n << " in source tx " << get_transaction_hash(source_tx) << ENDL << msg)
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  uint64_t unlock_time = get_tx_unlock_time(source_tx);
+  uint64_t unlock_time = get_tx_unlock_time(source_tx, out_n);
   LOC_CHK(is_tx_spendtime_unlocked(unlock_time), "Source transaction is LOCKED! unlock_time: " << unlock_time << ", now is " << m_core_runtime_config.get_core_time() << ", blockchain size is " << get_current_blockchain_size());
 
   LOC_CHK(source_tx.vout.size() > out_n, "internal error: out_n==" << out_n << " is out-of-bounds of source_tx.vout, size=" << source_tx.vout.size());

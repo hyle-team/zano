@@ -12,6 +12,44 @@
 namespace currency
 {
   //---------------------------------------------------------------
+  account_public_address get_crypt_address_from_destinations(const account_keys& sender_account_keys, const std::vector<tx_destination_entry>& destinations)
+  {
+    for (const auto& de : destinations)
+    {
+      if (de.addr.size() == 1 && sender_account_keys.m_account_address != de.addr.back())
+        return de.addr.back();                    // return the first destination address that is non-multisig and not equal to the sender's address
+    }
+    return sender_account_keys.m_account_address; // otherwise, fallback to sender's address
+  }
+  //------------------------------------------------------------------
+  bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)
+  {
+    /// tx expiration condition (tx is ok if the following is true)
+    /// tx_expiration_time - TX_EXPIRATION_MEDIAN_SHIFT > get_last_n_blocks_timestamps_median(TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW)
+    uint64_t expiration_time = get_tx_expiration_time(tx);
+    if (expiration_time == 0)
+      return false; // 0 means it never expires
+    return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
+  }
+  //---------------------------------------------------------------
+  inline uint64_t get_tx_unlock_time(const transaction& tx, uint64_t o_i)
+  { 
+    // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
+    uint64_t v = get_tx_x_detail<etc_tx_details_unlock_time>(tx); 
+    if (v)
+      return v;
+
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    get_type_in_variant_container(tx.extra, ut2);
+    if (!ut2.unlock_time_array.size())
+      return 0;
+    
+    CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() > o_i, "unlock_time_array.size=" << ut2.unlock_time_array.size() 
+      << " is less then o_i=" << o_i << " in tx: " << get_transaction_hash(tx));
+
+    return ut2.unlock_time_array[o_i];
+  }
+  //---------------------------------------------------------------
   void get_transaction_prefix_hash(const transaction_prefix& tx, crypto::hash& h)
   {
     std::ostringstream s;

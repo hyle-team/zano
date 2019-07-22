@@ -891,16 +891,7 @@ namespace currency
     }
     return n;
   }
-  //---------------------------------------------------------------
-  account_public_address get_crypt_address_from_destinations(const account_keys& sender_account_keys, const std::vector<tx_destination_entry>& destinations)
-  {
-    for (const auto& de : destinations)
-    {
-      if (de.addr.size() == 1 && sender_account_keys.m_account_address != de.addr.back())
-        return de.addr.back();                    // return the first destination address that is non-multisig and not equal to the sender's address
-    }
-    return sender_account_keys.m_account_address; // otherwise, fallback to sender's address
-  }
+
   //---------------------------------------------------------------
   bool construct_tx(const account_keys& sender_account_keys,
     const std::vector<tx_source_entry>& sources,
@@ -2523,16 +2514,6 @@ namespace currency
   bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id)
   {
     return epee::string_tools::parse_hexstr_to_binbuff(payment_id_str, payment_id);
-  }
-  //------------------------------------------------------------------
-  bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)
-  {
-    /// tx expiration condition (tx is ok if the following is true)
-    /// tx_expiration_time - TX_EXPIRATION_MEDIAN_SHIFT > get_last_n_blocks_timestamps_median(TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW)
-    uint64_t expiration_time = get_tx_expiration_time(tx);
-    if (expiration_time == 0)
-      return false; // 0 means it never expires
-    return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
   }
   //--------------------------------------------------------------------------------
   crypto::hash prepare_prefix_hash_for_sign(const transaction& tx, uint64_t in_index, const crypto::hash& tx_id)

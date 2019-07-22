@@ -707,7 +707,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << tx_in_to_key.key_offsets.size());
       
       TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-      if (!vis.handle_output(tx_ptr->tx, tx_ptr->tx.vout[n]))
+      if (!vis.handle_output(tx_ptr->tx, tx_ptr->tx.vout[n], output_index))
       {
         LOG_PRINT_L0("Failed to handle_output for output id = " << tx_id << ", no " << n);
         return false;
