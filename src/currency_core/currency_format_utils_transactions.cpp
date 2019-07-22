@@ -39,6 +39,10 @@ namespace currency
     if (v)
       return v;
 
+    CHECK_AND_ASSERT_THROW_MES(tx.vout.size() > o_i, "tx.vout.size=" << tx.vout.size()
+      << " is not bigger then o_i=" << o_i << " in tx: " << get_transaction_hash(tx));
+
+
     etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
     get_type_in_variant_container(tx.extra, ut2);
     if (!ut2.unlock_time_array.size())
@@ -48,6 +52,35 @@ namespace currency
       << " is less then o_i=" << o_i << " in tx: " << get_transaction_hash(tx));
 
     return ut2.unlock_time_array[o_i];
+  }
+  //---------------------------------------------------------------
+  inline bool get_tx_max_min_unlock_time(const transaction& tx, uint64_t& max_unlock_time, uint64_t& min_unlock_time)
+  {
+    max_unlock_time = min_unlock_time = 0;
+    // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
+    uint64_t v = get_tx_x_detail<etc_tx_details_unlock_time>(tx);
+    if (v)
+    {
+      max_unlock_time = min_unlock_time = v;
+      return true;
+    }
+
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    get_type_in_variant_container(tx.extra, ut2);
+    if (!ut2.unlock_time_array.size())
+    {
+      return true;
+    }
+    CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "unlock_time_array.size=" << ut2.unlock_time_array.size()
+      << " is not equal tx.vout.size()=" << tx.vout.size() << " in tx: " << get_transaction_hash(tx));
+    for (size_t i = 0; i != ut2.unlock_time_array.size(); i++)
+    {
+      if (ut2.unlock_time_array[i] > max_unlock_time)
+        max_unlock_time = ut2.unlock_time_array[i];
+      if (ut2.unlock_time_array[i] < min_unlock_time)
+        min_unlock_time = ut2.unlock_time_array[i];
+    }
+    return true;
   }
   //---------------------------------------------------------------
   void get_transaction_prefix_hash(const transaction_prefix& tx, crypto::hash& h)

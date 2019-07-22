@@ -30,8 +30,9 @@ namespace currency
   }
 
   inline uint64_t get_tx_unlock_time(const transaction& tx, uint64_t o_i);
+  inline bool get_tx_max_min_unlock_time(const transaction& tx, uint64_t& max_unlock_time, uint64_t& min_unlock_time);
   inline uint64_t get_tx_flags(const transaction& tx) { return get_tx_x_detail<etc_tx_details_flags>(tx); }
-  inline uint64_t get_tx_expiration_time(const transaction& tx) return get_tx_x_detail<etc_tx_details_expiration_time>(tx); }
+  inline uint64_t get_tx_expiration_time(const transaction& tx) {return get_tx_x_detail<etc_tx_details_expiration_time>(tx); }
   inline void set_tx_unlock_time(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_unlock_time>(tx, v); }
   inline void set_tx_flags(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_flags>(tx, v); }
   inline void set_tx_expiration_time(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_expiration_time>(tx, v); }
