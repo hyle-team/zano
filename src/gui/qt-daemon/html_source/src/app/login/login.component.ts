@@ -27,6 +27,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   });
 
   type = 'reg';
+  currentPass = ''; 
 
   constructor(
     private route: ActivatedRoute,
@@ -47,7 +48,21 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   onSubmitCreatePass(): void {
     if (this.regForm.valid) {
-      this.variablesService.appPass = this.regForm.get('password').value;
+      // this.variablesService.appPass = this.regForm.get('password').value; ||changeD it on 23.07 12:09||
+      this.currentPass = this.regForm.get('password').value  //the pass what was written in input of login form by user
+
+      this.backend.setMasterPassword({pass: this.currentPass}, (status, data) => {
+        if (status) {
+          this.variablesService.appLogin = true;
+          this.variablesService.startCountdown();
+          this.ngZone.run(() => {
+            this.router.navigate(['/']);
+          });
+        } else {
+          console.log(data['error_code']);
+        }
+      })
+      /*
       this.backend.storeSecureAppData((status, data) => {
         if (status) {
           this.variablesService.appLogin = true;
@@ -59,6 +74,7 @@ export class LoginComponent implements OnInit, OnDestroy {
           console.log(data['error_code']);
         }
       });
+      */
     }
   }
 
@@ -71,6 +87,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   onSubmitAuthPass(): void {
+    
     if (this.authForm.valid) {
       const appPass = this.authForm.get('password').value;
       this.backend.getSecureAppData({pass: appPass}, (status, data) => {
