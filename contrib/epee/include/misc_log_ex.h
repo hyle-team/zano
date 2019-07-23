@@ -252,10 +252,9 @@ DISABLE_VS_WARNINGS(4100)
 }
 
 
-#define CATCH_ENTRY_WITH_FORWARDING_EXCEPTION()  \
+#define CATCH_ENTRY_WITH_FORWARDING_EXCEPTION() } \
   catch(const std::exception& ex) \
 { \
-  (void)(ex); \
   LOG_ERROR("Exception at [" << LOCATION_SS << "], what=" << ex.what()); \
   throw std::runtime_error(std::string("[EXCEPTION FORWARDED]: ") + ex.what()); \
 } \

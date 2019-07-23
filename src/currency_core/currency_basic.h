@@ -351,7 +351,7 @@ namespace currency
   {
     std::vector<uint64_t> unlock_time_array;
     BEGIN_SERIALIZE()
-      VARINT_FIELD(unlock_time_array)
+      FIELD(unlock_time_array)
     END_SERIALIZE()
   };
 
@@ -371,7 +371,7 @@ namespace currency
     uint64_t v;
     BEGIN_SERIALIZE()
       VARINT_FIELD(v)
-      END_SERIALIZE()
+    END_SERIALIZE()
   };
 
   struct etc_tx_details_flags

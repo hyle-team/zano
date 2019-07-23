@@ -3738,6 +3738,12 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
   return false;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const
+{
+  uint64_t stub = 0;
+  return check_tx_inputs(tx, tx_prefix_hash, stub);
+}
+//------------------------------------------------------------------
 bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height) const
 {
   size_t sig_index = 0;

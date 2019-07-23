@@ -6,8 +6,8 @@
 
 #include "currency_format_utils_transactions.h"
 #include "serialization/serialization.h"
-#include "currency_format_utils_abstract.h"
 #include "currency_format_utils.h"
+#include "currency_format_utils_abstract.h"
 
 namespace currency
 {

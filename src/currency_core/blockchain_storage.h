@@ -223,7 +223,7 @@ namespace currency
     std::shared_ptr<transaction> get_tx(const crypto::hash &id) const;
 
     template<class visitor_t>
-    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t& max_related_block_height = NULL) const ;
+    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t& max_related_block_height) const ;
 
     uint64_t get_current_blockchain_size() const;
     uint64_t get_top_block_height() const;
@@ -264,6 +264,7 @@ namespace currency
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height, uint64_t& max_unlock_time)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height)const;
+    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const transaction& source_tx, size_t out_n) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_to_key& txin, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& max_unlock_time) const;

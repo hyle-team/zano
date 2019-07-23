@@ -2072,6 +2072,20 @@ namespace currency
 
       return true;
     }
+    bool operator()(const etc_tx_details_unlock_time2& ee)
+    {
+      tv.type = "unlock_time";
+      std::stringstream ss;
+      ss << "[";
+      for (auto v : ee.unlock_time_array)
+      {
+        ss << " " << v;
+      }
+      ss << "]";
+      tv.short_view = ss.str();
+
+      return true;
+    }
     bool operator()(const etc_tx_details_expiration_time& ee)
     {
       tv.type = "expiration_time";
