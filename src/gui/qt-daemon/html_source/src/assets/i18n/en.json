@@ -191,18 +191,17 @@
   },
   "ASSIGN_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
+      "LABEL": "Alias",
       "PLACEHOLDER": "@ Enter alias",
       "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
     },
     "COMMENT": {
       "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment",
+      "PLACEHOLDER": "",
       "TOOLTIP": "The comment will be visible to anyone who wants to make a payment to your alias. You can provide details about your business, contacts, or include any text. Comments can be edited later."
     },
-    "COST": "Cost to create alias {{value}} {{currency}}",
+    "COST": "Alias fee {{value}} {{currency}}",
     "BUTTON_ASSIGN": "Assign",
-    "BUTTON_CANCEL": "Cancel",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
       "NAME_WRONG": "Alias has wrong name",
@@ -216,40 +215,39 @@
   },
   "EDIT_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
+      "LABEL": "Alias",
       "PLACEHOLDER": "@ Enter alias"
     },
     "COMMENT": {
       "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment"
+      "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
       "NO_MONEY": "You do not have enough funds to change the comment to this alias",
       "MAX_LENGTH": "Maximum comment length reached"
     },
-    "COST": "Cost to edit alias {{value}} {{currency}}",
-    "BUTTON_EDIT": "Edit",
-    "BUTTON_CANCEL": "Cancel"
+    "COST": "Fee {{value}} {{currency}}",
+    "BUTTON_EDIT": "Edit"
   },
   "TRANSFER_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
+      "LABEL": "Alias",
       "PLACEHOLDER": "@ Enter alias"
     },
     "COMMENT": {
       "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment"
+      "PLACEHOLDER": ""
     },
     "ADDRESS": {
-      "LABEL": "The account to which the alias will be transferred",
-      "PLACEHOLDER": "Enter wallet address"
+      "LABEL": "Transfer to",
+      "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
       "WRONG_ADDRESS": "No wallet with this account exists",
       "ALIAS_EXISTS": "This account already has an alias",
       "NO_MONEY": "You do not have enough funds to transfer this alias"
     },
-    "COST": "Cost to transfer alias {{value}} {{currency}}",
+    "COST": "Transfer fee {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Transfer",
     "BUTTON_CANCEL": "Cancel",
     "REQUEST_SEND_REG": "The alias will be transferred within 10 minutes"
@@ -451,6 +449,16 @@
     "SUCCESS": "Success",
     "INFO": "Information",
     "OK": "OK"
+  },
+  "CONFIRM": {
+    "BUTTON_CONFIRM": "Confirm",
+    "BUTTON_CANCEL": "Cancel",
+    "MESSAGE": {
+      "SEND": "Send",
+      "FROM": "From",
+      "TO": "To",
+      "COMMENT": "Comment"
+    }
   },
   "STAKING": {
     "TITLE": "Staking",
