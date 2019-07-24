@@ -35,7 +35,7 @@ namespace tools
 {
 
   //---------------------------------------------------------------
-  uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const tools::money_transfer2_details& td)
+  uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const tools::wallet_rpc::wallet_transfer_info_details& td)
   {
     uint64_t max_unlock_time = 0;
     // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
@@ -50,7 +50,7 @@ namespace tools
 
     CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "Internal error: wrong tx transfer details: ut2.unlock_time_array.size()" << ut2.unlock_time_array.size() << " is not equal transaction outputs vector size=" << tx.vout.size());
 
-    for (auto ri : td.receive_indices)
+    for (auto ri : td.rcv)
     {
       CHECK_AND_ASSERT_THROW_MES(ri < tx.vout.size(), "Internal error: wrong tx transfer details: reciev index=" << ri << " is greater than transaction outputs vector " << tx.vout.size());
       if (tx.vout[ri].target.type() == typeid(currency::txout_to_key))
@@ -960,7 +960,7 @@ void wallet2::prepare_wti(wallet_rpc::wallet_transfer_info& wti, uint64_t height
   wti.amount = amount;
   wti.height = height;
   fill_transfer_details(tx, td, wti.td);
-  wti.unlock_time = get_max_unlock_time_from_receive_indices(tx, td);
+  wti.unlock_time = get_max_unlock_time_from_receive_indices(tx, wti.td);
   wti.timestamp = timestamp;
   wti.fee = currency::is_coinbase(tx) ? 0:currency::get_tx_fee(tx);
   wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
