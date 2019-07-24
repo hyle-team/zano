@@ -1,4 +1,4 @@
-import {Component, OnInit, OnDestroy, NgZone, HostListener} from '@angular/core';
+import {Component, OnInit, OnDestroy, NgZone, HostListener, Input} from '@angular/core';
 import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {ActivatedRoute} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
@@ -15,6 +15,7 @@ export class SendComponent implements OnInit, OnDestroy {
 
   isOpen = false;
   localAliases = [];
+  isModalDialogVisible = false;
 
   currentWalletId = null;
   parentRouting;
@@ -130,6 +131,17 @@ export class SendComponent implements OnInit, OnDestroy {
         hide: this.variablesService.currentWallet.send_data['hide'] || false
       });
     });
+  }
+
+  showDialog() {
+    this.isModalDialogVisible = true;
+  }
+
+  confirmed(confirmed: boolean) {
+    if (confirmed) {
+      this.onSend();
+    }
+    this.isModalDialogVisible = false;
   }
 
   onSend() {

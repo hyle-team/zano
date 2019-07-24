@@ -51,6 +51,7 @@ import * as highcharts from 'highcharts';
 import exporting from 'highcharts/modules/exporting.src';
 import { ProgressContainerComponent } from './_helpers/directives/progress-container/progress-container.component';
 import { InputDisableSelectionDirective } from './_helpers/directives/input-disable-selection/input-disable-selection.directive';
+import { SendModalComponent } from './send-modal/send-modal.component';
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json');
@@ -108,7 +109,8 @@ export function highchartsFactory() {
     ModalContainerComponent,
     TransactionDetailsComponent,
     ProgressContainerComponent,
-    InputDisableSelectionDirective
+    InputDisableSelectionDirective,
+    SendModalComponent
   ],
   imports: [
     BrowserModule,
@@ -136,7 +138,8 @@ export function highchartsFactory() {
     // {provide: HIGHCHARTS_MODULES, useFactory: () => [ highstock, more, exporting ] }
   ],
   entryComponents: [
-    ModalContainerComponent
+    ModalContainerComponent,
+    SendModalComponent
   ],
   bootstrap: [AppComponent]
 })

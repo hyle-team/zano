@@ -996,3 +996,21 @@ app-open-wallet-modal {
     }
   }
 }
+
+app-send-modal {
+  .modal {
+
+    @include themify($themes) {
+      background: themed(modalBackground);
+      color: themed(mainTextColor);
+    }
+
+    .action-button {
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+        color: themed(alternativeTextColor);
+      }
+    }
+  }
+}

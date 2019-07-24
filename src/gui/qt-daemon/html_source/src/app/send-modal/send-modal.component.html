@@ -1,0 +1,26 @@
+<div class="modal">
+  <div class="content">
+    <div class="message-container">
+      <div class="message-block">
+        <span class="message-label">{{ 'CONFIRM.MESSAGE.SEND' | translate }}</span>
+        <span class="message-text">{{ form.get('amount').value }} {{variablesService.defaultCurrency}}</span>
+      </div>
+      <div class="message-block">
+        <span class="message-label">{{ 'CONFIRM.MESSAGE.FROM' | translate }}</span>
+        <span class="message-text">{{ variablesService.currentWallet.address }}</span>
+      </div>
+      <div class="message-block">
+        <span class="message-label">{{ 'CONFIRM.MESSAGE.TO' | translate }}</span>
+        <span class="message-text">{{ form.get('address').value }}</span>
+      </div>
+      <div class="message-block" *ngIf="form.get('comment').value != null">
+        <span class="message-label">{{ 'CONFIRM.MESSAGE.COMMENT' | translate }}</span>
+        <span class="message-text">{{ form.get('comment').value }}</span>
+      </div>  
+    </div>
+  </div>
+  <div class="wrapper-buttons">
+    <button type="button" class="blue-button" (click)="confirm()">{{ 'CONFIRM.BUTTON_CONFIRM' | translate }}</button>
+    <button type="button" class="blue-button" (click)="onClose()">{{ 'CONFIRM.BUTTON_CANCEL' | translate }}</button>
+  </div>
+</div>
