@@ -21,8 +21,7 @@
 
   <div class="wrap-buttons">
     <button type="button" class="blue-button seed-phrase-button" (click)="runWallet()">{{ 'SEED_PHRASE.BUTTON_CREATE_ACCOUNT' | translate }}</button>
-    <button type="button" class="blue-button copy-button" *ngIf="!seedPhraseCopied" (click)="copySeedPhrase()">{{ 'SEED_PHRASE.BUTTON_COPY' | translate }}</button>
-    <button type="button" class="transparent-button copy-button" *ngIf="seedPhraseCopied" disabled><i class="icon"></i>{{ 'SEED_PHRASE.BUTTON_COPY' | translate }}</button>
+    <button type="button" class="blue-button copy-button" (click)="copySeedPhrase()">{{ 'SEED_PHRASE.BUTTON_COPY' | translate }}</button>
   </div>
 </div>
 
