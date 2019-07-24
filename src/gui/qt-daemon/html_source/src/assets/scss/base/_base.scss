@@ -1016,6 +1016,7 @@ app-send-modal {
       color: themed(mainTextColor);
     }
 
+<<<<<<< HEAD
     .title {
 
       @include themify($themes) {
@@ -1024,6 +1025,8 @@ app-send-modal {
 
     }
 
+=======
+>>>>>>> confirm modal
     .action-button {
 
       @include themify($themes) {

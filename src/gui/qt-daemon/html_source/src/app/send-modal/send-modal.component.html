@@ -1,4 +1,5 @@
 <div class="modal">
+<<<<<<< HEAD
   <div class="title">
     <span>{{ 'CONFIRM.TITLE' | translate }}</span>
   </div>
@@ -22,6 +23,26 @@
           <div class="message-text">{{ form.get('comment').value }}</div>
         </div>  
       </ng-container>   
+=======
+  <div class="content">
+    <div class="message-container">
+      <div class="message-block">
+        <span class="message-label">{{ 'CONFIRM.MESSAGE.SEND' | translate }}</span>
+        <span class="message-text">{{ form.get('amount').value }} {{variablesService.defaultCurrency}}</span>
+      </div>
+      <div class="message-block">
+        <span class="message-label">{{ 'CONFIRM.MESSAGE.FROM' | translate }}</span>
+        <span class="message-text">{{ variablesService.currentWallet.address }}</span>
+      </div>
+      <div class="message-block">
+        <span class="message-label">{{ 'CONFIRM.MESSAGE.TO' | translate }}</span>
+        <span class="message-text">{{ form.get('address').value }}</span>
+      </div>
+      <div class="message-block" *ngIf="form.get('comment').value != null">
+        <span class="message-label">{{ 'CONFIRM.MESSAGE.COMMENT' | translate }}</span>
+        <span class="message-text">{{ form.get('comment').value }}</span>
+      </div>  
+>>>>>>> confirm modal
     </div>
   </div>
   <div class="wrapper-buttons">

@@ -53,11 +53,14 @@ import exporting from 'highcharts/modules/exporting.src';
 import { ProgressContainerComponent } from './_helpers/directives/progress-container/progress-container.component';
 import { InputDisableSelectionDirective } from './_helpers/directives/input-disable-selection/input-disable-selection.directive';
 import { SendModalComponent } from './send-modal/send-modal.component';
+<<<<<<< HEAD
 import { ContactsComponent } from './contacts/contacts.component';
 import { AddContactsComponent } from './add-contacts/add-contacts.component';
 import { ContactSendComponent } from './contact-send/contact-send.component';
 import { ExportImportComponent } from './export-import/export-import.component';
 import { ConfirmModalComponent } from './_helpers/directives/confirm-modal/confirm-modal.component';
+=======
+>>>>>>> confirm modal
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json');
@@ -117,6 +120,7 @@ export function highchartsFactory() {
     TransactionDetailsComponent,
     ProgressContainerComponent,
     InputDisableSelectionDirective,
+<<<<<<< HEAD
     SendModalComponent,
     ContactsComponent,
     AddContactsComponent,
@@ -124,6 +128,9 @@ export function highchartsFactory() {
     ExportImportComponent,
     SafeHTMLPipe,
     ConfirmModalComponent
+=======
+    SendModalComponent
+>>>>>>> confirm modal
   ],
   imports: [
     BrowserModule,
@@ -153,8 +160,12 @@ export function highchartsFactory() {
   ],
   entryComponents: [
     ModalContainerComponent,
+<<<<<<< HEAD
     SendModalComponent,
     ConfirmModalComponent
+=======
+    SendModalComponent
+>>>>>>> confirm modal
   ],
   bootstrap: [AppComponent]
 })
