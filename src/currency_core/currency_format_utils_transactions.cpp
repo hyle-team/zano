@@ -32,7 +32,7 @@ namespace currency
     return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
   }
   //---------------------------------------------------------------
-  inline uint64_t get_tx_unlock_time(const transaction& tx, uint64_t o_i)
+  uint64_t get_tx_unlock_time(const transaction& tx, uint64_t o_i)
   { 
     // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
     uint64_t v = get_tx_x_detail<etc_tx_details_unlock_time>(tx); 
@@ -54,7 +54,7 @@ namespace currency
     return ut2.unlock_time_array[o_i];
   }
   //---------------------------------------------------------------
-  inline bool get_tx_max_min_unlock_time(const transaction& tx, uint64_t& max_unlock_time, uint64_t& min_unlock_time)
+  bool get_tx_max_min_unlock_time(const transaction& tx, uint64_t& max_unlock_time, uint64_t& min_unlock_time)
   {
     max_unlock_time = min_unlock_time = 0;
     // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
