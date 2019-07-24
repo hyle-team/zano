@@ -563,12 +563,14 @@ namespace currency
     uint64_t index;
     crypto::key_image keyimage;
     uint64_t block_timestamp;
+    uint64_t stake_unlock_time;
     //not for serialization
     uint64_t wallet_index;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
       KV_SERIALIZE(index)
+      KV_SERIALIZE(stake_unlock_time)
       KV_SERIALIZE(block_timestamp)
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(keyimage)
     END_KV_SERIALIZE_MAP()

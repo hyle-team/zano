@@ -32,6 +32,31 @@ namespace currency
     return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
   }
   //---------------------------------------------------------------
+  uint64_t get_tx_max_unlock_time(const transaction& tx)
+  {
+    // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
+    uint64_t v = get_tx_x_detail<etc_tx_details_unlock_time>(tx);
+    if (v)
+      return v;
+
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    get_type_in_variant_container(tx.extra, ut2);
+    if (!ut2.unlock_time_array.size())
+      return 0;
+
+    uint64_t max_unlock_time = 0;
+    CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "unlock_time_array.size=" << ut2.unlock_time_array.size()
+      << " is not the same as  tx.vout.size =" << tx.vout.size() << " in tx: " << get_transaction_hash(tx));
+    for (size_t i = 0; i != tx.vout.size(); i++)
+    {
+      if (ut2.unlock_time_array[i] > max_unlock_time)
+        max_unlock_time = ut2.unlock_time_array[i];
+    }
+
+    return max_unlock_time;
+  }
+
+  //---------------------------------------------------------------
   uint64_t get_tx_unlock_time(const transaction& tx, uint64_t o_i)
   { 
     // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2

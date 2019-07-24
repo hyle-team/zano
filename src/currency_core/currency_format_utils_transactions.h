@@ -51,17 +51,20 @@ namespace currency
     std::list<account_public_address>   addr;        //destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
     size_t   minimum_sigs;                           // if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
     uint64_t amount_to_provide;                      //amount money that provided by initial creator of tx, used with partially created transactions
+    uint64_t unlock_time;
 
-    tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0) {}
-    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0) {}
-    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0) {}
+    tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0), unlock_time(0){}
+    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(0){}
+    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t unlock_time) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0) {}
+    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0), unlock_time(0){}
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(amount)
       FIELD(addr)
       FIELD(minimum_sigs)
       FIELD(amount_to_provide)
-      END_SERIALIZE()
+      FIELD(unlock_time)
+    END_SERIALIZE()
   };
 
   template<class extra_type_t>
@@ -80,6 +83,7 @@ namespace currency
   }
 
   uint64_t get_tx_unlock_time(const transaction& tx, uint64_t o_i);
+  uint64_t get_tx_max_unlock_time(const transaction& tx);
   bool get_tx_max_min_unlock_time(const transaction& tx, uint64_t& max_unlock_time, uint64_t& min_unlock_time);
   inline uint64_t get_tx_flags(const transaction& tx) { return get_tx_x_detail<etc_tx_details_flags>(tx); }
   inline uint64_t get_tx_expiration_time(const transaction& tx) {return get_tx_x_detail<etc_tx_details_expiration_time>(tx); }
@@ -87,6 +91,7 @@ namespace currency
   inline void set_tx_flags(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_flags>(tx, v); }
   inline void set_tx_expiration_time(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_expiration_time>(tx, v); }
   account_public_address get_crypt_address_from_destinations(const account_keys& sender_account_keys, const std::vector<tx_destination_entry>& destinations);
+
 
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median);
 

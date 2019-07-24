@@ -683,6 +683,7 @@ namespace tools
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, const currency::account_public_address& miner_address, uint64_t new_block_expected_height = UINT64_MAX);
     bool reset_history();
     bool is_transfer_unlocked(const transfer_details& td) const;
+    bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
     void get_mining_history(wallet_rpc::mining_history& hist);
     void set_core_runtime_config(const currency::core_runtime_config& pc);  
     currency::core_runtime_config& get_core_runtime_config();
@@ -720,7 +721,7 @@ namespace tools
     void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx);
 
     std::string get_log_prefix() const { return m_log_prefix; }
-
+    static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const tools::money_transfer2_details& td);
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
@@ -768,7 +769,7 @@ private:
     std::string get_alias_for_address(const std::string& addr);
     static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, currency::stake_kernel& kernel, uint64_t& coindays_weight, uint64_t timestamp);
     bool is_connected_to_net();
-    bool is_transfer_okay_for_pos(const transfer_details& tr);
+    bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time);
     bool scan_unconfirmed_outdate_tx();
     const currency::transaction& get_transaction_by_id(const crypto::hash& tx_hash);
     void rise_on_transfer2(const wallet_rpc::wallet_transfer_info& wti);
@@ -815,6 +816,7 @@ private:
       const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd,
       const currency::transaction& proposal_template_tx);
 
+    
     void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_rpc::wallet_transfer_info_details& res_td) const;
     void print_source_entry(const currency::tx_source_entry& src) const;
 
@@ -954,7 +956,7 @@ namespace boost
       //do not store this items in the file since it's quite easy to restore it from original tx 
       if (Archive::is_loading::value)
       {
-        x.unlock_time = currency::get_tx_unlock_time(x.tx);        
+        x.unlock_time = wallet::get_max_unlock_time_from_receive_indices(x.tx, x.td)
         x.is_service = currency::is_service_tx(x.tx);
         x.is_mixing = currency::is_mixin_tx(x.tx);
         x.is_mining = currency::is_coinbase(x.tx);

@@ -110,16 +110,37 @@ namespace currency
     std::vector<tx_destination_entry> destinations;
     for (auto a : out_amounts)
     {
-      tx_destination_entry de;
+      tx_destination_entry de = AUTO_VAL_INIT(de);
       de.addr.push_back(miner_address);
       de.amount = a;
       destinations.push_back(de);
     }
 
     if (pos)
-      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address));
+      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, pe.stake_unlock_time));
 
     return construct_miner_tx(height, median_size, already_generated_coins, current_block_size, fee, destinations, tx, extra_nonce, max_outs, pos, pe);
+  }
+  //------------------------------------------------------------------
+  bool apply_unlock_time(const std::vector<tx_destination_entry>& destinations, transaction& tx)
+  {
+    currency::etc_tx_details_unlock_time2 unlock_time2 = AUTO_VAL_INIT(unlock_time2);
+    unlock_time2.unlock_time_array.resize(destinations.size());
+    bool found_unlock_time = false;
+    for (size_t i = 0; i != unlock_time2.unlock_time_array.size(); i++)
+    {
+      if (destinations[i].unlock_time)
+      {
+        found_unlock_time = true;
+        unlock_time2.unlock_time_array[i] = destinations[i].unlock_time;
+      }
+    }
+    if (found_unlock_time)
+    {
+      tx.extra.push_back(unlock_time2);
+    }
+
+    return true;
   }
   //------------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
@@ -144,8 +165,7 @@ namespace currency
       if (!add_tx_extra_userdata(tx, extra_nonce))
         return false;
 
-    //we always add extra_padding with 2 bytes length to make possible for get_block_template to adjust cumulative size
-    tx.extra.push_back(extra_padding());
+
 
     txin_gen in;
     in.height = height;
@@ -172,6 +192,11 @@ namespace currency
       no++;
     }
 
+    //at this moment we do apply_unlock_time only for coin_base transactions 
+    apply_unlock_time(destinations, tx);
+
+    //we always add extra_padding with 2 bytes length to make possible for get_block_template to adjust cumulative size
+    tx.extra.push_back(extra_padding());
 
     tx.version = CURRENT_TRANSACTION_VERSION;
     set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);

@@ -33,6 +33,35 @@ using namespace currency;
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
 namespace tools
 {
+
+  //---------------------------------------------------------------
+  uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const tools::money_transfer2_details& td)
+  {
+    uint64_t max_unlock_time = 0;
+    // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
+    uint64_t major_unlock_time = get_tx_x_detail<etc_tx_details_unlock_time>(tx);
+    if (major_unlock_time)
+      return major_unlock_time;
+
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    get_type_in_variant_container(tx.extra, ut2);
+    if (!ut2.unlock_time_array.size())
+      return 0;
+
+    CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "Internal error: wrong tx transfer details: ut2.unlock_time_array.size()" << ut2.unlock_time_array.size() << " is not equal transaction outputs vector size=" << tx.vout.size());
+
+    for (auto ri : td.receive_indices)
+    {
+      CHECK_AND_ASSERT_THROW_MES(ri < tx.vout.size(), "Internal error: wrong tx transfer details: reciev index=" << ri << " is greater than transaction outputs vector " << tx.vout.size());
+      if (tx.vout[ri].target.type() == typeid(currency::txout_to_key))
+      {
+        //update unlock_time if needed
+        if (ut2.unlock_time_array[ri] > max_unlock_time)
+          max_unlock_time = ut2.unlock_time_array[ri];
+      }
+    }
+    return max_unlock_time;
+  }
 //----------------------------------------------------------------------------------------------------
 void wallet2::fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_rpc::wallet_transfer_info_details& res_td) const
 {
@@ -48,7 +77,9 @@ void wallet2::fill_transfer_details(const currency::transaction& tx, const tools
   {
     WLT_CHECK_AND_ASSERT_MES(ri < tx.vout.size(), void(), "Internal error: wrong tx transfer details: reciev index=" << ri << " is greater than transaction outputs vector " << tx.vout.size());
     if (tx.vout[ri].target.type() == typeid(currency::txout_to_key))
+    {
       res_td.rcv.push_back(tx.vout[ri].amount);
+    }
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -258,8 +289,14 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     i++;
   }
 
-  //check for transaction income
+  /*
+  collect unlock_time from every output that transfered coins to this account and use maximum of
+  all values m_payments entry, use this strict policy is required to protect exchanges from being feeded with
+  useless outputs
+  */
+  uint64_t max_out_unlock_time = 0;
 
+  //check for transaction income
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, tx_money_got_in_outs, derivation);
   THROW_IF_TRUE_WALLET_EX(!r, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
@@ -355,6 +392,10 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         if (td.m_key_image != currency::null_ki)
           m_key_images[td.m_key_image] = transfer_index;
         add_transfer_to_transfers_cache(tx.vout[o].amount, transfer_index);
+
+        if (max_out_unlock_time < get_tx_unlock_time(tx, o))
+          max_out_unlock_time = get_tx_unlock_time(tx, o);
+
         WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
       }
       else if (tx.vout[o].target.type() == typeid(txout_multisig))
@@ -379,7 +420,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
       payment.m_tx_hash      = currency::get_transaction_hash(tx);
       payment.m_amount       = received;
       payment.m_block_height = height;
-      payment.m_unlock_time = currency::get_tx_unlock_time(tx);
+      payment.m_unlock_time = max_out_unlock_time;
       m_payments.emplace(payment_id, payment);
       WLT_LOG_L2("Payment found, id (hex): " << epee::string_tools::buff_to_hex_nodelimer(payment_id) << ", tx: " << payment.m_tx_hash << ", amount: " << print_money_brief(payment.m_amount));
     }
@@ -919,9 +960,9 @@ void wallet2::prepare_wti(wallet_rpc::wallet_transfer_info& wti, uint64_t height
   wti.amount = amount;
   wti.height = height;
   fill_transfer_details(tx, td, wti.td);
+  wti.unlock_time = get_max_unlock_time_from_receive_indices(tx, td);
   wti.timestamp = timestamp;
   wti.fee = currency::is_coinbase(tx) ? 0:currency::get_tx_fee(tx);
-  wti.unlock_time = get_tx_unlock_time(tx);
   wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
   wti.tx_hash = currency::get_transaction_hash(tx);
   wti.is_service = currency::is_service_tx(tx);
@@ -2398,15 +2439,16 @@ bool wallet2::get_transfer_address(const std::string& adr_str, currency::account
   return m_core_proxy->get_transfer_address(adr_str, addr, payment_id);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr)
+bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time)
 {
   if (!tr.is_spendable())
     return false;
 
   //blockchain conditions
-  if (!is_transfer_unlocked(tr))
+  if (!is_transfer_unlocked(tr, true, stake_unlock_time))
     return false;
 
+  //prevent staking of after-last-pow-coins
   if (m_blockchain.size() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age)
     return false;
   
@@ -2436,13 +2478,15 @@ bool wallet2::get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req)
   for (size_t i = 0; i != m_transfers.size(); i++)
   {
     auto& tr = m_transfers[i];
-    if (!is_transfer_okay_for_pos(tr))
+    uint64_t stake_unlock_time = 0;
+    if (!is_transfer_okay_for_pos(tr, stake_unlock_time))
       continue;
     currency::pos_entry pe = AUTO_VAL_INIT(pe);
     pe.amount = tr.amount();
     pe.index = tr.m_global_output_index;
     pe.keyimage = tr.m_key_image;
     pe.wallet_index = i;
+    pe.stake_unlock_time = stake_unlock_time;
     pe.block_timestamp = tr.m_ptx_wallet_info->m_block_timestamp;
     req.pos_entries.push_back(pe);
   }
@@ -2619,6 +2663,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     tmpl_req.pos_amount = req.pos_entries[rsp.index].amount;
     tmpl_req.pos_index = req.pos_entries[rsp.index].index;
     tmpl_req.extra_text = m_miner_text_info;
+    tmpl_req.stake_unlock_time = req.pos_entries[rsp.index].stake_unlock_time;
     m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
     WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == CORE_RPC_STATUS_OK, false, "Failed to create block template after kernel hash found!");
 
@@ -2702,15 +2747,31 @@ currency::core_runtime_config& wallet2::get_core_runtime_config()
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_transfer_unlocked(const transfer_details& td) const
 {
+  uint64_t stub = 0;
+  return is_transfer_unlocked(td, false, stub);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const
+{
   if (td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_BLOCKED)
     return false; 
 
-  if (!currency::is_tx_spendtime_unlocked(get_tx_unlock_time(td.m_ptx_wallet_info->m_tx), m_blockchain.size(), m_core_runtime_config.get_core_time()))
+  if (td.m_ptx_wallet_info->m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE > m_blockchain.size())
     return false;
 
-  if(td.m_ptx_wallet_info->m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE > m_blockchain.size())
-    return false;
+  
 
+  uint64_t unlock_time = get_tx_unlock_time(td.m_ptx_wallet_info->m_tx, td.m_internal_output_index);
+  if (for_pos_mining && m_blockchain.size() > m_core_runtime_config.hard_fork1_starts_after_height)
+  {
+    //allowed of staking locked coins with 
+    stake_lock_time = unlock_time;
+  }
+  else
+  {
+    if (!currency::is_tx_spendtime_unlocked(unlock_time, m_blockchain.size(), m_core_runtime_config.get_core_time()))
+      return false;
+  }
   return true;
 }
 //----------------------------------------------------------------------------------------------------
