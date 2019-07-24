@@ -491,6 +491,16 @@
       "COMMENT": "Comment"
     }
   },
+  "CONFIRM": {
+    "BUTTON_CONFIRM": "Confirm",
+    "BUTTON_CANCEL": "Cancel",
+    "MESSAGE": {
+      "SEND": "Send",
+      "FROM": "From",
+      "TO": "To",
+      "COMMENT": "Comment"
+    }
+  },
   "STAKING": {
     "TITLE": "Staking",
     "TITLE_PENDING": "Pending",
