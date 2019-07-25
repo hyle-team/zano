@@ -229,7 +229,9 @@ simple_wallet::simple_wallet()
 }
 //----------------------------------------------------------------------------------------------------
 
-
+simple_wallet::~simple_wallet()
+{
+}
 bool simple_wallet::enable_concole_logger(const std::vector<std::string> &args)
 {
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_0);
@@ -1517,13 +1519,12 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
-  try
-    {
-      TRY_ENTRY();
-
 #ifdef WIN32
-  _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
+  _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+  //_CrtSetBreakAlloc(9594);
 #endif
+
+  TRY_ENTRY();
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     std::cout << "\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address; // in case error happens before log init
@@ -1563,6 +1564,7 @@ int main(int argc, char* argv[])
   positional_options.add(arg_command.name, -1);
 
   shared_ptr<currency::simple_wallet> sw(new currency::simple_wallet);
+
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
   po::variables_map vm;
@@ -1613,7 +1615,7 @@ int main(int argc, char* argv[])
 
   bool offline_mode = command_line::get_arg(vm, arg_offline_mode);
 
-  if(command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
+  if (command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
   {
     // runs wallet as RPC server
     log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
@@ -1647,8 +1649,8 @@ int main(int argc, char* argv[])
       }
     }
 
-    std::string wallet_file     = command_line::get_arg(vm, arg_wallet_file);
-    std::string daemon_address  = command_line::get_arg(vm, arg_daemon_address);
+    std::string wallet_file = command_line::get_arg(vm, arg_wallet_file);
+    std::string daemon_address = command_line::get_arg(vm, arg_daemon_address);
     std::string daemon_host = command_line::get_arg(vm, arg_daemon_host);
     int daemon_port = command_line::get_arg(vm, arg_daemon_port);
     if (daemon_host.empty())
@@ -1751,11 +1753,6 @@ int main(int argc, char* argv[])
     }
   }
 
-      CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
-    }
-  catch (...)
-    {
-      return EXIT_FAILURE;
-    }
+  CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
   return EXIT_SUCCESS;
 }
