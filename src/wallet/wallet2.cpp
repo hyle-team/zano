@@ -2823,7 +2823,7 @@ void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, cur
   bc_services::put_offer_into_attachment(co, attachments);
 
   destinations.push_back(tx_dest);
-  uint64_t fee = 0; // use zero fee for offer cancellation transaction
+  uint64_t fee = TX_DEFAULT_FEE;
   transfer(destinations, 0, 0, fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx);
 }
 //----------------------------------------------------------------------------------------------------
