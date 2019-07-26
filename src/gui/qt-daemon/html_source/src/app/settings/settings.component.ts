@@ -72,6 +72,7 @@ export class SettingsComponent implements OnInit {
   ];
 
   currentBuild = '';
+  appPass: any;
 
   constructor(
     private renderer: Renderer2,
@@ -123,13 +124,36 @@ export class SettingsComponent implements OnInit {
     if (this.changeForm.valid) {
       this.variablesService.appPass = this.changeForm.get('new_password').value;
       if (this.variablesService.appPass) {
-        this.backend.storeSecureAppData();
+        this.backend.setMasterPassword({pass: this.variablesService.appPass}, (status, data) => {
+          if (status) {
+            this.backend.storeSecureAppData({pass: this.variablesService.appPass});
+            this.variablesService.appLogin = true;
+            this.variablesService.dataIsLoaded = true;
+            this.variablesService.startCountdown();
+            // this.ngZone.run(() => {
+            //   this.router.navigate(['/']);
+            // });
+          } else {
+            console.log(data['error_code']);
+          }
+        
+        })
       } else {
         this.backend.dropSecureAppData();
       }
       this.changeForm.reset();
     }
   }
+
+
+      /*if (this.variablesService.appPass) {
+        this.backend.storeSecureAppData({pass: this.variablesService.appPass});
+      } else {
+        this.backend.dropSecureAppData();
+      }
+      this.changeForm.reset();
+    }
+  }*/
 
   onLockChange() {
     if (this.variablesService.appLogin) {
