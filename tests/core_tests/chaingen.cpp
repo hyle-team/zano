@@ -191,7 +191,7 @@ bool test_generator::construct_block(currency::block& blk,
                                      const std::list<currency::transaction>& tx_list, 
                                      const std::list<currency::account_base>& coin_stake_sources)//in case of PoS block
 {
-  blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+  blk.major_version = BLOCK_MAJOR_VERSION_INITAL;
   blk.minor_version = CURRENT_BLOCK_MINOR_VERSION;
   blk.timestamp = timestamp;
   blk.prev_id = prev_id;
@@ -786,7 +786,7 @@ bool test_generator::construct_block(const std::vector<test_event_entry>& events
                                               size_t txs_sizes/* = 0*/)
 {
   size_t height = get_block_height(prev_block) + 1;
-  blk.major_version = actual_params & bf_major_ver ? major_ver : CURRENT_BLOCK_MAJOR_VERSION;
+  blk.major_version = actual_params & bf_major_ver ? major_ver : BLOCK_MAJOR_VERSION_INITAL;
   blk.minor_version = actual_params & bf_minor_ver ? minor_ver : CURRENT_BLOCK_MINOR_VERSION;
   blk.timestamp     = actual_params & bf_timestamp ? timestamp : (height > 10 ? prev_block.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN: prev_block.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN-POW_DIFF_UP_TIMESTAMP_DELTA); // Keep difficulty unchanged
   blk.prev_id       = actual_params & bf_prev_id   ? prev_id   : get_block_hash(prev_block);
@@ -1197,10 +1197,10 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
                 continue;
             if (check_for_unlocktime)
             {
-              if (currency::get_tx_unlock_time(*oi.p_tx) < CURRENCY_MAX_BLOCK_NUMBER)
+              if (currency::get_tx_max_unlock_time(*oi.p_tx) < CURRENCY_MAX_BLOCK_NUMBER)
               {
                 //interpret as block index
-                if (currency::get_tx_unlock_time(*oi.p_tx) > blockchain.size())
+                if (currency::get_tx_max_unlock_time(*oi.p_tx) > blockchain.size())
                   continue;
               }
               else

@@ -1194,7 +1194,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, unlock_time, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  CHECK_AND_ASSERT_MES(get_tx_unlock_time(tx_1) == unlock_time, false, "Unlock time was not correctly set");
+  CHECK_AND_ASSERT_MES(get_tx_max_unlock_time(tx_1) == unlock_time, false, "Unlock time was not correctly set");
   events.push_back(tx_1);
 
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);

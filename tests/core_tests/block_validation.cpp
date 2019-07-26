@@ -193,7 +193,7 @@ bool gen_block_unlock_time_is_low::generate(std::vector<test_event_entry>& event
   BLOCK_VALIDATION_INIT_GENERATE();
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
-  currency::set_tx_unlock_time(miner_tx, currency::get_tx_unlock_time(miner_tx) - 1);
+  currency::set_tx_unlock_time(miner_tx, currency::get_tx_max_unlock_time(miner_tx) - 1);
 
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_miner_tx, 0, 0, 0, crypto::hash(), 0, miner_tx);
@@ -209,7 +209,7 @@ bool gen_block_unlock_time_is_high::generate(std::vector<test_event_entry>& even
   BLOCK_VALIDATION_INIT_GENERATE();
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
-  set_tx_unlock_time(miner_tx, get_tx_unlock_time(miner_tx) + 1);
+  set_tx_unlock_time(miner_tx, get_tx_max_unlock_time(miner_tx) + 1);
 
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_miner_tx, 0, 0, 0, crypto::hash(), 0, miner_tx);

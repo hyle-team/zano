@@ -1718,7 +1718,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
   const block_extended_info& alt_chain_bei = alt_chain.back()->second;
   const block_extended_info& connection_point = alt_chain.front()->second;
 
-  if (alt_chain_bei.bl.major_version == BLOCK_MAJOR_VERSION_INITAL || connection_point.height <= m_core_runtime_config.hard_fork1_starts_after_height)
+  if (connection_point.height <= m_core_runtime_config.hard_fork1_starts_after_height)
   {
     //use pre-hard fork, old-style comparing
     if (main_chain_bei.cumulative_diff_adjusted < alt_chain_bei.cumulative_diff_adjusted)
@@ -1739,7 +1739,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       return true;
     }
   }
-  else if (alt_chain_bei.bl.major_version == CURRENT_BLOCK_MAJOR_VERSION)
+  else if (alt_chain_bei.height > m_core_runtime_config.hard_fork1_starts_after_height)
   {
     //new rules, applied after HARD_FORK_1
     //to learn this algo please read https://github.com/hyle-team/docs/blob/master/zano/PoS_Analysis_and_improvements_proposal.pdf
@@ -4819,7 +4819,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   //////////////////////////////////////////////////////////////////////////
   // rebuild cumulative_diff_precise_adjusted for whole period 
   wide_difficulty_type diff_precise_adj = correct_difficulty_with_sequence_factor(sequence_factor, current_diffic);
-  bei.cumulative_diff_precise_adjusted = m_db_blocks[last_x_h]->cumulative_diff_precise_adjusted + diff_precise_adj;
+  bei.cumulative_diff_precise_adjusted = last_x_h ? m_db_blocks[last_x_h]->cumulative_diff_precise_adjusted + diff_precise_adj : diff_precise_adj;
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -5028,7 +5028,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       return false;
     }
 
-    if (prevalidate_block(bl))
+    if (!prevalidate_block(bl))
     {
       LOG_PRINT_RED_L0("block with id = " << id << " failed to prevalidate");
       bvc.m_added_to_main_chain = false;

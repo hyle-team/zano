@@ -222,6 +222,9 @@ namespace currency
     bool have_tx_keyimg_as_spent(const crypto::key_image &key_im, uint64_t before_height = UINT64_MAX) const;
     std::shared_ptr<transaction> get_tx(const crypto::hash &id) const;
 
+
+    template<class visitor_t>
+    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis) { uint64_t stub = 0; return scan_outputkeys_for_indexes(validated_tx, tx_in_to_key, vis, stub); }
     template<class visitor_t>
     bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t& max_related_block_height) const ;
 
@@ -708,7 +711,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << tx_in_to_key.key_offsets.size());
       
       TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-      if (!vis.handle_output(tx_ptr->tx, validated_tx, tx_ptr->tx.vout[n], output_index))
+      if (!vis.handle_output(tx_ptr->tx, validated_tx, tx_ptr->tx.vout[n], n))
       {
         LOG_PRINT_L0("Failed to handle_output for output id = " << tx_id << ", no " << n);
         return false;

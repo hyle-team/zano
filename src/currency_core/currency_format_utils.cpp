@@ -165,6 +165,10 @@ namespace currency
       if (!add_tx_extra_userdata(tx, extra_nonce))
         return false;
 
+    //at this moment we do apply_unlock_time only for coin_base transactions 
+    apply_unlock_time(destinations, tx);
+    //we always add extra_padding with 2 bytes length to make possible for get_block_template to adjust cumulative size
+    tx.extra.push_back(extra_padding());
 
 
     txin_gen in;
@@ -191,12 +195,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(r, false, "Failed to contruct miner tx out");
       no++;
     }
-
-    //at this moment we do apply_unlock_time only for coin_base transactions 
-    apply_unlock_time(destinations, tx);
-
-    //we always add extra_padding with 2 bytes length to make possible for get_block_template to adjust cumulative size
-    tx.extra.push_back(extra_padding());
+    
 
     tx.version = CURRENT_TRANSACTION_VERSION;
     set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
