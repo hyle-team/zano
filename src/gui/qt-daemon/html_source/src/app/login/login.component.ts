@@ -26,8 +26,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     password: new FormControl('')
   });
 
-  type = 'reg';
-  appPass: any; 
+  type = 'reg'; 
 
   constructor(
     private route: ActivatedRoute,
@@ -68,7 +67,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   onSkipCreatePass(): void {
-    // this.variablesService.appPass = '';
+    this.variablesService.appPass = '';
     this.ngZone.run(() => {
       this.variablesService.appLogin = true;
       this.router.navigate(['/']);

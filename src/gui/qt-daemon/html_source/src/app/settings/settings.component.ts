@@ -130,9 +130,6 @@ export class SettingsComponent implements OnInit {
             this.variablesService.appLogin = true;
             this.variablesService.dataIsLoaded = true;
             this.variablesService.startCountdown();
-            // this.ngZone.run(() => {
-            //   this.router.navigate(['/']);
-            // });
           } else {
             console.log(data['error_code']);
           }
@@ -144,17 +141,7 @@ export class SettingsComponent implements OnInit {
       this.changeForm.reset();
     }
   }
-
-
-      /*if (this.variablesService.appPass) {
-        this.backend.storeSecureAppData({pass: this.variablesService.appPass});
-      } else {
-        this.backend.dropSecureAppData();
-      }
-      this.changeForm.reset();
-    }
-  }*/
-
+  
   onLockChange() {
     if (this.variablesService.appLogin) {
       this.variablesService.restartCountdown();
