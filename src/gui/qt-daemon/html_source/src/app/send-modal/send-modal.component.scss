@@ -16,6 +16,7 @@
   background-position: center;
   background-size: 200%;
 <<<<<<< HEAD
+<<<<<<< HEAD
   padding: 0.3rem 3rem 3rem 3rem;
   width: 64rem;
 
@@ -30,18 +31,32 @@
     font-size: 1.4rem;
 =======
   padding: 2rem;
+=======
+  padding: 0.3rem 3rem 3rem 3rem;
+>>>>>>> confirm pop up
   width: 64rem;
+
+  .title {
+    padding: 1.4rem 0;
+    font-size: 1.8rem;
+    line-height: 3rem;
+  }
 
   .content {
     display: flex;
+<<<<<<< HEAD
     margin: 1.2rem 0;
 >>>>>>> confirm modal
+=======
+    font-size: 1.4rem;
+>>>>>>> confirm pop up
 
     .message-container {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
       justify-content: center;
+<<<<<<< HEAD
 <<<<<<< HEAD
       margin: 1.4rem 3rem 6.2rem 0;
       
@@ -69,18 +84,42 @@
           line-height: 2rem;
 =======
       margin-left: 2rem;
+=======
+      margin: 1.4rem 3rem 6.2rem 0;
+>>>>>>> confirm pop up
       
       .message-block {
         display: flex;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
+
+        &:first-child {
+
+          .message-label {
+            line-height: 4rem;
+          }
+
+          .message-text {
+            line-height: 4rem;
+          }
+        }
+
+        &:last-child {
+          margin-bottom: 0;
+        }
 
         .message-label {
+<<<<<<< HEAD
           width: 10rem;
 >>>>>>> confirm modal
+=======
+          min-width: 6.7rem;
+          line-height: 2rem;
+>>>>>>> confirm pop up
         }
 
         .message-text {
           overflow-wrap: break-word;
+<<<<<<< HEAD
 <<<<<<< HEAD
           margin-left: 4.8rem;
           width: 43.4rem;
@@ -88,6 +127,11 @@
 =======
           width: 46rem;
 >>>>>>> confirm modal
+=======
+          margin-left: 4.8rem;
+          width: 43.4rem;
+          line-height: 2rem;
+>>>>>>> confirm pop up
         }
       }
 
@@ -101,9 +145,12 @@
 
     button {
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
       margin: 2rem;
 >>>>>>> confirm modal
+=======
+>>>>>>> confirm pop up
       width: 100%;
       max-width: 15rem;
     }

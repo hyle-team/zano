@@ -492,8 +492,9 @@
     }
   },
   "CONFIRM": {
-    "BUTTON_CONFIRM": "Confirm",
+    "BUTTON_CONFIRM": "Send",
     "BUTTON_CANCEL": "Cancel",
+    "TITLE": "Confirm transaction",
     "MESSAGE": {
       "SEND": "Send",
       "FROM": "From",
