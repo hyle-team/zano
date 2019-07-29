@@ -1005,6 +1005,14 @@ app-send-modal {
       color: themed(mainTextColor);
     }
 
+    .title {
+
+      @include themify($themes) {
+        border-bottom: 0.2rem solid themed(transparentButtonBorderColor);
+      }
+
+    }
+
     .action-button {
 
       @include themify($themes) {
