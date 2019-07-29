@@ -74,13 +74,7 @@ export class SendComponent implements OnInit, OnDestroy {
       }
       return null;
     }]),
-    comment: new FormControl('', [(g: FormControl) => {
-      if (g.value > this.variablesService.maxCommentLength) {
-        return {'maxLength': true};
-      } else {
-        return null;
-      }
-    }]),
+    comment: new FormControl(''),
     mixin: new FormControl(0, Validators.required),
     fee: new FormControl(this.variablesService.default_fee, [Validators.required, (g: FormControl) => {
       if ((new BigNumber(g.value)).isLessThan(this.variablesService.default_fee)) {

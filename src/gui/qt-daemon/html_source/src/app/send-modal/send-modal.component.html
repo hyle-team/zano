@@ -16,10 +16,12 @@
         <div class="message-label">{{ 'CONFIRM.MESSAGE.TO' | translate }}</div>
         <div class="message-text">{{ form.get('address').value }}</div>
       </div>
-      <div class="message-block" *ngIf="form.get('comment').value != null">
-        <div class="message-label">{{ 'CONFIRM.MESSAGE.COMMENT' | translate }}</div>
-        <div class="message-text">{{ form.get('comment').value }}</div>
-      </div>  
+      <ng-container *ngIf="form.get('comment').value != ''">
+        <div class="message-block" *ngIf="form.get('comment').value != null">
+          <div class="message-label">{{ 'CONFIRM.MESSAGE.COMMENT' | translate }}</div>
+          <div class="message-text">{{ form.get('comment').value }}</div>
+        </div>  
+      </ng-container>   
     </div>
   </div>
   <div class="wrapper-buttons">
