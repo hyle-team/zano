@@ -305,6 +305,13 @@ export class BackendService {
     this.runCommand('get_secure_app_data', pass, callback);
   }
 
+  setMasterPassword(pass, callback) {
+    this.runCommand('set_master_password', pass, callback);
+  }
+
+  checkMasterPassword(pass, callback) {
+    this.runCommand('check_master_password', pass, callback);
+  }
   storeSecureAppData(callback?) {
     const wallets = [];
     this.variablesService.wallets.forEach((wallet) => {

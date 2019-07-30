@@ -1730,6 +1730,7 @@ void wallet2::detach_blockchain(uint64_t height)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::deinit()
 {
+  m_wcallback.reset();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2732,7 +2733,7 @@ const transaction& wallet2::get_transaction_by_id(const crypto::hash& tx_hash)
   ASSERT_MES_AND_THROW("Tx " << tx_hash << " not found in wallet");
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, currency::transaction& res_tx)
+void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, uint64_t fee, currency::transaction& res_tx)
 {
   currency::tx_destination_entry tx_dest;
   tx_dest.addr.push_back(m_account.get_keys().m_account_address);
@@ -2754,8 +2755,7 @@ void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, cur
   crypto::generate_signature(crypto::cn_fast_hash(sig_blob.data(), sig_blob.size()), ephemeral.pub, ephemeral.sec, co.sig);
   bc_services::put_offer_into_attachment(co, attachments);
 
-  destinations.push_back(tx_dest);
-  uint64_t fee = 0; // use zero fee for offer cancellation transaction
+  //destinations.push_back(tx_dest);
   transfer(destinations, 0, 0, fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx);
 }
 //----------------------------------------------------------------------------------------------------

@@ -723,5 +723,3 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
 
 }
-#undef LOG_DEFAULT_CHANNEL 
-#define LOG_DEFAULT_CHANNEL NULL

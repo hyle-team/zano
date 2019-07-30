@@ -1043,8 +1043,48 @@ QString MainWindow::get_secure_app_data(const QString& param)
     return MAKE_RESPONSE(ar);
   }
 
+  m_master_password = pwd.pass;
+
   return app_data_buff.substr(sizeof(app_data_file_binary_header)).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
+}
+
+QString MainWindow::set_master_password(const QString& param)
+{
+  view::password_data pwd = AUTO_VAL_INIT(pwd);
+
+  if (!epee::serialization::load_t_from_json(pwd, param.toStdString()))
+  {
+    view::api_response ar;
+    ar.error_code = API_RETURN_CODE_BAD_ARG;
+    return MAKE_RESPONSE(ar);
+  }
+  m_master_password = pwd.pass;
+
+  view::api_response ar;
+  ar.error_code = API_RETURN_CODE_OK;
+  return MAKE_RESPONSE(ar);
+}
+
+QString MainWindow::check_master_password(const QString& param)
+{
+  view::password_data pwd = AUTO_VAL_INIT(pwd);
+  view::api_response ar = AUTO_VAL_INIT(ar);
+
+  if (!epee::serialization::load_t_from_json(pwd, param.toStdString()))
+  {
+    ar.error_code = API_RETURN_CODE_BAD_ARG;
+    return MAKE_RESPONSE(ar);
+  }
+ 
+  if (m_master_password != pwd.pass)
+  {
+    ar.error_code = API_RETURN_CODE_WRONG_PASSWORD;
+  }else
+  {
+    ar.error_code = API_RETURN_CODE_OK;
+  }
+  return MAKE_RESPONSE(ar);
 }
 
 QString MainWindow::store_app_data(const QString& param)
@@ -1128,7 +1168,7 @@ QString MainWindow::get_app_data()
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::store_secure_app_data(const QString& param, const QString& pass)
+QString MainWindow::store_secure_app_data(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -1139,13 +1179,14 @@ QString MainWindow::store_secure_app_data(const QString& param, const QString& p
     return MAKE_RESPONSE(ar);
   }
 
+
   std::string buff(sizeof(app_data_file_binary_header), 0);
   app_data_file_binary_header* phdr = (app_data_file_binary_header*)buff.data();
   phdr->m_signature = APP_DATA_FILE_BINARY_SIGNATURE;
   phdr->m_cb_body = 0; // for future use
 
   buff.append(param.toStdString());
-  crypto::chacha_crypt(buff, pass.toStdString());
+  crypto::chacha_crypt(buff, m_master_password);
 
   bool r = file_io_utils::save_string_to_file(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME, buff);
   view::api_response ar;
