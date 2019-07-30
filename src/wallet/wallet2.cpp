@@ -2735,11 +2735,6 @@ const transaction& wallet2::get_transaction_by_id(const crypto::hash& tx_hash)
 //----------------------------------------------------------------------------------------------------
 void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, uint64_t fee, currency::transaction& res_tx)
 {
-  currency::tx_destination_entry tx_dest;
-  tx_dest.addr.push_back(m_account.get_keys().m_account_address);
-  prepare_free_transfers_cache(0);
-  tx_dest.amount = m_found_free_amounts.size() ? m_found_free_amounts.begin()->first:m_core_runtime_config.tx_default_fee;
-  std::vector<currency::tx_destination_entry> destinations;
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
   bc_services::cancel_offer co = AUTO_VAL_INIT(co);
@@ -2755,8 +2750,7 @@ void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, uin
   crypto::generate_signature(crypto::cn_fast_hash(sig_blob.data(), sig_blob.size()), ephemeral.pub, ephemeral.sec, co.sig);
   bc_services::put_offer_into_attachment(co, attachments);
 
-  //destinations.push_back(tx_dest);
-  transfer(destinations, 0, 0, fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx);
+  transfer(std::vector<currency::tx_destination_entry>(), 0, 0, fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::update_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, const bc_services::offer_details_ex& od, currency::transaction& res_tx)
