@@ -35,7 +35,10 @@
         <input type="password" id="master-pass-login" formControlName="password" autofocus (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
       </div>
 
-      <button type="submit" class="blue-button">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>
+      <div class="wrap-button">
+        <button type="submit" class="blue-button">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>
+        <button type="button" class="blue-button_reset" (click)="dropSecureAppData()">{{ 'LOGIN.BUTTON_RESET' | translate }}</button>   <!--Add "Reset"-button-->
+      </div> 
 
     </form>
 

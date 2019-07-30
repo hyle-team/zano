@@ -50,6 +50,7 @@ export class VariablesService {
   public enableAliasSearch = false;
   public maxWalletNameLength = 25;
   public maxCommentLength = 255;
+  public dataIsLoaded = false; 
 
   getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);
