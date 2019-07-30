@@ -1,5 +1,6 @@
 {
   "LOGIN": {
+<<<<<<< HEAD
     "SETUP_MASTER_PASS": "Imposta password principale",
     "SETUP_CONFIRM_PASS": "Conferma la password",
     "MASTER_PASS": "Password principale",
@@ -7,6 +8,15 @@
     "BUTTON_SKIP": "Salta",
     "BUTTON_RESET": "Azzera",
     "INCORRECT_PASSWORD": "Password non valida",
+=======
+    "SETUP_MASTER_PASS": "Setup master password",
+    "SETUP_CONFIRM_PASS": "Confirm the password",
+    "MASTER_PASS": "Master password",
+    "BUTTON_NEXT": "Next",
+    "BUTTON_SKIP": "Skip",
+    "BUTTON_RESET": "Reset",
+    "INCORRECT_PASSWORD": "Invalid password",
+>>>>>>> rebuild html
     "FORM_ERRORS": {
       "PASS_REQUIRED": "La password è necessaria",
       "CONFIRM_REQUIRED": "La conferma è necessaria",

@@ -1,5 +1,6 @@
 {
   "LOGIN": {
+<<<<<<< HEAD
     "SETUP_MASTER_PASS": "Master-Passwort einrichten",
     "SETUP_CONFIRM_PASS": "Passwort bestätigen",
     "MASTER_PASS": "Master-Passwort",
@@ -7,6 +8,15 @@
     "BUTTON_SKIP": "Überspringen",
     "BUTTON_RESET": "Zurücksetzen",
     "INCORRECT_PASSWORD": "Ungültiges Passwort",
+=======
+    "SETUP_MASTER_PASS": "Setup master password",
+    "SETUP_CONFIRM_PASS": "Confirm the password",
+    "MASTER_PASS": "Master password",
+    "BUTTON_NEXT": "Next",
+    "BUTTON_SKIP": "Skip",
+    "BUTTON_RESET": "Reset",
+    "INCORRECT_PASSWORD": "Invalid password",
+>>>>>>> rebuild html
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Passwort ist erforderlich",
       "CONFIRM_REQUIRED": "Bestätigung ist erforderlich",
