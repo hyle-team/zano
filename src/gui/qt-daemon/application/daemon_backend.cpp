@@ -1210,6 +1210,11 @@ std::string daemon_backend::request_cancel_contract(size_t wallet_id, const cryp
     //TODO: add some 
     return API_RETURN_CODE_OK;
   }
+  catch (const tools::error::not_enough_money& e)
+  {
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "request_cancel_contract error: API_RETURN_CODE_NOT_ENOUGH_MONEY: " << e.what());
+    return API_RETURN_CODE_NOT_ENOUGH_MONEY;
+  }
   catch (...)
   {
     return API_RETURN_CODE_FAIL;
