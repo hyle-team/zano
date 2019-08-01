@@ -1514,6 +1514,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
 
     alt_block_extended_info abei = AUTO_VAL_INIT(abei);
     abei.bl = b;
+    abei.timestamp = m_core_runtime_config.get_core_time();
     abei.height = alt_chain.size() ? it_prev->second.height + 1 : *ptr_main_prev + 1;
     CHECK_AND_ASSERT_MES_CUSTOM(coinbase_height == abei.height, false, bvc.m_verification_failed = true, "block coinbase height doesn't match with altchain height, declined");
     uint64_t connection_height = alt_chain.size() ? alt_chain.front()->second.height:abei.height;
@@ -1665,6 +1666,11 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
       return r;
     }
     bvc.added_to_altchain = true;
+
+    //protect ourself from altchains container flood
+    if (m_alternative_chains.size() > m_core_runtime_config.max_alt_blocks)
+      prune_aged_alt_blocks();
+
     return true;
   }else
   {
@@ -4210,6 +4216,12 @@ bool blockchain_storage::prune_aged_alt_blocks()
   CRITICAL_REGION_LOCAL1(m_alternative_chains_lock);
   uint64_t current_height = get_current_blockchain_size();
 
+  size_t count_to_delete = 0;
+  if(m_alternative_chains.size() > m_core_runtime_config.max_alt_blocks)
+    count_to_delete = m_alternative_chains.size() - m_core_runtime_config.max_alt_blocks;
+
+  std::map<uint64_t, alt_chain_container::iterator> alts_to_delete;
+
   for(auto it = m_alternative_chains.begin(); it != m_alternative_chains.end();)
   {
     if (current_height > it->second.height && current_height - it->second.height > CURRENCY_ALT_BLOCK_LIVETIME_COUNT)
@@ -4218,8 +4230,27 @@ bool blockchain_storage::prune_aged_alt_blocks()
     }
     else
     {
+      if (count_to_delete)
+      {
+        if (!alts_to_delete.size())
+          alts_to_delete[it->second.timestamp] = it;
+        else
+        {
+          if (it->second.timestamp >= alts_to_delete.rbegin()->first)
+            alts_to_delete[it->second.timestamp] = it;
+
+          if (alts_to_delete.size() > count_to_delete)
+            alts_to_delete.erase(alts_to_delete.begin());
+        }
+      }
+
       ++it;
     }
+  }
+  //now, if there was count_to_delete we should erase most oldest entries of altblocks
+  for (auto& itd : alts_to_delete)
+  {
+    m_alternative_chains.erase(itd.second);
   }
 
   return true;
@@ -4357,11 +4388,11 @@ bool blockchain_storage::validate_pos_block(const block& b,
 
   //check actual time if it there
   uint64_t actual_ts = get_actual_timestamp(b);
-  if ((actual_ts > b.timestamp && actual_ts - b.timestamp > POS_MAC_ACTUAL_TIMESTAMP_TO_MINED) ||
-    (actual_ts < b.timestamp && b.timestamp - actual_ts > POS_MAC_ACTUAL_TIMESTAMP_TO_MINED)
+  if ((actual_ts > b.timestamp && actual_ts - b.timestamp > POS_MAX_ACTUAL_TIMESTAMP_TO_MINED) ||
+    (actual_ts < b.timestamp && b.timestamp - actual_ts > POS_MAX_ACTUAL_TIMESTAMP_TO_MINED)
      )
   {
-    LOG_PRINT_L0("PoS block actual timestamp " << actual_ts << " differs from b.timestamp " << b.timestamp << " by " << ((int64_t)actual_ts - (int64_t)b.timestamp) << " s, it's more than allowed " << POS_MAC_ACTUAL_TIMESTAMP_TO_MINED << " s.");
+    LOG_PRINT_L0("PoS block actual timestamp " << actual_ts << " differs from b.timestamp " << b.timestamp << " by " << ((int64_t)actual_ts - (int64_t)b.timestamp) << " s, it's more than allowed " << POS_MAX_ACTUAL_TIMESTAMP_TO_MINED << " s.");
     return false;
   }
 
@@ -4677,6 +4708,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
   size_t tx_processed_count = 0;
   uint64_t fee_summary = 0;
+  uint64_t burned_coins = 0;
 
   for(const crypto::hash& tx_id : bl.tx_hashes)
   {
@@ -4716,6 +4748,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       return false;
     }
     TIME_MEASURE_FINISH_PD(tx_check_inputs_time);
+    burned_coins += get_burned_amount(tx);
 
     TIME_MEASURE_START_PD(tx_prapare_append);
     uint64_t current_bc_size = get_current_blockchain_size();
@@ -4824,7 +4857,14 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   //////////////////////////////////////////////////////////////////////////
 
   //etc 
-  bei.already_generated_coins = already_generated_coins + base_reward;
+  if (already_generated_coins < burned_coins)
+  {
+    LOG_ERROR("Condition failed: already_generated_coins(" << already_generated_coins << ") >= burned_coins(" << burned_coins << ")");
+    purge_block_data_from_blockchain(bl, tx_processed_count);
+    bvc.m_verification_failed = true;
+    return false;
+  }
+  bei.already_generated_coins = already_generated_coins - burned_coins + base_reward;
 
   auto blocks_index_ptr = m_db_blocks_index.get(id);
   if (blocks_index_ptr)

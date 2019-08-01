@@ -153,6 +153,9 @@ namespace currency
       
       // {amount -> pub_keys} map of outputs' pub_keys appeared in this alt block ( index_in_vector == output_gindex - gindex_lookup_table[output_amount] )
       std::map<uint64_t, std::vector<crypto::public_key> > outputs_pub_keys;
+      
+      //date added to alt chain storage
+      uint64_t timestamp; 
     };
     typedef std::unordered_map<crypto::hash, alt_block_extended_info> alt_chain_container;
     //typedef std::list<alt_chain_container::iterator> alt_chain_type;
@@ -435,6 +438,7 @@ namespace currency
     bool rebuild_tx_fee_medians();
     bool validate_all_aliases_for_new_median_mode();
     bool print_tx_outputs_lookup(const crypto::hash& tx_id) const;
+    uint64_t get_last_x_block_height(bool pos)const;
   private:
 
     //-------------- DB containers --------------
@@ -614,7 +618,6 @@ namespace currency
     //POS
     wide_difficulty_type get_adjusted_cumulative_difficulty_for_next_pos(wide_difficulty_type next_diff)const;
     wide_difficulty_type get_adjusted_cumulative_difficulty_for_next_alt_pos(alt_chain_type& alt_chain, uint64_t block_height, wide_difficulty_type next_diff, uint64_t connection_height)const;
-    uint64_t get_last_x_block_height(bool pos)const;
     wide_difficulty_type get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos, wide_difficulty_type& cumulative_diff_precise_adj)const;
     wide_difficulty_type get_last_alt_x_block_cumulative_precise_adj_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos) const;
     size_t get_current_sequence_factor_for_alt(alt_chain_type& alt_chain, bool pos, uint64_t connection_height)const;

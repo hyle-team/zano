@@ -32,6 +32,20 @@ namespace currency
     return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
   }
   //---------------------------------------------------------------
+  uint64_t get_burned_amount(const transaction& tx)
+  {
+    uint64_t res = 0;
+    for (auto& o : tx.vout)
+    {
+      if (o.target.type() == typeid(txout_to_key))
+      {
+        if (boost::get<txout_to_key>(o.target).key == null_pkey)
+          res += o.amount;
+      }
+    }
+    return res;
+  }
+  //---------------------------------------------------------------
   uint64_t get_tx_max_unlock_time(const transaction& tx)
   {
     // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2

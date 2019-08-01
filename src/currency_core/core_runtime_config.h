@@ -19,6 +19,7 @@ namespace currency
     uint64_t tx_pool_min_fee;
     uint64_t tx_default_fee;
     uint64_t hard_fork1_starts_after_height;
+    uint64_t max_alt_blocks;
     crypto::public_key alias_validation_pubkey;
     core_time_func_t get_core_time;
   
@@ -35,6 +36,7 @@ namespace currency
     pc.pos_minimum_heigh = POS_START_HEIGHT;
     pc.tx_pool_min_fee = TX_MINIMUM_FEE;
     pc.tx_default_fee = TX_DEFAULT_FEE;
+    pc.max_alt_blocks = CURRENCY_ALT_BLOCK_MAX_COUNT;
     pc.hard_fork1_starts_after_height = ZANO_HARDFORK_1_AFTER_HEIGHT;
     pc.get_core_time = &core_runtime_config::_default_core_time_function;
     bool r = epee::string_tools::hex_to_pod(ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY, pc.alias_validation_pubkey);

@@ -345,7 +345,7 @@ public:
     currency::wide_difficulty_type cumul_difficulty;
     std::vector<currency::transaction> m_transactions;
     crypto::hash ks_hash;
-     };
+  };
 
   //               amount             vec_ind, tx_index, out index in tx
   typedef std::map<uint64_t, std::vector<std::tuple<size_t, size_t, size_t> > > outputs_index;
@@ -473,6 +473,7 @@ public:
   bool construct_genesis_block(currency::block& blk, 
     const currency::account_base& miner_acc, 
     uint64_t timestamp);
+
   bool construct_block(const std::vector<test_event_entry>& events,
     currency::block& blk,
     const currency::block& blk_prev, 
@@ -480,6 +481,14 @@ public:
     const std::list<currency::transaction>& tx_list = std::list<currency::transaction>(), 
     const std::list<currency::account_base>& coin_stake_sources = std::list<currency::account_base>() //in case of PoS block
     );
+  bool construct_block(int64_t manual_timestamp_adjustment,
+    const std::vector<test_event_entry>& events,
+    currency::block& blk,
+    const currency::block& blk_prev,
+    const currency::account_base& miner_acc,
+    const std::list<currency::transaction>& tx_list = std::list<currency::transaction>(),
+    const std::list<currency::account_base>& coin_stake_sources = std::list<currency::account_base>() //in case of PoS block
+  );
 
 
   bool construct_block_manually(currency::block& blk, const currency::block& prev_block,
@@ -500,8 +509,15 @@ public:
   static const test_gentime_settings& get_test_gentime_settings() { return m_test_gentime_settings; }
   static void set_test_gentime_settings(const test_gentime_settings& s) { m_test_gentime_settings = s; }
   static void set_test_gentime_settings_default() { m_test_gentime_settings = m_test_gentime_settings_default; }
+  void set_pos_to_low_timestamp(bool do_pos_to_low_timestamp) { m_do_pos_to_low_timestamp = do_pos_to_low_timestamp; }
+  void set_hardfork_height(uint64_t h);
 
 private:
+  bool m_do_pos_to_low_timestamp;
+  uint64_t m_last_found_timestamp;
+  
+  uint64_t m_hardfork_after_heigh;
+
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;
   static test_gentime_settings m_test_gentime_settings_default;
@@ -953,6 +969,14 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define MAKE_NEXT_BLOCK(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC)                  \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC);             \
+  VEC_EVENTS.push_back(BLK_NAME);                                                     \
+  PRINT_EVENT_NO(VEC_EVENTS);
+
+
+
+#define MAKE_NEXT_BLOCK_TIMESTAMP_ADJUSTMENT(ADJ, VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC)                  \
+  currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
+  generator.construct_block(ADJ, VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC);             \
   VEC_EVENTS.push_back(BLK_NAME);                                                     \
   PRINT_EVENT_NO(VEC_EVENTS);
 

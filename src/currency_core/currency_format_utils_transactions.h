@@ -94,7 +94,7 @@ namespace currency
 
 
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median);
-
+  uint64_t get_burned_amount(const transaction& tx);
   void get_transaction_prefix_hash(const transaction_prefix& tx, crypto::hash& h);
   crypto::hash get_transaction_prefix_hash(const transaction_prefix& tx);
   bool parse_and_validate_tx_from_blob(const blobdata& tx_blob, transaction& tx, crypto::hash& tx_hash);

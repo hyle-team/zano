@@ -935,6 +935,12 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_uint_overflow_1);
     GENERATE_AND_PLAY(gen_uint_overflow_2);
 
+
+    // Hardfok1 tests
+    GENERATE_AND_PLAY(before_hard_fork_1_cumulative_difficulty);
+    GENERATE_AND_PLAY(inthe_middle_hard_fork_1_cumulative_difficulty);
+    GENERATE_AND_PLAY(after_hard_fork_1_cumulative_difficulty);
+    
     //GENERATE_AND_PLAY(gen_block_reward); */
 
 
