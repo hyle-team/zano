@@ -27,14 +27,15 @@ namespace tools
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_port;
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
     const static command_line::arg_descriptor<std::string> arg_miner_text_info;
-    
+    const static command_line::arg_descriptor<bool>        arg_deaf_mode;
 
 
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
     bool run(bool do_mint, bool offline_mode);
 
-    CHAIN_HTTP_TO_MAP2(connection_context); //forward http requests to uri map
+    
+    bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context);
 
     BEGIN_URI_MAP2()
       BEGIN_JSON_RPC_MAP("/json_rpc")
@@ -70,6 +71,7 @@ namespace tools
       std::string m_port;
       std::string m_bind_ip;
       bool m_do_mint;
+      bool m_deaf;
   };
 
 } // namespace tools
