@@ -22,15 +22,17 @@ namespace tools
   const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_port = {"rpc-bind-port", "Starts wallet as rpc server for wallet operations, sets bind port for server", "", true};
   const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip = {"rpc-bind-ip", "Specify ip to bind rpc server", "127.0.0.1"};
   const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_miner_text_info = { "miner-text-info", "Wallet password", "", true };
+  const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_deaf_mode = { "deaf", "Put wallet into 'deaf' mode make it ignore any rpc commands(usable for safe PoS mining)", false, true };
 
   void wallet_rpc_server::init_options(boost::program_options::options_description& desc)
   {
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
     command_line::add_arg(desc, arg_miner_text_info);
+    command_line::add_arg(desc, arg_deaf_mode);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  wallet_rpc_server::wallet_rpc_server(wallet2& w):m_wallet(w), m_do_mint(false)
+  wallet_rpc_server::wallet_rpc_server(wallet2& w):m_wallet(w), m_do_mint(false), m_deaf(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::run(bool do_mint, bool offline_mode)
@@ -75,6 +77,12 @@ namespace tools
   {
     m_bind_ip = command_line::get_arg(vm, arg_rpc_bind_ip);
     m_port = command_line::get_arg(vm, arg_rpc_bind_port);
+    m_deaf = command_line::get_arg(vm, arg_deaf_mode);
+    if (m_deaf)
+    {
+      LOG_PRINT_MAGENTA("Wallet launched in 'deaf' mode", LOG_LEVEL_0);
+    }
+
     if (command_line::has_arg(vm, arg_miner_text_info))
     {
       m_wallet.set_miner_text_info(command_line::get_arg(vm, arg_miner_text_info));
@@ -88,6 +96,33 @@ namespace tools
     bool r = handle_command_line(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to process command line in core_rpc_server");
     return epee::http_server_impl_base<wallet_rpc_server, connection_context>::init(m_port, m_bind_ip);
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
+  {
+    response.m_response_code = 200; 
+    response.m_response_comment = "Ok"; 
+    std::string reference_stub; 
+    bool call_found = false; 
+    if (m_deaf)
+    {
+      response.m_response_code = 500; 
+      response.m_response_comment = "Internal Server Error"; 
+      return true;
+    }
+    if (!handle_http_request_map(query_info, response, m_conn_context, call_found, reference_stub) && response.m_response_code == 200)
+    {
+      response.m_response_code = 500; 
+      response.m_response_comment = "Internal Server Error"; 
+      return true;
+    }
+    if (!call_found)
+    {
+      response.m_response_code = 404; 
+      response.m_response_comment = "Not Found"; 
+      return true;
+    }
+    return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_getbalance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx)

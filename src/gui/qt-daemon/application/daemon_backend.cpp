@@ -11,11 +11,11 @@
 #include "currency_core/core_tools.h"
 //#include <codecvt>
 
-#define GET_WALLET_OPT_BY_ID(wallet_id, name)       \
+#define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   CRITICAL_REGION_LOCAL(m_wallets_lock);    \
   auto it = m_wallets.find(wallet_id);      \
-if (it == m_wallets.end())                \
-  return API_RETURN_CODE_WALLET_WRONG_ID; \
+  if (it == m_wallets.end())                \
+    return API_RETURN_CODE_WALLET_WRONG_ID; \
   auto& name = it->second;
 
 #define GET_WALLET_BY_ID(wallet_id, name)       \
@@ -551,8 +551,15 @@ void daemon_backend::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
     wo.core_conf = currency::get_default_core_runtime_config();
   else 
     wo.core_conf = m_ccore.get_blockchain_storage().get_core_runtime_config();
-}
 
+  // update wallet log prefix for further usage
+  {
+    CRITICAL_REGION_LOCAL(m_wallet_log_prefixes_lock);
+    if (m_wallet_log_prefixes.size() <= id)
+      m_wallet_log_prefixes.resize(id + 1);
+    m_wallet_log_prefixes[id] = std::string("[") + epee::string_tools::num_to_string_fast(id) + ":" + wo.w->get()->get_account().get_public_address_str().substr(0, 6) + "] ";
+  }
+}
 
 
 std::string daemon_backend::get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res)
@@ -679,7 +686,7 @@ std::string daemon_backend::open_wallet(const std::wstring& path, const std::str
   **wo.w = w;
   get_wallet_info(wo, owr.wi);
   init_wallet_entry(wo, owr.wallet_id);
-  //update_wallets_info();
+  
   return return_code;
 }
 
@@ -833,6 +840,11 @@ std::string daemon_backend::close_wallet(size_t wallet_id)
 
     it->second.w->get()->store();
     m_wallets.erase(it);
+
+    {
+      CRITICAL_REGION_LOCAL(m_wallet_log_prefixes_lock);
+      m_wallet_log_prefixes[wallet_id] = std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":CLOSED] ";
+    }
   }
 
   catch (const std::exception& e)
@@ -1198,6 +1210,11 @@ std::string daemon_backend::request_cancel_contract(size_t wallet_id, const cryp
     //TODO: add some 
     return API_RETURN_CODE_OK;
   }
+  catch (const tools::error::not_enough_money& e)
+  {
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "request_cancel_contract error: API_RETURN_CODE_NOT_ENOUGH_MONEY: " << e.what());
+    return API_RETURN_CODE_NOT_ENOUGH_MONEY;
+  }
   catch (...)
   {
     return API_RETURN_CODE_FAIL;
@@ -1348,7 +1365,7 @@ std::string daemon_backend::cancel_offer(const view::cancel_offer_param& co, cur
   GET_WALLET_BY_ID(co.wallet_id, w);
   try
   {
-    w->get()->cancel_offer_by_id(co.tx_id, co.no, res_tx);
+    w->get()->cancel_offer_by_id(co.tx_id, co.no, TX_DEFAULT_FEE, res_tx);
     return API_RETURN_CODE_OK;
   }
   catch (const std::exception& e)
@@ -1436,6 +1453,9 @@ void daemon_backend::on_pos_block_found(size_t wallet_id, const currency::block&
 }
 void daemon_backend::on_sync_progress(size_t wallet_id, const uint64_t& percents)
 {
+  // do not lock m_wallets_lock down the callstack! It will lead to a deadlock, because wallet locked_object is aready locked
+  // and other threads are usually locks m_wallets_lock before locking wallet's locked_object
+
   view::wallet_sync_progres_param wspp = AUTO_VAL_INIT(wspp);
   wspp.progress = percents;
   wspp.wallet_id = wallet_id;
@@ -1600,11 +1620,9 @@ daemon_backend::wallet_vs_options::~wallet_vs_options()
 
 std::string daemon_backend::get_wallet_log_prefix(size_t wallet_id) const
 {
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
-  auto it = m_wallets.find(wallet_id);
-  if (it == m_wallets.end())
-    return std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":???]";
+  CRITICAL_REGION_LOCAL(m_wallet_log_prefixes_lock);
 
-  return std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":" + it->second.w->get()->get_account().get_public_address_str().substr(0, 6) + "]";
+  CHECK_AND_ASSERT_MES(wallet_id < m_wallet_log_prefixes.size(), std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":???] ", "wallet prefix is not found for id " << wallet_id);
+  return m_wallet_log_prefixes[wallet_id];
 }
 

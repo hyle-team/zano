@@ -9,7 +9,6 @@
     <span class="loading-bar"></span>
   </div>
 </div>
-
 <context-menu #allContextMenu>
   <ng-template contextMenuItem (execute)="contextMenuCopy($event.item)">{{ 'CONTEXT_MENU.COPY' | translate }}</ng-template>
   <ng-template contextMenuItem (execute)="contextMenuPaste($event.item)">{{ 'CONTEXT_MENU.PASTE' | translate }}</ng-template>

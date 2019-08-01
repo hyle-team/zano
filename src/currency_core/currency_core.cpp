@@ -713,6 +713,9 @@ namespace currency
 #define MINIMUM_REQUIRED_FREE_SPACE_BYTES (1024 * 1024 * 100)
   void core::check_free_space()
   {
+    if (!m_critical_error_handler)
+      return;
+
     boost::filesystem::space_info si = boost::filesystem::space(m_config_folder);
 
     if (si.available < MINIMUM_REQUIRED_FREE_SPACE_BYTES)
@@ -723,5 +726,3 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
 
 }
-#undef LOG_DEFAULT_CHANNEL 
-#define LOG_DEFAULT_CHANNEL NULL

@@ -1773,6 +1773,7 @@ void wallet2::detach_blockchain(uint64_t height)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::deinit()
 {
+  m_wcallback.reset();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2800,13 +2801,8 @@ const transaction& wallet2::get_transaction_by_id(const crypto::hash& tx_hash)
   ASSERT_MES_AND_THROW("Tx " << tx_hash << " not found in wallet");
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, currency::transaction& res_tx)
+void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, uint64_t fee, currency::transaction& res_tx)
 {
-  currency::tx_destination_entry tx_dest;
-  tx_dest.addr.push_back(m_account.get_keys().m_account_address);
-  prepare_free_transfers_cache(0);
-  tx_dest.amount = m_found_free_amounts.size() ? m_found_free_amounts.begin()->first:m_core_runtime_config.tx_default_fee;
-  std::vector<currency::tx_destination_entry> destinations;
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
   bc_services::cancel_offer co = AUTO_VAL_INIT(co);
@@ -3115,6 +3111,12 @@ void wallet2::build_escrow_cancel_template(crypto::hash multisig_id,
   //generate cancel escrow proposal
   construct_params.dsts[0].amount = ecrow_details.amount_a_pledge + ecrow_details.amount_to_pay;
   construct_params.dsts[1].amount = ecrow_details.amount_b_pledge;
+
+  if (construct_params.dsts[0].amount == 0)
+    construct_params.dsts.erase(construct_params.dsts.begin());
+  else if (construct_params.dsts[1].amount == 0)
+    construct_params.dsts.erase(construct_params.dsts.begin() + 1);
+
   tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
   tsa.service_id = BC_ESCROW_SERVICE_ID;
   tsa.instruction = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_CANCEL;

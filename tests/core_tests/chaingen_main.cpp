@@ -752,6 +752,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(offer_sig_validity_in_update_and_cancel);
     GENERATE_AND_PLAY(offer_lifecycle_via_tx_pool);
     GENERATE_AND_PLAY(offers_updating_hack);
+    GENERATE_AND_PLAY(offer_cancellation_with_zero_fee);
 
     GENERATE_AND_PLAY(gen_crypted_attachments);
     GENERATE_AND_PLAY(gen_checkpoints_attachments_basic);

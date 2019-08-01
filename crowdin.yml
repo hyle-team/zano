@@ -1,0 +1,3 @@
+files:
+  - source: /**/src/gui/qt-daemon/html_source/src/assets/i18n/en.json
+    translation: /**/src/gui/qt-daemon/html_source/src/assets/i18n/%two_letters_code%.json

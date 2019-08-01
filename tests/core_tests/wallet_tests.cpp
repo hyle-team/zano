@@ -2150,7 +2150,7 @@ bool gen_wallet_offers_basic::c1(currency::core& c, size_t ev_index, const std::
   // cancel offer 1
 
   transaction tx_offer1_cancel;
-  miner_wlt->cancel_offer_by_id(actual_offer_1.tx_hash, actual_offer_1.index_in_tx, tx_offer1_cancel);
+  miner_wlt->cancel_offer_by_id(actual_offer_1.tx_hash, actual_offer_1.index_in_tx, TESTS_DEFAULT_FEE, tx_offer1_cancel);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
