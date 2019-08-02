@@ -35,7 +35,7 @@ namespace tools
 {
 
   //---------------------------------------------------------------
-  uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const tools::wallet_rpc::wallet_transfer_info_details& td)
+  uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td)
   {
     uint64_t max_unlock_time = 0;
     // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
@@ -50,7 +50,7 @@ namespace tools
 
     CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "Internal error: wrong tx transfer details: ut2.unlock_time_array.size()" << ut2.unlock_time_array.size() << " is not equal transaction outputs vector size=" << tx.vout.size());
 
-    for (auto ri : td.rcv)
+    for (auto ri : td.receive_indices)
     {
       CHECK_AND_ASSERT_THROW_MES(ri < tx.vout.size(), "Internal error: wrong tx transfer details: reciev index=" << ri << " is greater than transaction outputs vector " << tx.vout.size());
       if (tx.vout[ri].target.type() == typeid(currency::txout_to_key))
@@ -960,7 +960,7 @@ void wallet2::prepare_wti(wallet_rpc::wallet_transfer_info& wti, uint64_t height
   wti.amount = amount;
   wti.height = height;
   fill_transfer_details(tx, td, wti.td);
-  wti.unlock_time = get_max_unlock_time_from_receive_indices(tx, wti.td);
+  wti.unlock_time = get_max_unlock_time_from_receive_indices(tx, td);
   wti.timestamp = timestamp;
   wti.fee = currency::is_coinbase(tx) ? 0:currency::get_tx_fee(tx);
   wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
@@ -2818,9 +2818,7 @@ void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, uin
   crypto::generate_signature(crypto::cn_fast_hash(sig_blob.data(), sig_blob.size()), ephemeral.pub, ephemeral.sec, co.sig);
   bc_services::put_offer_into_attachment(co, attachments);
 
-  destinations.push_back(tx_dest);
-  uint64_t fee = TX_DEFAULT_FEE;
-  transfer(destinations, 0, 0, fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx);
+  transfer(std::vector<currency::tx_destination_entry>(), 0, 0, fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::update_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, const bc_services::offer_details_ex& od, currency::transaction& res_tx)

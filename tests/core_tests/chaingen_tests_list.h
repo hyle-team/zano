@@ -34,3 +34,4 @@
 #include "misc_tests.h"
 #include "emission_test.h"
 #include "hard_fork_1_locked_pos_test.h"
+#include "hard_fork_1_consensus_test.h"

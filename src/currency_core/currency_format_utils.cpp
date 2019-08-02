@@ -107,17 +107,29 @@ namespace currency
       out_amounts.resize(out_amounts.size() - 1);
     }
 
+
     std::vector<tx_destination_entry> destinations;
     for (auto a : out_amounts)
     {
       tx_destination_entry de = AUTO_VAL_INIT(de);
       de.addr.push_back(miner_address);
       de.amount = a;
+      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+      {
+        //this means that block is creating after hardfork_1 and unlock_time is needed to set for every destination separately
+        de.unlock_time = height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
+      }
       destinations.push_back(de);
     }
 
     if (pos)
-      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, pe.stake_unlock_time));
+    {
+      uint64_t stake_lock_time = 0;
+      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+        stake_lock_time = pe.stake_unlock_time;
+      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, stake_lock_time));
+    }
+      
 
     return construct_miner_tx(height, median_size, already_generated_coins, current_block_size, fee, destinations, tx, extra_nonce, max_outs, pos, pe);
   }
@@ -198,7 +210,12 @@ namespace currency
     
 
     tx.version = CURRENT_TRANSACTION_VERSION;
-    set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    if (!have_type_in_variant_container<etc_tx_details_unlock_time2>(tx.extra))
+    {
+      //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
+      set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    }
+    
     return true;
   }
   //---------------------------------------------------------------

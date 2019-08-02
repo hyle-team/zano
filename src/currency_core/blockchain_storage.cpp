@@ -3864,7 +3864,7 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction
       //check tx unlock time
       uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
       //let coinbase sources for PoS block to have locked inputs, the outputs supposed to be locked same way, except the reward 
-      if (is_coinbase(source_tx) && is_pos_block(source_tx))
+      if (is_coinbase(validated_tx) && is_pos_block(validated_tx))
       {
         if (source_out_unlock_time > m_max_unlock_time)
           m_max_unlock_time = source_out_unlock_time;
@@ -4336,9 +4336,16 @@ bool blockchain_storage::validate_coinbase_outs_unlocktime(const transaction& mi
   uint64_t major_unlock_time = get_tx_x_detail<etc_tx_details_unlock_time>(miner_tx);
   if (major_unlock_time)
   {
+    //if there was etc_tx_details_unlock_time present in tx, then ignore etc_tx_details_unlock_time2
     if (major_unlock_time < max_unlock_time)
       return false;
+    else
+      return true;
   }
+  
+  CHECK_AND_ASSERT_MES(get_block_height(miner_tx) > m_core_runtime_config.hard_fork1_starts_after_height, false, "error in block [" << get_block_height(miner_tx) << "] etc_tx_details_unlock_time2 can exist only after hard fork point : " << m_core_runtime_config.hard_fork1_starts_after_height);
+
+  //etc_tx_details_unlock_time2 can be kept only after hard_fork_1 point
   etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
   get_type_in_variant_container(miner_tx.extra, ut2);
   CHECK_AND_ASSERT_MES(ut2.unlock_time_array.size() == miner_tx.vout.size(), false, "ut2.unlock_time_array.size()<" << ut2.unlock_time_array.size() 

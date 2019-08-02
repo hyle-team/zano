@@ -55,7 +55,7 @@ namespace currency
 
     tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0), unlock_time(0){}
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(0){}
-    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t unlock_time) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0) {}
+    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(ut) {}
     tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0), unlock_time(0){}
 
     BEGIN_SERIALIZE_OBJECT()

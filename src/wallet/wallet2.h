@@ -721,7 +721,7 @@ namespace tools
     void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx);
 
     std::string get_log_prefix() const { return m_log_prefix; }
-    static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const tools::wallet_rpc::wallet_transfer_info_details& td);
+    static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
@@ -953,10 +953,11 @@ namespace boost
       a & x.contract;
       a & x.selected_indicies;
       a & x.srv_attachments;
+      a & x.unlock_time;
       //do not store this items in the file since it's quite easy to restore it from original tx 
       if (Archive::is_loading::value)
       {
-        x.unlock_time = tools::wallet2::get_max_unlock_time_from_receive_indices(x.tx, x.td);
+
         x.is_service = currency::is_service_tx(x.tx);
         x.is_mixing = currency::is_mixin_tx(x.tx);
         x.is_mining = currency::is_coinbase(x.tx);

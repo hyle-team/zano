@@ -397,6 +397,7 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
     currency::core_runtime_config pc = cc;
     pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
     pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+    pc.hard_fork1_starts_after_height = m_hardfork_after_heigh;
     wallets.back()->set_core_runtime_config(pc);
   }
 
@@ -481,6 +482,7 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
   uint64_t& found_timestamp,
   crypto::hash& found_kh)
 {
+  bool is_after_hardfork = blck_chain.size() > m_hardfork_after_heigh ? true : false;
   uint64_t median_timestamp = get_timestamps_median(blck_chain);
   wide_difficulty_type basic_diff = 0;
 

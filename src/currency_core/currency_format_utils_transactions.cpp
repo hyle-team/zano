@@ -112,13 +112,19 @@ namespace currency
     }
     CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "unlock_time_array.size=" << ut2.unlock_time_array.size()
       << " is not equal tx.vout.size()=" << tx.vout.size() << " in tx: " << get_transaction_hash(tx));
-    for (size_t i = 0; i != ut2.unlock_time_array.size(); i++)
+    if (ut2.unlock_time_array.size())
     {
-      if (ut2.unlock_time_array[i] > max_unlock_time)
-        max_unlock_time = ut2.unlock_time_array[i];
-      if (ut2.unlock_time_array[i] < min_unlock_time)
-        min_unlock_time = ut2.unlock_time_array[i];
+      max_unlock_time = min_unlock_time = ut2.unlock_time_array[0];
+      for (size_t i = 1; i != ut2.unlock_time_array.size(); i++)
+      {
+        if (ut2.unlock_time_array[i] > max_unlock_time)
+          max_unlock_time = ut2.unlock_time_array[i];
+        if (ut2.unlock_time_array[i] < min_unlock_time)
+          min_unlock_time = ut2.unlock_time_array[i];
+      }
     }
+
+
     return true;
   }
   //---------------------------------------------------------------
