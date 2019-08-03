@@ -510,10 +510,12 @@ public:
   static void set_test_gentime_settings(const test_gentime_settings& s) { m_test_gentime_settings = s; }
   static void set_test_gentime_settings_default() { m_test_gentime_settings = m_test_gentime_settings_default; }
   void set_pos_to_low_timestamp(bool do_pos_to_low_timestamp) { m_do_pos_to_low_timestamp = do_pos_to_low_timestamp; }
+  void set_ignore_last_pow_in_wallets(bool ignore_last_pow_in_wallets) { m_ignore_last_pow_in_wallets = ignore_last_pow_in_wallets; }
   void set_hardfork_height(uint64_t h);
 
 private:
   bool m_do_pos_to_low_timestamp;
+  bool m_ignore_last_pow_in_wallets;
   uint64_t m_last_found_timestamp;
   
   uint64_t m_hardfork_after_heigh;
@@ -986,6 +988,16 @@ void append_vector_by_another_vector(U& dst, const V& src)
   VEC_EVENTS.push_back(BLK_NAME);                                                     \
   PRINT_EVENT_NO(VEC_EVENTS)
 
+#define MAKE_NEXT_POS_BLOCK_TX1(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, MINERS_ACC_LIST, TX_1)         \
+  currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                                       \
+  {                                                                                                         \
+    std::list<currency::transaction>tx_list;                                                                \
+    tx_list.push_back(TX_1);                                                                                \
+    generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, tx_list, MINERS_ACC_LIST);       \
+  }                                                                                                         \
+  VEC_EVENTS.push_back(BLK_NAME);                                                                           \
+  PRINT_EVENT_NO(VEC_EVENTS)
+
 #define MAKE_NEXT_BLOCK_NO_ADD(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC)           \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC);             \
@@ -1005,6 +1017,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
     }                                                                                   \
   VEC_EVENTS.push_back(BLK_NAME);                                                   \
   PRINT_EVENT_NO(VEC_EVENTS)
+
 
 #define MAKE_NEXT_BLOCK_TX_LIST(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, TXLIST)  \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \

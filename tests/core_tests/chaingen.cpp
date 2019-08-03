@@ -48,6 +48,7 @@ const crypto::signature invalid_signature = create_invalid_signature();
 test_generator::test_generator()
   : m_wallet_test_core_proxy(new wallet_test_core_proxy()), 
   m_do_pos_to_low_timestamp(false),
+  m_ignore_last_pow_in_wallets(false),
   m_last_found_timestamp(0), 
   m_hardfork_after_heigh(CURRENCY_MAX_BLOCK_NUMBER)
 {
@@ -517,6 +518,10 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
     //lets try to find block
     for (auto& w : wallets)
     {
+      //set m_last_pow_block_h to big value, to let wallet to use any available outputs, including the those which is not behind last pow block
+      if (m_ignore_last_pow_in_wallets)
+        w->m_last_pow_block_h = CURRENCY_MAX_BLOCK_NUMBER;
+
       currency::COMMAND_RPC_SCAN_POS::request scan_pos_entries;
       bool r = w->get_pos_entries(scan_pos_entries);
       CHECK_AND_ASSERT_THROW_MES(r, "Failed to get_pos_entries");

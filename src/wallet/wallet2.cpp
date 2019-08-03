@@ -2453,7 +2453,7 @@ bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& sta
   if (m_blockchain.size() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age)
     return false;
   
-  if (tr.m_ptx_wallet_info->m_block_height >= m_last_pow_block_h)
+  if (tr.m_ptx_wallet_info->m_block_height > m_last_pow_block_h)
     return false;
 
   return true;

@@ -4449,7 +4449,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
     if (get_block_height(b) > m_core_runtime_config.hard_fork1_starts_after_height)
     {
       uint64_t last_pow_h = get_last_x_block_height(false);
-      CHECK_AND_ASSERT_MES(max_related_block_height < last_pow_h, false, "Failed to failed to validate coinbase in pos block, condition failed: max_related_block_height(" << max_related_block_height << ") < last_pow_h(" << last_pow_h << ")");
+      CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_h, false, "Failed to failed to validate coinbase in pos block, condition failed: max_related_block_height(" << max_related_block_height << ") < last_pow_h(" << last_pow_h << ")");
       //let's check that coinbase amount and unlock time
       r = validate_coinbase_outs_unlocktime(b.miner_tx, coinstake_in.amount, max_unlock_time);
       CHECK_AND_ASSERT_MES(r, false, "Failed to validate_coinbase_outs_unlocktime() in miner tx, block_id = " << get_block_hash(b) 

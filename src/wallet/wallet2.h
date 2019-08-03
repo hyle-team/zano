@@ -64,6 +64,8 @@ ENABLE_CHANNEL_BY_DEFAULT("wallet");
 #define WLT_CHECK_AND_ASSERT_MES_NO_RET(expr, msg) CHECK_AND_ASSERT_MES_NO_RET(expr, "[W:" << m_log_prefix << "]" << msg)
 #define WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, "[W:" << m_log_prefix << "]" << msg)
 
+class test_generator;
+
 namespace tools
 {
 #pragma pack(push, 1)
@@ -664,7 +666,7 @@ namespace tools
     //synchronous version of function 
     bool try_mint_pos();
     //for unit tests
-    friend class test_generator;
+    friend class ::test_generator;
     
     //next functions in public area only because of test_generator
     //TODO: Need refactoring - remove it back to private zone 
@@ -877,6 +879,8 @@ private:
     uint64_t m_fake_outputs_count;
     std::string m_miner_text_info;
 
+    //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
+    friend class test_generator;
  
   }; // class wallet2
 
