@@ -215,7 +215,7 @@
 #ifndef TESTNET
 #define ZANO_HARDFORK_1_AFTER_HEIGHT               120000
 #else
-#define ZANO_HARDFORK_1_AFTER_HEIGHT               ???
+#define ZANO_HARDFORK_1_AFTER_HEIGHT               62102
 #endif
 
 

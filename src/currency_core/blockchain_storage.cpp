@@ -4654,7 +4654,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   if (is_pos_bl)
   {
     bool r = validate_pos_block(bl, current_diffic, pos_coinstake_amount, this_coin_diff, proof_hash, id, false);
-    CHECK_AND_ASSERT_MES_CUSTOM(r, false, bvc.m_verification_failed = true, "validate_pos_block failed!!");
+     CHECK_AND_ASSERT_MES_CUSTOM(r, false, bvc.m_verification_failed = true, "validate_pos_block failed!!");
   }
   else
   {
