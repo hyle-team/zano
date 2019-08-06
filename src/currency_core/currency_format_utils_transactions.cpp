@@ -48,7 +48,7 @@ namespace currency
   //---------------------------------------------------------------
   uint64_t get_tx_max_unlock_time(const transaction& tx)
   {
-    // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
+    // etc_tx_details_unlock_time have priority over etc_tx_details_unlock_time2
     uint64_t v = get_tx_x_detail<etc_tx_details_unlock_time>(tx);
     if (v)
       return v;

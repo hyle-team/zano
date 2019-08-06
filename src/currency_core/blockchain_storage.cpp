@@ -5050,7 +5050,8 @@ bool blockchain_storage::prevalidate_block(const block& bl)
     return true;
   if (bl.major_version != CURRENT_BLOCK_MAJOR_VERSION)
   {
-    LOG_ERROR("Failed to prevalidate_block: " << get_block_hash(bl) << ENDL << obj_to_json_str(bl));
+    LOG_ERROR("prevalidation failed for block " << get_block_hash(bl) << ": major block version " << static_cast<size_t>(bl.major_version) << " is incorrect, " << CURRENT_BLOCK_MAJOR_VERSION << " is expected" << ENDL
+      << obj_to_json_str(bl));
     return false;
   }
   return true;
