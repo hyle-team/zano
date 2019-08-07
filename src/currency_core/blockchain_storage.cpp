@@ -3409,6 +3409,8 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   TIME_MEASURE_START_PD(tx_append_is_expired);
   CHECK_AND_ASSERT_MES(!is_tx_expired(tx), false, "Transaction can't be added to the blockchain since it's already expired. tx expiration time: " << get_tx_expiration_time(tx) << ", blockchain median time: " << get_tx_expiration_median());
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_append_is_expired);
+
+  CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height), false, "tx " << tx_id << ": hardfork-specific validation failed");
   
   TIME_MEASURE_START_PD(tx_process_extra);
   bool r = process_blockchain_tx_extra(tx);
@@ -4330,6 +4332,23 @@ void blockchain_storage::get_pos_mining_estimate(uint64_t amount_coins,
     days.push_back(current_amount);
   }
   estimate_result = current_amount;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+{
+  if (block_height <= m_core_runtime_config.hard_fork1_starts_after_height)
+  {
+    // before hardfork 1
+
+    for (const auto& el : tx.extra)
+    {
+      // etc_tx_details_unlock_time2 is not allowed in txs in blocks prior to hardfork 1
+      CHECK_AND_ASSERT_MES(el.type() != typeid(etc_tx_details_unlock_time2), false, "tx " << tx_id << " contains etc_tx_details_unlock_time2 which is not allowed on height " << block_height);
+    }
+    return true;
+  }
+
+  return true;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t max_unlock_time)const
@@ -5869,6 +5888,8 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
   }
   update_alt_out_indexes_for_tx_in_block(b.miner_tx, abei);
 
+  CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(b.miner_tx, null_hash, height), false, "miner tx hardfork-specific validation failed");
+
   for (auto tx_id : b.tx_hashes)
   {
     std::shared_ptr<transaction> tx_ptr;
@@ -5899,6 +5920,8 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
         CHECK_AND_ASSERT_MES(false, false, "input #" << n << " has unexpected type (" << tx.vin[n].type().name() << "), tx " << tx_id);
       }
     }
+
+    CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, height), false, "tx " << tx_id << ": hardfork-specific validation failed");
     
     // Updating abei (and not updating alt_chain) during this cycle is safe because txs in the same block can't reference one another,
     // so only valid references are either to previous alt blocks (accessed via alt_chain) or to main chain blocks.
