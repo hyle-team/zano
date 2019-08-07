@@ -1336,7 +1336,7 @@ namespace currency
   bool get_inputs_money_amount(const transaction& tx, uint64_t& money)
   {
     money = 0;
-    BOOST_FOREACH(const auto& in, tx.vin)
+    for(const auto& in : tx.vin)
     {
       uint64_t this_amount = get_amount_from_variant(in);
       if (!this_amount)
@@ -1360,7 +1360,7 @@ namespace currency
   //---------------------------------------------------------------
   bool check_inputs_types_supported(const transaction& tx)
   {
-    BOOST_FOREACH(const auto& in, tx.vin)
+    for(const auto& in : tx.vin)
     {
       CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_multisig), false, "wrong variant type: "
         << in.type().name() << ", expected " << typeid(txin_to_key).name()

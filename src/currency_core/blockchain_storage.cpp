@@ -68,6 +68,7 @@ using namespace currency;
 #else
 #define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION          18000
 #endif
+#define BLOCK_POS_STRICT_SEQUENCE_LIMIT                               20
 
 
 
@@ -1599,7 +1600,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     if (abei.height >= m_core_runtime_config.pos_minimum_heigh)
       cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
 
-    if (abei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && pos_block && sequence_factor > 20)
+    if (abei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && pos_block && sequence_factor > BLOCK_POS_STRICT_SEQUENCE_LIMIT)
     {
       LOG_PRINT_RED_L0("Alternative block " << id << " @ " << abei.height << " has too big sequence factor: " << sequence_factor << ", rejected");
       bvc.m_verification_failed = true;
@@ -3420,7 +3421,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
 
 
   TIME_MEASURE_START_PD(tx_process_inputs);
-  BOOST_FOREACH(const txin_v& in, tx.vin)
+  for(const txin_v& in : tx.vin)
   {
     if(!boost::apply_visitor(add_transaction_input_visitor(*this, m_db_spent_keys, tx_id, bl_id, bl_height), in))
     {
@@ -4331,7 +4332,7 @@ void blockchain_storage::get_pos_mining_estimate(uint64_t amount_coins,
   estimate_result = current_amount;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_coinbase_outs_unlocktime(const transaction& miner_tx, uint64_t staked_amount, uint64_t max_unlock_time)const
+bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t max_unlock_time)const
 {
   uint64_t major_unlock_time = get_tx_x_detail<etc_tx_details_unlock_time>(miner_tx);
   if (major_unlock_time)
@@ -4451,8 +4452,8 @@ bool blockchain_storage::validate_pos_block(const block& b,
       uint64_t last_pow_h = get_last_x_block_height(false);
       CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_h, false, "Failed to failed to validate coinbase in pos block, condition failed: max_related_block_height(" << max_related_block_height << ") < last_pow_h(" << last_pow_h << ")");
       //let's check that coinbase amount and unlock time
-      r = validate_coinbase_outs_unlocktime(b.miner_tx, coinstake_in.amount, max_unlock_time);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to validate_coinbase_outs_unlocktime() in miner tx, block_id = " << get_block_hash(b) 
+      r = validate_pos_coinbase_outs_unlock_time(b.miner_tx, coinstake_in.amount, max_unlock_time);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to validate_pos_coinbase_outs_unlock_time() in miner tx, block_id = " << get_block_hash(b) 
         << "max_unlock_time=" << max_unlock_time);
     }
     else
@@ -4845,10 +4846,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   if (bei.height >= m_core_runtime_config.pos_minimum_heigh)
     cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
 
-  if (bei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && is_pos_bl && sequence_factor > 20)
+  if (bei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && is_pos_bl && sequence_factor > BLOCK_POS_STRICT_SEQUENCE_LIMIT)
   {
-    LOG_PRINT_L0("Block with id: " << id
-      << " has too big sequence_factor = " << sequence_factor);
+    LOG_PRINT_RED_L0("Block " << id << " @ " << bei.height << " has too big sequence factor: " << sequence_factor << ", rejected");
     purge_block_data_from_blockchain(bl, tx_processed_count);
     bvc.m_verification_failed = true;
     return false;
