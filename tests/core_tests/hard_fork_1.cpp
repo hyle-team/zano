@@ -48,14 +48,19 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
   crypto::secret_key tx_sec_key;
   r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_sec_key, 0 /* unlock time 1 is zero and not set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+
+  //DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_0);
 
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
-  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_1_bad, blk_0r, miner_acc, tx_0);
 
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK(events, "clear_tx_pool");
 
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc); // hardfork should happen here
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
   // make sure hardfork went okay
@@ -126,7 +131,7 @@ bool hard_fork_1_unlock_time_2_in_coinbase::generate(std::vector<test_event_entr
   events.pop_back(); // remove blk_1
 
   // remove etc_tx_details_unlock_time entries from miner_tx
-  blk_1.miner_tx.extra.erase(std::remove_if(blk_1.miner_tx.extra.begin(), blk_1.miner_tx.extra.end(), [](auto& extra_element) { return extra_element.type() == typeid(etc_tx_details_unlock_time); }), blk_1.miner_tx.extra.end());
+  blk_1.miner_tx.extra.erase(std::remove_if(blk_1.miner_tx.extra.begin(), blk_1.miner_tx.extra.end(), [](extra_v& extra_element) { return extra_element.type() == typeid(etc_tx_details_unlock_time); }), blk_1.miner_tx.extra.end());
 
   // add etc_tx_details_unlock_time2 entry
   etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
@@ -134,11 +139,13 @@ bool hard_fork_1_unlock_time_2_in_coinbase::generate(std::vector<test_event_entr
   ut2.unlock_time_array[0] = get_block_height(blk_1) + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
   blk_1.miner_tx.extra.push_back(ut2);
 
+  DO_CALLBACK(events, "mark_invalid_block");
   // add blk_1 with modified miner tx
   events.push_back(blk_1);
   generator.add_block_info(blk_1, std::list<transaction>()); // add modified block info
 
-  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_1a, blk_0, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1a, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);  // hardfork should happen here
   MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
   // make sure hardfork went okay
@@ -152,7 +159,7 @@ bool hard_fork_1_unlock_time_2_in_coinbase::generate(std::vector<test_event_entr
   events.pop_back();
 
   // remove etc_tx_details_unlock_time entries from miner_tx
-  blk_5.miner_tx.extra.erase(std::remove_if(blk_5.miner_tx.extra.begin(), blk_5.miner_tx.extra.end(), [](auto& extra_element) { return extra_element.type() == typeid(etc_tx_details_unlock_time); }), blk_5.miner_tx.extra.end());
+  blk_5.miner_tx.extra.erase(std::remove_if(blk_5.miner_tx.extra.begin(), blk_5.miner_tx.extra.end(), [](extra_v& extra_element) { return extra_element.type() == typeid(etc_tx_details_unlock_time); }), blk_5.miner_tx.extra.end());
 
   // add etc_tx_details_unlock_time2 entry
   ut2 = AUTO_VAL_INIT(ut2);
