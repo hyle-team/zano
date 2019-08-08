@@ -1609,7 +1609,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
 
     abei.cumulative_diff_adjusted += cumulative_diff_delta;
     wide_difficulty_type last_x_cumul_dif_precise_adj = 0;
-    abei.cumulative_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, abei.height, pos_block, last_x_cumul_dif_precise_adj);
+    abei.cumulative_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, abei.height-1, pos_block, last_x_cumul_dif_precise_adj);
     abei.cumulative_diff_precise += current_diff;
     //////////////////////////////////////////////////////////////////////////
 
@@ -4635,7 +4635,7 @@ wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise
 //------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos, wide_difficulty_type& cumulative_diff_precise_adj) const
 {
-  uint64_t main_chain_first_block = block_height - 1;
+  uint64_t main_chain_first_block = block_height;
   for (auto it = alt_chain.rbegin(); it != alt_chain.rend(); it++)
   {
     if (is_pos_block((*it)->second.bl) == pos)
