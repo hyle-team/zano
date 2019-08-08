@@ -430,6 +430,7 @@ namespace currency
     void print_blockchain_outs(const std::string& file) const;
     void print_blockchain_outs_stat() const;
     void print_db_cache_perfeormance_data() const;
+    void print_last_n_difficulty_numbers(uint64_t n) const;
     bool calc_tx_cummulative_blob(const block& bl)const;
     bool get_outs_index_stat(outs_index_stat& outs_stat)const;
     bool print_lookup_key_image(const crypto::key_image& ki) const;
@@ -561,7 +562,7 @@ namespace currency
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
-
+    void get_last_n_x_blocks(uint64_t n, bool pos_blocks, std::list<std::shared_ptr<const block_extended_info>>& blocks) const;
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
     bool rollback_blockchain_switching(std::list<block>& original_chain, size_t rollback_height);
     bool add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp);

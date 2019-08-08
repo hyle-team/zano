@@ -2665,6 +2665,46 @@ void blockchain_storage::print_db_cache_perfeormance_data() const
   );
 }
 //------------------------------------------------------------------
+void blockchain_storage::get_last_n_x_blocks(uint64_t n, bool pos_blocks, std::list<std::shared_ptr<const block_extended_info>>& blocks) const
+{
+  uint64_t count = 0;
+  bool looking_for_a_pos = true;
+  for (uint64_t i = m_db_blocks.size() - 1; i != 0; --i)
+  {
+    auto block_ptr = m_db_blocks[i];
+    if (is_pos_block(block_ptr->bl) == pos_blocks)
+    {
+      blocks.push_back(block_ptr);
+      ++count;
+      if (count >= n)
+        break;
+    }
+  }
+}
+//------------------------------------------------------------------
+void blockchain_storage::print_last_n_difficulty_numbers(uint64_t n) const
+{
+
+  std::stringstream ss;
+  std::list<std::shared_ptr<const block_extended_info>> pos_blocks;
+  std::list<std::shared_ptr<const block_extended_info>> pow_blocks;
+  
+  get_last_n_x_blocks(n, true, pos_blocks);
+  get_last_n_x_blocks(n, false, pow_blocks);
+  ss << "PoS blocks difficulty:" << ENDL;
+  for (auto& bl_ptr : pos_blocks)
+  {
+    ss << bl_ptr->cumulative_diff_precise << ENDL;
+  }
+
+  ss << "PoW blocks difficulty:" << ENDL;
+  for (auto& bl_ptr : pow_blocks)
+  {
+    ss << bl_ptr->cumulative_diff_precise << ENDL;
+  }
+
+}
+//------------------------------------------------------------------
 void blockchain_storage::print_blockchain_outs_stat() const
 {
   LOG_ERROR("NOT IMPLEMENTED YET");
