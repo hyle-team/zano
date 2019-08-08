@@ -2694,13 +2694,13 @@ void blockchain_storage::print_last_n_difficulty_numbers(uint64_t n) const
   ss << "PoS blocks difficulty:" << ENDL;
   for (auto& bl_ptr : pos_blocks)
   {
-    ss << bl_ptr->cumulative_diff_precise << ENDL;
+    ss << bl_ptr->difficulty << ENDL;
   }
 
   ss << "PoW blocks difficulty:" << ENDL;
   for (auto& bl_ptr : pow_blocks)
   {
-    ss << bl_ptr->cumulative_diff_precise << ENDL;
+    ss << bl_ptr->difficulty << ENDL;
   }
   LOG_PRINT_L0("LAST BLOCKS:" << ss.str());
 }
