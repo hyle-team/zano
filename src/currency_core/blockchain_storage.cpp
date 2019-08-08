@@ -2702,7 +2702,7 @@ void blockchain_storage::print_last_n_difficulty_numbers(uint64_t n) const
   {
     ss << bl_ptr->cumulative_diff_precise << ENDL;
   }
-
+  LOG_PRINT_L0("LAST BLOCKS:" << ss.str());
 }
 //------------------------------------------------------------------
 void blockchain_storage::print_blockchain_outs_stat() const
