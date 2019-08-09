@@ -4,9 +4,10 @@
 #pragma once
 
 #include "chaingen.h"
-#include "wallet_tests_basic.h"
+//#include "wallet_tests_basic.h"
+#include "checkpoints_tests.h"
 
-struct hard_fork_1_base_test : public test_chain_unit_enchanced
+struct hard_fork_1_base_test : virtual public test_chain_unit_enchanced
 {
   hard_fork_1_base_test(size_t hardfork_height);
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
@@ -30,4 +31,20 @@ struct hard_fork_1_chain_switch_pow_only : public hard_fork_1_base_test
 {
   hard_fork_1_chain_switch_pow_only();
   bool generate(std::vector<test_event_entry>& events) const;
+};
+
+struct hard_fork_1_checkpoint_basic_test : public hard_fork_1_base_test, public checkpoints_test
+{
+  hard_fork_1_checkpoint_basic_test();
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+struct hard_fork_1_pos_and_locked_coins : public hard_fork_1_base_test
+{
+  hard_fork_1_pos_and_locked_coins();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+  bool check_outputs_with_unique_amount(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  uint64_t m_unique_amount;
 };
