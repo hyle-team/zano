@@ -1504,14 +1504,14 @@ bool construct_tx_to_key(const std::vector<test_event_entry>& events,
   if (!fill_tx_sources(sources, events, blk_head, from.get_keys(), spending_amount, nmix, check_for_spends, check_for_unlocktime, use_ref_by_id))
     return false;
 
-  int64_t change = get_sources_total_amount(sources);
+  boost::multiprecision::int128_t change = get_sources_total_amount(sources);
   change -= spending_amount;
   if (change < 0)
     return false; // should never happen if fill_tx_sources succeded
   if (change == 0)
     return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, sk, 0, mix_attr);
   std::vector<tx_destination_entry> local_dst = destinations;
-  local_dst.push_back(tx_destination_entry(change, from.get_public_address()));
+  local_dst.push_back(tx_destination_entry(change.convert_to<uint64_t>(), from.get_public_address()));
   return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, sk, 0, mix_attr);
 }
 

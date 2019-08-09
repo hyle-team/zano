@@ -247,7 +247,7 @@ struct offers_count_param
   size_t offers_count_raw;
 };
 
-class test_chain_unit_enchanced : public test_chain_unit_base
+class test_chain_unit_enchanced : virtual public test_chain_unit_base
 {
 public:
   test_chain_unit_enchanced();
