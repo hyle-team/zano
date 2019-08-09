@@ -362,6 +362,16 @@ bool blockchain_storage::set_lost_tx_unmixable()
 //------------------------------------------------------------------
 void  blockchain_storage::patch_out_if_needed(txout_to_key& out, const crypto::hash& tx_id, uint64_t n) const 
 {
+  static crypto::hash tx_id_1 = epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("c2a2229d614e7c026433efbcfdbd0be1f68d9b419220336df3e2c209f5d57314");
+  static crypto::hash tx_id_2 = epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("647f936c6ffbd136f5c95d9a90ad554bdb4c01541c6eb5755ad40b984d80da67");
+
+  if (tx_id == tx_id_1 && n == 12)
+  {
+    out.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX;
+  }else if(tx_id == tx_id_2 && n == 5)
+  {
+    out.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX;
+  }
 }
 //------------------------------------------------------------------
 void blockchain_storage::initialize_db_solo_options_values()
