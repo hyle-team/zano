@@ -213,7 +213,7 @@
 //hard forks section
 #define BLOCK_MAJOR_VERSION_INITAL                     1
 #ifndef TESTNET
-#define ZANO_HARDFORK_1_AFTER_HEIGHT               120000
+#define ZANO_HARDFORK_1_AFTER_HEIGHT               165000
 #else
 #define ZANO_HARDFORK_1_AFTER_HEIGHT               62102
 #endif
