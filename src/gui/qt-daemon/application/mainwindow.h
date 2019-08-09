@@ -132,6 +132,7 @@ public:
   QString restore_wallet(const QString& param);
   QString is_pos_allowed();
   QString store_to_file(const QString& path, const QString& buff);
+  QString load_from_file(const QString& path);
   QString is_file_exist(const QString& path);
   QString get_mining_estimate(const QString& obj);
   QString backup_wallet_keys(const QString& obj);

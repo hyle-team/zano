@@ -289,6 +289,40 @@ namespace file_io_utils
 		}
 	}
 
+  template<class t_string>
+    bool load_file_to_string(const t_string& path_to_file, std::string& target_str)
+  {
+    try
+    {
+      std::ifstream fstream;
+      //fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+      fstream.open(path_to_file, std::ios_base::binary | std::ios_base::in | std::ios::ate);
+      if (!fstream.good())
+        return false;
+      std::ifstream::pos_type file_size = fstream.tellg();
+
+      if (file_size > 1000000000)
+        return false;//don't get crazy
+      size_t file_size_t = static_cast<size_t>(file_size);
+
+      target_str.resize(file_size_t);
+
+      fstream.seekg(0, std::ios::beg);
+      fstream.read((char*)target_str.data(), target_str.size());
+      if (!fstream.good())
+        return false;
+
+      fstream.close();
+      return true;
+    }
+
+    catch (...)
+    {
+      return false;
+    }
+  }
+
+
 	/*
 	inline
 		bool load_form_handle(HANDLE hfile, std::string& str)
@@ -338,38 +372,7 @@ namespace file_io_utils
 	}
 
 
-	inline
-		bool load_file_to_string(const std::string& path_to_file, std::string& target_str)
-	{
-		try
-		{
-			std::ifstream fstream;
-			//fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-			fstream.open(path_to_file, std::ios_base::binary | std::ios_base::in | std::ios::ate);
-      if (!fstream.good())
-        return false;
-			std::ifstream::pos_type file_size = fstream.tellg();
 
-			if(file_size > 1000000000)
-				return false;//don't go crazy
-			size_t file_size_t = static_cast<size_t>(file_size);
-
-			target_str.resize(file_size_t);
-
-			fstream.seekg (0, std::ios::beg);
-			fstream.read((char*)target_str.data(), target_str.size());
-      if (!fstream.good())
-        return false;
-
-			fstream.close();
-			return true;
-		}
-
-		catch(...)
-		{
-			return false;
-		}
-	}
 
 #ifdef WIN32
   typedef HANDLE native_filesystem_handle;
