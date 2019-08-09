@@ -18,7 +18,7 @@
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     1
-#define CURRENT_BLOCK_MAJOR_VERSION                     2
+#define CURRENT_BLOCK_MAJOR_VERSION                     1
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2
 #define CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT            60*20
@@ -211,9 +211,9 @@
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
 //hard forks section
-#define BLOCK_MAJOR_VERSION_INITAL                     1
+#define BLOCK_MAJOR_VERSION_INITAL                     0
 #ifndef TESTNET
-#define ZANO_HARDFORK_1_AFTER_HEIGHT               165000
+#define ZANO_HARDFORK_1_AFTER_HEIGHT               166440
 #else
 #define ZANO_HARDFORK_1_AFTER_HEIGHT               62102
 #endif
