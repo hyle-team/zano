@@ -1760,7 +1760,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
 
     wide_difficulty_type alt_pos_diff_end = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain, alt_chain_bei.height, true);
     wide_difficulty_type alt_pos_diff_begin = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), connection_point.height-1, true);
-    alt_cumul_diff.pos_diff = alt_pos_diff_end- alt_pos_diff_begin;
+    alt_cumul_diff.pos_diff = alt_pos_diff_end - alt_pos_diff_begin;
     
     wide_difficulty_type alt_pow_diff_end = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain, alt_chain_bei.height, false);
     wide_difficulty_type alt_pow_diff_begin = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), connection_point.height - 1, false);
