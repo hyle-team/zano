@@ -90,37 +90,37 @@
     "PASS": "Mot de passe du portefeuille",
     "BUTTON": "Ouvrir un portefeuille",
     "WITH_ADDRESS_ALREADY_OPEN": "Un portefeuille avec cette adresse est déjà ouvert",
-    "FILE_NOT_FOUND1": "Wallet file not found",
-    "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
+    "FILE_NOT_FOUND1": "Fichier de portefeuille introuvable",
+    "FILE_NOT_FOUND2": "<br/><br/> Il aurait peut-être été renommé ou déplacé. <br/> Pour l'ouvrir, utilisez le bouton \"Ouvrir le portefeuille\".",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
+      "NAME_REQUIRED": "Le nom est requis",
+      "NAME_DUPLICATE": "Nom déjà utilisé",
       "MAX_LENGTH": "Maximum name length reached"
     },
     "MODAL": {
-      "TITLE": "Type wallet password",
-      "LABEL": "Password to this wallet",
-      "OPEN": "Open wallet",
-      "SKIP": "Skip",
-      "NOT_FOUND": "Not found"
+      "TITLE": "Entrer le mot de passe du portefeuille",
+      "LABEL": "Mot de passe de ce portefeuille",
+      "OPEN": "Ouvrir un portefeuille",
+      "SKIP": "Sauter",
+      "NOT_FOUND": "Introuvable"
     }
   },
   "RESTORE_WALLET": {
-    "LABEL_NAME": "Wallet name",
+    "LABEL_NAME": "Nom du portefeuille",
     "LABEL_PHRASE_KEY": "Seed phrase / private key",
-    "PASS": "Wallet password",
-    "CONFIRM": "Confirm wallet password",
-    "BUTTON_SELECT": "Select wallet location",
-    "BUTTON_CREATE": "Create wallet",
+    "PASS": "Mot de passe du portefeuille",
+    "CONFIRM": "Confirmer le mot de passe du portefeuille",
+    "BUTTON_SELECT": "Sélectionner l'emplacement du portefeuille",
+    "BUTTON_CREATE": "Créer un portefeuille",
     "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
-    "CHOOSE_PATH": "Please choose a path",
+    "CHOOSE_PATH": "Veuillez choisir un chemin",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
+      "NAME_REQUIRED": "Le nom est requis",
+      "NAME_DUPLICATE": "Nom déjà utilisé",
       "MAX_LENGTH": "Maximum name length reached",
       "CONFIRM_NOT_MATCH": "Confirm password not match",
-      "KEY_REQUIRED": "Key is required",
-      "KEY_NOT_VALID": "Key not valid"
+      "KEY_REQUIRED": "Clé requise",
+      "KEY_NOT_VALID": "Clé invalide"
     }
   },
   "SEED_PHRASE": {
@@ -178,35 +178,35 @@
     }
   },
   "WALLET_DETAILS": {
-    "LABEL_NAME": "Wallet name",
-    "LABEL_FILE_LOCATION": "Wallet file location",
+    "LABEL_NAME": "Nom du portefeuille",
+    "LABEL_FILE_LOCATION": "Emplacement du fichier de portefeuille",
     "LABEL_SEED_PHRASE": "Seed phrase",
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
-    "BUTTON_SAVE": "Save",
-    "BUTTON_REMOVE": "Close wallet",
+    "BUTTON_SAVE": "Enregistrer",
+    "BUTTON_REMOVE": "Fermer le portefeuille",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
+      "NAME_REQUIRED": "Le nom est requis",
+      "NAME_DUPLICATE": "Nom déjà utilisé",
       "MAX_LENGTH": "Maximum name length reached"
     }
   },
   "ASSIGN_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
-      "PLACEHOLDER": "@ Enter alias",
+      "LABEL": "Nom unique",
+      "PLACEHOLDER": "@ Entrer l'alias",
       "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
     },
     "COMMENT": {
-      "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment",
-      "TOOLTIP": "The comment will be visible to anyone who wants to make a payment to your alias. You can provide details about your business, contacts, or include any text. Comments can be edited later."
+      "LABEL": "Commentaire",
+      "PLACEHOLDER": "Entrez un commentaire",
+      "TOOLTIP": "Le commentaire sera visible à quiconque souhaite effectuer un paiement à votre alias. Vous pouvez fournir des détails sur votre entreprise, vos informations de contact ou inclure tout texte. Les commentaires peuvent être modifiés plus tard."
     },
-    "COST": "Cost to create alias {{value}} {{currency}}",
-    "BUTTON_ASSIGN": "Assign",
-    "BUTTON_CANCEL": "Cancel",
+    "COST": "Coût pour créer l'alias {{value}} {{currency}}",
+    "BUTTON_ASSIGN": "Assigner",
+    "BUTTON_CANCEL": "Annuler",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_WRONG": "Alias has wrong name",
+      "NAME_REQUIRED": "Le nom est requis",
+      "NAME_WRONG": "L'alias a un nom incorrect",
       "NAME_LENGTH": "The alias must be 6-25 characters long",
       "NAME_EXISTS": "Alias name already exists",
       "NO_MONEY": "You do not have enough funds to assign this alias",
