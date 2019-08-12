@@ -80,16 +80,16 @@
     "ERROR_CANNOT_SAVE_SYSTEM": "Les fichiers de portefeuille ne peuvent pas être sauvegardés sur la partition du OS",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Le nom est requis",
-      "NAME_DUPLICATE": "Name is duplicate",
+      "NAME_DUPLICATE": "Nom déjà utilisé",
       "MAX_LENGTH": "Maximum name length reached",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     }
   },
   "OPEN_WALLET": {
-    "NAME": "Wallet name",
-    "PASS": "Wallet password",
-    "BUTTON": "Open wallet",
-    "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this address is already open",
+    "NAME": "Nom du portefeuille",
+    "PASS": "Mot de passe du portefeuille",
+    "BUTTON": "Ouvrir un portefeuille",
+    "WITH_ADDRESS_ALREADY_OPEN": "Un portefeuille avec cette adresse est déjà ouvert",
     "FILE_NOT_FOUND1": "Wallet file not found",
     "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
     "FORM_ERRORS": {
