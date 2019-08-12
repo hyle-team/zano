@@ -1,24 +1,24 @@
 {
   "LOGIN": {
-    "SETUP_MASTER_PASS": "Setup master password",
-    "SETUP_CONFIRM_PASS": "Confirm the password",
-    "MASTER_PASS": "Master password",
-    "BUTTON_NEXT": "Next",
-    "BUTTON_SKIP": "Skip",
-    "BUTTON_RESET": "Reset",
-    "INCORRECT_PASSWORD": "Invalid password",
+    "SETUP_MASTER_PASS": "Configurer le mot de passe principal",
+    "SETUP_CONFIRM_PASS": "Confirmer le mot de passe",
+    "MASTER_PASS": "Mot de passe principal",
+    "BUTTON_NEXT": "Suivant",
+    "BUTTON_SKIP": "Sauter",
+    "BUTTON_RESET": "Réinitialiser",
+    "INCORRECT_PASSWORD": "Mot de passe invalide",
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required",
-      "CONFIRM_REQUIRED": "Confirmation is required",
+      "PASS_REQUIRED": "Mot de passe requis",
+      "CONFIRM_REQUIRED": "Confirmation requise",
       "MISMATCH": "Mismatch"
     }
   },
   "COMMON": {
-    "BACK": "Go back"
+    "BACK": "Retour"
   },
   "BREADCRUMBS": {
-    "ADD_WALLET": "Add wallet",
-    "CREATE_WALLET": "Create new wallet",
+    "ADD_WALLET": "Ajouter un portefeuille",
+    "CREATE_WALLET": "Créer un nouveau portefeuille",
     "SAVE_PHRASE": "Save your seed phrase",
     "OPEN_WALLET": "Open existing wallet",
     "RESTORE_WALLET": "Restore from backup",
