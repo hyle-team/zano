@@ -125,26 +125,26 @@
   },
   "SEED_PHRASE": {
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
-    "BUTTON_CREATE_ACCOUNT": "Create wallet",
-    "BUTTON_COPY": "Copy"
+    "BUTTON_CREATE_ACCOUNT": "Créer un portefeuille",
+    "BUTTON_COPY": "Copier"
   },
   "PROGRESS": {
-    "ADD_WALLET": "Add wallet",
-    "SELECT_LOCATION": "Select wallet location",
-    "CREATE_WALLET": "Create new wallet",
-    "RESTORE_WALLET": "Restore from backup"
+    "ADD_WALLET": "Ajouter un portefeuille",
+    "SELECT_LOCATION": "Sélectionner l'emplacement du portefeuille",
+    "CREATE_WALLET": "Créer un nouveau portefeuille",
+    "RESTORE_WALLET": "Restaurer depuis une sauvegarde"
   },
   "SETTINGS": {
-    "TITLE": "Settings",
-    "DARK_THEME": "Dark theme",
-    "WHITE_THEME": "White theme",
-    "GRAY_THEME": "Grey theme",
+    "TITLE": "Paramètres",
+    "DARK_THEME": "Thème sombre",
+    "WHITE_THEME": "Thème blanc",
+    "GRAY_THEME": "Thème gris",
     "APP_LOCK": {
-      "TITLE": "Lock app after:",
+      "TITLE": "Verrouiller l'application après :",
       "TIME1": "5 min",
       "TIME2": "15 min",
-      "TIME3": "1 hour",
-      "TIME4": "Never"
+      "TIME3": "1 heure",
+      "TIME4": "Jamais"
     },
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
@@ -251,9 +251,9 @@
       "NO_MONEY": "Vous n'avez pas assez de fonds pour transférer cet alias"
     },
     "COST": "Coût pour transférer l'alias {{value}} {{currency}}",
-    "BUTTON_TRANSFER": "Transfer",
-    "BUTTON_CANCEL": "Cancel",
-    "REQUEST_SEND_REG": "The alias will be transferred within 10 minutes"
+    "BUTTON_TRANSFER": "Transférer",
+    "BUTTON_CANCEL": "Annuler",
+    "REQUEST_SEND_REG": "L'alias sera transféré dans les 10 prochaines minutes"
   },
   "SEND": {
     "ADDRESS": "Address",
