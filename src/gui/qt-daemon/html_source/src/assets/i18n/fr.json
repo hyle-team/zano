@@ -207,50 +207,50 @@
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Le nom est requis",
       "NAME_WRONG": "L'alias a un nom incorrect",
-      "NAME_LENGTH": "The alias must be 6-25 characters long",
+      "NAME_LENGTH": "L'alias doit contenir 6-25 caractères",
       "NAME_EXISTS": "Alias name already exists",
-      "NO_MONEY": "You do not have enough funds to assign this alias",
-      "MAX_LENGTH": "Maximum comment length reached"
+      "NO_MONEY": "Vous n'avez pas assez de fonds pour assigner cet alias",
+      "MAX_LENGTH": "Longueur maximale du commentaire atteinte"
     },
-    "ONE_ALIAS": "You can create only one alias per wallet",
-    "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
+    "ONE_ALIAS": "Vous pouvez créer un seul alias par portefeuille",
+    "REQUEST_ADD_REG": "L'alias sera assigné dans les 10 prochaines minutes"
   },
   "EDIT_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
-      "PLACEHOLDER": "@ Enter alias"
+      "LABEL": "Nom unique",
+      "PLACEHOLDER": "@ Entrer l'alias"
     },
     "COMMENT": {
-      "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment"
+      "LABEL": "Commentaire",
+      "PLACEHOLDER": "Entrez un commentaire"
     },
     "FORM_ERRORS": {
-      "NO_MONEY": "You do not have enough funds to change the comment to this alias",
-      "MAX_LENGTH": "Maximum comment length reached"
+      "NO_MONEY": "Vous n'avez pas assez de fonds pour changer le commentaire de cet alias",
+      "MAX_LENGTH": "Longueur maximale du commentaire atteinte"
     },
-    "COST": "Cost to edit alias {{value}} {{currency}}",
-    "BUTTON_EDIT": "Edit",
-    "BUTTON_CANCEL": "Cancel"
+    "COST": "Coût pour modifier l'alias {{value}} {{currency}}",
+    "BUTTON_EDIT": "Modifier",
+    "BUTTON_CANCEL": "Annuler"
   },
   "TRANSFER_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
-      "PLACEHOLDER": "@ Enter alias"
+      "LABEL": "Nom unique",
+      "PLACEHOLDER": "@ Entrer l'alias"
     },
     "COMMENT": {
-      "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment"
+      "LABEL": "Commentaire",
+      "PLACEHOLDER": "Entrez un commentaire"
     },
     "ADDRESS": {
-      "LABEL": "The account to which the alias will be transferred",
-      "PLACEHOLDER": "Enter wallet address"
+      "LABEL": "Le compte auquel l'alias sera transféré",
+      "PLACEHOLDER": "Entrez l'adresse du portefeuille"
     },
     "FORM_ERRORS": {
-      "WRONG_ADDRESS": "No wallet with this account exists",
-      "ALIAS_EXISTS": "This account already has an alias",
-      "NO_MONEY": "You do not have enough funds to transfer this alias"
+      "WRONG_ADDRESS": "Aucun portefeuille avec ce compte n'existe",
+      "ALIAS_EXISTS": "Ce compte a déjà un alias",
+      "NO_MONEY": "Vous n'avez pas assez de fonds pour transférer cet alias"
     },
-    "COST": "Cost to transfer alias {{value}} {{currency}}",
+    "COST": "Coût pour transférer l'alias {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Transfer",
     "BUTTON_CANCEL": "Cancel",
     "REQUEST_SEND_REG": "The alias will be transferred within 10 minutes"
