@@ -147,32 +147,32 @@
       "TIME4": "Jamais"
     },
     "MASTER_PASSWORD": {
-      "TITLE": "Update master password",
-      "OLD": "Old password",
-      "NEW": "New password",
-      "CONFIRM": "New password confirmation",
-      "BUTTON": "Save"
+      "TITLE": "Mettre à jour le mot de passe principal",
+      "OLD": "Ancien mot de passe",
+      "NEW": "Nouveau mot de passe",
+      "CONFIRM": "Confirmer le mot de passe",
+      "BUTTON": "Enregistrer"
     },
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required",
+      "PASS_REQUIRED": "Mot de passe requis",
       "PASS_NOT_MATCH": "Old password not match",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     },
     "LAST_BUILD": "Current build: {{value}}",
-    "APP_LOG_TITLE": "Log level:"
+    "APP_LOG_TITLE": "Niveau de log :"
   },
   "WALLET": {
     "REGISTER_ALIAS": "Register an alias",
-    "DETAILS": "Details",
-    "LOCK": "Lock",
+    "DETAILS": "Détails",
+    "LOCK": "Verrouillage",
     "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
     "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
     "LOCKED_BALANCE_LINK": "What does that mean?",
     "TABS": {
-      "SEND": "Send",
-      "RECEIVE": "Receive",
-      "HISTORY": "History",
-      "CONTRACTS": "Contracts",
+      "SEND": "Envoyer",
+      "RECEIVE": "Recevoir",
+      "HISTORY": "Historique",
+      "CONTRACTS": "Contrats",
       "MESSAGES": "Messages",
       "STAKING": "Staking"
     }
@@ -308,48 +308,48 @@
       "POS_REWARD": "POS reward",
       "CREATE_CONTRACT": "Contract proposal",
       "PLEDGE_CONTRACT": "Contract deposit",
-      "NULLIFY_CONTRACT": "Burn deposits",
-      "PROPOSAL_CANCEL_CONTRACT": "Cancellation request",
-      "CANCEL_CONTRACT": "Cancel and return deposits"
+      "NULLIFY_CONTRACT": "Brûler les dépôts",
+      "PROPOSAL_CANCEL_CONTRACT": "Demande d'annulation",
+      "CANCEL_CONTRACT": "Annuler et retourner les dépôts"
     }
   },
   "CONTRACTS": {
-    "EMPTY": "No active contracts",
-    "CONTRACTS": "Contracts",
-    "PURCHASE": "Purchase",
-    "SELL": "Sell",
+    "EMPTY": "Aucun contrat actif",
+    "CONTRACTS": "Contrats",
+    "PURCHASE": "Achat",
+    "SELL": "Vendre",
     "DATE": "Date",
-    "AMOUNT": "Amount",
-    "STATUS": "Status",
-    "COMMENTS": "Comments",
-    "PURCHASE_BUTTON": "New Purchase",
+    "AMOUNT": "Montant",
+    "STATUS": "Statut",
+    "COMMENTS": "Commentaires",
+    "PURCHASE_BUTTON": "Nouvel achat",
     "LISTING_BUTTON": "Create listing",
     "TIME_LEFT": {
-      "REMAINING_LESS_ONE": "Less than an hour to respond",
-      "REMAINING_ONE": "{{time}} hour remains",
-      "REMAINING_MANY": "{{time}} hours remain",
-      "REMAINING_MANY_ALT": "{{time}} hours remain",
-      "REMAINING_ONE_RESPONSE": "{{time}} hour remains",
-      "REMAINING_MANY_RESPONSE": "{{time}} hours remain",
-      "REMAINING_MANY_ALT_RESPONSE": "{{time}} hours remain",
-      "REMAINING_ONE_WAITING": "Waiting for {{time}} hour",
-      "REMAINING_MANY_WAITING": "Waiting for {{time}} hours",
-      "REMAINING_MANY_ALT_WAITING": "Waiting for {{time}} hours"
+      "REMAINING_LESS_ONE": "Moins d'une heure pour répondre",
+      "REMAINING_ONE": "{{time}} heure restante",
+      "REMAINING_MANY": "{{time}} heures restantes",
+      "REMAINING_MANY_ALT": "{{time}} heures restantes",
+      "REMAINING_ONE_RESPONSE": "{{time}} heure restante",
+      "REMAINING_MANY_RESPONSE": "{{time}} heures restantes",
+      "REMAINING_MANY_ALT_RESPONSE": "{{time}} heures restantes",
+      "REMAINING_ONE_WAITING": "En attente de {{time}}  heure",
+      "REMAINING_MANY_WAITING": "En attente de {{time}} heures",
+      "REMAINING_MANY_ALT_WAITING": "En attente de {{time}} heures"
     },
     "STATUS_MESSAGES": {
       "SELLER": {
-        "NEW_CONTRACT": "New contract proposal",
-        "IGNORED": "You ignored contract proposal",
-        "ACCEPTED": "Contract started",
-        "WAIT": "Waiting for contract confirmation",
-        "WAITING_BUYER": "Waiting for delivery",
-        "COMPLETED": "Contract completed",
-        "NOT_RECEIVED": "Delivery failed",
-        "NULLIFIED": "All deposits burned",
-        "PROPOSAL_CANCEL": "New proposal to cancel contract and return deposits",
-        "BEING_CANCELLED": "Cancellation in progress",
-        "CANCELLED": "Contract canceled",
-        "IGNORED_CANCEL": "You ignored cancellation proposal",
+        "NEW_CONTRACT": "Nouvelle proposition de contrat",
+        "IGNORED": "Vous avez ignoré la proposition de contrat",
+        "ACCEPTED": "Contrat démarré",
+        "WAIT": "En attente de confirmation du contrat",
+        "WAITING_BUYER": "En attente de livraison",
+        "COMPLETED": "Contrat terminé",
+        "NOT_RECEIVED": "Échec de la livraison",
+        "NULLIFIED": "Tous les dépôts ont été brûlés",
+        "PROPOSAL_CANCEL": "Nouvelle proposition d'annulation de contrat et retour des dépôts",
+        "BEING_CANCELLED": "Annulation en cours",
+        "CANCELLED": "Contrat annulé",
+        "IGNORED_CANCEL": "Vous avez ignoré la proposition d'annulation",
         "EXPIRED": "Contract proposal has expired"
       },
       "BUYER": {
