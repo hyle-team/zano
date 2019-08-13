@@ -52,12 +52,16 @@ import exporting from 'highcharts/modules/exporting.src';
 import { ProgressContainerComponent } from './_helpers/directives/progress-container/progress-container.component';
 import { InputDisableSelectionDirective } from './_helpers/directives/input-disable-selection/input-disable-selection.directive';
 import { SendModalComponent } from './send-modal/send-modal.component';
+import { ContactsComponent } from './contacts/contacts.component';
+import { AddContactsComponent } from './add-contacts/add-contacts.component';
+import { ContactSendComponent } from './contact-send/contact-send.component';
+import { ExportImportComponent } from './export-import/export-import.component';
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json');
 }
 
-
+import { PapaParseModule } from 'ngx-papaparse';
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
@@ -110,7 +114,11 @@ export function highchartsFactory() {
     TransactionDetailsComponent,
     ProgressContainerComponent,
     InputDisableSelectionDirective,
-    SendModalComponent
+    SendModalComponent,
+    ContactsComponent,
+    AddContactsComponent,
+    ContactSendComponent,
+    ExportImportComponent
   ],
   imports: [
     BrowserModule,
@@ -127,6 +135,7 @@ export function highchartsFactory() {
     ReactiveFormsModule,
     NgSelectModule,
     ChartModule,
+    PapaParseModule,
     ContextMenuModule.forRoot()
   ],
   providers: [

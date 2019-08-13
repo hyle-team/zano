@@ -1,0 +1,25 @@
+:host {
+  width: 100%;
+}
+
+.head {
+  justify-content: flex-end;
+}
+
+.contacts-title {
+  font-size: 1.7rem;
+  margin-bottom: 1rem;
+}
+
+.btn-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -0.5rem;
+  padding: 1.5rem 0;
+
+  button {
+    flex: 1 0 auto;
+    margin: 0 0.5rem;
+  }
+}

@@ -26,7 +26,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     password: new FormControl('')
   });
 
-  type = 'reg'; 
+  type = 'reg';
 
   constructor(
     private route: ActivatedRoute,
@@ -61,8 +61,7 @@ export class LoginComponent implements OnInit, OnDestroy {
         } else {
           console.log(data['error_code']);
         }
-       
-      })
+      });
     }
   }
 
@@ -74,10 +73,12 @@ export class LoginComponent implements OnInit, OnDestroy {
     });
   }
 
-   dropSecureAppData(): void{ 
+   dropSecureAppData(): void {
      this.backend.dropSecureAppData(() => {
-       this.onSkipCreatePass(); 
-     }); 
+       this.onSkipCreatePass();
+     });
+     this.variablesService.wallets = [];
+     this.variablesService.contacts = [];
    }
 
   onSubmitAuthPass(): void {
@@ -93,9 +94,9 @@ export class LoginComponent implements OnInit, OnDestroy {
                 this.router.navigate(['/']);
               });
            }
-         })
+         });
       } else {
-        this.getWalletData(this.variablesService.appPass)
+        this.getWalletData(this.variablesService.appPass);
       }
     }
   }
@@ -107,16 +108,21 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.variablesService.dataIsLoaded = true;
         this.variablesService.startCountdown();
         this.variablesService.appPass = appPass;
+        if (Object.keys(data['contacts']).length !== 0) {
+          data['contacts'].map(contact => {
+            this.variablesService.contacts.push(contact);
+          });
+        }
         if (this.variablesService.wallets.length) {
           this.ngZone.run(() => {
             this.router.navigate(['/wallet/' + this.variablesService.wallets[0].wallet_id]);
           });
           return;
         }
-        if (Object.keys(data).length !== 0) {
+        if (Object.keys(data['wallets']).length !== 0) {
           let openWallets = 0;
           let runWallets = 0;
-          data.forEach((wallet, wallet_index) => {
+          data['wallets'].forEach((wallet, wallet_index) => {
             this.backend.openWallet(wallet.path, wallet.pass, true, (open_status, open_data, open_error) => {
               if (open_status || open_error === 'FILE_RESTORED') {
                 openWallets++;
