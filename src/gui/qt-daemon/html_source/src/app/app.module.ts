@@ -54,20 +54,29 @@ import { ProgressContainerComponent } from './_helpers/directives/progress-conta
 import { InputDisableSelectionDirective } from './_helpers/directives/input-disable-selection/input-disable-selection.directive';
 import { SendModalComponent } from './send-modal/send-modal.component';
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> contact service
 import { ContactsComponent } from './contacts/contacts.component';
 import { AddContactsComponent } from './add-contacts/add-contacts.component';
 import { ContactSendComponent } from './contact-send/contact-send.component';
 import { ExportImportComponent } from './export-import/export-import.component';
+<<<<<<< HEAD
 import { ConfirmModalComponent } from './_helpers/directives/confirm-modal/confirm-modal.component';
 =======
 >>>>>>> confirm modal
+=======
+>>>>>>> contact service
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json');
 }
 
 import { PapaParseModule } from 'ngx-papaparse';
+<<<<<<< HEAD
 
+=======
+>>>>>>> contact service
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
@@ -121,16 +130,23 @@ export function highchartsFactory() {
     ProgressContainerComponent,
     InputDisableSelectionDirective,
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> contact service
     SendModalComponent,
     ContactsComponent,
     AddContactsComponent,
     ContactSendComponent,
+<<<<<<< HEAD
     ExportImportComponent,
     SafeHTMLPipe,
     ConfirmModalComponent
 =======
     SendModalComponent
 >>>>>>> confirm modal
+=======
+    ExportImportComponent
+>>>>>>> contact service
   ],
   imports: [
     BrowserModule,

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { Component, OnInit, NgZone } from '@angular/core';
+=======
+import { Component, OnInit } from '@angular/core';
+>>>>>>> contact service
 import { Location } from '@angular/common';
 import { BackendService } from '../_helpers/services/backend.service';
 import { VariablesService } from '../_helpers/services/variables.service';
@@ -6,7 +10,10 @@ import { Contact } from '../_helpers/models/contact.model';
 import { ModalService } from '../_helpers/services/modal.service';
 import { Papa } from 'ngx-papaparse';
 import { TranslateService } from '@ngx-translate/core';
+<<<<<<< HEAD
 import { Router } from '@angular/router';
+=======
+>>>>>>> contact service
 
 @Component({
   selector: 'app-export-import',
@@ -22,9 +29,13 @@ export class ExportImportComponent implements OnInit {
     private backend: BackendService,
     private modalService: ModalService,
     private papa: Papa,
+<<<<<<< HEAD
     private translate: TranslateService,
     private router: Router,
     private ngZone: NgZone
+=======
+    private translate: TranslateService
+>>>>>>> contact service
   ) {}
 
   ngOnInit() {}
@@ -42,18 +53,27 @@ export class ExportImportComponent implements OnInit {
           );
           if (this.isValid(file_data.path)) {
             this.backend.loadFile(file_data.path, (status, data) => {
+<<<<<<< HEAD
               if (!status) {
                 this.modalService.prepareModal(
                   'error',
                   'CONTACTS.ERROR_IMPORT_EMPTY'
                 );
               } else {
+=======
+              if (status) {
+>>>>>>> contact service
                 const options = {
                   header: true
                 };
                 const elements = this.papa.parse(data, options);
+<<<<<<< HEAD
                 const isArray = Array.isArray(elements.data);
                 if (isArray && elements.data.length !== 0 && !elements.errors.length) {
+=======
+
+                if (elements.data && !elements.errors.length) {
+>>>>>>> contact service
                   if (!this.variablesService.contacts.length) {
                     elements.data.forEach(element => {
                       this.variablesService.contacts.push(element);
@@ -81,9 +101,16 @@ export class ExportImportComponent implements OnInit {
                     });
                   }
                   this.backend.getContactAlias();
+<<<<<<< HEAD
                   this.ngZone.run(() => {
                     this.router.navigate(['/contacts']);
                   });
+=======
+                  this.modalService.prepareModal(
+                    'success',
+                    'CONTACTS.SUCCESS_IMPORT'
+                  );
+>>>>>>> contact service
                 }
                 if (elements.errors.length) {
                   this.modalService.prepareModal(
@@ -114,6 +141,7 @@ export class ExportImportComponent implements OnInit {
       '*',
       this.variablesService.settings.default_path,
       (file_status, file_data) => {
+<<<<<<< HEAD
         if (!this.variablesService.contacts.length && !(file_data.error_code === 'CANCELED')) {
           this.modalService.prepareModal('error', 'CONTACTS.ERROR_EMPTY_LIST');
         }
@@ -123,6 +151,10 @@ export class ExportImportComponent implements OnInit {
         }
         if (!(file_data.error_code === 'CANCELED') && !this.isValid(path)) {
           this.modalService.prepareModal('error', 'CONTACTS.ERROR_EXPORT');
+=======
+        if (file_status) {
+          this.backend.storeFile(file_data.path, this.papa.unparse(contacts));
+>>>>>>> contact service
         }
       }
     );

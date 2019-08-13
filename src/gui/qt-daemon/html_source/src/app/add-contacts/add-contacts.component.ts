@@ -66,8 +66,12 @@ export class AddContactsComponent implements OnInit, OnDestroy {
     ]),
     name: new FormControl('', [
       Validators.required,
+<<<<<<< HEAD
       Validators.minLength(4),
       Validators.maxLength(25),
+=======
+      Validators.pattern(/^[\w\s-_.]{4,25}$/),
+>>>>>>> contact service
       (g: FormControl) => {
         if (g.value) {
           const isDublicated = this.variablesService.contacts.findIndex(
@@ -178,7 +182,11 @@ export class AddContactsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+<<<<<<< HEAD
     if (!(this.id || this.id === 0)) {
+=======
+    if (!this.id) {
+>>>>>>> contact service
       this.variablesService.newContact = {
         name: this.addContactForm.get('name').value,
         address: this.addContactForm.get('address').value,

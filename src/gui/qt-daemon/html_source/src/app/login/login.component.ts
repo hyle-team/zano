@@ -31,8 +31,11 @@ export class LoginComponent implements OnInit, OnDestroy {
   });
 
   type = 'reg';
+<<<<<<< HEAD
 
   logo = icons.logo;
+=======
+>>>>>>> contact service
 
   constructor(
     private route: ActivatedRoute,
@@ -102,7 +105,11 @@ export class LoginComponent implements OnInit, OnDestroy {
            }
          });
       } else {
+<<<<<<< HEAD
         this.getData(this.variablesService.appPass);
+=======
+        this.getWalletData(this.variablesService.appPass);
+>>>>>>> contact service
       }
     }
   }
@@ -114,14 +121,23 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.variablesService.dataIsLoaded = true;
         this.variablesService.startCountdown();
         this.variablesService.appPass = appPass;
+<<<<<<< HEAD
         const isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
 
+=======
+        if (Object.keys(data['contacts']).length !== 0) {
+          data['contacts'].map(contact => {
+            this.variablesService.contacts.push(contact);
+          });
+        }
+>>>>>>> contact service
         if (this.variablesService.wallets.length) {
           this.ngZone.run(() => {
             this.router.navigate(['/wallet/' + this.variablesService.wallets[0].wallet_id]);
           });
           return;
         }
+<<<<<<< HEAD
         if (data.hasOwnProperty('contacts')) {
           if (Object.keys(data['contacts']).length !== 0) {
             data['contacts'].map(contact => {
@@ -182,6 +198,15 @@ export class LoginComponent implements OnInit, OnDestroy {
             }
             this.backend.getContracts(open_data.wallet_id, (contracts_status, contracts_data) => {
               if (contracts_status && contracts_data.hasOwnProperty('contracts')) {
+=======
+        if (Object.keys(data['wallets']).length !== 0) {
+          let openWallets = 0;
+          let runWallets = 0;
+          data['wallets'].forEach((wallet, wallet_index) => {
+            this.backend.openWallet(wallet.path, wallet.pass, true, (open_status, open_data, open_error) => {
+              if (open_status || open_error === 'FILE_RESTORED') {
+                openWallets++;
+>>>>>>> contact service
                 this.ngZone.run(() => {
                   new_wallet.prepareContractsAfterOpen(contracts_data.contracts, this.variablesService.exp_med_ts, this.variablesService.height_app, this.variablesService.settings.viewedContracts, this.variablesService.settings.notViewedContracts);
                 });

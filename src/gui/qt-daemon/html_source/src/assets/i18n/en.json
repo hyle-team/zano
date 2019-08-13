@@ -39,7 +39,10 @@
       "SYNCING": "Syncing wallet"
     },
     "CONTACTS": "Contacts",
+<<<<<<< HEAD
     "CONTACTS_TOOLTIP": "Contacts option available only with Master Password enabled",
+=======
+>>>>>>> contact service
     "SETTINGS": "Settings",
     "LOG_OUT": "Log out",
     "LOG_OUT_TOOLTIP": "Logout option available only with Master Password enabled",
@@ -558,6 +561,10 @@
       "SET_MASTER_PASSWORD": "Set master password",
       "ADDRESS_DUBLICATED": "Address is dublicated",
       "MAX_LENGTH": "Maximum notes length reached",
+<<<<<<< HEAD
+=======
+      "NAME_WRONG": "Contact has wrong name",
+>>>>>>> contact service
       "NAME_LENGTH": "The name must be 4-25 characters long"
     },
     "BUTTON": {
@@ -571,6 +578,7 @@
     },
     "SUCCESS_SENT": "Contact added",
     "SUCCESS_SAVE": "Contact is edited",
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Error is occured while reading file!",
@@ -578,6 +586,11 @@
     "ERROR_EXPORT": "Invalid file type. Save file as .csv",
     "ERROR_EMPTY_LIST": "Contact list is empty",
     "ERROR_IMPORT_EMPTY": "File is empty"
+=======
+    "SUCCESS_IMPORT": "Contacts is imported",
+    "ERROR_IMPORT": "Error is occured while reading file!",
+    "ERROR_TYPE_FILE": "Please import valid .csv file."
+>>>>>>> contact service
   },
   "ERRORS": {
     "NO_MONEY": "Not enough money",

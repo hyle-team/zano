@@ -57,8 +57,11 @@ export class VariablesService {
 
   public contacts: Array<Contact> = [];
   public newContact: Contact = {name: null, address: null, notes: null};
+<<<<<<< HEAD
 
   public pattern = '^[a-zA-Z0-9_.\\\]\*\|\~\!\?\@\#\$\%\^\&\+\{\}\(\)\<\>\:\;\"\'\-\=\/\,\[\\\\]*$';
+=======
+>>>>>>> contact service
 
   getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);

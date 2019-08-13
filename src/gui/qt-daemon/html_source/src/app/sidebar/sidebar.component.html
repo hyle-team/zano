@@ -60,6 +60,7 @@
     </div>
   </ng-template>
   <div class="wrap-button" routerLinkActive="active">
+<<<<<<< HEAD
     <button [routerLink]="['/settings']"
       (mouseover)="menuItemHovered = true"
       (mouseleave)="menuItemHovered = false"
@@ -68,6 +69,16 @@
       <ng-template #svgSetting>
         <div class="animated" [innerHTML]="settings | safeHTML"></div>
       </ng-template>
+=======
+    <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2" [disabled]="variablesService.daemon_state !== 2">
+      <i class="icon contacts"></i>
+      <span>{{ 'SIDEBAR.CONTACTS' | translate }}</span>
+    </button>
+  </div>
+  <div class="wrap-button" routerLinkActive="active">
+    <button [routerLink]="['/settings']">
+      <i class="icon settings"></i>
+>>>>>>> contact service
       <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>
     </button>
   </div>

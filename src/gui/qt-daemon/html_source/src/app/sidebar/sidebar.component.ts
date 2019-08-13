@@ -3,8 +3,11 @@ import {ActivatedRoute, NavigationStart, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
 import { ModalService } from '../_helpers/services/modal.service';
+<<<<<<< HEAD
 
 import icons from '../../assets/icons/icons.json';
+=======
+>>>>>>> contact service
 
 @Component({
   selector: 'app-sidebar',

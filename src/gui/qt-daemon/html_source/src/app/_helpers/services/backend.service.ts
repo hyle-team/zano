@@ -359,7 +359,11 @@ export class BackendService {
   }
 
   storeFile(path, buff) {
+<<<<<<< HEAD
     this.backendObject['store_to_file'](path, buff);
+=======
+    this.backendObject['store_to_file'](path, (typeof buff === 'string' ? buff : JSON.stringify(buff)));
+>>>>>>> contact service
   }
 
   loadFile(path, callback) {
