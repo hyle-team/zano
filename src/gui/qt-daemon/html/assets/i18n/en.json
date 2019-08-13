@@ -38,6 +38,7 @@
       "MESSAGES": "New offers/Messages",
       "SYNCING": "Syncing wallet"
     },
+    "CONTACTS": "Contacts",
     "SETTINGS": "Settings",
     "LOG_OUT": "Log out",
     "SYNCHRONIZATION": {
@@ -486,6 +487,55 @@
       "ON": "ON",
       "OFF": "OFF"
     }
+  },
+  "CONTACTS": {
+    "TITLE": "Contact list",
+    "IMPORT_EXPORT": "Import or export contacts",
+    "IMPORT": "Import",
+    "EXPORT": "Export",
+    "ADD": "Add/edit contact",
+    "SEND": "Send",
+    "SEND_FROM": "Send from",
+    "SEND_TO": "To",
+    "OPEN_ADD_WALLET": "Open/Add wallet",
+    "COPY": "- Copy"
+,    "TABLE": {
+      "NAME": "Name",
+      "ALIAS": "Alias",
+      "ADDRESS": "Address",
+      "NOTES": "Notes",
+      "EMPTY": "Contact list is empty"
+    },
+    "FORM": {
+      "NAME": "Name",
+      "ADDRESS": "Address",
+      "NOTES": "Notes"
+    },
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUBLICATED": "Name is dublicated",
+      "ADDRESS_REQUIRED": "Address is required",
+      "ADDRESS_NOT_VALID": "Address not valid",
+      "SET_MASTER_PASSWORD": "Set master password",
+      "ADDRESS_DUBLICATED": "Address is dublicated",
+      "MAX_LENGTH": "Maximum notes length reached",
+      "NAME_WRONG": "Contact has wrong name",
+      "NAME_LENGTH": "The name must be 4-25 characters long"
+    },
+    "BUTTON": {
+      "SEND": "Send",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "ADD": "Add contact",
+      "ADD_EDIT": "Add/Save",
+      "GO_TO_WALLET": "Go to wallet",
+      "IMPORT_EXPORT": "Import/export"
+    },
+    "SUCCESS_SENT": "Contact added",
+    "SUCCESS_SAVE": "Contact is edited",
+    "SUCCESS_IMPORT": "Contacts is imported",
+    "ERROR_IMPORT": "Error is occured while reading file!",
+    "ERROR_TYPE_FILE": "Please import valid .csv file."
   },
   "ERRORS": {
     "NO_MONEY": "Not enough money",
