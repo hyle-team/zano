@@ -22,8 +22,12 @@
         <div *ngIf="addContactForm.controls['name'].errors['pattern']">
           {{ 'CONTACTS.FORM_ERRORS.NAME_WRONG' | translate }}
         </div>
+<<<<<<< HEAD
         <div *ngIf="addContactForm.get('name').value.length <= 4 || addContactForm.get('name').value.length > 25">
 >>>>>>> contact service
+=======
+        <div *ngIf="addContactForm.get('name').value.length < 4 || addContactForm.get('name').value.length > 25">
+>>>>>>> fix add contact + rebuild html
           {{ 'CONTACTS.FORM_ERRORS.NAME_LENGTH' | translate }}
         </div>
         <div *ngIf="addContactForm.controls['name'].errors['required']">
