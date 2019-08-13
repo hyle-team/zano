@@ -1,14 +1,70 @@
 LMDB 0.9 Change Log
 
-LMDB 0.9.18 Release Engineering
+LMDB 0.9.24 Release (2019/07/24)
+	ITS#8969 Tweak mdb_page_split
+	ITS#8975 WIN32 fix writemap set_mapsize crash
+	ITS#9007 Fix loose pages in WRITEMAP
+
+LMDB 0.9.23 Release (2018/12/19)
+	ITS#8756 Fix loose pages in dirty list
+	ITS#8831 Fix mdb_load flag init
+	ITS#8844 Fix mdb_env_close in forked process
+	Documentation
+		ITS#8857 mdb_cursor_del doesn't invalidate cursor
+		ITS#8908 GET_MULTIPLE etc don't change passed in key
+
+LMDB 0.9.22 Release (2018/03/22)
+	Fix MDB_DUPSORT alignment bug (ITS#8819)
+	Fix regression with new db from 0.9.19 (ITS#8760)
+	Fix liblmdb to build on Solaris (ITS#8612)
+	Fix delete behavior with DUPSORT DB (ITS#8622)
+	Fix mdb_cursor_get/mdb_cursor_del behavior (ITS#8722)
+
+LMDB 0.9.21 Release (2017/06/01)
+	Fix xcursor after cursor_del (ITS#8622)
+
+LMDB 0.9.20 (Withdrawn)
+	Fix mdb_load with escaped plaintext (ITS#8558)
+	Fix mdb_cursor_last / mdb_put interaction (ITS#8557)
+
+LMDB 0.9.19 Release (2016/12/28)
+	Fix mdb_env_cwalk cursor init (ITS#8424)
+	Fix robust mutexes on Solaris 10/11 (ITS#8339)
+	Tweak Win32 error message buffer
+	Fix MDB_GET_BOTH on non-dup record (ITS#8393)
+	Optimize mdb_drop
+	Fix xcursors after mdb_cursor_del (ITS#8406)
+	Fix MDB_NEXT_DUP after mdb_cursor_del (ITS#8412)
+	Fix mdb_cursor_put resetting C_EOF (ITS#8489)
+	Fix mdb_env_copyfd2 to return EPIPE on SIGPIPE (ITS#8504)
+	Fix mdb_env_copy with empty DB (ITS#8209)
+	Fix behaviors with fork (ITS#8505)
+	Fix mdb_dbi_open with mainDB cursors (ITS#8542)
+	Fix robust mutexes on kFreeBSD (ITS#8554)
+	Fix utf8_to_utf16 error checks (ITS#7992)
+	Fix F_NOCACHE on MacOS, error is non-fatal (ITS#7682)
+	Build
+		Make shared lib suffix overridable (ITS#8481)
+	Documentation
+		Cleanup doxygen nits
+		Note reserved vs actual mem/disk usage
+
+
+LMDB 0.9.18 Release (2016/02/05)
 	Fix robust mutex detection on glibc 2.10-11 (ITS#8330)
+	Fix page_search_root assert on FreeDB (ITS#8336)
+	Fix MDB_APPENDDUP vs. rewrite(single item) (ITS#8334)
+	Fix mdb_copy of large files on Windows
+	Fix subcursor move after delete (ITS#8355)
+	Fix mdb_midl_shirnk off-by-one (ITS#8363)
 	Check for utf8_to_utf16 failures (ITS#7992)
 	Catch strdup failure in mdb_dbi_open
 	Build
 		Additional makefile var tweaks (ITS#8169)
 	Documentation
 		Add Getting Started page
-
+		Update WRITEMAP description
+	
 
 LMDB 0.9.17 Release (2015/11/30)
 	Fix ITS#7377 catch calloc failure
