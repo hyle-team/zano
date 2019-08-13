@@ -17,14 +17,20 @@ namespace lmdb_test
     bool r = false;
     epee::shared_recursive_mutex rw_lock;
 
+    epee::log_space::log_singletone::enable_channels("lmdb");
+
     static const uint64_t buffer_size = 64 * 1024;                                         // 64 KB
-    static const uint64_t db_total_size = static_cast<uint64_t>(2.1 * 1024 * 1024 * 1024); // 2.1 GB
+    static const uint64_t db_total_size = static_cast<uint64_t>(2.1 * 1024 * 1024 * 1024); // 2.1 GB -- a bit more than 2GB to test 2GB boundary
+    static const std::string db_file_path = "2gb_lmdb_test";
 
     std::shared_ptr<db::lmdb_db_backend> lmdb_ptr = std::make_shared<db::lmdb_db_backend>();
     db::basic_db_accessor bdba(lmdb_ptr, rw_lock);
 
+    //
+    // write data
+    //
 
-    r = bdba.open("2gb_lmdb_test", CACHE_SIZE);
+    r = bdba.open(db_file_path, CACHE_SIZE);
     ASSERT_TRUE(r);
 
     db::container_handle h;
@@ -46,7 +52,12 @@ namespace lmdb_test
       total_data += buffer_size;
 
       if (key % 1024 == 0)
+      {
+        ASSERT_TRUE(lmdb_ptr->commit_transaction());
+        ASSERT_TRUE(lmdb_ptr->resize_if_needed());
+        ASSERT_TRUE(lmdb_ptr->begin_transaction());
         std::cout << total_data / 1024 / 1024 << " MB written to DB" << ENDL;
+      }
     }
 
     ASSERT_TRUE(lmdb_ptr->commit_transaction());
@@ -55,9 +66,11 @@ namespace lmdb_test
     ASSERT_TRUE(r);
 
 
+    //
+    // read data and check
+    //
 
-
-    r = bdba.open("2gb_lmdb_test");
+    r = bdba.open(db_file_path);
     ASSERT_TRUE(r);
     r = lmdb_ptr->open_container("c1", h);
     ASSERT_TRUE(r);
@@ -83,6 +96,8 @@ namespace lmdb_test
 
     r = bdba.close();
     ASSERT_TRUE(r);
+
+    boost::filesystem::remove_all(db_file_path);
 
   }
 
