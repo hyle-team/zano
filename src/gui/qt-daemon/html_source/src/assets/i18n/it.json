@@ -1,126 +1,126 @@
 {
   "LOGIN": {
-    "SETUP_MASTER_PASS": "Setup master password",
-    "SETUP_CONFIRM_PASS": "Confirm the password",
-    "MASTER_PASS": "Master password",
-    "BUTTON_NEXT": "Next",
-    "BUTTON_SKIP": "Skip",
-    "BUTTON_RESET": "Reset",
-    "INCORRECT_PASSWORD": "Invalid password",
+    "SETUP_MASTER_PASS": "Imposta la password generale",
+    "SETUP_CONFIRM_PASS": "Conferma la password",
+    "MASTER_PASS": "Password generale",
+    "BUTTON_NEXT": "Prossimo",
+    "BUTTON_SKIP": "Salta",
+    "BUTTON_RESET": "Azzera",
+    "INCORRECT_PASSWORD": "Password non valida",
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required",
-      "CONFIRM_REQUIRED": "Confirmation is required",
-      "MISMATCH": "Mismatch"
+      "PASS_REQUIRED": "La password è necessaria",
+      "CONFIRM_REQUIRED": "La conferma è richiesta",
+      "MISMATCH": "Non corrisponde"
     }
   },
   "COMMON": {
-    "BACK": "Go back"
+    "BACK": "Torna indietro"
   },
   "BREADCRUMBS": {
-    "ADD_WALLET": "Add wallet",
-    "CREATE_WALLET": "Create new wallet",
+    "ADD_WALLET": "Aggiungi portafoglio",
+    "CREATE_WALLET": "Crea un nuovo portafoglio",
     "SAVE_PHRASE": "Save your seed phrase",
-    "OPEN_WALLET": "Open existing wallet",
-    "RESTORE_WALLET": "Restore from backup",
-    "WALLET_DETAILS": "Wallet details",
+    "OPEN_WALLET": "Apri portafoglio esistente",
+    "RESTORE_WALLET": "Ripristina da backup",
+    "WALLET_DETAILS": "Dettagli portafoglio",
     "ASSIGN_ALIAS": "Assign alias",
     "EDIT_ALIAS": "Edit alias",
     "TRANSFER_ALIAS": "Transfer alias",
-    "CONTRACTS": "Contracts",
-    "NEW_PURCHASE": "New purchase",
-    "OLD_PURCHASE": "Purchase"
+    "CONTRACTS": "Contratti",
+    "NEW_PURCHASE": "Nuovo acquisto",
+    "OLD_PURCHASE": "Acquisto"
   },
   "SIDEBAR": {
-    "TITLE": "Wallets",
-    "ADD_NEW": "+ Add",
+    "TITLE": "Portafogli",
+    "ADD_NEW": "+ Aggiungi",
     "ACCOUNT": {
       "STAKING": "Staking",
-      "MESSAGES": "New offers/Messages",
-      "SYNCING": "Syncing wallet"
+      "MESSAGES": "Nuove offerte/messaggi",
+      "SYNCING": "Sincronizzazione portafoglio"
     },
-    "SETTINGS": "Settings",
-    "LOG_OUT": "Log out",
+    "SETTINGS": "Impostazioni",
+    "LOG_OUT": "Esci",
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
       "ONLINE": "Online",
-      "ERROR": "System error",
+      "ERROR": "Errore di sistema",
       "COMPLETE": "Completion",
-      "SYNCING": "Syncing blockchain",
+      "SYNCING": "Sincronizzazione blockchain",
       "LOADING": "Loading blockchain data"
     },
     "UPDATE": {
-      "STANDARD": "Update available",
+      "STANDARD": "Aggiornamento disponibile",
       "STANDARD_TOOLTIP": "<span class=\"standard-update\">Get new update.</span><br><span>Update is recommended!</span>",
-      "IMPORTANT": "Update available",
-      "IMPORTANT_HINT": "Important update!",
+      "IMPORTANT": "Aggiornamento disponibile",
+      "IMPORTANT_HINT": "Aggiornamento importante!",
       "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Get new update.</span><br><span>Important update!</span>",
-      "CRITICAL": "Update available",
-      "CRITICAL_HINT": "Critical update!",
+      "CRITICAL": "Aggiornamento disponibile",
+      "CRITICAL_HINT": "Aggiornamento critico!",
       "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
-      "TIME": "System time differs from network",
+      "TIME": "L'orario di sistema differisce dalla rete",
       "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
     }
   },
   "MAIN": {
-    "TITLE": "Create or open the wallet to start using Zano",
-    "BUTTON_NEW_WALLET": "Create new wallet",
-    "BUTTON_OPEN_WALLET": "Open existing wallet",
-    "BUTTON_RESTORE_BACKUP": "Restore from backup",
-    "HELP": "How to create wallet?",
-    "CHOOSE_PATH": "Please choose a path"
+    "TITLE": "Crea o apri il portafoglio per iniziare a usare Zano",
+    "BUTTON_NEW_WALLET": "Crea un nuovo portafoglio",
+    "BUTTON_OPEN_WALLET": "Apri portafoglio esistente",
+    "BUTTON_RESTORE_BACKUP": "Ripristina da backup",
+    "HELP": "Come creare il portafoglio?",
+    "CHOOSE_PATH": "Scegli un percorso"
   },
   "CREATE_WALLET": {
-    "NAME": "Wallet name",
-    "PASS": "Set wallet password",
-    "CONFIRM": "Confirm wallet password",
-    "BUTTON_SELECT": "Select wallet location",
-    "BUTTON_CREATE": "Create wallet",
-    "TITLE_SAVE": "Save the wallet file.",
-    "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
-    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
+    "NAME": "Nome del portafoglio",
+    "PASS": "Imposta password portafoglio",
+    "CONFIRM": "Conferma password portafoglio",
+    "BUTTON_SELECT": "Seleziona posizione portafoglio",
+    "BUTTON_CREATE": "Crea portafoglio",
+    "TITLE_SAVE": "Salva il file del portafoglio.",
+    "ERROR_CANNOT_SAVE_TOP": "I file del portafoglio esistenti non possono essere sostituiti o sovrascritti",
+    "ERROR_CANNOT_SAVE_SYSTEM": "I file del portafoglio non possono essere salvati nella partizione di sistema",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
-      "MAX_LENGTH": "Maximum name length reached",
-      "CONFIRM_NOT_MATCH": "Confirm password not match"
+      "NAME_REQUIRED": "Il nome è richiesto",
+      "NAME_DUPLICATE": "Il nome è duplicato",
+      "MAX_LENGTH": "Lunghezza massima del nome raggiunta",
+      "CONFIRM_NOT_MATCH": "La password di conferma non corrisponde"
     }
   },
   "OPEN_WALLET": {
-    "NAME": "Wallet name",
-    "PASS": "Wallet password",
-    "BUTTON": "Open wallet",
-    "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this address is already open",
-    "FILE_NOT_FOUND1": "Wallet file not found",
-    "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
+    "NAME": "Nome del portafoglio",
+    "PASS": "Password portafoglio",
+    "BUTTON": "Apri portafoglio",
+    "WITH_ADDRESS_ALREADY_OPEN": "Un portafoglio con questo indirizzo è già aperto",
+    "FILE_NOT_FOUND1": "File del portafoglio non trovato",
+    "FILE_NOT_FOUND2": "<br/><br/> Potrebbe essere stato rinominato o spostato. <br/> Per aprirlo, usa il pulsante \"Apri portafoglio\".",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
-      "MAX_LENGTH": "Maximum name length reached"
+      "NAME_REQUIRED": "Il nome è richiesto",
+      "NAME_DUPLICATE": "Il nome è un duplicato",
+      "MAX_LENGTH": "Lunghezza massima del nome raggiunta"
     },
     "MODAL": {
-      "TITLE": "Type wallet password",
-      "LABEL": "Password to this wallet",
-      "OPEN": "Open wallet",
-      "SKIP": "Skip",
-      "NOT_FOUND": "Not found"
+      "TITLE": "Imposta password portafoglio",
+      "LABEL": "Password per questo portafoglio",
+      "OPEN": "Apri portafoglio",
+      "SKIP": "Salta",
+      "NOT_FOUND": "Non trovato"
     }
   },
   "RESTORE_WALLET": {
-    "LABEL_NAME": "Wallet name",
-    "LABEL_PHRASE_KEY": "Seed phrase / private key",
-    "PASS": "Wallet password",
-    "CONFIRM": "Confirm wallet password",
-    "BUTTON_SELECT": "Select wallet location",
-    "BUTTON_CREATE": "Create wallet",
+    "LABEL_NAME": "Nome del portafoglio",
+    "LABEL_PHRASE_KEY": "Frase segreta / chiave privata",
+    "PASS": "Password portafoglio",
+    "CONFIRM": "Conferma password portafoglio",
+    "BUTTON_SELECT": "Seleziona posizione portafoglio",
+    "BUTTON_CREATE": "Crea portafoglio",
     "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
     "CHOOSE_PATH": "Please choose a path",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
-      "MAX_LENGTH": "Maximum name length reached",
-      "CONFIRM_NOT_MATCH": "Confirm password not match",
-      "KEY_REQUIRED": "Key is required",
-      "KEY_NOT_VALID": "Key not valid"
+      "NAME_REQUIRED": "Il nome è richiesto",
+      "NAME_DUPLICATE": "Il nome è un duplicato",
+      "MAX_LENGTH": "Lunghezza massima del nome raggiunta",
+      "CONFIRM_NOT_MATCH": "La password di conferma non corrisponde",
+      "KEY_REQUIRED": "Chiave richiesta",
+      "KEY_NOT_VALID": "Chiave non valida"
     }
   },
   "SEED_PHRASE": {
@@ -136,15 +136,15 @@
   },
   "SETTINGS": {
     "TITLE": "Settings",
-    "DARK_THEME": "Dark theme",
-    "WHITE_THEME": "White theme",
-    "GRAY_THEME": "Grey theme",
+    "DARK_THEME": "Tema scuro",
+    "WHITE_THEME": "Tema bianco",
+    "GRAY_THEME": "Tema grigio",
     "APP_LOCK": {
-      "TITLE": "Lock app after:",
-      "TIME1": "5 min",
-      "TIME2": "15 min",
-      "TIME3": "1 hour",
-      "TIME4": "Never"
+      "TITLE": "Blocca app dopo:",
+      "TIME1": "5 minuti",
+      "TIME2": "15 minuti",
+      "TIME3": "1 ora",
+      "TIME4": "Mai"
     },
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
