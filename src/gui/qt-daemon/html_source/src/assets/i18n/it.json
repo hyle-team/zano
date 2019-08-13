@@ -23,9 +23,9 @@
     "OPEN_WALLET": "Apri portafoglio esistente",
     "RESTORE_WALLET": "Ripristina da backup",
     "WALLET_DETAILS": "Dettagli portafoglio",
-    "ASSIGN_ALIAS": "Assign alias",
-    "EDIT_ALIAS": "Edit alias",
-    "TRANSFER_ALIAS": "Transfer alias",
+    "ASSIGN_ALIAS": "Assegna alias",
+    "EDIT_ALIAS": "Modifica alias",
+    "TRANSFER_ALIAS": "Trasferisci alias",
     "CONTRACTS": "Contratti",
     "NEW_PURCHASE": "Nuovo acquisto",
     "OLD_PURCHASE": "Acquisto"
@@ -124,18 +124,18 @@
     }
   },
   "SEED_PHRASE": {
-    "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
-    "BUTTON_CREATE_ACCOUNT": "Create wallet",
-    "BUTTON_COPY": "Copy"
+    "TITLE": "Assicurati di mantenere la tua frase segreta in un posto sicuro. Se dimentichi la tua frase segreta non sarai in grado di recuperare il tuo portafoglio.",
+    "BUTTON_CREATE_ACCOUNT": "Crea portafoglio",
+    "BUTTON_COPY": "Copia"
   },
   "PROGRESS": {
-    "ADD_WALLET": "Add wallet",
-    "SELECT_LOCATION": "Select wallet location",
-    "CREATE_WALLET": "Create new wallet",
-    "RESTORE_WALLET": "Restore from backup"
+    "ADD_WALLET": "Aggiungi portafoglio",
+    "SELECT_LOCATION": "Seleziona posizione portafoglio",
+    "CREATE_WALLET": "Crea un nuovo portafoglio",
+    "RESTORE_WALLET": "Ripristina da backup"
   },
   "SETTINGS": {
-    "TITLE": "Settings",
+    "TITLE": "Impostazioni",
     "DARK_THEME": "Tema scuro",
     "WHITE_THEME": "Tema bianco",
     "GRAY_THEME": "Tema grigio",
@@ -148,106 +148,106 @@
     },
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
-      "OLD": "Old password",
-      "NEW": "New password",
-      "CONFIRM": "New password confirmation",
-      "BUTTON": "Save"
+      "OLD": "Vecchia password",
+      "NEW": "Nuova password",
+      "CONFIRM": "Conferma nuova password",
+      "BUTTON": "Salva"
     },
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required",
-      "PASS_NOT_MATCH": "Old password not match",
-      "CONFIRM_NOT_MATCH": "Confirm password not match"
+      "PASS_REQUIRED": "La password è necessaria",
+      "PASS_NOT_MATCH": "La vecchia password non corrisponde",
+      "CONFIRM_NOT_MATCH": "La password di conferma non corrisponde"
     },
-    "LAST_BUILD": "Current build: {{value}}",
-    "APP_LOG_TITLE": "Log level:"
+    "LAST_BUILD": "Build attuale: {{value}}",
+    "APP_LOG_TITLE": "Livello di log:"
   },
   "WALLET": {
-    "REGISTER_ALIAS": "Register an alias",
-    "DETAILS": "Details",
-    "LOCK": "Lock",
-    "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
-    "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
-    "LOCKED_BALANCE_LINK": "What does that mean?",
+    "REGISTER_ALIAS": "Registra un alias",
+    "DETAILS": "Dettagli",
+    "LOCK": "Blocca",
+    "AVAILABLE_BALANCE": "Disponibile <b>{{available}} {{currency}}<b/>",
+    "LOCKED_BALANCE": "Bloccato <b>{{locked}} {{currency}}<b/>",
+    "LOCKED_BALANCE_LINK": "Che cosa significa?",
     "TABS": {
-      "SEND": "Send",
-      "RECEIVE": "Receive",
-      "HISTORY": "History",
-      "CONTRACTS": "Contracts",
-      "MESSAGES": "Messages",
+      "SEND": "Invia",
+      "RECEIVE": "Ricevi",
+      "HISTORY": "Storico",
+      "CONTRACTS": "Contratti",
+      "MESSAGES": "Messaggi",
       "STAKING": "Staking"
     }
   },
   "WALLET_DETAILS": {
-    "LABEL_NAME": "Wallet name",
-    "LABEL_FILE_LOCATION": "Wallet file location",
-    "LABEL_SEED_PHRASE": "Seed phrase",
-    "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
-    "BUTTON_SAVE": "Save",
-    "BUTTON_REMOVE": "Close wallet",
+    "LABEL_NAME": "Nome portafoglio",
+    "LABEL_FILE_LOCATION": "Posizione file portafoglio",
+    "LABEL_SEED_PHRASE": "Frase segreta",
+    "SEED_PHRASE_HINT": "Clicca per rivelare la frase segreta",
+    "BUTTON_SAVE": "Salva",
+    "BUTTON_REMOVE": "Chiudi portafoglio",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
-      "MAX_LENGTH": "Maximum name length reached"
+      "NAME_REQUIRED": "Il nome è richiesto",
+      "NAME_DUPLICATE": "Il nome è un duplicato",
+      "MAX_LENGTH": "Lunghezza massima del nome raggiunta"
     }
   },
   "ASSIGN_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
-      "PLACEHOLDER": "@ Enter alias",
-      "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
+      "LABEL": "Nome univoco",
+      "PLACEHOLDER": "@ Inserisci alias",
+      "TOOLTIP": "Un alias è un modulo abbreviato o il tuo account. Un alias può solo includere lettere latine, numeri e caratteri “.” e “-”. Deve iniziare con “@”."
     },
     "COMMENT": {
       "LABEL": "Comment",
       "PLACEHOLDER": "Enter comment",
-      "TOOLTIP": "The comment will be visible to anyone who wants to make a payment to your alias. You can provide details about your business, contacts, or include any text. Comments can be edited later."
+      "TOOLTIP": "Il commento sarà visibile a chiunque desideri effettuare un pagamento al tuo alias. Puoi fornire dettagli sul tuo business, contatti o includere qualsiasi testo. I commenti possono essere modificati più tardi."
     },
-    "COST": "Cost to create alias {{value}} {{currency}}",
+    "COST": "Costo per creare alias {{value}} {{currency}}",
     "BUTTON_ASSIGN": "Assign",
     "BUTTON_CANCEL": "Cancel",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
-      "NAME_WRONG": "Alias has wrong name",
-      "NAME_LENGTH": "The alias must be 6-25 characters long",
-      "NAME_EXISTS": "Alias name already exists",
-      "NO_MONEY": "You do not have enough funds to assign this alias",
+      "NAME_WRONG": "L'Alias ha un nome errato",
+      "NAME_LENGTH": "L'alias deve essere lungo 6-25 caratteri",
+      "NAME_EXISTS": "Il nome dell'alias esiste già",
+      "NO_MONEY": "Non hai fondi sufficienti per assegnare questo alias",
       "MAX_LENGTH": "Maximum comment length reached"
     },
-    "ONE_ALIAS": "You can create only one alias per wallet",
-    "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
+    "ONE_ALIAS": "Puoi creare solo un alias per portafoglio",
+    "REQUEST_ADD_REG": "L'alias sarà assegnato entro 10 minuti"
   },
   "EDIT_ALIAS": {
     "NAME": {
       "LABEL": "Unique name",
-      "PLACEHOLDER": "@ Enter alias"
+      "PLACEHOLDER": "@ Inserisci alias"
     },
     "COMMENT": {
       "LABEL": "Comment",
       "PLACEHOLDER": "Enter comment"
     },
     "FORM_ERRORS": {
-      "NO_MONEY": "You do not have enough funds to change the comment to this alias",
+      "NO_MONEY": "Non hai fondi sufficienti per modificare il commento a questo alias",
       "MAX_LENGTH": "Maximum comment length reached"
     },
-    "COST": "Cost to edit alias {{value}} {{currency}}",
+    "COST": "Costo per modificare alias {{value}} {{currency}}",
     "BUTTON_EDIT": "Edit",
     "BUTTON_CANCEL": "Cancel"
   },
   "TRANSFER_ALIAS": {
     "NAME": {
       "LABEL": "Unique name",
-      "PLACEHOLDER": "@ Enter alias"
+      "PLACEHOLDER": "@ Inserisci alias"
     },
     "COMMENT": {
       "LABEL": "Comment",
       "PLACEHOLDER": "Enter comment"
     },
     "ADDRESS": {
-      "LABEL": "The account to which the alias will be transferred",
+      "LABEL": "L'account al quale l'alias verrà trasferito",
       "PLACEHOLDER": "Enter wallet address"
     },
     "FORM_ERRORS": {
       "WRONG_ADDRESS": "No wallet with this account exists",
-      "ALIAS_EXISTS": "This account already has an alias",
+      "ALIAS_EXISTS": "Questo account ha già un alias",
       "NO_MONEY": "You do not have enough funds to transfer this alias"
     },
     "COST": "Cost to transfer alias {{value}} {{currency}}",
