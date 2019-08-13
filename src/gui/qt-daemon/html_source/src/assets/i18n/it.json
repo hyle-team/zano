@@ -112,8 +112,8 @@
     "CONFIRM": "Conferma password portafoglio",
     "BUTTON_SELECT": "Seleziona posizione portafoglio",
     "BUTTON_CREATE": "Crea portafoglio",
-    "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
-    "CHOOSE_PATH": "Please choose a path",
+    "NOT_CORRECT_FILE_OR_PASSWORD": "File del portafoglio non valido o password non corrispondente",
+    "CHOOSE_PATH": "Scegli un percorso",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Il nome è richiesto",
       "NAME_DUPLICATE": "Il nome è un duplicato",
@@ -147,7 +147,7 @@
       "TIME4": "Mai"
     },
     "MASTER_PASSWORD": {
-      "TITLE": "Update master password",
+      "TITLE": "Aggiorna password generale",
       "OLD": "Vecchia password",
       "NEW": "Nuova password",
       "CONFIRM": "Conferma nuova password",
@@ -197,91 +197,91 @@
       "TOOLTIP": "Un alias è un modulo abbreviato o il tuo account. Un alias può solo includere lettere latine, numeri e caratteri “.” e “-”. Deve iniziare con “@”."
     },
     "COMMENT": {
-      "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment",
+      "LABEL": "Commento",
+      "PLACEHOLDER": "Inserisci commento",
       "TOOLTIP": "Il commento sarà visibile a chiunque desideri effettuare un pagamento al tuo alias. Puoi fornire dettagli sul tuo business, contatti o includere qualsiasi testo. I commenti possono essere modificati più tardi."
     },
     "COST": "Costo per creare alias {{value}} {{currency}}",
-    "BUTTON_ASSIGN": "Assign",
-    "BUTTON_CANCEL": "Cancel",
+    "BUTTON_ASSIGN": "Assegna",
+    "BUTTON_CANCEL": "Cancella",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
+      "NAME_REQUIRED": "Il nome è richiesto",
       "NAME_WRONG": "L'Alias ha un nome errato",
       "NAME_LENGTH": "L'alias deve essere lungo 6-25 caratteri",
       "NAME_EXISTS": "Il nome dell'alias esiste già",
       "NO_MONEY": "Non hai fondi sufficienti per assegnare questo alias",
-      "MAX_LENGTH": "Maximum comment length reached"
+      "MAX_LENGTH": "Lunghezza massima del nome raggiunta"
     },
     "ONE_ALIAS": "Puoi creare solo un alias per portafoglio",
     "REQUEST_ADD_REG": "L'alias sarà assegnato entro 10 minuti"
   },
   "EDIT_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
+      "LABEL": "Nome univoco",
       "PLACEHOLDER": "@ Inserisci alias"
     },
     "COMMENT": {
-      "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment"
+      "LABEL": "Commento",
+      "PLACEHOLDER": "Inserisci commento"
     },
     "FORM_ERRORS": {
       "NO_MONEY": "Non hai fondi sufficienti per modificare il commento a questo alias",
-      "MAX_LENGTH": "Maximum comment length reached"
+      "MAX_LENGTH": "Lunghezza massima del commento raggiunta"
     },
     "COST": "Costo per modificare alias {{value}} {{currency}}",
-    "BUTTON_EDIT": "Edit",
-    "BUTTON_CANCEL": "Cancel"
+    "BUTTON_EDIT": "Modifica",
+    "BUTTON_CANCEL": "Cancella"
   },
   "TRANSFER_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
+      "LABEL": "Nome univoco",
       "PLACEHOLDER": "@ Inserisci alias"
     },
     "COMMENT": {
-      "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment"
+      "LABEL": "Commento",
+      "PLACEHOLDER": "Inserisci commento"
     },
     "ADDRESS": {
       "LABEL": "L'account al quale l'alias verrà trasferito",
-      "PLACEHOLDER": "Enter wallet address"
+      "PLACEHOLDER": "Inserisci indirizzo portafoglio"
     },
     "FORM_ERRORS": {
-      "WRONG_ADDRESS": "No wallet with this account exists",
+      "WRONG_ADDRESS": "Non esiste alcun portafoglio con questo account",
       "ALIAS_EXISTS": "Questo account ha già un alias",
-      "NO_MONEY": "You do not have enough funds to transfer this alias"
+      "NO_MONEY": "Non hai fondi sufficienti per trasferire questo alias"
     },
-    "COST": "Cost to transfer alias {{value}} {{currency}}",
-    "BUTTON_TRANSFER": "Transfer",
-    "BUTTON_CANCEL": "Cancel",
-    "REQUEST_SEND_REG": "The alias will be transferred within 10 minutes"
+    "COST": "Costo per trasferire alias {{value}} {{currency}}",
+    "BUTTON_TRANSFER": "Trasferisci",
+    "BUTTON_CANCEL": "Cancella",
+    "REQUEST_SEND_REG": "L'alias verrà trasferito entro 10 minuti"
   },
   "SEND": {
-    "ADDRESS": "Address",
-    "AMOUNT": "Amount",
-    "COMMENT": "Comment",
-    "DETAILS": "Additional details",
+    "ADDRESS": "Indirizzo",
+    "AMOUNT": "Importo",
+    "COMMENT": "Commento",
+    "DETAILS": "Dettagli aggiuntivi",
     "MIXIN": "Mixin",
-    "FEE": "Fee",
-    "HIDE": "Hide your wallet address from recipient",
-    "BUTTON": "Send",
-    "SUCCESS_SENT": "Transaction sent",
+    "FEE": "Commissione",
+    "HIDE": "Nascondi l'indirizzo del tuo portafoglio dal destinatario",
+    "BUTTON": "Invia",
+    "SUCCESS_SENT": "Transazione inviata",
     "FORM_ERRORS": {
-      "ADDRESS_REQUIRED": "Address is required",
-      "ADDRESS_NOT_VALID": "Address not valid",
-      "ALIAS_NOT_VALID": "Alias not valid",
-      "AMOUNT_REQUIRED": "Amount is required",
-      "AMOUNT_ZERO": "Amount is zero",
-      "FEE_REQUIRED": "Fee is required",
+      "ADDRESS_REQUIRED": "Indirizzo richiesto",
+      "ADDRESS_NOT_VALID": "Indirizzo non valido",
+      "ALIAS_NOT_VALID": "Alias non valido",
+      "AMOUNT_REQUIRED": "Importo richiesto",
+      "AMOUNT_ZERO": "Importo è zero",
+      "FEE_REQUIRED": "La commissione è richiesta",
       "FEE_MINIMUM": "Minimum fee: {{fee}}",
-      "MAX_LENGTH": "Maximum comment length reached"
+      "MAX_LENGTH": "Lunghezza massima del commento raggiunta"
     }
   },
   "HISTORY": {
     "STATUS": "Status",
-    "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
-    "LOCK_TOOLTIP": "Locked till {{date}}",
-    "SEND": "Sent",
-    "RECEIVED": "Received",
+    "STATUS_TOOLTIP": "Conferme {{current}}/{{total}}",
+    "LOCK_TOOLTIP": "Bloccato fino a {{date}}",
+    "SEND": "Inviato",
+    "RECEIVED": "Ricevuto",
     "DATE": "Date",
     "AMOUNT": "Amount",
     "FEE": "Fee",
@@ -500,7 +500,7 @@
     "TX_TYPE_NORMAL_TO": "to",
     "TX_TYPE_NORMAL_END": "was not completed.",
     "TX_TYPE_NEW_ALIAS": "Error. Failed to register alias to safe",
-    "TX_TYPE_NEW_ALIAS_END": "Please try again.",
+    "TX_TYPE_NEW_ALIAS_END": "Per favore riprova.",
     "TX_TYPE_UPDATE_ALIAS": "Error. Failed to change comment to alias in safe",
     "TX_TYPE_COIN_BASE": "Error. The payment was not completed."
   },
