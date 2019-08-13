@@ -57,31 +57,31 @@
       "CRITICAL": "Aktualizace k dispozici",
       "CRITICAL_HINT": "Kritická aktualizace!",
       "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Kritická aktualizace k dispozici.</span><i class=\"icon\"></i><span>Aktualizaci důrazně doporučujeme!</span>",
-      "TIME": "System time differs from network",
-      "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
+      "TIME": "Systémový čas se liší od sítového",
+      "TIME_TOOLTIP": "<span class=\"wrong-time\">Špatný systémový čas!</span><br><span>Zkontrolujte a nastavte systémový čas.</span>"
     }
   },
   "MAIN": {
-    "TITLE": "Create or open the wallet to start using Zano",
-    "BUTTON_NEW_WALLET": "Create new wallet",
-    "BUTTON_OPEN_WALLET": "Open existing wallet",
-    "BUTTON_RESTORE_BACKUP": "Restore from backup",
-    "HELP": "How to create wallet?",
-    "CHOOSE_PATH": "Please choose a path"
+    "TITLE": "Chcete-li začít používat Zano, vytvořte nebo otevřete peněženku",
+    "BUTTON_NEW_WALLET": "Vytvořit novou peněženku",
+    "BUTTON_OPEN_WALLET": "Otevřít existující peněženku",
+    "BUTTON_RESTORE_BACKUP": "Obnovení ze zálohy",
+    "HELP": "Jak vytvořit peněženku?",
+    "CHOOSE_PATH": "Zvolte prosím cestu"
   },
   "CREATE_WALLET": {
-    "NAME": "Wallet name",
-    "PASS": "Set wallet password",
-    "CONFIRM": "Confirm wallet password",
-    "BUTTON_SELECT": "Select wallet location",
-    "BUTTON_CREATE": "Create wallet",
-    "TITLE_SAVE": "Save the wallet file.",
-    "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
-    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
+    "NAME": "Název peněženky",
+    "PASS": "Nastavit heslo peněženky",
+    "CONFIRM": "Potvrdit heslo k peněžence",
+    "BUTTON_SELECT": "Vyberte cestu k pěněžence",
+    "BUTTON_CREATE": "Vytvořit peněženku",
+    "TITLE_SAVE": "Uložte soubor peněženky.",
+    "ERROR_CANNOT_SAVE_TOP": "Stávající soubory peněženky nelze nahradit nebo přepsat",
+    "ERROR_CANNOT_SAVE_SYSTEM": "Soubory peněženky nelze uložit na diskový oddíl s operačním systémem",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
-      "MAX_LENGTH": "Maximum name length reached",
+      "NAME_REQUIRED": "Název je povinný",
+      "NAME_DUPLICATE": "Název je duplicitní",
+      "MAX_LENGTH": "Dosáhli jste maximální délky názvu",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     }
   },
