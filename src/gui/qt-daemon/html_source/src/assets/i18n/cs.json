@@ -1,6 +1,6 @@
 {
   "LOGIN": {
-    "SETUP_MASTER_PASS": "Setup master password",
+    "SETUP_MASTER_PASS": "Nastavit hlavní heslo",
     "SETUP_CONFIRM_PASS": "Confirm the password",
     "MASTER_PASS": "Master password",
     "BUTTON_NEXT": "Next",
