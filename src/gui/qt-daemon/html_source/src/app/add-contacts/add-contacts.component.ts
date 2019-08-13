@@ -177,7 +177,7 @@ export class AddContactsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (!this.id) {
+    if (!(this.id || this.id === 0)) {
       this.variablesService.newContact = {
         name: this.addContactForm.get('name').value,
         address: this.addContactForm.get('address').value,
