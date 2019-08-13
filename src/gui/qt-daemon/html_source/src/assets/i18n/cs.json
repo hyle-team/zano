@@ -50,13 +50,13 @@
     },
     "UPDATE": {
       "STANDARD": "Aktualizace k dispozici",
-      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Get new update.</span><br><span>Update is recommended!</span>",
-      "IMPORTANT": "Update available",
-      "IMPORTANT_HINT": "Important update!",
-      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Get new update.</span><br><span>Important update!</span>",
-      "CRITICAL": "Update available",
-      "CRITICAL_HINT": "Critical update!",
-      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
+      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Získejte novou aktualizaci.</span><br><span>Doporučená aktualizace!</span>",
+      "IMPORTANT": "Aktualizace k dispozici",
+      "IMPORTANT_HINT": "Důležitá aktualizace!",
+      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Získejte novou aktualizaci.</span><br><span>Důležitá aktualizace!</span>",
+      "CRITICAL": "Aktualizace k dispozici",
+      "CRITICAL_HINT": "Kritická aktualizace!",
+      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Kritická aktualizace k dispozici.</span><i class=\"icon\"></i><span>Aktualizaci důrazně doporučujeme!</span>",
       "TIME": "System time differs from network",
       "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
     }
