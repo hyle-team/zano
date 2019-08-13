@@ -1906,8 +1906,8 @@ namespace currency
     //string_tools::parse_hexstr_to_binbuff(genesis_coinbase_tx_hex, tx_bl);
     bool r = parse_and_validate_tx_from_blob(tx_bl, bl.miner_tx);
     CHECK_AND_ASSERT_MES(r, false, "failed to parse coinbase tx from hard coded blob");
-    bl.major_version = BLOCK_MAJOR_VERSION_INITAL;
-    bl.minor_version = CURRENT_BLOCK_MINOR_VERSION;
+    bl.major_version = BLOCK_MAJOR_VERSION_GENESIS;
+    bl.minor_version = BLOCK_MINOR_VERSION_GENESIS;
     bl.timestamp = 0;
     bl.nonce = CURRENCY_GENESIS_NONCE;
     LOG_PRINT_GREEN("Generated genesis: " << get_block_hash(bl), LOG_LEVEL_0);
