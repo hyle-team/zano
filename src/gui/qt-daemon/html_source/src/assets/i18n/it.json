@@ -19,7 +19,7 @@
   "BREADCRUMBS": {
     "ADD_WALLET": "Aggiungi portafoglio",
     "CREATE_WALLET": "Crea un nuovo portafoglio",
-    "SAVE_PHRASE": "Save your seed phrase",
+    "SAVE_PHRASE": "Salva la tua frase segreta",
     "OPEN_WALLET": "Apri portafoglio esistente",
     "RESTORE_WALLET": "Ripristina da backup",
     "WALLET_DETAILS": "Dettagli portafoglio",
@@ -38,28 +38,28 @@
       "MESSAGES": "Nuove offerte/messaggi",
       "SYNCING": "Sincronizzazione portafoglio"
     },
-    "CONTACTS": "Contacts",
+    "CONTACTS": "Contatti",
     "SETTINGS": "Impostazioni",
     "LOG_OUT": "Esci",
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
       "ONLINE": "Online",
       "ERROR": "Errore di sistema",
-      "COMPLETE": "Completion",
+      "COMPLETE": "Completamento",
       "SYNCING": "Sincronizzazione blockchain",
-      "LOADING": "Loading blockchain data"
+      "LOADING": "Caricamento dati blockchain"
     },
     "UPDATE": {
       "STANDARD": "Aggiornamento disponibile",
-      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Get new update.</span><br><span>Update is recommended!</span>",
+      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Ottieni un nuovo aggiornamento.</span><br><span>L'aggiornamento è consigliato!</span>",
       "IMPORTANT": "Aggiornamento disponibile",
       "IMPORTANT_HINT": "Aggiornamento importante!",
-      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Get new update.</span><br><span>Important update!</span>",
+      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Ottieni un nuovo aggiornamento.</span><br><span>Aggiornamento importante!</span>",
       "CRITICAL": "Aggiornamento disponibile",
       "CRITICAL_HINT": "Aggiornamento critico!",
-      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
+      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Aggiornamento critico disponibile.</span><i class=\"icon\"></i><span>Aggiornamento fortemente consigliato!</span>",
       "TIME": "L'orario di sistema differisce dalla rete",
-      "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
+      "TIME_TOOLTIP": "<span class=\"wrong-time\">L'orario di sistema è sbagliato!</span><br><span>Controlla e sistema l'orario di sistema.</span>"
     }
   },
   "MAIN": {
@@ -202,7 +202,7 @@
       "PLACEHOLDER": "",
       "TOOLTIP": "Il commento sarà visibile a chiunque desideri effettuare un pagamento al tuo alias. Puoi fornire dettagli sul tuo business, contatti o includere qualsiasi testo. I commenti possono essere modificati più tardi."
     },
-    "COST": "Alias fee {{value}} {{currency}}",
+    "COST": "Quota alias {{value}} {{currency}}",
     "BUTTON_ASSIGN": "Assegna",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Il nome è richiesto",
@@ -228,7 +228,7 @@
       "NO_MONEY": "Non hai fondi sufficienti per modificare il commento a questo alias",
       "MAX_LENGTH": "Lunghezza massima del commento raggiunta"
     },
-    "COST": "Fee {{value}} {{currency}}",
+    "COST": "Tassa {{value}} {{currency}}",
     "BUTTON_EDIT": "Modifica"
   },
   "TRANSFER_ALIAS": {
@@ -241,7 +241,7 @@
       "PLACEHOLDER": ""
     },
     "ADDRESS": {
-      "LABEL": "Transfer to",
+      "LABEL": "Trasferisci a",
       "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
@@ -249,7 +249,7 @@
       "ALIAS_EXISTS": "Questo account ha già un alias",
       "NO_MONEY": "Non hai fondi sufficienti per trasferire questo alias"
     },
-    "COST": "Transfer fee {{value}} {{currency}}",
+    "COST": "Trasferimento commissione {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Trasferisci",
     "BUTTON_CANCEL": "Cancella",
     "REQUEST_SEND_REG": "L'alias verrà trasferito entro 10 minuti"
@@ -271,24 +271,24 @@
       "AMOUNT_REQUIRED": "Importo richiesto",
       "AMOUNT_ZERO": "Importo è zero",
       "FEE_REQUIRED": "La commissione è richiesta",
-      "FEE_MINIMUM": "Minimum fee: {{fee}}",
+      "FEE_MINIMUM": "Costo minimo: {{fee}}",
       "MAX_LENGTH": "Lunghezza massima del commento raggiunta"
     }
   },
   "HISTORY": {
-    "STATUS": "Status",
+    "STATUS": "Stato",
     "STATUS_TOOLTIP": "Conferme {{current}}/{{total}}",
     "LOCK_TOOLTIP": "Bloccato fino a {{date}}",
     "SEND": "Inviato",
     "RECEIVED": "Ricevuto",
-    "DATE": "Date",
-    "AMOUNT": "Amount",
-    "FEE": "Fee",
-    "ADDRESS": "Address",
+    "DATE": "Data",
+    "AMOUNT": "Importo",
+    "FEE": "Commissione",
+    "ADDRESS": "Indirizzo",
     "DETAILS": {
-      "PAYMENT_ID": "Payment ID",
-      "ID": "Transaction ID",
-      "SIZE": "Transaction size",
+      "PAYMENT_ID": "ID pagamento",
+      "ID": "ID transazione",
+      "SIZE": "Dimensione transazione",
       "SIZE_VALUE": "{{value}} bytes",
       "HEIGHT": "Height",
       "CONFIRMATION": "Confirmation",
