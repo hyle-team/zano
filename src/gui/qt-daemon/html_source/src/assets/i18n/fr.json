@@ -34,7 +34,7 @@
     "TITLE": "Portefeuilles",
     "ADD_NEW": "+ Ajouter",
     "ACCOUNT": {
-      "STAKING": "Staking",
+      "STAKING": "Mise",
       "MESSAGES": "Nouvelles offres/Messages",
       "SYNCING": "Synchronisation du portefeuille"
     },
@@ -57,8 +57,8 @@
       "CRITICAL": "Mise à jour disponible",
       "CRITICAL_HINT": "Mise à jour critique !",
       "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
-      "TIME": "System time differs from network",
-      "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
+      "TIME": "Le temps du système diffère de celui du réseau",
+      "TIME_TOOLTIP": "<span class=\"wrong-time\">Mauvais temps de système</span><br><span>Vérifier et corriger votre temps de système.</span>"
     }
   },
   "MAIN": {
@@ -67,7 +67,7 @@
     "BUTTON_OPEN_WALLET": "Ouvrir un portefeuille existant",
     "BUTTON_RESTORE_BACKUP": "Restaurer depuis une sauvegarde",
     "HELP": "Comment créer un portefeuille ?",
-    "CHOOSE_PATH": "Please choose a path"
+    "CHOOSE_PATH": "Veuillez choisir un chemin"
   },
   "CREATE_WALLET": {
     "NAME": "Nom du portefeuille",
@@ -81,8 +81,8 @@
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Le nom est requis",
       "NAME_DUPLICATE": "Nom déjà utilisé",
-      "MAX_LENGTH": "Maximum name length reached",
-      "CONFIRM_NOT_MATCH": "Confirm password not match"
+      "MAX_LENGTH": "Longueur maximale du nom atteinte",
+      "CONFIRM_NOT_MATCH": "La confirmation du mot de passe ne correspond pas"
     }
   },
   "OPEN_WALLET": {
@@ -95,7 +95,7 @@
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Le nom est requis",
       "NAME_DUPLICATE": "Nom déjà utilisé",
-      "MAX_LENGTH": "Maximum name length reached"
+      "MAX_LENGTH": "Longueur maximale du nom atteinte"
     },
     "MODAL": {
       "TITLE": "Entrer le mot de passe du portefeuille",
@@ -439,38 +439,38 @@
     "CANCEL": "Annuler",
     "NULLIFY_QUESTION": "Êtes-vous sûr de vouloir brûler les deux dépôts ?",
     "BUTTON_NULLIFY_SHORT": "Brûler",
-    "WAITING_TIME_QUESTION": "Are you sure you want to cancel the contract?"
+    "WAITING_TIME_QUESTION": "Êtes-vous sûr de vouloir annuler le contrat ?"
   },
   "MESSAGES": {
-    "ADDRESS": "Address",
+    "ADDRESS": "Adresse",
     "MESSAGE": "Message",
-    "SEND_PLACEHOLDER": "Type a message...",
-    "SEND_BUTTON": "Send"
+    "SEND_PLACEHOLDER": "Tapez un message...",
+    "SEND_BUTTON": "Envoyer"
   },
   "MODALS": {
-    "ERROR": "Error",
-    "SUCCESS": "Success",
+    "ERROR": "Erreur",
+    "SUCCESS": "Succès",
     "INFO": "Information",
     "OK": "OK"
   },
   "STAKING": {
-    "TITLE": "Staking",
-    "TITLE_PENDING": "Pending",
+    "TITLE": "Mise",
+    "TITLE_PENDING": "En attente",
     "TITLE_TOTAL": "Total",
-    "TITLE_PERIOD": "Time period:",
+    "TITLE_PERIOD": "Période de temps:",
     "PERIOD": {
-      "WEEK1": "1 week",
-      "WEEK2": "2 week",
-      "MONTH1": "1 month",
-      "MONTH3": "3 month",
-      "MONTH6": "6 month",
-      "YEAR": "1 year",
-      "ALL": "All"
+      "WEEK1": "1 semaine",
+      "WEEK2": "2 semaines",
+      "MONTH1": "1 mois",
+      "MONTH3": "3 mois",
+      "MONTH6": "6 mois",
+      "YEAR": "1 an",
+      "ALL": "Tout"
     },
-    "TITLE_GROUP": "Group:",
+    "TITLE_GROUP": "Groupe :",
     "GROUP": {
-      "DAY": "day",
-      "WEEK": "week",
+      "DAY": "jour",
+      "WEEK": "semaine",
       "MONTH": "mois"
     },
     "SWITCH": {
@@ -517,7 +517,7 @@
     "INCOME_TRANSFER_CONFIRMED": "Paiement reçu",
     "MINED": "Miné",
     "LOCKED": "Bloqué",
-    "IS_MINIMIZE": "Zano application is minimized to the system tray",
+    "IS_MINIMIZE": "L'application Zano est minimisée dans la barre d'état",
     "RESTORE": "Vous pouvez le récupérer en cliquant ou en utilisant le menu contextuel",
     "TRAY_MENU_SHOW": "Redimensionner",
     "TRAY_MENU_MINIMIZE": "Réduire"
