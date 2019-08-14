@@ -554,31 +554,31 @@
     "FILE_RESTORED": "Il file del portafoglio è stato danneggiato. Abbiamo recuperato le chiavi e il portafoglio dalla blockchain",
     "FILE_NOT_FOUND": "File non trovato",
     "FILE_EXIST": "Esiste già un file con questo nome. Inserisci un altro nome per salvare il file",
-    "FILE_NOT_SAVED": "You cannot save a wallet file in this folder. Please choose another folder.",
-    "TX_TYPE_NORMAL": "Error. The payment from the wallet",
-    "TX_TYPE_NORMAL_TO": "to",
-    "TX_TYPE_NORMAL_END": "was not completed.",
-    "TX_TYPE_NEW_ALIAS": "Error. Failed to register alias to safe",
+    "FILE_NOT_SAVED": "Non puoi salvare un file di portafoglio in questa cartella. Scegli un'altra cartella.",
+    "TX_TYPE_NORMAL": "Errore. Il pagamento dal portafoglio",
+    "TX_TYPE_NORMAL_TO": "a",
+    "TX_TYPE_NORMAL_END": "non è stato completato.",
+    "TX_TYPE_NEW_ALIAS": "Errore. Impossibile registrare l'alias in sicurezza",
     "TX_TYPE_NEW_ALIAS_END": "Per favore riprova.",
-    "TX_TYPE_UPDATE_ALIAS": "Error. Failed to change comment to alias in safe",
-    "TX_TYPE_COIN_BASE": "Error. The payment was not completed."
+    "TX_TYPE_UPDATE_ALIAS": "Errore. Impossibile cambiare il commento all'alias in sicurezza",
+    "TX_TYPE_COIN_BASE": "Errore. Il pagamento non è stato completato."
   },
   "CONTEXT_MENU": {
-    "COPY": "copy",
-    "PASTE": "paste",
-    "SELECT": "select all"
+    "COPY": "copia",
+    "PASTE": "incolla",
+    "SELECT": "seleziona tutto"
   },
   "BACKEND_LOCALIZATION": {
-    "QUIT": "Quit",
+    "QUIT": "Esci",
     "IS_RECEIVED": "",
     "IS_CONFIRMED": "",
-    "INCOME_TRANSFER_UNCONFIRMED": "Incoming payment (not confirmed)",
-    "INCOME_TRANSFER_CONFIRMED": "Payment received",
-    "MINED": "Mined",
-    "LOCKED": "Blocked",
-    "IS_MINIMIZE": "Zano application is minimized to the system tray",
-    "RESTORE": "You can recover it by clicking or using the context menu",
-    "TRAY_MENU_SHOW": "Resize",
-    "TRAY_MENU_MINIMIZE": "Minimize"
+    "INCOME_TRANSFER_UNCONFIRMED": "Pagamento in arrivo (non confermato)",
+    "INCOME_TRANSFER_CONFIRMED": "Pagamento ricevuto",
+    "MINED": "Minato",
+    "LOCKED": "Bloccato",
+    "IS_MINIMIZE": "L'applicazione Zano è minimizzata nella barra di sistema",
+    "RESTORE": "Puoi recuperarlo cliccando o utilizzando il menu contestuale",
+    "TRAY_MENU_SHOW": "Ridimensiona",
+    "TRAY_MENU_MINIMIZE": "Minimizza"
   }
 }
