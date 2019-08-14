@@ -496,10 +496,10 @@
     "FILE_NOT_FOUND": "Fichier introuvable",
     "FILE_EXIST": "Un fichier avec ce nom existe déjà. Entrez un autre nom pour enregistrer le fichier sous",
     "FILE_NOT_SAVED": "Vous ne pouvez pas enregistrer un fichier de portefeuille dans ce dossier. Veuillez choisir un autre dossier.",
-    "TX_TYPE_NORMAL": "Error. The payment from the wallet",
+    "TX_TYPE_NORMAL": "Erreur. paiement du portefeuille",
     "TX_TYPE_NORMAL_TO": "à",
     "TX_TYPE_NORMAL_END": "n'a pas été complété.",
-    "TX_TYPE_NEW_ALIAS": "Error. Failed to register alias to safe",
+    "TX_TYPE_NEW_ALIAS": "Erreur. Impossible d'enregistrer l'alias dans la blockchain",
     "TX_TYPE_NEW_ALIAS_END": "Veuillez réessayer.",
     "TX_TYPE_UPDATE_ALIAS": "Erreur. Impossible de changer le commentaire de l'alias actuel",
     "TX_TYPE_COIN_BASE": "Erreur. Le paiement n'a pas été complété."
