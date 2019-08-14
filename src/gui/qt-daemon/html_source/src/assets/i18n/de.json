@@ -1,20 +1,20 @@
 {
   "LOGIN": {
-    "SETUP_MASTER_PASS": "Setup master password",
+    "SETUP_MASTER_PASS": "Master-Passwort einrichten",
     "SETUP_CONFIRM_PASS": "Passwort bestätigen",
-    "MASTER_PASS": "Master password",
-    "BUTTON_NEXT": "Next",
+    "MASTER_PASS": "Master-Passwort",
+    "BUTTON_NEXT": "Weiter",
     "BUTTON_SKIP": "Überspringen",
-    "BUTTON_RESET": "Reset",
+    "BUTTON_RESET": "Zurücksetzen",
     "INCORRECT_PASSWORD": "Ungültiges Passwort",
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required",
-      "CONFIRM_REQUIRED": "Confirmation is required",
+      "PASS_REQUIRED": "Passwort ist erforderlich",
+      "CONFIRM_REQUIRED": "Bestätigung ist erforderlich",
       "MISMATCH": "Mismatch"
     }
   },
   "COMMON": {
-    "BACK": "Go back"
+    "BACK": "Zurück"
   },
   "BREADCRUMBS": {
     "ADD_WALLET": "Add wallet",
@@ -24,9 +24,9 @@
     "RESTORE_WALLET": "Restore from backup",
     "WALLET_DETAILS": "Wallet details",
     "ASSIGN_ALIAS": "Assign alias",
-    "EDIT_ALIAS": "Edit alias",
+    "EDIT_ALIAS": "Alias bearbeiten",
     "TRANSFER_ALIAS": "Transfer alias",
-    "CONTRACTS": "Contracts",
+    "CONTRACTS": "Verträge",
     "NEW_PURCHASE": "New purchase",
     "OLD_PURCHASE": "Purchase"
   },
@@ -38,9 +38,9 @@
       "MESSAGES": "New offers/Messages",
       "SYNCING": "Syncing wallet"
     },
-    "CONTACTS": "Contacts",
+    "CONTACTS": "Kontakte",
     "SETTINGS": "Einstellungen",
-    "LOG_OUT": "Log out",
+    "LOG_OUT": "Abmelden",
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
       "ONLINE": "Online",
@@ -50,15 +50,15 @@
       "LOADING": "Loading blockchain data"
     },
     "UPDATE": {
-      "STANDARD": "Update available",
+      "STANDARD": "Update verfügbar",
       "STANDARD_TOOLTIP": "<span class=\"standard-update\">Get new update.</span><br><span>Update is recommended!</span>",
       "IMPORTANT": "Update verfügbar",
-      "IMPORTANT_HINT": "Important update!",
+      "IMPORTANT_HINT": "Wichtiges Update!",
       "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Get new update.</span><br><span>Important update!</span>",
       "CRITICAL": "Update verfügbar",
       "CRITICAL_HINT": "Kritisches Update!",
       "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
-      "TIME": "System time differs from network",
+      "TIME": "Systemzeit unterscheidet sich vom Netzwerk",
       "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
     }
   },
@@ -80,7 +80,7 @@
     "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
     "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
+      "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_DUPLICATE": "Name existiert bereits",
       "MAX_LENGTH": "Maximum name length reached",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
@@ -103,7 +103,7 @@
       "LABEL": "Password to this wallet",
       "OPEN": "Open wallet",
       "SKIP": "Überspringen",
-      "NOT_FOUND": "Not found"
+      "NOT_FOUND": "Nicht gefunden"
     }
   },
   "RESTORE_WALLET": {
@@ -127,7 +127,7 @@
   "SEED_PHRASE": {
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
     "BUTTON_CREATE_ACCOUNT": "Create wallet",
-    "BUTTON_COPY": "Copy"
+    "BUTTON_COPY": "Kopieren"
   },
   "PROGRESS": {
     "ADD_WALLET": "Add wallet",
@@ -136,23 +136,23 @@
     "RESTORE_WALLET": "Restore from backup"
   },
   "SETTINGS": {
-    "TITLE": "Settings",
+    "TITLE": "Einstellungen",
     "DARK_THEME": "Dark theme",
     "WHITE_THEME": "White theme",
     "GRAY_THEME": "Grey theme",
     "APP_LOCK": {
-      "TITLE": "Lock app after:",
-      "TIME1": "5 min",
-      "TIME2": "15 min",
-      "TIME3": "1 hour",
-      "TIME4": "Never"
+      "TITLE": "Programm sperren nach:",
+      "TIME1": "5 Minuten",
+      "TIME2": "15 Minuten",
+      "TIME3": "1 Stunde",
+      "TIME4": "Nie"
     },
     "MASTER_PASSWORD": {
-      "TITLE": "Update master password",
-      "OLD": "Old password",
+      "TITLE": "Master-Passwort aktualisieren",
+      "OLD": "Altes Passwort",
       "NEW": "Neues Passwort",
       "CONFIRM": "New password confirmation",
-      "BUTTON": "Save"
+      "BUTTON": "Speichern"
     },
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Password is required",
@@ -205,20 +205,20 @@
     "COST": "Alias fee {{value}} {{currency}}",
     "BUTTON_ASSIGN": "Assign",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
+      "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_WRONG": "Alias has wrong name",
       "NAME_LENGTH": "The alias must be 6-25 characters long",
       "NAME_EXISTS": "Alias name already exists",
       "NO_MONEY": "You do not have enough funds to assign this alias",
       "MAX_LENGTH": "Maximum comment length reached"
     },
-    "ONE_ALIAS": "You can create only one alias per wallet",
+    "ONE_ALIAS": "Sie können nur einen Alias pro Wallet erstellen",
     "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
   },
   "EDIT_ALIAS": {
     "NAME": {
       "LABEL": "Alias",
-      "PLACEHOLDER": "@ Enter alias"
+      "PLACEHOLDER": "@ Alias eingeben"
     },
     "COMMENT": {
       "LABEL": "Comment",
@@ -229,7 +229,7 @@
       "MAX_LENGTH": "Maximum comment length reached"
     },
     "COST": "Fee {{value}} {{currency}}",
-    "BUTTON_EDIT": "Edit"
+    "BUTTON_EDIT": "Bearbeiten"
   },
   "TRANSFER_ALIAS": {
     "NAME": {
@@ -258,16 +258,16 @@
     "ADDRESS": "Adresse",
     "AMOUNT": "Amount",
     "COMMENT": "Comment",
-    "DETAILS": "Additional details",
+    "DETAILS": "Zusätzliche Informationen",
     "MIXIN": "Mixin",
     "FEE": "Gebühr",
     "HIDE": "Hide your wallet address from recipient",
-    "BUTTON": "Send",
-    "SUCCESS_SENT": "Transaction sent",
+    "BUTTON": "Senden",
+    "SUCCESS_SENT": "Transaktion gesendet",
     "FORM_ERRORS": {
       "ADDRESS_REQUIRED": "Adresse benötigt",
       "ADDRESS_NOT_VALID": "Adresse ungültig",
-      "ALIAS_NOT_VALID": "Alias not valid",
+      "ALIAS_NOT_VALID": "Alias ungültig",
       "AMOUNT_REQUIRED": "Betrag ist erforderlich",
       "AMOUNT_ZERO": "Betrag ist Null",
       "FEE_REQUIRED": "Gebühr ist erforderlich",
@@ -279,16 +279,16 @@
     "STATUS": "Status",
     "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
     "LOCK_TOOLTIP": "Locked till {{date}}",
-    "SEND": "Sent",
-    "RECEIVED": "Received",
-    "DATE": "Date",
+    "SEND": "Gesendet",
+    "RECEIVED": "Empfangen",
+    "DATE": "Datum",
     "AMOUNT": "Betrag",
     "FEE": "Gebühr",
     "ADDRESS": "Adresse",
     "DETAILS": {
-      "PAYMENT_ID": "Payment ID",
-      "ID": "Transaction ID",
-      "SIZE": "Transaction size",
+      "PAYMENT_ID": "Zahlungs-ID",
+      "ID": "Transaktions-ID",
+      "SIZE": "Transaktionsgröße",
       "SIZE_VALUE": "{{value}} bytes",
       "HEIGHT": "Height",
       "CONFIRMATION": "Confirmation",
@@ -316,9 +316,9 @@
     "EMPTY": "No active contracts",
     "CONTRACTS": "Contracts",
     "PURCHASE": "Purchase",
-    "SELL": "Sell",
-    "DATE": "Date",
-    "AMOUNT": "Amount",
+    "SELL": "Verkaufen",
+    "DATE": "Datum",
+    "AMOUNT": "Betrag",
     "STATUS": "Status",
     "COMMENTS": "Comments",
     "PURCHASE_BUTTON": "New Purchase",
@@ -517,7 +517,7 @@
       "ADDRESS_REQUIRED": "Adresse benötigt",
       "ADDRESS_NOT_VALID": "Adresse ungültig",
       "SET_MASTER_PASSWORD": "Master-Passwort festlegen",
-      "ADDRESS_DUBLICATED": "Addresse existiert bereits",
+      "ADDRESS_DUBLICATED": "Adresse existiert bereits",
       "MAX_LENGTH": "Maximum notes length reached",
       "NAME_WRONG": "Kontakt hat einen falschen Namen",
       "NAME_LENGTH": "The name must be 4-25 characters long"
