@@ -1860,9 +1860,7 @@ namespace currency
     //for future forks 
 
     std::cout << "Currency name: \t\t" << CURRENCY_NAME << "(" << CURRENCY_NAME_SHORT << ")" << std::endl;
-    std::cout << "Money supply: \t\t" << print_money(TOTAL_MONEY_SUPPLY) << " coins"
-      << "(" << print_money(TOTAL_MONEY_SUPPLY) << "), dev bounties is ???" << std::endl;
-
+    std::cout << "Money supply: \t\t " << CURRENCY_BLOCK_REWARD * CURRENCY_BLOCKS_PER_DAY * 365 << " coins per year" << std::endl;
     std::cout << "PoS block interval: \t" << DIFFICULTY_POS_TARGET << " seconds" << std::endl;
     std::cout << "PoW block interval: \t" << DIFFICULTY_POW_TARGET << " seconds" << std::endl;
     std::cout << "Total blocks per day: \t" << CURRENCY_BLOCKS_PER_DAY << " seconds" << std::endl;

@@ -24,10 +24,6 @@
 #define CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT            60*20
                                                         
 #define BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW               60
-
-
-// TOTAL_MONEY_SUPPLY - total number coins to be generated
-#define TOTAL_MONEY_SUPPLY                              ((uint64_t)(-1))
                                                         
 #define POS_START_HEIGHT                                0
                                                         
