@@ -10,7 +10,7 @@
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Mot de passe requis",
       "CONFIRM_REQUIRED": "Confirmation requise",
-      "MISMATCH": "Mismatch"
+      "MISMATCH": "Non-concordant"
     }
   },
   "COMMON": {
@@ -19,7 +19,7 @@
   "BREADCRUMBS": {
     "ADD_WALLET": "Ajouter un portefeuille",
     "CREATE_WALLET": "Créer un nouveau portefeuille",
-    "SAVE_PHRASE": "Save your seed phrase",
+    "SAVE_PHRASE": "Enregistrer votre phrase de sécurité",
     "OPEN_WALLET": "Ouvrir un portefeuille existant",
     "RESTORE_WALLET": "Restaurer depuis une sauvegarde",
     "WALLET_DETAILS": "Détails du portefeuille",
@@ -56,7 +56,7 @@
       "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Mise à jour.</span><br><span>La mise à jour est recommandée.</span>",
       "CRITICAL": "Mise à jour disponible",
       "CRITICAL_HINT": "Mise à jour critique !",
-      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
+      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Mise à jour critique disponible.</span><i class=\"icon\"></i><span>Mise à jour fortement recommandée.</span>",
       "TIME": "Le temps du système diffère de celui du réseau",
       "TIME_TOOLTIP": "<span class=\"wrong-time\">Mauvais temps de système</span><br><span>Vérifier et corriger votre temps de système.</span>"
     }
@@ -107,7 +107,7 @@
   },
   "RESTORE_WALLET": {
     "LABEL_NAME": "Nom du portefeuille",
-    "LABEL_PHRASE_KEY": "Seed phrase / private key",
+    "LABEL_PHRASE_KEY": "Phrase de sécurité / clé privée",
     "PASS": "Mot de passe du portefeuille",
     "CONFIRM": "Confirmer le mot de passe du portefeuille",
     "BUTTON_SELECT": "Sélectionner l'emplacement du portefeuille",
@@ -124,7 +124,7 @@
     }
   },
   "SEED_PHRASE": {
-    "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
+    "TITLE": "Assurez-vous de garder votre phrase de sécurité dans un endroit sûr. Si vous oubliez votre phrase de sécurité, vous ne pourrez pas récupérer votre portefeuille.",
     "BUTTON_CREATE_ACCOUNT": "Créer un portefeuille",
     "BUTTON_COPY": "Copier"
   },
@@ -166,7 +166,7 @@
     "DETAILS": "Détails",
     "LOCK": "Verrouillage",
     "AVAILABLE_BALANCE": "Disponible <b>{{available}} {{currency}}<b/>",
-    "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
+    "LOCKED_BALANCE": "Vérouillé<b>{{locked}}{{currency}}<b/>",
     "LOCKED_BALANCE_LINK": "Que signifie cela?",
     "TABS": {
       "SEND": "Envoyer",
@@ -180,8 +180,8 @@
   "WALLET_DETAILS": {
     "LABEL_NAME": "Nom du portefeuille",
     "LABEL_FILE_LOCATION": "Emplacement du fichier de portefeuille",
-    "LABEL_SEED_PHRASE": "Seed phrase",
-    "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
+    "LABEL_SEED_PHRASE": "Phrase de sécurité",
+    "SEED_PHRASE_HINT": "Cliquez pour révéler la phrase de sécurité",
     "BUTTON_SAVE": "Enregistrer",
     "BUTTON_REMOVE": "Fermer le portefeuille",
     "FORM_ERRORS": {
@@ -481,8 +481,8 @@
   "ERRORS": {
     "NO_MONEY": "Pas assez de fonds",
     "NOT_ENOUGH_MONEY": "Fonds insuffisants dans le compte",
-    "CORE_BUSY": "Internal error: core is busy",
-    "DAEMON_BUSY": "Internal error: daemon is busy",
+    "CORE_BUSY": "Erreur interne : le noyau est occupé",
+    "DAEMON_BUSY": "Erreur interne : le daemon est occupé",
     "NO_MONEY_REMOVE_OFFER": "Il n'y a pas de frais pour supprimer une offre, mais pour protéger le réseau contre les transactions de spam, vous devez avoir au moins {{fee}} {{currency}} dans votre portefeuille",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "Le nombre de mixage est trop grand pour l'état actuel de la blockchain. Il n'y a pas assez de sorties non utilisées pour mélanger avec",
     "TRANSACTION_IS_TO_BIG": "La transaction dépasse la limite réseau, envoyez le montant requis avec plusieurs transactions",
@@ -501,7 +501,7 @@
     "TX_TYPE_NORMAL_END": "n'a pas été complété.",
     "TX_TYPE_NEW_ALIAS": "Error. Failed to register alias to safe",
     "TX_TYPE_NEW_ALIAS_END": "Veuillez réessayer.",
-    "TX_TYPE_UPDATE_ALIAS": "Error. Failed to change comment to alias in safe",
+    "TX_TYPE_UPDATE_ALIAS": "Erreur. Impossible de changer le commentaire de l'alias actuel",
     "TX_TYPE_COIN_BASE": "Erreur. Le paiement n'a pas été complété."
   },
   "CONTEXT_MENU": {
