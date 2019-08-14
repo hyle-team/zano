@@ -449,7 +449,7 @@
   "MODALS": {
     "ERROR": "Errore",
     "SUCCESS": "Successo",
-    "INFO": "Information",
+    "INFO": "Informazioni",
     "OK": "OK"
   },
   "CONFIRM": {
@@ -465,23 +465,23 @@
   },
   "STAKING": {
     "TITLE": "Staking",
-    "TITLE_PENDING": "Pending",
-    "TITLE_TOTAL": "Total",
-    "TITLE_PERIOD": "Time period:",
+    "TITLE_PENDING": "In sospeso",
+    "TITLE_TOTAL": "Totale",
+    "TITLE_PERIOD": "Periodo di tempo:",
     "PERIOD": {
-      "WEEK1": "1 week",
-      "WEEK2": "2 week",
-      "MONTH1": "1 month",
-      "MONTH3": "3 month",
-      "MONTH6": "6 month",
-      "YEAR": "1 year",
-      "ALL": "All"
+      "WEEK1": "1 settimana",
+      "WEEK2": "2 settimane",
+      "MONTH1": "1 mese",
+      "MONTH3": "3 mesi",
+      "MONTH6": "6 mesi",
+      "YEAR": "1 anno",
+      "ALL": "Tutti"
     },
-    "TITLE_GROUP": "Group:",
+    "TITLE_GROUP": "Gruppo:",
     "GROUP": {
-      "DAY": "day",
-      "WEEK": "week",
-      "MONTH": "month"
+      "DAY": "giorno",
+      "WEEK": "settimana",
+      "MONTH": "mese"
     },
     "SWITCH": {
       "ON": "ON",
@@ -489,49 +489,49 @@
     }
   },
   "CONTACTS": {
-    "TITLE": "Contact list",
-    "IMPORT_EXPORT": "Import or export contacts",
-    "IMPORT": "Import",
-    "EXPORT": "Export",
-    "ADD": "Add/edit contact",
-    "SEND": "Send",
-    "SEND_FROM": "Send from",
-    "SEND_TO": "To",
-    "OPEN_ADD_WALLET": "Open/Add wallet",
-    "COPY": "- Copy",
+    "TITLE": "Lista contatti",
+    "IMPORT_EXPORT": "Importa o esporta contatti",
+    "IMPORT": "Importa",
+    "EXPORT": "Esporta",
+    "ADD": "Aggiungi/modifica contatto",
+    "SEND": "Invia",
+    "SEND_FROM": "Invia da",
+    "SEND_TO": "A",
+    "OPEN_ADD_WALLET": "Apri/Aggiungi portafoglio",
+    "COPY": "- Copia",
     "TABLE": {
-      "NAME": "Name",
+      "NAME": "Nome",
       "ALIAS": "Alias",
-      "ADDRESS": "Address",
-      "NOTES": "Notes",
-      "EMPTY": "Contact list is empty"
+      "ADDRESS": "Indirizzo",
+      "NOTES": "Note",
+      "EMPTY": "La lista dei contatti è vuota"
     },
     "FORM": {
-      "NAME": "Name",
-      "ADDRESS": "Address",
-      "NOTES": "Notes"
+      "NAME": "Nome",
+      "ADDRESS": "Indirizzo",
+      "NOTES": "Note"
     },
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUBLICATED": "Name is dublicated",
-      "ADDRESS_REQUIRED": "Address is required",
-      "ADDRESS_NOT_VALID": "Address not valid",
+      "NAME_REQUIRED": "Il nome è richiesto",
+      "NAME_DUBLICATED": "Il nome è un duplicato",
+      "ADDRESS_REQUIRED": "Indirizzo è richiesto",
+      "ADDRESS_NOT_VALID": "Indirizzo non valido",
       "SET_MASTER_PASSWORD": "Imposta password principale",
-      "ADDRESS_DUBLICATED": "Address is dublicated",
-      "MAX_LENGTH": "Maximum notes length reached",
-      "NAME_WRONG": "Contact has wrong name",
-      "NAME_LENGTH": "The name must be 4-25 characters long"
+      "ADDRESS_DUBLICATED": "Indirizzo è un duplicato",
+      "MAX_LENGTH": "Lunghezza massima delle note raggiunta",
+      "NAME_WRONG": "Il contatto ha un nome errato",
+      "NAME_LENGTH": "Il nome deve essere lungo da 4 a 25 caratteri"
     },
     "BUTTON": {
-      "SEND": "Send",
-      "EDIT": "Edit",
-      "DELETE": "Delete",
-      "ADD": "Add contact",
-      "ADD_EDIT": "Add/Save",
-      "GO_TO_WALLET": "Go to wallet",
-      "IMPORT_EXPORT": "Import/export"
+      "SEND": "Invia",
+      "EDIT": "Modifica",
+      "DELETE": "Elimina",
+      "ADD": "Aggiungi contatto",
+      "ADD_EDIT": "Aggiungi/Salva",
+      "GO_TO_WALLET": "Vai al portafoglio",
+      "IMPORT_EXPORT": "Importa/esporta"
     },
-    "SUCCESS_SENT": "Contact added",
+    "SUCCESS_SENT": "Contatto aggiunto",
     "SUCCESS_SAVE": "Contact is edited",
     "SUCCESS_IMPORT": "Contacts is imported",
     "ERROR_IMPORT": "Error is occured while reading file!",
