@@ -38,6 +38,7 @@
       "MESSAGES": "Nuove offerte/messaggi",
       "SYNCING": "Sincronizzazione portafoglio"
     },
+    "CONTACTS": "Contacts",
     "SETTINGS": "Impostazioni",
     "LOG_OUT": "Esci",
     "SYNCHRONIZATION": {
@@ -192,18 +193,17 @@
   },
   "ASSIGN_ALIAS": {
     "NAME": {
-      "LABEL": "Nome univoco",
+      "LABEL": "Alias",
       "PLACEHOLDER": "@ Inserisci alias",
       "TOOLTIP": "Un alias è un modulo abbreviato o il tuo account. Un alias può solo includere lettere latine, numeri e caratteri “.” e “-”. Deve iniziare con “@”."
     },
     "COMMENT": {
       "LABEL": "Commento",
-      "PLACEHOLDER": "Inserisci commento",
+      "PLACEHOLDER": "",
       "TOOLTIP": "Il commento sarà visibile a chiunque desideri effettuare un pagamento al tuo alias. Puoi fornire dettagli sul tuo business, contatti o includere qualsiasi testo. I commenti possono essere modificati più tardi."
     },
-    "COST": "Costo per creare alias {{value}} {{currency}}",
+    "COST": "Alias fee {{value}} {{currency}}",
     "BUTTON_ASSIGN": "Assegna",
-    "BUTTON_CANCEL": "Cancella",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Il nome è richiesto",
       "NAME_WRONG": "L'Alias ha un nome errato",
@@ -217,40 +217,39 @@
   },
   "EDIT_ALIAS": {
     "NAME": {
-      "LABEL": "Nome univoco",
+      "LABEL": "Alias",
       "PLACEHOLDER": "@ Inserisci alias"
     },
     "COMMENT": {
       "LABEL": "Commento",
-      "PLACEHOLDER": "Inserisci commento"
+      "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
       "NO_MONEY": "Non hai fondi sufficienti per modificare il commento a questo alias",
       "MAX_LENGTH": "Lunghezza massima del commento raggiunta"
     },
-    "COST": "Costo per modificare alias {{value}} {{currency}}",
-    "BUTTON_EDIT": "Modifica",
-    "BUTTON_CANCEL": "Cancella"
+    "COST": "Fee {{value}} {{currency}}",
+    "BUTTON_EDIT": "Modifica"
   },
   "TRANSFER_ALIAS": {
     "NAME": {
-      "LABEL": "Nome univoco",
+      "LABEL": "Alias",
       "PLACEHOLDER": "@ Inserisci alias"
     },
     "COMMENT": {
       "LABEL": "Commento",
-      "PLACEHOLDER": "Inserisci commento"
+      "PLACEHOLDER": ""
     },
     "ADDRESS": {
-      "LABEL": "L'account al quale l'alias verrà trasferito",
-      "PLACEHOLDER": "Inserisci indirizzo portafoglio"
+      "LABEL": "Transfer to",
+      "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
       "WRONG_ADDRESS": "Non esiste alcun portafoglio con questo account",
       "ALIAS_EXISTS": "Questo account ha già un alias",
       "NO_MONEY": "Non hai fondi sufficienti per trasferire questo alias"
     },
-    "COST": "Costo per trasferire alias {{value}} {{currency}}",
+    "COST": "Transfer fee {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Trasferisci",
     "BUTTON_CANCEL": "Cancella",
     "REQUEST_SEND_REG": "L'alias verrà trasferito entro 10 minuti"
@@ -453,6 +452,17 @@
     "INFO": "Information",
     "OK": "OK"
   },
+  "CONFIRM": {
+    "BUTTON_CONFIRM": "Send",
+    "BUTTON_CANCEL": "Cancel",
+    "TITLE": "Confirm transaction",
+    "MESSAGE": {
+      "SEND": "Send",
+      "FROM": "From",
+      "TO": "To",
+      "COMMENT": "Comment"
+    }
+  },
   "STAKING": {
     "TITLE": "Staking",
     "TITLE_PENDING": "Pending",
@@ -477,6 +487,55 @@
       "ON": "ON",
       "OFF": "OFF"
     }
+  },
+  "CONTACTS": {
+    "TITLE": "Contact list",
+    "IMPORT_EXPORT": "Import or export contacts",
+    "IMPORT": "Import",
+    "EXPORT": "Export",
+    "ADD": "Add/edit contact",
+    "SEND": "Send",
+    "SEND_FROM": "Send from",
+    "SEND_TO": "To",
+    "OPEN_ADD_WALLET": "Open/Add wallet",
+    "COPY": "- Copy",
+    "TABLE": {
+      "NAME": "Name",
+      "ALIAS": "Alias",
+      "ADDRESS": "Address",
+      "NOTES": "Notes",
+      "EMPTY": "Contact list is empty"
+    },
+    "FORM": {
+      "NAME": "Name",
+      "ADDRESS": "Address",
+      "NOTES": "Notes"
+    },
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUBLICATED": "Name is dublicated",
+      "ADDRESS_REQUIRED": "Address is required",
+      "ADDRESS_NOT_VALID": "Address not valid",
+      "SET_MASTER_PASSWORD": "Set master password",
+      "ADDRESS_DUBLICATED": "Address is dublicated",
+      "MAX_LENGTH": "Maximum notes length reached",
+      "NAME_WRONG": "Contact has wrong name",
+      "NAME_LENGTH": "The name must be 4-25 characters long"
+    },
+    "BUTTON": {
+      "SEND": "Send",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "ADD": "Add contact",
+      "ADD_EDIT": "Add/Save",
+      "GO_TO_WALLET": "Go to wallet",
+      "IMPORT_EXPORT": "Import/export"
+    },
+    "SUCCESS_SENT": "Contact added",
+    "SUCCESS_SAVE": "Contact is edited",
+    "SUCCESS_IMPORT": "Contacts is imported",
+    "ERROR_IMPORT": "Error is occured while reading file!",
+    "ERROR_TYPE_FILE": "Please import valid .csv file."
   },
   "ERRORS": {
     "NO_MONEY": "Not enough money",
