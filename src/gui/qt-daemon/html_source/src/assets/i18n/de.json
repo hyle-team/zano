@@ -1,12 +1,12 @@
 {
   "LOGIN": {
     "SETUP_MASTER_PASS": "Setup master password",
-    "SETUP_CONFIRM_PASS": "Confirm the password",
+    "SETUP_CONFIRM_PASS": "Passwort bestätigen",
     "MASTER_PASS": "Master password",
     "BUTTON_NEXT": "Next",
-    "BUTTON_SKIP": "Skip",
+    "BUTTON_SKIP": "Überspringen",
     "BUTTON_RESET": "Reset",
-    "INCORRECT_PASSWORD": "Invalid password",
+    "INCORRECT_PASSWORD": "Ungültiges Passwort",
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Password is required",
       "CONFIRM_REQUIRED": "Confirmation is required",
@@ -32,13 +32,13 @@
   },
   "SIDEBAR": {
     "TITLE": "Wallets",
-    "ADD_NEW": "+ Add",
+    "ADD_NEW": "+ Hinzufügen",
     "ACCOUNT": {
       "STAKING": "Staking",
       "MESSAGES": "New offers/Messages",
       "SYNCING": "Syncing wallet"
     },
-    "SETTINGS": "Settings",
+    "SETTINGS": "Einstellungen",
     "LOG_OUT": "Log out",
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
@@ -51,11 +51,11 @@
     "UPDATE": {
       "STANDARD": "Update available",
       "STANDARD_TOOLTIP": "<span class=\"standard-update\">Get new update.</span><br><span>Update is recommended!</span>",
-      "IMPORTANT": "Update available",
+      "IMPORTANT": "Update verfügbar",
       "IMPORTANT_HINT": "Important update!",
       "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Get new update.</span><br><span>Important update!</span>",
-      "CRITICAL": "Update available",
-      "CRITICAL_HINT": "Critical update!",
+      "CRITICAL": "Update verfügbar",
+      "CRITICAL_HINT": "Kritisches Update!",
       "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
       "TIME": "System time differs from network",
       "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
@@ -80,7 +80,7 @@
     "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
+      "NAME_DUPLICATE": "Name existiert bereits",
       "MAX_LENGTH": "Maximum name length reached",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     }
@@ -88,20 +88,20 @@
   "OPEN_WALLET": {
     "NAME": "Wallet name",
     "PASS": "Wallet password",
-    "BUTTON": "Open wallet",
+    "BUTTON": "Wallet öffnen",
     "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this address is already open",
     "FILE_NOT_FOUND1": "Wallet file not found",
     "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
+      "NAME_DUPLICATE": "Name existiert bereits",
       "MAX_LENGTH": "Maximum name length reached"
     },
     "MODAL": {
       "TITLE": "Type wallet password",
       "LABEL": "Password to this wallet",
       "OPEN": "Open wallet",
-      "SKIP": "Skip",
+      "SKIP": "Überspringen",
       "NOT_FOUND": "Not found"
     }
   },
@@ -116,7 +116,7 @@
     "CHOOSE_PATH": "Please choose a path",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
+      "NAME_DUPLICATE": "Name existiert bereits",
       "MAX_LENGTH": "Maximum name length reached",
       "CONFIRM_NOT_MATCH": "Confirm password not match",
       "KEY_REQUIRED": "Key is required",
@@ -149,7 +149,7 @@
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
       "OLD": "Old password",
-      "NEW": "New password",
+      "NEW": "Neues Passwort",
       "CONFIRM": "New password confirmation",
       "BUTTON": "Save"
     },
@@ -169,7 +169,7 @@
     "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
     "LOCKED_BALANCE_LINK": "What does that mean?",
     "TABS": {
-      "SEND": "Send",
+      "SEND": "Senden",
       "RECEIVE": "Receive",
       "HISTORY": "History",
       "CONTRACTS": "Contracts",
@@ -266,7 +266,7 @@
     "BUTTON": "Send",
     "SUCCESS_SENT": "Transaction sent",
     "FORM_ERRORS": {
-      "ADDRESS_REQUIRED": "Address is required",
+      "ADDRESS_REQUIRED": "Adresse benötigt",
       "ADDRESS_NOT_VALID": "Address not valid",
       "ALIAS_NOT_VALID": "Alias not valid",
       "AMOUNT_REQUIRED": "Amount is required",

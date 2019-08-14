@@ -39,6 +39,12 @@
 </div>
 <div class="sidebar-settings">
   <div class="wrap-button" routerLinkActive="active">
+    <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2" [disabled]="variablesService.daemon_state !== 2">
+      <i class="icon contacts"></i>
+      <span>{{ 'SIDEBAR.CONTACTS' | translate }}</span>
+    </button>
+  </div>
+  <div class="wrap-button" routerLinkActive="active">
     <button [routerLink]="['/settings']">
       <i class="icon settings"></i>
       <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>

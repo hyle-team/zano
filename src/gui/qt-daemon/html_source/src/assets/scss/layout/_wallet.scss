@@ -199,6 +199,13 @@ app-history {
           }
         }
 
+        .unlock-transaction {
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+        }
+
         .status.send {
 
           .status-transaction {

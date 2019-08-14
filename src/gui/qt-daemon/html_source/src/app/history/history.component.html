@@ -13,16 +13,33 @@
     <tbody>
     <ng-container *ngFor="let item of variablesService.currentWallet.history">
       <tr (click)="openDetails(item.tx_hash)" [class.locked-transaction]="!item.is_mining && item.unlock_time > 0">
-        <td>
+        <td> 
           <div class="status" [class.send]="!item.is_income" [class.received]="item.is_income">
             <ng-container *ngIf="variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0">
               <div class="confirmation" tooltip="{{ 'HISTORY.STATUS_TOOLTIP' | translate : {'current': getHeight(item)/10, 'total': 10} }}" placement="bottom-left" tooltipClass="table-tooltip" [delay]="500">
                 <div class="fill" [style.height]="getHeight(item) + '%'"></div>
               </div>
             </ng-container>
-            <ng-container *ngIf="!item.is_mining && item.unlock_time > 0">
-              <i class="icon lock-transaction" tooltip="{{ 'HISTORY.LOCK_TOOLTIP' | translate : {'date': item.unlock_time * 1000 | date : 'MM.dd.yy'} }}" placement="bottom-left" tooltipClass="table-tooltip" [delay]="500"></i>
+
+            <ng-container *ngIf="item.unlock_time !== 0 && item.tx_type !== 6">
+              <ng-container *ngIf="isLocked(item); else unlock">
+                <ng-container *ngIf="item.unlock_time < 500000000">
+                  <i class="icon lock-transaction" tooltip="{{ 'HISTORY.LOCK_TOOLTIP' | translate : {'date': time(item) | date : 'MM.dd.yy'} }}" placement="bottom-left" tooltipClass="table-tooltip" [delay]="500"
+                  [class.position]="variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0"></i>
+                </ng-container>
+                <ng-container *ngIf="item.unlock_time > 500000000">
+                  <i class="icon lock-transaction" tooltip="{{ 'HISTORY.LOCK_TOOLTIP' | translate : {'date': item.unlock_time * 1000 | date : 'MM.dd.yy'} }}" placement="bottom-left" tooltipClass="table-tooltip" [delay]="500"
+                  [class.position]="variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0"></i>
+                </ng-container>
+              </ng-container> 
+              <ng-template #unlock>
+                <i class="icon unlock-transaction" placement="bottom-left" [class.position]="variablesService.height_app - item.height < 10 || item.height === 0 && item.timestamp > 0"></i>
+              </ng-template>
             </ng-container>
+
+            <!-- <ng-container *ngIf="!item.is_mining && item.unlock_time > 0">
+              <i class="icon lock-transaction" tooltip="{{ 'HISTORY.LOCK_TOOLTIP' | translate : {'date': item.unlock_time * 1000 | date : 'MM.dd.yy'} }}" placement="bottom-left" tooltipClass="table-tooltip" [delay]="500"></i>
+            </ng-container> -->
             <i class="icon status-transaction"></i>
             <span>{{ (item.is_income ? 'HISTORY.RECEIVED' : 'HISTORY.SEND') | translate }}</span>
           </div>

@@ -313,11 +313,17 @@ export class BackendService {
     this.runCommand('check_master_password', pass, callback);
   }
   storeSecureAppData(callback?) {
+    let data;
     const wallets = [];
+    const contacts = [];
     this.variablesService.wallets.forEach((wallet) => {
       wallets.push({name: wallet.name, pass: wallet.pass, path: wallet.path, staking: wallet.staking});
     });
-    this.backendObject['store_secure_app_data'](JSON.stringify(wallets), this.variablesService.appPass, (dataStore) => {
+    this.variablesService.contacts.forEach((contact) => {
+      contacts.push({name: contact.name, address: contact.address, notes: contact.notes});
+    });
+    data = {wallets: wallets, contacts: contacts};
+    this.backendObject['store_secure_app_data'](JSON.stringify(data), this.variablesService.appPass, (dataStore) => {
       this.backendCallback(dataStore, {}, callback, 'store_secure_app_data');
     });
   }
@@ -350,6 +356,14 @@ export class BackendService {
       default_dir: dir
     };
     this.runCommand('show_openfile_dialog', params, callback);
+  }
+
+  storeFile(path, buff) {
+    this.backendObject['store_to_file'](path, (typeof buff === 'string' ? buff : JSON.stringify(buff)));
+  }
+
+  loadFile(path, callback) {
+    this.runCommand('load_from_file', path, callback);
   }
 
   generateWallet(path, pass, callback) {
@@ -599,6 +613,22 @@ export class BackendService {
       return this.variablesService.aliasesChecked[address];
     }
     return {};
+  }
+
+  getContactAlias() {
+    if (this.variablesService.contacts.length && this.variablesService.daemon_state === 2) {
+      this.variablesService.contacts.map(contact => {
+        this.getAliasByAddress(contact.address, (status, data) => {
+          if (status) {
+            if (data.alias) {
+              contact.alias = '@' + data.alias;
+            }
+          } else {
+            contact.alias = null;
+          }
+        });
+      });
+    }
   }
 
   getPoolInfo(callback) {

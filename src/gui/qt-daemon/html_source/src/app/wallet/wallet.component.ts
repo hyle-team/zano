@@ -14,6 +14,7 @@ import {Subscription} from 'rxjs';
 export class WalletComponent implements OnInit, OnDestroy {
   subRouting1;
   subRouting2;
+  queryRouting;
   walletID;
   copyAnimation = false;
   copyAnimationTimeout;
@@ -92,6 +93,15 @@ export class WalletComponent implements OnInit, OnDestroy {
             this.tabs[i].active = (this.tabs[i].link === '/' + val.state.root.firstChild.firstChild.url[0].path);
           }
         }
+      }
+    });
+    this.queryRouting = this.route.queryParams.subscribe(params => {
+      if (params.send) {
+        this.tabs.forEach((tab, index) => {
+          if (tab.link === '/send') {
+            this.changeTab(index);
+          }
+        });
       }
     });
     if (this.variablesService.currentWallet.alias.hasOwnProperty('name')) {
@@ -178,6 +188,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.subRouting1.unsubscribe();
     this.subRouting2.unsubscribe();
+    this.queryRouting.unsubscribe();
     this.aliasSubscription.unsubscribe();
     clearTimeout(this.copyAnimationTimeout);
   }
