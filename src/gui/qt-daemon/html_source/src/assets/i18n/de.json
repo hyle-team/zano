@@ -27,8 +27,8 @@
     "EDIT_ALIAS": "Alias bearbeiten",
     "TRANSFER_ALIAS": "Transfer alias",
     "CONTRACTS": "Verträge",
-    "NEW_PURCHASE": "New purchase",
-    "OLD_PURCHASE": "Purchase"
+    "NEW_PURCHASE": "Neuer Kauf",
+    "OLD_PURCHASE": "Kauf"
   },
   "SIDEBAR": {
     "TITLE": "Wallets",
@@ -45,9 +45,9 @@
       "OFFLINE": "Offline",
       "ONLINE": "Online",
       "ERROR": "System error",
-      "COMPLETE": "Completion",
+      "COMPLETE": "Abschluss",
       "SYNCING": "Syncing blockchain",
-      "LOADING": "Loading blockchain data"
+      "LOADING": "Lade Blockchain-Daten"
     },
     "UPDATE": {
       "STANDARD": "Update verfügbar",
@@ -94,7 +94,7 @@
     "FILE_NOT_FOUND1": "Wallet file not found",
     "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
+      "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_DUPLICATE": "Name existiert bereits",
       "MAX_LENGTH": "Maximum name length reached"
     },
@@ -163,7 +163,7 @@
     "APP_LOG_TITLE": "Log level:"
   },
   "WALLET": {
-    "REGISTER_ALIAS": "Register an alias",
+    "REGISTER_ALIAS": "Alias registrieren",
     "DETAILS": "Details",
     "LOCK": "Verschlüsseln",
     "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
@@ -171,10 +171,10 @@
     "LOCKED_BALANCE_LINK": "What does that mean?",
     "TABS": {
       "SEND": "Senden",
-      "RECEIVE": "Receive",
-      "HISTORY": "History",
+      "RECEIVE": "Empfangen",
+      "HISTORY": "Verlauf",
       "CONTRACTS": "Contracts",
-      "MESSAGES": "Messages",
+      "MESSAGES": "Nachrichten",
       "STAKING": "Staking"
     }
   },
@@ -183,11 +183,11 @@
     "LABEL_FILE_LOCATION": "Wallet file location",
     "LABEL_SEED_PHRASE": "Seed phrase",
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
-    "BUTTON_SAVE": "Save",
+    "BUTTON_SAVE": "Speichern",
     "BUTTON_REMOVE": "Close wallet",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
+      "NAME_DUPLICATE": "Name existiert bereits",
       "MAX_LENGTH": "Maximum name length reached"
     }
   },
@@ -198,16 +198,16 @@
       "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
     },
     "COMMENT": {
-      "LABEL": "Comment",
+      "LABEL": "Kommentar",
       "PLACEHOLDER": "",
       "TOOLTIP": "The comment will be visible to anyone who wants to make a payment to your alias. You can provide details about your business, contacts, or include any text. Comments can be edited later."
     },
     "COST": "Alias fee {{value}} {{currency}}",
-    "BUTTON_ASSIGN": "Assign",
+    "BUTTON_ASSIGN": "Zuweisen",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_WRONG": "Alias has wrong name",
-      "NAME_LENGTH": "The alias must be 6-25 characters long",
+      "NAME_LENGTH": "Der Alias muss 6-25 Zeichen lang sein",
       "NAME_EXISTS": "Alias name already exists",
       "NO_MONEY": "You do not have enough funds to assign this alias",
       "MAX_LENGTH": "Maximum comment length reached"
@@ -256,8 +256,8 @@
   },
   "SEND": {
     "ADDRESS": "Adresse",
-    "AMOUNT": "Amount",
-    "COMMENT": "Comment",
+    "AMOUNT": "Betrag",
+    "COMMENT": "Kommentar",
     "DETAILS": "Zusätzliche Informationen",
     "MIXIN": "Mixin",
     "FEE": "Gebühr",
@@ -290,16 +290,16 @@
       "ID": "Transaktions-ID",
       "SIZE": "Transaktionsgröße",
       "SIZE_VALUE": "{{value}} bytes",
-      "HEIGHT": "Height",
+      "HEIGHT": "Höhe",
       "CONFIRMATION": "Confirmation",
       "INPUTS": "Inputs",
       "OUTPUTS": "Outputs",
-      "COMMENT": "Comment"
+      "COMMENT": "Kommentar"
     },
     "TYPE_MESSAGES": {
       "HIDDEN": "hidden",
-      "UNDEFINED": "Undefined",
-      "COMPLETE_BUYER": "Contract completed",
+      "UNDEFINED": "Unbedefiniert",
+      "COMPLETE_BUYER": "Vertrag abgeschlossen",
       "COMPLETE_SELLER": "Contract completed",
       "CREATE_ALIAS": "Fee for assigning alias",
       "UPDATE_ALIAS": "Fee for editing alias",
