@@ -1,0 +1,98 @@
+<div class="content scrolled-content">
+  <div>
+    <div class="head">
+      <button type="button" class="back-btn" (click)="back()">
+        <i class="icon back"></i>
+        <span>{{ 'COMMON.BACK' | translate }}</span>
+      </button>
+    </div>
+
+    <h3 class="contacts-title">{{ 'CONTACTS.TITLE' | translate }}</h3>
+
+    <div class="wrap-table">
+      <ng-container>
+        <table
+          *ngIf="this.variablesService.contacts.length !== 0; else emptyList"
+        >
+          <thead>
+            <tr #head (window:resize)="calculateWidth()">
+              <th>{{ 'CONTACTS.TABLE.NAME' | translate }}</th>
+              <th>{{ 'CONTACTS.TABLE.ALIAS' | translate }}</th>
+              <th>{{ 'CONTACTS.TABLE.ADDRESS' | translate }}</th>
+              <th>{{ 'CONTACTS.TABLE.NOTES' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <ng-container
+              *ngFor="
+                let contact of this.variablesService.contacts;
+                let i = index
+              "
+            >
+              <tr>
+                <td>
+                  {{ contact.name }}
+                </td>
+                <td>
+                  <ng-container *ngIf="contact.alias">
+                    <span
+                      class="alias"
+                      (click)="openInBrowser(contact.alias)"
+                      >{{ contact.alias }}</span
+                    >
+                  </ng-container>
+                </td>
+                <td class="remote-address">
+                  {{ contact.address }}
+                </td>
+                <td class="remote-notes">
+                  {{ contact.notes }}
+                </td>
+                <td>
+                  <div class="button-wrapper">
+                    <button
+                      [routerLink]="['/contact-send/' + i]"
+                      [queryParams]="{ address: contact.address }"
+                    >
+                      <i class="icon transfer"></i>
+                      <span>{{ 'CONTACTS.BUTTON.SEND' | translate }}</span>
+                    </button>
+                    <button
+                      [routerLink]="['/edit-contacts/' + i]"
+                      [queryParams]="{ id: i }"
+                    >
+                      <i class="icon edit"></i>
+                      <span>{{ 'CONTACTS.BUTTON.EDIT' | translate }}</span>
+                    </button>
+                    <button (click)="delete(i)">
+                      <i class="icon delete"></i>
+                      <span>{{ 'CONTACTS.BUTTON.DELETE' | translate }}</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+      </ng-container>
+
+      <ng-template #emptyList>
+        <div class="empty-list">
+          {{ 'CONTACTS.TABLE.EMPTY' | translate }}
+        </div>
+      </ng-template>
+    </div>
+
+    <button [routerLink]="['/add-contacts']" class="blue-button">
+      {{ 'CONTACTS.BUTTON.ADD' | translate }}
+    </button>
+
+    <div class="footer">
+      <button type="button" class="import-btn" [routerLink]="['/import']">
+        <i class="icon import"></i>
+        <span>{{ 'CONTACTS.BUTTON.IMPORT_EXPORT' | translate }}</span>
+      </button>
+    </div>
+  </div>
+</div>

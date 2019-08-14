@@ -20,8 +20,12 @@ import { RestoreWalletComponent } from './restore-wallet/restore-wallet.componen
 import { SeedPhraseComponent } from './seed-phrase/seed-phrase.component';
 import { WalletDetailsComponent } from './wallet-details/wallet-details.component';
 import { AssignAliasComponent } from './assign-alias/assign-alias.component';
-import { EditAliasComponent } from "./edit-alias/edit-alias.component";
-import { TransferAliasComponent } from "./transfer-alias/transfer-alias.component";
+import { EditAliasComponent } from './edit-alias/edit-alias.component';
+import { TransferAliasComponent } from './transfer-alias/transfer-alias.component';
+import { ContactsComponent } from './contacts/contacts.component';
+import { AddContactsComponent } from './add-contacts/add-contacts.component';
+import { ContactSendComponent } from './contact-send/contact-send.component';
+import { ExportImportComponent } from './export-import/export-import.component';
 
 const routes: Routes = [
   {
@@ -118,6 +122,26 @@ const routes: Routes = [
   {
     path: 'settings',
     component: SettingsComponent
+  },
+  {
+    path: 'contacts',
+    component: ContactsComponent
+  },
+  {
+    path: 'add-contacts',
+    component: AddContactsComponent
+  },
+  {
+    path: 'edit-contacts/:id',
+    component: AddContactsComponent
+  },
+  {
+    path: 'contact-send/:id',
+    component: ContactSendComponent
+  },
+  {
+    path: 'import',
+    component: ExportImportComponent
   },
   {
     path: '',
