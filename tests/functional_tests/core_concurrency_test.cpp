@@ -46,7 +46,7 @@ static const std::vector<currency::attachment_v> empty_attachment;
 bool create_block_template_manually(const currency::block& prev_block, boost::multiprecision::uint128_t already_generated_coins, const std::vector<const currency::transaction*>& txs, const currency::account_public_address& miner_addr, currency::block& result)
 {
   result.flags = 0;
-  result.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+  result.major_version = BLOCK_MAJOR_VERSION_INITAL;
   result.minor_version = CURRENT_BLOCK_MINOR_VERSION;
   result.nonce = 0;
   result.prev_id = get_block_hash(prev_block);

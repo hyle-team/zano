@@ -38,7 +38,11 @@ namespace tools
       boost::recursive_mutex m_cs;
       boost::recursive_mutex m_write_exclusive_lock;
       std::map<std::thread::id, transactions_list> m_txs; // size_t -> count of nested read_only transactions
+      std::atomic<uint64_t> m_commits_count;
+      
       bool pop_tx_entry(tx_entry& txe);
+
+
     public:
       lmdb_db_backend();
       ~lmdb_db_backend();
@@ -60,6 +64,7 @@ namespace tools
       //-------------------------------------------------------------------------------------
       bool have_tx();
       MDB_txn* get_current_tx();
+      bool resize_if_needed();
 
     };
   }

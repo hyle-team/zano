@@ -7,8 +7,13 @@
 #include "misc_language.h"
 #include "string_coding.h"
 #include "profile_tools.h"
+#include "util.h"
 
 #define BUF_SIZE 1024
+#define DB_RESIZE_MIN_FREE_SIZE    (100 * 1024 * 1024) // DB map size will grow if that much space left on DB
+#define DB_RESIZE_MIN_MAX_SIZE     (50 * 1024 * 1024)  // Minimum DB map size (starting size)
+#define DB_RESIZE_INCREMENT_SIZE   (100 * 1024 * 1024) // Grow step size
+#define DB_RESIZE_COMMITS_TO_CHECK 50
 
 #define CHECK_AND_ASSERT_MESS_LMDB_DB(rc, ret, mess) CHECK_AND_ASSERT_MES(res == MDB_SUCCESS, ret, "[DB ERROR]:(" << rc << ")" << mdb_strerror(rc) << ", [message]: " << mess);
 #define CHECK_AND_ASSERT_THROW_MESS_LMDB_DB(rc, mess) CHECK_AND_ASSERT_THROW_MES(res == MDB_SUCCESS, "[DB ERROR]:(" << rc << ")" << mdb_strerror(rc) << ", [message]: " << mess);
@@ -22,10 +27,13 @@ namespace tools
 {
   namespace db
   {
-    lmdb_db_backend::lmdb_db_backend() : m_penv(AUTO_VAL_INIT(m_penv))  
+    lmdb_db_backend::lmdb_db_backend()
+      : m_penv(AUTO_VAL_INIT(m_penv))
+      , m_commits_count(0)
     {
 
     }
+
     lmdb_db_backend::~lmdb_db_backend()
     {
       NESTED_TRY_ENTRY();
@@ -44,16 +52,17 @@ namespace tools
       res = mdb_env_set_maxdbs(m_penv, 15);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_set_maxdbs");
 
-      res = mdb_env_set_mapsize(m_penv, cache_sz);
-      CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_set_mapsize");
-      
       m_path = path_;
 #ifdef WIN32
       m_path = epee::string_encoding::convert_ansii_to_utf8(m_path);
 #endif
 
-      res = mdb_env_open(m_penv, m_path.c_str(), MDB_NORDAHEAD , 0644);
+      CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(m_path), false, "create_directories_if_necessary failed: " << m_path);
+
+      res = mdb_env_open(m_penv, m_path.c_str(), MDB_NORDAHEAD /*| MDB_NOSYNC | MDB_WRITEMAP | MDB_MAPASYNC*/, 0644);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_open, m_path=" << m_path);
+
+      resize_if_needed();
       
       return true;
     }
@@ -102,6 +111,13 @@ namespace tools
       {
         LOG_PRINT_CYAN("[DB " << m_path << "] WRITE LOCKED", LOG_LEVEL_3);
         CRITICAL_SECTION_LOCK(m_write_exclusive_lock);
+
+        if (m_commits_count.fetch_add(1, std::memory_order_relaxed) % DB_RESIZE_COMMITS_TO_CHECK == DB_RESIZE_COMMITS_TO_CHECK - 1)
+        {
+          if (!resize_if_needed())
+            m_commits_count.store(DB_RESIZE_COMMITS_TO_CHECK - 1, std::memory_order_relaxed); // if failed, try again on next commit
+        }
+
       }
       PROFILE_FUNC("lmdb_db_backend::begin_transaction");
       {
@@ -326,6 +342,7 @@ namespace tools
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_put");
       return true;
     }
+
     bool lmdb_db_backend::enumerate(container_handle h, i_db_callback* pcb)
     {
       CHECK_AND_ASSERT_MES(pcb, false, "null capback ptr passed to enumerate");
@@ -380,6 +397,42 @@ namespace tools
       }
       return true;
     }
+
+    bool lmdb_db_backend::resize_if_needed()
+    {
+      LOG_PRINT_CYAN("[DB " << m_path << "] WRITE LOCKED in resize_if_needed()", LOG_LEVEL_3);
+      CRITICAL_REGION_LOCAL(m_write_exclusive_lock);
+
+      if (have_tx())
+      {
+        LOG_PRINT_RED("[DB " << m_path << "] : resize_if_needed(): Have txs on stack, unable to resize!", LOG_LEVEL_0);
+        return false;
+      }
+
+      MDB_stat st = AUTO_VAL_INIT(st);
+      mdb_env_stat(m_penv, &st);
+      MDB_envinfo ei = AUTO_VAL_INIT(ei);
+      mdb_env_info(m_penv, &ei);
+
+      uint64_t dirty_size = ei.me_last_pgno * st.ms_psize;
+      int64_t size_diff = ei.me_mapsize - dirty_size;
+      if (size_diff >= DB_RESIZE_MIN_FREE_SIZE && ei.me_mapsize >= DB_RESIZE_MIN_MAX_SIZE)
+        return true; // resize is not needed
+
+      double gigabyte = 1024 * 1024 * 1024;
+      const uint64_t increment_size_pg_aligned = DB_RESIZE_INCREMENT_SIZE - (DB_RESIZE_INCREMENT_SIZE % st.ms_psize);
+
+      // need to resize DB
+      uint64_t new_size = ei.me_mapsize - (ei.me_mapsize % increment_size_pg_aligned) + increment_size_pg_aligned;
+
+      int res = mdb_env_set_mapsize(m_penv, new_size);
+      CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_set_mapsize");
+
+      LOG_PRINT_CYAN("[DB " << m_path << "] has grown: " << std::fixed << std::setprecision(2) << ei.me_mapsize / gigabyte << " GiB  ->  " << std::fixed << std::setprecision(2) << new_size / gigabyte << " GiB", LOG_LEVEL_0);
+
+      return true;
+    }
+
   }
 }
 

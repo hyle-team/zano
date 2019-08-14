@@ -24,10 +24,6 @@
 #define CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT            60*20
                                                         
 #define BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW               60
-
-
-// TOTAL_MONEY_SUPPLY - total number coins to be generated
-#define TOTAL_MONEY_SUPPLY                              ((uint64_t)(-1))
                                                         
 #define POS_START_HEIGHT                                0
                                                         
@@ -87,7 +83,9 @@
 
 
 #define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week
+#define CURRENCY_ALT_BLOCK_MAX_COUNT                    43200 //30 days
 #define CURRENCY_MEMPOOL_TX_LIVETIME                    345600 //seconds, 4 days
+
 
 #ifndef TESTNET
 #define P2P_DEFAULT_PORT                                11121
@@ -128,7 +126,7 @@
 //PoS definitions
 #define POS_SCAN_WINDOW                                 60*10 //seconds // 10 minutes
 #define POS_SCAN_STEP                                   15    //seconds
-#define POS_MAC_ACTUAL_TIMESTAMP_TO_MINED               (POS_SCAN_WINDOW+100)                       
+#define POS_MAX_ACTUAL_TIMESTAMP_TO_MINED               (POS_SCAN_WINDOW+100)                       
 
 #define POS_STARTER_KERNEL_HASH                         "00000000000000000006382a8d8f94588ce93a1351924f6ccb9e07dd287c6e4b"
 #define POS_MODFIFIER_INTERVAL                          10
@@ -192,10 +190,11 @@
 #define GUI_INTERNAL_CONFIG                             "gui_internal_config.bin"
 
 
+
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3
 #define CURRENT_BLOCK_EXTENDED_INFO_ARCHIVE_VER         1
 
-#define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 7
+#define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 8
 #define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  1
 
 
@@ -203,10 +202,19 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+64)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+65)
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
+//hard forks section
+#define BLOCK_MAJOR_VERSION_GENESIS                     1
+#define BLOCK_MINOR_VERSION_GENESIS                     0
+#define BLOCK_MAJOR_VERSION_INITAL                      0
+#ifndef TESTNET
+#define ZANO_HARDFORK_1_AFTER_HEIGHT                    166440
+#else
+#define ZANO_HARDFORK_1_AFTER_HEIGHT                    62102
+#endif
 
 
 

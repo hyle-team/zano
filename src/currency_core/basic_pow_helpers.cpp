@@ -36,7 +36,7 @@ namespace currency
   //------------------------------------------------------------------
   int ethash_height_to_epoch(uint64_t height)
   {
-    return height / ETHASH_EPOCH_LENGTH;
+    return static_cast<int>(height / ETHASH_EPOCH_LENGTH);
   }
   //--------------------------------------------------------------
   crypto::hash ethash_epoch_to_seed(int epoch)
@@ -51,7 +51,7 @@ namespace currency
   {
     int epoch = ethash_height_to_epoch(height);
     const auto& context = progpow::get_global_epoch_context_full(static_cast<int>(epoch));
-    auto res_eth = progpow::hash(context, height, *(ethash::hash256*)&block_header_hash, nonce);
+    auto res_eth = progpow::hash(context,  static_cast<int>(height), *(ethash::hash256*)&block_header_hash, nonce);
     crypto::hash result = currency::null_hash;
     memcpy(&result.data, &res_eth.final_hash, sizeof(res_eth.final_hash));
     return result;

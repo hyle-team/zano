@@ -251,6 +251,21 @@ DISABLE_VS_WARNINGS(4100)
   custom_code; \
 }
 
+
+#define CATCH_ENTRY_WITH_FORWARDING_EXCEPTION() } \
+  catch(const std::exception& ex) \
+{ \
+  LOG_ERROR("Exception at [" << LOCATION_SS << "], what=" << ex.what()); \
+  throw std::runtime_error(std::string("[EXCEPTION FORWARDED]: ") + ex.what()); \
+} \
+  catch(...) \
+{ \
+  LOG_ERROR("Exception at [" << LOCATION_SS << "], generic unknown exception \"...\""); \
+  throw std::runtime_error("[EXCEPTION FORWARDED]"); \
+}
+
+
+
 #define NESTED_TRY_ENTRY() try { TRY_ENTRY();
 
 #define NESTED_CATCH_ENTRY(location) \
