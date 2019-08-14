@@ -294,7 +294,7 @@ namespace file_io_utils
   {
     try
     {
-      std::ifstream fstream;
+      boost::filesystem::ifstream  fstream;
       //fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
       fstream.open(path_to_file, std::ios_base::binary | std::ios_base::in | std::ios::ate);
       if (!fstream.good())
