@@ -1158,6 +1158,32 @@ QString MainWindow::store_to_file(const QString& path, const QString& buff)
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
+QString MainWindow::load_from_file(const QString& path)
+{
+  TRY_ENTRY();
+  try {
+    std::string buff;
+    bool r = epee::file_io_utils::load_file_to_string(path.toStdWString(), buff);
+    if (r)
+      return QString::fromStdString(buff);
+    else
+      return QString();
+  }
+  catch (const std::exception& ex)
+  {
+    LOG_ERROR("FILED TO LOAD FROM FILE: " << path.toStdString() << " ERROR:" << ex.what());
+    return QString(API_RETURN_CODE_ACCESS_DENIED) + ": " + ex.what();
+  }
+
+  catch (...)
+  {
+    return API_RETURN_CODE_ACCESS_DENIED;
+  }
+
+
+  CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
+}
+
 QString MainWindow::get_app_data()
 {
   TRY_ENTRY();

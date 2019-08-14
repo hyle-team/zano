@@ -1,5 +1,6 @@
 import {Injectable, NgZone} from '@angular/core';
 import {Wallet} from '../models/wallet.model';
+import {Contact} from '../models/contact.model';
 import {BehaviorSubject} from 'rxjs';
 import {Idle} from 'idlejs/dist';
 import {Router} from '@angular/router';
@@ -45,12 +46,16 @@ export class VariablesService {
 
   public wallets: Array<Wallet> = [];
   public currentWallet: Wallet;
+  public selectWallet: number;
   public aliases: any = [];
   public aliasesChecked: any = {};
   public enableAliasSearch = false;
   public maxWalletNameLength = 25;
   public maxCommentLength = 255;
-  public dataIsLoaded = false; 
+  public dataIsLoaded = false;
+
+  public contacts: Array<Contact> = [];
+  public newContact: Contact = {name: null, address: null, notes: null};
 
   getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);
