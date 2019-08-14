@@ -112,13 +112,13 @@
     "CONFIRM": "Confirmer le mot de passe du portefeuille",
     "BUTTON_SELECT": "Sélectionner l'emplacement du portefeuille",
     "BUTTON_CREATE": "Créer un portefeuille",
-    "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
+    "NOT_CORRECT_FILE_OR_PASSWORD": "Le fichier est invalide ou mot de passe du portefeuille ne correspond pas",
     "CHOOSE_PATH": "Veuillez choisir un chemin",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Le nom est requis",
       "NAME_DUPLICATE": "Nom déjà utilisé",
-      "MAX_LENGTH": "Maximum name length reached",
-      "CONFIRM_NOT_MATCH": "Confirm password not match",
+      "MAX_LENGTH": "Longueur maximale atteinte",
+      "CONFIRM_NOT_MATCH": "La confirmation du mot de passe ne correspond pas",
       "KEY_REQUIRED": "Clé requise",
       "KEY_NOT_VALID": "Clé invalide"
     }
@@ -155,26 +155,26 @@
     },
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Mot de passe requis",
-      "PASS_NOT_MATCH": "Old password not match",
-      "CONFIRM_NOT_MATCH": "Confirm password not match"
+      "PASS_NOT_MATCH": "Ancien mot de passe non correspondant",
+      "CONFIRM_NOT_MATCH": "La confirmation du mot de passe ne correspond pas"
     },
-    "LAST_BUILD": "Current build: {{value}}",
+    "LAST_BUILD": "Version actuelle : {{value}}",
     "APP_LOG_TITLE": "Niveau de log :"
   },
   "WALLET": {
-    "REGISTER_ALIAS": "Register an alias",
+    "REGISTER_ALIAS": "Enregistrer un alias",
     "DETAILS": "Détails",
     "LOCK": "Verrouillage",
-    "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
+    "AVAILABLE_BALANCE": "Disponible <b>{{available}} {{currency}}<b/>",
     "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
-    "LOCKED_BALANCE_LINK": "What does that mean?",
+    "LOCKED_BALANCE_LINK": "Que signifie cela?",
     "TABS": {
       "SEND": "Envoyer",
       "RECEIVE": "Recevoir",
       "HISTORY": "Historique",
       "CONTRACTS": "Contrats",
       "MESSAGES": "Messages",
-      "STAKING": "Staking"
+      "STAKING": "Mise"
     }
   },
   "WALLET_DETAILS": {
@@ -187,14 +187,14 @@
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Le nom est requis",
       "NAME_DUPLICATE": "Nom déjà utilisé",
-      "MAX_LENGTH": "Maximum name length reached"
+      "MAX_LENGTH": "Longueur maximale atteinte"
     }
   },
   "ASSIGN_ALIAS": {
     "NAME": {
       "LABEL": "Nom unique",
       "PLACEHOLDER": "@ Entrer l'alias",
-      "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
+      "TOOLTIP": "Un alias est une forme abréviée pour votre compte. Un alias ne peut inclure que des lettres, des chiffres et des caractères latins « » et « - ». Il doit commencer par « @ »."
     },
     "COMMENT": {
       "LABEL": "Commentaire",
@@ -307,7 +307,7 @@
       "POW_REWARD": "Récompense POW",
       "POS_REWARD": "Récompense POS",
       "CREATE_CONTRACT": "Proposition de contrat",
-      "PLEDGE_CONTRACT": "Contract deposit",
+      "PLEDGE_CONTRACT": "Dépôt de contrat",
       "NULLIFY_CONTRACT": "Brûler les dépôts",
       "PROPOSAL_CANCEL_CONTRACT": "Demande d'annulation",
       "CANCEL_CONTRACT": "Annuler et retourner les dépôts"
@@ -350,12 +350,12 @@
         "BEING_CANCELLED": "Annulation en cours",
         "CANCELLED": "Contrat annulé",
         "IGNORED_CANCEL": "Vous avez ignoré la proposition d'annulation",
-        "EXPIRED": "Contract proposal has expired"
+        "EXPIRED": "La proposition de contrat a expiré"
       },
       "BUYER": {
-        "WAITING": "Waiting for response",
-        "IGNORED": "Seller ignored your contract proposal",
-        "ACCEPTED": "Seller accepted your contract proposal",
+        "WAITING": "En attente d'une réponse",
+        "IGNORED": "Le vendeur a ignoré votre proposition de contrat",
+        "ACCEPTED": "Le vendeur a accepté votre proposition de contrat",
         "WAIT": "Waiting for deposits confirmation",
         "WAITING_SELLER": "Waiting for delivery",
         "COMPLETED": "Contract completed",
@@ -519,7 +519,7 @@
     "LOCKED": "Bloqué",
     "IS_MINIMIZE": "Zano application is minimized to the system tray",
     "RESTORE": "Vous pouvez le récupérer en cliquant ou en utilisant le menu contextuel",
-    "TRAY_MENU_SHOW": "Resize",
+    "TRAY_MENU_SHOW": "Redimensionner",
     "TRAY_MENU_MINIMIZE": "Réduire"
   }
 }
