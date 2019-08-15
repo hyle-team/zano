@@ -179,7 +179,7 @@ namespace currency {
     return res.convert_to<wide_difficulty_type>();
   }
 
-  wide_difficulty_type next_difficulty(vector<uint64_t>& timestamps, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
+  wide_difficulty_type next_difficulty_1(vector<uint64_t>& timestamps, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
   {
 
     // timestamps  - first is latest, back - is oldest timestamps
@@ -216,6 +216,42 @@ namespace currency {
     if (dif_fast != 0)
     {
       summ += dif_fast;
+      ++devider;
+    }
+    return summ / devider;
+  }
+
+  wide_difficulty_type next_difficulty_2(vector<uint64_t>& timestamps, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
+  {
+
+    // timestamps  - first is latest, back - is oldest timestamps
+    if (timestamps.size() > DIFFICULTY_WINDOW)
+    {
+      timestamps.resize(DIFFICULTY_WINDOW);
+      cumulative_difficulties.resize(DIFFICULTY_WINDOW);
+    }
+
+
+    size_t length = timestamps.size();
+    CHECK_AND_ASSERT_MES(length == cumulative_difficulties.size(), 0, "Check \"length == cumulative_difficulties.size()\" failed");
+    if (length <= 1)
+    {
+      return DIFFICULTY_STARTER;
+    }
+    static_assert(DIFFICULTY_WINDOW >= 2, "Window is too small");
+
+    CHECK_AND_ASSERT_MES(length <= DIFFICULTY_WINDOW, 0, "length <= DIFFICULTY_WINDOW check failed, length=" << length);
+
+    sort(timestamps.begin(), timestamps.end(), std::greater<uint64_t>());
+
+    static_assert(2 * DIFFICULTY_CUT <= DIFFICULTY_WINDOW - 2, "Cut length is too large");
+    wide_difficulty_type dif_slow = get_adjustment_for_zone(timestamps, cumulative_difficulties, target_seconds, DIFFICULTY_WINDOW, DIFFICULTY_CUT / 2, DIFFICULTY_CUT / 2);
+    wide_difficulty_type dif_medium = get_adjustment_for_zone(timestamps, cumulative_difficulties, target_seconds, DIFFICULTY_WINDOW / 3, DIFFICULTY_CUT / 8, DIFFICULTY_CUT / 12);
+    uint64_t devider = 1;
+    wide_difficulty_type summ = dif_slow;
+    if (dif_medium != 0)
+    {
+      summ += dif_medium;
       ++devider;
     }
     return summ / devider;

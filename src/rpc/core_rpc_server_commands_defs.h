@@ -778,6 +778,7 @@ namespace currency
       bool pos_block;              //is pos block 
       uint64_t pos_amount;         //
       uint64_t pos_index;          //
+      uint64_t stake_unlock_time;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(extra_text)
@@ -786,6 +787,7 @@ namespace currency
         KV_SERIALIZE(pos_block)
         KV_SERIALIZE(pos_amount)
         KV_SERIALIZE(pos_index)
+        KV_SERIALIZE(stake_unlock_time)
       END_KV_SERIALIZE_MAP()
     };
 

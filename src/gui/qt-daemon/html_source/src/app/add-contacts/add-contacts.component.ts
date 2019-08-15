@@ -66,8 +66,12 @@ export class AddContactsComponent implements OnInit, OnDestroy {
     ]),
     name: new FormControl('', [
       Validators.required,
+<<<<<<< HEAD
       Validators.minLength(4),
       Validators.maxLength(25),
+=======
+      Validators.pattern(/^[\w\s-_.]{4,25}$/),
+>>>>>>> 3ff1ce583e414436a973956284587d52e402f589
       (g: FormControl) => {
         if (g.value) {
           const isDublicated = this.variablesService.contacts.findIndex(

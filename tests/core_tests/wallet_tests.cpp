@@ -48,15 +48,15 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
       , m_found(false)
     {}
 
-    bool handle_output(const currency::transaction& tx, const currency::tx_out& out)
+    bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out& out, uint64_t out_i)
     {
       CHECK_AND_ASSERT_MES(!m_found, false, "Internal error: m_found is true but the visitor is still being applied");
-      auto it = std::find(tx.vout.begin(), tx.vout.end(), out);
-      if (it == tx.vout.end())
+      auto it = std::find(validated_tx.vout.begin(), validated_tx.vout.end(), out);
+      if (it == validated_tx.vout.end())
         return false;
-      size_t output_tx_index = it - tx.vout.begin();
+      size_t output_tx_index = it - validated_tx.vout.begin();
 
-      crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
+      crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(validated_tx);
       crypto::key_derivation derivation;
       bool r = generate_key_derivation(tx_pub_key, m_keys.m_view_secret_key, derivation);
       CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
@@ -96,7 +96,7 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
       continue;
     }
     local_visitor vis(keys, in.k_image);
-    bool r = c.get_blockchain_storage().scan_outputkeys_for_indexes(in, vis);
+    bool r = c.get_blockchain_storage().scan_outputkeys_for_indexes(tx, in, vis);
     CHECK_AND_ASSERT_MES(r || vis.m_found, false, "scan_outputkeys_for_indexes failed");
     if (!vis.m_found)
       return false;

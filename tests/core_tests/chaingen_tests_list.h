@@ -33,3 +33,7 @@
 #include "escrow_wallet_altchain_test.h"
 #include "misc_tests.h"
 #include "emission_test.h"
+#include "hard_fork_1_locked_pos_test.h"
+#include "hard_fork_1_consensus_test.h"
+#include "hard_fork_1_bad_pos_source.h"
+#include "hard_fork_1.h"

@@ -46,6 +46,7 @@ export class ContactsComponent implements OnInit {
     );
   }
 
+<<<<<<< HEAD
   // openInBrowser(alias: string) {
   //   if (alias !== null) {
   //     this.backend.openUrlInBrowser(
@@ -53,6 +54,15 @@ export class ContactsComponent implements OnInit {
   //     );
   //   }
   // }
+=======
+  openInBrowser(alias: string) {
+    if (alias !== null) {
+      this.backend.openUrlInBrowser(
+        `explorer.zano.org/aliases/${alias.slice(1)}`
+      );
+    }
+  }
+>>>>>>> 3ff1ce583e414436a973956284587d52e402f589
 
   back() {
     this.location.back();

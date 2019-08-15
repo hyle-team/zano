@@ -68,6 +68,7 @@ public:
     m_cmd_binder.set_handler("print_block_from_hex_blob", boost::bind(&daemon_commands_handler::print_block_from_hex_blob, this, _1), "Unserialize block from hex binary data to json-like representation");
     m_cmd_binder.set_handler("print_tx_from_hex_blob", boost::bind(&daemon_commands_handler::print_tx_from_hex_blob, this, _1), "Unserialize transaction from hex binary data to json-like representation");
     m_cmd_binder.set_handler("print_tx_outputs_usage", boost::bind(&daemon_commands_handler::print_tx_outputs_usage, this, _1), "Analyse if tx outputs for involved in subsequent transactions");
+    m_cmd_binder.set_handler("print_difficulties_of_last_n_blocks", boost::bind(&daemon_commands_handler::print_difficulties_of_last_n_blocks, this, _1), "Print difficulties of last n blocks");
 
   }
 
@@ -696,8 +697,26 @@ private:
     m_srv.get_payload_object().get_core().get_blockchain_storage().print_tx_outputs_lookup(tx_hash);
     return true;
   }
+  //--------------------------------------------------------------------------------
+  bool print_difficulties_of_last_n_blocks(const std::vector<std::string>& args)
+  {
+    if (args.empty())
+    {
+      std::cout << "expected: n - number of blocks to read" << std::endl;
+      return true;
+    }
 
+    const std::string& amount = args.front();
+    uint64_t n = 0;
+    if (!epee::string_tools::get_xtype_from_string(n, amount))
+    {
+      std::cout << "unable to convert to number '" << amount << "'" << std::endl;
+      return true;
+    }
 
+    m_srv.get_payload_object().get_core().get_blockchain_storage().print_last_n_difficulty_numbers(n);
+    return true;
+  }
   //--------------------------------------------------------------------------------
   bool print_pool(const std::vector<std::string>& args)
   {

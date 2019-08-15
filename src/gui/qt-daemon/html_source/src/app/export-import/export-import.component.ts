@@ -107,6 +107,7 @@ export class ExportImportComponent implements OnInit {
       '*',
       this.variablesService.settings.default_path,
       (file_status, file_data) => {
+<<<<<<< HEAD
         if (file_status && this.isValid(file_data.path)) {
           this.backend.storeFile(file_data.path, this.papa.unparse(contacts));
           this.modalService.prepareModal(
@@ -116,6 +117,10 @@ export class ExportImportComponent implements OnInit {
         }
         if (!(file_data.error_code === 'CANCELED') && !this.isValid(file_data.path)) {
           this.modalService.prepareModal('error', 'CONTACTS.ERROR_EXPORT');
+=======
+        if (file_status) {
+          this.backend.storeFile(file_data.path, this.papa.unparse(contacts));
+>>>>>>> 3ff1ce583e414436a973956284587d52e402f589
         }
       }
     );

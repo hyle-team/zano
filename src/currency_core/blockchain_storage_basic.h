@@ -47,6 +47,7 @@ namespace currency
     uint64_t block_cumulative_size;
     wide_difficulty_type cumulative_diff_adjusted;
     wide_difficulty_type cumulative_diff_precise;
+    wide_difficulty_type cumulative_diff_precise_adjusted;
     wide_difficulty_type difficulty;
     boost::multiprecision::uint128_t already_generated_coins;
     crypto::hash stake_hash;                  //TODO: unused field for PoW blocks, subject for refactoring
