@@ -241,7 +241,7 @@
       "PLACEHOLDER": ""
     },
     "ADDRESS": {
-      "LABEL": "Transfer to",
+      "LABEL": "Transférer à",
       "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
@@ -249,7 +249,7 @@
       "ALIAS_EXISTS": "Ce compte a déjà un alias",
       "NO_MONEY": "Vous n'avez pas assez de fonds pour transférer cet alias"
     },
-    "COST": "Transfer fee {{value}} {{currency}}",
+    "COST": "Frais de transfert {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Transférer",
     "BUTTON_CANCEL": "Annuler",
     "REQUEST_SEND_REG": "L'alias sera transféré dans les 10 prochaines minutes"
@@ -453,14 +453,14 @@
     "OK": "OK"
   },
   "CONFIRM": {
-    "BUTTON_CONFIRM": "Send",
-    "BUTTON_CANCEL": "Cancel",
-    "TITLE": "Confirm transaction",
+    "BUTTON_CONFIRM": "Envoyer",
+    "BUTTON_CANCEL": "Annuler",
+    "TITLE": "Confirmer la transaction",
     "MESSAGE": {
-      "SEND": "Send",
-      "FROM": "From",
-      "TO": "To",
-      "COMMENT": "Comment"
+      "SEND": "Envoyer",
+      "FROM": "De",
+      "TO": "À",
+      "COMMENT": "Commentaire"
     }
   },
   "STAKING": {
@@ -489,50 +489,50 @@
     }
   },
   "CONTACTS": {
-    "TITLE": "Contact list",
-    "IMPORT_EXPORT": "Import or export contacts",
-    "IMPORT": "Import",
-    "EXPORT": "Export",
-    "ADD": "Add/edit contact",
-    "SEND": "Send",
-    "SEND_FROM": "Send from",
-    "SEND_TO": "To",
-    "OPEN_ADD_WALLET": "Open/Add wallet",
-    "COPY": "- Copy",
+    "TITLE": "Liste de contacts",
+    "IMPORT_EXPORT": "Importer ou exporter des contacts",
+    "IMPORT": "Importer",
+    "EXPORT": "Exporter",
+    "ADD": "Ajouter/modifier un contact",
+    "SEND": "Envoyer",
+    "SEND_FROM": "Envoyer de",
+    "SEND_TO": "À",
+    "OPEN_ADD_WALLET": "Ouvrir/Ajouter un portefeuille",
+    "COPY": "- Copier",
     "TABLE": {
-      "NAME": "Name",
+      "NAME": "Nom",
       "ALIAS": "Alias",
-      "ADDRESS": "Address",
+      "ADDRESS": "Adresse",
       "NOTES": "Notes",
-      "EMPTY": "Contact list is empty"
+      "EMPTY": "La liste de contacts est vide"
     },
     "FORM": {
-      "NAME": "Name",
-      "ADDRESS": "Address",
+      "NAME": "Nom",
+      "ADDRESS": "Adresse",
       "NOTES": "Notes"
     },
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUBLICATED": "Name is dublicated",
-      "ADDRESS_REQUIRED": "Address is required",
-      "ADDRESS_NOT_VALID": "Address not valid",
-      "SET_MASTER_PASSWORD": "Set master password",
+      "NAME_REQUIRED": "Le nom est requis",
+      "NAME_DUBLICATED": "Nom déjà utilisé",
+      "ADDRESS_REQUIRED": "Adresse requise",
+      "ADDRESS_NOT_VALID": "Addresse invalide",
+      "SET_MASTER_PASSWORD": "Définir le mot de passe maître",
       "ADDRESS_DUBLICATED": "Address is dublicated",
-      "MAX_LENGTH": "Maximum notes length reached",
-      "NAME_WRONG": "Contact has wrong name",
-      "NAME_LENGTH": "The name must be 4-25 characters long"
+      "MAX_LENGTH": "Longueur maximale des notes atteinte",
+      "NAME_WRONG": "Le contact a un nom incorrect",
+      "NAME_LENGTH": "Le nom doit contenir 4-25 caractères"
     },
     "BUTTON": {
-      "SEND": "Send",
-      "EDIT": "Edit",
-      "DELETE": "Delete",
-      "ADD": "Add contact",
-      "ADD_EDIT": "Add/Save",
-      "GO_TO_WALLET": "Go to wallet",
-      "IMPORT_EXPORT": "Import/export"
+      "SEND": "Envoyer",
+      "EDIT": "Modifier",
+      "DELETE": "Supprimer",
+      "ADD": "Ajouter un contact",
+      "ADD_EDIT": "Ajouter/Enregistrer",
+      "GO_TO_WALLET": "Aller au portefeuille",
+      "IMPORT_EXPORT": "Importer/exporter"
     },
-    "SUCCESS_SENT": "Contact added",
-    "SUCCESS_SAVE": "Contact is edited",
+    "SUCCESS_SENT": "Contact ajouté",
+    "SUCCESS_SAVE": "Contact modifié",
     "SUCCESS_IMPORT": "Contacts is imported",
     "ERROR_IMPORT": "Error is occured while reading file!",
     "ERROR_TYPE_FILE": "Please import valid .csv file."
