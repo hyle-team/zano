@@ -19,7 +19,7 @@
   "BREADCRUMBS": {
     "ADD_WALLET": "Wallet hinzufügen",
     "CREATE_WALLET": "Neue Wallet erstellen",
-    "SAVE_PHRASE": "Save your seed phrase",
+    "SAVE_PHRASE": "Speichere deinen Seed-Satz",
     "OPEN_WALLET": "Vorhandene Wallet öffnen",
     "RESTORE_WALLET": "Aus Backup wiederherstellen",
     "WALLET_DETAILS": "Wallet-Details",
@@ -108,7 +108,7 @@
   },
   "RESTORE_WALLET": {
     "LABEL_NAME": "Wallet-Name",
-    "LABEL_PHRASE_KEY": "Seed phrase / private key",
+    "LABEL_PHRASE_KEY": "Seed-Satz / Private-Key",
     "PASS": "Wallet-Passwort",
     "CONFIRM": "Wallet-Passwort bestätigen",
     "BUTTON_SELECT": "Wallet-Verzeichnis auswählen",
@@ -125,7 +125,7 @@
     }
   },
   "SEED_PHRASE": {
-    "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
+    "TITLE": "Stellen Sie sicher, dass Ihr Seed-Satz an einem sicheren Ort bleibt. Wenn Sie Ihren Seed-Satz vergessen, können Sie Ihre Wallet nicht wiederherstellen.",
     "BUTTON_CREATE_ACCOUNT": "Wallet erstellen",
     "BUTTON_COPY": "Kopieren"
   },
@@ -181,8 +181,8 @@
   "WALLET_DETAILS": {
     "LABEL_NAME": "Wallet-Name",
     "LABEL_FILE_LOCATION": "Wallet-Datei-Verzeichnis",
-    "LABEL_SEED_PHRASE": "Seed phrase",
-    "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
+    "LABEL_SEED_PHRASE": "Seed-Satz",
+    "SEED_PHRASE_HINT": "Klicken, um den Seed-Satz anzuzeigen",
     "BUTTON_SAVE": "Speichern",
     "BUTTON_REMOVE": "Wallet schließen",
     "FORM_ERRORS": {
@@ -355,16 +355,16 @@
         "WAITING": "Warte auf Antwort",
         "IGNORED": "Verkäufer ignorierte Ihren Vertragsvorschlag",
         "ACCEPTED": "Seller accepted your contract proposal",
-        "WAIT": "Waiting for deposits confirmation",
-        "WAITING_SELLER": "Waiting for delivery",
+        "WAIT": "Warten auf die Bestätigung der Einzahlungen",
+        "WAITING_SELLER": "Warte auf Sendung",
         "COMPLETED": "Vertrag abgeschlossen",
-        "NOT_RECEIVED": "Delivery failed",
-        "NULLIFIED": "All deposits burned",
-        "WAITING_CANCEL": "Waiting for contract cancellation",
-        "BEING_CANCELLED": "Cancellation in progress",
+        "NOT_RECEIVED": "Senden fehlgeschlagen",
+        "NULLIFIED": "Alle Einzahlungen verbrannt",
+        "WAITING_CANCEL": "Warten auf Stornierung des Vertrages",
+        "BEING_CANCELLED": "Abbruch wird durchgeführt",
         "CANCELLED": "Vertrag abgebrochen",
         "IGNORED_CANCEL": "Der Verkäufer hat Ihren Vorschlag zur Stornierung des Vertrages ignoriert",
-        "EXPIRED": "The contract proposal has expired"
+        "EXPIRED": "Der Vertragsvorschlag ist abgelaufen"
       }
     }
   },
@@ -388,7 +388,7 @@
       "AMOUNT_REQUIRED": "Betrag ist erforderlich",
       "AMOUNT_ZERO": "Betrag darf nicht Null sein",
       "YOUR_DEPOSIT_REQUIRED": "Einzahlung erforderlich",
-      "SELLER_DEPOSIT_REQUIRED": "Seller deposit required",
+      "SELLER_DEPOSIT_REQUIRED": "Verkäufer-Einzahlung erforderlich",
       "SELLER_SAME": "Anderes Konto verwenden",
       "COMMENT_MAXIMUM": "Maximum field length reached"
     },
@@ -410,7 +410,7 @@
       "PROPOSAL_CANCEL_SELLER": "Stornierungsanfrage gesendet",
       "PROPOSAL_CANCEL_BUYER": "Stornierungsanfrage erhalten",
       "BEING_CANCELLED": "Abbruch wird durchgeführt",
-      "IGNORED_CANCEL_SELLER": "The seller ignored your proposal to cancel the contract",
+      "IGNORED_CANCEL_SELLER": "Der Verkäufer hat Ihren Vorschlag zur Stornierung des Vertrages ignoriert",
       "IGNORED_CANCEL_BUYER": "Vertragsstornierungsanfrage ignoriert",
       "CANCELLED": "Vertrag abgebrochen",
       "EXPIRED": "Vertragsvorschlag abgelaufen",
@@ -436,7 +436,7 @@
     "HOUR": "Stunde",
     "HOURS": "Stunden",
     "CANCEL": "Abbrechen",
-    "NULLIFY_QUESTION": "Are you sure you want to burn both deposits?",
+    "NULLIFY_QUESTION": "Sind Sie sicher, dass Sie beide Einzahlungen verbrennen möchten?",
     "BUTTON_NULLIFY_SHORT": "Verbrennen",
     "WAITING_TIME_QUESTION": "Sind Sie sicher, dass Sie den Vertrag kündigen möchten?"
   },
@@ -535,7 +535,7 @@
     "SUCCESS_SAVE": "Kontakt wurde bearbeitet",
     "SUCCESS_IMPORT": "Kontakt wurde importiert",
     "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
-    "ERROR_TYPE_FILE": "Please import valid .csv file."
+    "ERROR_TYPE_FILE": "Bitte importieren Sie eine gültige .csv Datei."
   },
   "ERRORS": {
     "NO_MONEY": "Nicht genügend Geld",
@@ -544,7 +544,7 @@
     "DAEMON_BUSY": "Internal error: daemon is busy",
     "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",
-    "TRANSACTION_IS_TO_BIG": "Transaction exceeds network limit, send required amount with multiple transactions",
+    "TRANSACTION_IS_TO_BIG": "Transaktion überschreitet das Netzwerk-Limit. Sendet benötigten Betrag mit mehreren Transaktionen.",
     "TRANSFER_ATTEMPT": "Keine Verbindung zum Zano-Netzwerk",
     "ACCESS_DENIED": "Zugriff verweigert",
     "TRANSACTION_ERROR": "Fehler. Transaktion nicht abgeschlossen.",
@@ -553,7 +553,7 @@
     "WRONG_PASSWORD": "Ungültiges Passwort",
     "FILE_RESTORED": "The wallet file was corrupted. We have recovered the keys and the wallet from the blockchain",
     "FILE_NOT_FOUND": "Datei nicht gefunden",
-    "FILE_EXIST": "A file with that name already exists. Enter another name to save the file under",
+    "FILE_EXIST": "Eine Datei mit diesem Namen existiert bereits. Geben Sie einen anderen Namen ein, um die Datei zu speichern",
     "FILE_NOT_SAVED": "Sie können keine Wallet-Datei in diesem Ordner speichern. Bitte wählen Sie einen anderen Ordner.",
     "TX_TYPE_NORMAL": "Error. The payment from the wallet",
     "TX_TYPE_NORMAL_TO": "zu",
@@ -572,7 +572,7 @@
     "QUIT": "Beenden",
     "IS_RECEIVED": "",
     "IS_CONFIRMED": "",
-    "INCOME_TRANSFER_UNCONFIRMED": "Incoming payment (not confirmed)",
+    "INCOME_TRANSFER_UNCONFIRMED": "Eingehende Zahlung (nicht bestätigt)",
     "INCOME_TRANSFER_CONFIRMED": "Zahlung erhalten",
     "MINED": "Mined",
     "LOCKED": "Blockiert",
