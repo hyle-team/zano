@@ -99,7 +99,7 @@
 #define STRATUM_DEFAULT_PORT                            11777
 #define P2P_NETWORK_ID_TESTNET_FLAG                     0
 #else 
-#define P2P_DEFAULT_PORT                                (11112 + TESTNET_FORMATION_VERSION)
+#define P2P_DEFAULT_PORT                                (11112 + CURRENCY_FORMATION_VERSION)
 #define RPC_DEFAULT_PORT                                12111
 #define STRATUM_DEFAULT_PORT                            11888
 #define STRARUM_DEFAULT_PORT                            51113
