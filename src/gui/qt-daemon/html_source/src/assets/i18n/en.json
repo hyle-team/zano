@@ -532,9 +532,11 @@
     },
     "SUCCESS_SENT": "Contact added",
     "SUCCESS_SAVE": "Contact is edited",
-    "SUCCESS_IMPORT": "Contacts is imported",
+    "SUCCESS_IMPORT": "Contacts are imported",
+    "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Error is occured while reading file!",
-    "ERROR_TYPE_FILE": "Please import valid .csv file."
+    "ERROR_TYPE_FILE": "Please import valid .csv file.",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
   },
   "ERRORS": {
     "NO_MONEY": "Not enough money",

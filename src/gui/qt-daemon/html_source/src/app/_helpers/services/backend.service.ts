@@ -359,7 +359,7 @@ export class BackendService {
   }
 
   storeFile(path, buff) {
-    this.backendObject['store_to_file'](path, (typeof buff === 'string' ? buff : JSON.stringify(buff)));
+    this.backendObject['store_to_file'](path, buff);
   }
 
   loadFile(path, callback) {
