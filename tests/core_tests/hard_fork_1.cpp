@@ -10,6 +10,7 @@
 
 using namespace currency;
 
+<<<<<<< HEAD
 template<typename extra_t>
 void remove_unlock_v1_entries_from_extra(extra_t& extra)
 {
@@ -24,6 +25,8 @@ void remove_unlock_v2_entries_from_extra(extra_t& extra)
 
 //------------------------------------------------------------------------------
 
+=======
+>>>>>>> commit
 hard_fork_1_base_test::hard_fork_1_base_test(size_t hardfork_height)
   : m_hardfork_height(hardfork_height)
 {
@@ -42,6 +45,10 @@ bool hard_fork_1_base_test::configure_core(currency::core& c, size_t ev_index, c
 
 //------------------------------------------------------------------------------
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> commit
 hard_fork_1_unlock_time_2_in_normal_tx::hard_fork_1_unlock_time_2_in_normal_tx()
   : hard_fork_1_base_test(12)
 {
@@ -312,28 +319,43 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   generator.set_hardfork_height(m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
+<<<<<<< HEAD
   DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 7));
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   DO_CALLBACK(events, "check_being_in_cp_zone");                // make sure CP was has passed
 
+=======
+  DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2));
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+>>>>>>> commit
   //
   // before hardfork 1
   //
 
   std::vector<tx_source_entry> sources;
+<<<<<<< HEAD
   CHECK_AND_ASSERT_MES(fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), MK_TEST_COINS(90) + TESTS_DEFAULT_FEE, 0), false, "");
 
   uint64_t stake_lock_time = 100; // locked till block 100
 
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(tx_destination_entry(MK_TEST_COINS(90), alice_acc.get_public_address()));
+=======
+  std::vector<tx_destination_entry> destinations;
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations), false, "");
+>>>>>>> commit
 
   // set unlock_time_2, should be rejected before hardfork 1
   std::vector<extra_v> extra;
   etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
   ut2.unlock_time_array.resize(destinations.size());
+<<<<<<< HEAD
   ut2.unlock_time_array[0] = stake_lock_time;
+=======
+  ut2.unlock_time_array[0] = 1; // not zero, unlocked from block 1
+>>>>>>> commit
   extra.push_back(ut2);
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
   crypto::secret_key tx_sec_key;
@@ -348,13 +370,18 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   DO_CALLBACK(events, "clear_tx_pool");
 
   MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
+<<<<<<< HEAD
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+=======
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);             // <-- checkpoint
+>>>>>>> commit
 
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);             // <-- hard fork
   MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
   // make sure hardfork went okay
   CHECK_AND_ASSERT_MES(blk_3.major_version != CURRENT_BLOCK_MAJOR_VERSION && blk_4.major_version == CURRENT_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
 
+<<<<<<< HEAD
   //
   // after hardfork 1
   //
@@ -436,11 +463,14 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   std::list<currency::account_base> pos_stakeing_accounts{alice_acc};
   MAKE_NEXT_POS_BLOCK(events, blk_9, blk_8r, miner_acc, pos_stakeing_accounts);
 
+=======
+>>>>>>> commit
   return true;
 }
 
 //------------------------------------------------------------------------------
 
+<<<<<<< HEAD
 struct unique_amount_params
 {
   unique_amount_params(uint64_t amount, uint64_t count) : amount(amount), count(count) {}
@@ -462,6 +492,11 @@ bool does_amount_have_one_non_zero_digit(uint64_t amount)
 
 hard_fork_1_pos_and_locked_coins::hard_fork_1_pos_and_locked_coins()
   : hard_fork_1_base_test(25) // hardfork height
+=======
+hard_fork_1_pos_and_locked_coins::hard_fork_1_pos_and_locked_coins()
+  : hard_fork_1_base_test(13) // hardfork height
+  , m_unique_amount(TESTS_DEFAULT_FEE * 9)
+>>>>>>> commit
 {
   REGISTER_CALLBACK_METHOD(hard_fork_1_pos_and_locked_coins, check_outputs_with_unique_amount);
 }
@@ -471,12 +506,16 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
+<<<<<<< HEAD
   GENERATE_ACCOUNT(bob_acc);
+=======
+>>>>>>> commit
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   generator.set_hardfork_height(m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
+<<<<<<< HEAD
   const uint64_t unique_amount_alice = TESTS_DEFAULT_FEE * 9;
   const uint64_t unique_amount_bob   = TESTS_DEFAULT_FEE * 3;
 
@@ -489,6 +528,11 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
 
   // create few locked outputs in the blockchain with unique amount 
   // tx_0 : miner -> Alice 
+=======
+  DO_CALLBACK_PARAMS(events, "check_outputs_with_unique_amount", static_cast<size_t>(0));
+
+  // create few locked outputs in the blockchain with unique amount 
+>>>>>>> commit
   std::vector<extra_v> extra;
   etc_tx_details_unlock_time ut = AUTO_VAL_INIT(ut);
   ut.v = 100; // locked until block 100
@@ -496,13 +540,18 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
 
   std::vector<tx_destination_entry> destinations;
   for (size_t i = 0; i < 5; ++i)
+<<<<<<< HEAD
     destinations.push_back(tx_destination_entry(unique_amount_alice, alice_acc.get_public_address()));
+=======
+    destinations.push_back(tx_destination_entry(m_unique_amount, alice_acc.get_public_address()));
+>>>>>>> commit
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
   r = construct_tx_to_key(events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
 
+<<<<<<< HEAD
   // tx_1 : miner -> Bob
   extra.clear();
   uint64_t ut2_unlock_time = 100; // locked until block 100
@@ -637,17 +686,36 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
     size_t height = get_block_height(prev_block) + 1;
     currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
 
+=======
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  DO_CALLBACK_PARAMS(events, "check_outputs_with_unique_amount", static_cast<size_t>(5));
+
+
+  block blk_0a;
+  {
+    crypto::hash prev_id = get_block_hash(blk_0);
+    size_t height = get_block_height(blk_0) + 1;
+    currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
+
+    const transaction& stake = blk_0.miner_tx;
+>>>>>>> commit
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
     uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
+<<<<<<< HEAD
     generate_key_image_helper(bob_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
+=======
+    generate_key_image_helper(miner_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
+>>>>>>> commit
     crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);
+<<<<<<< HEAD
     pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -661,11 +729,21 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   events.push_back(blk_5);
 
 
+=======
+    pb.step2_set_txs(std::vector<transaction>());
+    pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
+    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), miner_acc.get_public_address());
+    pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner_acc);
+    blk_0a = pb.m_block;
+  }
+
+>>>>>>> commit
   return true;
 }
 
 bool hard_fork_1_pos_and_locked_coins::check_outputs_with_unique_amount(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+<<<<<<< HEAD
   unique_amount_params p(0, 0);
   const std::string& params = boost::get<callback_entry>(events[ev_index]).callback_params;
   CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(params, p), false, "hex_to_pod failed, params = " << params);
@@ -869,6 +947,16 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_1);
+=======
+  size_t expected_outputs_count = 0;
+  const std::string& params = boost::get<callback_entry>(events[ev_index]).callback_params;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(params, expected_outputs_count), false, "hex_to_pod failed, params = " << params);
+
+  std::list<crypto::public_key> pub_keys;
+  bool r = c.get_outs(m_unique_amount, pub_keys);
+
+  CHECK_AND_ASSERT_MES(r && pub_keys.size() == expected_outputs_count, false, "amount " << print_money_brief(m_unique_amount) << ": " << pub_keys.size() << " != " << expected_outputs_count);
+>>>>>>> commit
 
   return true;
 }

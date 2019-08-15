@@ -2719,7 +2719,11 @@ namespace currency
   }
 
 
+<<<<<<< HEAD
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
+=======
+  wide_difficulty_type get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
+>>>>>>> commit
     const wide_difficulty_type& difficulty_pow_at_split_point,
     const difficulties& a_diff,
     const difficulties& b_diff )
@@ -2732,6 +2736,7 @@ namespace currency
 
     boost::multiprecision::uint1024_t basic_sum = boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty) + (boost::multiprecision::uint1024_t(a_pos_cumulative_difficulty)*difficulty_pow_at_split_point) / difficulty_pos_at_split_point;
     boost::multiprecision::uint1024_t res =
+<<<<<<< HEAD
       (basic_sum * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(b_pow_cumulative_difficulty)*b_pos_cumulative_difficulty);
 
 //     if (res > boost::math::tools::max_value<wide_difficulty_type>())
@@ -2748,6 +2753,24 @@ namespace currency
     TRY_ENTRY();
 //    wide_difficulty_type short_res = res.convert_to<wide_difficulty_type>();
     return res;
+=======
+      (basic_sum * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty)*a_pos_cumulative_difficulty);
+
+    if (res > boost::math::tools::max_value<wide_difficulty_type>())
+    {
+      ASSERT_MES_AND_THROW("[INTERNAL ERROR]: Failed to get_a_to_b_relative_cumulative_difficulty, res = " << res << ENDL
+        << ", difficulty_pos_at_split_point: " << difficulty_pos_at_split_point << ENDL
+        << ", difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
+        << ", a_pos_cumulative_difficulty:" << a_pos_cumulative_difficulty << ENDL
+        << ", b_pos_cumulative_difficulty:" << b_pos_cumulative_difficulty << ENDL
+        << ", a_pow_cumulative_difficulty:" << a_pow_cumulative_difficulty << ENDL
+        << ", b_pow_cumulative_difficulty:" << b_pow_cumulative_difficulty << ENDL       
+      );
+    }
+    TRY_ENTRY();
+    wide_difficulty_type short_res = res.convert_to<wide_difficulty_type>();
+    return short_res;
+>>>>>>> commit
     CATCH_ENTRY_WITH_FORWARDING_EXCEPTION();
   }
 

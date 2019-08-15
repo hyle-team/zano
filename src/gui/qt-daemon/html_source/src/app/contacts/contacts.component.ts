@@ -48,8 +48,11 @@ export class ContactsComponent implements OnInit {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> alias fix
+=======
+>>>>>>> commit
   // openInBrowser(alias: string) {
   //   if (alias !== null) {
   //     this.backend.openUrlInBrowser(
@@ -58,6 +61,9 @@ export class ContactsComponent implements OnInit {
   //   }
   // }
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> commit
 =======
   openInBrowser(alias: string) {
     if (alias !== null) {
@@ -66,9 +72,13 @@ export class ContactsComponent implements OnInit {
       );
     }
   }
+<<<<<<< HEAD
 >>>>>>> contact service
 =======
 >>>>>>> alias fix
+=======
+>>>>>>> 3ff1ce583e414436a973956284587d52e402f589
+>>>>>>> commit
 
   back() {
     this.location.back();

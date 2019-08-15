@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
 #endif
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet");
+  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet,lmdb");
   LOG_PRINT_L0("Starting...");
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {

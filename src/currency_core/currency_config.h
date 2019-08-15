@@ -202,7 +202,11 @@
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3
 #define CURRENT_BLOCK_EXTENDED_INFO_ARCHIVE_VER         1
 
+<<<<<<< HEAD
 #define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 9
+=======
+#define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 8
+>>>>>>> commit
 #define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  1
 
 
@@ -219,10 +223,18 @@
 #define BLOCK_MINOR_VERSION_GENESIS                     0
 #define BLOCK_MAJOR_VERSION_INITAL                      0
 #ifndef TESTNET
+<<<<<<< HEAD
 #define ZANO_HARDFORK_1_AFTER_HEIGHT                    194624
 #else
 #define ZANO_HARDFORK_1_AFTER_HEIGHT                    1440
 #endif
+=======
+#define ZANO_HARDFORK_1_AFTER_HEIGHT                    166440
+#else
+#define ZANO_HARDFORK_1_AFTER_HEIGHT                    1440
+#endif
+
+>>>>>>> commit
 
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");

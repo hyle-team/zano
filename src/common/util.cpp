@@ -660,6 +660,7 @@ std::string get_nix_version_display_string()
 
   bool check_remote_client_version(const std::string& client_ver)
   {
+<<<<<<< HEAD
     std::string v = client_ver.substr(0, client_ver.find('[')); // remove commit id
     v = v.substr(0, v.rfind('.')); // remove build number
 
@@ -675,6 +676,34 @@ std::string get_nix_version_display_string()
       return false;
 
     if (dot_pos != std::string::npos)
+=======
+    try
+    {
+      boost::asio::io_service io_service;
+      boost::asio::ip::udp::resolver resolver(io_service);
+      boost::asio::ip::udp::resolver::query query(boost::asio::ip::udp::v4(), host_name, "ntp");
+      boost::asio::ip::udp::endpoint receiver_endpoint = *resolver.resolve(query);
+      boost::asio::ip::udp::socket socket(io_service);
+      socket.open(boost::asio::ip::udp::v4());
+
+      boost::array<unsigned char, 48> send_buf = { { 010, 0, 0, 0, 0, 0, 0, 0, 0 } };
+      socket.send_to(boost::asio::buffer(send_buf), receiver_endpoint);
+
+      boost::array<unsigned long, 1024> recv_buf;
+      boost::asio::ip::udp::endpoint sender_endpoint;
+      size_t len = socket.receive_from(boost::asio::buffer(recv_buf), sender_endpoint);
+
+      time_t time_recv = ntohl((time_t)recv_buf[4]);
+      time_recv -= 2208988800U;  //Unix time starts from 01/01/1970 == 2208988800U
+      return time_recv;
+    }
+    catch (const std::exception& e)
+    {
+      LOG_PRINT_L2("get_ntp_time(): exception: " << e.what());
+      return 0;
+    }
+    catch (...)
+>>>>>>> commit
     {
       // revision
       v = v.substr(dot_pos + 1);

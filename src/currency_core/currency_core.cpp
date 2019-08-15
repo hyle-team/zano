@@ -718,7 +718,14 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::check_if_free_space_critically_low(uint64_t* p_available_space /* = nullptr */)
   {
+<<<<<<< HEAD
     namespace fs = boost::filesystem;
+=======
+    if (!m_critical_error_handler)
+      return;
+
+    boost::filesystem::space_info si = boost::filesystem::space(m_config_folder);
+>>>>>>> commit
 
     try
     {

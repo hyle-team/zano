@@ -563,11 +563,17 @@
       "MAX_LENGTH": "Maximum notes length reached",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
       "NAME_WRONG": "Contact has wrong name",
 >>>>>>> rebuild html
 =======
 >>>>>>> rebuild html
+=======
+=======
+      "NAME_WRONG": "Contact has wrong name",
+>>>>>>> 3ff1ce583e414436a973956284587d52e402f589
+>>>>>>> commit
       "NAME_LENGTH": "The name must be 4-25 characters long"
     },
     "BUTTON": {
@@ -583,6 +589,7 @@
     "SUCCESS_SAVE": "Contact is edited",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Error is occured while reading file!",
@@ -596,12 +603,22 @@
     "ERROR_TYPE_FILE": "Please import valid .csv file."
 >>>>>>> rebuild html
 =======
+=======
+>>>>>>> commit
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Error is occured while reading file!",
     "ERROR_TYPE_FILE": "Please import valid .csv file.",
     "ERROR_EXPORT": "Invalid file type. Save file as .csv"
+<<<<<<< HEAD
 >>>>>>> rebuild html
+=======
+=======
+    "SUCCESS_IMPORT": "Contacts is imported",
+    "ERROR_IMPORT": "Error is occured while reading file!",
+    "ERROR_TYPE_FILE": "Please import valid .csv file."
+>>>>>>> 3ff1ce583e414436a973956284587d52e402f589
+>>>>>>> commit
   },
   "ERRORS": {
     "NO_MONEY": "Not enough money",

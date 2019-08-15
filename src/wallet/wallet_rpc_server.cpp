@@ -141,7 +141,11 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+<<<<<<< HEAD
   bool wallet_rpc_server::on_getbalance(const wallet_public::COMMAND_RPC_GET_BALANCE::request& req, wallet_public::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+=======
+  bool wallet_rpc_server::on_getbalance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+>>>>>>> commit
   {
     try
     {

@@ -53,7 +53,15 @@ test_generator::test_generator()
   m_ignore_last_pow_in_wallets(false),
   m_last_found_timestamp(0), 
   m_hardfork_after_heigh(CURRENCY_MAX_BLOCK_NUMBER)
+<<<<<<< HEAD
 {
+}
+
+void test_generator::set_hardfork_height(uint64_t h)
+=======
+>>>>>>> commit
+{
+  m_hardfork_after_heigh = h;
 }
 
 void test_generator::set_hardfork_height(uint64_t h)
@@ -510,11 +518,19 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
   }
   if (m_do_pos_to_low_timestamp)
     starter_timestamp += 60;
+<<<<<<< HEAD
 
   //adjust timestamp starting from timestamp%POS_SCAN_STEP = 0
   //starter_timestamp = starter_timestamp - POS_SCAN_WINDOW;
   starter_timestamp = POS_SCAN_STEP - (starter_timestamp%POS_SCAN_STEP) + starter_timestamp;
 
+=======
+
+  //adjust timestamp starting from timestamp%POS_SCAN_STEP = 0
+  //starter_timestamp = starter_timestamp - POS_SCAN_WINDOW;
+  starter_timestamp = POS_SCAN_STEP - (starter_timestamp%POS_SCAN_STEP) + starter_timestamp;
+
+>>>>>>> commit
   for (uint64_t ts = starter_timestamp; ts < starter_timestamp + POS_SCAN_WINDOW/2; ts += POS_SCAN_STEP)
   {
     //lets try to find block
@@ -523,11 +539,19 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
       //set m_last_pow_block_h to big value, to let wallet to use any available outputs, including the those which is not behind last pow block
       if (m_ignore_last_pow_in_wallets)
         w->m_last_pow_block_h = CURRENCY_MAX_BLOCK_NUMBER;
+<<<<<<< HEAD
 
       currency::COMMAND_RPC_SCAN_POS::request scan_pos_entries;
       bool r = w->get_pos_entries(scan_pos_entries);
       CHECK_AND_ASSERT_THROW_MES(r, "Failed to get_pos_entries");
 
+=======
+
+      currency::COMMAND_RPC_SCAN_POS::request scan_pos_entries;
+      bool r = w->get_pos_entries(scan_pos_entries);
+      CHECK_AND_ASSERT_THROW_MES(r, "Failed to get_pos_entries");
+
+>>>>>>> commit
       for (size_t i = 0; i != scan_pos_entries.pos_entries.size(); i++)
       {
 
@@ -795,6 +819,7 @@ bool test_generator::construct_block(const std::vector<test_event_entry>& events
                                      const currency::account_base& miner_acc,
                                      const std::list<currency::transaction>& tx_list, 
                                      const std::list<currency::account_base>& coin_stake_sources)
+<<<<<<< HEAD
 {
   return construct_block(0, events, blk, blk_prev, miner_acc, tx_list, coin_stake_sources);
 }
@@ -806,6 +831,19 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
                                      const std::list<currency::transaction>& tx_list, 
                                      const std::list<currency::account_base>& coin_stake_sources)
 {
+=======
+{
+  return construct_block(0, events, blk, blk_prev, miner_acc, tx_list, coin_stake_sources);
+}
+bool test_generator::construct_block(int64_t manual_timestamp_adjustment, 
+                                     const std::vector<test_event_entry>& events,
+                                     currency::block& blk,
+                                     const currency::block& blk_prev,
+                                     const currency::account_base& miner_acc,
+                                     const std::list<currency::transaction>& tx_list, 
+                                     const std::list<currency::account_base>& coin_stake_sources)
+{
+>>>>>>> commit
   uint64_t height = boost::get<txin_gen>(blk_prev.miner_tx.vin[0]).height + 1;
   crypto::hash prev_id = get_block_hash(blk_prev);
   // Keep push difficulty little up to be sure about PoW hash success

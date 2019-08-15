@@ -1,4 +1,5 @@
 // Copyright (c) 2019 Zano Project
+<<<<<<< HEAD
 // Copyright (c) 2018 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -14,12 +15,22 @@
 #include "common/db_abstract_accessor.h"
 #include "common/db_backend_lmdb.h"
 #include "serialization/serialization.h"
+=======
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#include <memory>
+#include "crypto/crypto.h"
+#include "gtest/gtest.h"
+#include "common/db_backend_lmdb.h"
+#include "common/db_abstract_accessor.h"
+>>>>>>> commit
 
 using namespace tools;
 
 namespace lmdb_test
 {
 
+<<<<<<< HEAD
   crypto::hash null_hash = AUTO_VAL_INIT(null_hash);
 
   template<typename T>
@@ -890,6 +901,8 @@ namespace lmdb_test
   //////////////////////////////////////////////////////////////////////////////
   // 2gb_test
   //////////////////////////////////////////////////////////////////////////////
+=======
+>>>>>>> commit
   TEST(lmdb, 2gb_test)
   {
     bool r = false;
@@ -932,7 +945,11 @@ namespace lmdb_test
       if (key % 1024 == 0)
       {
         ASSERT_TRUE(lmdb_ptr->commit_transaction());
+<<<<<<< HEAD
         //ASSERT_TRUE(lmdb_ptr->resize_if_needed());
+=======
+        ASSERT_TRUE(lmdb_ptr->resize_if_needed());
+>>>>>>> commit
         ASSERT_TRUE(lmdb_ptr->begin_transaction());
         std::cout << total_data / 1024 / 1024 << " MB written to DB" << ENDL;
       }
@@ -979,4 +996,8 @@ namespace lmdb_test
 
   }
 
+<<<<<<< HEAD
 } // namespace lmdb_test
+=======
+}
+>>>>>>> commit

@@ -300,13 +300,21 @@ namespace file_io_utils
 	}
 
   template<class t_string>
+<<<<<<< HEAD
   bool load_file_to_string(const t_string& path_to_file, std::string& target_str)
+=======
+    bool load_file_to_string(const t_string& path_to_file, std::string& target_str)
+>>>>>>> commit
   {
     try
     {
       boost::filesystem::ifstream  fstream;
       //fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+<<<<<<< HEAD
       fstream.open(convert_utf8_to_wstring_if_needed(path_to_file), std::ios_base::binary | std::ios_base::in | std::ios::ate);
+=======
+      fstream.open(path_to_file, std::ios_base::binary | std::ios_base::in | std::ios::ate);
+>>>>>>> commit
       if (!fstream.good())
         return false;
       std::ifstream::pos_type file_size = fstream.tellg();
@@ -325,6 +333,10 @@ namespace file_io_utils
       fstream.close();
       return true;
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> commit
     catch (...)
     {
       return false;

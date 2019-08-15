@@ -46,7 +46,11 @@
       "ONLINE": "En ligne",
       "ERROR": "Erreur de système",
       "COMPLETE": "Fermeture",
+<<<<<<< HEAD
       "SYNCING": "Syncing block",
+=======
+      "SYNCING": "Synchronisation de la blockchain",
+>>>>>>> commit
       "LOADING": "Chargement des données de la blockchain"
     },
     "UPDATE": {
@@ -519,6 +523,10 @@
       "SET_MASTER_PASSWORD": "Définir le mot de passe maître",
       "ADDRESS_DUBLICATED": "L'addresse est dupliquée",
       "MAX_LENGTH": "Longueur maximale des notes atteinte",
+<<<<<<< HEAD
+=======
+      "NAME_WRONG": "Le contact a un nom incorrect",
+>>>>>>> commit
       "NAME_LENGTH": "Le nom doit contenir 4-25 caractères"
     },
     "BUTTON": {
@@ -532,6 +540,7 @@
     },
     "SUCCESS_SENT": "Contact ajouté",
     "SUCCESS_SAVE": "Contact modifié",
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
@@ -539,6 +548,11 @@
     "ERROR_EXPORT": "Invalid file type. Save file as .csv",
     "ERROR_EMPTY_LIST": "Contact list is empty",
     "ERROR_IMPORT_EMPTY": "File is empty"
+=======
+    "SUCCESS_IMPORT": "Contacts importés",
+    "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
+    "ERROR_TYPE_FILE": "Veuillez importer un fichier .csv valide."
+>>>>>>> commit
   },
   "ERRORS": {
     "NO_MONEY": "Pas assez de fonds",

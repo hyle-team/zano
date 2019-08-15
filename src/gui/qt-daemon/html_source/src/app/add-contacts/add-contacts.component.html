@@ -18,11 +18,15 @@
       <div class="error-block" *ngIf="addContactForm.controls['name'].invalid && (addContactForm.controls['name'].dirty || addContactForm.controls['name'].touched)">
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> commit
         <div *ngIf="addContactForm.controls['name'].errors['minlength'] || addContactForm.controls['name'].errors['maxlength']">
 =======
         <div *ngIf="addContactForm.controls['name'].errors['pattern']">
           {{ 'CONTACTS.FORM_ERRORS.NAME_WRONG' | translate }}
         </div>
+<<<<<<< HEAD
 <<<<<<< HEAD
         <div *ngIf="addContactForm.get('name').value.length <= 4 || addContactForm.get('name').value.length > 25">
 >>>>>>> contact service
@@ -32,6 +36,10 @@
 =======
         <div *ngIf="addContactForm.controls['name'].errors['minlength'] || addContactForm.controls['name'].errors['maxlength']">
 >>>>>>> allow symbols at name field diffrent from latin
+=======
+        <div *ngIf="addContactForm.get('name').value.length < 4 || addContactForm.get('name').value.length > 25">
+>>>>>>> 3ff1ce583e414436a973956284587d52e402f589
+>>>>>>> commit
           {{ 'CONTACTS.FORM_ERRORS.NAME_LENGTH' | translate }}
         </div>
         <div *ngIf="addContactForm.controls['name'].errors['required']">

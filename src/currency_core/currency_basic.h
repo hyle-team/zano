@@ -390,7 +390,11 @@ namespace currency
     END_SERIALIZE()
   };
 
+<<<<<<< HEAD
   typedef boost::mpl::vector<tx_service_attachment, tx_comment, tx_payer, tx_receiver, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time, etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_uint16_t, etc_tx_details_unlock_time2> all_payload_types;
+=======
+  typedef boost::mpl::vector<tx_service_attachment, tx_comment, tx_payer, tx_receiver, tx_message, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time, etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_derivation_hint, etc_tx_details_unlock_time2> all_payload_types;
+>>>>>>> commit
   typedef boost::make_variant_over<all_payload_types>::type attachment_v;
   typedef boost::make_variant_over<all_payload_types>::type extra_v;
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;

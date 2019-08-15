@@ -402,7 +402,10 @@ bool blockchain_storage::set_lost_tx_unmixable()
 //------------------------------------------------------------------
 void  blockchain_storage::patch_out_if_needed(txout_to_key& out, const crypto::hash& tx_id, uint64_t n) const 
 {
+<<<<<<< HEAD
 #ifndef TESTNET
+=======
+>>>>>>> commit
   static crypto::hash tx_id_1 = epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("c2a2229d614e7c026433efbcfdbd0be1f68d9b419220336df3e2c209f5d57314");
   static crypto::hash tx_id_2 = epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("647f936c6ffbd136f5c95d9a90ad554bdb4c01541c6eb5755ad40b984d80da67");
 
@@ -413,7 +416,10 @@ void  blockchain_storage::patch_out_if_needed(txout_to_key& out, const crypto::h
   {
     out.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX;
   }
+<<<<<<< HEAD
 #endif
+=======
+>>>>>>> commit
 }
 //------------------------------------------------------------------
 void blockchain_storage::store_db_solo_options_values()
@@ -1755,6 +1761,7 @@ wide_difficulty_type blockchain_storage::get_x_difficulty_after_height(uint64_t 
   CHECK_AND_ASSERT_THROW_MES(height < m_db_blocks.size(), "Internal error: condition failed: height (" << height << ") < m_db_blocks.size() " << m_db_blocks.size());
   wide_difficulty_type diff = 0;
   for (uint64_t i = height + 1; i != m_db_blocks.size(); i++)
+<<<<<<< HEAD
   {
     auto bei_ptr = m_db_blocks[i];
     if (is_pos_block(bei_ptr->bl) == is_pos)
@@ -1765,6 +1772,18 @@ wide_difficulty_type blockchain_storage::get_x_difficulty_after_height(uint64_t 
   }
   if (diff == 0)
   {
+=======
+  {
+    auto bei_ptr = m_db_blocks[i];
+    if (is_pos_block(bei_ptr->bl) == is_pos)
+    {
+      diff = bei_ptr->difficulty;
+      break;
+    }
+  }
+  if (diff == 0)
+  {
+>>>>>>> commit
     //never met x type of block, that meanst that difficulty is current
     diff = get_cached_next_difficulty(is_pos);
   }
@@ -1826,6 +1845,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
     wide_difficulty_type main_pow_diff_begin = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), connection_point.height - 1, false);
     main_cumul_diff.pow_diff = main_pow_diff_end - main_pow_diff_begin;
 
+<<<<<<< HEAD
     //TODO: measurement of precise cumulative difficult
     boost::multiprecision::uint1024_t alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
     boost::multiprecision::uint1024_t main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
@@ -1839,6 +1859,12 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       << "alt:" << alt << ENDL
       << "main:" << main << ENDL
     );
+=======
+    //TODO: measurment of precise cumulative difficult
+    wide_difficulty_type alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
+    wide_difficulty_type main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+
+>>>>>>> commit
     if (main < alt)
       return true;
     else if (main > alt)
@@ -1853,7 +1879,11 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       if (std::memcmp(&main_chain_bei.stake_hash, &proof_alt, sizeof(main_chain_bei.stake_hash)) >= 0)
         return false;
 
+<<<<<<< HEAD
       LOG_PRINT_L1("[is_reorganize_required]:TRUE, \"by order of memcmp\" main_stake_hash:" << &main_chain_bei.stake_hash << ", alt_stake_hash" << proof_alt);
+=======
+      LOG_PRINT_L2("[is_reorganize_required]:TRUE, \"by order of memcmp\" main_stake_hash:" << &main_chain_bei.stake_hash << ", alt_stake_hash" << proof_alt);
+>>>>>>> commit
       return true;
     }
   }
@@ -2730,6 +2760,10 @@ void blockchain_storage::print_db_cache_perfeormance_data() const
 void blockchain_storage::get_last_n_x_blocks(uint64_t n, bool pos_blocks, std::list<std::shared_ptr<const block_extended_info>>& blocks) const
 {
   uint64_t count = 0;
+<<<<<<< HEAD
+=======
+  bool looking_for_a_pos = true;
+>>>>>>> commit
   for (uint64_t i = m_db_blocks.size() - 1; i != 0; --i)
   {
     auto block_ptr = m_db_blocks[i];
@@ -3924,14 +3958,22 @@ bool blockchain_storage::is_tx_spendtime_unlocked(uint64_t unlock_time) const
 }
 
 //------------------------------------------------------------------
+<<<<<<< HEAD
 bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
+=======
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height, uint64_t& max_unlock_time) const
+>>>>>>> commit
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   //TIME_MEASURE_START_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
 
   std::vector<crypto::public_key> output_keys;
+<<<<<<< HEAD
   if(!get_output_keys_for_input_with_checks(tx, txin, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase))
+=======
+  if(!get_output_keys_for_input_with_checks(tx, txin, output_keys, max_related_block_height, max_unlock_time))
+>>>>>>> commit
   {
     LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << ")");
     return false;
@@ -3950,7 +3992,11 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 // 1) source tx unlock time validity
 // 2) mixin restrictions
 // 3) general gindex/ref_by_id corectness
+<<<<<<< HEAD
 bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, const txin_to_key& txin, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
+=======
+bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, const txin_to_key& txin, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& max_unlock_time) const
+>>>>>>> commit
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
@@ -3958,6 +4004,7 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction
   {
     std::vector<crypto::public_key >&  m_results_collector;
     const blockchain_storage& m_bch;
+<<<<<<< HEAD
     uint64_t& m_source_max_unlock_time_for_pos_coinbase;
     outputs_visitor(std::vector<crypto::public_key>& results_collector,
                     const blockchain_storage& bch, 
@@ -3965,6 +4012,12 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction
       : m_results_collector(results_collector)
       , m_bch(bch)
       , m_source_max_unlock_time_for_pos_coinbase(source_max_unlock_time_for_pos_coinbase)
+=======
+    uint64_t& m_max_unlock_time;
+    outputs_visitor(std::vector<crypto::public_key>& results_collector,
+                    const blockchain_storage& bch, 
+                    uint64_t& max_unlock_time) :m_results_collector(results_collector), m_bch(bch), m_max_unlock_time(max_unlock_time)
+>>>>>>> commit
     {}
     bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out& out, uint64_t out_i)
     {
@@ -3973,6 +4026,7 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction
       //let coinbase sources for PoS block to have locked inputs, the outputs supposed to be locked same way, except the reward 
       if (is_coinbase(validated_tx) && is_pos_block(validated_tx))
       {
+<<<<<<< HEAD
         CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(source_out_unlock_time), false, "source output #" << out_i << " is locked by time, not by height, which is not allowed for PoS coinbase");
         if (source_out_unlock_time > m_source_max_unlock_time_for_pos_coinbase)
           m_source_max_unlock_time_for_pos_coinbase = source_out_unlock_time;
@@ -3984,7 +4038,20 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction
           LOG_PRINT_L0("One of outputs for one of inputs have wrong tx.unlock_time = " << get_tx_unlock_time(source_tx, out_i));
           return false;
         }
+=======
+        if (source_out_unlock_time > m_max_unlock_time)
+          m_max_unlock_time = source_out_unlock_time;
+>>>>>>> commit
       }
+      else
+      {
+        if (!m_bch.is_tx_spendtime_unlocked(source_out_unlock_time))
+        {
+          LOG_PRINT_L0("One of outputs for one of inputs have wrong tx.unlock_time = " << get_tx_unlock_time(source_tx, out_i));
+          return false;
+        }
+      }
+
 
       if(out.target.type() != typeid(txout_to_key))
       {
@@ -3997,7 +4064,11 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction
     }
   };
 
+<<<<<<< HEAD
   outputs_visitor vi(output_keys, *this, source_max_unlock_time_for_pos_coinbase);
+=======
+  outputs_visitor vi(output_keys, *this, max_unlock_time);
+>>>>>>> commit
   return scan_outputkeys_for_indexes(tx, txin, vi, max_related_block_height);
 }
 //------------------------------------------------------------------
@@ -4455,13 +4526,21 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   return true;
 }
 //------------------------------------------------------------------
+<<<<<<< HEAD
 bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const
+=======
+bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t max_unlock_time)const
+>>>>>>> commit
 {
   uint64_t major_unlock_time = get_tx_x_detail<etc_tx_details_unlock_time>(miner_tx);
   if (major_unlock_time)
   {
     //if there was etc_tx_details_unlock_time present in tx, then ignore etc_tx_details_unlock_time2
+<<<<<<< HEAD
     if (major_unlock_time < source_max_unlock_time)
+=======
+    if (major_unlock_time < max_unlock_time)
+>>>>>>> commit
       return false;
     else
       return true;
@@ -4475,6 +4554,7 @@ bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transactio
   CHECK_AND_ASSERT_MES(ut2.unlock_time_array.size() == miner_tx.vout.size(), false, "ut2.unlock_time_array.size()<" << ut2.unlock_time_array.size() 
     << "> != miner_tx.vout.size()<" << miner_tx.vout.size() << ">");
   
+<<<<<<< HEAD
   uint64_t amount_of_coins_in_unlock_in_range = 0; // amount of outputs locked for at least the same time
 
   for (uint64_t i = 0; i != miner_tx.vout.size(); i++)
@@ -4482,6 +4562,13 @@ bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transactio
     uint64_t unlock_value = ut2.unlock_time_array[i];
     CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(unlock_value), false, "output #" << i << " is locked by time, not buy height, which is not allowed for PoS coinbase");
     if (unlock_value >= source_max_unlock_time)
+=======
+  uint64_t amount_of_coins_in_unlock_in_range = 0;
+
+  for (uint64_t i = 0; i != miner_tx.vout.size(); i++)
+  {
+    if (ut2.unlock_time_array[i] >= max_unlock_time)
+>>>>>>> commit
       amount_of_coins_in_unlock_in_range += miner_tx.vout[i].amount;
   }
   
@@ -4568,13 +4655,19 @@ bool blockchain_storage::validate_pos_block(const block& b,
   {
     // Do coinstake input validation for main chain only.
     // Txs in alternative PoS blocks (including miner_tx) are validated by validate_alt_block_txs()
+<<<<<<< HEAD
     uint64_t source_max_unlock_time_for_pos_coinbase = 0;
     r = check_tx_input(b.miner_tx, 1, coinstake_in, id, b.miner_tx.signatures[0], max_related_block_height, source_max_unlock_time_for_pos_coinbase);
+=======
+    uint64_t max_unlock_time = 0;
+    r = check_tx_input(b.miner_tx, 1, coinstake_in, id, b.miner_tx.signatures[0], max_related_block_height, max_unlock_time);
+>>>>>>> commit
     CHECK_AND_ASSERT_MES(r, false, "Failed to validate coinstake input in miner tx, block_id = " << get_block_hash(b));
 
     if (get_block_height(b) > m_core_runtime_config.hard_fork1_starts_after_height)
     {
       uint64_t last_pow_h = get_last_x_block_height(false);
+<<<<<<< HEAD
       CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_h, false, "Failed to validate coinbase in PoS block, condition failed: max_related_block_height(" << max_related_block_height << ") <= last_pow_h(" << last_pow_h << ")");
       //let's check that coinbase amount and unlock time
       r = validate_pos_coinbase_outs_unlock_time(b.miner_tx, coinstake_in.amount, source_max_unlock_time_for_pos_coinbase);
@@ -4584,6 +4677,17 @@ bool blockchain_storage::validate_pos_block(const block& b,
     else
     {
       CHECK_AND_ASSERT_MES(is_tx_spendtime_unlocked(source_max_unlock_time_for_pos_coinbase), false, "Failed to validate coinbase in PoS block, condition failed: is_tx_spendtime_unlocked(source_max_unlock_time_for_pos_coinbase)(" << source_max_unlock_time_for_pos_coinbase << ")");
+=======
+      CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_h, false, "Failed to failed to validate coinbase in pos block, condition failed: max_related_block_height(" << max_related_block_height << ") < last_pow_h(" << last_pow_h << ")");
+      //let's check that coinbase amount and unlock time
+      r = validate_pos_coinbase_outs_unlock_time(b.miner_tx, coinstake_in.amount, max_unlock_time);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to validate_pos_coinbase_outs_unlock_time() in miner tx, block_id = " << get_block_hash(b) 
+        << "max_unlock_time=" << max_unlock_time);
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(is_tx_spendtime_unlocked(max_unlock_time), false, "Failed to failed to validate coinbase in pos block, condition failed: is_tx_spendtime_unlocked(max_unlock_time)(" << max_unlock_time << ")");
+>>>>>>> commit
     }
   }
 

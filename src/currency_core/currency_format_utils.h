@@ -605,7 +605,11 @@ namespace currency
     wide_difficulty_type pow_diff;
   };
 
+<<<<<<< HEAD
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
+=======
+  wide_difficulty_type get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
+>>>>>>> commit
     const wide_difficulty_type& difficulty_pow_at_split_point,
     const difficulties& a_diff, 
     const difficulties& b_diff

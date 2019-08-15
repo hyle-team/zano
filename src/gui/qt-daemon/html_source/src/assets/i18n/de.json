@@ -10,7 +10,11 @@
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Passwort ist erforderlich",
       "CONFIRM_REQUIRED": "Bestätigung ist erforderlich",
+<<<<<<< HEAD
       "MISMATCH": "Fehlanpassung"
+=======
+      "MISMATCH": "Mismatch"
+>>>>>>> commit
     }
   },
   "COMMON": {
@@ -34,7 +38,11 @@
     "TITLE": "Wallets",
     "ADD_NEW": "+ Hinzufügen",
     "ACCOUNT": {
+<<<<<<< HEAD
       "STAKING": "Staking",
+=======
+      "STAKING": "Staking (Anlegen)",
+>>>>>>> commit
       "MESSAGES": "Neue Angebote/Nachrichten",
       "SYNCING": "Wallet synchronisieren"
     },
@@ -46,7 +54,11 @@
       "ONLINE": "Online",
       "ERROR": "Systemfehler",
       "COMPLETE": "Abschluss",
+<<<<<<< HEAD
       "SYNCING": "Syncing block",
+=======
+      "SYNCING": "Synchronisiere Blockchain",
+>>>>>>> commit
       "LOADING": "Lade Blockchain-Daten"
     },
     "UPDATE": {
@@ -166,8 +178,13 @@
     "REGISTER_ALIAS": "Alias registrieren",
     "DETAILS": "Details",
     "LOCK": "Verschlüsseln",
+<<<<<<< HEAD
     "AVAILABLE_BALANCE": "Verfügbar <b>{{available}} {{currency}}<b/>",
     "LOCKED_BALANCE": "Gesperrt <b>{{locked}} {{currency}}<b/>",
+=======
+    "AVAILABLE_BALANCE": "Verfügbar <b>{{verfügbar}} {{Währung}}<b/>",
+    "LOCKED_BALANCE": "Gesperrt <b>{{gesperrt}} {{Währung}}<b/>",
+>>>>>>> commit
     "LOCKED_BALANCE_LINK": "Was bedeutet das?",
     "TABS": {
       "SEND": "Senden",
@@ -175,7 +192,11 @@
       "HISTORY": "Verlauf",
       "CONTRACTS": "Verträge",
       "MESSAGES": "Nachrichten",
+<<<<<<< HEAD
       "STAKING": "Staking"
+=======
+      "STAKING": "Staking (Anlegen)"
+>>>>>>> commit
     }
   },
   "WALLET_DETAILS": {
@@ -195,21 +216,35 @@
     "NAME": {
       "LABEL": "Alias",
       "PLACEHOLDER": "@ Alias eingeben",
+<<<<<<< HEAD
       "TOOLTIP": "Ein Alias ist eine verkürzte Form Ihres Kontos. Ein Alias kann nur lateinische Buchstaben, Zahlen und die Zeichen „.“ und “-” enthalten. Es muss mit “@” beginnen."
+=======
+      "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
+>>>>>>> commit
     },
     "COMMENT": {
       "LABEL": "Kommentar",
       "PLACEHOLDER": "",
+<<<<<<< HEAD
       "TOOLTIP": "Der Kommentar wird für jeden sichtbar sein, der eine Zahlung an Ihren Alias vornehmen möchte. Sie können Details über Ihre Geschäfte, Kontakte oder Text angeben. Kommentare können später bearbeitet werden."
     },
     "COST": "Alias-Gebühr {{value}} {{currency}}",
+=======
+      "TOOLTIP": "The comment will be visible to anyone who wants to make a payment to your alias. You can provide details about your business, contacts, or include any text. Comments can be edited later."
+    },
+    "COST": "Alias fee {{value}} {{currency}}",
+>>>>>>> commit
     "BUTTON_ASSIGN": "Zuweisen",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_WRONG": "Alias hat einen falschen Namen",
       "NAME_LENGTH": "Der Alias muss 6-25 Zeichen lang sein",
       "NAME_EXISTS": "Alias-Name existiert bereits",
+<<<<<<< HEAD
       "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zuzuweisen",
+=======
+      "NO_MONEY": "You do not have enough funds to assign this alias",
+>>>>>>> commit
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
     "ONE_ALIAS": "Sie können nur einen Alias pro Wallet erstellen",
@@ -225,10 +260,17 @@
       "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
+<<<<<<< HEAD
       "NO_MONEY": "Sie haben nicht genügend Geldmittel, um den Kommentar zu diesem Alias zu ändern",
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
     "COST": "Gebühr {{value}} {{currency}}",
+=======
+      "NO_MONEY": "You do not have enough funds to change the comment to this alias",
+      "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
+    },
+    "COST": "Gebühr {{Wert}} {{Währung}}",
+>>>>>>> commit
     "BUTTON_EDIT": "Bearbeiten"
   },
   "TRANSFER_ALIAS": {
@@ -247,9 +289,15 @@
     "FORM_ERRORS": {
       "WRONG_ADDRESS": "Keine Wallet mit diesem Konto existiert",
       "ALIAS_EXISTS": "Dieses Konto hat bereits einen Alias",
+<<<<<<< HEAD
       "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zu transferieren"
     },
     "COST": "Überweisungsgebühr {{value}} {{currency}}",
+=======
+      "NO_MONEY": "You do not have enough funds to transfer this alias"
+    },
+    "COST": "Transfer fee {{value}} {{currency}}",
+>>>>>>> commit
     "BUTTON_TRANSFER": "Transfer",
     "BUTTON_CANCEL": "Abbrechen",
     "REQUEST_SEND_REG": "Der Alias wird innerhalb von 10 Minuten übertragen"
@@ -271,14 +319,23 @@
       "AMOUNT_REQUIRED": "Betrag ist erforderlich",
       "AMOUNT_ZERO": "Betrag ist Null",
       "FEE_REQUIRED": "Gebühr ist erforderlich",
+<<<<<<< HEAD
       "FEE_MINIMUM": "Mindestgebühr: {{fee}}",
+=======
+      "FEE_MINIMUM": "Mindestgebühr: {{Gebühr}}",
+>>>>>>> commit
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     }
   },
   "HISTORY": {
     "STATUS": "Status",
+<<<<<<< HEAD
     "STATUS_TOOLTIP": "Bestätigungen {{current}}/{{total}}",
     "LOCK_TOOLTIP": "Gesperrt bis {{date}}",
+=======
+    "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
+    "LOCK_TOOLTIP": "Gesperrt bis {{Datum}}",
+>>>>>>> commit
     "SEND": "Gesendet",
     "RECEIVED": "Empfangen",
     "DATE": "Datum",
@@ -289,7 +346,11 @@
       "PAYMENT_ID": "Zahlungs-ID",
       "ID": "Transaktions-ID",
       "SIZE": "Transaktionsgröße",
+<<<<<<< HEAD
       "SIZE_VALUE": "{{value}} Bytes",
+=======
+      "SIZE_VALUE": "{{Wert}} Bytes",
+>>>>>>> commit
       "HEIGHT": "Höhe",
       "CONFIRMATION": "Bestätigung",
       "INPUTS": "Inputs",
@@ -306,10 +367,17 @@
       "POW_REWARD": "POW-Belohnung",
       "POS_REWARD": "POS-Belohnung",
       "CREATE_CONTRACT": "Vertragsvorschlag",
+<<<<<<< HEAD
       "PLEDGE_CONTRACT": "Vertrag-Einzahlung",
       "NULLIFY_CONTRACT": "Einzahlungen verbrennen",
       "PROPOSAL_CANCEL_CONTRACT": "Stornierungsanfrage",
       "CANCEL_CONTRACT": "Abbrechen und Einzahlungen zurückzahlen"
+=======
+      "PLEDGE_CONTRACT": "Contract deposit",
+      "NULLIFY_CONTRACT": "Einzahlungen verbrennen",
+      "PROPOSAL_CANCEL_CONTRACT": "Stornierungsanfrage",
+      "CANCEL_CONTRACT": "Cancel and return deposits"
+>>>>>>> commit
     }
   },
   "CONTRACTS": {
@@ -322,6 +390,7 @@
     "STATUS": "Status",
     "COMMENTS": "Kommentare",
     "PURCHASE_BUTTON": "Neuer Kauf",
+<<<<<<< HEAD
     "LISTING_BUTTON": "Auflistung erstellen",
     "TIME_LEFT": {
       "REMAINING_LESS_ONE": "Weniger als eine Stunde, um zu antworten",
@@ -334,18 +403,40 @@
       "REMAINING_ONE_WAITING": "Warte für {{time}} Stunde",
       "REMAINING_MANY_WAITING": "Warte für {{time}} Stunden",
       "REMAINING_MANY_ALT_WAITING": "Warte für {{Zeit}} Stunden"
+=======
+    "LISTING_BUTTON": "Create listing",
+    "TIME_LEFT": {
+      "REMAINING_LESS_ONE": "Weniger als eine Stunde, um zu antworten",
+      "REMAINING_ONE": "{{Zeit}} verbleibende Stunde",
+      "REMAINING_MANY": "{{Zeit}} verbleibende Stunden",
+      "REMAINING_MANY_ALT": "{{Zeit}} verbleibende Stunden",
+      "REMAINING_ONE_RESPONSE": "{{Zeit}} verbleibende Stunde",
+      "REMAINING_MANY_RESPONSE": "{{Zeit}} verbleibende Stunde",
+      "REMAINING_MANY_ALT_RESPONSE": "{{Zeit}} verbleibende Stunden",
+      "REMAINING_ONE_WAITING": "Waiting for {{time}} hour",
+      "REMAINING_MANY_WAITING": "Waiting for {{time}} hours",
+      "REMAINING_MANY_ALT_WAITING": "Waiting for {{time}} hours"
+>>>>>>> commit
     },
     "STATUS_MESSAGES": {
       "SELLER": {
         "NEW_CONTRACT": "Neuer Vertragsvorschlag",
         "IGNORED": "Sie haben den Vertragsvorschlag ignoriert",
         "ACCEPTED": "Vertrag gestartet",
+<<<<<<< HEAD
         "WAIT": "Warten auf Bestätitung des Vertrages",
+=======
+        "WAIT": "Waiting for contract confirmation",
+>>>>>>> commit
         "WAITING_BUYER": "Warte auf Sendung",
         "COMPLETED": "Vertrag abgeschlossen",
         "NOT_RECEIVED": "Senden fehlgeschlagen",
         "NULLIFIED": "Alle Einzahlungen verbrannt",
+<<<<<<< HEAD
         "PROPOSAL_CANCEL": "Neuer Vorschlag, Vertrag zu kündigen und Einzahlungen zurückzugeben",
+=======
+        "PROPOSAL_CANCEL": "New proposal to cancel contract and return deposits",
+>>>>>>> commit
         "BEING_CANCELLED": "Abbruch wird durchgeführt",
         "CANCELLED": "Vertrag abgebrochen",
         "IGNORED_CANCEL": "Sie haben den Stornierungsvorschlag ignoriert",
@@ -354,7 +445,11 @@
       "BUYER": {
         "WAITING": "Warte auf Antwort",
         "IGNORED": "Verkäufer ignorierte Ihren Vertragsvorschlag",
+<<<<<<< HEAD
         "ACCEPTED": "Verkäufer hat Ihren Vertragsvorschlag akzeptiert",
+=======
+        "ACCEPTED": "Seller accepted your contract proposal",
+>>>>>>> commit
         "WAIT": "Warten auf die Bestätigung der Einzahlungen",
         "WAITING_SELLER": "Warte auf Sendung",
         "COMPLETED": "Vertrag abgeschlossen",
@@ -381,7 +476,11 @@
     "SEND_BUTTON": "Senden",
     "FORM_ERRORS": {
       "DESC_REQUIRED": "Beschreibung erforderlich",
+<<<<<<< HEAD
       "DESC_MAXIMUM": "Maximale Feldlänge erreicht",
+=======
+      "DESC_MAXIMUM": "Maximum field length reached",
+>>>>>>> commit
       "SELLER_REQUIRED": "Adresse benötigt",
       "SELLER_NOT_VALID": "Ungültige Adresse",
       "ALIAS_NOT_VALID": "Ungültiger Alias",
@@ -390,7 +489,11 @@
       "YOUR_DEPOSIT_REQUIRED": "Einzahlung erforderlich",
       "SELLER_DEPOSIT_REQUIRED": "Verkäufer-Einzahlung erforderlich",
       "SELLER_SAME": "Anderes Konto verwenden",
+<<<<<<< HEAD
       "COMMENT_MAXIMUM": "Maximale Feldlänge erreicht"
+=======
+      "COMMENT_MAXIMUM": "Maximum field length reached"
+>>>>>>> commit
     },
     "PROGRESS_NEW": "Neuer Kauf",
     "PROGRESS_WAIT": "Warte auf Antwort",
@@ -428,7 +531,11 @@
     "NEED_MONEY": "Unzureichendes Guthaben",
     "BUTTON_MAKE_PLEDGE": "Akzeptieren und Einzahlung tätigen",
     "BUTTON_IGNORE": "Angebot ignorieren und ausblenden",
+<<<<<<< HEAD
     "BUTTON_NULLIFY": "Beenden und Einzahlungen verbrennen",
+=======
+    "BUTTON_NULLIFY": "Terminate and burn deposits",
+>>>>>>> commit
     "BUTTON_RECEIVED": "Einzahlungen abschließen und freigeben",
     "BUTTON_CANCEL_BUYER": "Einzahlungen abbrechen und zurückzahlen",
     "BUTTON_NOT_CANCEL": "Anfrage ignorieren",
@@ -518,7 +625,12 @@
       "ADDRESS_NOT_VALID": "Adresse ungültig",
       "SET_MASTER_PASSWORD": "Master-Passwort festlegen",
       "ADDRESS_DUBLICATED": "Adresse existiert bereits",
+<<<<<<< HEAD
       "MAX_LENGTH": "Maximale Länge der Notiz erreicht",
+=======
+      "MAX_LENGTH": "Maximum notes length reached",
+      "NAME_WRONG": "Kontakt hat einen falschen Namen",
+>>>>>>> commit
       "NAME_LENGTH": "Der Name muss 4-25 Zeichen lang sein"
     },
     "BUTTON": {
@@ -532,6 +644,7 @@
     },
     "SUCCESS_SENT": "Kontakt hinzugefügt",
     "SUCCESS_SAVE": "Kontakt wurde bearbeitet",
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Kontakte wurden importiert",
     "SUCCESS_EXPORT": "Kontakte wurden exportiert",
     "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
@@ -539,14 +652,24 @@
     "ERROR_EXPORT": "Ungültiger Dateityp. Datei als .csv speichern",
     "ERROR_EMPTY_LIST": "Contact list is empty",
     "ERROR_IMPORT_EMPTY": "File is empty"
+=======
+    "SUCCESS_IMPORT": "Kontakt wurde importiert",
+    "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
+    "ERROR_TYPE_FILE": "Bitte importieren Sie eine gültige .csv Datei."
+>>>>>>> commit
   },
   "ERRORS": {
     "NO_MONEY": "Nicht genügend Geld",
     "NOT_ENOUGH_MONEY": "Unzureichendes Guthaben im Konto",
     "CORE_BUSY": "Interner Fehler: Kern ist beschäftigt",
     "DAEMON_BUSY": "Interner Fehler: Daemon ist beschäftigt",
+<<<<<<< HEAD
     "NO_MONEY_REMOVE_OFFER": "Es gibt keine Gebühr für das Löschen eines Angebots, aber um das Netzwerk vor Spam-Transaktionen zu schützen, müssen Sie mindestens {{fee}} {{currency}} in Ihrer Wallet haben",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in-Nummer ist zu groß für den aktuellen Blockchain-Status. Nicht genügend unverbrauchte outputs zum Mischen",
+=======
+    "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
+    "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",
+>>>>>>> commit
     "TRANSACTION_IS_TO_BIG": "Transaktion überschreitet das Netzwerk-Limit. Sendet benötigten Betrag mit mehreren Transaktionen.",
     "TRANSFER_ATTEMPT": "Keine Verbindung zum Zano-Netzwerk",
     "ACCESS_DENIED": "Zugriff verweigert",
@@ -563,7 +686,11 @@
     "TX_TYPE_NORMAL_END": "wurde nicht abgeschlossen.",
     "TX_TYPE_NEW_ALIAS": "Fehler. Fehler beim Registrieren des Alias zum Speichern",
     "TX_TYPE_NEW_ALIAS_END": "Bitte nochmals versuchen.",
+<<<<<<< HEAD
     "TX_TYPE_UPDATE_ALIAS": "Fehler. Fehlgeschlagen Kommentar von gespeichertem Alias zu ändern",
+=======
+    "TX_TYPE_UPDATE_ALIAS": "Error. Failed to change comment to alias in safe",
+>>>>>>> commit
     "TX_TYPE_COIN_BASE": "Fehler. Die Zahlung wurde nicht abgeschlossen."
   },
   "CONTEXT_MENU": {
@@ -579,8 +706,13 @@
     "INCOME_TRANSFER_CONFIRMED": "Zahlung erhalten",
     "MINED": "Mined",
     "LOCKED": "Blockiert",
+<<<<<<< HEAD
     "IS_MINIMIZE": "Zano-Anwendung wird auf die Systemleiste minimiert",
     "RESTORE": "Sie können es wiederherstellen, indem Sie auf das Kontextmenü benutzen oder anklicken ",
+=======
+    "IS_MINIMIZE": "Zano application is minimized to the system tray",
+    "RESTORE": "You can recover it by clicking or using the context menu",
+>>>>>>> commit
     "TRAY_MENU_SHOW": "Größe ändern",
     "TRAY_MENU_MINIMIZE": "Minimieren"
   }
