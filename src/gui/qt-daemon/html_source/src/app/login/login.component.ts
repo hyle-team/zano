@@ -106,10 +106,14 @@ export class LoginComponent implements OnInit, OnDestroy {
          });
       } else {
 <<<<<<< HEAD
+<<<<<<< HEAD
         this.getData(this.variablesService.appPass);
 =======
         this.getWalletData(this.variablesService.appPass);
 >>>>>>> contact service
+=======
+        this.getData(this.variablesService.appPass);
+>>>>>>> fix master pass (immigration 41 > 43)
       }
     }
   }
@@ -122,6 +126,7 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.variablesService.startCountdown();
         this.variablesService.appPass = appPass;
 <<<<<<< HEAD
+<<<<<<< HEAD
         const isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
 
 =======
@@ -131,6 +136,8 @@ export class LoginComponent implements OnInit, OnDestroy {
           });
         }
 >>>>>>> contact service
+=======
+>>>>>>> fix master pass (immigration 41 > 43)
         if (this.variablesService.wallets.length) {
           this.ngZone.run(() => {
             this.router.navigate(['/wallet/' + this.variablesService.wallets[0].wallet_id]);
@@ -138,6 +145,9 @@ export class LoginComponent implements OnInit, OnDestroy {
           return;
         }
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> fix master pass (immigration 41 > 43)
         if (data.hasOwnProperty('contacts')) {
           if (Object.keys(data['contacts']).length !== 0) {
             data['contacts'].map(contact => {
@@ -155,7 +165,11 @@ export class LoginComponent implements OnInit, OnDestroy {
           }
         }
         if (!data.hasOwnProperty('wallets') && !data.hasOwnProperty('contacts')) {
+<<<<<<< HEAD
           if (data.length !== 0  && !isEmptyObject) {
+=======
+          if (data.length !== 0) {
+>>>>>>> fix master pass (immigration 41 > 43)
             this.getWalletData(data);
           } else {
             this.ngZone.run(() => {
@@ -198,6 +212,7 @@ export class LoginComponent implements OnInit, OnDestroy {
             }
             this.backend.getContracts(open_data.wallet_id, (contracts_status, contracts_data) => {
               if (contracts_status && contracts_data.hasOwnProperty('contracts')) {
+<<<<<<< HEAD
 =======
         if (Object.keys(data['wallets']).length !== 0) {
           let openWallets = 0;
@@ -207,6 +222,8 @@ export class LoginComponent implements OnInit, OnDestroy {
               if (open_status || open_error === 'FILE_RESTORED') {
                 openWallets++;
 >>>>>>> contact service
+=======
+>>>>>>> fix master pass (immigration 41 > 43)
                 this.ngZone.run(() => {
                   new_wallet.prepareContractsAfterOpen(contracts_data.contracts, this.variablesService.exp_med_ts, this.variablesService.height_app, this.variablesService.settings.viewedContracts, this.variablesService.settings.notViewedContracts);
                 });
