@@ -42,7 +42,7 @@ namespace zlib_helper
 		int ret = deflateInit(&zstream, Z_DEFAULT_COMPRESSION);
 		if(target.size())
 		{
-      size_t estimated_output_size_max = deflateBound(&zstream, target.size());
+			size_t estimated_output_size_max = deflateBound(&zstream, static_cast<uLong>(target.size()));
 			result_packed_buff.resize(estimated_output_size_max, 'X');
 
 			zstream.next_in = (Bytef*)target.data();

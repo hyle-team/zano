@@ -600,7 +600,7 @@ std::string get_nix_version_display_string()
       boost::asio::ip::udp::socket socket(io_service);
       socket.open(boost::asio::ip::udp::v4());
 
-      boost::array<unsigned char, 48> send_buf = { 010, 0, 0, 0, 0, 0, 0, 0, 0 };
+      boost::array<unsigned char, 48> send_buf = { { 010, 0, 0, 0, 0, 0, 0, 0, 0 } };
       socket.send_to(boost::asio::buffer(send_buf), receiver_endpoint);
 
       boost::array<unsigned long, 1024> recv_buf;
