@@ -494,7 +494,7 @@ namespace currency
 
     BEGIN_SERIALIZE()
       FIELD(major_version)
-      //if(major_version > CURRENT_BLOCK_MAJOR_VERSION) return false;
+      if(major_version > CURRENT_BLOCK_MAJOR_VERSION) return false;
       FIELD(nonce)
       FIELD(prev_id)
       VARINT_FIELD(minor_version)
