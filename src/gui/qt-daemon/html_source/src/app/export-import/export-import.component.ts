@@ -142,6 +142,7 @@ export class ExportImportComponent implements OnInit {
       this.variablesService.settings.default_path,
       (file_status, file_data) => {
 <<<<<<< HEAD
+<<<<<<< HEAD
         if (!this.variablesService.contacts.length && !(file_data.error_code === 'CANCELED')) {
           this.modalService.prepareModal('error', 'CONTACTS.ERROR_EMPTY_LIST');
         }
@@ -155,6 +156,17 @@ export class ExportImportComponent implements OnInit {
         if (file_status) {
           this.backend.storeFile(file_data.path, this.papa.unparse(contacts));
 >>>>>>> contact service
+=======
+        if (file_status && this.isValid(file_data.path)) {
+          this.backend.storeFile(file_data.path, this.papa.unparse(contacts));
+          this.modalService.prepareModal(
+            'success',
+            'CONTACTS.SUCCESS_EXPORT'
+          );
+        }
+        if (!(file_data.error_code === 'CANCELED') && !this.isValid(file_data.path)) {
+          this.modalService.prepareModal('error', 'CONTACTS.ERROR_EXPORT');
+>>>>>>> fix export import
         }
       }
     );
