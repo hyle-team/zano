@@ -17,6 +17,7 @@
       <input type="text" id="add-name" formControlName="name" (contextmenu)="variablesService.onContextMenu($event)">
       <div class="error-block" *ngIf="addContactForm.controls['name'].invalid && (addContactForm.controls['name'].dirty || addContactForm.controls['name'].touched)">
 <<<<<<< HEAD
+<<<<<<< HEAD
         <div *ngIf="addContactForm.controls['name'].errors['minlength'] || addContactForm.controls['name'].errors['maxlength']">
 =======
         <div *ngIf="addContactForm.controls['name'].errors['pattern']">
@@ -28,6 +29,9 @@
 =======
         <div *ngIf="addContactForm.get('name').value.length < 4 || addContactForm.get('name').value.length > 25">
 >>>>>>> fix add contact + rebuild html
+=======
+        <div *ngIf="addContactForm.controls['name'].errors['minlength'] || addContactForm.controls['name'].errors['maxlength']">
+>>>>>>> allow symbols at name field diffrent from latin
           {{ 'CONTACTS.FORM_ERRORS.NAME_LENGTH' | translate }}
         </div>
         <div *ngIf="addContactForm.controls['name'].errors['required']">

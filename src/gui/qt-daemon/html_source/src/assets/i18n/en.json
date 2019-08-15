@@ -562,9 +562,12 @@
       "ADDRESS_DUBLICATED": "Address is dublicated",
       "MAX_LENGTH": "Maximum notes length reached",
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
       "NAME_WRONG": "Contact has wrong name",
 >>>>>>> contact service
+=======
+>>>>>>> allow symbols at name field diffrent from latin
       "NAME_LENGTH": "The name must be 4-25 characters long"
     },
     "BUTTON": {

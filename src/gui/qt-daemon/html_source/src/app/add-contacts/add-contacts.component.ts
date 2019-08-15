@@ -67,11 +67,16 @@ export class AddContactsComponent implements OnInit, OnDestroy {
     name: new FormControl('', [
       Validators.required,
 <<<<<<< HEAD
+<<<<<<< HEAD
       Validators.minLength(4),
       Validators.maxLength(25),
 =======
       Validators.pattern(/^[\w\s-_.]{4,25}$/),
 >>>>>>> contact service
+=======
+      Validators.minLength(4),
+      Validators.maxLength(25),
+>>>>>>> allow symbols at name field diffrent from latin
       (g: FormControl) => {
         if (g.value) {
           const isDublicated = this.variablesService.contacts.findIndex(
