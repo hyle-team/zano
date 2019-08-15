@@ -7,16 +7,13 @@
 #pragma once
 
 
-#define CURRENCY_FORMATION_VERSION                      84
-#define TESTNET_FORMATION_VERSION                       2
-
 #ifndef TESTNET
-#define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
+#define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_GENESIS_NONCE                          (TESTNET_FORMATION_VERSION + CURRENCY_FORMATION_VERSION + 101011010121) 
+#define CURRENCY_FORMATION_VERSION                      86
 #endif
 
-
+#define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
 
 
                                                         
