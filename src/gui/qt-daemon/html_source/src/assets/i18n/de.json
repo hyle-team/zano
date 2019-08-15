@@ -23,7 +23,7 @@
     "OPEN_WALLET": "Vorhandene Wallet öffnen",
     "RESTORE_WALLET": "Restore from backup",
     "WALLET_DETAILS": "Wallet-Details",
-    "ASSIGN_ALIAS": "Assign alias",
+    "ASSIGN_ALIAS": "Alias zuweisen",
     "EDIT_ALIAS": "Alias bearbeiten",
     "TRANSFER_ALIAS": "Transfer alias",
     "CONTRACTS": "Verträge",
@@ -46,7 +46,7 @@
       "ONLINE": "Online",
       "ERROR": "Systemfehler",
       "COMPLETE": "Abschluss",
-      "SYNCING": "Syncing blockchain",
+      "SYNCING": "Synchronisiere Blockchain",
       "LOADING": "Lade Blockchain-Daten"
     },
     "UPDATE": {
@@ -63,7 +63,7 @@
     }
   },
   "MAIN": {
-    "TITLE": "Create or open the wallet to start using Zano",
+    "TITLE": "Erstellen oder öffnen Sie die Wallet, um Zano zu verwenden",
     "BUTTON_NEW_WALLET": "Neue Wallet erstellen",
     "BUTTON_OPEN_WALLET": "Vorhandene Wallet öffnen",
     "BUTTON_RESTORE_BACKUP": "Restore from backup",
@@ -96,10 +96,10 @@
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_DUPLICATE": "Name existiert bereits",
-      "MAX_LENGTH": "Maximum name length reached"
+      "MAX_LENGTH": "Maximale Namenslänge erreicht"
     },
     "MODAL": {
-      "TITLE": "Type wallet password",
+      "TITLE": "Wallet-Passwort eingeben",
       "LABEL": "Passwort für diese Wallet",
       "OPEN": "Wallet öffnen",
       "SKIP": "Überspringen",
@@ -114,24 +114,24 @@
     "BUTTON_SELECT": "Wallet-Verzeichnis auswählen",
     "BUTTON_CREATE": "Wallet erstellen",
     "NOT_CORRECT_FILE_OR_PASSWORD": "Ungültige Wallet-Datei oder Passwort stimmt nicht überein",
-    "CHOOSE_PATH": "Please choose a path",
+    "CHOOSE_PATH": "Bitte wählen Sie einen Pfad",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
+      "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_DUPLICATE": "Name existiert bereits",
-      "MAX_LENGTH": "Maximum name length reached",
+      "MAX_LENGTH": "Maximale Namenslänge erreicht",
       "CONFIRM_NOT_MATCH": "Confirm password not match",
-      "KEY_REQUIRED": "Key is required",
-      "KEY_NOT_VALID": "Key not valid"
+      "KEY_REQUIRED": "Schlüssel ist erforderlich",
+      "KEY_NOT_VALID": "Schlüssel ungültig"
     }
   },
   "SEED_PHRASE": {
     "TITLE": "Make sure to keep your seed phrase in a safe place. If you forget your seed phrase you will not be able to recover your wallet.",
-    "BUTTON_CREATE_ACCOUNT": "Create wallet",
+    "BUTTON_CREATE_ACCOUNT": "Wallet erstellen",
     "BUTTON_COPY": "Kopieren"
   },
   "PROGRESS": {
     "ADD_WALLET": "Wallet hinzufügen",
-    "SELECT_LOCATION": "Select wallet location",
+    "SELECT_LOCATION": "Wallet-Verzeichnis auswählen",
     "CREATE_WALLET": "Neue Wallet erstellen",
     "RESTORE_WALLET": "Restore from backup"
   },
@@ -166,25 +166,25 @@
     "REGISTER_ALIAS": "Alias registrieren",
     "DETAILS": "Details",
     "LOCK": "Verschlüsseln",
-    "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
-    "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
-    "LOCKED_BALANCE_LINK": "What does that mean?",
+    "AVAILABLE_BALANCE": "Verfügbar <b>{{verfügbar}} {{Währung}}<b/>",
+    "LOCKED_BALANCE": "Gesperrt <b>{{gesperrt}} {{Währung}}<b/>",
+    "LOCKED_BALANCE_LINK": "Was bedeutet das?",
     "TABS": {
       "SEND": "Senden",
       "RECEIVE": "Empfangen",
       "HISTORY": "Verlauf",
-      "CONTRACTS": "Contracts",
+      "CONTRACTS": "Verträge",
       "MESSAGES": "Nachrichten",
       "STAKING": "Staking"
     }
   },
   "WALLET_DETAILS": {
     "LABEL_NAME": "Wallet-Name",
-    "LABEL_FILE_LOCATION": "Wallet file location",
+    "LABEL_FILE_LOCATION": "Wallet-Datei-Verzeichnis",
     "LABEL_SEED_PHRASE": "Seed phrase",
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
     "BUTTON_SAVE": "Speichern",
-    "BUTTON_REMOVE": "Close wallet",
+    "BUTTON_REMOVE": "Wallet schließen",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
       "NAME_DUPLICATE": "Name existiert bereits",
@@ -234,7 +234,7 @@
   "TRANSFER_ALIAS": {
     "NAME": {
       "LABEL": "Alias",
-      "PLACEHOLDER": "@ Enter alias"
+      "PLACEHOLDER": "@ Alias eingeben"
     },
     "COMMENT": {
       "LABEL": "Comment",
@@ -245,7 +245,7 @@
       "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
-      "WRONG_ADDRESS": "No wallet with this account exists",
+      "WRONG_ADDRESS": "Keine Wallet mit diesem Konto existiert",
       "ALIAS_EXISTS": "This account already has an alias",
       "NO_MONEY": "You do not have enough funds to transfer this alias"
     },
@@ -261,7 +261,7 @@
     "DETAILS": "Zusätzliche Informationen",
     "MIXIN": "Mixin",
     "FEE": "Gebühr",
-    "HIDE": "Hide your wallet address from recipient",
+    "HIDE": "Verstecke deine Wallet-Adresse vom Empfänger",
     "BUTTON": "Senden",
     "SUCCESS_SENT": "Transaktion gesendet",
     "FORM_ERRORS": {
@@ -271,8 +271,8 @@
       "AMOUNT_REQUIRED": "Betrag ist erforderlich",
       "AMOUNT_ZERO": "Betrag ist Null",
       "FEE_REQUIRED": "Gebühr ist erforderlich",
-      "FEE_MINIMUM": "Minimum fee: {{fee}}",
-      "MAX_LENGTH": "Maximum comment length reached"
+      "FEE_MINIMUM": "Mindestgebühr: {{Gebühr}}",
+      "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     }
   },
   "HISTORY": {
@@ -291,13 +291,13 @@
       "SIZE": "Transaktionsgröße",
       "SIZE_VALUE": "{{value}} bytes",
       "HEIGHT": "Höhe",
-      "CONFIRMATION": "Confirmation",
+      "CONFIRMATION": "Bestätigung",
       "INPUTS": "Inputs",
       "OUTPUTS": "Outputs",
       "COMMENT": "Kommentar"
     },
     "TYPE_MESSAGES": {
-      "HIDDEN": "hidden",
+      "HIDDEN": "versteckt",
       "UNDEFINED": "Unbedefiniert",
       "COMPLETE_BUYER": "Vertrag abgeschlossen",
       "COMPLETE_SELLER": "Vertrag abgeschlossen",
@@ -307,21 +307,21 @@
       "POS_REWARD": "POS reward",
       "CREATE_CONTRACT": "Contract proposal",
       "PLEDGE_CONTRACT": "Contract deposit",
-      "NULLIFY_CONTRACT": "Burn deposits",
-      "PROPOSAL_CANCEL_CONTRACT": "Cancellation request",
+      "NULLIFY_CONTRACT": "Einzahlungen verbrennen",
+      "PROPOSAL_CANCEL_CONTRACT": "Stornierungsanfrage",
       "CANCEL_CONTRACT": "Cancel and return deposits"
     }
   },
   "CONTRACTS": {
-    "EMPTY": "No active contracts",
-    "CONTRACTS": "Contracts",
-    "PURCHASE": "Purchase",
+    "EMPTY": "Keine aktiven Verträge",
+    "CONTRACTS": "Verträge",
+    "PURCHASE": "Kauf",
     "SELL": "Verkaufen",
     "DATE": "Datum",
     "AMOUNT": "Betrag",
     "STATUS": "Status",
     "COMMENTS": "Kommentare",
-    "PURCHASE_BUTTON": "New Purchase",
+    "PURCHASE_BUTTON": "Neuer Kauf",
     "LISTING_BUTTON": "Create listing",
     "TIME_LEFT": {
       "REMAINING_LESS_ONE": "Weniger als eine Stunde, um zu antworten",
@@ -337,23 +337,23 @@
     },
     "STATUS_MESSAGES": {
       "SELLER": {
-        "NEW_CONTRACT": "New contract proposal",
-        "IGNORED": "You ignored contract proposal",
-        "ACCEPTED": "Contract started",
+        "NEW_CONTRACT": "Neuer Vertragsvorschlag",
+        "IGNORED": "Sie haben den Vertragsvorschlag ignoriert",
+        "ACCEPTED": "Vertrag gestartet",
         "WAIT": "Waiting for contract confirmation",
         "WAITING_BUYER": "Waiting for delivery",
-        "COMPLETED": "Contract completed",
-        "NOT_RECEIVED": "Delivery failed",
+        "COMPLETED": "Vertrag abgeschlossen",
+        "NOT_RECEIVED": "Senden fehlgeschlagen",
         "NULLIFIED": "All deposits burned",
         "PROPOSAL_CANCEL": "New proposal to cancel contract and return deposits",
-        "BEING_CANCELLED": "Cancellation in progress",
-        "CANCELLED": "Contract canceled",
+        "BEING_CANCELLED": "Abbruch wird durchgeführt",
+        "CANCELLED": "Vertrag abgebrochen",
         "IGNORED_CANCEL": "You ignored cancellation proposal",
-        "EXPIRED": "Contract proposal has expired"
+        "EXPIRED": "Vertragsvorschlag ist abgelaufen"
       },
       "BUYER": {
         "WAITING": "Warte auf Antwort",
-        "IGNORED": "Seller ignored your contract proposal",
+        "IGNORED": "Verkäufer ignorierte Ihren Vertragsvorschlag",
         "ACCEPTED": "Seller accepted your contract proposal",
         "WAIT": "Waiting for deposits confirmation",
         "WAITING_SELLER": "Waiting for delivery",
@@ -362,7 +362,7 @@
         "NULLIFIED": "All deposits burned",
         "WAITING_CANCEL": "Waiting for contract cancellation",
         "BEING_CANCELLED": "Cancellation in progress",
-        "CANCELLED": "Contract canceled",
+        "CANCELLED": "Vertrag abgebrochen",
         "IGNORED_CANCEL": "The seller ignored your proposal to cancel the contract",
         "EXPIRED": "The contract proposal has expired"
       }
@@ -370,7 +370,7 @@
   },
   "PURCHASE": {
     "DESCRIPTION": "Beschreibung",
-    "SELLER": "Seller",
+    "SELLER": "Verkäufer",
     "AMOUNT": "Betrag",
     "YOUR_DEPOSIT": "Ihre Einzahlung",
     "SELLER_DEPOSIT": "Seller deposit",
@@ -392,53 +392,53 @@
       "SELLER_SAME": "Anderes Konto verwenden",
       "COMMENT_MAXIMUM": "Maximum field length reached"
     },
-    "PROGRESS_NEW": "New purchase",
+    "PROGRESS_NEW": "Neuer Kauf",
     "PROGRESS_WAIT": "Warte auf Antwort",
     "PROGRESS_RECEIVE": "Antwort erhalten",
     "PROGRESS_COMPLETE": "Abgeschlossen",
     "FEE": "Gebühr",
     "PAYMENT": "Zahlungs-ID",
     "STATUS_MESSAGES": {
-      "NEW_PURCHASE": "New purchase",
+      "NEW_PURCHASE": "Neuer Kauf",
       "WAITING_SELLER": "Warte auf Antwort",
-      "WAITING_BUYER": "Contract proposal received",
-      "WAITING_CONFIRMATION": "Waiting for deposits confirmation",
+      "WAITING_BUYER": "Vertragsvorschlag erhalten",
+      "WAITING_CONFIRMATION": "Warten auf die Bestätigung der Einzahlungen",
       "WAITING_DELIVERY": "Waiting for delivery",
       "COMPLETED": "Vertrag abgeschlossen",
       "IGNORED_BUYER": "Vertragsvorschlag ignoriert",
       "IGNORED_SELLER": "The seller ignored your contract proposal",
       "PROPOSAL_CANCEL_SELLER": "Cancellation request sent",
-      "PROPOSAL_CANCEL_BUYER": "Cancellation request received",
-      "BEING_CANCELLED": "Cancellation in progress",
+      "PROPOSAL_CANCEL_BUYER": "Stornierungsanfrage erhalten",
+      "BEING_CANCELLED": "Abbruch wird durchgeführt",
       "IGNORED_CANCEL_SELLER": "The seller ignored your proposal to cancel the contract",
       "IGNORED_CANCEL_BUYER": "Contract cancellation proposal ignored",
-      "CANCELLED": "Contract canceled",
-      "EXPIRED": "Contract proposal expired",
+      "CANCELLED": "Vertrag abgebrochen",
+      "EXPIRED": "Vertragsvorschlag abgelaufen",
       "NOT_RECEIVED": "Delivery failed",
-      "NULLIFIED": "All deposits burned"
+      "NULLIFIED": "Alle Einzahlungen verbrannt"
     },
-    "ACCEPT_STATE_WAIT_BIG": "Contract started",
-    "IGNORED_ACCEPT": "Contract proposal ignored",
-    "BURN_PROPOSAL": "Deposits burned",
-    "SUCCESS_FINISH_PROPOSAL": "Contract completed",
-    "SEND_CANCEL_PROPOSAL": "Cancellation request sent",
-    "IGNORED_CANCEL": "Contract cancellation proposal ignored",
+    "ACCEPT_STATE_WAIT_BIG": "Vertrag gestartet",
+    "IGNORED_ACCEPT": "Vertragsvorschlag ignoriert",
+    "BURN_PROPOSAL": "Einzahlungen verbrannt",
+    "SUCCESS_FINISH_PROPOSAL": "Vertrag abgeschlossen",
+    "SEND_CANCEL_PROPOSAL": "Stornierungsanfrage gesendet",
+    "IGNORED_CANCEL": "Vertragsstornierungsanfrage ignoriert",
     "DEALS_CANCELED_WAIT": "Cancellation in progress",
     "WAITING_TIME": "Response time",
     "NEED_MONEY": "Unzureichendes Guthaben",
-    "BUTTON_MAKE_PLEDGE": "Accept and make deposit",
-    "BUTTON_IGNORE": "Ignore and hide offer",
+    "BUTTON_MAKE_PLEDGE": "Akzeptieren und Einzahlung tätigen",
+    "BUTTON_IGNORE": "Angebot ignorieren und ausblenden",
     "BUTTON_NULLIFY": "Terminate and burn deposits",
     "BUTTON_RECEIVED": "Complete and release deposits",
     "BUTTON_CANCEL_BUYER": "Cancel and return deposits",
-    "BUTTON_NOT_CANCEL": "Ignore request",
+    "BUTTON_NOT_CANCEL": "Anfrage ignorieren",
     "BUTTON_CANCEL_SELLER": "Confirm and return deposits",
     "HOUR": "Stunde",
     "HOURS": "Stunden",
     "CANCEL": "Abbrechen",
     "NULLIFY_QUESTION": "Are you sure you want to burn both deposits?",
-    "BUTTON_NULLIFY_SHORT": "Burn",
-    "WAITING_TIME_QUESTION": "Are you sure you want to cancel the contract?"
+    "BUTTON_NULLIFY_SHORT": "Verbrennen",
+    "WAITING_TIME_QUESTION": "Sind Sie sicher, dass Sie den Vertrag kündigen möchten?"
   },
   "MESSAGES": {
     "ADDRESS": "Adresse",
@@ -459,7 +459,7 @@
     "MESSAGE": {
       "SEND": "Senden",
       "FROM": "Von",
-      "TO": "To",
+      "TO": "Zu",
       "COMMENT": "Comment"
     }
   },
@@ -493,18 +493,18 @@
     "IMPORT_EXPORT": "Kontakte importieren oder exportieren",
     "IMPORT": "Importieren",
     "EXPORT": "Exportieren",
-    "ADD": "Add/edit contact",
+    "ADD": "Kontakt hinzufügen/bearbeiten",
     "SEND": "Senden",
     "SEND_FROM": "Senden von",
-    "SEND_TO": "To",
-    "OPEN_ADD_WALLET": "Open/Add wallet",
+    "SEND_TO": "Zu",
+    "OPEN_ADD_WALLET": "Wallet öffnen/hinzufügen",
     "COPY": "- Kopieren",
     "TABLE": {
       "NAME": "Name",
       "ALIAS": "Alias",
       "ADDRESS": "Adresse",
       "NOTES": "Notizen",
-      "EMPTY": "Contact list is empty"
+      "EMPTY": "Kontaktliste ist leer"
     },
     "FORM": {
       "NAME": "Name",
@@ -520,7 +520,7 @@
       "ADDRESS_DUBLICATED": "Adresse existiert bereits",
       "MAX_LENGTH": "Maximum notes length reached",
       "NAME_WRONG": "Kontakt hat einen falschen Namen",
-      "NAME_LENGTH": "The name must be 4-25 characters long"
+      "NAME_LENGTH": "Der Name muss 4-25 Zeichen lang sein"
     },
     "BUTTON": {
       "SEND": "Senden",
@@ -528,13 +528,13 @@
       "DELETE": "Löschen",
       "ADD": "Kontakt hinzufügen",
       "ADD_EDIT": "Hinzufügen/Speichern",
-      "GO_TO_WALLET": "Go to wallet",
+      "GO_TO_WALLET": "Zu Wallet gehen",
       "IMPORT_EXPORT": "importieren/exportieren"
     },
     "SUCCESS_SENT": "Kontakt hinzugefügt",
     "SUCCESS_SAVE": "Kontakt wurde bearbeitet",
     "SUCCESS_IMPORT": "Kontakt wurde importiert",
-    "ERROR_IMPORT": "Error is occured while reading file!",
+    "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
     "ERROR_TYPE_FILE": "Please import valid .csv file."
   },
   "ERRORS": {
@@ -545,23 +545,23 @@
     "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",
     "TRANSACTION_IS_TO_BIG": "Transaction exceeds network limit, send required amount with multiple transactions",
-    "TRANSFER_ATTEMPT": "There is no connection to Zano network",
+    "TRANSFER_ATTEMPT": "Keine Verbindung zum Zano-Netzwerk",
     "ACCESS_DENIED": "Zugriff verweigert",
-    "TRANSACTION_ERROR": "Error. Transaction not completed.",
-    "BAD_ARG": "Invalid argument",
-    "WALLET_WRONG_ID": "Invalid wallet ID",
+    "TRANSACTION_ERROR": "Fehler. Transaktion nicht abgeschlossen.",
+    "BAD_ARG": "Ungültiges Argument",
+    "WALLET_WRONG_ID": "Ungültige Wallet-ID",
     "WRONG_PASSWORD": "Ungültiges Passwort",
     "FILE_RESTORED": "The wallet file was corrupted. We have recovered the keys and the wallet from the blockchain",
     "FILE_NOT_FOUND": "Datei nicht gefunden",
     "FILE_EXIST": "A file with that name already exists. Enter another name to save the file under",
     "FILE_NOT_SAVED": "Sie können keine Wallet-Datei in diesem Ordner speichern. Bitte wählen Sie einen anderen Ordner.",
     "TX_TYPE_NORMAL": "Error. The payment from the wallet",
-    "TX_TYPE_NORMAL_TO": "to",
-    "TX_TYPE_NORMAL_END": "was not completed.",
-    "TX_TYPE_NEW_ALIAS": "Error. Failed to register alias to safe",
+    "TX_TYPE_NORMAL_TO": "zu",
+    "TX_TYPE_NORMAL_END": "wurde nicht abgeschlossen.",
+    "TX_TYPE_NEW_ALIAS": "Fehler. Fehler beim Registrieren des Alias zum Speichern",
     "TX_TYPE_NEW_ALIAS_END": "Bitte nochmals versuchen.",
     "TX_TYPE_UPDATE_ALIAS": "Error. Failed to change comment to alias in safe",
-    "TX_TYPE_COIN_BASE": "Error. The payment was not completed."
+    "TX_TYPE_COIN_BASE": "Fehler. Die Zahlung wurde nicht abgeschlossen."
   },
   "CONTEXT_MENU": {
     "COPY": "kopieren",
@@ -575,7 +575,7 @@
     "INCOME_TRANSFER_UNCONFIRMED": "Incoming payment (not confirmed)",
     "INCOME_TRANSFER_CONFIRMED": "Zahlung erhalten",
     "MINED": "Mined",
-    "LOCKED": "Blocked",
+    "LOCKED": "Blockiert",
     "IS_MINIMIZE": "Zano application is minimized to the system tray",
     "RESTORE": "You can recover it by clicking or using the context menu",
     "TRAY_MENU_SHOW": "Resize",
