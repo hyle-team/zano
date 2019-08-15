@@ -8,7 +8,16 @@
 
 
 #define CURRENCY_FORMATION_VERSION                      84
+#define TESTNET_FORMATION_VERSION                       2
+
+#ifndef TESTNET
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
+#else
+#define CURRENCY_GENESIS_NONCE                          (TESTNET_FORMATION_VERSION + CURRENCY_FORMATION_VERSION + 101011010121) 
+#endif
+
+
+
 
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -93,7 +102,7 @@
 #define STRATUM_DEFAULT_PORT                            11777
 #define P2P_NETWORK_ID_TESTNET_FLAG                     0
 #else 
-#define P2P_DEFAULT_PORT                                (11112)
+#define P2P_DEFAULT_PORT                                (11112 + TESTNET_FORMATION_VERSION)
 #define RPC_DEFAULT_PORT                                12111
 #define STRATUM_DEFAULT_PORT                            11888
 #define STRARUM_DEFAULT_PORT                            51113
@@ -213,7 +222,7 @@
 #ifndef TESTNET
 #define ZANO_HARDFORK_1_AFTER_HEIGHT                    166440
 #else
-#define ZANO_HARDFORK_1_AFTER_HEIGHT                    62102
+#define ZANO_HARDFORK_1_AFTER_HEIGHT                    1440
 #endif
 
 
