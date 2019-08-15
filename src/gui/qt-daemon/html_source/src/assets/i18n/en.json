@@ -519,7 +519,6 @@
       "SET_MASTER_PASSWORD": "Set master password",
       "ADDRESS_DUBLICATED": "Address is dublicated",
       "MAX_LENGTH": "Maximum notes length reached",
-      "NAME_WRONG": "Contact has wrong name",
       "NAME_LENGTH": "The name must be 4-25 characters long"
     },
     "BUTTON": {
