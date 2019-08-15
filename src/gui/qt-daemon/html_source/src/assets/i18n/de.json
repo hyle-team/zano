@@ -34,7 +34,7 @@
     "TITLE": "Wallets",
     "ADD_NEW": "+ Hinzufügen",
     "ACCOUNT": {
-      "STAKING": "Staking",
+      "STAKING": "Staking (Anlegen)",
       "MESSAGES": "Neue Angebote/Nachrichten",
       "SYNCING": "Wallet synchronisieren"
     },
@@ -92,7 +92,7 @@
     "BUTTON": "Wallet öffnen",
     "WITH_ADDRESS_ALREADY_OPEN": "Eine Wallet mit dieser Adresse ist bereits geöffnet",
     "FILE_NOT_FOUND1": "Wallet-Datei nicht gefunden",
-    "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
+    "FILE_NOT_FOUND2": "<br/><br/> Es wurde umbenannt oder verschoben. <br/> Um es zu öffnen, verwenden Sie den \"Wallet öffnen\"-Knopf.",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_DUPLICATE": "Name existiert bereits",
@@ -175,7 +175,7 @@
       "HISTORY": "Verlauf",
       "CONTRACTS": "Verträge",
       "MESSAGES": "Nachrichten",
-      "STAKING": "Staking"
+      "STAKING": "Staking (Anlegen)"
     }
   },
   "WALLET_DETAILS": {
