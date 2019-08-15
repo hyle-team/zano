@@ -51,15 +51,15 @@
     },
     "UPDATE": {
       "STANDARD": "Update verfügbar",
-      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Get new update.</span><br><span>Update is recommended!</span>",
+      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Neues Update ausführen.</span><br><span>Update wird empfohlen!</span>",
       "IMPORTANT": "Update verfügbar",
       "IMPORTANT_HINT": "Wichtiges Update!",
-      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Get new update.</span><br><span>Important update!</span>",
+      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Neues Update ausführen.</span><br><span>Wichtiges Update!</span>",
       "CRITICAL": "Update verfügbar",
       "CRITICAL_HINT": "Kritisches Update!",
-      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
+      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Kritisches Update verfügbar.</span><i class=\"icon\"></i><span>Update dringend empfohlen!</span>",
       "TIME": "Systemzeit unterscheidet sich vom Netzwerk",
-      "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
+      "TIME_TOOLTIP": "<span class=\"wrong-time\">Falsche Systemzeit!</span><br><span>Prüfen und korrigieren Sie Ihre Systemzeit.</span>"
     }
   },
   "MAIN": {
@@ -137,9 +137,9 @@
   },
   "SETTINGS": {
     "TITLE": "Einstellungen",
-    "DARK_THEME": "Dark theme",
-    "WHITE_THEME": "White theme",
-    "GRAY_THEME": "Grey theme",
+    "DARK_THEME": "Nachtmodus",
+    "WHITE_THEME": "Tagmodus",
+    "GRAY_THEME": "Graumodus",
     "APP_LOCK": {
       "TITLE": "Programm sperren nach:",
       "TIME1": "5 Minuten",
@@ -186,9 +186,9 @@
     "BUTTON_SAVE": "Speichern",
     "BUTTON_REMOVE": "Wallet schließen",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
+      "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_DUPLICATE": "Name existiert bereits",
-      "MAX_LENGTH": "Maximum name length reached"
+      "MAX_LENGTH": "Maximale Namenslänge erreicht"
     }
   },
   "ASSIGN_ALIAS": {
@@ -210,7 +210,7 @@
       "NAME_LENGTH": "Der Alias muss 6-25 Zeichen lang sein",
       "NAME_EXISTS": "Alias-Name existiert bereits",
       "NO_MONEY": "You do not have enough funds to assign this alias",
-      "MAX_LENGTH": "Maximum comment length reached"
+      "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
     "ONE_ALIAS": "Sie können nur einen Alias pro Wallet erstellen",
     "REQUEST_ADD_REG": "Der Alias wird innerhalb von 10 Minuten zugewiesen"
@@ -226,9 +226,9 @@
     },
     "FORM_ERRORS": {
       "NO_MONEY": "You do not have enough funds to change the comment to this alias",
-      "MAX_LENGTH": "Maximum comment length reached"
+      "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
-    "COST": "Fee {{value}} {{currency}}",
+    "COST": "Gebühr {{Wert}} {{Währung}}",
     "BUTTON_EDIT": "Bearbeiten"
   },
   "TRANSFER_ALIAS": {
@@ -241,7 +241,7 @@
       "PLACEHOLDER": ""
     },
     "ADDRESS": {
-      "LABEL": "Transfer to",
+      "LABEL": "transferieren zu",
       "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
@@ -341,14 +341,14 @@
         "IGNORED": "Sie haben den Vertragsvorschlag ignoriert",
         "ACCEPTED": "Vertrag gestartet",
         "WAIT": "Waiting for contract confirmation",
-        "WAITING_BUYER": "Waiting for delivery",
+        "WAITING_BUYER": "Warte auf Sendung",
         "COMPLETED": "Vertrag abgeschlossen",
         "NOT_RECEIVED": "Senden fehlgeschlagen",
-        "NULLIFIED": "All deposits burned",
+        "NULLIFIED": "Alle Einzahlungen verbrannt",
         "PROPOSAL_CANCEL": "New proposal to cancel contract and return deposits",
         "BEING_CANCELLED": "Abbruch wird durchgeführt",
         "CANCELLED": "Vertrag abgebrochen",
-        "IGNORED_CANCEL": "You ignored cancellation proposal",
+        "IGNORED_CANCEL": "Sie haben den Stornierungsvorschlag ignoriert",
         "EXPIRED": "Vertragsvorschlag ist abgelaufen"
       },
       "BUYER": {
@@ -432,7 +432,7 @@
     "BUTTON_RECEIVED": "Einzahlungen abschließen und freigeben",
     "BUTTON_CANCEL_BUYER": "Einzahlungen abbrechen und zurückzahlen",
     "BUTTON_NOT_CANCEL": "Anfrage ignorieren",
-    "BUTTON_CANCEL_SELLER": "Confirm and return deposits",
+    "BUTTON_CANCEL_SELLER": "Einzahlungen bestätigen und zurückzahlen",
     "HOUR": "Stunde",
     "HOURS": "Stunden",
     "CANCEL": "Abbrechen",
@@ -540,8 +540,8 @@
   "ERRORS": {
     "NO_MONEY": "Nicht genügend Geld",
     "NOT_ENOUGH_MONEY": "Unzureichendes Guthaben im Konto",
-    "CORE_BUSY": "Internal error: core is busy",
-    "DAEMON_BUSY": "Internal error: daemon is busy",
+    "CORE_BUSY": "Interner Fehler: Kern ist beschäftigt",
+    "DAEMON_BUSY": "Interner Fehler: Daemon ist beschäftigt",
     "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",
     "TRANSACTION_IS_TO_BIG": "Transaktion überschreitet das Netzwerk-Limit. Sendet benötigten Betrag mit mehreren Transaktionen.",
@@ -551,11 +551,11 @@
     "BAD_ARG": "Ungültiges Argument",
     "WALLET_WRONG_ID": "Ungültige Wallet-ID",
     "WRONG_PASSWORD": "Ungültiges Passwort",
-    "FILE_RESTORED": "The wallet file was corrupted. We have recovered the keys and the wallet from the blockchain",
+    "FILE_RESTORED": "Die Wallet-Datei wurde beschädigt. Wir haben die Schlüssel und die Wallet von der Blockchain wiederhergestellt",
     "FILE_NOT_FOUND": "Datei nicht gefunden",
     "FILE_EXIST": "Eine Datei mit diesem Namen existiert bereits. Geben Sie einen anderen Namen ein, um die Datei zu speichern",
     "FILE_NOT_SAVED": "Sie können keine Wallet-Datei in diesem Ordner speichern. Bitte wählen Sie einen anderen Ordner.",
-    "TX_TYPE_NORMAL": "Error. The payment from the wallet",
+    "TX_TYPE_NORMAL": "Fehler. Die Zahlung von der Wallet",
     "TX_TYPE_NORMAL_TO": "zu",
     "TX_TYPE_NORMAL_END": "wurde nicht abgeschlossen.",
     "TX_TYPE_NEW_ALIAS": "Fehler. Fehler beim Registrieren des Alias zum Speichern",
