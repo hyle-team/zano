@@ -17,12 +17,12 @@
     "BACK": "Zurück"
   },
   "BREADCRUMBS": {
-    "ADD_WALLET": "Add wallet",
-    "CREATE_WALLET": "Create new wallet",
+    "ADD_WALLET": "Wallet hinzufügen",
+    "CREATE_WALLET": "Neue Wallet erstellen",
     "SAVE_PHRASE": "Save your seed phrase",
-    "OPEN_WALLET": "Open existing wallet",
+    "OPEN_WALLET": "Vorhandene Wallet öffnen",
     "RESTORE_WALLET": "Restore from backup",
-    "WALLET_DETAILS": "Wallet details",
+    "WALLET_DETAILS": "Wallet-Details",
     "ASSIGN_ALIAS": "Assign alias",
     "EDIT_ALIAS": "Alias bearbeiten",
     "TRANSFER_ALIAS": "Transfer alias",
@@ -36,7 +36,7 @@
     "ACCOUNT": {
       "STAKING": "Staking",
       "MESSAGES": "New offers/Messages",
-      "SYNCING": "Syncing wallet"
+      "SYNCING": "Wallet synchronisieren"
     },
     "CONTACTS": "Kontakte",
     "SETTINGS": "Einstellungen",
@@ -44,7 +44,7 @@
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
       "ONLINE": "Online",
-      "ERROR": "System error",
+      "ERROR": "Systemfehler",
       "COMPLETE": "Abschluss",
       "SYNCING": "Syncing blockchain",
       "LOADING": "Lade Blockchain-Daten"
@@ -64,34 +64,34 @@
   },
   "MAIN": {
     "TITLE": "Create or open the wallet to start using Zano",
-    "BUTTON_NEW_WALLET": "Create new wallet",
-    "BUTTON_OPEN_WALLET": "Open existing wallet",
+    "BUTTON_NEW_WALLET": "Neue Wallet erstellen",
+    "BUTTON_OPEN_WALLET": "Vorhandene Wallet öffnen",
     "BUTTON_RESTORE_BACKUP": "Restore from backup",
-    "HELP": "How to create wallet?",
-    "CHOOSE_PATH": "Please choose a path"
+    "HELP": "Wie Wallet erstellen?",
+    "CHOOSE_PATH": "Bitte wählen Sie einen Pfad"
   },
   "CREATE_WALLET": {
-    "NAME": "Wallet name",
-    "PASS": "Set wallet password",
-    "CONFIRM": "Confirm wallet password",
-    "BUTTON_SELECT": "Select wallet location",
-    "BUTTON_CREATE": "Create wallet",
-    "TITLE_SAVE": "Save the wallet file.",
-    "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
-    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
+    "NAME": "Wallet-Name",
+    "PASS": "Wallet-Passwort festlegen",
+    "CONFIRM": "Wallet-Passwort bestätigen",
+    "BUTTON_SELECT": "Wallet-Verzeichnis auswählen",
+    "BUTTON_CREATE": "Wallet erstellen",
+    "TITLE_SAVE": "Wallet-Datei speichern.",
+    "ERROR_CANNOT_SAVE_TOP": "Bestehende Wallet-Dateien können nicht ersetzt oder überschrieben werden",
+    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet-Dateien können nicht auf der OS-Partition gespeichert werden",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
       "NAME_DUPLICATE": "Name existiert bereits",
-      "MAX_LENGTH": "Maximum name length reached",
+      "MAX_LENGTH": "Maximale Namenslänge erreicht",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     }
   },
   "OPEN_WALLET": {
-    "NAME": "Wallet name",
-    "PASS": "Wallet password",
+    "NAME": "Wallet-Name",
+    "PASS": "Wallet-Passwort",
     "BUTTON": "Wallet öffnen",
-    "WITH_ADDRESS_ALREADY_OPEN": "A wallet with this address is already open",
-    "FILE_NOT_FOUND1": "Wallet file not found",
+    "WITH_ADDRESS_ALREADY_OPEN": "Eine Wallet mit dieser Adresse ist bereits geöffnet",
+    "FILE_NOT_FOUND1": "Wallet-Datei nicht gefunden",
     "FILE_NOT_FOUND2": "<br/><br/> It might have been renamed or moved. <br/> To open it, use the \"Open wallet\" button.",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
@@ -100,20 +100,20 @@
     },
     "MODAL": {
       "TITLE": "Type wallet password",
-      "LABEL": "Password to this wallet",
-      "OPEN": "Open wallet",
+      "LABEL": "Passwort für diese Wallet",
+      "OPEN": "Wallet öffnen",
       "SKIP": "Überspringen",
       "NOT_FOUND": "Nicht gefunden"
     }
   },
   "RESTORE_WALLET": {
-    "LABEL_NAME": "Wallet name",
+    "LABEL_NAME": "Wallet-Name",
     "LABEL_PHRASE_KEY": "Seed phrase / private key",
-    "PASS": "Wallet password",
-    "CONFIRM": "Confirm wallet password",
-    "BUTTON_SELECT": "Select wallet location",
-    "BUTTON_CREATE": "Create wallet",
-    "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
+    "PASS": "Wallet-Passwort",
+    "CONFIRM": "Wallet-Passwort bestätigen",
+    "BUTTON_SELECT": "Wallet-Verzeichnis auswählen",
+    "BUTTON_CREATE": "Wallet erstellen",
+    "NOT_CORRECT_FILE_OR_PASSWORD": "Ungültige Wallet-Datei oder Passwort stimmt nicht überein",
     "CHOOSE_PATH": "Please choose a path",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
@@ -130,9 +130,9 @@
     "BUTTON_COPY": "Kopieren"
   },
   "PROGRESS": {
-    "ADD_WALLET": "Add wallet",
+    "ADD_WALLET": "Wallet hinzufügen",
     "SELECT_LOCATION": "Select wallet location",
-    "CREATE_WALLET": "Create new wallet",
+    "CREATE_WALLET": "Neue Wallet erstellen",
     "RESTORE_WALLET": "Restore from backup"
   },
   "SETTINGS": {
@@ -179,7 +179,7 @@
     }
   },
   "WALLET_DETAILS": {
-    "LABEL_NAME": "Wallet name",
+    "LABEL_NAME": "Wallet-Name",
     "LABEL_FILE_LOCATION": "Wallet file location",
     "LABEL_SEED_PHRASE": "Seed phrase",
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
