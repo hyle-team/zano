@@ -2135,9 +2135,13 @@ var BackendService = /** @class */ (function () {
     };
     BackendService.prototype.storeFile = function (path, buff) {
 <<<<<<< HEAD
+<<<<<<< HEAD
         this.backendObject['store_to_file'](path, buff);
 =======
         this.backendObject['store_to_file'](path, (typeof buff === 'string' ? buff : JSON.stringify(buff)));
+>>>>>>> rebuild html
+=======
+        this.backendObject['store_to_file'](path, buff);
 >>>>>>> rebuild html
     };
     BackendService.prototype.loadFile = function (path, callback) {
@@ -2778,6 +2782,7 @@ var VariablesService = /** @class */ (function () {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 module.exports = "<div class=\"content scrolled-content\">\r\n  <div class=\"head\">\r\n    <div class=\"breadcrumbs\">\r\n      <span [routerLink]=\"['/contacts']\">{{ 'CONTACTS.TITLE' | translate }}</span>\r\n      <span>{{ 'CONTACTS.ADD' | translate }}</span>\r\n    </div>\r\n    <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\r\n      <i class=\"icon back\"></i>\r\n      <span>{{ 'COMMON.BACK' | translate }}</span>\r\n    </button>\r\n  </div>\r\n\r\n  <form class=\"form-add\" [formGroup]=\"addContactForm\" (ngSubmit)=\"add()\">\r\n\r\n    <div class=\"input-block input-block-name\">\r\n      <label for=\"add-name\">{{ 'CONTACTS.FORM.NAME' | translate }}</label>\r\n      <input type=\"text\" id=\"add-name\" formControlName=\"name\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['name'].invalid && (addContactForm.controls['name'].dirty || addContactForm.controls['name'].touched)\">\r\n        <div *ngIf=\"addContactForm.controls['name'].errors['minlength'] || addContactForm.controls['name'].errors['maxlength']\">\r\n          {{ 'CONTACTS.FORM_ERRORS.NAME_LENGTH' | translate }}\r\n        </div>\r\n        <div *ngIf=\"addContactForm.controls['name'].errors['required']\">\r\n          {{ 'CONTACTS.FORM_ERRORS.NAME_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"addContactForm.controls['name'].errors['dublicated']\">\r\n          {{ 'CONTACTS.FORM_ERRORS.NAME_DUBLICATED' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block input-block-alias\">\r\n      <label for=\"address\">{{ 'CONTACTS.FORM.ADDRESS' | translate }}</label>\r\n  \r\n      <input type=\"text\" id=\"address\" formControlName=\"address\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n  \r\n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['address'].invalid && (addContactForm.controls['address'].dirty || addContactForm.controls['address'].touched)\">\r\n        <div *ngIf=\"addContactForm.controls['address'].errors['required']\">\r\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"addContactForm.controls['address'].errors['address_not_valid']\">\r\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_NOT_VALID' | translate }}\r\n        </div>\r\n        <div *ngIf=\"addContactForm.controls['address'].errors['dublicated']\">\r\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_DUBLICATED' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block input-block-notes\">\r\n      <label for=\"notes\">{{ 'CONTACTS.FORM.NOTES' | translate }}</label>\r\n  \r\n      <input type=\"text\" id=\"notes\" formControlName=\"notes\" (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      \r\n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['notes'].invalid\">\r\n        <div *ngIf=\"addContactForm.controls['notes'].errors['maxLength']\">\r\n          {{ 'CONTACTS.FORM_ERRORS.MAX_LENGTH' | translate }}\r\n        </div>\r\n      </div>\r\n    </div>\r\n   \r\n    <button type=\"submit\" class=\"blue-button\" [disabled]=\"!addContactForm.valid\">{{ 'CONTACTS.BUTTON.ADD_EDIT' | translate }}</button>\r\n  \r\n    <app-send-modal *ngIf=\"isModalDialogVisible\" [form]=\"addContactForm\" (confirmed)=\"confirmed($event)\"></app-send-modal>\r\n  \r\n  </form>\r\n</div>\r\n"
 =======
 module.exports = "<div class=\"content scrolled-content\">\n  <div class=\"head\">\n    <div class=\"breadcrumbs\">\n      <span [routerLink]=\"['/contacts']\">{{ 'CONTACTS.TITLE' | translate }}</span>\n      <span>{{ 'CONTACTS.ADD' | translate }}</span>\n    </div>\n    <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\n      <i class=\"icon back\"></i>\n      <span>{{ 'COMMON.BACK' | translate }}</span>\n    </button>\n  </div>\n\n  <form class=\"form-add\" [formGroup]=\"addContactForm\" (ngSubmit)=\"add()\">\n\n    <div class=\"input-block input-block-name\">\n      <label for=\"add-name\">{{ 'CONTACTS.FORM.NAME' | translate }}</label>\n      <input type=\"text\" id=\"add-name\" formControlName=\"name\" (contextmenu)=\"variablesService.onContextMenu($event)\">\n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['name'].invalid && (addContactForm.controls['name'].dirty || addContactForm.controls['name'].touched)\">\n        <div *ngIf=\"addContactForm.controls['name'].errors['pattern']\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_WRONG' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.get('name').value.length <= 4 || addContactForm.get('name').value.length > 25\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_LENGTH' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['name'].errors['required']\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_REQUIRED' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['name'].errors['dublicated']\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_DUBLICATED' | translate }}\n        </div>\n      </div>\n    </div>\n\n    <div class=\"input-block input-block-alias\">\n      <label for=\"address\">{{ 'CONTACTS.FORM.ADDRESS' | translate }}</label>\n  \n      <input type=\"text\" id=\"address\" formControlName=\"address\" (contextmenu)=\"variablesService.onContextMenu($event)\">\n  \n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['address'].invalid && (addContactForm.controls['address'].dirty || addContactForm.controls['address'].touched)\">\n        <div *ngIf=\"addContactForm.controls['address'].errors['required']\">\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_REQUIRED' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['address'].errors['address_not_valid']\">\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_NOT_VALID' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['address'].errors['dublicated']\">\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_DUBLICATED' | translate }}\n        </div>\n      </div>\n    </div>\n\n    <div class=\"input-block input-block-notes\">\n      <label for=\"notes\">{{ 'CONTACTS.FORM.NOTES' | translate }}</label>\n  \n      <input type=\"text\" id=\"notes\" formControlName=\"notes\" (contextmenu)=\"variablesService.onContextMenu($event)\">\n      \n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['notes'].invalid\">\n        <div *ngIf=\"addContactForm.controls['notes'].errors['maxLength']\">\n          {{ 'CONTACTS.FORM_ERRORS.MAX_LENGTH' | translate }}\n        </div>\n      </div>\n    </div>\n   \n    <button type=\"submit\" class=\"blue-button\" [disabled]=\"!addContactForm.valid\">{{ 'CONTACTS.BUTTON.ADD_EDIT' | translate }}</button>\n  \n    <app-send-modal *ngIf=\"isModalDialogVisible\" [form]=\"addContactForm\" (confirmed)=\"confirmed($event)\"></app-send-modal>\n  \n  </form>\n</div>\n"
@@ -2785,6 +2790,9 @@ module.exports = "<div class=\"content scrolled-content\">\n  <div class=\"head\
 =======
 module.exports = "<div class=\"content scrolled-content\">\n  <div class=\"head\">\n    <div class=\"breadcrumbs\">\n      <span [routerLink]=\"['/contacts']\">{{ 'CONTACTS.TITLE' | translate }}</span>\n      <span>{{ 'CONTACTS.ADD' | translate }}</span>\n    </div>\n    <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\n      <i class=\"icon back\"></i>\n      <span>{{ 'COMMON.BACK' | translate }}</span>\n    </button>\n  </div>\n\n  <form class=\"form-add\" [formGroup]=\"addContactForm\" (ngSubmit)=\"add()\">\n\n    <div class=\"input-block input-block-name\">\n      <label for=\"add-name\">{{ 'CONTACTS.FORM.NAME' | translate }}</label>\n      <input type=\"text\" id=\"add-name\" formControlName=\"name\" (contextmenu)=\"variablesService.onContextMenu($event)\">\n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['name'].invalid && (addContactForm.controls['name'].dirty || addContactForm.controls['name'].touched)\">\n        <div *ngIf=\"addContactForm.controls['name'].errors['pattern']\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_WRONG' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.get('name').value.length < 4 || addContactForm.get('name').value.length > 25\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_LENGTH' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['name'].errors['required']\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_REQUIRED' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['name'].errors['dublicated']\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_DUBLICATED' | translate }}\n        </div>\n      </div>\n    </div>\n\n    <div class=\"input-block input-block-alias\">\n      <label for=\"address\">{{ 'CONTACTS.FORM.ADDRESS' | translate }}</label>\n  \n      <input type=\"text\" id=\"address\" formControlName=\"address\" (contextmenu)=\"variablesService.onContextMenu($event)\">\n  \n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['address'].invalid && (addContactForm.controls['address'].dirty || addContactForm.controls['address'].touched)\">\n        <div *ngIf=\"addContactForm.controls['address'].errors['required']\">\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_REQUIRED' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['address'].errors['address_not_valid']\">\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_NOT_VALID' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['address'].errors['dublicated']\">\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_DUBLICATED' | translate }}\n        </div>\n      </div>\n    </div>\n\n    <div class=\"input-block input-block-notes\">\n      <label for=\"notes\">{{ 'CONTACTS.FORM.NOTES' | translate }}</label>\n  \n      <input type=\"text\" id=\"notes\" formControlName=\"notes\" (contextmenu)=\"variablesService.onContextMenu($event)\">\n      \n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['notes'].invalid\">\n        <div *ngIf=\"addContactForm.controls['notes'].errors['maxLength']\">\n          {{ 'CONTACTS.FORM_ERRORS.MAX_LENGTH' | translate }}\n        </div>\n      </div>\n    </div>\n   \n    <button type=\"submit\" class=\"blue-button\" [disabled]=\"!addContactForm.valid\">{{ 'CONTACTS.BUTTON.ADD_EDIT' | translate }}</button>\n  \n    <app-send-modal *ngIf=\"isModalDialogVisible\" [form]=\"addContactForm\" (confirmed)=\"confirmed($event)\"></app-send-modal>\n  \n  </form>\n</div>\n"
 >>>>>>> fix add contact + rebuild html
+=======
+module.exports = "<div class=\"content scrolled-content\">\n  <div class=\"head\">\n    <div class=\"breadcrumbs\">\n      <span [routerLink]=\"['/contacts']\">{{ 'CONTACTS.TITLE' | translate }}</span>\n      <span>{{ 'CONTACTS.ADD' | translate }}</span>\n    </div>\n    <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\n      <i class=\"icon back\"></i>\n      <span>{{ 'COMMON.BACK' | translate }}</span>\n    </button>\n  </div>\n\n  <form class=\"form-add\" [formGroup]=\"addContactForm\" (ngSubmit)=\"add()\">\n\n    <div class=\"input-block input-block-name\">\n      <label for=\"add-name\">{{ 'CONTACTS.FORM.NAME' | translate }}</label>\n      <input type=\"text\" id=\"add-name\" formControlName=\"name\" (contextmenu)=\"variablesService.onContextMenu($event)\">\n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['name'].invalid && (addContactForm.controls['name'].dirty || addContactForm.controls['name'].touched)\">\n        <div *ngIf=\"addContactForm.controls['name'].errors['minlength'] || addContactForm.controls['name'].errors['maxlength']\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_LENGTH' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['name'].errors['required']\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_REQUIRED' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['name'].errors['dublicated']\">\n          {{ 'CONTACTS.FORM_ERRORS.NAME_DUBLICATED' | translate }}\n        </div>\n      </div>\n    </div>\n\n    <div class=\"input-block input-block-alias\">\n      <label for=\"address\">{{ 'CONTACTS.FORM.ADDRESS' | translate }}</label>\n  \n      <input type=\"text\" id=\"address\" formControlName=\"address\" (contextmenu)=\"variablesService.onContextMenu($event)\">\n  \n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['address'].invalid && (addContactForm.controls['address'].dirty || addContactForm.controls['address'].touched)\">\n        <div *ngIf=\"addContactForm.controls['address'].errors['required']\">\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_REQUIRED' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['address'].errors['address_not_valid']\">\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_NOT_VALID' | translate }}\n        </div>\n        <div *ngIf=\"addContactForm.controls['address'].errors['dublicated']\">\n          {{ 'CONTACTS.FORM_ERRORS.ADDRESS_DUBLICATED' | translate }}\n        </div>\n      </div>\n    </div>\n\n    <div class=\"input-block input-block-notes\">\n      <label for=\"notes\">{{ 'CONTACTS.FORM.NOTES' | translate }}</label>\n  \n      <input type=\"text\" id=\"notes\" formControlName=\"notes\" (contextmenu)=\"variablesService.onContextMenu($event)\">\n      \n      <div class=\"error-block\" *ngIf=\"addContactForm.controls['notes'].invalid\">\n        <div *ngIf=\"addContactForm.controls['notes'].errors['maxLength']\">\n          {{ 'CONTACTS.FORM_ERRORS.MAX_LENGTH' | translate }}\n        </div>\n      </div>\n    </div>\n   \n    <button type=\"submit\" class=\"blue-button\" [disabled]=\"!addContactForm.valid\">{{ 'CONTACTS.BUTTON.ADD_EDIT' | translate }}</button>\n  \n    <app-send-modal *ngIf=\"isModalDialogVisible\" [form]=\"addContactForm\" (confirmed)=\"confirmed($event)\"></app-send-modal>\n  \n  </form>\n</div>\n"
+>>>>>>> rebuild html
 
 /***/ }),
 
@@ -2901,10 +2909,15 @@ var AddContactsComponent = /** @class */ (function () {
             name: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"]('', [
                 _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required,
 <<<<<<< HEAD
+<<<<<<< HEAD
                 _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].minLength(4),
                 _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].maxLength(25),
 =======
                 _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].pattern(/^[\w\s-_.]{4,25}$/),
+>>>>>>> rebuild html
+=======
+                _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].minLength(4),
+                _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].maxLength(25),
 >>>>>>> rebuild html
                 function (g) {
                     if (g.value) {
@@ -4775,7 +4788,7 @@ var ContactSendComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"content scrolled-content\">\n  <div>\n    <div class=\"head\">\n      <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\n        <i class=\"icon back\"></i>\n        <span>{{ 'COMMON.BACK' | translate }}</span>\n      </button>\n    </div>\n\n    <h3 class=\"contacts-title\">{{ 'CONTACTS.TITLE' | translate }}</h3>\n\n    <div class=\"wrap-table\">\n      <ng-container>\n        <table\n          *ngIf=\"this.variablesService.contacts.length !== 0; else emptyList\"\n        >\n          <thead>\n            <tr #head (window:resize)=\"calculateWidth()\">\n              <th>{{ 'CONTACTS.TABLE.NAME' | translate }}</th>\n              <th>{{ 'CONTACTS.TABLE.ALIAS' | translate }}</th>\n              <th>{{ 'CONTACTS.TABLE.ADDRESS' | translate }}</th>\n              <th>{{ 'CONTACTS.TABLE.NOTES' | translate }}</th>\n              <th></th>\n            </tr>\n          </thead>\n          <tbody>\n            <ng-container\n              *ngFor=\"\n                let contact of this.variablesService.contacts;\n                let i = index\n              \"\n            >\n              <tr>\n                <td>\n                  {{ contact.name }}\n                </td>\n                <td>\n                  <ng-container *ngIf=\"contact.alias\">\n                    <span\n                      class=\"alias\"\n                      (click)=\"openInBrowser(contact.alias)\"\n                      >{{ contact.alias }}</span\n                    >\n                  </ng-container>\n                </td>\n                <td class=\"remote-address\">\n                  {{ contact.address }}\n                </td>\n                <td class=\"remote-notes\">\n                  {{ contact.notes }}\n                </td>\n                <td>\n                  <div class=\"button-wrapper\">\n                    <button\n                      [routerLink]=\"['/contact-send/' + i]\"\n                      [queryParams]=\"{ address: contact.address }\"\n                    >\n                      <i class=\"icon transfer\"></i>\n                      <span>{{ 'CONTACTS.BUTTON.SEND' | translate }}</span>\n                    </button>\n                    <button\n                      [routerLink]=\"['/edit-contacts/' + i]\"\n                      [queryParams]=\"{ id: i }\"\n                    >\n                      <i class=\"icon edit\"></i>\n                      <span>{{ 'CONTACTS.BUTTON.EDIT' | translate }}</span>\n                    </button>\n                    <button (click)=\"delete(i)\">\n                      <i class=\"icon delete\"></i>\n                      <span>{{ 'CONTACTS.BUTTON.DELETE' | translate }}</span>\n                    </button>\n                  </div>\n                </td>\n              </tr>\n            </ng-container>\n          </tbody>\n        </table>\n      </ng-container>\n\n      <ng-template #emptyList>\n        <div class=\"empty-list\">\n          {{ 'CONTACTS.TABLE.EMPTY' | translate }}\n        </div>\n      </ng-template>\n    </div>\n\n    <button [routerLink]=\"['/add-contacts']\" class=\"blue-button\">\n      {{ 'CONTACTS.BUTTON.ADD' | translate }}\n    </button>\n\n    <div class=\"footer\">\n      <button type=\"button\" class=\"import-btn\" [routerLink]=\"['/import']\">\n        <i class=\"icon import\"></i>\n        <span>{{ 'CONTACTS.BUTTON.IMPORT_EXPORT' | translate }}</span>\n      </button>\n    </div>\n  </div>\n</div>\n"
+module.exports = "<div class=\"content scrolled-content\">\n  <div>\n    <div class=\"head\">\n      <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\n        <i class=\"icon back\"></i>\n        <span>{{ 'COMMON.BACK' | translate }}</span>\n      </button>\n    </div>\n\n    <h3 class=\"contacts-title\">{{ 'CONTACTS.TITLE' | translate }}</h3>\n\n    <div class=\"wrap-table\">\n      <ng-container>\n        <table\n          *ngIf=\"this.variablesService.contacts.length !== 0; else emptyList\"\n        >\n          <thead>\n            <tr #head (window:resize)=\"calculateWidth()\">\n              <th>{{ 'CONTACTS.TABLE.NAME' | translate }}</th>\n              <th>{{ 'CONTACTS.TABLE.ALIAS' | translate }}</th>\n              <th>{{ 'CONTACTS.TABLE.ADDRESS' | translate }}</th>\n              <th>{{ 'CONTACTS.TABLE.NOTES' | translate }}</th>\n              <th></th>\n            </tr>\n          </thead>\n          <tbody>\n            <ng-container\n              *ngFor=\"\n                let contact of this.variablesService.contacts;\n                let i = index\n              \"\n            >\n              <tr>\n                <td>\n                  {{ contact.name }}\n                </td>\n                <td>\n                  <ng-container *ngIf=\"contact.alias\">\n                    <span>{{ contact.alias }}</span\n                    >\n                  </ng-container>\n                </td>\n                <td class=\"remote-address\">\n                  {{ contact.address }}\n                </td>\n                <td class=\"remote-notes\">\n                  {{ contact.notes }}\n                </td>\n                <td>\n                  <div class=\"button-wrapper\">\n                    <button\n                      [routerLink]=\"['/contact-send/' + i]\"\n                      [queryParams]=\"{ address: contact.address }\"\n                    >\n                      <i class=\"icon transfer\"></i>\n                      <span>{{ 'CONTACTS.BUTTON.SEND' | translate }}</span>\n                    </button>\n                    <button\n                      [routerLink]=\"['/edit-contacts/' + i]\"\n                      [queryParams]=\"{ id: i }\"\n                    >\n                      <i class=\"icon edit\"></i>\n                      <span>{{ 'CONTACTS.BUTTON.EDIT' | translate }}</span>\n                    </button>\n                    <button (click)=\"delete(i)\">\n                      <i class=\"icon delete\"></i>\n                      <span>{{ 'CONTACTS.BUTTON.DELETE' | translate }}</span>\n                    </button>\n                  </div>\n                </td>\n              </tr>\n            </ng-container>\n          </tbody>\n        </table>\n      </ng-container>\n\n      <ng-template #emptyList>\n        <div class=\"empty-list\">\n          {{ 'CONTACTS.TABLE.EMPTY' | translate }}\n        </div>\n      </ng-template>\n    </div>\n\n    <button [routerLink]=\"['/add-contacts']\" class=\"blue-button\">\n      {{ 'CONTACTS.BUTTON.ADD' | translate }}\n    </button>\n\n    <div class=\"footer\">\n      <button type=\"button\" class=\"import-btn\" [routerLink]=\"['/import']\">\n        <i class=\"icon import\"></i>\n        <span>{{ 'CONTACTS.BUTTON.IMPORT_EXPORT' | translate }}</span>\n      </button>\n    </div>\n  </div>\n</div>\n"
 
 /***/ }),
 
@@ -4841,11 +4854,13 @@ var ContactsComponent = /** @class */ (function () {
         this.calculatedWidth.push(this.head.nativeElement.childNodes[3].clientWidth);
         this.calculatedWidth.push(this.head.nativeElement.childNodes[4].clientWidth);
     };
-    ContactsComponent.prototype.openInBrowser = function (alias) {
-        if (alias !== null) {
-            this.backend.openUrlInBrowser("explorer.zano.org/aliases/" + alias.slice(1));
-        }
-    };
+    // openInBrowser(alias: string) {
+    //   if (alias !== null) {
+    //     this.backend.openUrlInBrowser(
+    //       `explorer.zano.org/aliases/${alias.slice(1)}#modalOpen`
+    //     );
+    //   }
+    // }
     ContactsComponent.prototype.back = function () {
         this.location.back();
     };
@@ -5457,6 +5472,7 @@ var ExportImportComponent = /** @class */ (function () {
         });
         this.backend.saveFileDialog('', '*', this.variablesService.settings.default_path, function (file_status, file_data) {
 <<<<<<< HEAD
+<<<<<<< HEAD
             if (!_this.variablesService.contacts.length && !(file_data.error_code === 'CANCELED')) {
                 _this.modalService.prepareModal('error', 'CONTACTS.ERROR_EMPTY_LIST');
             }
@@ -5469,6 +5485,14 @@ var ExportImportComponent = /** @class */ (function () {
 =======
             if (file_status) {
                 _this.backend.storeFile(file_data.path, _this.papa.unparse(contacts));
+>>>>>>> rebuild html
+=======
+            if (file_status && _this.isValid(file_data.path)) {
+                _this.backend.storeFile(file_data.path, _this.papa.unparse(contacts));
+                _this.modalService.prepareModal('success', 'CONTACTS.SUCCESS_EXPORT');
+            }
+            if (!(file_data.error_code === 'CANCELED') && !_this.isValid(file_data.path)) {
+                _this.modalService.prepareModal('error', 'CONTACTS.ERROR_EXPORT');
 >>>>>>> rebuild html
             }
         });
@@ -5848,6 +5872,7 @@ var LoginComponent = /** @class */ (function () {
                 _this.variablesService.startCountdown();
                 _this.variablesService.appPass = appPass;
 <<<<<<< HEAD
+<<<<<<< HEAD
                 var isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
 =======
                 if (Object.keys(data['contacts']).length !== 0) {
@@ -5856,6 +5881,8 @@ var LoginComponent = /** @class */ (function () {
                     });
                 }
 >>>>>>> rebuild html
+=======
+>>>>>>> rebuild html
                 if (_this.variablesService.wallets.length) {
                     _this.ngZone.run(function () {
                         _this.router.navigate(['/wallet/' + _this.variablesService.wallets[0].wallet_id]);
@@ -5863,6 +5890,9 @@ var LoginComponent = /** @class */ (function () {
                     return;
                 }
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> rebuild html
                 if (data.hasOwnProperty('contacts')) {
                     if (Object.keys(data['contacts']).length !== 0) {
                         data['contacts'].map(function (contact) {
@@ -5881,7 +5911,11 @@ var LoginComponent = /** @class */ (function () {
                     }
                 }
                 if (!data.hasOwnProperty('wallets') && !data.hasOwnProperty('contacts')) {
+<<<<<<< HEAD
                     if (data.length !== 0 && !isEmptyObject) {
+=======
+                    if (data.length !== 0) {
+>>>>>>> rebuild html
                         _this.getWalletData(data);
                     }
                     else {
@@ -5916,6 +5950,7 @@ var LoginComponent = /** @class */ (function () {
                         }
                         _this.backend.getContracts(open_data.wallet_id, function (contracts_status, contracts_data) {
                             if (contracts_status && contracts_data.hasOwnProperty('contracts')) {
+<<<<<<< HEAD
 =======
                 if (Object.keys(data['wallets']).length !== 0) {
                     var openWallets_1 = 0;
@@ -5924,6 +5959,8 @@ var LoginComponent = /** @class */ (function () {
                         _this.backend.openWallet(wallet.path, wallet.pass, true, function (open_status, open_data, open_error) {
                             if (open_status || open_error === 'FILE_RESTORED') {
                                 openWallets_1++;
+>>>>>>> rebuild html
+=======
 >>>>>>> rebuild html
                                 _this.ngZone.run(function () {
                                     new_wallet.prepareContractsAfterOpen(contracts_data.contracts, _this.variablesService.exp_med_ts, _this.variablesService.height_app, _this.variablesService.settings.viewedContracts, _this.variablesService.settings.notViewedContracts);
