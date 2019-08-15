@@ -21,11 +21,11 @@
     "CREATE_WALLET": "Neue Wallet erstellen",
     "SAVE_PHRASE": "Save your seed phrase",
     "OPEN_WALLET": "Vorhandene Wallet öffnen",
-    "RESTORE_WALLET": "Restore from backup",
+    "RESTORE_WALLET": "Aus Backup wiederherstellen",
     "WALLET_DETAILS": "Wallet-Details",
     "ASSIGN_ALIAS": "Alias zuweisen",
     "EDIT_ALIAS": "Alias bearbeiten",
-    "TRANSFER_ALIAS": "Transfer alias",
+    "TRANSFER_ALIAS": "Alias übertragen",
     "CONTRACTS": "Verträge",
     "NEW_PURCHASE": "Neuer Kauf",
     "OLD_PURCHASE": "Kauf"
@@ -35,7 +35,7 @@
     "ADD_NEW": "+ Hinzufügen",
     "ACCOUNT": {
       "STAKING": "Staking",
-      "MESSAGES": "New offers/Messages",
+      "MESSAGES": "Neue Angebote/Nachrichten",
       "SYNCING": "Wallet synchronisieren"
     },
     "CONTACTS": "Kontakte",
@@ -66,7 +66,7 @@
     "TITLE": "Erstellen oder öffnen Sie die Wallet, um Zano zu verwenden",
     "BUTTON_NEW_WALLET": "Neue Wallet erstellen",
     "BUTTON_OPEN_WALLET": "Vorhandene Wallet öffnen",
-    "BUTTON_RESTORE_BACKUP": "Restore from backup",
+    "BUTTON_RESTORE_BACKUP": "Aus Backup wiederherstellen",
     "HELP": "Wie Wallet erstellen?",
     "CHOOSE_PATH": "Bitte wählen Sie einen Pfad"
   },
@@ -133,7 +133,7 @@
     "ADD_WALLET": "Wallet hinzufügen",
     "SELECT_LOCATION": "Wallet-Verzeichnis auswählen",
     "CREATE_WALLET": "Neue Wallet erstellen",
-    "RESTORE_WALLET": "Restore from backup"
+    "RESTORE_WALLET": "Aus Backup wiederherstellen"
   },
   "SETTINGS": {
     "TITLE": "Einstellungen",
@@ -155,7 +155,7 @@
       "BUTTON": "Speichern"
     },
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required",
+      "PASS_REQUIRED": "Passwort ist erforderlich",
       "PASS_NOT_MATCH": "Old password not match",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     },
@@ -194,7 +194,7 @@
   "ASSIGN_ALIAS": {
     "NAME": {
       "LABEL": "Alias",
-      "PLACEHOLDER": "@ Enter alias",
+      "PLACEHOLDER": "@ Alias eingeben",
       "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
     },
     "COMMENT": {
@@ -206,14 +206,14 @@
     "BUTTON_ASSIGN": "Zuweisen",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
-      "NAME_WRONG": "Alias has wrong name",
+      "NAME_WRONG": "Alias hat einen falschen Namen",
       "NAME_LENGTH": "Der Alias muss 6-25 Zeichen lang sein",
-      "NAME_EXISTS": "Alias name already exists",
+      "NAME_EXISTS": "Alias-Name existiert bereits",
       "NO_MONEY": "You do not have enough funds to assign this alias",
       "MAX_LENGTH": "Maximum comment length reached"
     },
     "ONE_ALIAS": "Sie können nur einen Alias pro Wallet erstellen",
-    "REQUEST_ADD_REG": "The alias will be assigned within 10 minutes"
+    "REQUEST_ADD_REG": "Der Alias wird innerhalb von 10 Minuten zugewiesen"
   },
   "EDIT_ALIAS": {
     "NAME": {
@@ -221,7 +221,7 @@
       "PLACEHOLDER": "@ Alias eingeben"
     },
     "COMMENT": {
-      "LABEL": "Comment",
+      "LABEL": "Kommentar",
       "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
@@ -237,7 +237,7 @@
       "PLACEHOLDER": "@ Alias eingeben"
     },
     "COMMENT": {
-      "LABEL": "Comment",
+      "LABEL": "Kommentar",
       "PLACEHOLDER": ""
     },
     "ADDRESS": {
@@ -246,13 +246,13 @@
     },
     "FORM_ERRORS": {
       "WRONG_ADDRESS": "Keine Wallet mit diesem Konto existiert",
-      "ALIAS_EXISTS": "This account already has an alias",
+      "ALIAS_EXISTS": "Dieses Konto hat bereits einen Alias",
       "NO_MONEY": "You do not have enough funds to transfer this alias"
     },
     "COST": "Transfer fee {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Transfer",
     "BUTTON_CANCEL": "Abbrechen",
-    "REQUEST_SEND_REG": "The alias will be transferred within 10 minutes"
+    "REQUEST_SEND_REG": "Der Alias wird innerhalb von 10 Minuten übertragen"
   },
   "SEND": {
     "ADDRESS": "Adresse",
@@ -278,7 +278,7 @@
   "HISTORY": {
     "STATUS": "Status",
     "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
-    "LOCK_TOOLTIP": "Locked till {{date}}",
+    "LOCK_TOOLTIP": "Gesperrt bis {{Datum}}",
     "SEND": "Gesendet",
     "RECEIVED": "Empfangen",
     "DATE": "Datum",
@@ -289,7 +289,7 @@
       "PAYMENT_ID": "Zahlungs-ID",
       "ID": "Transaktions-ID",
       "SIZE": "Transaktionsgröße",
-      "SIZE_VALUE": "{{value}} bytes",
+      "SIZE_VALUE": "{{Wert}} Bytes",
       "HEIGHT": "Höhe",
       "CONFIRMATION": "Bestätigung",
       "INPUTS": "Inputs",
@@ -301,11 +301,11 @@
       "UNDEFINED": "Unbedefiniert",
       "COMPLETE_BUYER": "Vertrag abgeschlossen",
       "COMPLETE_SELLER": "Vertrag abgeschlossen",
-      "CREATE_ALIAS": "Fee for assigning alias",
-      "UPDATE_ALIAS": "Fee for editing alias",
-      "POW_REWARD": "POW reward",
-      "POS_REWARD": "POS reward",
-      "CREATE_CONTRACT": "Contract proposal",
+      "CREATE_ALIAS": "Gebühr für die Zuordnung eines Alias",
+      "UPDATE_ALIAS": "Gebühr für die Bearbeitung eines Alias",
+      "POW_REWARD": "POW-Belohnung",
+      "POS_REWARD": "POS-Belohnung",
+      "CREATE_CONTRACT": "Vertragsvorschlag",
       "PLEDGE_CONTRACT": "Contract deposit",
       "NULLIFY_CONTRACT": "Einzahlungen verbrennen",
       "PROPOSAL_CANCEL_CONTRACT": "Stornierungsanfrage",
@@ -325,12 +325,12 @@
     "LISTING_BUTTON": "Create listing",
     "TIME_LEFT": {
       "REMAINING_LESS_ONE": "Weniger als eine Stunde, um zu antworten",
-      "REMAINING_ONE": "{{time}} hour remains",
-      "REMAINING_MANY": "{{time}} hours remain",
-      "REMAINING_MANY_ALT": "{{time}} hours remain",
-      "REMAINING_ONE_RESPONSE": "{{time}} hour remains",
-      "REMAINING_MANY_RESPONSE": "{{time}} hours remain",
-      "REMAINING_MANY_ALT_RESPONSE": "{{time}} hours remain",
+      "REMAINING_ONE": "{{Zeit}} verbleibende Stunde",
+      "REMAINING_MANY": "{{Zeit}} verbleibende Stunden",
+      "REMAINING_MANY_ALT": "{{Zeit}} verbleibende Stunden",
+      "REMAINING_ONE_RESPONSE": "{{Zeit}} verbleibende Stunde",
+      "REMAINING_MANY_RESPONSE": "{{Zeit}} verbleibende Stunde",
+      "REMAINING_MANY_ALT_RESPONSE": "{{Zeit}} verbleibende Stunden",
       "REMAINING_ONE_WAITING": "Waiting for {{time}} hour",
       "REMAINING_MANY_WAITING": "Waiting for {{time}} hours",
       "REMAINING_MANY_ALT_WAITING": "Waiting for {{time}} hours"
@@ -363,7 +363,7 @@
         "WAITING_CANCEL": "Waiting for contract cancellation",
         "BEING_CANCELLED": "Cancellation in progress",
         "CANCELLED": "Vertrag abgebrochen",
-        "IGNORED_CANCEL": "The seller ignored your proposal to cancel the contract",
+        "IGNORED_CANCEL": "Der Verkäufer hat Ihren Vorschlag zur Stornierung des Vertrages ignoriert",
         "EXPIRED": "The contract proposal has expired"
       }
     }
@@ -373,16 +373,16 @@
     "SELLER": "Verkäufer",
     "AMOUNT": "Betrag",
     "YOUR_DEPOSIT": "Ihre Einzahlung",
-    "SELLER_DEPOSIT": "Seller deposit",
-    "BUYER_DEPOSIT": "Buyer deposit",
+    "SELLER_DEPOSIT": "Einzahlung Verkäufer",
+    "BUYER_DEPOSIT": "Einzahlung Käufer",
     "SAME_AMOUNT": "Gleicher Betrag",
-    "COMMENT": "Comment",
-    "DETAILS": "Additional details",
+    "COMMENT": "Kommentar",
+    "DETAILS": "Zusätzliche Informationen",
     "SEND_BUTTON": "Senden",
     "FORM_ERRORS": {
       "DESC_REQUIRED": "Beschreibung erforderlich",
       "DESC_MAXIMUM": "Maximum field length reached",
-      "SELLER_REQUIRED": "Address required",
+      "SELLER_REQUIRED": "Adresse benötigt",
       "SELLER_NOT_VALID": "Ungültige Adresse",
       "ALIAS_NOT_VALID": "Ungültiger Alias",
       "AMOUNT_REQUIRED": "Betrag ist erforderlich",
@@ -403,18 +403,18 @@
       "WAITING_SELLER": "Warte auf Antwort",
       "WAITING_BUYER": "Vertragsvorschlag erhalten",
       "WAITING_CONFIRMATION": "Warten auf die Bestätigung der Einzahlungen",
-      "WAITING_DELIVERY": "Waiting for delivery",
+      "WAITING_DELIVERY": "Warte auf Sendung",
       "COMPLETED": "Vertrag abgeschlossen",
       "IGNORED_BUYER": "Vertragsvorschlag ignoriert",
-      "IGNORED_SELLER": "The seller ignored your contract proposal",
-      "PROPOSAL_CANCEL_SELLER": "Cancellation request sent",
+      "IGNORED_SELLER": "Der Verkäufer ignorierte Ihren Vertragsvorschlag",
+      "PROPOSAL_CANCEL_SELLER": "Stornierungsanfrage gesendet",
       "PROPOSAL_CANCEL_BUYER": "Stornierungsanfrage erhalten",
       "BEING_CANCELLED": "Abbruch wird durchgeführt",
       "IGNORED_CANCEL_SELLER": "The seller ignored your proposal to cancel the contract",
-      "IGNORED_CANCEL_BUYER": "Contract cancellation proposal ignored",
+      "IGNORED_CANCEL_BUYER": "Vertragsstornierungsanfrage ignoriert",
       "CANCELLED": "Vertrag abgebrochen",
       "EXPIRED": "Vertragsvorschlag abgelaufen",
-      "NOT_RECEIVED": "Delivery failed",
+      "NOT_RECEIVED": "Senden fehlgeschlagen",
       "NULLIFIED": "Alle Einzahlungen verbrannt"
     },
     "ACCEPT_STATE_WAIT_BIG": "Vertrag gestartet",
@@ -423,14 +423,14 @@
     "SUCCESS_FINISH_PROPOSAL": "Vertrag abgeschlossen",
     "SEND_CANCEL_PROPOSAL": "Stornierungsanfrage gesendet",
     "IGNORED_CANCEL": "Vertragsstornierungsanfrage ignoriert",
-    "DEALS_CANCELED_WAIT": "Cancellation in progress",
-    "WAITING_TIME": "Response time",
+    "DEALS_CANCELED_WAIT": "Abbruch wird durchgeführt",
+    "WAITING_TIME": "Antwortzeit",
     "NEED_MONEY": "Unzureichendes Guthaben",
     "BUTTON_MAKE_PLEDGE": "Akzeptieren und Einzahlung tätigen",
     "BUTTON_IGNORE": "Angebot ignorieren und ausblenden",
     "BUTTON_NULLIFY": "Terminate and burn deposits",
-    "BUTTON_RECEIVED": "Complete and release deposits",
-    "BUTTON_CANCEL_BUYER": "Cancel and return deposits",
+    "BUTTON_RECEIVED": "Einzahlungen abschließen und freigeben",
+    "BUTTON_CANCEL_BUYER": "Einzahlungen abbrechen und zurückzahlen",
     "BUTTON_NOT_CANCEL": "Anfrage ignorieren",
     "BUTTON_CANCEL_SELLER": "Confirm and return deposits",
     "HOUR": "Stunde",
@@ -460,7 +460,7 @@
       "SEND": "Senden",
       "FROM": "Von",
       "TO": "Zu",
-      "COMMENT": "Comment"
+      "COMMENT": "Kommentar"
     }
   },
   "STAKING": {
@@ -578,7 +578,7 @@
     "LOCKED": "Blockiert",
     "IS_MINIMIZE": "Zano application is minimized to the system tray",
     "RESTORE": "You can recover it by clicking or using the context menu",
-    "TRAY_MENU_SHOW": "Resize",
+    "TRAY_MENU_SHOW": "Größe ändern",
     "TRAY_MENU_MINIMIZE": "Minimieren"
   }
 }
