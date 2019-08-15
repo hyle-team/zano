@@ -517,7 +517,7 @@
       "ADDRESS_REQUIRED": "Adresse requise",
       "ADDRESS_NOT_VALID": "Addresse invalide",
       "SET_MASTER_PASSWORD": "Définir le mot de passe maître",
-      "ADDRESS_DUBLICATED": "Address is dublicated",
+      "ADDRESS_DUBLICATED": "L'addresse est dupliquée",
       "MAX_LENGTH": "Longueur maximale des notes atteinte",
       "NAME_WRONG": "Le contact a un nom incorrect",
       "NAME_LENGTH": "Le nom doit contenir 4-25 caractères"
@@ -533,9 +533,9 @@
     },
     "SUCCESS_SENT": "Contact ajouté",
     "SUCCESS_SAVE": "Contact modifié",
-    "SUCCESS_IMPORT": "Contacts is imported",
-    "ERROR_IMPORT": "Error is occured while reading file!",
-    "ERROR_TYPE_FILE": "Please import valid .csv file."
+    "SUCCESS_IMPORT": "Contacts importés",
+    "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
+    "ERROR_TYPE_FILE": "Veuillez importer un fichier .csv valide."
   },
   "ERRORS": {
     "NO_MONEY": "Pas assez de fonds",
