@@ -202,7 +202,7 @@
       "PLACEHOLDER": "",
       "TOOLTIP": "Le commentaire sera visible à quiconque souhaite effectuer un paiement à votre alias. Vous pouvez fournir des détails sur votre entreprise, vos informations de contact ou inclure tout texte. Les commentaires peuvent être modifiés plus tard."
     },
-    "COST": "Alias fee {{value}} {{currency}}",
+    "COST": "Frais d'alias {{value}} {{currency}}",
     "BUTTON_ASSIGN": "Assigner",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Le nom est requis",
@@ -228,7 +228,7 @@
       "NO_MONEY": "Vous n'avez pas assez de fonds pour changer le commentaire de cet alias",
       "MAX_LENGTH": "Longueur maximale du commentaire atteinte"
     },
-    "COST": "Fee {{value}} {{currency}}",
+    "COST": "Frais {{value}} {{currency}}",
     "BUTTON_EDIT": "Modifier"
   },
   "TRANSFER_ALIAS": {
