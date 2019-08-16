@@ -159,7 +159,7 @@
       "PASS_NOT_MATCH": "Old password not match",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     },
-    "LAST_BUILD": "Current build: {{value}}",
+    "LAST_BUILD": "Aktueller Build: {{value}}",
     "APP_LOG_TITLE": "Log level:"
   },
   "WALLET": {
@@ -195,14 +195,14 @@
     "NAME": {
       "LABEL": "Alias",
       "PLACEHOLDER": "@ Alias eingeben",
-      "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
+      "TOOLTIP": "Ein Alias ist eine verkürzte Form Ihres Kontos. Ein Alias kann nur lateinische Buchstaben, Zahlen und die Zeichen „.“ und “-” enthalten. Es muss mit “@” beginnen."
     },
     "COMMENT": {
       "LABEL": "Kommentar",
       "PLACEHOLDER": "",
-      "TOOLTIP": "The comment will be visible to anyone who wants to make a payment to your alias. You can provide details about your business, contacts, or include any text. Comments can be edited later."
+      "TOOLTIP": "Der Kommentar wird für jeden sichtbar sein, der eine Zahlung an Ihren Alias vornehmen möchte. Sie können Details über Ihre Geschäfte, Kontakte oder Text angeben. Kommentare können später bearbeitet werden."
     },
-    "COST": "Alias fee {{value}} {{currency}}",
+    "COST": "Alias-Gebühr {{Wert}} {{Währung}}",
     "BUTTON_ASSIGN": "Zuweisen",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
@@ -249,7 +249,7 @@
       "ALIAS_EXISTS": "Dieses Konto hat bereits einen Alias",
       "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zu transferieren"
     },
-    "COST": "Transfer fee {{value}} {{currency}}",
+    "COST": "Überweisungsgebühr {{Wert}} {{Währung}}",
     "BUTTON_TRANSFER": "Transfer",
     "BUTTON_CANCEL": "Abbrechen",
     "REQUEST_SEND_REG": "Der Alias wird innerhalb von 10 Minuten übertragen"
@@ -354,7 +354,7 @@
       "BUYER": {
         "WAITING": "Warte auf Antwort",
         "IGNORED": "Verkäufer ignorierte Ihren Vertragsvorschlag",
-        "ACCEPTED": "Seller accepted your contract proposal",
+        "ACCEPTED": "Verkäufer hat Ihren Vertragsvorschlag akzeptiert",
         "WAIT": "Warten auf die Bestätigung der Einzahlungen",
         "WAITING_SELLER": "Warte auf Sendung",
         "COMPLETED": "Vertrag abgeschlossen",
@@ -381,7 +381,7 @@
     "SEND_BUTTON": "Senden",
     "FORM_ERRORS": {
       "DESC_REQUIRED": "Beschreibung erforderlich",
-      "DESC_MAXIMUM": "Maximum field length reached",
+      "DESC_MAXIMUM": "Maximale Feldlänge erreicht",
       "SELLER_REQUIRED": "Adresse benötigt",
       "SELLER_NOT_VALID": "Ungültige Adresse",
       "ALIAS_NOT_VALID": "Ungültiger Alias",
@@ -390,7 +390,7 @@
       "YOUR_DEPOSIT_REQUIRED": "Einzahlung erforderlich",
       "SELLER_DEPOSIT_REQUIRED": "Verkäufer-Einzahlung erforderlich",
       "SELLER_SAME": "Anderes Konto verwenden",
-      "COMMENT_MAXIMUM": "Maximum field length reached"
+      "COMMENT_MAXIMUM": "Maximale Feldlänge erreicht"
     },
     "PROGRESS_NEW": "Neuer Kauf",
     "PROGRESS_WAIT": "Warte auf Antwort",
@@ -577,7 +577,7 @@
     "INCOME_TRANSFER_CONFIRMED": "Zahlung erhalten",
     "MINED": "Mined",
     "LOCKED": "Blockiert",
-    "IS_MINIMIZE": "Zano application is minimized to the system tray",
+    "IS_MINIMIZE": "Zano-Anwendung wird auf die Systemleiste minimiert",
     "RESTORE": "You can recover it by clicking or using the context menu",
     "TRAY_MENU_SHOW": "Größe ändern",
     "TRAY_MENU_MINIMIZE": "Minimieren"
