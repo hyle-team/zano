@@ -34,7 +34,7 @@
     "TITLE": "Wallets",
     "ADD_NEW": "+ Hinzufügen",
     "ACCOUNT": {
-      "STAKING": "Staking (Anlegen)",
+      "STAKING": "Staking",
       "MESSAGES": "Neue Angebote/Nachrichten",
       "SYNCING": "Wallet synchronisieren"
     },
@@ -166,8 +166,8 @@
     "REGISTER_ALIAS": "Alias registrieren",
     "DETAILS": "Details",
     "LOCK": "Verschlüsseln",
-    "AVAILABLE_BALANCE": "Verfügbar <b>{{verfügbar}} {{Währung}}<b/>",
-    "LOCKED_BALANCE": "Gesperrt <b>{{gesperrt}} {{Währung}}<b/>",
+    "AVAILABLE_BALANCE": "Verfügbar <b>{{available}} {{currency}}<b/>",
+    "LOCKED_BALANCE": "Gesperrt <b>{{locked}} {{currency}}<b/>",
     "LOCKED_BALANCE_LINK": "Was bedeutet das?",
     "TABS": {
       "SEND": "Senden",
@@ -175,7 +175,7 @@
       "HISTORY": "Verlauf",
       "CONTRACTS": "Verträge",
       "MESSAGES": "Nachrichten",
-      "STAKING": "Staking (Anlegen)"
+      "STAKING": "Staking"
     }
   },
   "WALLET_DETAILS": {
@@ -202,7 +202,7 @@
       "PLACEHOLDER": "",
       "TOOLTIP": "Der Kommentar wird für jeden sichtbar sein, der eine Zahlung an Ihren Alias vornehmen möchte. Sie können Details über Ihre Geschäfte, Kontakte oder Text angeben. Kommentare können später bearbeitet werden."
     },
-    "COST": "Alias-Gebühr {{Wert}} {{Währung}}",
+    "COST": "Alias-Gebühr {{value}} {{currency}}",
     "BUTTON_ASSIGN": "Zuweisen",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
@@ -228,7 +228,7 @@
       "NO_MONEY": "Sie haben nicht genügend Geldmittel, um den Kommentar zu diesem Alias zu ändern",
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
-    "COST": "Gebühr {{Wert}} {{Währung}}",
+    "COST": "Gebühr {{value}} {{currency}}",
     "BUTTON_EDIT": "Bearbeiten"
   },
   "TRANSFER_ALIAS": {
@@ -249,7 +249,7 @@
       "ALIAS_EXISTS": "Dieses Konto hat bereits einen Alias",
       "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zu transferieren"
     },
-    "COST": "Überweisungsgebühr {{Wert}} {{Währung}}",
+    "COST": "Überweisungsgebühr {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Transfer",
     "BUTTON_CANCEL": "Abbrechen",
     "REQUEST_SEND_REG": "Der Alias wird innerhalb von 10 Minuten übertragen"
@@ -271,14 +271,14 @@
       "AMOUNT_REQUIRED": "Betrag ist erforderlich",
       "AMOUNT_ZERO": "Betrag ist Null",
       "FEE_REQUIRED": "Gebühr ist erforderlich",
-      "FEE_MINIMUM": "Mindestgebühr: {{Gebühr}}",
+      "FEE_MINIMUM": "Mindestgebühr: {{fee}}",
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     }
   },
   "HISTORY": {
     "STATUS": "Status",
-    "STATUS_TOOLTIP": "Bestätigungen {{momentan}}/{{gesamt}}",
-    "LOCK_TOOLTIP": "Gesperrt bis {{Datum}}",
+    "STATUS_TOOLTIP": "Bestätigungen {{current}}/{{total}}",
+    "LOCK_TOOLTIP": "Gesperrt bis {{date}}",
     "SEND": "Gesendet",
     "RECEIVED": "Empfangen",
     "DATE": "Datum",
@@ -289,7 +289,7 @@
       "PAYMENT_ID": "Zahlungs-ID",
       "ID": "Transaktions-ID",
       "SIZE": "Transaktionsgröße",
-      "SIZE_VALUE": "{{Wert}} Bytes",
+      "SIZE_VALUE": "{{value}} Bytes",
       "HEIGHT": "Höhe",
       "CONFIRMATION": "Bestätigung",
       "INPUTS": "Inputs",
@@ -325,14 +325,14 @@
     "LISTING_BUTTON": "Create listing",
     "TIME_LEFT": {
       "REMAINING_LESS_ONE": "Weniger als eine Stunde, um zu antworten",
-      "REMAINING_ONE": "{{Zeit}} verbleibende Stunde",
-      "REMAINING_MANY": "{{Zeit}} verbleibende Stunden",
-      "REMAINING_MANY_ALT": "{{Zeit}} verbleibende Stunden",
-      "REMAINING_ONE_RESPONSE": "{{Zeit}} verbleibende Stunde",
-      "REMAINING_MANY_RESPONSE": "{{Zeit}} verbleibende Stunde",
-      "REMAINING_MANY_ALT_RESPONSE": "{{Zeit}} verbleibende Stunden",
-      "REMAINING_ONE_WAITING": "Warte für {{Zeit}} Stunde",
-      "REMAINING_MANY_WAITING": "Warte für {{Zeit}} Stunden",
+      "REMAINING_ONE": "{{time}} verbleibende Stunde",
+      "REMAINING_MANY": "{{time}} verbleibende Stunden",
+      "REMAINING_MANY_ALT": "{{time}} verbleibende Stunden",
+      "REMAINING_ONE_RESPONSE": "{{time}} verbleibende Stunde",
+      "REMAINING_MANY_RESPONSE": "{{time}} verbleibende Stunde",
+      "REMAINING_MANY_ALT_RESPONSE": "{{time}} verbleibende Stunden",
+      "REMAINING_ONE_WAITING": "Warte für {{time}} Stunde",
+      "REMAINING_MANY_WAITING": "Warte für {{time}} Stunden",
       "REMAINING_MANY_ALT_WAITING": "Warte für {{Zeit}} Stunden"
     },
     "STATUS_MESSAGES": {
@@ -464,7 +464,7 @@
     }
   },
   "STAKING": {
-    "TITLE": "Staking (Anlegen)",
+    "TITLE": "Staking",
     "TITLE_PENDING": "Ausstehend",
     "TITLE_TOTAL": "Gesamt",
     "TITLE_PERIOD": "Zeitspanne:",
@@ -532,8 +532,8 @@
     },
     "SUCCESS_SENT": "Kontakt hinzugefügt",
     "SUCCESS_SAVE": "Kontakt wurde bearbeitet",
-    "SUCCESS_IMPORT": "Contacts are imported",
-    "SUCCESS_EXPORT": "Contacts are exported",
+    "SUCCESS_IMPORT": "Kontakte wurden importiert",
+    "SUCCESS_EXPORT": "Kontakte wurden exportiert",
     "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
     "ERROR_TYPE_FILE": "Bitte importieren Sie eine gültige .csv Datei.",
     "ERROR_EXPORT": "Invalid file type. Save file as .csv"
@@ -543,7 +543,7 @@
     "NOT_ENOUGH_MONEY": "Unzureichendes Guthaben im Konto",
     "CORE_BUSY": "Interner Fehler: Kern ist beschäftigt",
     "DAEMON_BUSY": "Interner Fehler: Daemon ist beschäftigt",
-    "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
+    "NO_MONEY_REMOVE_OFFER": "Es gibt keine Gebühr für das Löschen eines Angebots, aber um das Netzwerk vor Spam-Transaktionen zu schützen, müssen Sie mindestens {{fee}} {{currency}} in Ihrer Wallet haben",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",
     "TRANSACTION_IS_TO_BIG": "Transaktion überschreitet das Netzwerk-Limit. Sendet benötigten Betrag mit mehreren Transaktionen.",
     "TRANSFER_ATTEMPT": "Keine Verbindung zum Zano-Netzwerk",
