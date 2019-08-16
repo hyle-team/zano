@@ -519,7 +519,6 @@
       "SET_MASTER_PASSWORD": "Définir le mot de passe maître",
       "ADDRESS_DUBLICATED": "L'addresse est dupliquée",
       "MAX_LENGTH": "Longueur maximale des notes atteinte",
-      "NAME_WRONG": "Le contact a un nom incorrect",
       "NAME_LENGTH": "Le nom doit contenir 4-25 caractères"
     },
     "BUTTON": {
@@ -533,9 +532,11 @@
     },
     "SUCCESS_SENT": "Contact ajouté",
     "SUCCESS_SAVE": "Contact modifié",
-    "SUCCESS_IMPORT": "Contacts importés",
+    "SUCCESS_IMPORT": "Contacts are imported",
+    "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
-    "ERROR_TYPE_FILE": "Veuillez importer un fichier .csv valide."
+    "ERROR_TYPE_FILE": "Veuillez importer un fichier .csv valide.",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
   },
   "ERRORS": {
     "NO_MONEY": "Pas assez de fonds",
