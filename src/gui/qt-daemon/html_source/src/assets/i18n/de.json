@@ -10,7 +10,7 @@
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Passwort ist erforderlich",
       "CONFIRM_REQUIRED": "Bestätigung ist erforderlich",
-      "MISMATCH": "Mismatch"
+      "MISMATCH": "Fehlanpassung"
     }
   },
   "COMMON": {
@@ -306,10 +306,10 @@
       "POW_REWARD": "POW-Belohnung",
       "POS_REWARD": "POS-Belohnung",
       "CREATE_CONTRACT": "Vertragsvorschlag",
-      "PLEDGE_CONTRACT": "Contract deposit",
+      "PLEDGE_CONTRACT": "Vertrag-Einzahlung",
       "NULLIFY_CONTRACT": "Einzahlungen verbrennen",
       "PROPOSAL_CANCEL_CONTRACT": "Stornierungsanfrage",
-      "CANCEL_CONTRACT": "Cancel and return deposits"
+      "CANCEL_CONTRACT": "Abbrechen und Einzahlungen zurückzahlen"
     }
   },
   "CONTRACTS": {
@@ -536,7 +536,7 @@
     "SUCCESS_EXPORT": "Kontakte wurden exportiert",
     "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
     "ERROR_TYPE_FILE": "Bitte importieren Sie eine gültige .csv Datei.",
-    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
+    "ERROR_EXPORT": "Ungültiger Dateityp. Datei als .csv speichern"
   },
   "ERRORS": {
     "NO_MONEY": "Nicht genügend Geld",
@@ -544,7 +544,7 @@
     "CORE_BUSY": "Interner Fehler: Kern ist beschäftigt",
     "DAEMON_BUSY": "Interner Fehler: Daemon ist beschäftigt",
     "NO_MONEY_REMOVE_OFFER": "Es gibt keine Gebühr für das Löschen eines Angebots, aber um das Netzwerk vor Spam-Transaktionen zu schützen, müssen Sie mindestens {{fee}} {{currency}} in Ihrer Wallet haben",
-    "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",
+    "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in-Nummer ist zu groß für den aktuellen Blockchain-Status. Nicht genügend unverbrauchte outputs zum Mischen",
     "TRANSACTION_IS_TO_BIG": "Transaktion überschreitet das Netzwerk-Limit. Sendet benötigten Betrag mit mehreren Transaktionen.",
     "TRANSFER_ATTEMPT": "Keine Verbindung zum Zano-Netzwerk",
     "ACCESS_DENIED": "Zugriff verweigert",
@@ -578,7 +578,7 @@
     "MINED": "Mined",
     "LOCKED": "Blockiert",
     "IS_MINIMIZE": "Zano-Anwendung wird auf die Systemleiste minimiert",
-    "RESTORE": "You can recover it by clicking or using the context menu",
+    "RESTORE": "Sie können es wiederherstellen, indem Sie auf das Kontextmenü benutzen oder anklicken ",
     "TRAY_MENU_SHOW": "Größe ändern",
     "TRAY_MENU_MINIMIZE": "Minimieren"
   }
