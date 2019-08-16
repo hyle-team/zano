@@ -209,7 +209,7 @@
       "NAME_WRONG": "Alias hat einen falschen Namen",
       "NAME_LENGTH": "Der Alias muss 6-25 Zeichen lang sein",
       "NAME_EXISTS": "Alias-Name existiert bereits",
-      "NO_MONEY": "You do not have enough funds to assign this alias",
+      "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zuzuweisen",
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
     "ONE_ALIAS": "Sie können nur einen Alias pro Wallet erstellen",
@@ -225,7 +225,7 @@
       "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
-      "NO_MONEY": "You do not have enough funds to change the comment to this alias",
+      "NO_MONEY": "Sie haben nicht genügend Geldmittel, um den Kommentar zu diesem Alias zu ändern",
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
     "COST": "Gebühr {{Wert}} {{Währung}}",
@@ -247,7 +247,7 @@
     "FORM_ERRORS": {
       "WRONG_ADDRESS": "Keine Wallet mit diesem Konto existiert",
       "ALIAS_EXISTS": "Dieses Konto hat bereits einen Alias",
-      "NO_MONEY": "You do not have enough funds to transfer this alias"
+      "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zu transferieren"
     },
     "COST": "Transfer fee {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Transfer",
@@ -331,21 +331,21 @@
       "REMAINING_ONE_RESPONSE": "{{Zeit}} verbleibende Stunde",
       "REMAINING_MANY_RESPONSE": "{{Zeit}} verbleibende Stunde",
       "REMAINING_MANY_ALT_RESPONSE": "{{Zeit}} verbleibende Stunden",
-      "REMAINING_ONE_WAITING": "Waiting for {{time}} hour",
-      "REMAINING_MANY_WAITING": "Waiting for {{time}} hours",
-      "REMAINING_MANY_ALT_WAITING": "Waiting for {{time}} hours"
+      "REMAINING_ONE_WAITING": "Warte für {{Zeit}} Stunde",
+      "REMAINING_MANY_WAITING": "Warte für {{Zeit}} Stunden",
+      "REMAINING_MANY_ALT_WAITING": "Warte für {{Zeit}} Stunden"
     },
     "STATUS_MESSAGES": {
       "SELLER": {
         "NEW_CONTRACT": "Neuer Vertragsvorschlag",
         "IGNORED": "Sie haben den Vertragsvorschlag ignoriert",
         "ACCEPTED": "Vertrag gestartet",
-        "WAIT": "Waiting for contract confirmation",
+        "WAIT": "Warten auf Bestätitung des Vertrages",
         "WAITING_BUYER": "Warte auf Sendung",
         "COMPLETED": "Vertrag abgeschlossen",
         "NOT_RECEIVED": "Senden fehlgeschlagen",
         "NULLIFIED": "Alle Einzahlungen verbrannt",
-        "PROPOSAL_CANCEL": "New proposal to cancel contract and return deposits",
+        "PROPOSAL_CANCEL": "Neuer Vorschlag, Vertrag zu kündigen und Einzahlungen zurückzugeben",
         "BEING_CANCELLED": "Abbruch wird durchgeführt",
         "CANCELLED": "Vertrag abgebrochen",
         "IGNORED_CANCEL": "Sie haben den Stornierungsvorschlag ignoriert",
@@ -464,7 +464,7 @@
     }
   },
   "STAKING": {
-    "TITLE": "Staking",
+    "TITLE": "Staking (Anlegen)",
     "TITLE_PENDING": "Ausstehend",
     "TITLE_TOTAL": "Gesamt",
     "TITLE_PERIOD": "Zeitspanne:",
@@ -519,7 +519,6 @@
       "SET_MASTER_PASSWORD": "Master-Passwort festlegen",
       "ADDRESS_DUBLICATED": "Adresse existiert bereits",
       "MAX_LENGTH": "Maximum notes length reached",
-      "NAME_WRONG": "Kontakt hat einen falschen Namen",
       "NAME_LENGTH": "Der Name muss 4-25 Zeichen lang sein"
     },
     "BUTTON": {
@@ -533,9 +532,11 @@
     },
     "SUCCESS_SENT": "Kontakt hinzugefügt",
     "SUCCESS_SAVE": "Kontakt wurde bearbeitet",
-    "SUCCESS_IMPORT": "Kontakt wurde importiert",
+    "SUCCESS_IMPORT": "Contacts are imported",
+    "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
-    "ERROR_TYPE_FILE": "Bitte importieren Sie eine gültige .csv Datei."
+    "ERROR_TYPE_FILE": "Bitte importieren Sie eine gültige .csv Datei.",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
   },
   "ERRORS": {
     "NO_MONEY": "Nicht genügend Geld",
