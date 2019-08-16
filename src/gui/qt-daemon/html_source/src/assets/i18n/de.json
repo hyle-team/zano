@@ -160,7 +160,7 @@
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     },
     "LAST_BUILD": "Aktueller Build: {{value}}",
-    "APP_LOG_TITLE": "Log level:"
+    "APP_LOG_TITLE": "Log-Level:"
   },
   "WALLET": {
     "REGISTER_ALIAS": "Alias registrieren",
@@ -322,7 +322,7 @@
     "STATUS": "Status",
     "COMMENTS": "Kommentare",
     "PURCHASE_BUTTON": "Neuer Kauf",
-    "LISTING_BUTTON": "Create listing",
+    "LISTING_BUTTON": "Auflistung erstellen",
     "TIME_LEFT": {
       "REMAINING_LESS_ONE": "Weniger als eine Stunde, um zu antworten",
       "REMAINING_ONE": "{{time}} verbleibende Stunde",
@@ -428,7 +428,7 @@
     "NEED_MONEY": "Unzureichendes Guthaben",
     "BUTTON_MAKE_PLEDGE": "Akzeptieren und Einzahlung tätigen",
     "BUTTON_IGNORE": "Angebot ignorieren und ausblenden",
-    "BUTTON_NULLIFY": "Terminate and burn deposits",
+    "BUTTON_NULLIFY": "Beenden und Einzahlungen verbrennen",
     "BUTTON_RECEIVED": "Einzahlungen abschließen und freigeben",
     "BUTTON_CANCEL_BUYER": "Einzahlungen abbrechen und zurückzahlen",
     "BUTTON_NOT_CANCEL": "Anfrage ignorieren",
@@ -561,7 +561,7 @@
     "TX_TYPE_NORMAL_END": "wurde nicht abgeschlossen.",
     "TX_TYPE_NEW_ALIAS": "Fehler. Fehler beim Registrieren des Alias zum Speichern",
     "TX_TYPE_NEW_ALIAS_END": "Bitte nochmals versuchen.",
-    "TX_TYPE_UPDATE_ALIAS": "Error. Failed to change comment to alias in safe",
+    "TX_TYPE_UPDATE_ALIAS": "Fehler. Fehlgeschlagen Kommentar von gespeichertem Alias zu ändern",
     "TX_TYPE_COIN_BASE": "Fehler. Die Zahlung wurde nicht abgeschlossen."
   },
   "CONTEXT_MENU": {
