@@ -46,13 +46,13 @@ export class ContactsComponent implements OnInit {
     );
   }
 
-  openInBrowser(alias: string) {
-    if (alias !== null) {
-      this.backend.openUrlInBrowser(
-        `explorer.zano.org/aliases/${alias.slice(1)}`
-      );
-    }
-  }
+  // openInBrowser(alias: string) {
+  //   if (alias !== null) {
+  //     this.backend.openUrlInBrowser(
+  //       `explorer.zano.org/aliases/${alias.slice(1)}#modalOpen`
+  //     );
+  //   }
+  // }
 
   back() {
     this.location.back();

@@ -1,87 +1,88 @@
 {
   "LOGIN": {
-    "SETUP_MASTER_PASS": "Setup master password",
-    "SETUP_CONFIRM_PASS": "Confirm the password",
-    "MASTER_PASS": "Master password",
-    "BUTTON_NEXT": "Next",
-    "BUTTON_SKIP": "Skip",
-    "BUTTON_RESET": "Reset",
-    "INCORRECT_PASSWORD": "Invalid password",
+    "SETUP_MASTER_PASS": "Nastavit hlavní heslo",
+    "SETUP_CONFIRM_PASS": "Potvrdit heslo",
+    "MASTER_PASS": "Hlavní heslo",
+    "BUTTON_NEXT": "Další",
+    "BUTTON_SKIP": "Přeskočit",
+    "BUTTON_RESET": "Resetovat",
+    "INCORRECT_PASSWORD": "Neplatné heslo",
     "FORM_ERRORS": {
-      "PASS_REQUIRED": "Password is required",
-      "CONFIRM_REQUIRED": "Confirmation is required",
-      "MISMATCH": "Mismatch"
+      "PASS_REQUIRED": "Je vyžadováno heslo",
+      "CONFIRM_REQUIRED": "Je požadováno potvrzení",
+      "MISMATCH": "Neodpovídající"
     }
   },
   "COMMON": {
-    "BACK": "Go back"
+    "BACK": "Jít zpět"
   },
   "BREADCRUMBS": {
-    "ADD_WALLET": "Add wallet",
-    "CREATE_WALLET": "Create new wallet",
-    "SAVE_PHRASE": "Save your seed phrase",
-    "OPEN_WALLET": "Open existing wallet",
-    "RESTORE_WALLET": "Restore from backup",
-    "WALLET_DETAILS": "Wallet details",
-    "ASSIGN_ALIAS": "Assign alias",
-    "EDIT_ALIAS": "Edit alias",
-    "TRANSFER_ALIAS": "Transfer alias",
-    "CONTRACTS": "Contracts",
-    "NEW_PURCHASE": "New purchase",
-    "OLD_PURCHASE": "Purchase"
+    "ADD_WALLET": "Přidat peněženku",
+    "CREATE_WALLET": "Vytvořit novou peněženku",
+    "SAVE_PHRASE": "Uložit svoji seed frázi",
+    "OPEN_WALLET": "Otevřít existující peněženku",
+    "RESTORE_WALLET": "Obnovení z zálohy",
+    "WALLET_DETAILS": "Podrobnosti o peněžence",
+    "ASSIGN_ALIAS": "Přidělit přezdívku",
+    "EDIT_ALIAS": "Upravit přezdívku",
+    "TRANSFER_ALIAS": "Převést přezdívku",
+    "CONTRACTS": "Kontrakty",
+    "NEW_PURCHASE": "Nový nákup",
+    "OLD_PURCHASE": "Nákup"
   },
   "SIDEBAR": {
-    "TITLE": "Wallets",
-    "ADD_NEW": "+ Add",
+    "TITLE": "Peněženky",
+    "ADD_NEW": "+ Přidat",
     "ACCOUNT": {
       "STAKING": "Staking",
-      "MESSAGES": "New offers/Messages",
-      "SYNCING": "Syncing wallet"
+      "MESSAGES": "Nové nabídky/zprávy",
+      "SYNCING": "Synchronizace pěněženky"
     },
-    "SETTINGS": "Settings",
-    "LOG_OUT": "Log out",
+    "CONTACTS": "Contacts",
+    "SETTINGS": "Nastavení",
+    "LOG_OUT": "Odhlásit se",
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
       "ONLINE": "Online",
-      "ERROR": "System error",
-      "COMPLETE": "Completion",
-      "SYNCING": "Syncing blockchain",
-      "LOADING": "Loading blockchain data"
+      "ERROR": "Chyba systému",
+      "COMPLETE": "Dokončení",
+      "SYNCING": "Sychronizace blockchainu",
+      "LOADING": "Nahrávání blockchainových dat"
     },
     "UPDATE": {
-      "STANDARD": "Update available",
-      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Get new update.</span><br><span>Update is recommended!</span>",
-      "IMPORTANT": "Update available",
-      "IMPORTANT_HINT": "Important update!",
-      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Get new update.</span><br><span>Important update!</span>",
-      "CRITICAL": "Update available",
-      "CRITICAL_HINT": "Critical update!",
-      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
-      "TIME": "System time differs from network",
-      "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
+      "STANDARD": "Aktualizace k dispozici",
+      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Získejte novou aktualizaci.</span><br><span>Doporučená aktualizace!</span>",
+      "IMPORTANT": "Aktualizace k dispozici",
+      "IMPORTANT_HINT": "Důležitá aktualizace!",
+      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Získejte novou aktualizaci.</span><br><span>Důležitá aktualizace!</span>",
+      "CRITICAL": "Aktualizace k dispozici",
+      "CRITICAL_HINT": "Kritická aktualizace!",
+      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Kritická aktualizace k dispozici.</span><i class=\"icon\"></i><span>Aktualizaci důrazně doporučujeme!</span>",
+      "TIME": "Systémový čas se liší od sítového",
+      "TIME_TOOLTIP": "<span class=\"wrong-time\">Špatný systémový čas!</span><br><span>Zkontrolujte a nastavte systémový čas.</span>"
     }
   },
   "MAIN": {
-    "TITLE": "Create or open the wallet to start using Zano",
-    "BUTTON_NEW_WALLET": "Create new wallet",
-    "BUTTON_OPEN_WALLET": "Open existing wallet",
-    "BUTTON_RESTORE_BACKUP": "Restore from backup",
-    "HELP": "How to create wallet?",
-    "CHOOSE_PATH": "Please choose a path"
+    "TITLE": "Chcete-li začít používat Zano, vytvořte nebo otevřete peněženku",
+    "BUTTON_NEW_WALLET": "Vytvořit novou peněženku",
+    "BUTTON_OPEN_WALLET": "Otevřít existující peněženku",
+    "BUTTON_RESTORE_BACKUP": "Obnovení ze zálohy",
+    "HELP": "Jak vytvořit peněženku?",
+    "CHOOSE_PATH": "Zvolte prosím cestu"
   },
   "CREATE_WALLET": {
-    "NAME": "Wallet name",
-    "PASS": "Set wallet password",
-    "CONFIRM": "Confirm wallet password",
-    "BUTTON_SELECT": "Select wallet location",
-    "BUTTON_CREATE": "Create wallet",
-    "TITLE_SAVE": "Save the wallet file.",
-    "ERROR_CANNOT_SAVE_TOP": "Existing wallet files cannot be replaced or overwritten",
-    "ERROR_CANNOT_SAVE_SYSTEM": "Wallet files cannot be saved to the OS partition",
+    "NAME": "Název peněženky",
+    "PASS": "Nastavit heslo peněženky",
+    "CONFIRM": "Potvrdit heslo k peněžence",
+    "BUTTON_SELECT": "Vyberte cestu k pěněžence",
+    "BUTTON_CREATE": "Vytvořit peněženku",
+    "TITLE_SAVE": "Uložte soubor peněženky.",
+    "ERROR_CANNOT_SAVE_TOP": "Stávající soubory peněženky nelze nahradit nebo přepsat",
+    "ERROR_CANNOT_SAVE_SYSTEM": "Soubory peněženky nelze uložit na diskový oddíl s operačním systémem",
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUPLICATE": "Name is duplicate",
-      "MAX_LENGTH": "Maximum name length reached",
+      "NAME_REQUIRED": "Název je povinný",
+      "NAME_DUPLICATE": "Název je duplicitní",
+      "MAX_LENGTH": "Dosáhli jste maximální délky názvu",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     }
   },
@@ -192,18 +193,17 @@
   },
   "ASSIGN_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
+      "LABEL": "Alias",
       "PLACEHOLDER": "@ Enter alias",
       "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
     },
     "COMMENT": {
       "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment",
+      "PLACEHOLDER": "",
       "TOOLTIP": "The comment will be visible to anyone who wants to make a payment to your alias. You can provide details about your business, contacts, or include any text. Comments can be edited later."
     },
-    "COST": "Cost to create alias {{value}} {{currency}}",
+    "COST": "Alias fee {{value}} {{currency}}",
     "BUTTON_ASSIGN": "Assign",
-    "BUTTON_CANCEL": "Cancel",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
       "NAME_WRONG": "Alias has wrong name",
@@ -217,40 +217,39 @@
   },
   "EDIT_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
+      "LABEL": "Alias",
       "PLACEHOLDER": "@ Enter alias"
     },
     "COMMENT": {
       "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment"
+      "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
       "NO_MONEY": "You do not have enough funds to change the comment to this alias",
       "MAX_LENGTH": "Maximum comment length reached"
     },
-    "COST": "Cost to edit alias {{value}} {{currency}}",
-    "BUTTON_EDIT": "Edit",
-    "BUTTON_CANCEL": "Cancel"
+    "COST": "Fee {{value}} {{currency}}",
+    "BUTTON_EDIT": "Edit"
   },
   "TRANSFER_ALIAS": {
     "NAME": {
-      "LABEL": "Unique name",
+      "LABEL": "Alias",
       "PLACEHOLDER": "@ Enter alias"
     },
     "COMMENT": {
       "LABEL": "Comment",
-      "PLACEHOLDER": "Enter comment"
+      "PLACEHOLDER": ""
     },
     "ADDRESS": {
-      "LABEL": "The account to which the alias will be transferred",
-      "PLACEHOLDER": "Enter wallet address"
+      "LABEL": "Transfer to",
+      "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
       "WRONG_ADDRESS": "No wallet with this account exists",
       "ALIAS_EXISTS": "This account already has an alias",
       "NO_MONEY": "You do not have enough funds to transfer this alias"
     },
-    "COST": "Cost to transfer alias {{value}} {{currency}}",
+    "COST": "Transfer fee {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Transfer",
     "BUTTON_CANCEL": "Cancel",
     "REQUEST_SEND_REG": "The alias will be transferred within 10 minutes"
@@ -453,6 +452,17 @@
     "INFO": "Information",
     "OK": "OK"
   },
+  "CONFIRM": {
+    "BUTTON_CONFIRM": "Send",
+    "BUTTON_CANCEL": "Cancel",
+    "TITLE": "Confirm transaction",
+    "MESSAGE": {
+      "SEND": "Send",
+      "FROM": "From",
+      "TO": "To",
+      "COMMENT": "Comment"
+    }
+  },
   "STAKING": {
     "TITLE": "Staking",
     "TITLE_PENDING": "Pending",
@@ -477,6 +487,55 @@
       "ON": "ON",
       "OFF": "OFF"
     }
+  },
+  "CONTACTS": {
+    "TITLE": "Contact list",
+    "IMPORT_EXPORT": "Import or export contacts",
+    "IMPORT": "Import",
+    "EXPORT": "Export",
+    "ADD": "Add/edit contact",
+    "SEND": "Send",
+    "SEND_FROM": "Send from",
+    "SEND_TO": "To",
+    "OPEN_ADD_WALLET": "Open/Add wallet",
+    "COPY": "- Copy",
+    "TABLE": {
+      "NAME": "Name",
+      "ALIAS": "Alias",
+      "ADDRESS": "Address",
+      "NOTES": "Notes",
+      "EMPTY": "Contact list is empty"
+    },
+    "FORM": {
+      "NAME": "Name",
+      "ADDRESS": "Address",
+      "NOTES": "Notes"
+    },
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Name is required",
+      "NAME_DUBLICATED": "Name is dublicated",
+      "ADDRESS_REQUIRED": "Address is required",
+      "ADDRESS_NOT_VALID": "Address not valid",
+      "SET_MASTER_PASSWORD": "Set master password",
+      "ADDRESS_DUBLICATED": "Address is dublicated",
+      "MAX_LENGTH": "Maximum notes length reached",
+      "NAME_WRONG": "Contact has wrong name",
+      "NAME_LENGTH": "The name must be 4-25 characters long"
+    },
+    "BUTTON": {
+      "SEND": "Send",
+      "EDIT": "Edit",
+      "DELETE": "Delete",
+      "ADD": "Add contact",
+      "ADD_EDIT": "Add/Save",
+      "GO_TO_WALLET": "Go to wallet",
+      "IMPORT_EXPORT": "Import/export"
+    },
+    "SUCCESS_SENT": "Contact added",
+    "SUCCESS_SAVE": "Contact is edited",
+    "SUCCESS_IMPORT": "Contacts is imported",
+    "ERROR_IMPORT": "Error is occured while reading file!",
+    "ERROR_TYPE_FILE": "Please import valid .csv file."
   },
   "ERRORS": {
     "NO_MONEY": "Not enough money",
