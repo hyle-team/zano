@@ -16,7 +16,8 @@
   background-position: center;
   background-size: 200%;
   padding: 2rem;
-  width: 34rem;
+  min-width: 34rem;
+  max-width: 60rem;
 
   .content {
     display: flex;
