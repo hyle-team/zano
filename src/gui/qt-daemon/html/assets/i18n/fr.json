@@ -1,6 +1,9 @@
 {
   "LOGIN": {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> rebuild
     "SETUP_MASTER_PASS": "Configurer le mot de passe principal",
     "SETUP_CONFIRM_PASS": "Confirmer le mot de passe",
     "MASTER_PASS": "Mot de passe principal",
@@ -8,6 +11,7 @@
     "BUTTON_SKIP": "Sauter",
     "BUTTON_RESET": "Réinitialiser",
     "INCORRECT_PASSWORD": "Mot de passe invalide",
+<<<<<<< HEAD
 =======
     "SETUP_MASTER_PASS": "Setup master password",
     "SETUP_CONFIRM_PASS": "Confirm the password",
@@ -17,6 +21,8 @@
     "BUTTON_RESET": "Reset",
     "INCORRECT_PASSWORD": "Invalid password",
 >>>>>>> rebuild html
+=======
+>>>>>>> rebuild
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Mot de passe requis",
       "CONFIRM_REQUIRED": "Confirmation requise",
@@ -56,7 +62,11 @@
       "ONLINE": "En ligne",
       "ERROR": "Erreur de système",
       "COMPLETE": "Fermeture",
+<<<<<<< HEAD
       "SYNCING": "Syncing block",
+=======
+      "SYNCING": "Synchronisation de la blockchain",
+>>>>>>> rebuild
       "LOADING": "Chargement des données de la blockchain"
     },
     "UPDATE": {
@@ -529,6 +539,10 @@
       "SET_MASTER_PASSWORD": "Définir le mot de passe maître",
       "ADDRESS_DUBLICATED": "L'addresse est dupliquée",
       "MAX_LENGTH": "Longueur maximale des notes atteinte",
+<<<<<<< HEAD
+=======
+      "NAME_WRONG": "Le contact a un nom incorrect",
+>>>>>>> rebuild
       "NAME_LENGTH": "Le nom doit contenir 4-25 caractères"
     },
     "BUTTON": {
@@ -542,6 +556,7 @@
     },
     "SUCCESS_SENT": "Contact ajouté",
     "SUCCESS_SAVE": "Contact modifié",
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
@@ -549,6 +564,11 @@
     "ERROR_EXPORT": "Invalid file type. Save file as .csv",
     "ERROR_EMPTY_LIST": "Contact list is empty",
     "ERROR_IMPORT_EMPTY": "File is empty"
+=======
+    "SUCCESS_IMPORT": "Contacts importés",
+    "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
+    "ERROR_TYPE_FILE": "Veuillez importer un fichier .csv valide."
+>>>>>>> rebuild
   },
   "ERRORS": {
     "NO_MONEY": "Pas assez de fonds",

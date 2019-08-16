@@ -1,6 +1,9 @@
 {
   "LOGIN": {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> rebuild
     "SETUP_MASTER_PASS": "Nastavit hlavní heslo",
     "SETUP_CONFIRM_PASS": "Potvrdit heslo",
     "MASTER_PASS": "Hlavní heslo",
@@ -8,6 +11,7 @@
     "BUTTON_SKIP": "Přeskočit",
     "BUTTON_RESET": "Resetovat",
     "INCORRECT_PASSWORD": "Neplatné heslo",
+<<<<<<< HEAD
 =======
     "SETUP_MASTER_PASS": "Setup master password",
     "SETUP_CONFIRM_PASS": "Confirm the password",
@@ -17,6 +21,8 @@
     "BUTTON_RESET": "Reset",
     "INCORRECT_PASSWORD": "Invalid password",
 >>>>>>> rebuild html
+=======
+>>>>>>> rebuild
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Je vyžadováno heslo",
       "CONFIRM_REQUIRED": "Je požadováno potvrzení",
@@ -529,6 +535,10 @@
       "SET_MASTER_PASSWORD": "Set master password",
       "ADDRESS_DUBLICATED": "Address is dublicated",
       "MAX_LENGTH": "Maximum notes length reached",
+<<<<<<< HEAD
+=======
+      "NAME_WRONG": "Contact has wrong name",
+>>>>>>> rebuild
       "NAME_LENGTH": "The name must be 4-25 characters long"
     },
     "BUTTON": {
@@ -542,6 +552,7 @@
     },
     "SUCCESS_SENT": "Contact added",
     "SUCCESS_SAVE": "Contact is edited",
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Error is occured while reading file!",
@@ -549,6 +560,11 @@
     "ERROR_EXPORT": "Invalid file type. Save file as .csv",
     "ERROR_EMPTY_LIST": "Contact list is empty",
     "ERROR_IMPORT_EMPTY": "File is empty"
+=======
+    "SUCCESS_IMPORT": "Contacts is imported",
+    "ERROR_IMPORT": "Error is occured while reading file!",
+    "ERROR_TYPE_FILE": "Please import valid .csv file."
+>>>>>>> rebuild
   },
   "ERRORS": {
     "NO_MONEY": "Not enough money",
