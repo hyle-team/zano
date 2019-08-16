@@ -69,7 +69,7 @@ import { PapaParseModule } from 'ngx-papaparse';
 export function highchartsFactory() {
   // Default options.
   highcharts.setOptions({
-    global: {
+    time: {
       useUTC: false
     }
   });
