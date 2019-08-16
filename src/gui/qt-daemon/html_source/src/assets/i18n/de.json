@@ -277,7 +277,7 @@
   },
   "HISTORY": {
     "STATUS": "Status",
-    "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
+    "STATUS_TOOLTIP": "Bestätigungen {{momentan}}/{{gesamt}}",
     "LOCK_TOOLTIP": "Gesperrt bis {{Datum}}",
     "SEND": "Gesendet",
     "RECEIVED": "Empfangen",
@@ -518,7 +518,7 @@
       "ADDRESS_NOT_VALID": "Adresse ungültig",
       "SET_MASTER_PASSWORD": "Master-Passwort festlegen",
       "ADDRESS_DUBLICATED": "Adresse existiert bereits",
-      "MAX_LENGTH": "Maximum notes length reached",
+      "MAX_LENGTH": "Maximale Länge der Notiz erreicht",
       "NAME_LENGTH": "Der Name muss 4-25 Zeichen lang sein"
     },
     "BUTTON": {
