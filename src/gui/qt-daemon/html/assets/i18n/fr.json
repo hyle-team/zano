@@ -540,9 +540,12 @@
       "ADDRESS_DUBLICATED": "L'addresse est dupliquée",
       "MAX_LENGTH": "Longueur maximale des notes atteinte",
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
       "NAME_WRONG": "Le contact a un nom incorrect",
 >>>>>>> rebuild
+=======
+>>>>>>> fix modal width
       "NAME_LENGTH": "Le nom doit contenir 4-25 caractères"
     },
     "BUTTON": {
@@ -557,6 +560,7 @@
     "SUCCESS_SENT": "Contact ajouté",
     "SUCCESS_SAVE": "Contact modifié",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
@@ -569,6 +573,13 @@
     "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
     "ERROR_TYPE_FILE": "Veuillez importer un fichier .csv valide."
 >>>>>>> rebuild
+=======
+    "SUCCESS_IMPORT": "Contacts are imported",
+    "SUCCESS_EXPORT": "Contacts are exported",
+    "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
+    "ERROR_TYPE_FILE": "Veuillez importer un fichier .csv valide.",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
+>>>>>>> fix modal width
   },
   "ERRORS": {
     "NO_MONEY": "Pas assez de fonds",

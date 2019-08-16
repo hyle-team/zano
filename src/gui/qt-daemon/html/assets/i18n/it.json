@@ -540,9 +540,12 @@
       "ADDRESS_DUBLICATED": "Indirizzo è un duplicato",
       "MAX_LENGTH": "Lunghezza massima delle note raggiunta",
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
       "NAME_WRONG": "Il contatto ha un nome errato",
 >>>>>>> rebuild
+=======
+>>>>>>> fix modal width
       "NAME_LENGTH": "Il nome deve essere lungo da 4 a 25 caratteri"
     },
     "BUTTON": {
@@ -557,6 +560,7 @@
     "SUCCESS_SENT": "Contatto aggiunto",
     "SUCCESS_SAVE": "Contatto modificato",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Si è verificato un errore durante la lettura del file!",
@@ -569,6 +573,13 @@
     "ERROR_IMPORT": "Si è verificato un errore durante la lettura del file!",
     "ERROR_TYPE_FILE": "Importa un file .csv valido."
 >>>>>>> rebuild
+=======
+    "SUCCESS_IMPORT": "Contacts are imported",
+    "SUCCESS_EXPORT": "Contacts are exported",
+    "ERROR_IMPORT": "Si è verificato un errore durante la lettura del file!",
+    "ERROR_TYPE_FILE": "Importa un file .csv valido.",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
+>>>>>>> fix modal width
   },
   "ERRORS": {
     "NO_MONEY": "Non abbastanza denaro",

@@ -257,10 +257,14 @@
       "NAME_LENGTH": "Der Alias muss 6-25 Zeichen lang sein",
       "NAME_EXISTS": "Alias-Name existiert bereits",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zuzuweisen",
 =======
       "NO_MONEY": "You do not have enough funds to assign this alias",
 >>>>>>> rebuild
+=======
+      "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zuzuweisen",
+>>>>>>> fix modal width
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
     "ONE_ALIAS": "Sie können nur einen Alias pro Wallet erstellen",
@@ -277,12 +281,16 @@
     },
     "FORM_ERRORS": {
 <<<<<<< HEAD
+<<<<<<< HEAD
       "NO_MONEY": "Sie haben nicht genügend Geldmittel, um den Kommentar zu diesem Alias zu ändern",
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
     "COST": "Gebühr {{value}} {{currency}}",
 =======
       "NO_MONEY": "You do not have enough funds to change the comment to this alias",
+=======
+      "NO_MONEY": "Sie haben nicht genügend Geldmittel, um den Kommentar zu diesem Alias zu ändern",
+>>>>>>> fix modal width
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
     "COST": "Gebühr {{Wert}} {{Währung}}",
@@ -306,11 +314,15 @@
       "WRONG_ADDRESS": "Keine Wallet mit diesem Konto existiert",
       "ALIAS_EXISTS": "Dieses Konto hat bereits einen Alias",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zu transferieren"
     },
     "COST": "Überweisungsgebühr {{value}} {{currency}}",
 =======
       "NO_MONEY": "You do not have enough funds to transfer this alias"
+=======
+      "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zu transferieren"
+>>>>>>> fix modal width
     },
     "COST": "Transfer fee {{value}} {{currency}}",
 >>>>>>> rebuild
@@ -429,10 +441,16 @@
       "REMAINING_ONE_RESPONSE": "{{Zeit}} verbleibende Stunde",
       "REMAINING_MANY_RESPONSE": "{{Zeit}} verbleibende Stunde",
       "REMAINING_MANY_ALT_RESPONSE": "{{Zeit}} verbleibende Stunden",
+<<<<<<< HEAD
       "REMAINING_ONE_WAITING": "Waiting for {{time}} hour",
       "REMAINING_MANY_WAITING": "Waiting for {{time}} hours",
       "REMAINING_MANY_ALT_WAITING": "Waiting for {{time}} hours"
 >>>>>>> rebuild
+=======
+      "REMAINING_ONE_WAITING": "Warte für {{Zeit}} Stunde",
+      "REMAINING_MANY_WAITING": "Warte für {{Zeit}} Stunden",
+      "REMAINING_MANY_ALT_WAITING": "Warte für {{Zeit}} Stunden"
+>>>>>>> fix modal width
     },
     "STATUS_MESSAGES": {
       "SELLER": {
@@ -440,19 +458,27 @@
         "IGNORED": "Sie haben den Vertragsvorschlag ignoriert",
         "ACCEPTED": "Vertrag gestartet",
 <<<<<<< HEAD
+<<<<<<< HEAD
         "WAIT": "Warten auf Bestätitung des Vertrages",
 =======
         "WAIT": "Waiting for contract confirmation",
 >>>>>>> rebuild
+=======
+        "WAIT": "Warten auf Bestätitung des Vertrages",
+>>>>>>> fix modal width
         "WAITING_BUYER": "Warte auf Sendung",
         "COMPLETED": "Vertrag abgeschlossen",
         "NOT_RECEIVED": "Senden fehlgeschlagen",
         "NULLIFIED": "Alle Einzahlungen verbrannt",
 <<<<<<< HEAD
+<<<<<<< HEAD
         "PROPOSAL_CANCEL": "Neuer Vorschlag, Vertrag zu kündigen und Einzahlungen zurückzugeben",
 =======
         "PROPOSAL_CANCEL": "New proposal to cancel contract and return deposits",
 >>>>>>> rebuild
+=======
+        "PROPOSAL_CANCEL": "Neuer Vorschlag, Vertrag zu kündigen und Einzahlungen zurückzugeben",
+>>>>>>> fix modal width
         "BEING_CANCELLED": "Abbruch wird durchgeführt",
         "CANCELLED": "Vertrag abgebrochen",
         "IGNORED_CANCEL": "Sie haben den Stornierungsvorschlag ignoriert",
@@ -587,7 +613,7 @@
     }
   },
   "STAKING": {
-    "TITLE": "Staking",
+    "TITLE": "Staking (Anlegen)",
     "TITLE_PENDING": "Ausstehend",
     "TITLE_TOTAL": "Gesamt",
     "TITLE_PERIOD": "Zeitspanne:",
@@ -645,8 +671,11 @@
       "MAX_LENGTH": "Maximale Länge der Notiz erreicht",
 =======
       "MAX_LENGTH": "Maximum notes length reached",
+<<<<<<< HEAD
       "NAME_WRONG": "Kontakt hat einen falschen Namen",
 >>>>>>> rebuild
+=======
+>>>>>>> fix modal width
       "NAME_LENGTH": "Der Name muss 4-25 Zeichen lang sein"
     },
     "BUTTON": {
@@ -661,6 +690,7 @@
     "SUCCESS_SENT": "Kontakt hinzugefügt",
     "SUCCESS_SAVE": "Kontakt wurde bearbeitet",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Kontakte wurden importiert",
     "SUCCESS_EXPORT": "Kontakte wurden exportiert",
     "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
@@ -673,6 +703,13 @@
     "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
     "ERROR_TYPE_FILE": "Bitte importieren Sie eine gültige .csv Datei."
 >>>>>>> rebuild
+=======
+    "SUCCESS_IMPORT": "Contacts are imported",
+    "SUCCESS_EXPORT": "Contacts are exported",
+    "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
+    "ERROR_TYPE_FILE": "Bitte importieren Sie eine gültige .csv Datei.",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
+>>>>>>> fix modal width
   },
   "ERRORS": {
     "NO_MONEY": "Nicht genügend Geld",

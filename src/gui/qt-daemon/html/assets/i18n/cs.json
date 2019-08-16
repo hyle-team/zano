@@ -536,9 +536,12 @@
       "ADDRESS_DUBLICATED": "Address is dublicated",
       "MAX_LENGTH": "Maximum notes length reached",
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
       "NAME_WRONG": "Contact has wrong name",
 >>>>>>> rebuild
+=======
+>>>>>>> fix modal width
       "NAME_LENGTH": "The name must be 4-25 characters long"
     },
     "BUTTON": {
@@ -553,6 +556,7 @@
     "SUCCESS_SENT": "Contact added",
     "SUCCESS_SAVE": "Contact is edited",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Error is occured while reading file!",
@@ -565,6 +569,13 @@
     "ERROR_IMPORT": "Error is occured while reading file!",
     "ERROR_TYPE_FILE": "Please import valid .csv file."
 >>>>>>> rebuild
+=======
+    "SUCCESS_IMPORT": "Contacts are imported",
+    "SUCCESS_EXPORT": "Contacts are exported",
+    "ERROR_IMPORT": "Error is occured while reading file!",
+    "ERROR_TYPE_FILE": "Please import valid .csv file.",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
+>>>>>>> fix modal width
   },
   "ERRORS": {
     "NO_MONEY": "Not enough money",

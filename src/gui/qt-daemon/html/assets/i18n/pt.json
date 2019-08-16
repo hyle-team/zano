@@ -641,7 +641,6 @@
       "SET_MASTER_PASSWORD": "Set master password",
       "ADDRESS_DUBLICATED": "Address is dublicated",
       "MAX_LENGTH": "Maximum notes length reached",
-      "NAME_WRONG": "Contact has wrong name",
       "NAME_LENGTH": "The name must be 4-25 characters long"
     },
     "BUTTON": {
@@ -655,10 +654,16 @@
     },
     "SUCCESS_SENT": "Contact added",
     "SUCCESS_SAVE": "Contact is edited",
-    "SUCCESS_IMPORT": "Contacts is imported",
+    "SUCCESS_IMPORT": "Contacts are imported",
+    "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Error is occured while reading file!",
+<<<<<<< HEAD
     "ERROR_TYPE_FILE": "Please import valid .csv file."
 >>>>>>> rebuild
+=======
+    "ERROR_TYPE_FILE": "Please import valid .csv file.",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
+>>>>>>> fix modal width
   },
   "ERRORS": {
     "NO_MONEY": "Sem dinheiro suficiente",
