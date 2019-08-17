@@ -43,7 +43,7 @@ namespace tools
       NESTED_CATCH_ENTRY(__func__);
     }
 
-    bool lmdb_db_backend::open(const std::string& path_, uint64_t cache_sz)
+    bool lmdb_db_backend::open(const std::string& path_, uint64_t /* flags -- unused atm */)
     {
       int res = 0;
       res = mdb_env_create(&m_penv);
@@ -60,23 +60,12 @@ namespace tools
 
       CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(m_path), false, "create_directories_if_necessary failed: " << m_path);
 
+      // TODO: convert flags to lmdb_flags (implement fast lmdb modes)
       unsigned int lmdb_flags = MDB_NORDAHEAD /*| MDB_NOSYNC | MDB_WRITEMAP | MDB_MAPASYNC*/;
       mdb_mode_t lmdb_mode = 0644;
 
       res = mdb_env_open(m_penv, m_path.c_str(), lmdb_flags, lmdb_mode);
-      if (res != MDB_SUCCESS)
-      {
-        // DB created with prev LMDB 0.9.18 cannot be opened due to huge map size set in env
-        // try to remove DB folder completely and re-open
-        boost::filesystem::remove_all(m_path);
-        CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(m_path), false, "create_directories_if_necessary failed: " << m_path);
-        res = mdb_env_create(&m_penv);
-        CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_create");
-        res = mdb_env_set_maxdbs(m_penv, max_dbs);
-        CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_set_maxdbs");
-        res = mdb_env_open(m_penv, m_path.c_str(), lmdb_flags, lmdb_mode);
-        CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_open, m_path=" << m_path);
-      }
+      CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_open, m_path=" << m_path);
 
       resize_if_needed();
       
