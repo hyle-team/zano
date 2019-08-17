@@ -76,7 +76,6 @@ DISABLE_VS_WARNINGS(4267)
 
 namespace 
 {
-  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l1 = { "db-cache-l1", "Specify size of memory mapped db cache file", 0, true };
   const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2 = { "db-cache-l2", "Specify cached elements in db helpers", 0, true };
 }
 
@@ -152,7 +151,6 @@ std::shared_ptr<transaction> blockchain_storage::get_tx(const crypto::hash &id) 
 //------------------------------------------------------------------
 void blockchain_storage::init_options(boost::program_options::options_description& desc)
 {
-  command_line::add_arg(desc, arg_db_cache_l1);
   command_line::add_arg(desc, arg_db_cache_l2);
 }
 //------------------------------------------------------------------
@@ -214,6 +212,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     return false;
   }
 
+<<<<<<< HEAD
   uint64_t cache_size_l1 = CACHE_SIZE;
   if (command_line::has_arg(vm, arg_db_cache_l1))
   {
@@ -323,6 +322,101 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     break;
   }
 
+=======
+  m_config_folder = config_folder;
+  const std::string db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME;
+  LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
+
+  bool db_opened_okay = false;
+  for(size_t loading_attempt_no = 0; loading_attempt_no < 2; ++loading_attempt_no)
+  {
+    bool res = m_db.open(db_folder_path);
+    if (!res)
+    {
+      // if DB could not be opened -- try to remove the whole folder and re-open DB
+      LOG_PRINT_YELLOW("Failed to initialize database in folder: " << db_folder_path << ", first attempt", LOG_LEVEL_0);
+      boost::filesystem::remove_all(db_folder_path);
+      res = m_db.open(db_folder_path);
+      CHECK_AND_ASSERT_MES(res, false, "Failed to initialize database in folder: " << db_folder_path << ", second attempt");
+    }
+
+    res = m_db_blocks.init(BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_blocks_index.init(BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS_INDEX);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_transactions.init(BLOCKCHAIN_STORAGE_CONTAINER_TRANSACTIONS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_spent_keys.init(BLOCKCHAIN_STORAGE_CONTAINER_SPENT_KEYS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_outputs.init(BLOCKCHAIN_STORAGE_CONTAINER_OUTPUTS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_multisig_outs.init(BLOCKCHAIN_STORAGE_CONTAINER_MULTISIG_OUTS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_solo_options.init(BLOCKCHAIN_STORAGE_CONTAINER_SOLO_OPTIONS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_aliases.init(BLOCKCHAIN_STORAGE_CONTAINER_ALIASES);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_addr_to_alias.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_per_block_gindex_incs.init(BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+
+    if (command_line::has_arg(vm, arg_db_cache_l2))
+    {
+      uint64_t cache_size = command_line::get_arg(vm, arg_db_cache_l2);
+      LOG_PRINT_GREEN("Using db items cache size(L2): " << cache_size, LOG_LEVEL_0);
+      m_db_blocks_index.set_cache_size(cache_size);
+      m_db_blocks.set_cache_size(cache_size);
+      m_db_blocks_index.set_cache_size(cache_size);
+      m_db_transactions.set_cache_size(cache_size);
+      m_db_spent_keys.set_cache_size(cache_size);
+      //m_db_outputs.set_cache_size(cache_size);
+      m_db_multisig_outs.set_cache_size(cache_size);
+      m_db_solo_options.set_cache_size(cache_size);
+      m_db_aliases.set_cache_size(cache_size);
+      m_db_addr_to_alias.set_cache_size(cache_size);
+    }
+
+    bool need_reinit = false;
+    if (m_db_blocks.size() != 0)
+    {
+      if (m_db_storage_major_compatibility_version != BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION)
+      {
+        need_reinit = true;
+        LOG_PRINT_MAGENTA("DB storage needs reinit because it has major compatibility ver " << m_db_storage_major_compatibility_version << ", expected : " << BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION, LOG_LEVEL_0); 
+      }
+      else if (m_db_storage_minor_compatibility_version != BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION)
+      {
+        // nothing
+      }
+    }
+
+    if (need_reinit)
+    {
+      LOG_PRINT_L1("DB at " << db_folder_path << " is about to be deleted and re-created...");
+      m_db_blocks.deinit();
+      m_db_blocks_index.deinit();
+      m_db_transactions.deinit();
+      m_db_spent_keys.deinit();
+      m_db_outputs.deinit();
+      m_db_multisig_outs.deinit();
+      m_db_solo_options.deinit();
+      m_db_aliases.deinit();
+      m_db_addr_to_alias.deinit();
+      m_db_per_block_gindex_incs.deinit();
+      m_db.close();
+      size_t files_removed = boost::filesystem::remove_all(db_folder_path);
+      LOG_PRINT_L1(files_removed << " files at " << db_folder_path << " removed");
+
+      // try to re-create DB and re-init containers
+      continue;
+    }
+
+    db_opened_okay = true;
+    break;
+  }
+
+>>>>>>> merge
   CHECK_AND_ASSERT_MES(db_opened_okay, false, "All attempts to open DB at " << db_folder_path << " failed");
 
   if (!m_db_blocks.size())

@@ -48,7 +48,7 @@ namespace tools
       bool begin_transaction(bool read_only = false);
       bool commit_transaction();
       void abort_transaction();
-      bool open(const std::string& path, uint64_t cache_sz = CACHE_SIZE);
+      bool open(const std::string& path, uint64_t flags = 0);
       bool open_container(const std::string& name, container_handle& h);
       bool erase(container_handle h, const char* k, size_t s);
       bool get(container_handle h, const char* k, size_t s, std::string& res_buff);
