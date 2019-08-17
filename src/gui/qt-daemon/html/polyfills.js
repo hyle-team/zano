@@ -5805,6 +5805,7 @@ __webpack_require__.r(__webpack_exports__);
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 __webpack_require__(/*! D:\Projects\zano\src\gui\qt-daemon\html_source\src\polyfills.ts */"./src/polyfills.ts");
 module.exports = __webpack_require__(/*! D:\Projects\zano\src\gui\qt-daemon\html_source\node_modules\@angular-devkit\build-angular\src\angular-cli-files\models\jit-polyfills.js */"./node_modules/@angular-devkit/build-angular/src/angular-cli-files/models/jit-polyfills.js");
 =======
@@ -5827,6 +5828,10 @@ module.exports = __webpack_require__(/*! c:\Users\Admin\Documents\zano\src\gui\q
 __webpack_require__(/*! C:\Users\butsd\Documents\Projects\Projects now\zano\src\gui\qt-daemon\html_source\src\polyfills.ts */"./src/polyfills.ts");
 module.exports = __webpack_require__(/*! C:\Users\butsd\Documents\Projects\Projects now\zano\src\gui\qt-daemon\html_source\node_modules\@angular-devkit\build-angular\src\angular-cli-files\models\jit-polyfills.js */"./node_modules/@angular-devkit/build-angular/src/angular-cli-files/models/jit-polyfills.js");
 >>>>>>> fix modal width
+=======
+__webpack_require__(/*! D:\Projects\zano\src\gui\qt-daemon\html_source\src\polyfills.ts */"./src/polyfills.ts");
+module.exports = __webpack_require__(/*! D:\Projects\zano\src\gui\qt-daemon\html_source\node_modules\@angular-devkit\build-angular\src\angular-cli-files\models\jit-polyfills.js */"./node_modules/@angular-devkit/build-angular/src/angular-cli-files/models/jit-polyfills.js");
+>>>>>>> add type '.csv',validation empty contact list/file
 
 
 /***/ })

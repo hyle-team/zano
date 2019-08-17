@@ -608,6 +608,7 @@
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Error is occured while reading file!",
+<<<<<<< HEAD
     "ERROR_TYPE_FILE": "Please import valid .csv file.",
     "ERROR_EXPORT": "Invalid file type. Save file as .csv"
 <<<<<<< HEAD
@@ -619,6 +620,12 @@
     "ERROR_TYPE_FILE": "Please import valid .csv file."
 >>>>>>> 3ff1ce583e414436a973956284587d52e402f589
 >>>>>>> commit
+=======
+    "ERROR_TYPE_FILE": "Please import valid .csv file",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv",
+    "ERROR_EMPTY_LIST": "Contact list is empty",
+    "ERROR_IMPORT_EMPTY": "File is empty"
+>>>>>>> add type '.csv',validation empty contact list/file
   },
   "ERRORS": {
     "NO_MONEY": "Not enough money",
