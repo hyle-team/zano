@@ -535,7 +535,7 @@ namespace currency
 
     bool init_tx_fee_median();
     bool update_tx_fee_median();
-    void initialize_db_solo_options_values();
+    void store_db_solo_options_values();
     bool set_lost_tx_unmixable();
     bool set_lost_tx_unmixable_for_height(uint64_t height);
     void patch_out_if_needed(txout_to_key& out, const crypto::hash& tx_id, uint64_t n)const ;

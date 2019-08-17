@@ -146,7 +146,7 @@ namespace currency
     bool remove_alias_info(const transaction& tx);
 
     bool is_valid_contract_finalization_tx(const transaction &tx)const;
-    void initialize_db_solo_options_values();
+    void store_db_solo_options_values();
     bool is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const;
     bool validate_alias_info(const transaction& tx, bool is_in_block)const;
     bool get_key_images_from_tx_pool(std::unordered_set<crypto::key_image>& key_images)const;
