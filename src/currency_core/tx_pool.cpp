@@ -29,6 +29,7 @@ DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated 
 #define TRANSACTION_POOL_CONTAINER_ALIAS_ADDRESSES        "alias_addresses"
 #define TRANSACTION_POOL_CONTAINER_KEY_IMAGES             "key_images"
 #define TRANSACTION_POOL_CONTAINER_SOLO_OPTIONS           "solo"
+#define TRANSACTION_POOL_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION 92 // DON'T CHANGE THIS, if you need to resync db! Change TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION instead!
 #define TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION      BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 1
 
 #undef LOG_DEFAULT_CHANNEL 
@@ -48,7 +49,7 @@ namespace currency
     m_db_key_images_set(m_db),
     m_db_alias_names(m_db),
     m_db_alias_addresses(m_db),
-    m_db_storage_major_compatibility_version(TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION, m_db_solo_options)
+    m_db_storage_major_compatibility_version(TRANSACTION_POOL_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION, m_db_solo_options)
   {
 
   }
@@ -1108,7 +1109,7 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
-  void tx_memory_pool::initialize_db_solo_options_values()
+  void tx_memory_pool::store_db_solo_options_values()
   {
     m_db.begin_transaction();
     m_db_storage_major_compatibility_version = TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION;
@@ -1119,46 +1120,83 @@ namespace currency
   {
     m_config_folder = config_folder;
 
-    uint64_t cache_size = CACHE_SIZE;
-    LOG_PRINT_GREEN("Using pool db file cache size(L1): " << cache_size, LOG_LEVEL_0);
-
     LOG_PRINT_L0("Loading blockchain...");
-    const std::string folder_name = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME;
-    tools::create_directories_if_necessary(folder_name);
-    bool res = m_db.open(folder_name, cache_size);
-    CHECK_AND_ASSERT_MES(res, false, "Failed to initialize pool database in folder: " << folder_name);
-
-    res = m_db_transactions.init(TRANSACTION_POOL_CONTAINER_TRANSACTIONS);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_key_images_set.init(TRANSACTION_POOL_CONTAINER_KEY_IMAGES);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_black_tx_list.init(TRANSACTION_POOL_CONTAINER_BLACK_TX_LIST);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_alias_names.init(TRANSACTION_POOL_CONTAINER_ALIAS_NAMES);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_alias_addresses.init(TRANSACTION_POOL_CONTAINER_ALIAS_ADDRESSES);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-    res = m_db_solo_options.init(TRANSACTION_POOL_CONTAINER_SOLO_OPTIONS);
-    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-
-
-    m_db_transactions.set_cache_size(1000);
-    m_db_alias_names.set_cache_size(10000);
-    m_db_alias_addresses.set_cache_size(10000);
-    m_db_black_tx_list.set_cache_size(1000);
-
-    bool need_reinit = false;
-    if (m_db_storage_major_compatibility_version != TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION)
-      need_reinit = true;
-
-    if (need_reinit)
+    const std::string db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME;
+    
+    bool db_opened_okay = false;
+    for(size_t loading_attempt_no = 0; loading_attempt_no < 2; ++loading_attempt_no)
     {
-      clear();
-      LOG_PRINT_MAGENTA("Tx Pool reinitialized.", LOG_LEVEL_0);
-    }
-    initialize_db_solo_options_values();
+      bool res = m_db.open(db_folder_path);
+      if (!res)
+      {
+        // if DB could not be opened -- try to remove the whole folder and re-open DB
+        LOG_PRINT_YELLOW("Failed to initialize database in folder: " << db_folder_path << ", first attempt", LOG_LEVEL_0);
+        boost::filesystem::remove_all(db_folder_path);
+        res = m_db.open(db_folder_path);
+        CHECK_AND_ASSERT_MES(res, false, "Failed to initialize database in folder: " << db_folder_path << ", second attempt");
+      }
 
-    LOG_PRINT_GREEN("TX_POOL Initialized ok. (" << m_db_transactions.size() << " transactions)", LOG_LEVEL_0);
+      res = m_db_transactions.init(TRANSACTION_POOL_CONTAINER_TRANSACTIONS);
+      CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+      res = m_db_key_images_set.init(TRANSACTION_POOL_CONTAINER_KEY_IMAGES);
+      CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+      res = m_db_black_tx_list.init(TRANSACTION_POOL_CONTAINER_BLACK_TX_LIST);
+      CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+      res = m_db_alias_names.init(TRANSACTION_POOL_CONTAINER_ALIAS_NAMES);
+      CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+      res = m_db_alias_addresses.init(TRANSACTION_POOL_CONTAINER_ALIAS_ADDRESSES);
+      CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+      res = m_db_solo_options.init(TRANSACTION_POOL_CONTAINER_SOLO_OPTIONS);
+      CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+
+      m_db_transactions.set_cache_size(1000);
+      m_db_alias_names.set_cache_size(10000);
+      m_db_alias_addresses.set_cache_size(10000);
+      m_db_black_tx_list.set_cache_size(1000);
+
+      bool need_reinit = false;
+      if (m_db_storage_major_compatibility_version > 0 && m_db_storage_major_compatibility_version != TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION)
+      {
+        need_reinit = true;
+        LOG_PRINT_MAGENTA("Tx pool DB needs reinit because it has major compatibility ver is " << m_db_storage_major_compatibility_version << ", expected: " << TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION, LOG_LEVEL_0); 
+      }
+
+      if (need_reinit)
+      {
+        LOG_PRINT_L1("DB at " << db_folder_path << " is about to be deleted and re-created...");
+        m_db_transactions.deinit();
+        m_db_key_images_set.deinit();
+        m_db_black_tx_list.deinit();
+        m_db_alias_names.deinit();
+        m_db_alias_addresses.deinit();
+        m_db_solo_options.deinit();
+        m_db.close();
+        size_t files_removed = boost::filesystem::remove_all(db_folder_path);
+        LOG_PRINT_L1(files_removed << " files at " << db_folder_path << " removed");
+
+        // try to re-create DB and re-init containers
+        continue;
+      }
+
+      db_opened_okay = true;
+      break;
+    }
+
+    CHECK_AND_ASSERT_MES(db_opened_okay, false, "All attempts to open DB at " << db_folder_path << " failed");
+
+    store_db_solo_options_values();
+
+    LOG_PRINT_GREEN("tx pool loaded ok from " << db_folder_path << ", loaded " << m_db_transactions.size() << " transactions", LOG_LEVEL_0);
+    if (epee::log_space::log_singletone::get_log_detalisation_level() >= LOG_LEVEL_2 && m_db_transactions.size() != 0)
+    {
+      std::stringstream ss;
+      m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+      {
+        ss << h << " sz: " << std::setw(5) << tx_entry.blob_size << " rcv: " << misc_utils::get_time_interval_string(time(nullptr) - tx_entry.receive_time) << " ago"  << ENDL;
+        return true;
+      });
+      LOG_PRINT_L2(ss.str());
+    }
     return true;
   }
 
