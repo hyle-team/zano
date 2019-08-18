@@ -4751,7 +4751,10 @@ var ExportImportComponent = /** @class */ (function () {
                 _this.variablesService.settings.default_path = file_data.path.substr(0, file_data.path.lastIndexOf('/'));
                 if (_this.isValid(file_data.path)) {
                     _this.backend.loadFile(file_data.path, function (status, data) {
-                        if (status) {
+                        if (!status) {
+                            _this.modalService.prepareModal('error', 'CONTACTS.ERROR_IMPORT_EMPTY');
+                        }
+                        else {
                             var options = {
                                 header: true
                             };
@@ -4802,11 +4805,15 @@ var ExportImportComponent = /** @class */ (function () {
             contacts.push(contact);
         });
         this.backend.saveFileDialog('', '*', this.variablesService.settings.default_path, function (file_status, file_data) {
-            if (file_status && _this.isValid(file_data.path)) {
-                _this.backend.storeFile(file_data.path, _this.papa.unparse(contacts));
+            if (!_this.variablesService.contacts.length && !(file_data.error_code === 'CANCELED')) {
+                _this.modalService.prepareModal('error', 'CONTACTS.ERROR_EMPTY_LIST');
+            }
+            var path = _this.isValid(file_data.path) ? file_data.path : file_data.path + ".csv";
+            if (file_status && _this.isValid(path) && _this.variablesService.contacts.length) {
+                _this.backend.storeFile(path, _this.papa.unparse(contacts));
                 _this.modalService.prepareModal('success', 'CONTACTS.SUCCESS_EXPORT');
             }
-            if (!(file_data.error_code === 'CANCELED') && !_this.isValid(file_data.path)) {
+            if (!(file_data.error_code === 'CANCELED') && !_this.isValid(path)) {
                 _this.modalService.prepareModal('error', 'CONTACTS.ERROR_EXPORT');
             }
         });
