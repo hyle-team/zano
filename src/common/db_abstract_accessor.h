@@ -241,9 +241,9 @@ namespace tools
         m_is_open = false;
         return m_backend->close();
       }
-      bool open(const std::string& path, uint64_t cache_sz = CACHE_SIZE)
+      bool open(const std::string& path, uint64_t flags = 0)
       {
-        bool r = m_backend->open(path, cache_sz);
+        bool r = m_backend->open(path, flags);
         if(r)
           m_is_open = true;
         
@@ -558,13 +558,28 @@ namespace tools
       bool init(const std::string& container_name)
       {
 #ifdef ENABLE_PROFILING
-        m_get_profiler.m_name = container_name +":get";
-        m_set_profiler.m_name = container_name + ":set";
-        m_explicit_get_profiler.m_name = container_name + ":explicit_get";
-        m_explicit_set_profiler.m_name = container_name + ":explicit_set";
-        m_commit_profiler.m_name = container_name + ":commit";;
+        m_get_profiler.m_name           = container_name +":get";
+        m_set_profiler.m_name           = container_name + ":set";
+        m_explicit_get_profiler.m_name  = container_name + ":explicit_get";
+        m_explicit_set_profiler.m_name  = container_name + ":explicit_set";
+        m_commit_profiler.m_name        = container_name + ":commit";
 #endif
         return bdb.get_backend()->open_container(container_name, m_h);
+      }
+
+      bool deinit()
+      {
+#ifdef ENABLE_PROFILING
+        m_get_profiler.m_name           = "";
+        m_set_profiler.m_name           = "";
+        m_explicit_get_profiler.m_name  = "";
+        m_explicit_set_profiler.m_name  = "";
+        m_commit_profiler.m_name        = "";
+#endif
+        m_h = AUTO_VAL_INIT(m_h);
+        size_cache = 0;
+        size_cache_valid = false;
+        return true;
       }
 
       template<class t_cb>

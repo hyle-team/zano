@@ -39,7 +39,12 @@ export class ExportImportComponent implements OnInit {
           );
           if (this.isValid(file_data.path)) {
             this.backend.loadFile(file_data.path, (status, data) => {
-              if (status) {
+              if (!status) {
+                this.modalService.prepareModal(
+                  'error',
+                  'CONTACTS.ERROR_IMPORT_EMPTY'
+                );
+              } else {
                 const options = {
                   header: true
                 };
@@ -101,14 +106,25 @@ export class ExportImportComponent implements OnInit {
       delete contact.alias;
       contacts.push(contact);
     });
-
+    
     this.backend.saveFileDialog(
       '',
       '*',
       this.variablesService.settings.default_path,
       (file_status, file_data) => {
-        if (file_status) {
-          this.backend.storeFile(file_data.path, this.papa.unparse(contacts));
+        if (!this.variablesService.contacts.length && !(file_data.error_code === 'CANCELED')) {
+          this.modalService.prepareModal('error', 'CONTACTS.ERROR_EMPTY_LIST');
+        }
+        const path = this.isValid(file_data.path) ? file_data.path : `${file_data.path}.csv`;
+        if (file_status && this.isValid(path) && this.variablesService.contacts.length) {
+          this.backend.storeFile(path, this.papa.unparse(contacts));
+          this.modalService.prepareModal(
+            'success',
+            'CONTACTS.SUCCESS_EXPORT'
+          );
+        }
+        if (!(file_data.error_code === 'CANCELED') && !this.isValid(path)) {
+          this.modalService.prepareModal('error', 'CONTACTS.ERROR_EXPORT');
         }
       }
     );

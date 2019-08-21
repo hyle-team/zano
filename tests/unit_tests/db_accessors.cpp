@@ -29,9 +29,8 @@ TEST(db_accessor_tests, cached_key_value_accessor_test)
   tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> m_container(m_db);
   const std::string folder_name = "./TEST_cached_key_value_accessor_test";
   tools::create_directories_if_necessary(folder_name);
-  uint64_t cache_size = CACHE_SIZE;
   
-  ASSERT_TRUE(m_db.open(folder_name, cache_size));
+  ASSERT_TRUE(m_db.open(folder_name));
   ASSERT_TRUE(m_container.init("container"));
 
   ... TODO ...
@@ -47,8 +46,7 @@ TEST(db_accessor_tests_2, recoursive_tx_test)
 
   const std::string folder_name = "./TEST_db_recursive_tx";
   tools::create_directories_if_necessary(folder_name);
-  uint64_t cache_size = CACHE_SIZE;
-  ASSERT_TRUE(m_db.open(folder_name, cache_size));
+  ASSERT_TRUE(m_db.open(folder_name));
   ASSERT_TRUE(m_container.init("zzzz") );
 
   bool tx_result = m_container.begin_transaction();
@@ -319,8 +317,7 @@ TEST(db_accessor_tests, median_db_cache_test)
   const std::string folder_name = "./TEST_median_db_cache";
   const std::string naive_median_serialization_filename = folder_name + "/naive_median";
   tools::create_directories_if_necessary(folder_name);
-  uint64_t cache_size = CACHE_SIZE;
-  ASSERT_TRUE(m_db.open(folder_name, cache_size));
+  ASSERT_TRUE(m_db.open(folder_name));
   ASSERT_TRUE(m_tx_fee_median.init("median_fee"));
   m_db.begin_transaction();
 
