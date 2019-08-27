@@ -1113,7 +1113,7 @@ std::string daemon_backend::get_wallet_info(size_t wallet_id, view::wallet_info&
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   return get_wallet_info(w, wi);
 }
-std::string daemon_backend::get_contracts(size_t wallet_id, std::vector<tools::wallet_rpc::escrow_contract_details>& contracts)
+std::string daemon_backend::get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts)
 {
   tools::wallet2::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(wallet_id, w);
@@ -1130,46 +1130,41 @@ std::string daemon_backend::get_contracts(size_t wallet_id, std::vector<tools::w
   size_t i = 0;
   for (auto& c: cc)
   {
-    static_cast<tools::wallet_rpc::escrow_contract_details_basic&>(contracts[i]) = c.second;
+    static_cast<tools::wallet_public::escrow_contract_details_basic&>(contracts[i]) = c.second;
     contracts[i].contract_id = c.first; 
     i++;
   }
 
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::create_proposal(size_t wallet_id, 
-  const bc_services::contract_private_details& escrow_details,
-  const std::string& payment_id, 
-  uint64_t expiration_period, 
-  uint64_t fee, 
-  uint64_t b_fee)
+std::string daemon_backend::create_proposal(const view::create_proposal_param_gui& cpp)
 {
-  tools::wallet2::escrow_contracts_container cc;
-  GET_WALLET_OPT_BY_ID(wallet_id, w);
+  //tools::wallet2::escrow_contracts_container cc;
+  GET_WALLET_OPT_BY_ID(cpp.wallet_id, w);
   try
   {
     currency::transaction tx = AUTO_VAL_INIT(tx);
     currency::transaction template_tx = AUTO_VAL_INIT(template_tx);
-    w.w->get()->send_escrow_proposal(escrow_details, 0, 0, expiration_period, fee, b_fee, payment_id, tx, template_tx);
+    w.w->get()->send_escrow_proposal(cpp, tx, template_tx);
     //TODO: add some 
     return API_RETURN_CODE_OK;
   }
   catch (const tools::error::not_enough_money& e)
   {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "send_escrow_proposal error: API_RETURN_CODE_NOT_ENOUGH_MONEY: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(cpp.wallet_id) + "send_escrow_proposal error: API_RETURN_CODE_NOT_ENOUGH_MONEY: " << e.what());
     std::string err_code = API_RETURN_CODE_NOT_ENOUGH_MONEY;
     return err_code;
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "send_escrow_proposal error: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(cpp.wallet_id) + "send_escrow_proposal error: " << e.what());
     std::string err_code = API_RETURN_CODE_INTERNAL_ERROR;
     err_code += std::string(":") + e.what();
     return err_code;
   }
   catch (...)
   {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "send_escrow_proposal error: unknown error");
+    LOG_ERROR(get_wallet_log_prefix(cpp.wallet_id) + "send_escrow_proposal error: unknown error");
     return API_RETURN_CODE_INTERNAL_ERROR;
   }
 }
@@ -1282,7 +1277,7 @@ std::string daemon_backend::start_pos_mining(uint64_t wallet_id)
   wo.need_to_update_wallet_info = true;
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::get_mining_history(uint64_t wallet_id, tools::wallet_rpc::mining_history& mh)
+std::string daemon_backend::get_mining_history(uint64_t wallet_id, tools::wallet_public::mining_history& mh)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
@@ -1438,7 +1433,7 @@ void daemon_backend::on_new_block(size_t wallet_id, uint64_t /*height*/, const c
 
 }
 
-void daemon_backend::on_transfer2(size_t wallet_id, const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
+void daemon_backend::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
 {
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
@@ -1461,7 +1456,7 @@ void daemon_backend::on_sync_progress(size_t wallet_id, const uint64_t& percents
   wspp.wallet_id = wallet_id;
   m_pview->wallet_sync_progress(wspp);
 }
-void daemon_backend::on_transfer_canceled(size_t wallet_id, const tools::wallet_rpc::wallet_transfer_info& wti)
+void daemon_backend::on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti)
 {
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;

@@ -2533,7 +2533,7 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
   
   bool stub;
   std::deque<tools::wallet2::transfer_details> transfers;
-  std::vector<tools::wallet_rpc::wallet_transfer_info> unconfirmed_transfers;
+  std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed_transfers;
 
   alice_wlt->scan_tx_pool(stub);
   alice_wlt->get_transfers(transfers);

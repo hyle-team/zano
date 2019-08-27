@@ -1433,14 +1433,12 @@ QString MainWindow::create_proposal(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(view::create_proposal_param, cpp);
+  PREPARE_ARG_FROM_JSON(view::create_proposal_param_gui, cpp);
   PREPARE_RESPONSE(view::contracts_array, ar);
   ar.error_code = m_backend.create_proposal(cpp.wallet_id, cpp.details, cpp.payment_id, cpp.expiration_period, cpp.fee, cpp.b_fee);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
-
-
 
 
 QString MainWindow::accept_proposal(const QString& param)
@@ -1683,7 +1681,7 @@ QString MainWindow::get_mining_history(const QString& param)
   LOG_API_TIMING();
   //return prepare_call<view::wallet_id_obj, tools::wallet_rpc::mining_history>("get_mining_history", param, [this](const view::wallet_id_obj& a, view::api_response& ar) {
   PREPARE_ARG_FROM_JSON(view::wallet_id_obj, a);
-  PREPARE_RESPONSE(tools::wallet_rpc::mining_history, ar);
+  PREPARE_RESPONSE(tools::wallet_public::mining_history, ar);
 
   ar.error_code = m_backend.get_mining_history(a.wallet_id, ar.response_data);
   if (ar.error_code != API_RETURN_CODE_OK)

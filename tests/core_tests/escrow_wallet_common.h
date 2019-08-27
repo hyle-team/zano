@@ -70,8 +70,8 @@ inline bool refresh_wallet_and_check_1_contract_state(const char* wallet_name, s
   tools::wallet2::escrow_contracts_container contracts;
   r = wallet->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for " << wallet_name << " failed or returned wrong contracts count: " << contracts.size());
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == expected_contract_state, false, wallet_name << " has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state)
-    << ", expected: " << tools::wallet_rpc::get_escrow_contract_state_name(expected_contract_state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == expected_contract_state, false, wallet_name << " has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state)
+    << ", expected: " << tools::wallet_public::get_escrow_contract_state_name(expected_contract_state));
   
   return true;
 }
@@ -92,8 +92,8 @@ inline bool refresh_wallet_and_check_contract_state(const char* wallet_name, std
   {
     if (c.first == contract_id)
     {
-      CHECK_AND_ASSERT_MES(c.second.state == expected_contract_state, false, wallet_name << " has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(c.second.state)
-        << ", expected: " << tools::wallet_rpc::get_escrow_contract_state_name(expected_contract_state));
+      CHECK_AND_ASSERT_MES(c.second.state == expected_contract_state, false, wallet_name << " has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(c.second.state)
+        << ", expected: " << tools::wallet_public::get_escrow_contract_state_name(expected_contract_state));
       return true;
     }
   }
@@ -606,11 +606,11 @@ inline bool operator==(const bc_services::contract_private_details& lhs, const b
     lhs.title == rhs.title;
 }
 
-inline bool check_contract_state(const tools::wallet2::escrow_contracts_container& contracts, const bc_services::contract_private_details& cpd, tools::wallet_rpc::escrow_contract_details::contract_state state, const char* party)
+inline bool check_contract_state(const tools::wallet2::escrow_contracts_container& contracts, const bc_services::contract_private_details& cpd, tools::wallet_public::escrow_contract_details::contract_state state, const char* party)
 {
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, party << " has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == cpd, false, party << " has invalid contract's private details");
   CHECK_AND_ASSERT_MES(contracts.begin()->second.state == state, false, party << " has invalid contract state: " <<
-    tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state) << ", expected state: " << tools::wallet_rpc::get_escrow_contract_state_name(state));
+    tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state) << ", expected state: " << tools::wallet_public::get_escrow_contract_state_name(state));
   return true;
 }

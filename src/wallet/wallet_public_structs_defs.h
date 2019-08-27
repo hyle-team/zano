@@ -13,7 +13,7 @@
 #include "currency_core/bc_escrow_service.h"
 namespace tools
 {
-namespace wallet_rpc
+namespace wallet_public
 {
 #define WALLET_RPC_STATUS_OK      "OK"
 #define WALLET_RPC_STATUS_BUSY    "BUSY"
@@ -508,6 +508,31 @@ namespace wallet_rpc
       END_KV_SERIALIZE_MAP()
     };
   };
+
+
+  struct create_proposal_param
+  {
+//    uint64_t wallet_id;
+    bc_services::contract_private_details details;
+    std::string payment_id;
+    uint64_t expiration_period;
+    uint64_t fee;
+    uint64_t b_fee;
+    uint64_t fake_outputs_count;
+    uint64_t unlock_time;
+
+    BEGIN_KV_SERIALIZE_MAP()
+//      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(details)
+      KV_SERIALIZE(payment_id)
+      KV_SERIALIZE(expiration_period)
+      KV_SERIALIZE(fee)
+      KV_SERIALIZE(b_fee)
+      KV_SERIALIZE(fake_outputs_count)
+      KV_SERIALIZE(unlock_time)
+    END_KV_SERIALIZE_MAP()
+  };
+
 
   inline std::string get_escrow_contract_state_name(uint32_t state)
   {
