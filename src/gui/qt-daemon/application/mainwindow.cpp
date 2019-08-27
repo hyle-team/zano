@@ -1422,7 +1422,7 @@ QString MainWindow::get_contracts(const QString& param)
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::wallet_id_obj, owd);
-  PREPARE_RESPONSE(view::contracts_array, ar);
+  PREPARE_RESPONSE(tools::wallet_public::contracts_array, ar);
   ar.error_code = m_backend.get_contracts(owd.wallet_id, ar.response_data.contracts);
 
   return MAKE_RESPONSE(ar);
@@ -1434,7 +1434,7 @@ QString MainWindow::create_proposal(const QString& param)
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::create_proposal_param_gui, cpp);
-  PREPARE_RESPONSE(view::contracts_array, ar);
+  PREPARE_RESPONSE(tools::wallet_public::contracts_array, ar);
   ar.error_code = m_backend.create_proposal(cpp.wallet_id, cpp.details, cpp.payment_id, cpp.expiration_period, cpp.fee, cpp.b_fee);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -1457,7 +1457,7 @@ QString MainWindow::release_contract(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(view::accept_proposal_param, rcp);
+  PREPARE_ARG_FROM_JSON(view::release_contract_param, rcp);
   PREPARE_RESPONSE(view::api_void, ar);
 
   ar.error_code = m_backend.release_contract(rcp.wallet_id, rcp.contract_id, rcp.release_type);

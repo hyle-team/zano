@@ -132,7 +132,14 @@ namespace wallet_public
     END_KV_SERIALIZE_MAP()
   };
 
+  struct contracts_array
+  {
+    std::vector<escrow_contract_details> contracts;
 
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(contracts)
+    END_KV_SERIALIZE_MAP()
+  };
 
 
 
@@ -533,6 +540,116 @@ namespace wallet_public
     END_KV_SERIALIZE_MAP()
   };
 
+  struct COMMAND_SUBMIT_CONTRACT_PROPOSAL
+  {
+    typedef create_proposal_param request;
+
+    struct response
+    {
+      std::string status;  //"OK", "UNCONFIRMED", "BAD", "SPENT", "INTERNAL_ERROR", "BAD_ADDRESS"
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+  
+
+
+  struct COMMAND_SUBMIT_CONTRACT_ACCEPT
+  {
+    struct request
+    {
+      crypto::hash contract_id;
+      uint64_t acceptance_fee;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(acceptance_fee)
+        KV_SERIALIZE_POD_AS_HEX_STRING(contract_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+  
+  struct COMMAND_GET_CONTRACTS
+  {
+    struct request
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+
+    typedef contracts_array response;
+  };
+
+  struct COMMAND_RELEASE_CONTRACT
+  {
+    struct request
+    {
+      crypto::hash contract_id;
+      std::string release_type;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(release_type)
+        KV_SERIALIZE_POD_AS_HEX_STRING(contract_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_REQUEST_CANCEL_CONTRACT
+  {
+    struct request
+    {
+      crypto::hash contract_id;
+      uint64_t expiration_period;
+      uint64_t fee;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(expiration_period)
+        KV_SERIALIZE(fee)
+        KV_SERIALIZE_POD_AS_HEX_STRING(contract_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_ACCEPT_CANCEL_CONTRACT
+  {
+    struct request
+    {
+      crypto::hash contract_id;
+
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(contract_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   inline std::string get_escrow_contract_state_name(uint32_t state)
   {

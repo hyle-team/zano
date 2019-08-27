@@ -50,7 +50,12 @@ namespace tools
         MAP_JON_RPC_WE("sign_transfer",             on_sign_transfer,             wallet_public::COMMAND_SIGN_TRANSFER)
         MAP_JON_RPC_WE("submit_transfer",           on_submit_transfer,           wallet_public::COMMAND_SUBMIT_TRANSFER)
         //market API
-        MAP_JON_RPC_WE("send_proposal",             on_submit_transfer,           wallet_public::COMMAND_SUBMIT_TRANSFER)
+        MAP_JON_RPC_WE("contracts_send_proposal",             on_submit_contract_proposal,  wallet_public::COMMAND_SUBMIT_CONTRACT_PROPOSAL)
+        MAP_JON_RPC_WE("contracts_accept_proposal",           on_submit_contract_accept,    wallet_public::COMMAND_SUBMIT_CONTRACT_ACCEPT)
+        MAP_JON_RPC_WE("contracts_get_all",                   on_get_contracts,             wallet_public::COMMAND_GET_CONTRACTS)
+        MAP_JON_RPC_WE("contracts_release",                   on_release_contract,          wallet_public::COMMAND_RELEASE_CONTRACT)
+        MAP_JON_RPC_WE("contracts_request_cancel",            on_request_cancel_contract,   wallet_public::COMMAND_REQUEST_CANCEL_CONTRACT)
+        MAP_JON_RPC_WE("contracts_accept_cancel",             on_accept_cancel_contract,    wallet_public::COMMAND_ACCEPT_CANCEL_CONTRACT)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -65,6 +70,13 @@ namespace tools
       bool on_split_integrated_address(const wallet_public::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::request& req, wallet_public::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_sign_transfer(const wallet_public::COMMAND_SIGN_TRANSFER::request& req, wallet_public::COMMAND_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_submit_transfer(const wallet_public::COMMAND_SUBMIT_TRANSFER::request& req, wallet_public::COMMAND_SUBMIT_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_submit_contract_proposal(const wallet_public::COMMAND_SUBMIT_CONTRACT_PROPOSAL::request& req, wallet_public::COMMAND_SUBMIT_CONTRACT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_submit_contract_accept(const wallet_public::COMMAND_SUBMIT_CONTRACT_ACCEPT::request& req, wallet_public::COMMAND_SUBMIT_CONTRACT_ACCEPT::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_get_contracts(const wallet_public::COMMAND_GET_CONTRACTS::request& req, wallet_public::COMMAND_GET_CONTRACTS::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_release_contract(const wallet_public::COMMAND_RELEASE_CONTRACT::request& req, wallet_public::COMMAND_RELEASE_CONTRACT::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_request_cancel_contract(const wallet_public::COMMAND_REQUEST_CANCEL_CONTRACT::request& req, wallet_public::COMMAND_REQUEST_CANCEL_CONTRACT::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_accept_cancel_contract(const wallet_public::COMMAND_ACCEPT_CANCEL_CONTRACT::request& req, wallet_public::COMMAND_ACCEPT_CANCEL_CONTRACT::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
 
       bool handle_command_line(const boost::program_options::variables_map& vm);
 

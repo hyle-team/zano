@@ -3260,7 +3260,7 @@ void wallet2::send_escrow_proposal(const wallet_public::create_proposal_param& w
   currency::transaction &proposal_tx,
   currency::transaction &escrow_template_tx)
 {
-  return send_escrow_proposal(wp.details, wp.fake_outputs_count, wp.unlock_time, wp.expiration_period, wp.fee, wp.b_fee, wp.payment_id);
+  return send_escrow_proposal(wp.details, wp.fake_outputs_count, wp.unlock_time, wp.expiration_period, wp.fee, wp.b_fee, wp.payment_id, proposal_tx, escrow_template_tx);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::send_escrow_proposal(const bc_services::contract_private_details& ecrow_details,

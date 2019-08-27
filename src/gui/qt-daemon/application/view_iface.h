@@ -439,16 +439,6 @@ public:
   };
 
 
-  struct contracts_array
-  {
-    std::vector<tools::wallet_public::escrow_contract_details> contracts;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(contracts)
-    END_KV_SERIALIZE_MAP()
-  };
-
-
   struct header_entry
   {
     std::string field;
@@ -596,7 +586,7 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
-  struct accept_proposal_param : public wallet_and_contract_id_param
+  struct release_contract_param : public wallet_and_contract_id_param
   {
     std::string release_type;
 
@@ -626,7 +616,6 @@ public:
       KV_SERIALIZE(expiration_period)
       KV_CHAIN_BASE(contract_and_fee_param)
     END_KV_SERIALIZE_MAP()
-
   };
 
   struct create_proposal_param_gui : public tools::wallet_public::create_proposal_param

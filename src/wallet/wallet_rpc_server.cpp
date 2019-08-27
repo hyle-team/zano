@@ -443,5 +443,139 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_submit_contract_proposal(const wallet_public::COMMAND_SUBMIT_CONTRACT_PROPOSAL::request& req, wallet_public::COMMAND_SUBMIT_CONTRACT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      currency::transaction tx = AUTO_VAL_INIT(tx);
+      currency::transaction template_tx = AUTO_VAL_INIT(template_tx);
+      m_wallet.send_escrow_proposal(req, tx, template_tx);  
+      return true;
+    }
+    catch (const std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+      er.message = e.what();
+      return false;
+    }
+    catch (...)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_submit_contract_accept(const wallet_public::COMMAND_SUBMIT_CONTRACT_ACCEPT::request& req, wallet_public::COMMAND_SUBMIT_CONTRACT_ACCEPT::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      m_wallet.accept_proposal(req.contract_id, req.acceptance_fee);
+      return true;
+    }
+    catch (const std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+      er.message = e.what();
+      return false;
+    }
+    catch (...)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_get_contracts(const wallet_public::COMMAND_GET_CONTRACTS::request& req, wallet_public::COMMAND_GET_CONTRACTS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      tools::wallet2::escrow_contracts_container ecc;
+      m_wallet.get_contracts(ecc);
+      res.contracts.resize(ecc.size());
+      size_t i = 0;
+      for (auto& c : ecc)
+      {
+        static_cast<tools::wallet_public::escrow_contract_details_basic&>(res.contracts[i]) = c.second;
+        res.contracts[i].contract_id = c.first;
+        i++;
+      }
+      return true;
+    }
+    catch (const std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+      er.message = e.what();
+      return false;
+    }
+    catch (...)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+  }
+  bool wallet_rpc_server::on_release_contract(const wallet_public::COMMAND_RELEASE_CONTRACT::request& req, wallet_public::COMMAND_RELEASE_CONTRACT::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      m_wallet.finish_contract(req.contract_id, req.release_type);
+      return true;
+    }
+    catch (const std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+      er.message = e.what();
+      return false;
+    }
+    catch (...)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+  }
+  bool wallet_rpc_server::on_request_cancel_contract(const wallet_public::COMMAND_REQUEST_CANCEL_CONTRACT::request& req, wallet_public::COMMAND_REQUEST_CANCEL_CONTRACT::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      m_wallet.request_cancel_contract(req.contract_id, req.fee, req.expiration_period);
+      return true;
+    }
+    catch (const std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+      er.message = e.what();
+      return false;
+    }
+    catch (...)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+  }
+  bool wallet_rpc_server::on_accept_cancel_contract(const wallet_public::COMMAND_ACCEPT_CANCEL_CONTRACT::request& req, wallet_public::COMMAND_ACCEPT_CANCEL_CONTRACT::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      m_wallet.accept_cancel_contract(req.contract_id);
+      return true;
+    }
+    catch (const std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+      er.message = e.what();
+      return false;
+    }
+    catch (...)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+  }
+
 
 } // namespace tools
