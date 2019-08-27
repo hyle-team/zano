@@ -19,6 +19,8 @@ using namespace epee;
 #include "currency_format_utils.h"
 #include "misc_language.h"
 
+#define MINIMUM_REQUIRED_FREE_SPACE_BYTES (1024 * 1024 * 100)
+
 DISABLE_VS_WARNINGS(4355)
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "core"
@@ -135,6 +137,9 @@ namespace currency
   bool core::init(const boost::program_options::variables_map& vm)
   {
     bool r = handle_command_line(vm);
+
+    uint64_t available_space = 0;
+    CHECK_AND_ASSERT_MES(!check_if_free_space_critically_low(&available_space), false, "free space in data folder is critically low: " << std::fixed << available_space / (1024 * 1024) << " MB");
 
     r = m_mempool.init(m_config_folder);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize memory pool");
@@ -710,18 +715,22 @@ namespace currency
       l->on_blockchain_update();
   }
   //-----------------------------------------------------------------------------------------------
-#define MINIMUM_REQUIRED_FREE_SPACE_BYTES (1024 * 1024 * 100)
+  bool core::check_if_free_space_critically_low(uint64_t* p_available_space /* = nullptr */)
+  {
+    boost::filesystem::space_info si = boost::filesystem::space(m_config_folder);
+    if (p_available_space != nullptr)
+      *p_available_space = si.available;
+    return si.available < MINIMUM_REQUIRED_FREE_SPACE_BYTES;
+  }
+
   void core::check_free_space()
   {
     if (!m_critical_error_handler)
       return;
 
-    boost::filesystem::space_info si = boost::filesystem::space(m_config_folder);
-
-    if (si.available < MINIMUM_REQUIRED_FREE_SPACE_BYTES)
-    {
-      m_critical_error_handler->on_critical_low_free_space(si.available, MINIMUM_REQUIRED_FREE_SPACE_BYTES);
-    }
+    uint64_t available_space = 0;
+    if (check_if_free_space_critically_low(&available_space))
+      m_critical_error_handler->on_critical_low_free_space(available_space, MINIMUM_REQUIRED_FREE_SPACE_BYTES);
   }
   //-----------------------------------------------------------------------------------------------
 
