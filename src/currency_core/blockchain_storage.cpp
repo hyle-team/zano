@@ -76,6 +76,7 @@ DISABLE_VS_WARNINGS(4267)
 
 namespace 
 {
+  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l1 = { "db-cache-l1", "Specify size of memory mapped db cache file", 0, true };
   const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2 = { "db-cache-l2", "Specify cached elements in db helpers", 0, true };
 }
 
@@ -151,6 +152,7 @@ std::shared_ptr<transaction> blockchain_storage::get_tx(const crypto::hash &id) 
 //------------------------------------------------------------------
 void blockchain_storage::init_options(boost::program_options::options_description& desc)
 {
+  command_line::add_arg(desc, arg_db_cache_l1);
   command_line::add_arg(desc, arg_db_cache_l2);
 }
 //------------------------------------------------------------------
@@ -213,20 +215,36 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     return false;
   }
 
+  uint64_t cache_size_l1 = CACHE_SIZE;
+  if (command_line::has_arg(vm, arg_db_cache_l1))
+  {
+    cache_size_l1 = command_line::get_arg(vm, arg_db_cache_l1);
+  }
+  LOG_PRINT_GREEN("Using db file cache size(L1): " << cache_size_l1, LOG_LEVEL_0);
+
   m_config_folder = config_folder;
+
+  // remove old incompartible DB
+  const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
+  if (boost::filesystem::exists(old_db_folder_path))
+  {
+    LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
+    boost::filesystem::remove_all(old_db_folder_path);
+  }
+
   const std::string db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME;
   LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
 
   bool db_opened_okay = false;
   for(size_t loading_attempt_no = 0; loading_attempt_no < 2; ++loading_attempt_no)
   {
-    bool res = m_db.open(db_folder_path);
+    bool res = m_db.open(db_folder_path, cache_size_l1);
     if (!res)
     {
       // if DB could not be opened -- try to remove the whole folder and re-open DB
       LOG_PRINT_YELLOW("Failed to initialize database in folder: " << db_folder_path << ", first attempt", LOG_LEVEL_0);
       boost::filesystem::remove_all(db_folder_path);
-      res = m_db.open(db_folder_path);
+      res = m_db.open(db_folder_path, cache_size_l1);
       CHECK_AND_ASSERT_MES(res, false, "Failed to initialize database in folder: " << db_folder_path << ", second attempt");
     }
 

@@ -1120,19 +1120,30 @@ namespace currency
   {
     m_config_folder = config_folder;
 
-    LOG_PRINT_L0("Loading blockchain...");
+    uint64_t cache_size_l1 = CACHE_SIZE;
+    LOG_PRINT_GREEN("Using pool db file cache size(L1): " << cache_size_l1, LOG_LEVEL_0);
+
+    // remove old incompartible DB
+    const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME_OLD;
+    if (boost::filesystem::exists(old_db_folder_path))
+    {
+      LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
+      boost::filesystem::remove_all(old_db_folder_path);
+    }
+
     const std::string db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME;
-    
+    LOG_PRINT_L0("Loading blockchain from " << db_folder_path << "...");
+
     bool db_opened_okay = false;
     for(size_t loading_attempt_no = 0; loading_attempt_no < 2; ++loading_attempt_no)
     {
-      bool res = m_db.open(db_folder_path);
+      bool res = m_db.open(db_folder_path, cache_size_l1);
       if (!res)
       {
         // if DB could not be opened -- try to remove the whole folder and re-open DB
         LOG_PRINT_YELLOW("Failed to initialize database in folder: " << db_folder_path << ", first attempt", LOG_LEVEL_0);
         boost::filesystem::remove_all(db_folder_path);
-        res = m_db.open(db_folder_path);
+        res = m_db.open(db_folder_path, cache_size_l1);
         CHECK_AND_ASSERT_MES(res, false, "Failed to initialize database in folder: " << db_folder_path << ", second attempt");
       }
 

@@ -241,9 +241,9 @@ namespace tools
         m_is_open = false;
         return m_backend->close();
       }
-      bool open(const std::string& path, uint64_t flags = 0)
+      bool open(const std::string& path, uint64_t cache_sz = CACHE_SIZE)
       {
-        bool r = m_backend->open(path, flags);
+        bool r = m_backend->open(path, cache_sz);
         if(r)
           m_is_open = true;
         
@@ -558,10 +558,10 @@ namespace tools
       bool init(const std::string& container_name)
       {
 #ifdef ENABLE_PROFILING
-        m_get_profiler.m_name           = container_name +":get";
-        m_set_profiler.m_name           = container_name + ":set";
-        m_explicit_get_profiler.m_name  = container_name + ":explicit_get";
-        m_explicit_set_profiler.m_name  = container_name + ":explicit_set";
+        m_get_profiler.m_name = container_name +":get";
+        m_set_profiler.m_name = container_name + ":set";
+        m_explicit_get_profiler.m_name = container_name + ":explicit_get";
+        m_explicit_set_profiler.m_name = container_name + ":explicit_set";
         m_commit_profiler.m_name        = container_name + ":commit";
 #endif
         return bdb.get_backend()->open_container(container_name, m_h);
