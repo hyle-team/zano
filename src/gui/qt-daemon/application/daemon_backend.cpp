@@ -1168,6 +1168,7 @@ std::string daemon_backend::create_proposal(const view::create_proposal_param_gu
     return API_RETURN_CODE_INTERNAL_ERROR;
   }
 }
+
 std::string daemon_backend::accept_proposal(size_t wallet_id, const crypto::hash& contract_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
@@ -1400,10 +1401,10 @@ std::string daemon_backend::push_update_offer(const bc_services::update_offer_de
   }
 }
 
-// std::string daemon_backend::get_all_offers(currency::COMMAND_RPC_GET_ALL_OFFERS::response& od)
+// std::string daemon_backend::get_all_offers(currency::COMMAND_RPC_GET_OFFERS_EX::response& od)
 // {
-//   currency::COMMAND_RPC_GET_ALL_OFFERS::request rq = AUTO_VAL_INIT(rq);
-//   m_rpc_proxy->call_COMMAND_RPC_GET_ALL_OFFERS(rq, od);
+//   currency::COMMAND_RPC_GET_OFFERS_EX::request rq = AUTO_VAL_INIT(rq);
+//   m_rpc_proxy->call_COMMAND_RPC_GET_OFFERS_EX(rq, od);
 //   return API_RETURN_CODE_OK;
 // }
 
@@ -1515,7 +1516,7 @@ void daemon_backend::wallet_vs_options::worker_func()
             auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')
             auto offers_list_proxy = *offers; // than get locked exclusive access to offers
             offers_list_proxy->clear();
-            (*w_ptr)->get_actual_offers(*offers_list_proxy, false);
+            (*w_ptr)->get_actual_offers(*offers_list_proxy);
           }
 
           wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_ready;

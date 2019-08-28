@@ -3661,10 +3661,9 @@ bool wallet2::select_my_offers(std::list<bc_services::offer_details_ex>& offers)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_actual_offers(std::list<bc_services::offer_details_ex>& offers, bool fake)
+bool wallet2::get_actual_offers(std::list<bc_services::offer_details_ex>& offers)
 {
   select_my_offers(offers);
-
   return true;
 }
 //----------------------------------------------------------------------------------------------------

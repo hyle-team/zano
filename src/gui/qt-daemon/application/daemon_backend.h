@@ -88,10 +88,6 @@ public:
   std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist);
   std::string get_wallet_info(size_t wallet_id, view::wallet_info& wi);
   std::string get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts);
-  std::string create_proposal(size_t wallet_id, const bc_services::contract_private_details& escrow, const std::string& payment_id,
-                              uint64_t expiration_period,
-                              uint64_t fee, 
-                              uint64_t b_fee);
   std::string create_proposal(const view::create_proposal_param_gui& cpp);
   std::string accept_proposal(size_t wallet_id, const crypto::hash& contract_id);
   std::string release_contract(size_t wallet_id, const crypto::hash& contract_id, const std::string& contract_over_type);
@@ -104,7 +100,7 @@ public:
   std::string push_offer(size_t wallet_id, const bc_services::offer_details_ex& od, currency::transaction& res_tx);
   std::string cancel_offer(const view::cancel_offer_param& co, currency::transaction& res_tx);
   std::string push_update_offer(const bc_services::update_offer_details& uo, currency::transaction& res_tx);
-  //std::string get_all_offers(currency::COMMAND_RPC_GET_ALL_OFFERS::response& od);
+  //std::string get_all_offers(currency::COMMAND_RPC_GET_OFFERS_EX::response& od);
   std::string get_offers_ex(const bc_services::core_offers_filter& cof, std::list<bc_services::offer_details_ex>& offers, uint64_t& total_count);
   std::string get_aliases(view::alias_set& al_set);
   std::string get_alias_info_by_address(const std::string& addr, currency::alias_rpc_details& res_details);

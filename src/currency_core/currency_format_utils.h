@@ -21,13 +21,13 @@
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "difficulty.h"
-//#include "offers_services_helpers.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "bc_payments_id_service.h"
 #include "bc_attachments_helpers_basic.h"
 #include "blockchain_storage_basic.h"
 #include "currency_format_utils_blocks.h"
 #include "currency_format_utils_transactions.h"
+
 
 // ------ get_tx_type_definition -------------
 #define       GUI_TX_TYPE_NORMAL                  0

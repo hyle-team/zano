@@ -34,7 +34,6 @@
 #include "wallet_errors.h"
 #include "eos/portable_archive.hpp"
 #include "currency_core/core_runtime_config.h"
-#include "currency_core/offers_services_helpers.h"
 #include "currency_core/bc_offers_serialization.h"
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
@@ -697,7 +696,7 @@ namespace tools
     bool backup_keys(const std::string& path);
     bool reset_password(const std::string& pass);
     bool is_password_valid(const std::string& pass);
-    bool get_actual_offers(std::list<bc_services::offer_details_ex>& offers, bool fake = false);
+    bool get_actual_offers(std::list<bc_services::offer_details_ex>& offers);
     bool get_fake_offers(std::list<bc_services::offer_details_ex>& offers, uint64_t amount);
     bool process_contract_info(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_attach);
     bool handle_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::proposal_body& prop);

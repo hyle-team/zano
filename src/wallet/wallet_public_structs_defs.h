@@ -11,6 +11,8 @@
 #include "wallet_rpc_server_error_codes.h"
 #include "currency_core/offers_service_basics.h"
 #include "currency_core/bc_escrow_service.h"
+#include "rpc/core_rpc_server_commands_defs.h"
+
 namespace tools
 {
 namespace wallet_public
@@ -540,7 +542,7 @@ namespace wallet_public
     END_KV_SERIALIZE_MAP()
   };
 
-  struct COMMAND_SUBMIT_CONTRACT_PROPOSAL
+  struct COMMAND_CONTRACTS_SEND_PROPOSAL
   {
     typedef create_proposal_param request;
 
@@ -555,7 +557,7 @@ namespace wallet_public
   
 
 
-  struct COMMAND_SUBMIT_CONTRACT_ACCEPT
+  struct COMMAND_CONTRACTS_ACCEPT_PROPOSAL
   {
     struct request
     {
@@ -576,7 +578,7 @@ namespace wallet_public
     };
   };
   
-  struct COMMAND_GET_CONTRACTS
+  struct COMMAND_CONTRACTS_GET_ALL
   {
     struct request
     {
@@ -587,7 +589,7 @@ namespace wallet_public
     typedef contracts_array response;
   };
 
-  struct COMMAND_RELEASE_CONTRACT
+  struct COMMAND_CONTRACTS_RELEASE
   {
     struct request
     {
@@ -608,7 +610,7 @@ namespace wallet_public
     };
   };
 
-  struct COMMAND_REQUEST_CANCEL_CONTRACT
+  struct COMMAND_CONTRACTS_REQUEST_CANCEL
   {
     struct request
     {
@@ -631,7 +633,7 @@ namespace wallet_public
     };
   };
 
-  struct COMMAND_ACCEPT_CANCEL_CONTRACT
+  struct COMMAND_CONTRACTS_ACCEPT_CANCEL
   {
     struct request
     {
@@ -650,6 +652,90 @@ namespace wallet_public
       END_KV_SERIALIZE_MAP()
     };
   };
+
+  //--------------------
+  typedef currency::COMMAND_RPC_GET_OFFERS_EX COMMAND_MARKETPLACE_GET_MY_OFFERS;
+
+  struct COMMAND_MARKETPLACE_PUSH_OFFER
+  {
+    struct request
+    {
+      bc_services::offer_details_ex od;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(od)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string tx_hash;
+      uint64_t    tx_blob_size;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_hash)
+        KV_SERIALIZE(tx_blob_size)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER
+  {
+    struct request
+    {
+      crypto::hash tx_id;
+      uint64_t no;
+      bc_services::offer_details_ex od;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+        KV_SERIALIZE(no)
+        KV_SERIALIZE(od)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string tx_hash;
+      uint64_t    tx_blob_size;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_hash)
+        KV_SERIALIZE(tx_blob_size)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_MARKETPLACE_CANCEL_OFFER
+  {
+    struct request
+    {
+      crypto::hash tx_id;
+      uint64_t no;
+      uint64_t fee;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+        KV_SERIALIZE(no)
+        KV_SERIALIZE(fee)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string tx_hash;
+      uint64_t    tx_blob_size;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_hash)
+        KV_SERIALIZE(tx_blob_size)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 
   inline std::string get_escrow_contract_state_name(uint32_t state)
   {
