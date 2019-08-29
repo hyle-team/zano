@@ -13,7 +13,7 @@ namespace tools
   inline std::string get_callstack()
   {
 #if defined(__GNUC__)
-    return epee::misc_utils::print_trace();
+    return epee::misc_utils::print_trace_default();
 #elif defined(WIN32)
     return get_callstack_win_x64();
 #else
