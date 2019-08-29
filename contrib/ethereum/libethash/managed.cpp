@@ -89,12 +89,12 @@ const epoch_context& get_global_epoch_context(int epoch_number)
     return *thread_local_context;
 }
 
-const epoch_context_full& get_global_epoch_context_full(int epoch_number)
+std::shared_ptr<epoch_context_full> get_global_epoch_context_full(int epoch_number)
 {
     // Check if local context matches epoch number.
     if (!thread_local_context_full || thread_local_context_full->epoch_number != epoch_number)
         update_local_context_full(epoch_number);
 
-    return *thread_local_context_full;
+    return thread_local_context_full;
 }
 }  // namespace ethash
