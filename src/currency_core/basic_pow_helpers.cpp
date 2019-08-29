@@ -50,8 +50,9 @@ namespace currency
   crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_header_hash, uint64_t nonce)
   {
     int epoch = ethash_height_to_epoch(height);
-    const auto& context = progpow::get_global_epoch_context_full(static_cast<int>(epoch));
-    auto res_eth = progpow::hash(context,  static_cast<int>(height), *(ethash::hash256*)&block_header_hash, nonce);
+    std::shared_ptr<ethash::epoch_context_full> p_context = progpow::get_global_epoch_context_full(static_cast<int>(epoch));
+    CHECK_AND_ASSERT_THROW_MES(p_context, "progpow::get_global_epoch_context_full returned null");
+    auto res_eth = progpow::hash(*p_context,  static_cast<int>(height), *(ethash::hash256*)&block_header_hash, nonce);
     crypto::hash result = currency::null_hash;
     memcpy(&result.data, &res_eth.final_hash, sizeof(res_eth.final_hash));
     return result;
