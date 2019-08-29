@@ -47,7 +47,7 @@ namespace tools
 
       intptr_t size_lower = 0;
       intptr_t size_now = -1;            //don't change current database size
-      intptr_t size_upper = -1;          //don't set db file size limit
+      intptr_t size_upper = 0x10000000000;          //don't set db file size limit
       intptr_t growth_step = 0x40000000; //increment step 1GB
       intptr_t shrink_threshold = -1;
       intptr_t pagesize = 0x00001000;   //4kb
