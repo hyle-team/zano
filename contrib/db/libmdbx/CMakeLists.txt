@@ -1,5 +1,5 @@
 
-set (mdbx_sources src/mdbx.c src/osal.c)
+set (mdbx_sources src/mdbx.c src/osal.c src/lck-windows.c)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 

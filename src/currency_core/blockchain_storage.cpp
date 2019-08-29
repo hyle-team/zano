@@ -15,6 +15,7 @@
 #include "include_base_utils.h"
 
 #include "common/db_backend_lmdb.h"
+#include "common/db_backend_mdbx.h"
 #include "common/command_line.h"
 
 #include "blockchain_storage.h"
@@ -30,7 +31,6 @@
 #include "crypto/hash.h"
 #include "miner_common.h"
 #include "storages/portable_storage_template_helper.h"
-#include "common/db_backend_lmdb.h"
 #include "basic_pow_helpers.h"
 #include "version.h"
 
@@ -81,7 +81,7 @@ namespace
 }
 
 //------------------------------------------------------------------
-blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_rw_lock),
+blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::mdbx_db_backend), m_rw_lock),
                                                                  m_db_blocks(m_db),
                                                                  m_db_blocks_index(m_db),
                                                                  m_db_transactions(m_db),
