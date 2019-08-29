@@ -109,6 +109,7 @@ int main(int argc, char* argv[])
     std::fflush(nullptr); // all open output streams are flushed
   });
 
+  // setup custom callstack retrieving function
   epee::misc_utils::get_callstack(tools::get_callstack);
 
   po::options_description desc_cmd_only("Command line options");

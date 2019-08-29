@@ -9,7 +9,7 @@
 #include "core_fast_rpc_proxy.h"
 #include "string_coding.h"
 #include "currency_core/core_tools.h"
-//#include <codecvt>
+#include "common/callstack_helper.h"
 
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   CRITICAL_REGION_LOCAL(m_wallets_lock);    \
@@ -85,6 +85,8 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
     std::fflush(nullptr); // all open output streams are flushed
   });
 
+  // setup custom callstack retrieving function
+  epee::misc_utils::get_callstack(tools::get_callstack);
 
   //#if !defined(NDEBUG)
   //  log_space::log_singletone::add_logger(LOGGER_DEBUGGER, nullptr, nullptr);
