@@ -753,7 +753,7 @@ typedef NTSTATUS(NTAPI *MDBX_NtFsControlFile)(
     OUT OPTIONAL PVOID OutputBuffer, IN ULONG OutputBufferLength);
 extern MDBX_NtFsControlFile mdbx_NtFsControlFile;
 
-#ifndef _WIN32_WINNT_WIN8
+#if (_WIN32_WINNT < _WIN32_WINNT_WIN8)
 typedef struct _WIN32_MEMORY_RANGE_ENTRY {
   PVOID VirtualAddress;
   SIZE_T NumberOfBytes;

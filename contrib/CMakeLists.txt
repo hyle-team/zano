@@ -9,7 +9,8 @@ add_subdirectory(ethereum)
 
 set_property(TARGET upnpc-static PROPERTY FOLDER "contrib/miniupnp")
 set_property(TARGET zlibstatic PROPERTY FOLDER "contrib")
-set_property(TARGET lmdb PROPERTY FOLDER "contrib")
+# set_property(TARGET lmdb PROPERTY FOLDER "contrib")
+set_property(TARGET mdbx PROPERTY FOLDER "contrib")
 
 
 

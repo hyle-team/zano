@@ -37,7 +37,9 @@ endif()
 
 set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers for MSVC")
 
-include_directories(src contrib/eos_portable_archive contrib/db/liblmdb contrib contrib/epee/include "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
+#include_directories(src contrib/eos_portable_archive contrib/db/liblmdb contrib contrib/epee/include "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
+include_directories(src contrib/eos_portable_archive contrib/db/libmdbx contrib contrib/epee/include "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
+
 add_definitions(-DSTATICLIB)
 
 set(TESTNET FALSE CACHE BOOL "Compile for testnet")
