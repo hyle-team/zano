@@ -1,5 +1,18 @@
 
-set (mdbx_sources src/mdbx.c src/osal.c src/lck-windows.c)
+set (mdbx_sources src/mdbx.c src/osal.c)
+
+if(WIN32)
+  message(STATUS "MDBX locks: lck-windows.c")
+  set (mdbx_sources "${mdbx_sources} src/lck-windows.c")  
+elseif(APPLE)
+  message(STATUS "MDBX locks: lck-posix.c")
+  set (mdbx_sources "${mdbx_sources} src/lck-posix.c")  
+else
+  message(STATUS "MDBX locks: lck-linux.c")
+  set (mdbx_sources "${mdbx_sources} src/lck-linux.c")  
+endif()
+
+
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 
