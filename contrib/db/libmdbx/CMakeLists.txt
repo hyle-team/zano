@@ -5,7 +5,7 @@ if(WIN32)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   message(STATUS "MDBX locks: lck-linux.c")
   set (mdbx_sources src/mdbx.c src/osal.c src/version.c src/lck-linux.c )
-else
+else()
   message(STATUS "MDBX locks: lck-posix.c")
   set (mdbx_sources src/mdbx.c src/osal.c src/version.c src/lck-posix.c )
 endif()
