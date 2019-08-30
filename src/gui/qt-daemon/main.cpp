@@ -42,25 +42,29 @@ int main(int argc, char *argv[])
 #endif
 
 
-    epee::string_tools::set_module_name_and_folder(argv[0]);
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+  TRY_ENTRY();
+  epee::string_tools::set_module_name_and_folder(argv[0]);
+  QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 #ifdef _MSC_VER
 #if _MSC_VER >= 1910
-    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps); //HiDPI pixmaps
-    qputenv("QT_SCALE_FACTOR", "0.75");
+  QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps); //HiDPI pixmaps
+  qputenv("QT_SCALE_FACTOR", "0.75");
 #endif
 #endif
 
-    QApplication app(argc, argv);
-    MainWindow viewer;
-    if (!viewer.init_backend(argc, argv))
-    {
-      static_cast<view::i_view*>(&viewer)->show_msg_box("Failed to initialize backend, check debug logs for more details.");
-      return 1;
-    }
-    app.installNativeEventFilter(&viewer);
-    viewer.setWindowTitle(CURRENCY_NAME_BASE);
-    viewer.show_inital();
-    
-    return app.exec();
+  QApplication app(argc, argv);
+  MainWindow viewer;
+  if (!viewer.init_backend(argc, argv))
+  {
+    static_cast<view::i_view*>(&viewer)->show_msg_box("Failed to initialize backend, check debug logs for more details.");
+    return 1;
+  }
+  app.installNativeEventFilter(&viewer);
+  viewer.setWindowTitle(CURRENCY_NAME_BASE);
+  viewer.show_inital();
+
+  int res = app.exec();
+  LOG_PRINT_L0("Process exit with code: " << res);
+  return res;
+  CATCH_ENTRY2(0);
 }
