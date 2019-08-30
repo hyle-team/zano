@@ -7,7 +7,7 @@ if(WIN32)
 elseif(APPLE)
   message(STATUS "MDBX locks: lck-posix.c")
   set (mdbx_sources "${mdbx_sources} src/lck-posix.c")  
-else
+else()
   message(STATUS "MDBX locks: lck-linux.c")
   set (mdbx_sources "${mdbx_sources} src/lck-linux.c")  
 endif()
