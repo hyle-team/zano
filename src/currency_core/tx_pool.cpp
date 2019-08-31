@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/db_backend_lmdb.h"
+#include "common/db_backend_selector.h"
 #include "tx_pool.h"
 #include "currency_boost_serialization.h"
 #include "currency_core/currency_config.h"
@@ -42,7 +42,7 @@ namespace currency
   tx_memory_pool::tx_memory_pool(blockchain_storage& bchs, i_currency_protocol* pprotocol) :
     m_blockchain(bchs),
     m_pprotocol(pprotocol),
-    m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_dummy_rw_lock),
+    m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::default_db_backend), m_dummy_rw_lock),
     m_db_transactions(m_db),
     m_db_black_tx_list(m_db),
     m_db_solo_options(m_db), 

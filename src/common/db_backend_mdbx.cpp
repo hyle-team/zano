@@ -3,11 +3,14 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef DB_ENGINE_MDBX
+
 #include "db_backend_mdbx.h"
 #include "misc_language.h"
 #include "string_coding.h"
 #include "profile_tools.h"
 #include "util.h"
+
 
 #define BUF_SIZE 1024
 
@@ -394,3 +397,5 @@ namespace tools
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL NULL
+
+#endif

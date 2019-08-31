@@ -4,6 +4,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#ifdef DB_ENGINE_LMDB
+
 #include  <thread>
 
 #include "include_base_utils.h"
@@ -60,3 +62,4 @@ namespace tools
     };
   }
 }
+#endif

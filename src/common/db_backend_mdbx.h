@@ -4,6 +4,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+
+#ifdef DB_ENGINE_MDBX
+
 #include  <thread>
 
 #include "include_base_utils.h"
@@ -58,5 +61,8 @@ namespace tools
       MDBX_txn* get_current_tx();
 
     };
+    
   }
 }
+
+#endif

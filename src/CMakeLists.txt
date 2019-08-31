@@ -116,7 +116,7 @@ add_library(wallet ${WALLET})
 add_dependencies(wallet version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(WALLET)
 
-target_link_libraries(currency_core mdbx lmdb)
+target_link_libraries(currency_core ${DB_ENGINE})
 
 add_executable(daemon ${DAEMON} ${P2P} ${CURRENCY_PROTOCOL})
 add_dependencies(daemon version)

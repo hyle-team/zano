@@ -3,6 +3,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef DB_ENGINE_LMDB
+
 #include "db_backend_lmdb.h"
 #include "misc_language.h"
 #include "string_coding.h"
@@ -388,3 +390,4 @@ namespace tools
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL NULL
+#endif
