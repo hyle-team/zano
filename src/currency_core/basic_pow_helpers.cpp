@@ -22,17 +22,31 @@ namespace currency
 {
 
   //--------------------------------------------------------------
-  //global object 
-//   crypto::ethash::cache_manager cache;
-//   void ethash_set_use_dag(bool use_dag)
-//   {
-//     cache.set_use_dag(use_dag);
-//   }
-//   //------------------------------------------------------------------
-//   const uint8_t* ethash_get_dag(uint64_t epoch, uint64_t& dag_size)
-//   {
-//     return cache.get_dag(epoch, dag_size);
-//   }
+  int ethash_custom_log_get_level()
+  {
+    return epee::log_space::get_set_log_detalisation_level();
+  }
+  //--------------------------------------------------------------
+  void ethash_custom_log(const std::string& m, bool add_callstack)
+  {
+    std::string msg = epee::log_space::log_singletone::get_prefix_entry() + "[ETHASH]" + m;
+    if (add_callstack)
+      msg = msg + "callstask: " + epee::misc_utils::get_callstack();
+
+    epee::log_space::log_singletone::do_log_message(msg, LOG_LEVEL_0, epee::log_space::console_color_default, true, LOG_DEFAULT_TARGET);
+  }
+  //--------------------------------------------------------------
+  void init_ethash_log_if_necessary()
+  {
+    static bool inited = false;
+    if (inited)
+      return;
+
+    ethash::access_custom_log_level_function() = &ethash_custom_log_get_level;
+    ethash::access_custom_log_function() = &ethash_custom_log;
+
+    inited = true;
+  }
   //------------------------------------------------------------------
   int ethash_height_to_epoch(uint64_t height)
   {
@@ -49,9 +63,11 @@ namespace currency
   //--------------------------------------------------------------
   crypto::hash get_block_longhash(uint64_t height, const crypto::hash& block_header_hash, uint64_t nonce)
   {
+    init_ethash_log_if_necessary();
     int epoch = ethash_height_to_epoch(height);
-    const auto& context = progpow::get_global_epoch_context_full(static_cast<int>(epoch));
-    auto res_eth = progpow::hash(context,  static_cast<int>(height), *(ethash::hash256*)&block_header_hash, nonce);
+    std::shared_ptr<ethash::epoch_context_full> p_context = progpow::get_global_epoch_context_full(static_cast<int>(epoch));
+    CHECK_AND_ASSERT_THROW_MES(p_context, "progpow::get_global_epoch_context_full returned null");
+    auto res_eth = progpow::hash(*p_context,  static_cast<int>(height), *(ethash::hash256*)&block_header_hash, nonce);
     crypto::hash result = currency::null_hash;
     memcpy(&result.data, &res_eth.final_hash, sizeof(res_eth.final_hash));
     return result;

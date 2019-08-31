@@ -231,67 +231,7 @@ namespace tools
 
     }
 
-    static void GenerateCrashDump(EXCEPTION_POINTERS *pep = NULL)
-
-    {
-      SYSTEMTIME sysTime = { 0 };
-      GetSystemTime(&sysTime);
-      // get the computer name
-      char compName[MAX_COMPUTERNAME_LENGTH + 1] = { 0 };
-      DWORD compNameLen = ARRAYSIZE(compName);
-      GetComputerNameA(compName, &compNameLen);
-      // build the filename: APPNAME_COMPUTERNAME_DATE_TIME.DMP
-      char path[MAX_PATH*10] = { 0 };
-      std::string folder = epee::log_space::log_singletone::get_default_log_folder();
-      sprintf_s(path, ARRAYSIZE(path),"%s\\crashdump_%s_%04u-%02u-%02u_%02u-%02u-%02u.dmp",
-        folder.c_str(), compName, sysTime.wYear, sysTime.wMonth, sysTime.wDay,
-        sysTime.wHour, sysTime.wMinute, sysTime.wSecond);
-
-      HANDLE hFile = CreateFileA(path, GENERIC_READ | GENERIC_WRITE,
-        0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-
-      if ((hFile != NULL) && (hFile != INVALID_HANDLE_VALUE))
-      {
-        // Create the minidump 
-        MINIDUMP_EXCEPTION_INFORMATION mdei;
-
-        mdei.ThreadId = GetCurrentThreadId();
-        mdei.ExceptionPointers = pep;
-        mdei.ClientPointers = FALSE;
-
-        MINIDUMP_CALLBACK_INFORMATION mci;
-
-        mci.CallbackRoutine = (MINIDUMP_CALLBACK_ROUTINE)MyMiniDumpCallback;
-        mci.CallbackParam = 0;
-
-        MINIDUMP_TYPE mdt = (MINIDUMP_TYPE)(MiniDumpWithPrivateReadWriteMemory |
-          MiniDumpWithDataSegs |
-          MiniDumpWithHandleData |
-          MiniDumpWithFullMemoryInfo |
-          MiniDumpWithThreadInfo |
-          MiniDumpWithUnloadedModules);
-
-        BOOL rv = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
-          hFile, mdt, (pep != 0) ? &mdei : 0, 0, &mci);
-
-        if (!rv)
-        {
-          LOG_ERROR("Minidump file create FAILED(error " << GetLastError() << ") on path: " <<  path);
-        }
-        else
-        {
-          LOG_PRINT_L0("Minidump file created on path: " << path);
-        }
-        // Close the file 
-        CloseHandle(hFile);
-      }
-      else
-      {
-        LOG_ERROR("Minidump FAILED to create file (error " << GetLastError() << ") on path: " << path);
-      }
-    }
-
-
+    static void GenerateCrashDump(EXCEPTION_POINTERS *pep = NULL);
 
     static LONG WINAPI win_unhandled_exception_handler(_In_ struct _EXCEPTION_POINTERS *ep)
     {

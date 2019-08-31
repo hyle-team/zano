@@ -30,7 +30,7 @@ namespace lmdb_test
     // write data
     //
 
-    r = bdba.open(db_file_path);
+    r = bdba.open(db_file_path, CACHE_SIZE);
     ASSERT_TRUE(r);
 
     db::container_handle h;

@@ -126,7 +126,7 @@ namespace epee
         t_result result_struct = AUTO_VAL_INIT(result_struct);
         if( code <=0 )
         {
-          LOG_PRINT_L2("BACKTRACE: " << ENDL << epee::misc_utils::print_trace());
+          LOG_PRINT_L2("BACKTRACE: " << ENDL << epee::misc_utils::get_callstack());
           LOG_PRINT_L1("Failed to invoke command " << command << " return code " << code << "(" << epee::levin::get_err_descr(code) << ")context:" << print_connection_context(context));
           TRY_ENTRY()
           cb(code, result_struct, context);
@@ -150,7 +150,7 @@ namespace epee
       }, inv_timeout);
       if( res <=0 )
       {
-        LOG_PRINT_L2("BACKTRACE: " << ENDL << epee::misc_utils::print_trace());
+        LOG_PRINT_L2("BACKTRACE: " << ENDL << epee::misc_utils::get_callstack());
         LOG_PRINT_L1("Failed to invoke command " << command << " return code " << res << "(" << epee::levin::get_err_descr(res) << ") conn_id=" << conn_id);
         return false;
       }

@@ -26,6 +26,7 @@ using namespace epee;
 #include "common/miniupnp_helper.h"
 #include "version.h"
 #include "currency_core/core_tools.h"
+#include "common/callstack_helper.h"
 
 #include <cstdlib>
 
@@ -100,13 +101,16 @@ int main(int argc, char* argv[])
 #endif
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet,lmdb");
+  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet");
   LOG_PRINT_L0("Starting...");
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
     std::fflush(nullptr); // all open output streams are flushed
   });
+
+  // setup custom callstack retrieving function
+  epee::misc_utils::get_callstack(tools::get_callstack);
 
   po::options_description desc_cmd_only("Command line options");
   po::options_description desc_cmd_sett("Command line options and settings options", 130, 83);
