@@ -30,7 +30,7 @@ namespace lmdb_test
     // write data
     //
 
-    r = bdba.open(db_file_path);
+    r = bdba.open(db_file_path, CACHE_SIZE);
     ASSERT_TRUE(r);
 
     db::container_handle h;
@@ -54,7 +54,7 @@ namespace lmdb_test
       if (key % 1024 == 0)
       {
         ASSERT_TRUE(lmdb_ptr->commit_transaction());
-        ASSERT_TRUE(lmdb_ptr->resize_if_needed());
+        //ASSERT_TRUE(lmdb_ptr->resize_if_needed());
         ASSERT_TRUE(lmdb_ptr->begin_transaction());
         std::cout << total_data / 1024 / 1024 << " MB written to DB" << ENDL;
       }

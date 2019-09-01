@@ -150,7 +150,7 @@ DISABLE_VS_WARNINGS(4100)
   {std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, true, log_name);}}
 
 #define LOG_ERROR2(log_name, x) { \
-  std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << "[ERROR] Location: " << std::endl << LOCATION_SS << epee::misc_utils::print_trace() << " Message:" << std::endl << x << std::endl; epee::log_space::log_singletone::do_log_message(ss________.str(), LOG_LEVEL_0, epee::log_space::console_color_red, true, log_name); LOCAL_ASSERT(0); epee::log_space::increase_error_count(LOG_DEFAULT_CHANNEL); }
+  std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << "[ERROR] Location: " << std::endl << LOCATION_SS << epee::misc_utils::get_callstack() << " Message:" << std::endl << x << std::endl; epee::log_space::log_singletone::do_log_message(ss________.str(), LOG_LEVEL_0, epee::log_space::console_color_red, true, log_name); LOCAL_ASSERT(0); epee::log_space::increase_error_count(LOG_DEFAULT_CHANNEL); }
 
 #define LOG_FRAME2(log_name, x, y) epee::log_space::log_frame frame(x, y, log_name)
 

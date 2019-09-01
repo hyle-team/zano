@@ -145,7 +145,11 @@ epoch_context_full* create_epoch_context(
 
     char* const alloc_data = static_cast<char*>(std::calloc(1, alloc_size));
     if (!alloc_data)
-        return nullptr;  // Signal out-of-memory by returning null pointer.
+    {
+      LOG_CUSTOM_WITH_CALLSTACK("CRITICAL: std::calloc(" << alloc_size << ") failed in create_epoch_context()", 0);
+      return nullptr;  // Signal out-of-memory by returning null pointer.
+    }
+    LOG_CUSTOM("context for epoch " << epoch_number << " allocated, size: " << alloc_size << " bytes", 0);
 
     hash512* const light_cache = reinterpret_cast<hash512*>(alloc_data + context_alloc_size);
     const hash256 epoch_seed = calculate_epoch_seed(epoch_number);
@@ -373,6 +377,33 @@ search_result search(const epoch_context_full& context, const hash256& header_ha
     }
     return {};
 }
+
+custom_log_level_function*& access_custom_log_level_function()
+{
+  static custom_log_level_function* p_custom_log_level_function = nullptr;
+  return p_custom_log_level_function;
+}
+
+custom_log_function*& access_custom_log_function()
+{
+  static custom_log_function* p_custom_log_function = nullptr;
+  return p_custom_log_function;
+}
+
+int get_custom_log_level()
+{
+  if (access_custom_log_level_function() != nullptr)
+    return access_custom_log_level_function()();
+  return -1;
+}
+
+void custom_log(const std::string& m, bool add_callstack)
+{
+  if (access_custom_log_function() != nullptr)
+    access_custom_log_function()(m, add_callstack);
+}
+
+
 }  // namespace ethash
 
 using namespace ethash;
@@ -434,6 +465,8 @@ void ethash_destroy_epoch_context_full(epoch_context_full* context) noexcept
 
 void ethash_destroy_epoch_context(epoch_context* context) noexcept
 {
+    LOG_CUSTOM("context for epoch " << context->epoch_number << " is about to be freed", 0);
+
     context->~epoch_context();
     std::free(context);
 }
