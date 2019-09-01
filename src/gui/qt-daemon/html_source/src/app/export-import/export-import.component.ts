@@ -49,8 +49,8 @@ export class ExportImportComponent implements OnInit {
                   header: true
                 };
                 const elements = this.papa.parse(data, options);
-
-                if (elements.data && !elements.errors.length) {
+                const isArray = Array.isArray(elements.data);
+                if (isArray && elements.data.length !== 0 && !elements.errors.length) {
                   if (!this.variablesService.contacts.length) {
                     elements.data.forEach(element => {
                       this.variablesService.contacts.push(element);
