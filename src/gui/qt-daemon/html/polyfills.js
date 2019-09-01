@@ -5807,6 +5807,7 @@ __webpack_require__.r(__webpack_exports__);
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 __webpack_require__(/*! D:\Projects\zano\src\gui\qt-daemon\html_source\src\polyfills.ts */"./src/polyfills.ts");
 module.exports = __webpack_require__(/*! D:\Projects\zano\src\gui\qt-daemon\html_source\node_modules\@angular-devkit\build-angular\src\angular-cli-files\models\jit-polyfills.js */"./node_modules/@angular-devkit/build-angular/src/angular-cli-files/models/jit-polyfills.js");
 =======
@@ -5837,6 +5838,10 @@ module.exports = __webpack_require__(/*! D:\Projects\zano\src\gui\qt-daemon\html
 __webpack_require__(/*! C:\Users\butsd\Documents\Projects\Projects now\zano\src\gui\qt-daemon\html_source\src\polyfills.ts */"./src/polyfills.ts");
 module.exports = __webpack_require__(/*! C:\Users\butsd\Documents\Projects\Projects now\zano\src\gui\qt-daemon\html_source\node_modules\@angular-devkit\build-angular\src\angular-cli-files\models\jit-polyfills.js */"./node_modules/@angular-devkit/build-angular/src/angular-cli-files/models/jit-polyfills.js");
 >>>>>>> merge
+=======
+__webpack_require__(/*! c:\Projects\zano\src\gui\qt-daemon\html_source\src\polyfills.ts */"./src/polyfills.ts");
+module.exports = __webpack_require__(/*! c:\Projects\zano\src\gui\qt-daemon\html_source\node_modules\@angular-devkit\build-angular\src\angular-cli-files\models\jit-polyfills.js */"./node_modules/@angular-devkit/build-angular/src/angular-cli-files/models/jit-polyfills.js");
+>>>>>>> fix data.foreach & rebuild html
 
 
 /***/ })

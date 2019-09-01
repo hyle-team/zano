@@ -74,12 +74,17 @@ export class ExportImportComponent implements OnInit {
                 };
                 const elements = this.papa.parse(data, options);
 <<<<<<< HEAD
+<<<<<<< HEAD
                 const isArray = Array.isArray(elements.data);
                 if (isArray && elements.data.length !== 0 && !elements.errors.length) {
 =======
 
                 if (elements.data && !elements.errors.length) {
 >>>>>>> contact service
+=======
+                const isArray = Array.isArray(elements.data);
+                if (isArray && elements.data.length !== 0 && !elements.errors.length) {
+>>>>>>> fix data.foreach & rebuild html
                   if (!this.variablesService.contacts.length) {
                     elements.data.forEach(element => {
                       this.variablesService.contacts.push(element);

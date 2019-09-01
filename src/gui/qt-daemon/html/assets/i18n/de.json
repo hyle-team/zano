@@ -29,8 +29,12 @@
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Passwort ist erforderlich",
       "CONFIRM_REQUIRED": "Bestätigung ist erforderlich",
+<<<<<<< HEAD
       "MISMATCH": "Mismatch"
 >>>>>>> rebuild
+=======
+      "MISMATCH": "Fehlanpassung"
+>>>>>>> fix data.foreach & rebuild html
     }
   },
   "COMMON": {
@@ -55,10 +59,14 @@
     "ADD_NEW": "+ Hinzufügen",
     "ACCOUNT": {
 <<<<<<< HEAD
+<<<<<<< HEAD
       "STAKING": "Staking",
 =======
       "STAKING": "Staking (Anlegen)",
 >>>>>>> rebuild
+=======
+      "STAKING": "Staking",
+>>>>>>> fix data.foreach & rebuild html
       "MESSAGES": "Neue Angebote/Nachrichten",
       "SYNCING": "Wallet synchronisieren"
     },
@@ -195,12 +203,17 @@
     "DETAILS": "Details",
     "LOCK": "Verschlüsseln",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "AVAILABLE_BALANCE": "Verfügbar <b>{{available}} {{currency}}<b/>",
     "LOCKED_BALANCE": "Gesperrt <b>{{locked}} {{currency}}<b/>",
 =======
     "AVAILABLE_BALANCE": "Verfügbar <b>{{verfügbar}} {{Währung}}<b/>",
     "LOCKED_BALANCE": "Gesperrt <b>{{gesperrt}} {{Währung}}<b/>",
 >>>>>>> rebuild
+=======
+    "AVAILABLE_BALANCE": "Verfügbar <b>{{available}} {{currency}}<b/>",
+    "LOCKED_BALANCE": "Gesperrt <b>{{locked}} {{currency}}<b/>",
+>>>>>>> fix data.foreach & rebuild html
     "LOCKED_BALANCE_LINK": "Was bedeutet das?",
     "TABS": {
       "SEND": "Senden",
@@ -209,10 +222,14 @@
       "CONTRACTS": "Verträge",
       "MESSAGES": "Nachrichten",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "STAKING": "Staking"
 =======
       "STAKING": "Staking (Anlegen)"
 >>>>>>> rebuild
+=======
+      "STAKING": "Staking"
+>>>>>>> fix data.foreach & rebuild html
     }
   },
   "WALLET_DETAILS": {
@@ -233,14 +250,19 @@
       "LABEL": "Alias",
       "PLACEHOLDER": "@ Alias eingeben",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "TOOLTIP": "Ein Alias ist eine verkürzte Form Ihres Kontos. Ein Alias kann nur lateinische Buchstaben, Zahlen und die Zeichen „.“ und “-” enthalten. Es muss mit “@” beginnen."
 =======
       "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
 >>>>>>> rebuild
+=======
+      "TOOLTIP": "Ein Alias ist eine verkürzte Form Ihres Kontos. Ein Alias kann nur lateinische Buchstaben, Zahlen und die Zeichen „.“ und “-” enthalten. Es muss mit “@” beginnen."
+>>>>>>> fix data.foreach & rebuild html
     },
     "COMMENT": {
       "LABEL": "Kommentar",
       "PLACEHOLDER": "",
+<<<<<<< HEAD
 <<<<<<< HEAD
       "TOOLTIP": "Der Kommentar wird für jeden sichtbar sein, der eine Zahlung an Ihren Alias vornehmen möchte. Sie können Details über Ihre Geschäfte, Kontakte oder Text angeben. Kommentare können später bearbeitet werden."
     },
@@ -250,6 +272,11 @@
     },
     "COST": "Alias fee {{value}} {{currency}}",
 >>>>>>> rebuild
+=======
+      "TOOLTIP": "Der Kommentar wird für jeden sichtbar sein, der eine Zahlung an Ihren Alias vornehmen möchte. Sie können Details über Ihre Geschäfte, Kontakte oder Text angeben. Kommentare können später bearbeitet werden."
+    },
+    "COST": "Alias-Gebühr {{value}} {{currency}}",
+>>>>>>> fix data.foreach & rebuild html
     "BUTTON_ASSIGN": "Zuweisen",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name ist erforderlich",
@@ -286,6 +313,7 @@
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     },
     "COST": "Gebühr {{value}} {{currency}}",
+<<<<<<< HEAD
 =======
       "NO_MONEY": "You do not have enough funds to change the comment to this alias",
 =======
@@ -295,6 +323,8 @@
     },
     "COST": "Gebühr {{Wert}} {{Währung}}",
 >>>>>>> rebuild
+=======
+>>>>>>> fix data.foreach & rebuild html
     "BUTTON_EDIT": "Bearbeiten"
   },
   "TRANSFER_ALIAS": {
@@ -324,8 +354,12 @@
       "NO_MONEY": "Du hast nicht genug Geldmittel, um diesen Alias zu transferieren"
 >>>>>>> fix modal width
     },
+<<<<<<< HEAD
     "COST": "Transfer fee {{value}} {{currency}}",
 >>>>>>> rebuild
+=======
+    "COST": "Überweisungsgebühr {{value}} {{currency}}",
+>>>>>>> fix data.foreach & rebuild html
     "BUTTON_TRANSFER": "Transfer",
     "BUTTON_CANCEL": "Abbrechen",
     "REQUEST_SEND_REG": "Der Alias wird innerhalb von 10 Minuten übertragen"
@@ -348,15 +382,20 @@
       "AMOUNT_ZERO": "Betrag ist Null",
       "FEE_REQUIRED": "Gebühr ist erforderlich",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "FEE_MINIMUM": "Mindestgebühr: {{fee}}",
 =======
       "FEE_MINIMUM": "Mindestgebühr: {{Gebühr}}",
 >>>>>>> rebuild
+=======
+      "FEE_MINIMUM": "Mindestgebühr: {{fee}}",
+>>>>>>> fix data.foreach & rebuild html
       "MAX_LENGTH": "Maximale Kommentarlänge erreicht"
     }
   },
   "HISTORY": {
     "STATUS": "Status",
+<<<<<<< HEAD
 <<<<<<< HEAD
     "STATUS_TOOLTIP": "Bestätigungen {{current}}/{{total}}",
     "LOCK_TOOLTIP": "Gesperrt bis {{date}}",
@@ -364,6 +403,10 @@
     "STATUS_TOOLTIP": "Confirmations {{current}}/{{total}}",
     "LOCK_TOOLTIP": "Gesperrt bis {{Datum}}",
 >>>>>>> rebuild
+=======
+    "STATUS_TOOLTIP": "Bestätigungen {{current}}/{{total}}",
+    "LOCK_TOOLTIP": "Gesperrt bis {{date}}",
+>>>>>>> fix data.foreach & rebuild html
     "SEND": "Gesendet",
     "RECEIVED": "Empfangen",
     "DATE": "Datum",
@@ -375,10 +418,14 @@
       "ID": "Transaktions-ID",
       "SIZE": "Transaktionsgröße",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "SIZE_VALUE": "{{value}} Bytes",
 =======
       "SIZE_VALUE": "{{Wert}} Bytes",
 >>>>>>> rebuild
+=======
+      "SIZE_VALUE": "{{value}} Bytes",
+>>>>>>> fix data.foreach & rebuild html
       "HEIGHT": "Höhe",
       "CONFIRMATION": "Bestätigung",
       "INPUTS": "Inputs",
@@ -396,6 +443,7 @@
       "POS_REWARD": "POS-Belohnung",
       "CREATE_CONTRACT": "Vertragsvorschlag",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "PLEDGE_CONTRACT": "Vertrag-Einzahlung",
       "NULLIFY_CONTRACT": "Einzahlungen verbrennen",
       "PROPOSAL_CANCEL_CONTRACT": "Stornierungsanfrage",
@@ -406,6 +454,12 @@
       "PROPOSAL_CANCEL_CONTRACT": "Stornierungsanfrage",
       "CANCEL_CONTRACT": "Cancel and return deposits"
 >>>>>>> rebuild
+=======
+      "PLEDGE_CONTRACT": "Vertrag-Einzahlung",
+      "NULLIFY_CONTRACT": "Einzahlungen verbrennen",
+      "PROPOSAL_CANCEL_CONTRACT": "Stornierungsanfrage",
+      "CANCEL_CONTRACT": "Abbrechen und Einzahlungen zurückzahlen"
+>>>>>>> fix data.foreach & rebuild html
     }
   },
   "CONTRACTS": {
@@ -418,6 +472,7 @@
     "STATUS": "Status",
     "COMMENTS": "Kommentare",
     "PURCHASE_BUTTON": "Neuer Kauf",
+<<<<<<< HEAD
 <<<<<<< HEAD
     "LISTING_BUTTON": "Auflistung erstellen",
     "TIME_LEFT": {
@@ -449,6 +504,19 @@
 =======
       "REMAINING_ONE_WAITING": "Warte für {{Zeit}} Stunde",
       "REMAINING_MANY_WAITING": "Warte für {{Zeit}} Stunden",
+=======
+    "LISTING_BUTTON": "Auflistung erstellen",
+    "TIME_LEFT": {
+      "REMAINING_LESS_ONE": "Weniger als eine Stunde, um zu antworten",
+      "REMAINING_ONE": "{{time}} verbleibende Stunde",
+      "REMAINING_MANY": "{{time}} verbleibende Stunden",
+      "REMAINING_MANY_ALT": "{{time}} verbleibende Stunden",
+      "REMAINING_ONE_RESPONSE": "{{time}} verbleibende Stunde",
+      "REMAINING_MANY_RESPONSE": "{{time}} verbleibende Stunde",
+      "REMAINING_MANY_ALT_RESPONSE": "{{time}} verbleibende Stunden",
+      "REMAINING_ONE_WAITING": "Warte für {{time}} Stunde",
+      "REMAINING_MANY_WAITING": "Warte für {{time}} Stunden",
+>>>>>>> fix data.foreach & rebuild html
       "REMAINING_MANY_ALT_WAITING": "Warte für {{Zeit}} Stunden"
 >>>>>>> fix modal width
     },
@@ -488,10 +556,14 @@
         "WAITING": "Warte auf Antwort",
         "IGNORED": "Verkäufer ignorierte Ihren Vertragsvorschlag",
 <<<<<<< HEAD
+<<<<<<< HEAD
         "ACCEPTED": "Verkäufer hat Ihren Vertragsvorschlag akzeptiert",
 =======
         "ACCEPTED": "Seller accepted your contract proposal",
 >>>>>>> rebuild
+=======
+        "ACCEPTED": "Verkäufer hat Ihren Vertragsvorschlag akzeptiert",
+>>>>>>> fix data.foreach & rebuild html
         "WAIT": "Warten auf die Bestätigung der Einzahlungen",
         "WAITING_SELLER": "Warte auf Sendung",
         "COMPLETED": "Vertrag abgeschlossen",
@@ -519,10 +591,14 @@
     "FORM_ERRORS": {
       "DESC_REQUIRED": "Beschreibung erforderlich",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "DESC_MAXIMUM": "Maximale Feldlänge erreicht",
 =======
       "DESC_MAXIMUM": "Maximum field length reached",
 >>>>>>> rebuild
+=======
+      "DESC_MAXIMUM": "Maximale Feldlänge erreicht",
+>>>>>>> fix data.foreach & rebuild html
       "SELLER_REQUIRED": "Adresse benötigt",
       "SELLER_NOT_VALID": "Ungültige Adresse",
       "ALIAS_NOT_VALID": "Ungültiger Alias",
@@ -532,10 +608,14 @@
       "SELLER_DEPOSIT_REQUIRED": "Verkäufer-Einzahlung erforderlich",
       "SELLER_SAME": "Anderes Konto verwenden",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "COMMENT_MAXIMUM": "Maximale Feldlänge erreicht"
 =======
       "COMMENT_MAXIMUM": "Maximum field length reached"
 >>>>>>> rebuild
+=======
+      "COMMENT_MAXIMUM": "Maximale Feldlänge erreicht"
+>>>>>>> fix data.foreach & rebuild html
     },
     "PROGRESS_NEW": "Neuer Kauf",
     "PROGRESS_WAIT": "Warte auf Antwort",
@@ -574,10 +654,14 @@
     "BUTTON_MAKE_PLEDGE": "Akzeptieren und Einzahlung tätigen",
     "BUTTON_IGNORE": "Angebot ignorieren und ausblenden",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "BUTTON_NULLIFY": "Beenden und Einzahlungen verbrennen",
 =======
     "BUTTON_NULLIFY": "Terminate and burn deposits",
 >>>>>>> rebuild
+=======
+    "BUTTON_NULLIFY": "Beenden und Einzahlungen verbrennen",
+>>>>>>> fix data.foreach & rebuild html
     "BUTTON_RECEIVED": "Einzahlungen abschließen und freigeben",
     "BUTTON_CANCEL_BUYER": "Einzahlungen abbrechen und zurückzahlen",
     "BUTTON_NOT_CANCEL": "Anfrage ignorieren",
@@ -613,7 +697,7 @@
     }
   },
   "STAKING": {
-    "TITLE": "Staking (Anlegen)",
+    "TITLE": "Staking",
     "TITLE_PENDING": "Ausstehend",
     "TITLE_TOTAL": "Gesamt",
     "TITLE_PERIOD": "Zeitspanne:",
@@ -668,6 +752,7 @@
       "SET_MASTER_PASSWORD": "Master-Passwort festlegen",
       "ADDRESS_DUBLICATED": "Adresse existiert bereits",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "MAX_LENGTH": "Maximale Länge der Notiz erreicht",
 =======
       "MAX_LENGTH": "Maximum notes length reached",
@@ -676,6 +761,9 @@
 >>>>>>> rebuild
 =======
 >>>>>>> fix modal width
+=======
+      "MAX_LENGTH": "Maximale Länge der Notiz erreicht",
+>>>>>>> fix data.foreach & rebuild html
       "NAME_LENGTH": "Der Name muss 4-25 Zeichen lang sein"
     },
     "BUTTON": {
@@ -689,6 +777,7 @@
     },
     "SUCCESS_SENT": "Kontakt hinzugefügt",
     "SUCCESS_SAVE": "Kontakt wurde bearbeitet",
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
     "SUCCESS_IMPORT": "Kontakte wurden importiert",
@@ -710,6 +799,15 @@
     "ERROR_TYPE_FILE": "Bitte importieren Sie eine gültige .csv Datei.",
     "ERROR_EXPORT": "Invalid file type. Save file as .csv"
 >>>>>>> fix modal width
+=======
+    "SUCCESS_IMPORT": "Kontakte wurden importiert",
+    "SUCCESS_EXPORT": "Kontakte wurden exportiert",
+    "ERROR_IMPORT": "Fehler beim Lesen der Datei!",
+    "ERROR_TYPE_FILE": "Please import valid .csv file",
+    "ERROR_EXPORT": "Ungültiger Dateityp. Datei als .csv speichern",
+    "ERROR_EMPTY_LIST": "Contact list is empty",
+    "ERROR_IMPORT_EMPTY": "File is empty"
+>>>>>>> fix data.foreach & rebuild html
   },
   "ERRORS": {
     "NO_MONEY": "Nicht genügend Geld",
@@ -717,12 +815,17 @@
     "CORE_BUSY": "Interner Fehler: Kern ist beschäftigt",
     "DAEMON_BUSY": "Interner Fehler: Daemon ist beschäftigt",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "NO_MONEY_REMOVE_OFFER": "Es gibt keine Gebühr für das Löschen eines Angebots, aber um das Netzwerk vor Spam-Transaktionen zu schützen, müssen Sie mindestens {{fee}} {{currency}} in Ihrer Wallet haben",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in-Nummer ist zu groß für den aktuellen Blockchain-Status. Nicht genügend unverbrauchte outputs zum Mischen",
 =======
     "NO_MONEY_REMOVE_OFFER": "There is no fee for deleting an offer, but in order to protect the network against flood transactions you need to have at least {{fee}} {{currency}} in your wallet",
     "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in number is too big for current blockchain state. There are not enough unspent outputs to mix with",
 >>>>>>> rebuild
+=======
+    "NO_MONEY_REMOVE_OFFER": "Es gibt keine Gebühr für das Löschen eines Angebots, aber um das Netzwerk vor Spam-Transaktionen zu schützen, müssen Sie mindestens {{fee}} {{currency}} in Ihrer Wallet haben",
+    "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mix-in-Nummer ist zu groß für den aktuellen Blockchain-Status. Nicht genügend unverbrauchte outputs zum Mischen",
+>>>>>>> fix data.foreach & rebuild html
     "TRANSACTION_IS_TO_BIG": "Transaktion überschreitet das Netzwerk-Limit. Sendet benötigten Betrag mit mehreren Transaktionen.",
     "TRANSFER_ATTEMPT": "Keine Verbindung zum Zano-Netzwerk",
     "ACCESS_DENIED": "Zugriff verweigert",
@@ -740,10 +843,14 @@
     "TX_TYPE_NEW_ALIAS": "Fehler. Fehler beim Registrieren des Alias zum Speichern",
     "TX_TYPE_NEW_ALIAS_END": "Bitte nochmals versuchen.",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "TX_TYPE_UPDATE_ALIAS": "Fehler. Fehlgeschlagen Kommentar von gespeichertem Alias zu ändern",
 =======
     "TX_TYPE_UPDATE_ALIAS": "Error. Failed to change comment to alias in safe",
 >>>>>>> rebuild
+=======
+    "TX_TYPE_UPDATE_ALIAS": "Fehler. Fehlgeschlagen Kommentar von gespeichertem Alias zu ändern",
+>>>>>>> fix data.foreach & rebuild html
     "TX_TYPE_COIN_BASE": "Fehler. Die Zahlung wurde nicht abgeschlossen."
   },
   "CONTEXT_MENU": {
@@ -760,12 +867,17 @@
     "MINED": "Mined",
     "LOCKED": "Blockiert",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "IS_MINIMIZE": "Zano-Anwendung wird auf die Systemleiste minimiert",
     "RESTORE": "Sie können es wiederherstellen, indem Sie auf das Kontextmenü benutzen oder anklicken ",
 =======
     "IS_MINIMIZE": "Zano application is minimized to the system tray",
     "RESTORE": "You can recover it by clicking or using the context menu",
 >>>>>>> rebuild
+=======
+    "IS_MINIMIZE": "Zano-Anwendung wird auf die Systemleiste minimiert",
+    "RESTORE": "Sie können es wiederherstellen, indem Sie auf das Kontextmenü benutzen oder anklicken ",
+>>>>>>> fix data.foreach & rebuild html
     "TRAY_MENU_SHOW": "Größe ändern",
     "TRAY_MENU_MINIMIZE": "Minimieren"
   }

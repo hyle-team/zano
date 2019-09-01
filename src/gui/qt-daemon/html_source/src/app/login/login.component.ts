@@ -135,6 +135,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         const isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
 
 =======
@@ -151,6 +152,10 @@ export class LoginComponent implements OnInit, OnDestroy {
 >>>>>>> fix master pass (immigration 41 > 43)
 =======
 >>>>>>> commit
+=======
+        const isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
+
+>>>>>>> fix data.foreach & rebuild html
         if (this.variablesService.wallets.length) {
           this.ngZone.run(() => {
             this.router.navigate(['/wallet/' + this.variablesService.wallets[0].wallet_id]);
@@ -182,10 +187,14 @@ export class LoginComponent implements OnInit, OnDestroy {
         }
         if (!data.hasOwnProperty('wallets') && !data.hasOwnProperty('contacts')) {
 <<<<<<< HEAD
+<<<<<<< HEAD
           if (data.length !== 0  && !isEmptyObject) {
 =======
           if (data.length !== 0) {
 >>>>>>> fix master pass (immigration 41 > 43)
+=======
+          if (data.length !== 0  && !isEmptyObject) {
+>>>>>>> fix data.foreach & rebuild html
             this.getWalletData(data);
           } else {
             this.ngZone.run(() => {
