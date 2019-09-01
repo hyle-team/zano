@@ -535,8 +535,10 @@
     "SUCCESS_IMPORT": "Contacts are imported",
     "SUCCESS_EXPORT": "Contacts are exported",
     "ERROR_IMPORT": "Erreur lors de la lecture du fichier !",
-    "ERROR_TYPE_FILE": "Veuillez importer un fichier .csv valide.",
-    "ERROR_EXPORT": "Invalid file type. Save file as .csv"
+    "ERROR_TYPE_FILE": "Please import valid .csv file",
+    "ERROR_EXPORT": "Invalid file type. Save file as .csv",
+    "ERROR_EMPTY_LIST": "Contact list is empty",
+    "ERROR_IMPORT_EMPTY": "File is empty"
   },
   "ERRORS": {
     "NO_MONEY": "Pas assez de fonds",
