@@ -1552,7 +1552,7 @@ void daemon_backend::wallet_vs_options::worker_func()
         break;
       //******************************************************************************************
       //mining zone
-      if (do_mining)
+      if (do_mining && *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online)
       {
         pos_minin_interval.do_call([this](){
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);

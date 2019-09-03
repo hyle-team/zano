@@ -219,11 +219,10 @@
 #define BLOCK_MINOR_VERSION_GENESIS                     0
 #define BLOCK_MAJOR_VERSION_INITAL                      0
 #ifndef TESTNET
-#define ZANO_HARDFORK_1_AFTER_HEIGHT                    172200
+#define ZANO_HARDFORK_1_AFTER_HEIGHT                    180840
 #else
 #define ZANO_HARDFORK_1_AFTER_HEIGHT                    1440
 #endif
-
 
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");
