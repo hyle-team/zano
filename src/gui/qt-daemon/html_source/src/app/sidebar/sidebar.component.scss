@@ -246,14 +246,17 @@
 
 .sidebar-synchronization-status {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex: 0 0 7rem;
+  flex-direction: column;
+  justify-content: center;
+  flex: 0 0 8rem;
   font-size: 1.3rem;
+
+  .progress-height {
+    margin-top: 1rem;
+  }
 
   .status-container {
     position: relative;
-    flex-grow: 1;
     text-align: left;
 
     .offline, .online {
@@ -300,7 +303,14 @@
           font-size: 1.3rem;
           line-height: 0.7rem;
           padding-left: 0.7rem;
+<<<<<<< HEAD
         }       
+=======
+        }
+
+        
+        
+>>>>>>> fix countdown + counter of blocks
       }
 
       .loading {

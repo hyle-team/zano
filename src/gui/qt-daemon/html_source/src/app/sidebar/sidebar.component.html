@@ -134,6 +134,11 @@
       <div class="loading" *ngIf="variablesService.daemon_state === 3"></div>
     </div>
   </div>
+  <ng-container *ngIf="variablesService.daemon_state === 1 || variablesService.daemon_state === 3">
+    <ng-container *ngIf="variablesService.daemon_state === 1">
+      <div class="progress-height">{{ 'SIDEBAR.BLOCK' | translate }} {{ variablesService.height_app }} {{ 'SIDEBAR.OF' | translate }} {{ variablesService.height_max }}</div>
+    </ng-container>
+  </ng-container>
   <div class="update-container" *ngIf="(variablesService.daemon_state === 0 || variablesService.daemon_state === 2) && [2, 3, 4].indexOf(variablesService.last_build_displaymode) !== -1">
     <ng-container *ngIf="variablesService.last_build_displaymode === 2">
       <div class="update-text standard">
