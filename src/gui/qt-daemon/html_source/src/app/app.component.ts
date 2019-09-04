@@ -172,6 +172,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.variablesService.last_build_available = data.last_build_available;
         this.variablesService.last_build_displaymode = data.last_build_displaymode;
         this.variablesService.setHeightApp(data.height);
+        this.variablesService.setHeightMax(data.max_net_seen_height);
 
         this.ngZone.run(() => {
           this.variablesService.daemon_state = data['daemon_network_state'];
