@@ -39,8 +39,10 @@
       "SYNCING": "Syncing wallet"
     },
     "CONTACTS": "Contacts",
+    "CONTACTS_TOOLTIP": "Contacts option available only with Master Password enabled",
     "SETTINGS": "Settings",
     "LOG_OUT": "Log out",
+    "LOG_OUT_TOOLTIP": "Logout option available only with Master Password enabled",
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
       "ONLINE": "Online",
@@ -60,7 +62,9 @@
       "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
       "TIME": "System time differs from network",
       "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
-    }
+    },
+    "BLOCK": "Block",
+    "OF": "of"
   },
   "MAIN": {
     "TITLE": "Create or open the wallet to start using Zano",
