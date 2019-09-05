@@ -35,23 +35,36 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::run(bool do_mint, bool offline_mode)
   {
+    static const uint64_t wallet_rpt_idle_work_period_ms = 2000;
+
     m_do_mint = do_mint;
 
     if (!offline_mode)
     {
-      m_net_server.add_idle_handler([this]() {
+      m_net_server.add_idle_handler([this]() -> bool
+      {
         size_t blocks_fetched = 0;
-        bool received_money = false;
-        bool ok;
+        bool received_money = false, ok = false;
         std::atomic<bool> stop(false);
+        LOG_PRINT_L2("wallet RPC idle: refreshing...");
         m_wallet.refresh(blocks_fetched, received_money, ok, stop);
         if (stop)
+        {
+          LOG_PRINT_L1("wallet RPC idle: refresh failed");
           return true;
+        }
 
         if (m_do_mint)
+        {
+          bool has_related_alias_in_unconfirmed = false;
+          LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
+          m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
+          LOG_PRINT_L2("wallet RPC idle: tring to do PoS iteration...");
           m_wallet.try_mint_pos();
+        }
+
         return true;
-      }, 2000);
+      }, wallet_rpt_idle_work_period_ms);
     }
 
     //DO NOT START THIS SERVER IN MORE THEN 1 THREADS WITHOUT REFACTORING

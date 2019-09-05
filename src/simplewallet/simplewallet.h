@@ -45,6 +45,7 @@ namespace currency
 
     bool new_wallet(const std::string &wallet_file, const std::string& password);
     bool open_wallet(const std::string &wallet_file, const std::string& password);
+    bool restore_wallet(const std::string &wallet_file, const std::string &restore_seed, const std::string& password);
     bool close_wallet();
 
     bool help(const std::vector<std::string> &args = std::vector<std::string>());
@@ -70,6 +71,9 @@ namespace currency
     bool transfer(const std::vector<std::string> &args);
     bool resync_wallet(const std::vector<std::string> &args);    
     bool print_address(const std::vector<std::string> &args = std::vector<std::string>());
+    bool show_seed(const std::vector<std::string> &args);
+    bool spendkey(const std::vector<std::string> &args);
+    bool viewkey(const std::vector<std::string> &args);
     bool save(const std::vector<std::string> &args);
     bool set_log(const std::vector<std::string> &args);
     bool enable_concole_logger(const std::vector<std::string> &args);
@@ -156,6 +160,7 @@ namespace currency
     bool m_print_brain_wallet;
     bool m_do_pos_mining;
     bool m_offline_mode;
+    std::string m_restore_wallet;
 
     epee::console_handlers_binder m_cmd_binder;
 

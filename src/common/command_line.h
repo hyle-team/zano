@@ -186,4 +186,5 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_show_rpc_autodoc;
   extern const arg_descriptor<bool>        arg_disable_upnp;
   extern const arg_descriptor<bool>        arg_disable_stop_if_time_out_of_sync;
+  extern const arg_descriptor<bool>        arg_disable_stop_on_low_free_space;
 }

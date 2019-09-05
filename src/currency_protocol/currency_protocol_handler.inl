@@ -131,12 +131,10 @@ namespace currency
       if (!add_time_delta_and_check_time_sync(context.m_time_delta))
       {
         // serious time sync problem detected
-        i_stop_handler* ish(m_core.get_stop_handler());
-        if (ish != nullptr)
+        i_critical_error_handler* ceh(m_core.get_critical_error_handler());
+        if (ceh != nullptr && ceh->on_critical_time_sync_error())
         {
-          // this is daemon -- stop immediately
-          ish->stop_handling();
-          LOG_ERROR(ENDL << ENDL << "Serious time sync problem detected, daemon will stop immediately" << ENDL << ENDL);
+          // error is handled by a callee, should not be ignored here, stop processing immideately
           return true;
         }
       }

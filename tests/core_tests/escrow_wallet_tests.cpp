@@ -1552,6 +1552,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
     escrow_custom_test_callback_details cd = test_details[0];
     cd.cpd.comment         = "zero B pledge";
     cd.cpd.amount_b_pledge = 0;
+    // note: amount to pay is not zero
     test_details.push_back(cd);
   }
 
@@ -2969,5 +2970,99 @@ bool escrow_proposal_acceptance_in_alt_chain::c1(currency::core& c, size_t ev_in
 {
 
   //mine_next_pow_block_in_playtime()
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+escrow_zero_amounts::escrow_zero_amounts()
+{
+  REGISTER_CALLBACK_METHOD(escrow_zero_amounts, c1);
+}
+
+bool escrow_zero_amounts::generate(std::vector<test_event_entry>& events) const
+{
+  // Try to accept contracts having (b pledge + amount to pay) == 0
+  // It should not be accepted by wallet (ignored), accepting such contracts is impossible
+
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX];     bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  transaction tx_0 = AUTO_VAL_INIT(tx_0);
+  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
+  events.push_back(tx_0);
+
+  transaction tx_1 = AUTO_VAL_INIT(tx_1);
+  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
+  events.push_back(tx_1);
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({tx_0, tx_1}));
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool escrow_zero_amounts::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  bob_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(200), true, UINT64_MAX, MK_TEST_COINS(200)), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(200), true, UINT64_MAX, MK_TEST_COINS(200)), false, "");
+  
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+
+  // a_pledge > 0, b_pledge + amount_to_pay = 0
+  bc_services::contract_private_details cpd = AUTO_VAL_INIT(cpd);
+  cpd.amount_a_pledge = MK_TEST_COINS(10);
+  cpd.amount_b_pledge = 0;
+  cpd.amount_to_pay = 0;
+  cpd.a_addr = m_accounts[ALICE_ACC_IDX].get_public_address();
+  cpd.b_addr = m_accounts[BOB_ACC_IDX].get_public_address();
+  cpd.comment = get_random_text(1024);
+  cpd.title = get_random_text(7);
+
+  transaction proposal_tx = AUTO_VAL_INIT(proposal_tx);
+  transaction escrow_template_tx = AUTO_VAL_INIT(escrow_template_tx);
+  alice_wlt->send_escrow_proposal(cpd, 0, 0, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, "", proposal_tx, escrow_template_tx);
+
+  crypto::hash ms_id = get_multisig_out_id(escrow_template_tx, get_multisig_out_index(escrow_template_tx.vout));
+  CHECK_AND_ASSERT_MES(ms_id != null_hash, false, "Can't obtain multisig id from escrow template tx");
+  LOG_PRINT_L0("contract 1: " << ms_id);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+
+  bob_wlt->refresh();
+
+  bool caught = false;
+  try
+  {
+    bob_wlt->accept_proposal(ms_id, TESTS_DEFAULT_FEE);
+  }
+  catch (tools::error::wallet_internal_error &e)
+  {
+    LOG_PRINT_L0("caught: " << e.what());
+    caught = true;
+  }
+
+  CHECK_AND_ASSERT_MES(caught, false, "incorrect proposal was accepted");
+
   return true;
 }
