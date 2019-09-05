@@ -33,7 +33,7 @@ namespace currency
               m_miner(this, m_blockchain_storage),
               m_miner_address(boost::value_initialized<account_public_address>()), 
               m_starter_message_showed(false),
-              m_stop_handler(nullptr)
+              m_critical_error_handler(nullptr)
   {
     set_currency_protocol(pprotocol);
   }
@@ -48,9 +48,9 @@ namespace currency
     m_mempool.set_protocol(m_pprotocol);
   }
   //-----------------------------------------------------------------------------------
-  void core::set_stop_handler(i_stop_handler *handler)
+  void core::set_critical_error_handler(i_critical_error_handler* handler)
   {
-    m_stop_handler = handler;
+    m_critical_error_handler = handler;
   }
   //-----------------------------------------------------------------------------------
   bool core::set_checkpoints(checkpoints&& chk_pts)
@@ -685,6 +685,7 @@ namespace currency
     }
 
     m_prune_alt_blocks_interval.do_call([this](){return m_blockchain_storage.prune_aged_alt_blocks();});
+    m_check_free_space_interval.do_call([this](){ check_free_space(); return true; });
     m_miner.on_idle();
     m_mempool.on_idle();
     return true;
@@ -707,6 +708,17 @@ namespace currency
     CRITICAL_REGION_LOCAL(m_blockchain_update_listeners_lock);
     for(auto l : m_blockchain_update_listeners)
       l->on_blockchain_update();
+  }
+  //-----------------------------------------------------------------------------------------------
+#define MINIMUM_REQUIRED_FREE_SPACE_BYTES (1024 * 1024 * 100)
+  void core::check_free_space()
+  {
+    boost::filesystem::space_info si = boost::filesystem::space(m_config_folder);
+
+    if (si.available < MINIMUM_REQUIRED_FREE_SPACE_BYTES)
+    {
+      m_critical_error_handler->on_critical_low_free_space(si.available, MINIMUM_REQUIRED_FREE_SPACE_BYTES);
+    }
   }
   //-----------------------------------------------------------------------------------------------
 

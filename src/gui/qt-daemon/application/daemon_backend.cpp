@@ -1534,10 +1534,17 @@ void daemon_backend::wallet_vs_options::worker_func()
       {
         pos_minin_interval.do_call([this](){
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
-          LOG_PRINT_L1(w->get()->get_log_prefix() + " Starting PoS mint iteration");
+          LOG_PRINT_L1(get_log_prefix() + " Starting PoS mint iteration");
           if (!w->get()->fill_mining_context(ctx) || ctx.rsp.status != CORE_RPC_STATUS_OK)
+          {
+            LOG_PRINT_L1(get_log_prefix() + " cannot obtain PoS mining context, skip iteration");
             return true;
-          LOG_PRINT_L1(w->get()->get_log_prefix() + " POS_ENTRIES: " << ctx.sp.pos_entries.size());
+          }
+
+          uint64_t pos_entries_amount = 0;
+          for (auto& ent : ctx.sp.pos_entries)
+            pos_entries_amount += ent.amount;
+
           tools::wallet2::scan_pos(ctx, break_mining_loop, [this](){
             return *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online &&  *plast_daemon_height == last_wallet_synch_height;
           }, core_conf);
@@ -1546,7 +1553,7 @@ void daemon_backend::wallet_vs_options::worker_func()
           {
             w->get()->build_minted_block(ctx.sp, ctx.rsp);
           }
-          LOG_PRINT_L1(w->get()->get_log_prefix() + " PoS mint iteration finished(iterations: " << ctx.rsp.iterations_processed << "," << ctx.rsp.status << ")");
+          LOG_PRINT_L1(get_log_prefix() << " PoS mining iteration finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << currency::print_money_brief(pos_entries_amount) << ", processed: " << ctx.rsp.iterations_processed << " iter.");
           return true;
         });
       }

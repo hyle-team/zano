@@ -115,7 +115,7 @@ namespace wallet_rpc
       KV_SERIALIZE(height)
       KV_SERIALIZE(unlock_time)
       KV_SERIALIZE(tx_blob_size)
-      KV_SERIALIZE(payment_id)
+      KV_SERIALIZE_BLOB_AS_HEX_STRING(payment_id)
       KV_SERIALIZE(remote_addresses)      
       KV_SERIALIZE(recipients_aliases)
       KV_SERIALIZE(comment)

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -8,13 +8,12 @@
 
 
 #define CURRENCY_FORMATION_VERSION                      84
-#define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121)// <-- will be changed to another nightmare*/; //bender's nightmare
+#define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
 
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
 #define CURRENCY_MAX_BLOCK_SIZE                         500000000  // block header blob limit, never used!
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
-#define CURRENCY_PUBLIC_ADDRESS_TEXTBLOB_VER            0
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           197   // addresses start with 'Z'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
@@ -30,9 +29,6 @@
 // TOTAL_MONEY_SUPPLY - total number coins to be generated
 #define TOTAL_MONEY_SUPPLY                              ((uint64_t)(-1))
                                                         
-#define EMISSION_POS_REWARD_DEVIDER                     5425518   // originally based on formula "1/((sqrt(1.05, (740*366)) - 1))" which is avr 5% per year, and then adjusted 
-#define EMISSION_POW_REWARD_DEVIDER                     27098500  // originally based on formula "1/((sqrt(1.01, (740*366)) - 1))" which is avr 1% per year, and then adjusted 
-                                                        
 #define POS_START_HEIGHT                                0
                                                         
 #define CURRENCY_REWARD_BLOCKS_WINDOW                   400
@@ -45,22 +41,16 @@
 // COIN - number of smallest units in one coin
 #define COIN                                            ((uint64_t)1000000000000) // pow(10, CURRENCY_DISPLAY_DECIMAL_POINT)
 #define BASE_REWARD_DUST_THRESHOLD                      ((uint64_t)1000000) // pow(10, 6) - change this will cause hard-fork!
-#define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)//((uint64_t)100000) // pow(10, 5)
+#define DEFAULT_DUST_THRESHOLD                          ((uint64_t)0)
 
 #define TX_DEFAULT_FEE                                  ((uint64_t)10000000000) // .01
 #define TX_MINIMUM_FEE                                  ((uint64_t)10000000000) // .01
 
-// #define CURRENCY_FIXED_REWARD_ZONE_HEIGHT               300                   // blocks will have fixed reward up to this height (including) 
-// #define CURRENCY_FIXED_REWARD_ZONE_REWARD_AMOUNT        ((uint64_t)100000000) // should be TX_MINIMUM_FEE * CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER
-// #define CURRENCY_FIXED_REWARD_ZONE_FEE_MULTIPLIER       1000                  // reward in minimum fees for a block in the zone
-
-#define CURRENCY_BLOCK_REWARD                           1000000000000 // 1.0 coin
+#define CURRENCY_BLOCK_REWARD                           1000000000000 // 1.0 coin == pow(10, CURRENCY_DISPLAY_DECIMAL_POINT)
 
 
 #define WALLET_MAX_ALLOWED_OUTPUT_AMOUNT                ((uint64_t)0xffffffffffffffffLL)
 #define CURRENCY_MINER_TX_MAX_OUTS                      CURRENCY_TX_MAX_ALLOWED_OUTS
-
-#define ORPHANED_BLOCKS_MAX_COUNT                       100
 
 #define DIFFICULTY_STARTER                              1
 #define DIFFICULTY_POS_TARGET                           120 // seconds
@@ -120,7 +110,7 @@
 #define P2P_LOCAL_GRAY_PEERLIST_LIMIT                   5000
 
 #define P2P_DEFAULT_CONNECTIONS_COUNT                   8
-#define P2P_DEFAULT_HANDSHAKE_INTERVAL                  60           //secondes
+#define P2P_DEFAULT_HANDSHAKE_INTERVAL                  60           //seconds
 #define P2P_DEFAULT_PACKET_MAX_SIZE                     50000000     //50000000 bytes maximum packet size
 #define P2P_DEFAULT_PEERS_IN_HANDSHAKE                  250
 #define P2P_DEFAULT_CONNECTION_TIMEOUT                  5000       //5 seconds

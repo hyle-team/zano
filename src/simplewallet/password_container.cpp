@@ -59,12 +59,17 @@ namespace tools
 
   bool password_container::read_password()
   {
+    return read_password("password: ");
+  }
+
+  bool password_container::read_password(const std::string& prompt_text)
+  {
     clear();
 
     bool r;
     if (is_cin_tty())
     {
-      std::cout << "password: ";
+      std::cout << prompt_text;
       r = read_from_tty();
     }
     else
