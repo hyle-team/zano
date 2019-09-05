@@ -38,6 +38,7 @@
   </div>
 </div>
 <div class="sidebar-settings">
+<<<<<<< HEAD
   <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
     <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" 
       [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
@@ -71,10 +72,22 @@
       </ng-template>
 =======
     <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2" [disabled]="variablesService.daemon_state !== 2">
+=======
+  <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500">
+    <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
+>>>>>>> fix logout without master pass
       <i class="icon contacts"></i>
       <span>{{ 'SIDEBAR.CONTACTS' | translate }}</span>
     </button>
   </div>
+  <ng-template #contactsShow>
+    <div class="wrap-button" routerLinkActive="active">
+      <button (click)="contactsRoute()">
+        <i class="icon contacts"></i>
+        <span>{{ 'SIDEBAR.CONTACTS' | translate }}</span>
+      </button>
+    </div>
+  </ng-template>
   <div class="wrap-button" routerLinkActive="active">
     <button [routerLink]="['/settings']">
       <i class="icon settings"></i>
@@ -82,7 +95,11 @@
       <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>
     </button>
   </div>
+<<<<<<< HEAD
   <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
+=======
+  <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500">
+>>>>>>> fix logout without master pass
     <button (click)="logOut()" [class.disabled]="variablesService.appPass === ''" [disabled]="variablesService.appPass === ''">
       <i class="icon logout"></i>
       <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
@@ -90,6 +107,7 @@
   </div>
   <ng-template #masterPass>
     <div class="wrap-button">
+<<<<<<< HEAD
       <button 
       (mouseover)="itemHovered = true"
       (mouseleave)="itemHovered = false"
@@ -99,6 +117,10 @@
           <div class="animated" [innerHTML]="exit | safeHTML"></div>
         </ng-template>
         
+=======
+      <button (click)="logOut()">
+        <i class="icon logout"></i>
+>>>>>>> fix logout without master pass
         <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
       </button>
     </div>

@@ -40,9 +40,13 @@
     },
     "CONTACTS": "Contacts",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "CONTACTS_TOOLTIP": "Contacts option available only with Master Password enabled",
 =======
 >>>>>>> rebuild html
+=======
+    "CONTACTS_TOOLTIP": "Contacts option available only with Master Password enabled",
+>>>>>>> fix logout without master pass
     "SETTINGS": "Settings",
     "LOG_OUT": "Log out",
     "LOG_OUT_TOOLTIP": "Logout option available only with Master Password enabled",
