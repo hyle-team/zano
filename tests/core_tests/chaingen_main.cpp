@@ -947,6 +947,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_coinbase);
     GENERATE_AND_PLAY(hard_fork_1_chain_switch_pow_only);
     GENERATE_AND_PLAY(hard_fork_1_checkpoint_basic_test);
+    GENERATE_AND_PLAY(hard_fork_1_pos_locked_height_vs_time);
     //GENERATE_AND_PLAY(gen_block_reward); */
 
 

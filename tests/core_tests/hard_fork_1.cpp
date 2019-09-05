@@ -10,6 +10,20 @@
 
 using namespace currency;
 
+template<typename extra_t>
+void remove_unlock_v1_entries_from_extra(extra_t& extra)
+{
+  extra.erase(std::remove_if(extra.begin(), extra.end(), [](extra_v& extra_element) { return extra_element.type() == typeid(etc_tx_details_unlock_time); }), extra.end());
+}
+
+template<typename extra_t>
+void remove_unlock_v2_entries_from_extra(extra_t& extra)
+{
+  extra.erase(std::remove_if(extra.begin(), extra.end(), [](extra_v& extra_element) { return extra_element.type() == typeid(etc_tx_details_unlock_time2); }), extra.end());
+}
+
+//------------------------------------------------------------------------------
+
 hard_fork_1_base_test::hard_fork_1_base_test(size_t hardfork_height)
   : m_hardfork_height(hardfork_height)
 {
@@ -27,7 +41,6 @@ bool hard_fork_1_base_test::configure_core(currency::core& c, size_t ev_index, c
 }
 
 //------------------------------------------------------------------------------
-
 
 hard_fork_1_unlock_time_2_in_normal_tx::hard_fork_1_unlock_time_2_in_normal_tx()
   : hard_fork_1_base_test(12)
@@ -574,6 +587,139 @@ bool hard_fork_1_pos_and_locked_coins::check_outputs_with_unique_amount(currency
   bool r = c.get_outs(p.amount, pub_keys);
 
   CHECK_AND_ASSERT_MES(r && pub_keys.size() == p.count, false, "amount " << print_money_brief(p.amount) << ": " << pub_keys.size() << " != " << p.count);
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+hard_fork_1_pos_locked_height_vs_time::hard_fork_1_pos_locked_height_vs_time()
+  : hard_fork_1_base_test(11)
+{
+}
+
+bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure it's impossible to use height-locked coins as PoS stake IF they are ts-locked (not height-locked) in some outputs
+  // (because it could possibly be used to unlock coins eralier)
+
+  bool r = false;
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  GENERATE_ACCOUNT(bob_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  generator.set_hardfork_height(m_hardfork_height);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  // create few locked outputs in the blockchain with unique amount 
+  // tx_0 : miner -> Alice, miner -> Bob
+  std::vector<extra_v> extra;
+  etc_tx_details_unlock_time ut = AUTO_VAL_INIT(ut);
+  ut.v = 100; // locked until block 100
+  extra.push_back(ut);
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(10), alice_acc.get_public_address()));
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(10), bob_acc.get_public_address()));
+
+  transaction tx_0 = AUTO_VAL_INIT(tx_0);
+  r = construct_tx_to_key(events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  events.push_back(tx_0);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0); // first block after hardfork
+
+  // make sure hardfork went okay
+  CHECK_AND_ASSERT_MES(blk_0r.major_version != CURRENT_BLOCK_MAJOR_VERSION && blk_1.major_version == CURRENT_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  block blk_s;
+  {
+    const block& prev_block = blk_1r;
+    const transaction& stake = tx_0;
+    const account_base& stakeholder = alice_acc;
+
+    crypto::hash prev_id = get_block_hash(prev_block);
+    size_t height = get_block_height(prev_block) + 1;
+    currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
+
+    crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
+    size_t stake_output_idx = 0;
+    size_t stake_output_gidx = 0;
+    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    crypto::key_image stake_output_key_image;
+    keypair kp;
+    generate_key_image_helper(stakeholder.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+
+    pos_block_builder pb;
+    pb.step1_init_header(height, prev_id);
+    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.step2_set_txs(std::vector<transaction>());
+    pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
+    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address());
+
+    // set etc_tx_details_unlock_time2 
+    remove_unlock_v1_entries_from_extra(pb.m_block.miner_tx.extra); // clear already set unlock
+    std::vector<extra_v> extra;
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    ut2.unlock_time_array.push_back(height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW); // reward lock
+    for(size_t i = 0; i < pb.m_block.miner_tx.vout.size() - 1; ++i)
+      ut2.unlock_time_array.push_back(test_core_time::get_time() - 1000); // stake locked by time and it's already passed
+    extra.push_back(ut2);
+    pb.m_block.miner_tx.extra.push_back(ut2);
+
+    pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, stakeholder);
+    blk_s = pb.m_block;
+  }
+
+  DO_CALLBACK(events, "mark_invalid_block"); // should not pass as using time-locking in outputs
+  events.push_back(blk_s);
+
+  block blk_good;
+  {
+    const block& prev_block = blk_1r;
+    const transaction& stake = tx_0;
+    const account_base& stakeholder = alice_acc;
+
+    crypto::hash prev_id = get_block_hash(prev_block);
+    size_t height = get_block_height(prev_block) + 1;
+    currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
+
+    crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
+    size_t stake_output_idx = 0;
+    size_t stake_output_gidx = 0;
+    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    crypto::key_image stake_output_key_image;
+    keypair kp;
+    generate_key_image_helper(stakeholder.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+
+    pos_block_builder pb;
+    pb.step1_init_header(height, prev_id);
+    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.step2_set_txs(std::vector<transaction>());
+    pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
+    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address());
+
+    // set etc_tx_details_unlock_time2 
+    remove_unlock_v1_entries_from_extra(pb.m_block.miner_tx.extra); // clear already set unlock
+    std::vector<extra_v> extra;
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    ut2.unlock_time_array.push_back(height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW); // reward lock
+    for(size_t i = 0; i < pb.m_block.miner_tx.vout.size() - 1; ++i)
+      ut2.unlock_time_array.push_back(100); // stake locked by height 100
+    extra.push_back(ut2);
+    pb.m_block.miner_tx.extra.push_back(ut2);
+
+    pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, stakeholder);
+    blk_good = pb.m_block;
+  }
+
+  // should be okay
+  events.push_back(blk_good);
 
   return true;
 }
