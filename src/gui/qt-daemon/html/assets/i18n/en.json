@@ -39,8 +39,10 @@
       "SYNCING": "Syncing wallet"
     },
     "CONTACTS": "Contacts",
+    "CONTACTS_TOOLTIP": "Contacts option available only with Master Password enabled",
     "SETTINGS": "Settings",
     "LOG_OUT": "Log out",
+    "LOG_OUT_TOOLTIP": "Logout option available only with Master Password enabled",
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
       "ONLINE": "Online",
