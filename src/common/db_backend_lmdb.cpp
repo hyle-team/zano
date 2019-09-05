@@ -7,6 +7,7 @@
 #include "misc_language.h"
 #include "string_coding.h"
 #include "profile_tools.h"
+#include "util.h"
 
 #define BUF_SIZE 1024
 
@@ -51,6 +52,8 @@ namespace tools
 #ifdef WIN32
       m_path = epee::string_encoding::convert_ansii_to_utf8(m_path);
 #endif
+
+      CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(m_path), false, "create_directories_if_necessary failed: " << m_path);
 
       res = mdb_env_open(m_penv, m_path.c_str(), MDB_NORDAHEAD , 0644);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_env_open, m_path=" << m_path);

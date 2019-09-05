@@ -1,11 +1,10 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project 
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
 #include  <thread>
-
 
 #include "include_base_utils.h"
 
@@ -17,9 +16,6 @@ namespace tools
 {
   namespace db
   {
-
-
-
     class lmdb_db_backend : public i_db_backend
     {
 

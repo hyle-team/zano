@@ -42,9 +42,8 @@ namespace zlib_helper
 		int ret = deflateInit(&zstream, Z_DEFAULT_COMPRESSION);
 		if(target.size())
 		{
-
-			
-			result_packed_buff.resize(target.size()*2, 'X');
+			size_t estimated_output_size_max = deflateBound(&zstream, static_cast<uLong>(target.size()));
+			result_packed_buff.resize(estimated_output_size_max, 'X');
 
 			zstream.next_in = (Bytef*)target.data();
 			zstream.avail_in = (uInt)target.size();
@@ -52,12 +51,10 @@ namespace zlib_helper
 			zstream.avail_out = (uInt)result_packed_buff.size();
 
 			ret = deflate(&zstream, Z_FINISH);
-			CHECK_AND_ASSERT_MES(ret>=0, false, "Failed to deflate. err = " << ret);
+			// as we allocated enough room for a signel pass avail_out should not be zero
+      CHECK_AND_ASSERT_MES(ret == Z_STREAM_END && zstream.avail_out != 0, false, "Failed to deflate. err = " << ret);
 
-			if(result_packed_buff.size() != zstream.avail_out)
-				result_packed_buff.resize(result_packed_buff.size()-zstream.avail_out);
-
-			
+			result_packed_buff.resize(result_packed_buff.size() - zstream.avail_out);
 			result_packed_buff.erase(0, 2);
 		}
 

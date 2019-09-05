@@ -1194,7 +1194,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, unlock_time, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  CHECK_AND_ASSERT_MES(get_tx_unlock_time(tx_1) == unlock_time, false, "Unlock time was not correctly set");
+  CHECK_AND_ASSERT_MES(get_tx_max_unlock_time(tx_1) == unlock_time, false, "Unlock time was not correctly set");
   events.push_back(tx_1);
 
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
@@ -1622,7 +1622,7 @@ multisig_and_checkpoints::multisig_and_checkpoints()
 bool multisig_and_checkpoints::set_cp(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   currency::checkpoints checkpoints;
-  checkpoints.add_checkpoint(15, "f7543a7ac52a864dd3782a99229840a38e82fd31b64c6b197a2f41f74bd5bacc");
+  checkpoints.add_checkpoint(15, "726c5900f2ed7985619a54ecad3a5f5a11176a0873c51acb46ac60126a71c30a");
   c.set_checkpoints(std::move(checkpoints));
 
   return true;

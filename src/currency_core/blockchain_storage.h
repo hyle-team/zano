@@ -153,6 +153,9 @@ namespace currency
       
       // {amount -> pub_keys} map of outputs' pub_keys appeared in this alt block ( index_in_vector == output_gindex - gindex_lookup_table[output_amount] )
       std::map<uint64_t, std::vector<crypto::public_key> > outputs_pub_keys;
+      
+      //date added to alt chain storage
+      uint64_t timestamp; 
     };
     typedef std::unordered_map<crypto::hash, alt_block_extended_info> alt_chain_container;
     //typedef std::list<alt_chain_container::iterator> alt_chain_type;
@@ -184,6 +187,7 @@ namespace currency
    
     //------------- modifying members --------------
     bool add_new_block(const block& bl_, block_verification_context& bvc);
+    bool prevalidate_block(const block& bl);
     bool clear();
     bool reset_and_set_genesis_block(const block& b);
     //debug function
@@ -221,8 +225,11 @@ namespace currency
     bool have_tx_keyimg_as_spent(const crypto::key_image &key_im, uint64_t before_height = UINT64_MAX) const;
     std::shared_ptr<transaction> get_tx(const crypto::hash &id) const;
 
+
     template<class visitor_t>
-    bool scan_outputkeys_for_indexes(const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t* pmax_related_block_height = NULL) const ;
+    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis) { uint64_t stub = 0; return scan_outputkeys_for_indexes(validated_tx, tx_in_to_key, vis, stub); }
+    template<class visitor_t>
+    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t& max_related_block_height) const ;
 
     uint64_t get_current_blockchain_size() const;
     uint64_t get_top_block_height() const;
@@ -230,7 +237,7 @@ namespace currency
     crypto::hash get_top_block_id(uint64_t& height) const;
     bool get_top_block(block& b) const;
     wide_difficulty_type get_next_diff_conditional(bool pos) const;
-    wide_difficulty_type get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const;
+    wide_difficulty_type get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const;
     wide_difficulty_type get_cached_next_difficulty(bool pos) const;
 
     typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
@@ -260,13 +267,14 @@ namespace currency
     uint64_t get_aliases_count()const;
     uint64_t get_block_h_older_then(uint64_t timestamp) const;
     bool validate_tx_service_attachmens_in_services(const tx_service_attachment& a, size_t i, const transaction& tx)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t* pmax_related_block_height = NULL)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t* pmax_related_block_height = NULL)const;
-    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t* pmax_used_block_height = NULL)const;
-    //bool check_tx_inputs(const transaction& tx, uint64_t* pmax_used_block_height = NULL)const;
-    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& pmax_used_block_height, crypto::hash& max_used_block_id)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const;
+    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height)const;
+    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
+    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const transaction& source_tx, size_t out_n) const;
-    bool get_output_keys_for_input_with_checks(const txin_to_key& txin, std::vector<crypto::public_key>& output_keys, uint64_t* pmax_related_block_height = NULL) const;
+    bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
+    bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_to_key& txin, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
     bool check_tokey_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
     uint64_t get_current_comulative_blocksize_limit()const;
     uint64_t get_current_hashrate(size_t aprox_count)const;
@@ -304,6 +312,7 @@ namespace currency
     bool build_stake_modifier(stake_modifier_type& sm, const alt_chain_type& alt_chain = alt_chain_type(), uint64_t split_height = 0, crypto::hash *p_last_block_hash = nullptr) const;
 
     bool scan_pos(const COMMAND_RPC_SCAN_POS::request& sp, COMMAND_RPC_SCAN_POS::response& rsp)const;
+    bool validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const;
     bool validate_pos_block(const block& b, const crypto::hash& id, bool for_altchain)const;
     bool validate_pos_block(const block& b, wide_difficulty_type basic_diff, const crypto::hash& id, bool for_altchain)const;
     bool validate_pos_block(const block& b,
@@ -421,6 +430,7 @@ namespace currency
     void print_blockchain_outs(const std::string& file) const;
     void print_blockchain_outs_stat() const;
     void print_db_cache_perfeormance_data() const;
+    void print_last_n_difficulty_numbers(uint64_t n) const;
     bool calc_tx_cummulative_blob(const block& bl)const;
     bool get_outs_index_stat(outs_index_stat& outs_stat)const;
     bool print_lookup_key_image(const crypto::key_image& ki) const;
@@ -430,6 +440,7 @@ namespace currency
     bool rebuild_tx_fee_medians();
     bool validate_all_aliases_for_new_median_mode();
     bool print_tx_outputs_lookup(const crypto::hash& tx_id) const;
+    uint64_t get_last_x_block_height(bool pos)const;
   private:
 
     //-------------- DB containers --------------
@@ -524,7 +535,7 @@ namespace currency
 
     bool init_tx_fee_median();
     bool update_tx_fee_median();
-    void initialize_db_solo_options_values();
+    void store_db_solo_options_values();
     bool set_lost_tx_unmixable();
     bool set_lost_tx_unmixable_for_height(uint64_t height);
     void patch_out_if_needed(txout_to_key& out, const crypto::hash& tx_id, uint64_t n)const ;
@@ -541,7 +552,8 @@ namespace currency
     bool handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc);
     std::string print_alt_chain(alt_chain_type alt_chain);
     bool handle_alternative_block(const block& b, const crypto::hash& id, block_verification_context& bvc);
-    bool is_reorganize_required(const block_extended_info& main_chain_bei, const block_extended_info& alt_chain_bei, const crypto::hash& proof_alt);
+    bool is_reorganize_required(const block_extended_info& main_chain_bei, const alt_chain_type& alt_chain, const crypto::hash& proof_alt);
+    wide_difficulty_type get_x_difficulty_after_height(uint64_t height, bool is_pos);
     bool purge_keyimage_from_big_heap(const crypto::key_image& ki, const crypto::hash& id);
     bool purge_altblock_keyimages_from_big_heap(const block& b, const crypto::hash& id);
     bool append_altblock_keyimages_to_big_heap(const crypto::hash& block_id, const std::set<crypto::key_image>& alt_block_keyimages);
@@ -550,9 +562,8 @@ namespace currency
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
-
+    void get_last_n_x_blocks(uint64_t n, bool pos_blocks, std::list<std::shared_ptr<const block_extended_info>>& blocks) const;
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
-    bool validate_transaction(const block& b, uint64_t height, const transaction& tx)const;
     bool rollback_blockchain_switching(std::list<block>& original_chain, size_t rollback_height);
     bool add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp);
     bool push_transaction_to_global_outs_index(const transaction& tx, const crypto::hash& tx_id, std::vector<uint64_t>& global_indexes);
@@ -608,8 +619,8 @@ namespace currency
     //POS
     wide_difficulty_type get_adjusted_cumulative_difficulty_for_next_pos(wide_difficulty_type next_diff)const;
     wide_difficulty_type get_adjusted_cumulative_difficulty_for_next_alt_pos(alt_chain_type& alt_chain, uint64_t block_height, wide_difficulty_type next_diff, uint64_t connection_height)const;
-    uint64_t get_last_x_block_height(bool pos)const;
-    wide_difficulty_type get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type& alt_chain, uint64_t block_height, bool pos)const;
+    wide_difficulty_type get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos, wide_difficulty_type& cumulative_diff_precise_adj)const;
+    wide_difficulty_type get_last_alt_x_block_cumulative_precise_adj_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos) const;
     size_t get_current_sequence_factor_for_alt(alt_chain_type& alt_chain, bool pos, uint64_t connection_height)const;
   };
 
@@ -648,7 +659,7 @@ namespace currency
   //------------------------------------------------------------------
   //------------------------------------------------------------------
   template<class visitor_t>
-  bool blockchain_storage::scan_outputkeys_for_indexes(const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t* pmax_related_block_height) const
+  bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t& max_related_block_height) const
   {
     CRITICAL_REGION_LOCAL(m_read_lock);
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_get_item_size);
@@ -704,18 +715,16 @@ namespace currency
       CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << tx_in_to_key.key_offsets.size());
       
       TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-      if (!vis.handle_output(tx_ptr->tx, tx_ptr->tx.vout[n]))
+      if (!vis.handle_output(tx_ptr->tx, validated_tx, tx_ptr->tx.vout[n], n))
       {
         LOG_PRINT_L0("Failed to handle_output for output id = " << tx_id << ", no " << n);
         return false;
       }
       TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
 
-      if (pmax_related_block_height)
-      {
-        if (*pmax_related_block_height < tx_ptr->m_keeper_block_height)
-          *pmax_related_block_height = tx_ptr->m_keeper_block_height;
-      }
+        if (max_related_block_height < tx_ptr->m_keeper_block_height)
+          max_related_block_height = tx_ptr->m_keeper_block_height;
+
       
       ++output_index;
     }

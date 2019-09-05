@@ -38,18 +38,40 @@
   </div>
 </div>
 <div class="sidebar-settings">
+  <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500">
+    <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
+      <i class="icon contacts"></i>
+      <span>{{ 'SIDEBAR.CONTACTS' | translate }}</span>
+    </button>
+  </div>
+  <ng-template #contactsShow>
+    <div class="wrap-button" routerLinkActive="active">
+      <button (click)="contactsRoute()">
+        <i class="icon contacts"></i>
+        <span>{{ 'SIDEBAR.CONTACTS' | translate }}</span>
+      </button>
+    </div>
+  </ng-template>
   <div class="wrap-button" routerLinkActive="active">
     <button [routerLink]="['/settings']">
       <i class="icon settings"></i>
       <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>
     </button>
   </div>
-  <div class="wrap-button">
-    <button (click)="logOut()">
+  <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500">
+    <button (click)="logOut()" [class.disabled]="variablesService.appPass === ''" [disabled]="variablesService.appPass === ''">
       <i class="icon logout"></i>
       <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
     </button>
   </div>
+  <ng-template #masterPass>
+    <div class="wrap-button">
+      <button (click)="logOut()">
+        <i class="icon logout"></i>
+        <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
+      </button>
+    </div>
+  </ng-template>
 </div>
 <div class="sidebar-synchronization-status">
   <div class="status-container">
@@ -81,6 +103,11 @@
       <div class="loading" *ngIf="variablesService.daemon_state === 3"></div>
     </div>
   </div>
+  <ng-container *ngIf="variablesService.daemon_state === 1 || variablesService.daemon_state === 3">
+    <ng-container *ngIf="variablesService.daemon_state === 1">
+      <div class="progress-height">{{ 'SIDEBAR.BLOCK' | translate }} {{ variablesService.height_app }} {{ 'SIDEBAR.OF' | translate }} {{ variablesService.height_max }}</div>
+    </ng-container>
+  </ng-container>
   <div class="update-container" *ngIf="(variablesService.daemon_state === 0 || variablesService.daemon_state === 2) && [2, 3, 4].indexOf(variablesService.last_build_displaymode) !== -1">
     <ng-container *ngIf="variablesService.last_build_displaymode === 2">
       <div class="update-text standard">
@@ -112,3 +139,4 @@
     <i class="icon time" tooltip="{{ 'SIDEBAR.UPDATE.TIME_TOOLTIP' | translate }}" placement="right-bottom" tooltipClass="update-tooltip important" [delay]="500"></i>
   </div>
 </div>
+

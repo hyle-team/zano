@@ -99,3 +99,9 @@ struct offer_lifecycle_via_tx_pool : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct offer_cancellation_with_zero_fee : public wallet_test
+{
+  offer_cancellation_with_zero_fee();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

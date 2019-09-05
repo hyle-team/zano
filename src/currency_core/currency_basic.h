@@ -336,12 +336,22 @@ namespace currency
   };
 
 
-  //number of block (or time), used as a limitation: spend this tx not early then block/time
+  //number of block (or timestamp if v bigger then CURRENCY_MAX_BLOCK_NUMBER), used as a limitation: spend this tx not early then block/time
   struct etc_tx_details_unlock_time
   {
     uint64_t v;
     BEGIN_SERIALIZE()
       VARINT_FIELD(v)
+    END_SERIALIZE()
+  };
+
+  //number of block (or timestamp if unlock_time_array[i] bigger then CURRENCY_MAX_BLOCK_NUMBER), used as a limitation: spend this tx not early then block/time
+  //unlock_time_array[i], i - index of output, unlock_time_array.size() == vout.size()
+  struct etc_tx_details_unlock_time2
+  {
+    std::vector<uint64_t> unlock_time_array;
+    BEGIN_SERIALIZE()
+      FIELD(unlock_time_array)
     END_SERIALIZE()
   };
 
@@ -361,7 +371,7 @@ namespace currency
     uint64_t v;
     BEGIN_SERIALIZE()
       VARINT_FIELD(v)
-      END_SERIALIZE()
+    END_SERIALIZE()
   };
 
   struct etc_tx_details_flags
@@ -380,7 +390,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector<tx_service_attachment, tx_comment, tx_payer, tx_receiver, tx_message, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time, etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_derivation_hint> all_payload_types;
+  typedef boost::mpl::vector<tx_service_attachment, tx_comment, tx_payer, tx_receiver, tx_message, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time, etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_derivation_hint, etc_tx_details_unlock_time2> all_payload_types;
   typedef boost::make_variant_over<all_payload_types>::type attachment_v;
   typedef boost::make_variant_over<all_payload_types>::type extra_v;
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -553,12 +563,14 @@ namespace currency
     uint64_t index;
     crypto::key_image keyimage;
     uint64_t block_timestamp;
+    uint64_t stake_unlock_time;
     //not for serialization
     uint64_t wallet_index;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
       KV_SERIALIZE(index)
+      KV_SERIALIZE(stake_unlock_time)
       KV_SERIALIZE(block_timestamp)
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(keyimage)
     END_KV_SERIALIZE_MAP()
@@ -613,5 +625,6 @@ SET_VARIANT_TAGS(uint64_t, 26, "uint64_t");
 SET_VARIANT_TAGS(currency::etc_tx_time, 27, "etc_tx_time");
 SET_VARIANT_TAGS(uint32_t, 28, "uint32_t");
 SET_VARIANT_TAGS(currency::tx_receiver, 29, "payer");
+SET_VARIANT_TAGS(currency::etc_tx_details_unlock_time2, 30, "unlock_time2");
 
 #undef SET_VARIANT_TAGS

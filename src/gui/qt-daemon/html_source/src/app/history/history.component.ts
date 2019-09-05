@@ -1,6 +1,7 @@
 import {Component, OnInit, OnDestroy, AfterViewChecked, ViewChild, ElementRef} from '@angular/core';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {ActivatedRoute} from '@angular/router';
+import { Transaction } from '../_helpers/models/transaction.model';
 
 @Component({
   selector: 'app-history',
@@ -54,6 +55,23 @@ export class HistoryComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.calculatedWidth.push(this.head.nativeElement.childNodes[1].clientWidth + this.head.nativeElement.childNodes[2].clientWidth);
     this.calculatedWidth.push(this.head.nativeElement.childNodes[3].clientWidth);
     this.calculatedWidth.push(this.head.nativeElement.childNodes[4].clientWidth);
+  }
+
+  time(item: Transaction) {
+    const now = new Date().getTime();
+    const unlockTime = now + ((item.unlock_time - this.variablesService.height_app) * 60 * 1000);
+    return unlockTime;
+  }
+
+  isLocked(item: Transaction) {
+    if ((item.unlock_time > 500000000) && (item.unlock_time > new Date().getTime() / 1000)) {
+      console.log(new Date().getTime());
+      return true;
+    }
+    if ((item.unlock_time < 500000000) && (item.unlock_time > this.variablesService.height_app)) {
+      return true;
+    }
+    return false;
   }
 
   ngOnDestroy() {

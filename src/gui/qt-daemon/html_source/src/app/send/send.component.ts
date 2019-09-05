@@ -1,4 +1,4 @@
-import {Component, OnInit, OnDestroy, NgZone, HostListener} from '@angular/core';
+import {Component, OnInit, OnDestroy, NgZone, HostListener, Input} from '@angular/core';
 import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {ActivatedRoute} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
@@ -15,6 +15,7 @@ export class SendComponent implements OnInit, OnDestroy {
 
   isOpen = false;
   localAliases = [];
+  isModalDialogVisible = false;
 
   currentWalletId = null;
   parentRouting;
@@ -73,13 +74,7 @@ export class SendComponent implements OnInit, OnDestroy {
       }
       return null;
     }]),
-    comment: new FormControl('', [(g: FormControl) => {
-      if (g.value > this.variablesService.maxCommentLength) {
-        return {'maxLength': true};
-      } else {
-        return null;
-      }
-    }]),
+    comment: new FormControl(''),
     mixin: new FormControl(0, Validators.required),
     fee: new FormControl(this.variablesService.default_fee, [Validators.required, (g: FormControl) => {
       if ((new BigNumber(g.value)).isLessThan(this.variablesService.default_fee)) {
@@ -130,6 +125,17 @@ export class SendComponent implements OnInit, OnDestroy {
         hide: this.variablesService.currentWallet.send_data['hide'] || false
       });
     });
+  }
+
+  showDialog() {
+    this.isModalDialogVisible = true;
+  }
+
+  confirmed(confirmed: boolean) {
+    if (confirmed) {
+      this.onSend();
+    }
+    this.isModalDialogVisible = false;
   }
 
   onSend() {

@@ -562,9 +562,24 @@ namespace tools
         m_set_profiler.m_name = container_name + ":set";
         m_explicit_get_profiler.m_name = container_name + ":explicit_get";
         m_explicit_set_profiler.m_name = container_name + ":explicit_set";
-        m_commit_profiler.m_name = container_name + ":commit";;
+        m_commit_profiler.m_name        = container_name + ":commit";
 #endif
         return bdb.get_backend()->open_container(container_name, m_h);
+      }
+
+      bool deinit()
+      {
+#ifdef ENABLE_PROFILING
+        m_get_profiler.m_name           = "";
+        m_set_profiler.m_name           = "";
+        m_explicit_get_profiler.m_name  = "";
+        m_explicit_set_profiler.m_name  = "";
+        m_commit_profiler.m_name        = "";
+#endif
+        m_h = AUTO_VAL_INIT(m_h);
+        size_cache = 0;
+        size_cache_valid = false;
+        return true;
       }
 
       template<class t_cb>

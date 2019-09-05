@@ -107,19 +107,52 @@ namespace currency
       out_amounts.resize(out_amounts.size() - 1);
     }
 
+
     std::vector<tx_destination_entry> destinations;
     for (auto a : out_amounts)
     {
-      tx_destination_entry de;
+      tx_destination_entry de = AUTO_VAL_INIT(de);
       de.addr.push_back(miner_address);
       de.amount = a;
+      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+      {
+        //this means that block is creating after hardfork_1 and unlock_time is needed to set for every destination separately
+        de.unlock_time = height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
+      }
       destinations.push_back(de);
     }
 
     if (pos)
-      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address));
+    {
+      uint64_t stake_lock_time = 0;
+      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+        stake_lock_time = pe.stake_unlock_time;
+      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, stake_lock_time));
+    }
+      
 
     return construct_miner_tx(height, median_size, already_generated_coins, current_block_size, fee, destinations, tx, extra_nonce, max_outs, pos, pe);
+  }
+  //------------------------------------------------------------------
+  bool apply_unlock_time(const std::vector<tx_destination_entry>& destinations, transaction& tx)
+  {
+    currency::etc_tx_details_unlock_time2 unlock_time2 = AUTO_VAL_INIT(unlock_time2);
+    unlock_time2.unlock_time_array.resize(destinations.size());
+    bool found_unlock_time = false;
+    for (size_t i = 0; i != unlock_time2.unlock_time_array.size(); i++)
+    {
+      if (destinations[i].unlock_time)
+      {
+        found_unlock_time = true;
+        unlock_time2.unlock_time_array[i] = destinations[i].unlock_time;
+      }
+    }
+    if (found_unlock_time)
+    {
+      tx.extra.push_back(unlock_time2);
+    }
+
+    return true;
   }
   //------------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
@@ -144,8 +177,11 @@ namespace currency
       if (!add_tx_extra_userdata(tx, extra_nonce))
         return false;
 
+    //at this moment we do apply_unlock_time only for coin_base transactions 
+    apply_unlock_time(destinations, tx);
     //we always add extra_padding with 2 bytes length to make possible for get_block_template to adjust cumulative size
     tx.extra.push_back(extra_padding());
+
 
     txin_gen in;
     in.height = height;
@@ -171,10 +207,15 @@ namespace currency
       CHECK_AND_ASSERT_MES(r, false, "Failed to contruct miner tx out");
       no++;
     }
-
+    
 
     tx.version = CURRENT_TRANSACTION_VERSION;
-    set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    if (!have_type_in_variant_container<etc_tx_details_unlock_time2>(tx.extra))
+    {
+      //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
+      set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    }
+    
     return true;
   }
   //---------------------------------------------------------------
@@ -891,16 +932,7 @@ namespace currency
     }
     return n;
   }
-  //---------------------------------------------------------------
-  account_public_address get_crypt_address_from_destinations(const account_keys& sender_account_keys, const std::vector<tx_destination_entry>& destinations)
-  {
-    for (const auto& de : destinations)
-    {
-      if (de.addr.size() == 1 && sender_account_keys.m_account_address != de.addr.back())
-        return de.addr.back();                    // return the first destination address that is non-multisig and not equal to the sender's address
-    }
-    return sender_account_keys.m_account_address; // otherwise, fallback to sender's address
-  }
+
   //---------------------------------------------------------------
   bool construct_tx(const account_keys& sender_account_keys,
     const std::vector<tx_source_entry>& sources,
@@ -1304,7 +1336,7 @@ namespace currency
   bool get_inputs_money_amount(const transaction& tx, uint64_t& money)
   {
     money = 0;
-    BOOST_FOREACH(const auto& in, tx.vin)
+    for(const auto& in : tx.vin)
     {
       uint64_t this_amount = get_amount_from_variant(in);
       if (!this_amount)
@@ -1328,7 +1360,7 @@ namespace currency
   //---------------------------------------------------------------
   bool check_inputs_types_supported(const transaction& tx)
   {
-    BOOST_FOREACH(const auto& in, tx.vin)
+    for(const auto& in : tx.vin)
     {
       CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_multisig), false, "wrong variant type: "
         << in.type().name() << ", expected " << typeid(txin_to_key).name()
@@ -1828,9 +1860,7 @@ namespace currency
     //for future forks 
 
     std::cout << "Currency name: \t\t" << CURRENCY_NAME << "(" << CURRENCY_NAME_SHORT << ")" << std::endl;
-    std::cout << "Money supply: \t\t" << print_money(TOTAL_MONEY_SUPPLY) << " coins"
-      << "(" << print_money(TOTAL_MONEY_SUPPLY) << "), dev bounties is ???" << std::endl;
-
+    std::cout << "Money supply: \t\t " << CURRENCY_BLOCK_REWARD * CURRENCY_BLOCKS_PER_DAY * 365 << " coins per year" << std::endl;
     std::cout << "PoS block interval: \t" << DIFFICULTY_POS_TARGET << " seconds" << std::endl;
     std::cout << "PoW block interval: \t" << DIFFICULTY_POW_TARGET << " seconds" << std::endl;
     std::cout << "Total blocks per day: \t" << CURRENCY_BLOCKS_PER_DAY << " seconds" << std::endl;
@@ -1874,8 +1904,8 @@ namespace currency
     //string_tools::parse_hexstr_to_binbuff(genesis_coinbase_tx_hex, tx_bl);
     bool r = parse_and_validate_tx_from_blob(tx_bl, bl.miner_tx);
     CHECK_AND_ASSERT_MES(r, false, "failed to parse coinbase tx from hard coded blob");
-    bl.major_version = CURRENT_BLOCK_MAJOR_VERSION;
-    bl.minor_version = CURRENT_BLOCK_MINOR_VERSION;
+    bl.major_version = BLOCK_MAJOR_VERSION_GENESIS;
+    bl.minor_version = BLOCK_MINOR_VERSION_GENESIS;
     bl.timestamp = 0;
     bl.nonce = CURRENCY_GENESIS_NONCE;
     LOG_PRINT_GREEN("Generated genesis: " << get_block_hash(bl), LOG_LEVEL_0);
@@ -2078,6 +2108,20 @@ namespace currency
         tv.short_view = std::string("height: ") + std::to_string(ee.v);
       else
         tv.short_view = std::string("timestamp: ") + std::to_string(ee.v) + " " + epee::misc_utils::get_internet_time_str(ee.v);
+
+      return true;
+    }
+    bool operator()(const etc_tx_details_unlock_time2& ee)
+    {
+      tv.type = "unlock_time";
+      std::stringstream ss;
+      ss << "[";
+      for (auto v : ee.unlock_time_array)
+      {
+        ss << " " << v;
+      }
+      ss << "]";
+      tv.short_view = ss.str();
 
       return true;
     }
@@ -2524,16 +2568,6 @@ namespace currency
   {
     return epee::string_tools::parse_hexstr_to_binbuff(payment_id_str, payment_id);
   }
-  //------------------------------------------------------------------
-  bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)
-  {
-    /// tx expiration condition (tx is ok if the following is true)
-    /// tx_expiration_time - TX_EXPIRATION_MEDIAN_SHIFT > get_last_n_blocks_timestamps_median(TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW)
-    uint64_t expiration_time = get_tx_expiration_time(tx);
-    if (expiration_time == 0)
-      return false; // 0 means it never expires
-    return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
-  }
   //--------------------------------------------------------------------------------
   crypto::hash prepare_prefix_hash_for_sign(const transaction& tx, uint64_t in_index, const crypto::hash& tx_id)
   {
@@ -2667,4 +2701,41 @@ namespace currency
       return false;
   }
 
+
+  wide_difficulty_type get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
+    const wide_difficulty_type& difficulty_pow_at_split_point,
+    const difficulties& a_diff,
+    const difficulties& b_diff )
+  {
+    static const wide_difficulty_type difficulty_starter = DIFFICULTY_STARTER;
+    const wide_difficulty_type& a_pos_cumulative_difficulty = a_diff.pos_diff > 0 ? a_diff.pos_diff : difficulty_starter;
+    const wide_difficulty_type& b_pos_cumulative_difficulty = b_diff.pos_diff > 0 ? b_diff.pos_diff : difficulty_starter;
+    const wide_difficulty_type& a_pow_cumulative_difficulty = a_diff.pow_diff > 0 ? a_diff.pow_diff : difficulty_starter;
+    const wide_difficulty_type& b_pow_cumulative_difficulty = b_diff.pow_diff > 0 ? b_diff.pow_diff : difficulty_starter;
+
+    boost::multiprecision::uint1024_t basic_sum = boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty) + (boost::multiprecision::uint1024_t(a_pos_cumulative_difficulty)*difficulty_pow_at_split_point) / difficulty_pos_at_split_point;
+    boost::multiprecision::uint1024_t res =
+      (basic_sum * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(b_pow_cumulative_difficulty)*b_pos_cumulative_difficulty);
+
+    if (res > boost::math::tools::max_value<wide_difficulty_type>())
+    {
+      ASSERT_MES_AND_THROW("[INTERNAL ERROR]: Failed to get_a_to_b_relative_cumulative_difficulty, res = " << res << ENDL
+        << ", difficulty_pos_at_split_point: " << difficulty_pos_at_split_point << ENDL
+        << ", difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
+        << ", a_pos_cumulative_difficulty:" << a_pos_cumulative_difficulty << ENDL
+        << ", b_pos_cumulative_difficulty:" << b_pos_cumulative_difficulty << ENDL
+        << ", a_pow_cumulative_difficulty:" << a_pow_cumulative_difficulty << ENDL
+        << ", b_pow_cumulative_difficulty:" << b_pow_cumulative_difficulty << ENDL       
+      );
+    }
+    TRY_ENTRY();
+    wide_difficulty_type short_res = res.convert_to<wide_difficulty_type>();
+    return short_res;
+    CATCH_ENTRY_WITH_FORWARDING_EXCEPTION();
+  }
+
+
+
 } // namespace currency
+
+

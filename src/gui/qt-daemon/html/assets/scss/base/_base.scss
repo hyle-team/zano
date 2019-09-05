@@ -20,7 +20,8 @@ button {
   padding: 0 1rem;
   height: 4.2rem;
 
-  &:disabled:not(.transparent-button) {
+  &:disabled:not(.transparent-button), 
+  &.blue-button_reset{
 
     @include themify($themes) {
       background-color: themed(disabledButtonBackgroundColor);
@@ -993,6 +994,32 @@ app-open-wallet-modal {
     @include themify($themes) {
       background: themed(modalBackground);
       color: themed(mainTextColor);
+    }
+  }
+}
+
+app-send-modal {
+  .modal {
+
+    @include themify($themes) {
+      background: themed(modalBackground);
+      color: themed(mainTextColor);
+    }
+
+    .title {
+
+      @include themify($themes) {
+        border-bottom: 0.2rem solid themed(transparentButtonBorderColor);
+      }
+
+    }
+
+    .action-button {
+
+      @include themify($themes) {
+        background-color: themed(blueTextColor);
+        color: themed(alternativeTextColor);
+      }
     }
   }
 }

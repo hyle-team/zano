@@ -1,0 +1,117 @@
+:host {
+  min-width: 95rem;
+  width: 100%;
+  height: 100%;
+}
+
+.head {
+  justify-content: flex-end;
+}
+
+.contacts-title {
+  font-size: 1.7rem;
+}
+
+.wrap-table {
+  margin: 1rem -3rem;
+
+  table {
+
+    tbody{
+
+      tr {
+
+        td {
+          padding: 0 3rem 0 1rem;
+          overflow: hidden;
+          text-overflow: ellipsis;
+
+          &:first-child {
+            max-width: 10rem;
+            padding: 0 3rem 0 3rem;
+          }
+
+          &:nth-child(2) {
+            max-width: 10rem;
+          }
+
+          .alias {
+            cursor: pointer;
+          }
+
+          .button-wrapper {
+            display: flex;
+            
+            button {
+              display: flex;  
+              align-items: center;
+              background: transparent;
+              border: none;
+              font-size: 1.3rem;
+              font-weight: 400;
+              line-height: 3rem;
+              outline: none;
+              padding: 0;
+              height: auto;
+              margin-right: 1.8rem;
+          
+              .icon {
+                cursor: pointer;
+                margin-right: 0.8rem;
+                width: 1.7rem;
+                height: 1.7rem;
+            
+                &.edit {
+                  mask: url(../../assets/icons/edit.svg) no-repeat center;
+                }
+            
+                &.transfer {
+                  mask: url(../../assets/icons/send.svg) no-repeat center;
+                }
+        
+                &.delete {
+                  mask: url(../../assets/icons/delete.svg) no-repeat center;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  .empty-list {
+    margin: 2.5rem 3rem;
+  }  
+}
+
+.blue-button {
+  width: 100%;
+  max-width: 18rem;
+  margin-top: 3rem;
+}
+
+
+.footer {
+  position: absolute;
+  bottom: 3rem;
+  font-size: 1.3rem;
+  
+  .import-btn {
+    display: flex;
+    align-items: center;
+    background-color: transparent;
+    font-size: inherit;
+    font-weight: 400;
+    line-height: 1.3rem;
+    padding: 0;
+    height: auto;
+
+    .icon {
+      margin-right: 0.7rem;
+      mask: url(../../assets/icons/import-export.svg) no-repeat center;
+      width: 0.9rem;
+      height: 0.9rem;
+    }
+  }
+}

@@ -15,14 +15,14 @@
 
     <div class="input-block alias-name">
       <label for="alias-name">
-        {{ 'EDIT_ALIAS.NAME.LABEL' | translate }}
+        {{ 'TRANSFER_ALIAS.NAME.LABEL' | translate }}
       </label>
       <input type="text" id="alias-name" [value]="alias.name" placeholder="{{ 'EDIT_ALIAS.NAME.PLACEHOLDER' | translate }}" readonly>
     </div>
 
     <div class="input-block textarea">
       <label for="alias-comment">
-        {{ 'EDIT_ALIAS.COMMENT.LABEL' | translate }}
+        {{ 'TRANSFER_ALIAS.COMMENT.LABEL' | translate }}
       </label>
       <textarea id="alias-comment" [value]="alias.comment" placeholder="{{ 'EDIT_ALIAS.COMMENT.PLACEHOLDER' | translate }}" readonly></textarea>
     </div>
@@ -49,7 +49,6 @@
 
     <div class="wrap-buttons">
       <button type="button" class="blue-button" (click)="transferAlias()" [disabled]="transferAddressAlias || !transferAddressValid || notEnoughMoney">{{ 'TRANSFER_ALIAS.BUTTON_TRANSFER' | translate }}</button>
-      <button type="button" class="blue-button" (click)="back()">{{ 'TRANSFER_ALIAS.BUTTON_CANCEL' | translate }}</button>
     </div>
 
   </form>

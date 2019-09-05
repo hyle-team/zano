@@ -44,7 +44,6 @@
 
     <div class="wrap-buttons">
       <button type="button" class="blue-button" (click)="updateAlias()" [disabled]="notEnoughMoney || (oldAliasComment === alias.comment) || alias.comment.length > variablesService.maxCommentLength">{{ 'EDIT_ALIAS.BUTTON_EDIT' | translate }}</button>
-      <button type="button" class="blue-button" (click)="back()">{{ 'EDIT_ALIAS.BUTTON_CANCEL' | translate }}</button>
     </div>
 
   </form>

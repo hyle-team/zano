@@ -7,8 +7,14 @@
 #pragma once
 
 
+#ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
+#else
+#define CURRENCY_FORMATION_VERSION                      86
+#endif
+
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
+
 
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
@@ -24,10 +30,6 @@
 #define CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT            60*20
                                                         
 #define BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW               60
-
-
-// TOTAL_MONEY_SUPPLY - total number coins to be generated
-#define TOTAL_MONEY_SUPPLY                              ((uint64_t)(-1))
                                                         
 #define POS_START_HEIGHT                                0
                                                         
@@ -87,7 +89,9 @@
 
 
 #define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week
+#define CURRENCY_ALT_BLOCK_MAX_COUNT                    43200 //30 days
 #define CURRENCY_MEMPOOL_TX_LIVETIME                    345600 //seconds, 4 days
+
 
 #ifndef TESTNET
 #define P2P_DEFAULT_PORT                                11121
@@ -95,7 +99,7 @@
 #define STRATUM_DEFAULT_PORT                            11777
 #define P2P_NETWORK_ID_TESTNET_FLAG                     0
 #else 
-#define P2P_DEFAULT_PORT                                (11112)
+#define P2P_DEFAULT_PORT                                (11112 + CURRENCY_FORMATION_VERSION)
 #define RPC_DEFAULT_PORT                                12111
 #define STRATUM_DEFAULT_PORT                            11888
 #define STRARUM_DEFAULT_PORT                            51113
@@ -128,7 +132,7 @@
 //PoS definitions
 #define POS_SCAN_WINDOW                                 60*10 //seconds // 10 minutes
 #define POS_SCAN_STEP                                   15    //seconds
-#define POS_MAC_ACTUAL_TIMESTAMP_TO_MINED               (POS_SCAN_WINDOW+100)                       
+#define POS_MAX_ACTUAL_TIMESTAMP_TO_MINED               (POS_SCAN_WINDOW+100)                       
 
 #define POS_STARTER_KERNEL_HASH                         "00000000000000000006382a8d8f94588ce93a1351924f6ccb9e07dd287c6e4b"
 #define POS_MODFIFIER_INTERVAL                          10
@@ -183,8 +187,10 @@
 #define CURRENCY_CORE_INSTANCE_LOCK_FILE                "lock.lck"
 
 
-#define CURRENCY_POOLDATA_FOLDERNAME                    "poolstate"
-#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME              "blockchain"
+#define CURRENCY_POOLDATA_FOLDERNAME_OLD                "poolstate"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD          "blockchain"
+#define CURRENCY_POOLDATA_FOLDERNAME                    "poolstate_lmdb_v1"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME              "blockchain_lmdb_v1"
 #define P2P_NET_DATA_FILENAME                           "p2pstate.bin"
 #define MINER_CONFIG_FILENAME                           "miner_conf.json"
 #define GUI_SECURE_CONFIG_FILENAME                      "gui_secure_conf.bin"
@@ -192,10 +198,11 @@
 #define GUI_INTERNAL_CONFIG                             "gui_internal_config.bin"
 
 
+
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3
 #define CURRENT_BLOCK_EXTENDED_INFO_ARCHIVE_VER         1
 
-#define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 7
+#define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 8
 #define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  1
 
 
@@ -203,11 +210,19 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+64)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+65)
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
-
+//hard forks section
+#define BLOCK_MAJOR_VERSION_GENESIS                     1
+#define BLOCK_MINOR_VERSION_GENESIS                     0
+#define BLOCK_MAJOR_VERSION_INITAL                      0
+#ifndef TESTNET
+#define ZANO_HARDFORK_1_AFTER_HEIGHT                    180840
+#else
+#define ZANO_HARDFORK_1_AFTER_HEIGHT                    1440
+#endif
 
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");
