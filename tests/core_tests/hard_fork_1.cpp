@@ -614,14 +614,16 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
 
   // create few locked outputs in the blockchain with unique amount 
   // tx_0 : miner -> Alice, miner -> Bob
+  uint64_t stake_unlock_time = 100; // locked until block 100
+  uint64_t stake_amount = MK_TEST_COINS(10);
   std::vector<extra_v> extra;
   etc_tx_details_unlock_time ut = AUTO_VAL_INIT(ut);
-  ut.v = 100; // locked until block 100
+  ut.v = stake_unlock_time; 
   extra.push_back(ut);
 
   std::vector<tx_destination_entry> destinations;
-  destinations.push_back(tx_destination_entry(MK_TEST_COINS(10), alice_acc.get_public_address()));
-  destinations.push_back(tx_destination_entry(MK_TEST_COINS(10), bob_acc.get_public_address()));
+  destinations.push_back(tx_destination_entry(stake_amount, alice_acc.get_public_address()));
+  destinations.push_back(tx_destination_entry(stake_amount, bob_acc.get_public_address()));
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
   r = construct_tx_to_key(events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
@@ -635,7 +637,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
-  block blk_s;
+  block blk_b1;
   {
     const block& prev_block = blk_1r;
     const transaction& stake = tx_0;
@@ -659,7 +661,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
-    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address());
+    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(), stakeholder.get_public_address());
 
     // set etc_tx_details_unlock_time2 
     remove_unlock_v1_entries_from_extra(pb.m_block.miner_tx.extra); // clear already set unlock
@@ -672,11 +674,57 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     pb.m_block.miner_tx.extra.push_back(ut2);
 
     pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, stakeholder);
-    blk_s = pb.m_block;
+    blk_b1 = pb.m_block;
   }
 
-  DO_CALLBACK(events, "mark_invalid_block"); // should not pass as using time-locking in outputs
-  events.push_back(blk_s);
+  // should not pass as using time-locking in outputs
+  DO_CALLBACK(events, "mark_invalid_block");
+  events.push_back(blk_b1);
+
+
+  block blk_b2;
+  {
+    const block& prev_block = blk_1r;
+    const transaction& stake = tx_0;
+    const account_base& stakeholder = alice_acc;
+
+    crypto::hash prev_id = get_block_hash(prev_block);
+    size_t height = get_block_height(prev_block) + 1;
+    currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
+
+    crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
+    size_t stake_output_idx = 0;
+    size_t stake_output_gidx = 0;
+    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    crypto::key_image stake_output_key_image;
+    keypair kp;
+    generate_key_image_helper(stakeholder.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+
+    pos_block_builder pb;
+    pb.step1_init_header(height, prev_id);
+    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.step2_set_txs(std::vector<transaction>());
+    pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
+    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(), stakeholder.get_public_address());
+
+    // set etc_tx_details_unlock_time2 
+    remove_unlock_v1_entries_from_extra(pb.m_block.miner_tx.extra); // clear already set unlock
+    std::vector<extra_v> extra;
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    ut2.unlock_time_array.push_back(height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW); // reward lock
+    for(size_t i = 0; i < pb.m_block.miner_tx.vout.size() - 1; ++i)
+      ut2.unlock_time_array.push_back(stake_unlock_time - 1); // stake locked by 1 less height that stake_unlock_time, that is incorrect as lock time of this coin is decreased
+    extra.push_back(ut2);
+    pb.m_block.miner_tx.extra.push_back(ut2);
+
+    pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, stakeholder);
+    blk_b2 = pb.m_block;
+  }
+
+  // should no pass because stake output has less lock time than stake input
+  DO_CALLBACK(events, "mark_invalid_block");
+  events.push_back(blk_b2);
 
   block blk_good;
   {
@@ -702,7 +750,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
-    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address());
+    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(), stakeholder.get_public_address());
 
     // set etc_tx_details_unlock_time2 
     remove_unlock_v1_entries_from_extra(pb.m_block.miner_tx.extra); // clear already set unlock
@@ -710,7 +758,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
     ut2.unlock_time_array.push_back(height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW); // reward lock
     for(size_t i = 0; i < pb.m_block.miner_tx.vout.size() - 1; ++i)
-      ut2.unlock_time_array.push_back(100); // stake locked by height 100
+      ut2.unlock_time_array.push_back(stake_unlock_time); // using the same lock time as stake input
     extra.push_back(ut2);
     pb.m_block.miner_tx.extra.push_back(ut2);
 
@@ -718,8 +766,22 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     blk_good = pb.m_block;
   }
 
-  // should be okay
+  // should pass okay
   events.push_back(blk_good);
+  generator.add_block_info(blk_good, std::list<transaction>()); // add modified block info
+
+  MAKE_NEXT_BLOCK(events, blk_2, blk_good, miner_acc);
+
+  std::vector<tx_source_entry> sources;
+  r = fill_tx_sources(sources, events, blk_2, alice_acc.get_keys(), stake_amount / 2 + TESTS_DEFAULT_FEE, 0 /* nmix */, true /* check for spends */, false /* check for unlock time */);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  transaction tx_1 = AUTO_VAL_INIT(tx_1);
+  r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(stake_amount / 2, miner_acc.get_public_address()) },
+    empty_attachment, tx_1, stake_unlock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  
+  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(tx_1);
 
   return true;
 }
