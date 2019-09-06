@@ -107,7 +107,19 @@ void pos_block_builder::step3_build_stake_kernel(
 
 void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   const boost::multiprecision::uint128_t& already_generated_coins,
+  const account_public_address &reward_and_stake_receiver_address,
+  const blobdata& extra_nonce,
+  size_t max_outs,
+  const extra_alias_entry& alias,
+  keypair tx_one_time_key)
+{
+  step4_generate_coinbase_tx(median_size, already_generated_coins, reward_and_stake_receiver_address, reward_and_stake_receiver_address, extra_nonce, max_outs, alias, tx_one_time_key);
+}
+
+void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
+  const boost::multiprecision::uint128_t& already_generated_coins,
   const account_public_address &reward_receiver_address,
+  const account_public_address &stakeholder_address,
   const blobdata& extra_nonce,
   size_t max_outs,
   const extra_alias_entry& alias,
@@ -118,7 +130,7 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   // generate miner tx using incorrect current_block_size only for size estimation
   size_t estimated_block_size = m_txs_total_size;
   bool r = construct_homemade_pos_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee, m_pos_stake_amount, m_stake_kernel.kimage,
-    m_pos_stake_output_gindex, reward_receiver_address, m_block.miner_tx, extra_nonce, max_outs, alias, tx_one_time_key);
+    m_pos_stake_output_gindex, reward_receiver_address, stakeholder_address, m_block.miner_tx, extra_nonce, max_outs, tx_one_time_key);
   CHECK_AND_ASSERT_THROW_MES(r, "construct_homemade_pos_miner_tx failed");
 
   estimated_block_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
@@ -126,7 +138,7 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
     r = construct_homemade_pos_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee, m_pos_stake_amount, m_stake_kernel.kimage,
-      m_pos_stake_output_gindex, reward_receiver_address, m_block.miner_tx, extra_nonce, max_outs, alias, tx_one_time_key);
+      m_pos_stake_output_gindex, reward_receiver_address, stakeholder_address, m_block.miner_tx, extra_nonce, max_outs, tx_one_time_key);
     CHECK_AND_ASSERT_THROW_MES(r, "construct_homemade_pos_miner_tx failed");
 
     cumulative_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
@@ -171,11 +183,11 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
   uint64_t pos_stake_amount,
   crypto::key_image pos_stake_keyimage,
   size_t pos_stake_gindex,
-  const account_public_address &miner_address,
+  const account_public_address &reward_receiving_address,
+  const account_public_address &stakeholder_address,
   transaction& tx,
   const blobdata& extra_nonce /*= blobdata()*/,
   size_t max_outs /*= CURRENCY_MINER_TX_MAX_OUTS*/,
-  const extra_alias_entry& alias /*= alias_info()*/,
   keypair tx_one_time_key /*= keypair::generate()*/)
 {
   boost::value_initialized<transaction> new_tx;
@@ -189,12 +201,6 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
   bool r = get_block_reward(true, median_size, current_block_size, already_generated_coins, block_reward, height);
   CHECK_AND_ASSERT_MES(r, false, "Block is too big");
   block_reward += fee;
-  block_reward += pos_stake_amount;
-
-  uint64_t alias_reward = 0;
-  if (!alias.m_alias.empty())
-    alias_reward = currency::get_alias_coast_from_fee(alias.m_alias, TESTS_DEFAULT_FEE);
-  block_reward -= alias_reward;
 
   // decompose reward into outputs and populate tx.vout
   std::vector<size_t> out_amounts;
@@ -202,14 +208,15 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
     [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
     [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
 
-  CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
-  while (max_outs < out_amounts.size())
+  CHECK_AND_ASSERT_MES(2 <= max_outs, false, "max_out must be greather than 1");
+  while (out_amounts.size() + 1 > max_outs)
   {
     out_amounts[out_amounts.size() - 2] += out_amounts.back();
     out_amounts.resize(out_amounts.size() - 1);
   }
 
-  bool burn_money = miner_address.m_spend_public_key == null_pkey && miner_address.m_view_public_key == null_pkey; // if true, burn money, so no one on Earth can spend them
+  // reward
+  bool burn_money = reward_receiving_address.m_spend_public_key == null_pkey && reward_receiving_address.m_view_public_key == null_pkey; // if true, burn reward, so no one on Earth can spend them
   for (size_t output_index = 0; output_index < out_amounts.size(); ++output_index)
   {
     txout_to_key tk;
@@ -218,7 +225,7 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
 
     if (!burn_money)
     {
-      r = currency::derive_public_key_from_target_address(miner_address, tx_one_time_key.sec, output_index, tk.key); // derivation(view_pub; tx_sec).derive(output_index, spend_pub) => output pub key
+      r = currency::derive_public_key_from_target_address(reward_receiving_address, tx_one_time_key.sec, output_index, tk.key); // derivation(view_pub; tx_sec).derive(output_index, spend_pub) => output pub key
       CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
     }
 
@@ -228,36 +235,31 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
     tx.vout.push_back(out);
   }
 
+  // stake
+  burn_money = stakeholder_address.m_spend_public_key == null_pkey && stakeholder_address.m_view_public_key == null_pkey; // if true, burn stake
+  {
+    txout_to_key tk;
+    tk.key = null_pkey; // null means burn money
+    tk.mix_attr = 0;
+
+    if (!burn_money)
+    {
+      r = currency::derive_public_key_from_target_address(stakeholder_address, tx_one_time_key.sec, tx.vout.size(), tk.key);
+      CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
+    }
+
+    tx_out out;
+    out.amount = pos_stake_amount;
+    out.target = tk;
+    tx.vout.push_back(out);
+  }
+
   // take care about extra
   add_tx_pub_key_to_extra(tx, tx_one_time_key.pub);
   if (extra_nonce.size())
     if (!add_tx_extra_userdata(tx, extra_nonce))
       return false;
-  if (alias.m_alias.size())
-  {
-    if (!add_tx_extra_alias(tx, alias))
-      return false;
-    
-    // decompose alias reward into digits and create additional outputs
-    out_amounts.clear();
-    decompose_amount_into_digits(alias_reward, DEFAULT_DUST_THRESHOLD, [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); }, [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
-    while (out_amounts.size() > max_outs)
-    {
-      out_amounts[out_amounts.size() - 2] += out_amounts.back();
-      out_amounts.resize(out_amounts.size() - 1);
-    }
-    for (size_t output_index = 0; output_index < out_amounts.size(); ++output_index)
-    {
-      txout_to_key tk;
-      tk.key = null_pkey; // burn money for the sake of alias!
-      tk.mix_attr = 0;
-      tx_out out;
-      out.amount = out_amounts[output_index];
-      out.target = tk;
-      tx.vout.push_back(out);
-    }
-  }
-
+  
   // populate ins with 1) money-generating and 2) PoS
   txin_gen in;
   in.height = height;
