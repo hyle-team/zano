@@ -56,7 +56,10 @@ public:
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
     std::atomic<bool> do_mining;
-    std::atomic<bool> stop;
+    std::atomic<bool> major_stop;
+    std::atomic<bool> stop_for_refresh; //use separate var for passing to "refresh" member function, 
+                                        //because it can be changed there due to internal interruption logis
+
     std::atomic<bool> break_mining_loop;
     std::atomic<uint64_t> wallet_state;
     std::atomic<uint64_t> last_wallet_synch_height;

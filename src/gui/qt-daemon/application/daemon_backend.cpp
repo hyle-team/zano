@@ -429,7 +429,8 @@ void daemon_backend::main_worker(const po::variables_map& m_vm)
     //m_pview->update_daemon_status(dsi);
     try
     {
-      wo.second.stop = true;
+      wo.second.major_stop = true;
+      wo.second.stop_for_refresh = true;
       wo.second.w.unlocked_get()->stop();
 
       wo.second.w->get()->store();
@@ -543,7 +544,8 @@ void daemon_backend::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
 {
   wo.wallet_id = id;
   wo.do_mining = false;
-  wo.stop = false;
+  wo.major_stop = false;
+  wo.stop_for_refresh = false;
   wo.plast_daemon_height = &m_last_daemon_height;
   wo.plast_daemon_network_state = &m_last_daemon_network_state;
   wo.plast_daemon_is_disconnected = &m_last_daemon_is_disconnected;
@@ -837,7 +839,8 @@ std::string daemon_backend::close_wallet(size_t wallet_id)
 
   try
   {
-    it->second.stop = true;
+    it->second.major_stop = true;
+    it->second.stop_for_refresh = true;
     it->second.w.unlocked_get()->stop();
 
     it->second.w->get()->store();
@@ -1488,8 +1491,9 @@ void daemon_backend::wallet_vs_options::worker_func()
   epee::math_helper::once_a_time_seconds<1> scan_pool_interval;
   epee::math_helper::once_a_time_seconds<POS_WALLET_MINING_SCAN_INTERVAL> pos_minin_interval;
   view::wallet_status_info wsi = AUTO_VAL_INIT(wsi);
-  while (!stop)
+  while (!major_stop)
   {
+    stop_for_refresh = false;
     try
     {
       wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
@@ -1516,7 +1520,7 @@ void daemon_backend::wallet_vs_options::worker_func()
             prepare_wallet_status_info(*this, wsi);
             pview->update_wallet_status(wsi);
           }
-          w->get()->refresh(stop);
+          w->get()->refresh(stop_for_refresh);
           w->get()->resend_unconfirmed();
           {
             auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')
@@ -1548,7 +1552,7 @@ void daemon_backend::wallet_vs_options::worker_func()
         });
       }
 
-      if (stop)
+      if (major_stop || stop_for_refresh)
         break;
       //******************************************************************************************
       //mining zone
@@ -1614,7 +1618,8 @@ void daemon_backend::wallet_vs_options::worker_func()
 daemon_backend::wallet_vs_options::~wallet_vs_options()
 {
   do_mining = false;
-  stop = true;
+  major_stop = true;
+  stop_for_refresh = true;
   break_mining_loop = true;
   if (miner_thread.joinable())
     miner_thread.join();
