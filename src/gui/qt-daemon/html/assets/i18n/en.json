@@ -70,9 +70,7 @@
       "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Critical update available.</span><i class=\"icon\"></i><span>Update strongly recommended!</span>",
       "TIME": "System time differs from network",
       "TIME_TOOLTIP": "<span class=\"wrong-time\">Wrong system time!</span><br><span>Check and repair your system time.</span>"
-    },
-    "BLOCK": "Block",
-    "OF": "of"
+    }
   },
   "MAIN": {
     "TITLE": "Create or open the wallet to start using Zano",
