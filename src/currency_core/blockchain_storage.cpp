@@ -223,7 +223,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
 
   m_config_folder = config_folder;
 
-  // remove old incompartible DB
+  // remove old incompatible DB
   const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
   if (boost::filesystem::exists(old_db_folder_path))
   {
