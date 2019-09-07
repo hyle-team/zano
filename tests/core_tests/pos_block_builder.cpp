@@ -78,7 +78,7 @@ void pos_block_builder::step3_build_stake_kernel(
   if (last_pos_block_kernel_hash == null_hash)
   {
     bool r = string_tools::parse_tpod_from_hex_string(POS_STARTER_KERNEL_HASH, m_stake_kernel.stake_modifier.last_pos_kernel_id);
-    CHECK_AND_ASSERT_THROW_MES(r, "Failed to parse POS_STARTER_MODFIFIER");
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to parse POS_STARTER_KERNEL_HASH");
   }
 
   wide_difficulty_type stake_difficulty = difficulty / stake_output_amount;

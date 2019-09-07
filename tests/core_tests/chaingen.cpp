@@ -176,7 +176,7 @@ bool test_generator::add_block_info(const currency::block& b, const std::list<cu
       sk.stake_modifier.last_pos_kernel_id = chain[pos_idx]->ks_hash;
     else
     {
-      CHECK_AND_ASSERT_MES(string_tools::parse_tpod_from_hex_string(POS_STARTER_KERNEL_HASH, sk.stake_modifier.last_pos_kernel_id), false, "Failed to parse POS_STARTER_MODFIFIER");
+      CHECK_AND_ASSERT_MES(string_tools::parse_tpod_from_hex_string(POS_STARTER_KERNEL_HASH, sk.stake_modifier.last_pos_kernel_id), false, "Failed to parse POS_STARTER_KERNEL_HASH");
     }
     uint64_t pow_idx = get_last_block_of_type(false, chain);
     sk.stake_modifier.last_pow_id = get_block_hash(chain[pow_idx]->b);
@@ -686,7 +686,7 @@ bool test_generator::build_stake_modifier(stake_modifier_type& sm, const test_ge
   else
   {
     bool r = string_tools::parse_tpod_from_hex_string(POS_STARTER_KERNEL_HASH, sm.last_pos_kernel_id);
-    CHECK_AND_ASSERT_MES(r, false, "Failed to parse POS_STARTER_MODFIFIER");
+    CHECK_AND_ASSERT_MES(r, false, "Failed to parse POS_STARTER_KERNEL_HASH");
   }
 
   sm.last_pow_id = get_block_hash(blck_chain[last_pow_i]->b);
