@@ -312,22 +312,28 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   generator.set_hardfork_height(m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
-  DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2));
+  DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 7));
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "check_being_in_cp_zone");                // make sure CP was has passed
 
   //
   // before hardfork 1
   //
 
   std::vector<tx_source_entry> sources;
+  CHECK_AND_ASSERT_MES(fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), MK_TEST_COINS(90) + TESTS_DEFAULT_FEE, 0), false, "");
+
+  uint64_t stake_lock_time = 100; // locked till block 100
+
   std::vector<tx_destination_entry> destinations;
-  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations), false, "");
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(90), alice_acc.get_public_address()));
 
   // set unlock_time_2, should be rejected before hardfork 1
   std::vector<extra_v> extra;
   etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
   ut2.unlock_time_array.resize(destinations.size());
-  ut2.unlock_time_array[0] = 1; // not zero, unlocked from block 1
+  ut2.unlock_time_array[0] = stake_lock_time;
   extra.push_back(ut2);
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
   crypto::secret_key tx_sec_key;
@@ -342,12 +348,93 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   DO_CALLBACK(events, "clear_tx_pool");
 
   MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
-  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);             // <-- checkpoint
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
 
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);             // <-- hard fork
   MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
   // make sure hardfork went okay
   CHECK_AND_ASSERT_MES(blk_3.major_version != CURRENT_BLOCK_MAJOR_VERSION && blk_4.major_version == CURRENT_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+
+  //
+  // after hardfork 1
+  //
+
+  // now tx_0 is okay and can be added to the blockchain
+  events.push_back(tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_5, blk_4, miner_acc, tx_0);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_5r, blk_5, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_5r, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(90));
+
+  // try to mine a PoS block using locked coins
+  block blk_6;
+  {
+    const block& prev_block = blk_5r;
+    const transaction& stake = tx_0;
+    const account_base& stakeholder = alice_acc;
+
+    crypto::hash prev_id = get_block_hash(prev_block);
+    size_t height = get_block_height(prev_block) + 1;
+    currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
+
+    crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
+    size_t stake_output_idx = 0;
+    size_t stake_output_gidx = 0;
+    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    crypto::key_image stake_output_key_image;
+    keypair kp;
+    generate_key_image_helper(stakeholder.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+
+    pos_block_builder pb;
+    pb.step1_init_header(height, prev_id);
+    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.step2_set_txs(std::vector<transaction>());
+    pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
+    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(), stakeholder.get_public_address());
+
+    // set etc_tx_details_unlock_time2 
+    remove_unlock_v1_entries_from_extra(pb.m_block.miner_tx.extra); // clear already set unlock
+    std::vector<extra_v> extra;
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    ut2.unlock_time_array.push_back(height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW); // reward lock
+    for(size_t i = 0; i < pb.m_block.miner_tx.vout.size() - 1; ++i)
+      ut2.unlock_time_array.push_back(stake_lock_time); // using the same lock time as stake input
+    extra.push_back(ut2);
+    pb.m_block.miner_tx.extra.push_back(ut2);
+
+    pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, stakeholder);
+    blk_6 = pb.m_block;
+  }
+  events.push_back(blk_6);
+  generator.add_block_info(blk_6, std::list<transaction>()); // add modified block info
+
+
+  MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);             // <-- checkpoint
+  MAKE_NEXT_BLOCK(events, blk_8, blk_7, miner_acc);
+
+  DO_CALLBACK(events, "check_not_being_in_cp_zone");            // make sure CP was has passed
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_8r, blk_8, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // make sure locked Alice's coins still can't be spent
+  sources.clear();
+  r = fill_tx_sources(sources, events, blk_8r, alice_acc.get_keys(), MK_TEST_COINS(90), 0 /* nmix */, true /* check for spends */, false /* check for unlock time */);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  transaction tx_1 = AUTO_VAL_INIT(tx_1);
+  r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(MK_TEST_COINS(90) - TESTS_DEFAULT_FEE, miner_acc.get_public_address()) },
+    empty_attachment, tx_1, stake_lock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  
+  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(tx_1);
+
+  // mine another PoS block using the same stake after a checkpoint
+  std::list<currency::account_base> pos_stakeing_accounts{alice_acc};
+  MAKE_NEXT_POS_BLOCK(events, blk_9, blk_8r, miner_acc, pos_stakeing_accounts);
 
   return true;
 }
