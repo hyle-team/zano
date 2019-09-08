@@ -6,11 +6,127 @@
 
 #include "currency_format_utils_transactions.h"
 #include "serialization/serialization.h"
-#include "currency_format_utils_abstract.h"
 #include "currency_format_utils.h"
+#include "currency_format_utils_abstract.h"
 
 namespace currency
 {
+  //---------------------------------------------------------------
+  account_public_address get_crypt_address_from_destinations(const account_keys& sender_account_keys, const std::vector<tx_destination_entry>& destinations)
+  {
+    for (const auto& de : destinations)
+    {
+      if (de.addr.size() == 1 && sender_account_keys.m_account_address != de.addr.back())
+        return de.addr.back();                    // return the first destination address that is non-multisig and not equal to the sender's address
+    }
+    return sender_account_keys.m_account_address; // otherwise, fallback to sender's address
+  }
+  //------------------------------------------------------------------
+  bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)
+  {
+    /// tx expiration condition (tx is ok if the following is true)
+    /// tx_expiration_time - TX_EXPIRATION_MEDIAN_SHIFT > get_last_n_blocks_timestamps_median(TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW)
+    uint64_t expiration_time = get_tx_expiration_time(tx);
+    if (expiration_time == 0)
+      return false; // 0 means it never expires
+    return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
+  }
+  //---------------------------------------------------------------
+  uint64_t get_burned_amount(const transaction& tx)
+  {
+    uint64_t res = 0;
+    for (auto& o : tx.vout)
+    {
+      if (o.target.type() == typeid(txout_to_key))
+      {
+        if (boost::get<txout_to_key>(o.target).key == null_pkey)
+          res += o.amount;
+      }
+    }
+    return res;
+  }
+  //---------------------------------------------------------------
+  uint64_t get_tx_max_unlock_time(const transaction& tx)
+  {
+    // etc_tx_details_unlock_time have priority over etc_tx_details_unlock_time2
+    uint64_t v = get_tx_x_detail<etc_tx_details_unlock_time>(tx);
+    if (v)
+      return v;
+
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    get_type_in_variant_container(tx.extra, ut2);
+    if (!ut2.unlock_time_array.size())
+      return 0;
+
+    uint64_t max_unlock_time = 0;
+    CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "unlock_time_array.size=" << ut2.unlock_time_array.size()
+      << " is not the same as  tx.vout.size =" << tx.vout.size() << " in tx: " << get_transaction_hash(tx));
+    for (size_t i = 0; i != tx.vout.size(); i++)
+    {
+      if (ut2.unlock_time_array[i] > max_unlock_time)
+        max_unlock_time = ut2.unlock_time_array[i];
+    }
+
+    return max_unlock_time;
+  }
+
+  //---------------------------------------------------------------
+  uint64_t get_tx_unlock_time(const transaction& tx, uint64_t o_i)
+  { 
+    // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
+    uint64_t v = get_tx_x_detail<etc_tx_details_unlock_time>(tx); 
+    if (v)
+      return v;
+
+    CHECK_AND_ASSERT_THROW_MES(tx.vout.size() > o_i, "tx.vout.size=" << tx.vout.size()
+      << " is not bigger then o_i=" << o_i << " in tx: " << get_transaction_hash(tx));
+
+
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    get_type_in_variant_container(tx.extra, ut2);
+    if (!ut2.unlock_time_array.size())
+      return 0;
+    
+    CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() > o_i, "unlock_time_array.size=" << ut2.unlock_time_array.size() 
+      << " is less or equal to o_i=" << o_i << " in tx: " << get_transaction_hash(tx));
+
+    return ut2.unlock_time_array[o_i];
+  }
+  //---------------------------------------------------------------
+  bool get_tx_max_min_unlock_time(const transaction& tx, uint64_t& max_unlock_time, uint64_t& min_unlock_time)
+  {
+    max_unlock_time = min_unlock_time = 0;
+    // etc_tx_details_expiration_time have priority over etc_tx_details_expiration_time2
+    uint64_t v = get_tx_x_detail<etc_tx_details_unlock_time>(tx);
+    if (v)
+    {
+      max_unlock_time = min_unlock_time = v;
+      return true;
+    }
+
+    etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+    get_type_in_variant_container(tx.extra, ut2);
+    if (!ut2.unlock_time_array.size())
+    {
+      return true;
+    }
+    CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "unlock_time_array.size=" << ut2.unlock_time_array.size()
+      << " is not equal tx.vout.size()=" << tx.vout.size() << " in tx: " << get_transaction_hash(tx));
+    if (ut2.unlock_time_array.size())
+    {
+      max_unlock_time = min_unlock_time = ut2.unlock_time_array[0];
+      for (size_t i = 1; i != ut2.unlock_time_array.size(); i++)
+      {
+        if (ut2.unlock_time_array[i] > max_unlock_time)
+          max_unlock_time = ut2.unlock_time_array[i];
+        if (ut2.unlock_time_array[i] < min_unlock_time)
+          min_unlock_time = ut2.unlock_time_array[i];
+      }
+    }
+
+
+    return true;
+  }
   //---------------------------------------------------------------
   void get_transaction_prefix_hash(const transaction_prefix& tx, crypto::hash& h)
   {

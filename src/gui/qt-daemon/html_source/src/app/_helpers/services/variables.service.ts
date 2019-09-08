@@ -1,5 +1,6 @@
 import {Injectable, NgZone} from '@angular/core';
 import {Wallet} from '../models/wallet.model';
+import {Contact} from '../models/contact.model';
 import {BehaviorSubject} from 'rxjs';
 import {Idle} from 'idlejs/dist';
 import {Router} from '@angular/router';
@@ -21,6 +22,7 @@ export class VariablesService {
   public exp_med_ts = 0;
   public net_time_delta_median = 0;
   public height_app = 0;
+  public height_max = 0;
   public last_build_available = '';
   public last_build_displaymode = 0;
   public daemon_state = 3;
@@ -45,26 +47,36 @@ export class VariablesService {
 
   public wallets: Array<Wallet> = [];
   public currentWallet: Wallet;
+  public selectWallet: number;
   public aliases: any = [];
   public aliasesChecked: any = {};
   public enableAliasSearch = false;
   public maxWalletNameLength = 25;
   public maxCommentLength = 255;
+  public dataIsLoaded = false;
+
+  public contacts: Array<Contact> = [];
+  public newContact: Contact = {name: null, address: null, notes: null};
 
   getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);
+  getHeightMaxEvent = new BehaviorSubject(null);
   getRefreshStackingEvent = new BehaviorSubject(null);
   getAliasChangedEvent = new BehaviorSubject(null);
 
   public idle = new Idle()
     .whenNotInteractive()
     .do(() => {
-      this.ngZone.run(() => {
+      if (this.appPass == '') {
+        this.restartCountdown();
+      } else {
+        this.ngZone.run(() => {
         this.idle.stop();
         this.appPass = '';
         this.appLogin = false;
         this.router.navigate(['/login'], {queryParams: {type: 'auth'}});
       });
+      }
     });
 
   public allContextMenu: ContextMenuComponent;
@@ -85,6 +97,13 @@ export class VariablesService {
     if (height !== this.height_app) {
       this.height_app = height;
       this.getHeightAppEvent.next(height);
+    }
+  }
+
+  setHeightMax(height: number) {
+    if (height !== this.height_max) {
+      this.height_max = height;
+      this.getHeightMaxEvent.next(height);
     }
   }
 

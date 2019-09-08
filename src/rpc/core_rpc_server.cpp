@@ -798,6 +798,7 @@ namespace currency
     currency::pos_entry pe = AUTO_VAL_INIT(pe);
     pe.amount = req.pos_amount;
     pe.index = req.pos_index;
+    pe.stake_unlock_time = req.stake_unlock_time;
     //pe.keyimage key image will be set in the wallet
     //pe.wallet_index is not included in serialization map, TODO: refactoring here
 

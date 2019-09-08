@@ -169,10 +169,18 @@ IF %ERRORLEVEL% NEQ 0 (
 @echo "---------------------------------------------------------------"
 @echo "---------------------------------------------------------------"
 
-@echo "   UPLOADING TO SERVER ...."
-
 set installer_file=%ACHIVE_NAME_PREFIX%%version%-installer.exe
 set installer_path=%BUILDS_PATH%\builds\%installer_file%
+
+@echo "   SIGNING ...."
+
+%ZANO_SIGN_CMD% %installer_path%
+IF %ERRORLEVEL% NEQ 0 (
+  @echo "failed to sign installer"
+  goto error
+)
+
+@echo "   UPLOADING TO SERVER ...."
 
 pscp -load zano_build_server %installer_path% build.zano.org:/var/www/html/builds
 IF %ERRORLEVEL% NEQ 0 (

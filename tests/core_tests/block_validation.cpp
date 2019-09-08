@@ -21,7 +21,7 @@ namespace
     for (size_t i = 0; i < new_block_count; ++i)
     {
       block blk_next;
-      wide_difficulty_type diffic = next_difficulty(timestamps, cummulative_difficulties, DIFFICULTY_POW_TARGET);
+      wide_difficulty_type diffic = next_difficulty_1(timestamps, cummulative_difficulties, DIFFICULTY_POW_TARGET);
       if (!generator.construct_block_manually(blk_next, blk_prev, miner_account,
         test_generator::bf_timestamp | test_generator::bf_diffic, 0, 0, blk_prev.timestamp, crypto::hash(), diffic))
         return false;
@@ -152,7 +152,7 @@ bool gen_block_invalid_nonce::generate(std::vector<test_event_entry>& events) co
     return false;
 
   // Create invalid nonce
-  wide_difficulty_type diffic = next_difficulty(timestamps, commulative_difficulties, DIFFICULTY_POW_TARGET);
+  wide_difficulty_type diffic = next_difficulty_1(timestamps, commulative_difficulties, DIFFICULTY_POW_TARGET);
   CHECK_AND_ASSERT_MES(diffic > 1, false, "diffic > 1 validation failed");
   const block& blk_last = boost::get<block>(events.back());
   uint64_t timestamp = blk_last.timestamp;
@@ -193,7 +193,7 @@ bool gen_block_unlock_time_is_low::generate(std::vector<test_event_entry>& event
   BLOCK_VALIDATION_INIT_GENERATE();
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
-  currency::set_tx_unlock_time(miner_tx, currency::get_tx_unlock_time(miner_tx) - 1);
+  currency::set_tx_unlock_time(miner_tx, currency::get_tx_max_unlock_time(miner_tx) - 1);
 
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_miner_tx, 0, 0, 0, crypto::hash(), 0, miner_tx);
@@ -209,7 +209,7 @@ bool gen_block_unlock_time_is_high::generate(std::vector<test_event_entry>& even
   BLOCK_VALIDATION_INIT_GENERATE();
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
-  set_tx_unlock_time(miner_tx, get_tx_unlock_time(miner_tx) + 1);
+  set_tx_unlock_time(miner_tx, get_tx_max_unlock_time(miner_tx) + 1);
 
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_miner_tx, 0, 0, 0, crypto::hash(), 0, miner_tx);

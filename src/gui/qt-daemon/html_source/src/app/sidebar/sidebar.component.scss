@@ -198,10 +198,18 @@
       padding: 0 3rem;
       width: 100%;
 
+      &.disabled {
+        cursor: url(../../assets/icons/not-allowed.svg), not-allowed;
+      }
+
       .icon {
         margin-right: 1.2rem;
         width: 1.7rem;
         height: 1.7rem;
+
+        &.contacts {
+          mask: url(../../assets/icons/contacts.svg) no-repeat center;
+        }
 
         &.settings {
           mask: url(../../assets/icons/settings.svg) no-repeat center;
@@ -245,7 +253,7 @@
     }
 
     .syncing, .loading {
-      line-height: 4rem;
+      line-height: 5rem;
     }
 
     .progress-bar-container {
@@ -271,7 +279,7 @@
           font-size: 1.3rem;
           line-height: 0.7rem;
           padding-left: 0.7rem;
-        }
+        }       
       }
 
       .loading {

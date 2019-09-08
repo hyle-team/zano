@@ -37,12 +37,24 @@
 
           .lock-transaction {
             position: absolute;
-            top: 50%;
             left: -2rem;
-            transform: translateY(-50%);
             mask: url(../../assets/icons/lock-transaction.svg) no-repeat center;
             width: 1.2rem;
             height: 1.2rem;
+            margin-right: 1.1rem;
+          }
+
+          .unlock-transaction {
+            position: absolute;
+            left: -2rem;
+            mask: url(../../assets/icons/unlock-transaction.svg) no-repeat center;
+            width: 1.2rem;
+            height: 1.2rem;
+            margin-right: 1.1rem;
+          }
+
+          .position {
+            position: static;
           }
 
           .status-transaction {

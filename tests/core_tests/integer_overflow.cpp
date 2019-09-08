@@ -8,6 +8,10 @@
 
 #include "integer_overflow.h"
 
+// TOTAL_MONEY_SUPPLY - total number coins to be generated
+#define TX_MAX_TRANSFER_AMOUNT                              ((uint64_t)(-1))
+
+
 using namespace epee;
 using namespace currency;
 
@@ -83,7 +87,7 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
 
   // Problem 1. Miner tx output overflow
   MAKE_MINER_TX_MANUALLY(miner_tx_0, blk_0);
-  split_miner_tx_outs(miner_tx_0, TOTAL_MONEY_SUPPLY);
+  split_miner_tx_outs(miner_tx_0, TX_MAX_TRANSFER_AMOUNT);
   block blk_1;
   if (!generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_miner_tx, 0, 0, 0, crypto::hash(), 0, miner_tx_0))
     return false;
@@ -91,23 +95,23 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
 
   // Problem 1. Miner tx outputs overflow
   MAKE_MINER_TX_MANUALLY(miner_tx_1, blk_1);
-  split_miner_tx_outs(miner_tx_1, TOTAL_MONEY_SUPPLY);
+  split_miner_tx_outs(miner_tx_1, TX_MAX_TRANSFER_AMOUNT);
   block blk_2;
   if (!generator.construct_block_manually(blk_2, blk_1, miner_account, test_generator::bf_miner_tx, 0, 0, 0, crypto::hash(), 0, miner_tx_1))
     return false;
   events.push_back(blk_2);
 
   REWIND_BLOCKS(events, blk_2r, blk_2, miner_account);
-  MAKE_TX_LIST_START(events, txs_0, miner_account, bob_account, TOTAL_MONEY_SUPPLY, blk_2r);
-  MAKE_TX_LIST(events, txs_0, miner_account, bob_account, TOTAL_MONEY_SUPPLY, blk_2r);
+  MAKE_TX_LIST_START(events, txs_0, miner_account, bob_account, TX_MAX_TRANSFER_AMOUNT, blk_2r);
+  MAKE_TX_LIST(events, txs_0, miner_account, bob_account, TX_MAX_TRANSFER_AMOUNT, blk_2r);
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2r, miner_account, txs_0);
   REWIND_BLOCKS(events, blk_3r, blk_3, miner_account);
 
   // Problem 2. total_fee overflow, block_reward overflow
   std::list<currency::transaction> txs_1;
   // Create txs with huge fee
-  txs_1.push_back(construct_tx_with_fee(events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TOTAL_MONEY_SUPPLY - MK_TEST_COINS(1)));
-  txs_1.push_back(construct_tx_with_fee(events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TOTAL_MONEY_SUPPLY - MK_TEST_COINS(1)));
+  txs_1.push_back(construct_tx_with_fee(events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
+  txs_1.push_back(construct_tx_with_fee(events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3r, miner_account, txs_1);
 
   return true;
@@ -143,10 +147,10 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
 
   std::vector<currency::tx_destination_entry> destinations;
   const account_public_address& bob_addr = bob_account.get_keys().m_account_address;
-  destinations.push_back(tx_destination_entry(TOTAL_MONEY_SUPPLY, bob_addr));
-  destinations.push_back(tx_destination_entry(TOTAL_MONEY_SUPPLY - 1, bob_addr));
+  destinations.push_back(tx_destination_entry(TX_MAX_TRANSFER_AMOUNT, bob_addr));
+  destinations.push_back(tx_destination_entry(TX_MAX_TRANSFER_AMOUNT - 1, bob_addr));
   // sources.front().amount = destinations[0].amount + destinations[2].amount + destinations[3].amount + TESTS_DEFAULT_FEE
-  destinations.push_back(tx_destination_entry(sources.front().amount - TOTAL_MONEY_SUPPLY - TOTAL_MONEY_SUPPLY + 1 - TESTS_DEFAULT_FEE, bob_addr));
+  destinations.push_back(tx_destination_entry(sources.front().amount - TX_MAX_TRANSFER_AMOUNT - TX_MAX_TRANSFER_AMOUNT + 1 - TESTS_DEFAULT_FEE, bob_addr));
 
   currency::transaction tx_1;
   std::vector<currency::attachment_v> attachments;
@@ -162,7 +166,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   for (size_t i = 0; i < tx_1.vout.size(); ++i)
   {
     auto& tx_1_out = tx_1.vout[i];
-    if (tx_1_out.amount < TOTAL_MONEY_SUPPLY - 1)
+    if (tx_1_out.amount < TX_MAX_TRANSFER_AMOUNT - 1)
       continue;
 
     append_tx_source_entry(sources, tx_1, i);
@@ -171,7 +175,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   destinations.clear();
   currency::tx_destination_entry de;
   de.addr.push_back(alice_account.get_keys().m_account_address);
-  de.amount = TOTAL_MONEY_SUPPLY - TESTS_DEFAULT_FEE;
+  de.amount = TX_MAX_TRANSFER_AMOUNT - TESTS_DEFAULT_FEE;
   destinations.push_back(de);
   destinations.push_back(de);
 

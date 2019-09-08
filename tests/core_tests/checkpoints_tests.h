@@ -7,7 +7,7 @@
 #include "chaingen.h"
 #include "random_helper.h"
 
-struct checkpoints_test : public test_chain_unit_enchanced
+struct checkpoints_test : virtual public test_chain_unit_enchanced
 {
   checkpoints_test();
 

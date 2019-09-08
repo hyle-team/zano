@@ -100,7 +100,9 @@ public:
   QString have_secure_app_data();
   QString drop_secure_app_data();
   QString get_secure_app_data(const QString& param);
-  QString store_secure_app_data(const QString& param, const QString& pass);
+  QString store_secure_app_data(const QString& param);
+  QString set_master_password(const QString& param);
+  QString check_master_password(const QString& param);
   QString get_app_data();
   QString store_app_data(const QString& param);
   QString get_default_user_dir(const QString& param);
@@ -130,6 +132,7 @@ public:
   QString restore_wallet(const QString& param);
   QString is_pos_allowed();
   QString store_to_file(const QString& path, const QString& buff);
+  QString load_from_file(const QString& path);
   QString is_file_exist(const QString& path);
   QString get_mining_estimate(const QString& obj);
   QString backup_wallet_keys(const QString& obj);
@@ -230,6 +233,7 @@ private:
   std::atomic<bool> m_backend_stopped_2;
   std::atomic<bool> m_system_shutdown;
 
+  std::string m_master_password;
 
 
   app_config m_config;

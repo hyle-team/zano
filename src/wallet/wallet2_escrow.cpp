@@ -26,7 +26,7 @@ bool wallet2::validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& w
 
   // I. validate escrow proposal tx
   const transaction& escrow_proposal_tx = wti.tx;
-  uint64_t escrow_proposal_tx_unlock_time = get_tx_unlock_time(escrow_proposal_tx);
+  uint64_t escrow_proposal_tx_unlock_time = get_tx_max_unlock_time(escrow_proposal_tx);
   LOC_CHK(escrow_proposal_tx_unlock_time == 0, "proposal tx unlock time is non-zero: " << escrow_proposal_tx_unlock_time);
 
   uint64_t escrow_proposal_expiration_time = get_tx_expiration_time(escrow_proposal_tx);
@@ -66,7 +66,7 @@ bool wallet2::validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& w
   uint64_t template_expiration_time = get_tx_expiration_time(prop.tx_template);
   LOC_CHK(template_expiration_time != 0, "template has no expiration time");
 
-  uint64_t template_unlock_time = get_tx_unlock_time(prop.tx_template);
+  uint64_t template_unlock_time = get_tx_max_unlock_time(prop.tx_template);
   LOC_CHK(template_unlock_time == 0, "template has non-zero unlock time: " << template_unlock_time);
 
   // (3/5) outputs
@@ -156,7 +156,7 @@ bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_n
   uint64_t expiration_time = get_tx_expiration_time(tx);
   LOC_CHK(expiration_time == 0, "tx has non-zero expiration time: " << expiration_time);
 
-  uint64_t unlock_time = get_tx_unlock_time(tx);
+  uint64_t unlock_time = get_tx_max_unlock_time(tx);
   LOC_CHK(unlock_time == 0, "tx has non-zero unlock time: " << unlock_time);
 
   tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
@@ -285,7 +285,7 @@ bool wallet2::validate_escrow_contract(const wallet_rpc::wallet_transfer_info& w
   uint64_t tx_expiration_time = get_tx_expiration_time(wti.tx);
   LOC_CHK(tx_expiration_time != 0, "no or zero expiration time specified");
 
-  uint64_t tx_unlock_time = get_tx_unlock_time(wti.tx);
+  uint64_t tx_unlock_time = get_tx_max_unlock_time(wti.tx);
   LOC_CHK(tx_unlock_time == 0, "non-zero unlock time: " << tx_unlock_time);
 
 #undef LOC_CHK
@@ -341,7 +341,7 @@ bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, co
   uint64_t expiration_time = get_tx_expiration_time(tx);
   LOC_CHK(expiration_time != 0, "tx has zero or not specified expiration time");
 
-  uint64_t unlock_time = get_tx_unlock_time(tx);
+  uint64_t unlock_time = get_tx_max_unlock_time(tx);
   LOC_CHK(unlock_time == 0, "tx has non-zero unlock time: " << unlock_time);
 
   tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
@@ -430,7 +430,7 @@ bool wallet2::validate_escrow_cancel_proposal(const wallet_rpc::wallet_transfer_
   uint64_t flags = get_tx_flags(wti.tx);
   LOC_CHK(flags == 0, "invalid tx flags: " << flags);
 
-  uint64_t unlock_time = get_tx_unlock_time(cancellation_request_tx);
+  uint64_t unlock_time = get_tx_max_unlock_time(cancellation_request_tx);
   LOC_CHK(unlock_time == 0, "invalid unlock time: " << unlock_time);
 
   uint64_t expiration_time = get_tx_expiration_time(cancellation_request_tx);
