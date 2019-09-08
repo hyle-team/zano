@@ -4861,7 +4861,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       CHECK_AND_ASSERT_MES_NO_RET(add_res, "handle_block_to_main_chain: failed to add transaction back to transaction pool");
       purge_block_data_from_blockchain(bl, tx_processed_count);
       add_block_as_invalid(bl, id);
-      LOG_PRINT_L0("Block with id " << id << " added as invalid becouse of wrong inputs in transactions");
+      LOG_PRINT_L0("Block with id " << id << " added as invalid because of wrong inputs in transactions");
       bvc.m_verification_failed = true;
       return false;
     }
@@ -5361,7 +5361,7 @@ bool blockchain_storage::build_stake_modifier(stake_modifier_type& sm, const alt
   else
   {
     bool r = string_tools::parse_tpod_from_hex_string(POS_STARTER_KERNEL_HASH, sm.last_pos_kernel_id);
-    CHECK_AND_ASSERT_MES(r, false, "Failed to parse POS_STARTER_MODFIFIER");
+    CHECK_AND_ASSERT_MES(r, false, "Failed to parse POS_STARTER_KERNEL_HASH");
   }
 
   sm.last_pow_id = get_block_hash(pbei_last_pow->bl);
