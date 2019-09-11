@@ -6,6 +6,21 @@
 #include "chaingen.h"
 #include "random_helper.h"
 
+random_state_test_restorer::random_state_test_restorer()
+{
+  crypto::random_prng_get_state(&m_state, sizeof m_state);
+}
+
+random_state_test_restorer::~random_state_test_restorer()
+{
+  crypto::random_prng_set_state(&m_state, sizeof m_state);
+}
+
+void random_state_test_restorer::reset_random(uint64_t seed /* = 0 */)
+{
+  crypto::random_prng_initialize_with_seed(seed);
+}
+
 std::string get_random_text(size_t len)
 {
   static const char     text_chars[]    = "abcdefghijklmnopqrstuvwxyz" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "0123456789" "~!@#$%^&*()-=_+\\/?,.<>|{}[]`';:\" ";
