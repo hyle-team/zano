@@ -60,7 +60,7 @@ bool random_state_manupulation_test()
   // NOTE: If the test fails, it's most likely that random state permutation procedure was changed OR the state can't be correctly stored/loaded.
 
   static const uint64_t my_own_random_seed = 4669201609102990671;
-  static const char*    my_random_str = "18b79ebb56744e9bafa462631c6f7d760af2b788";
+  static const char*    my_random_str = "760af2b78894c6a441731e2b354011da6ac98ddc";
   static const size_t   rnd_buf_len = 20;
 
   uint64_t first_random_after_state_saved = 0;

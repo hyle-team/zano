@@ -4,6 +4,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#define USE_INSECURE_RANDOM_RPNG_ROUTINES // turns on pseudorandom number generator manupulations for tests
+
 #include <vector>
 #include <iostream>
 #include <sstream>
@@ -1030,44 +1032,46 @@ namespace
 
 bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, const currency::account_keys& acc_keys)
 {
-    for(const block& blk : blockchain)
+  for (const block& blk : blockchain)
+  {
+    volatile uint64_t height = get_block_height(blk);
+
+    std::vector<const transaction*> vtx;
+    vtx.push_back(&blk.miner_tx);
+
+    for (const crypto::hash &h : blk.tx_hashes)
     {
-        std::vector<const transaction*> vtx;
-        vtx.push_back(&blk.miner_tx);
-
-        for(const crypto::hash &h : blk.tx_hashes)
-        {
-            const map_hash2tx_t::const_iterator cit = mtx.find(h);
-            CHECK_AND_ASSERT_MES(cit != mtx.end(), false, "block at height " << get_block_height(blk) << " contains a reference to unknown tx " << h);
-            vtx.push_back(cit->second);
-        }
-
-        for (size_t i = 0; i < vtx.size(); i++)
-        {
-            const transaction &tx = *vtx[i];
-            crypto::key_derivation derivation;
-            bool r = generate_key_derivation(get_tx_pub_key_from_extra(tx), acc_keys.m_view_secret_key, derivation);
-            CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
-
-            for (size_t j = 0; j < tx.vout.size(); ++j)
-            {
-                const tx_out &out = tx.vout[j];
-                output_index oi(out.target, out.amount, boost::get<txin_gen>(*blk.miner_tx.vin.begin()).height, i, j, &blk, vtx[i]);
-
-                if (out.target.type() == typeid(txout_to_key))
-                {
-                    outs[out.amount].push_back(oi);
-                    size_t tx_global_idx = outs[out.amount].size() - 1;
-                    outs[out.amount][tx_global_idx].idx = tx_global_idx;
-                    // Is out to me?
-                    if (is_out_to_acc(acc_keys, boost::get<txout_to_key>(out.target), derivation, j))
-                        outs_mine[out.amount].push_back(tx_global_idx);
-                }
-            }
-        }
+      const map_hash2tx_t::const_iterator cit = mtx.find(h);
+      CHECK_AND_ASSERT_MES(cit != mtx.end(), false, "block at height " << get_block_height(blk) << " contains a reference to unknown tx " << h);
+      vtx.push_back(cit->second);
     }
 
-    return true;
+    for (size_t i = 0; i < vtx.size(); i++)
+    {
+      const transaction &tx = *vtx[i];
+      crypto::key_derivation derivation;
+      bool r = generate_key_derivation(get_tx_pub_key_from_extra(tx), acc_keys.m_view_secret_key, derivation);
+      CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
+
+      for (size_t j = 0; j < tx.vout.size(); ++j)
+      {
+        const tx_out &out = tx.vout[j];
+        output_index oi(out.target, out.amount, boost::get<txin_gen>(*blk.miner_tx.vin.begin()).height, i, j, &blk, vtx[i]);
+
+        if (out.target.type() == typeid(txout_to_key))
+        {
+          outs[out.amount].push_back(oi);
+          size_t tx_global_idx = outs[out.amount].size() - 1;
+          outs[out.amount][tx_global_idx].idx = tx_global_idx;
+          // Is out to me?
+          if (is_out_to_acc(acc_keys, boost::get<txout_to_key>(out.target), derivation, j))
+            outs_mine[out.amount].push_back(tx_global_idx);
+        }
+      }
+    }
+  }
+
+  return true;
 }
 
 bool init_spent_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, const currency::account_keys& from)
