@@ -659,27 +659,26 @@ namespace tools
       {
         return bdb.size(m_h);
       }
-      size_t clear()
+      
+      bool clear()
       {
-        bdb.clear(m_h);
+        bool result = bdb.clear(m_h);
         m_isolation.isolated_write_access<bool>([&](){
           size_cache_valid = false;
           return true;
         });
-        return true;
+        return result;
       }
 
       bool erase_validate(const t_key& k)
       {
-        auto res_ptr = this->get(k);
-        bdb.erase(m_h, k);
+        bool result = bdb.erase(m_h, k);
         m_isolation.isolated_write_access<bool>([&](){
           size_cache_valid = false;
           return true;
         });
-        return static_cast<bool>(res_ptr);
+        return result;
       }
-
 
       void erase(const t_key& k)
       {
@@ -861,13 +860,10 @@ namespace tools
 
       operator t_value() const 
       {
-        static_assert(std::is_pod<t_value>::value, "t_value must be a POD type.");
+        std::shared_ptr<const t_value> value_ptr = m_accessor.template explicit_get<t_key, t_value, access_strategy_selector<is_t_strategy> >(m_key);
+        if (value_ptr.get())
+          return *value_ptr.get();
 
-        std::shared_ptr<const t_value> vptr = m_accessor.template explicit_get<t_key, t_value, access_strategy_selector<false> >(m_key);
-        if (vptr.get())
-        {
-          return *vptr.get();
-        }
         return AUTO_VAL_INIT(t_value());
       }
     };
