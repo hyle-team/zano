@@ -164,7 +164,7 @@ namespace currency
         else
         {
           // this tx has no fee 
-          LOG_ERROR("Transaction with id= " << id << " has too small fee: " << tx_fee << ", expected fee: " << m_blockchain.get_core_runtime_config().tx_pool_min_fee);
+          LOG_PRINT_RED_L0("Transaction with id= " << id << " has too small fee: " << tx_fee << ", expected fee: " << m_blockchain.get_core_runtime_config().tx_pool_min_fee);
           tvc.m_verification_failed = false;
           tvc.m_should_be_relayed = false;
           tvc.m_added_to_pool = false;

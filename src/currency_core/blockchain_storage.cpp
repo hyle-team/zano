@@ -156,7 +156,6 @@ void blockchain_storage::init_options(boost::program_options::options_descriptio
   command_line::add_arg(desc, arg_db_cache_l2);
 }
 //------------------------------------------------------------------
-
 uint64_t blockchain_storage::get_block_h_older_then(uint64_t timestamp) const 
 {
   // get avarage block position
@@ -224,7 +223,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
 
   m_config_folder = config_folder;
 
-  // remove old incompartible DB
+  // remove old incompatible DB
   const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
   if (boost::filesystem::exists(old_db_folder_path))
   {
