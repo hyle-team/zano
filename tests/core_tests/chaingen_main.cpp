@@ -1024,3 +1024,11 @@ void tx2log(const currency::transaction& tx)
   currency::transaction ltx = tx;
   LOG_PRINT("!dbg transaction: " << currency::get_transaction_hash(ltx) << ENDL << currency::obj_to_json_str(ltx), LOG_LEVEL_0);
 }
+
+const char* amount2log(const uint64_t amount)
+{
+  static std::string s;
+  s = currency::print_money_brief(amount);
+  LOG_PRINT("!dbg amount: " << s, LOG_LEVEL_0);
+  return s.c_str();
+}

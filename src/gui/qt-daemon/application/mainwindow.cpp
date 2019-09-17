@@ -1037,7 +1037,7 @@ QString MainWindow::get_secure_app_data(const QString& param)
   const app_data_file_binary_header* phdr = reinterpret_cast<const app_data_file_binary_header*>(app_data_buff.data());
   if (phdr->m_signature != APP_DATA_FILE_BINARY_SIGNATURE)
   {
-    LOG_ERROR("password missmatch: provided pass: " << pwd.pass);
+    LOG_ERROR("password missmatch");
     view::api_response ar;
     ar.error_code = API_RETURN_CODE_WRONG_PASSWORD;
     return MAKE_RESPONSE(ar);
