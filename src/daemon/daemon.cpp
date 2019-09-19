@@ -87,6 +87,13 @@ struct core_critical_error_handler_t : public currency::i_critical_error_handler
   bool dont_stop_on_low_space;
 };
 
+void terminate_handler_func()
+{
+  LOG_ERROR("\n\nTERMINATE HANDLER\n"); // should print callstack
+  std::fflush(nullptr); // all open output streams are flushed
+  std::abort(); // default terminate handler's behavior
+}
+
 int main(int argc, char* argv[])
 {
   try
@@ -111,6 +118,8 @@ int main(int argc, char* argv[])
 
   // setup custom callstack retrieving function
   epee::misc_utils::get_callstack(tools::get_callstack);
+
+  std::set_terminate(&terminate_handler_func);
 
   po::options_description desc_cmd_only("Command line options");
   po::options_description desc_cmd_sett("Command line options and settings options", 130, 83);
