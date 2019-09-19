@@ -119,6 +119,7 @@ int main(int argc, char* argv[])
   // setup custom callstack retrieving function
   epee::misc_utils::get_callstack(tools::get_callstack);
 
+  // setup custom terminate functions
   std::set_terminate(&terminate_handler_func);
 
   po::options_description desc_cmd_only("Command line options");
