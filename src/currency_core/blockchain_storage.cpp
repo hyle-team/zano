@@ -1820,10 +1820,19 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
     wide_difficulty_type main_pow_diff_begin = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), connection_point.height - 1, false);
     main_cumul_diff.pow_diff = main_pow_diff_end - main_pow_diff_begin;
 
-    //TODO: measurment of precise cumulative difficult
+    //TODO: measurement of precise cumulative difficult
     wide_difficulty_type alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
     wide_difficulty_type main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
-
+    LOG_PRINT_L1("[FORK_CHOICE]: " << ENDL 
+      << "difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
+      << "difficulty_pos_at_split_point:" << difficulty_pos_at_split_point << ENDL
+      << "alt_cumul_diff.pow_diff:" << alt_cumul_diff.pow_diff << ENDL
+      << "alt_cumul_diff.pos_diff:" << alt_cumul_diff.pos_diff << ENDL
+      << "main_cumul_diff.pow_diff:" << main_cumul_diff.pow_diff << ENDL
+      << "main_cumul_diff.pos_diff:" << main_cumul_diff.pos_diff << ENDL
+      << "alt:" << alt << ENDL
+      << "main:" << main << ENDL
+    );
     if (main < alt)
       return true;
     else if (main > alt)
@@ -1838,7 +1847,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       if (std::memcmp(&main_chain_bei.stake_hash, &proof_alt, sizeof(main_chain_bei.stake_hash)) >= 0)
         return false;
 
-      LOG_PRINT_L2("[is_reorganize_required]:TRUE, \"by order of memcmp\" main_stake_hash:" << &main_chain_bei.stake_hash << ", alt_stake_hash" << proof_alt);
+      LOG_PRINT_L1("[is_reorganize_required]:TRUE, \"by order of memcmp\" main_stake_hash:" << &main_chain_bei.stake_hash << ", alt_stake_hash" << proof_alt);
       return true;
     }
   }
