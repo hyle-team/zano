@@ -502,8 +502,15 @@ private:
     bool r = m_srv.get_payload_object().get_core().get_blockchain_storage().get_main_blocks_rpc_details(height, 1, false, blocks);
     if (r && blocks.size())
     {
+      currency::block b = AUTO_VAL_INIT(b);
+      m_srv.get_payload_object().get_core().get_blockchain_storage().get_block_by_height(height, b);
+      currency::blobdata blob = block_to_blob(b);
+      std::string block_hex = epee::string_tools::buff_to_hex_nodelimer(blob);
+
       currency::block_rpc_extended_info& rbei = blocks.back();
-      LOG_PRINT_GREEN("------------------ block_id: " << rbei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(rbei), LOG_LEVEL_0);
+      LOG_PRINT_GREEN("------------------ block_id: " << rbei.id << " ------------------" << 
+        ENDL << epee::serialization::store_t_to_json(rbei) << ENDL
+        << " ------------------ hex_blob: " << ENDL << block_hex, LOG_LEVEL_0);
     }
     else
     {
@@ -526,8 +533,14 @@ private:
 
     if (r)
     {
+      currency::block b = AUTO_VAL_INIT(b);
+      m_srv.get_payload_object().get_core().get_blockchain_storage().get_block_by_hash(block_hash, b);
+      currency::blobdata blob = block_to_blob(b);
+      std::string block_hex = epee::string_tools::buff_to_hex_nodelimer(blob);
       //      currency::block& block = bei.bl;
-      LOG_PRINT_GREEN("------------------ block_id: " << bei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(bei), LOG_LEVEL_0);
+      LOG_PRINT_GREEN("------------------ block_id: " << bei.id << " ------------------" << ENDL 
+        << epee::serialization::store_t_to_json(bei) << ENDL 
+        << " ------------------ hex_blob: " << ENDL << block_hex, LOG_LEVEL_0);
     }
     else
     {
