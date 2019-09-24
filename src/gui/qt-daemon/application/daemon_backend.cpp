@@ -66,6 +66,13 @@ daemon_backend::~daemon_backend()
   stop();
 }
 
+void terminate_handler_func()
+{
+  LOG_ERROR("\n\nTERMINATE HANDLER\n"); // should print callstack
+  std::fflush(nullptr); // all open output streams are flushed
+  std::abort(); // default terminate handler's behavior
+}
+
 bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
 {
   m_stop_singal_sent = false;
@@ -87,6 +94,9 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
 
   // setup custom callstack retrieving function
   epee::misc_utils::get_callstack(tools::get_callstack);
+
+  // setup custom terminate functions
+  std::set_terminate(&terminate_handler_func);
 
   //#if !defined(NDEBUG)
   //  log_space::log_singletone::add_logger(LOGGER_DEBUGGER, nullptr, nullptr);
