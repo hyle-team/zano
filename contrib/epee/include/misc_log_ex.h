@@ -65,6 +65,7 @@ DISABLE_VS_WARNINGS(4100)
 
 #include "syncobj.h"
 #include "sync_locked_object.h"
+#include "string_coding.h"
 
 
 #define LOG_LEVEL_SILENT     -1
@@ -696,11 +697,11 @@ namespace log_space
   public:
     typedef std::map<std::string, std::ofstream*> named_log_streams;
 
-    file_output_stream( std::string default_log_file_name, std::string log_path )
+    file_output_stream( const std::string& default_log_file_name, const std::string& log_path )
     {
       m_default_log_filename = default_log_file_name;
       m_max_logfile_size = 0;
-      m_default_log_path = log_path;
+      m_default_log_path_w = epee::string_encoding::utf8_to_wstring(log_path);
       m_pdefault_file_stream = add_new_stream_and_open(default_log_file_name.c_str());
     }
 
@@ -718,20 +719,21 @@ namespace log_space
     }
   private:
     named_log_streams m_log_file_names;
-    std::string       m_default_log_path;
+    std::wstring      m_default_log_path_w;
     std::ofstream*    m_pdefault_file_stream;
     std::string     m_log_rotate_cmd;
     std::string     m_default_log_filename;
     uint64_t   m_max_logfile_size;
 
 
+    // gets utf-8 encoded string
     std::ofstream*    add_new_stream_and_open(const char* pstream_name)
     {
       //log_space::rotate_log_file((m_default_log_path + "\\" + pstream_name).c_str());
       boost::system::error_code ec;
-      boost::filesystem::create_directories(m_default_log_path, ec);
+      boost::filesystem::create_directories(m_default_log_path_w, ec);
       std::ofstream* pstream = (m_log_file_names[pstream_name] = new std::ofstream);
-      std::string target_path = m_default_log_path + "/" + pstream_name;
+      std::wstring target_path = m_default_log_path_w + L"/" + epee::string_encoding::utf8_to_wstring(pstream_name);
       pstream->open( target_path.c_str(), std::ios_base::out | std::ios::app /*ios_base::trunc */);
       if(pstream->fail())
         return NULL;
@@ -769,6 +771,7 @@ namespace log_space
       m_target_file_stream->write(buffer, buffer_len );
       m_target_file_stream->flush();
 
+      /*
       if(m_max_logfile_size)
       {
         std::ofstream::pos_type pt =  m_target_file_stream->tellp();
@@ -823,7 +826,7 @@ namespace log_space
             return false;
         }
       }
-
+      */
       return  true;
     }
     int get_type(){return LOGGER_FILE;}
