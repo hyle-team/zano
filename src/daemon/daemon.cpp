@@ -122,6 +122,21 @@ int main(int argc, char* argv[])
   // setup custom terminate functions
   std::set_terminate(&terminate_handler_func);
 
+  ////
+  
+  std::string utf8_str = "\xd0\x92\xd0\xb0\xd1\x81\xd0\xb8\xd1\x81\xd1\x83\xd0\xb0\xd0\xbb\xd0\xb8\xd1\x9d";
+
+  boost::system::error_code ec;
+
+  boost::filesystem::create_directory(boost::filesystem::path(epee::string_encoding::utf8_to_wstring(std::string("utf8_to_wstring_") + utf8_str)), ec);
+  std::cout << "utf8_to_wstring: ec = " << ec << std::endl;
+
+  boost::filesystem::create_directory(boost::filesystem::path(std::string("utf8_") + utf8_str), ec);
+  std::cout << "utf8: ec = " << ec << std::endl;
+
+  return 0;
+  
+  ////
   po::options_description desc_cmd_only("Command line options");
   po::options_description desc_cmd_sett("Command line options and settings options", 130, 83);
 
