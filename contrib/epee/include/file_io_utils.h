@@ -52,6 +52,7 @@
 #endif
 
 #include "include_base_utils.h"
+#include "string_coding.h"
 
 namespace epee
 {
@@ -380,16 +381,18 @@ namespace file_io_utils
   typedef int native_filesystem_handle;
 #endif
 
+  // uses UTF-8 for unicode names for all systems
   inline bool open_and_lock_file(const std::string file_path, native_filesystem_handle& h_file)
   {
 #ifdef WIN32
-    h_file = ::CreateFileA(file_path.c_str(),                // name of the write
-      GENERIC_WRITE,          // open for writing
-      0,                      // do not share
-      NULL,                   // default security
-      OPEN_ALWAYS,             // create new file only
-      FILE_ATTRIBUTE_NORMAL,  // normal file
-      NULL);                  // no attr. template
+    std::wstring file_path_w = epee::string_encoding::utf8_to_wstring(file_path);
+    h_file = ::CreateFileW(file_path_w.c_str(), // name of the file
+      GENERIC_WRITE,                            // open for writing
+      0,                                        // do not share
+      NULL,                                     // default security
+      OPEN_ALWAYS,                              // create new file only
+      FILE_ATTRIBUTE_NORMAL,                    // normal file
+      NULL);                                    // no attr. template
     if (h_file == INVALID_HANDLE_VALUE)
       return false;
     else
