@@ -65,6 +65,7 @@ DISABLE_VS_WARNINGS(4100)
 
 #include "syncobj.h"
 #include "sync_locked_object.h"
+#include "string_coding.h"
 
 
 #define LOG_LEVEL_SILENT     -1
@@ -694,13 +695,13 @@ namespace log_space
   class file_output_stream : public ibase_log_stream
   {
   public:
-    typedef std::map<std::string, std::ofstream*> named_log_streams;
+    typedef std::map<std::string, boost::filesystem::ofstream*> named_log_streams;
 
-    file_output_stream( std::string default_log_file_name, std::string log_path )
+    file_output_stream( const std::string& default_log_file_name, const std::string& log_path )
     {
       m_default_log_filename = default_log_file_name;
       m_max_logfile_size = 0;
-      m_default_log_path = log_path;
+      m_default_log_path_w = epee::string_encoding::utf8_to_wstring(log_path);
       m_pdefault_file_stream = add_new_stream_and_open(default_log_file_name.c_str());
     }
 
@@ -718,20 +719,22 @@ namespace log_space
     }
   private:
     named_log_streams m_log_file_names;
-    std::string       m_default_log_path;
-    std::ofstream*    m_pdefault_file_stream;
+    std::wstring      m_default_log_path_w;
+    boost::filesystem::ofstream*    m_pdefault_file_stream;
     std::string     m_log_rotate_cmd;
     std::string     m_default_log_filename;
     uint64_t   m_max_logfile_size;
 
 
-    std::ofstream*    add_new_stream_and_open(const char* pstream_name)
+    // gets utf-8 encoded string
+    boost::filesystem::ofstream*    add_new_stream_and_open(const char* pstream_name)
     {
       //log_space::rotate_log_file((m_default_log_path + "\\" + pstream_name).c_str());
       boost::system::error_code ec;
-      boost::filesystem::create_directories(m_default_log_path, ec);
-      std::ofstream* pstream = (m_log_file_names[pstream_name] = new std::ofstream);
-      std::string target_path = m_default_log_path + "/" + pstream_name;
+      boost::filesystem::create_directories(m_default_log_path_w, ec);
+      boost::filesystem::ofstream* pstream = (m_log_file_names[pstream_name] = new boost::filesystem::ofstream);
+      std::wstring target_path = m_default_log_path_w + L"/" + epee::string_encoding::utf8_to_wstring(pstream_name);
+      
       pstream->open( target_path.c_str(), std::ios_base::out | std::ios::app /*ios_base::trunc */);
       if(pstream->fail())
         return NULL;
@@ -754,7 +757,7 @@ namespace log_space
 
     virtual bool out_buffer( const char* buffer, int buffer_len, int log_level, int color, const char* plog_name = NULL )
     {
-      std::ofstream*    m_target_file_stream = m_pdefault_file_stream;
+      boost::filesystem::ofstream*    m_target_file_stream = m_pdefault_file_stream;
       if(plog_name)
       { //find named stream
         named_log_streams::iterator it = m_log_file_names.find(plog_name);
@@ -769,9 +772,10 @@ namespace log_space
       m_target_file_stream->write(buffer, buffer_len );
       m_target_file_stream->flush();
 
+      /*
       if(m_max_logfile_size)
       {
-        std::ofstream::pos_type pt =  m_target_file_stream->tellp();
+        boost::filesystem::ofstream::pos_type pt =  m_target_file_stream->tellp();
         uint64_t current_sz = pt;
         if(current_sz > m_max_logfile_size)
         {
@@ -818,12 +822,13 @@ namespace log_space
             misc_utils::call_sys_cmd(m_log_rotate_cmd_local_copy);
           }
 
-          m_target_file_stream->open( (m_default_log_path + "/" + log_file_name).c_str(), std::ios_base::out | std::ios::app /*ios_base::trunc */);
+
+          m_target_file_stream->open( (m_default_log_path + "/" + log_file_name).c_str(), std::ios_base::out | std::ios::app / * ios_base::trunc * /);
           if(m_target_file_stream->fail())
             return false;
         }
       }
-
+      */
       return  true;
     }
     int get_type(){return LOGGER_FILE;}
