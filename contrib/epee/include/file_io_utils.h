@@ -223,13 +223,23 @@ namespace file_io_utils
 		return str_result;
 	}
 #endif
+
+  inline const std::wstring& convert_utf8_to_wstring_if_needed(const std::wstring& s)
+  {
+    return s;
+  }
+
+  inline std::wstring convert_utf8_to_wstring_if_needed(const std::string& s)
+  {
+    return epee::string_encoding::utf8_to_wstring(s);
+  }
 	 
   template<class t_string>
   bool is_file_exist(const t_string& path)
-	{
-		boost::filesystem::path p(path);
-		return boost::filesystem::exists(p);
-	}
+  {
+    boost::filesystem::path p(convert_utf8_to_wstring_if_needed(path));
+    return boost::filesystem::exists(p);
+  }
 
 	/*
 	inline 
@@ -265,7 +275,7 @@ namespace file_io_utils
       //std::ofstream fstream;
       boost::filesystem::ofstream fstream;
       fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-      fstream.open(path_to_file, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+      fstream.open(convert_utf8_to_wstring_if_needed(path_to_file), std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
       fstream << str;
       fstream.close();
       return true;
@@ -297,7 +307,7 @@ namespace file_io_utils
     {
       boost::filesystem::ifstream  fstream;
       //fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-      fstream.open(path_to_file, std::ios_base::binary | std::ios_base::in | std::ios::ate);
+      fstream.open(convert_utf8_to_wstring_if_needed(path_to_file), std::ios_base::binary | std::ios_base::in | std::ios::ate);
       if (!fstream.good())
         return false;
       std::ifstream::pos_type file_size = fstream.tellg();
@@ -354,7 +364,7 @@ namespace file_io_utils
 	bool get_file_time(const std::string& path_to_file, OUT time_t& ft)
 	{
 		boost::system::error_code ec;
-		ft = boost::filesystem::last_write_time(boost::filesystem::path(path_to_file), ec);
+		ft = boost::filesystem::last_write_time(epee::string_encoding::utf8_to_wstring(path_to_file), ec);
 		if(!ec)
 			return true;
 		else
@@ -365,7 +375,7 @@ namespace file_io_utils
 		bool set_file_time(const std::string& path_to_file, const time_t& ft)
 	{
 		boost::system::error_code ec;
-		boost::filesystem::last_write_time(boost::filesystem::path(path_to_file), ft, ec);
+		boost::filesystem::last_write_time(epee::string_encoding::utf8_to_wstring(path_to_file), ft, ec);
 		if(!ec)
 			return true;
 		else
@@ -468,20 +478,21 @@ namespace file_io_utils
   bool copy_file(const std::string& source, const std::string& destination)
   {
     boost::system::error_code ec;
-    boost::filesystem::copy_file(source, destination, ec);
+    boost::filesystem::copy_file(epee::string_encoding::utf8_to_wstring(source), epee::string_encoding::utf8_to_wstring(destination), ec);
     if (ec)
       return false;
     else
       return true;
   }
+
 	inline
 		bool append_string_to_file(const std::string& path_to_file, const std::string& str)
 	{
 		try
 		{
-			std::ofstream fstream;
+			boost::filesystem::ofstream fstream;
 			fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-			fstream.open(path_to_file.c_str(), std::ios_base::binary | std::ios_base::out | std::ios_base::app);
+			fstream.open(epee::string_encoding::utf8_to_wstring(path_to_file), std::ios_base::binary | std::ios_base::out | std::ios_base::app);
 			fstream << str;
 			fstream.close();
 			return true;
@@ -553,7 +564,7 @@ namespace file_io_utils
 		{
 
 			boost::filesystem::directory_iterator end_itr; // default construction yields past-the-end
-			for ( boost::filesystem::directory_iterator itr( path ); itr != end_itr; ++itr )
+			for ( boost::filesystem::directory_iterator itr( epee::string_encoding::utf8_to_wstring(path) ); itr != end_itr; ++itr )
 			{
 				if ( only_files && boost::filesystem::is_directory(itr->status()) )
 				{
