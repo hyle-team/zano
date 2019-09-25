@@ -1232,7 +1232,7 @@ QString MainWindow::have_secure_app_data()
   view::api_response ar = AUTO_VAL_INIT(ar);
 
   boost::system::error_code ec;
-  if (boost::filesystem::exists(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME, ec))
+  if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME), ec))
     ar.error_code = API_RETURN_CODE_TRUE;
   else
     ar.error_code = API_RETURN_CODE_FALSE;
@@ -1240,6 +1240,7 @@ QString MainWindow::have_secure_app_data()
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+
 QString MainWindow::drop_secure_app_data()
 {
   TRY_ENTRY();
@@ -1247,13 +1248,14 @@ QString MainWindow::drop_secure_app_data()
   view::api_response ar = AUTO_VAL_INIT(ar);
 
   boost::system::error_code ec;
-  if (boost::filesystem::remove(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME, ec))
+  if (boost::filesystem::remove(epee::string_encoding::utf8_to_wstring(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME), ec))
     ar.error_code = API_RETURN_CODE_TRUE;
   else
     ar.error_code = API_RETURN_CODE_FALSE;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+
 QString MainWindow::get_all_aliases()
 {
   TRY_ENTRY();

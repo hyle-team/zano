@@ -154,8 +154,8 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
     m_data_dir = command_line::get_arg(m_vm, command_line::arg_data_dir);
     std::string config = command_line::get_arg(m_vm, command_line::arg_config_file);
 
-    boost::filesystem::path data_dir_path(m_data_dir);
-    boost::filesystem::path config_path(config);
+    boost::filesystem::path data_dir_path(epee::string_encoding::utf8_to_wstring(m_data_dir));
+    boost::filesystem::path config_path(epee::string_encoding::utf8_to_wstring(config));
     if (!config_path.has_parent_path())
     {
       config_path = data_dir_path / config_path;
