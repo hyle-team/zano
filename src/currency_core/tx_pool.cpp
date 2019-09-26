@@ -1125,10 +1125,10 @@ namespace currency
 
     // remove old incompartible DB
     const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME_OLD;
-    if (boost::filesystem::exists(old_db_folder_path))
+    if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
     {
       LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
-      boost::filesystem::remove_all(old_db_folder_path);
+      boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
     }
 
     const std::string db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME;
@@ -1142,7 +1142,7 @@ namespace currency
       {
         // if DB could not be opened -- try to remove the whole folder and re-open DB
         LOG_PRINT_YELLOW("Failed to initialize database in folder: " << db_folder_path << ", first attempt", LOG_LEVEL_0);
-        boost::filesystem::remove_all(db_folder_path);
+        boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
         res = m_db.open(db_folder_path, cache_size_l1);
         CHECK_AND_ASSERT_MES(res, false, "Failed to initialize database in folder: " << db_folder_path << ", second attempt");
       }
@@ -1182,7 +1182,7 @@ namespace currency
         m_db_alias_addresses.deinit();
         m_db_solo_options.deinit();
         m_db.close();
-        size_t files_removed = boost::filesystem::remove_all(db_folder_path);
+        size_t files_removed = boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
         LOG_PRINT_L1(files_removed << " files at " << db_folder_path << " removed");
 
         // try to re-create DB and re-init containers

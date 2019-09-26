@@ -172,8 +172,8 @@ int main(int argc, char* argv[])
     std::string data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
     std::string config = command_line::get_arg(vm, command_line::arg_config_file);
 
-    boost::filesystem::path data_dir_path(data_dir);
-    boost::filesystem::path config_path(config);
+    boost::filesystem::path data_dir_path(epee::string_encoding::utf8_to_wstring(data_dir));
+    boost::filesystem::path config_path(epee::string_encoding::utf8_to_wstring(config));
     if (!config_path.has_parent_path())
     {
       config_path = data_dir_path / config_path;
