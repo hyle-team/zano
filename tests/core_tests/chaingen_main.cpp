@@ -947,6 +947,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_coinbase);
     GENERATE_AND_PLAY(hard_fork_1_chain_switch_pow_only);
     GENERATE_AND_PLAY(hard_fork_1_checkpoint_basic_test);
+    GENERATE_AND_PLAY(hard_fork_1_pos_locked_height_vs_time);
     //GENERATE_AND_PLAY(gen_block_reward); */
 
 
@@ -1022,4 +1023,12 @@ void tx2log(const currency::transaction& tx)
 {
   currency::transaction ltx = tx;
   LOG_PRINT("!dbg transaction: " << currency::get_transaction_hash(ltx) << ENDL << currency::obj_to_json_str(ltx), LOG_LEVEL_0);
+}
+
+const char* amount2log(const uint64_t amount)
+{
+  static std::string s;
+  s = currency::print_money_brief(amount);
+  LOG_PRINT("!dbg amount: " << s, LOG_LEVEL_0);
+  return s.c_str();
 }

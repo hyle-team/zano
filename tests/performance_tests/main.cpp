@@ -68,7 +68,7 @@ int main(int argc, char** argv)
   */
   //TEST_PERFORMANCE0(test_is_out_to_acc);
   //TEST_PERFORMANCE0(test_generate_key_image_helper);
-  //TEST_PERFORMANCE0(test_generate_key_derivation);
+  TEST_PERFORMANCE0(test_generate_key_derivation);
   //TEST_PERFORMANCE0(test_generate_key_image);
   //TEST_PERFORMANCE0(test_derive_public_key);
   //TEST_PERFORMANCE0(test_derive_secret_key);

@@ -108,6 +108,8 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.variablesService.dataIsLoaded = true;
         this.variablesService.startCountdown();
         this.variablesService.appPass = appPass;
+        const isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
+
         if (this.variablesService.wallets.length) {
           this.ngZone.run(() => {
             this.router.navigate(['/wallet/' + this.variablesService.wallets[0].wallet_id]);
@@ -131,7 +133,7 @@ export class LoginComponent implements OnInit, OnDestroy {
           }
         }
         if (!data.hasOwnProperty('wallets') && !data.hasOwnProperty('contacts')) {
-          if (data.length !== 0) {
+          if (data.length !== 0  && !isEmptyObject) {
             this.getWalletData(data);
           } else {
             this.ngZone.run(() => {

@@ -20,6 +20,8 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <string>
+#include <sstream>
 
 namespace ethash
 {
@@ -157,4 +159,33 @@ const epoch_context& get_global_epoch_context(int epoch_number);
 
 /// Get global shared epoch context with full dataset initialized.
 std::shared_ptr<epoch_context_full> get_global_epoch_context_full(int epoch_number);
+
+typedef int (custom_log_level_function)();
+typedef void (custom_log_function)(const std::string& m, bool add_callstack);
+
+custom_log_level_function*& access_custom_log_level_function();
+custom_log_function*& access_custom_log_function();
+int get_custom_log_level();
+void custom_log(const std::string& m, bool add_callstack);
+
+#define LOG_CUSTOM(msg, level)                  \
+{                                               \
+  if (level <= ethash::get_custom_log_level())  \
+  {                                             \
+    std::stringstream ss;                       \
+    ss << msg << std::endl;                     \
+    ethash::custom_log(ss.str(), false);        \
+  }                                             \
+}
+
+#define LOG_CUSTOM_WITH_CALLSTACK(msg, level)   \
+{                                               \
+  if (level <= ethash::get_custom_log_level())  \
+  {                                             \
+    std::stringstream ss;                       \
+    ss << msg << std::endl;                     \
+    ethash::custom_log(ss.str(), true);         \
+  }                                             \
+}
+
 }  // namespace ethash
