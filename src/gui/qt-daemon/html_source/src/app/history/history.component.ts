@@ -60,15 +60,20 @@ export class HistoryComponent implements OnInit, OnDestroy, AfterViewChecked {
   time(item: Transaction) {
     const now = new Date().getTime();
 <<<<<<< HEAD
+<<<<<<< HEAD
     const unlockTime = now + ((item.unlock_time - this.variablesService.height_max) * 60 * 1000);
 =======
     const unlockTime = now + ((item.unlock_time - this.variablesService.height_app) * 60 * 1000);
 >>>>>>> lock & unlock transaction
+=======
+    const unlockTime = now + ((item.unlock_time - this.variablesService.height_max) * 60 * 1000);
+>>>>>>> fix lock transaction
     return unlockTime;
   }
 
   isLocked(item: Transaction) {
     if ((item.unlock_time > 500000000) && (item.unlock_time > new Date().getTime() / 1000)) {
+<<<<<<< HEAD
 <<<<<<< HEAD
       return true;
     }
@@ -79,6 +84,11 @@ export class HistoryComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
     if ((item.unlock_time < 500000000) && (item.unlock_time > this.variablesService.height_app)) {
 >>>>>>> lock & unlock transaction
+=======
+      return true;
+    }
+    if ((item.unlock_time < 500000000) && (item.unlock_time > this.variablesService.height_max)) {
+>>>>>>> fix lock transaction
       return true;
     }
     return false;
