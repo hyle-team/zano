@@ -272,19 +272,18 @@ namespace file_io_utils
   template<class t_string>
   bool save_string_to_file_throw(const t_string& path_to_file, const std::string& str)
   {
-      //std::ofstream fstream;
-      boost::filesystem::ofstream fstream;
-      fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-      fstream.open(convert_utf8_to_wstring_if_needed(path_to_file), std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
-      fstream << str;
-      fstream.close();
-      return true;
+    //std::ofstream fstream;
+    boost::filesystem::ofstream fstream;
+    fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    fstream.open(convert_utf8_to_wstring_if_needed(path_to_file), std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+    fstream << str;
+    fstream.close();
+    return true;
   }
 
 	template<class t_string>
   bool save_string_to_file(const t_string& path_to_file, const std::string& str)
 	{
-
 		try
 		{
       return save_string_to_file_throw(path_to_file, str);
@@ -301,7 +300,7 @@ namespace file_io_utils
 	}
 
   template<class t_string>
-    bool load_file_to_string(const t_string& path_to_file, std::string& target_str)
+  bool load_file_to_string(const t_string& path_to_file, std::string& target_str)
   {
     try
     {
@@ -326,7 +325,6 @@ namespace file_io_utils
       fstream.close();
       return true;
     }
-
     catch (...)
     {
       return false;

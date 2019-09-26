@@ -316,12 +316,12 @@ bool MainWindow::load_app_config()
   CATCH_ENTRY2(false);
 }
 
-bool MainWindow::init(const std::string& htmlPath)
+bool MainWindow::init(const std::string& html_path)
 {
   TRY_ENTRY();
   //QtWebEngine::initialize();
-  init_tray_icon(htmlPath);
-  set_html_path(htmlPath);
+  init_tray_icon(html_path);
+  set_html_path(html_path);
 
   m_backend.subscribe_to_core_events(this);
 
@@ -354,7 +354,7 @@ void MainWindow::on_menu_show()
   CATCH_ENTRY2(void());
 }
 
-void MainWindow::init_tray_icon(const std::string& htmlPath)
+void MainWindow::init_tray_icon(const std::string& html_path)
 {
   TRY_ENTRY();
   if (!QSystemTrayIcon::isSystemTrayAvailable())
@@ -384,14 +384,14 @@ void MainWindow::init_tray_icon(const std::string& htmlPath)
 
   //setup icon
 #ifdef TARGET_OS_MAC
-  m_normal_icon_path = htmlPath + "/files/app22macos.png"; // X11 tray icon size is 22x22
-  m_blocked_icon_path = htmlPath + "/files/app22macos_blocked.png"; // X11 tray icon size is 22x22
+  m_normal_icon_path = html_path + "/files/app22macos.png"; // X11 tray icon size is 22x22
+  m_blocked_icon_path = html_path + "/files/app22macos_blocked.png"; // X11 tray icon size is 22x22
 #else
-  m_normal_icon_path = htmlPath + "/files/app22windows.png"; // X11 tray icon size is 22x22
-  m_blocked_icon_path = htmlPath + "/files/app22windows_blocked.png"; // X11 tray icon size
+  m_normal_icon_path = html_path + "/files/app22windows.png"; // X11 tray icon size is 22x22
+  m_blocked_icon_path = html_path + "/files/app22windows_blocked.png"; // X11 tray icon size
 #endif
                                                                       //setWindowIcon(QIcon(iconPath.c_str()));
-  QIcon qi(m_normal_icon_path.c_str());
+  QIcon qi( QString::fromWCharArray(epee::string_encoding::utf8_to_wstring(m_normal_icon_path).c_str()) );
   qi.setIsMask(true);
   m_tray_icon->setIcon(qi);
   m_tray_icon->setToolTip(CURRENCY_NAME_BASE);
@@ -411,7 +411,7 @@ void MainWindow::bool_toggle_icon(const QString& param)
   else
     path = m_normal_icon_path;
 
-  QIcon qi(path.c_str());
+  QIcon qi( QString::fromWCharArray(epee::string_encoding::utf8_to_wstring(path).c_str()) );
   qi.setIsMask(true);
   m_tray_icon->setIcon(qi);
   CATCH_ENTRY2(void());
@@ -771,7 +771,7 @@ bool MainWindow::set_html_path(const std::string& path)
   TRY_ENTRY();
   //init_tray_icon(path);
 #ifdef _MSC_VER
-  QString url = QString::fromUtf8(epee::string_encoding::convert_ansii_to_utf8(path).c_str()) + "/index.html";
+  QString url = QString::fromUtf8(path.c_str()) + "/index.html";
   load_file(url);
 #else
 //  load_file(QString((std::string("file://") + path + "/index.html").c_str()));
