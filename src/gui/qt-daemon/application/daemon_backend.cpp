@@ -393,6 +393,7 @@ bool daemon_backend::deinit_local_daemon()
   LOG_PRINT_L0("Deinitializing p2p...");
   //dsi.text_state = "Deinitializing p2p";
   m_pview->update_daemon_status(dsi);
+  m_p2psrv.deinit();
 
   m_ccore.set_currency_protocol(NULL);
   m_cprotocol.set_p2p_endpoint(NULL);
