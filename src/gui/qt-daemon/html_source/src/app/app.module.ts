@@ -138,6 +138,7 @@ export function highchartsFactory() {
     AddContactsComponent,
     ContactSendComponent,
 <<<<<<< HEAD
+<<<<<<< HEAD
     ExportImportComponent,
     SafeHTMLPipe,
     ConfirmModalComponent
@@ -147,6 +148,10 @@ export function highchartsFactory() {
 =======
     ExportImportComponent
 >>>>>>> contact service
+=======
+    ExportImportComponent,
+    SafeHTMLPipe
+>>>>>>> icons functional
   ],
   imports: [
     BrowserModule,
