@@ -295,7 +295,7 @@ inline bool build_custom_escrow_proposal(const std::vector<test_event_entry>& ev
   attachments.push_back(sa);
 
   if (custom_config_mask & eccf_proposal_additional_attach)
-    attachments.push_back(tx_message({ get_random_text(1024) }));
+    attachments.push_back(std::string(get_random_text(1024)));
 
   r = fill_tx_sources(sources, events, head, a_keys, a_fee_proposal, nmix, used_sources);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
@@ -404,7 +404,7 @@ inline bool build_custom_escrow_release_template(
   std::vector<attachment_v> attachments;
   if (release_type == BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_BURN)
   {
-    attachments.push_back(tx_message({ "We don't need no water -- so let all the coins burn!" })); // attachments are allowed and must be normally handled, so one of release template will always have them
+    attachments.push_back(std::string("We don't need no water -- so let all the coins burn!")); // attachments are allowed and must be normally handled, so one of release template will always have them
     attachments.push_back(tx_comment({ "Burn, all the coins, burn!" }));
   }
   

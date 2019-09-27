@@ -37,7 +37,7 @@
 #define HTTP_MAX_PRE_COMMAND_LINE_CHARS		 20 
 #define HTTP_MAX_HEADER_LEN		             100000
 
-PUSH_WARNINGS
+PUSH_GCC_WARNINGS
 DISABLE_GCC_WARNING(maybe-uninitialized)
 
 
@@ -690,7 +690,7 @@ namespace net_utils
 }
 }
 
-POP_WARNINGS
+POP_GCC_WARNINGS
 //--------------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------------

@@ -16,7 +16,7 @@ using namespace std;
 using namespace crypto;
 typedef crypto::hash chash;
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4297)
 extern "C" {
   static void hash_tree(const void *data, size_t length, char *hash) {
@@ -26,7 +26,7 @@ extern "C" {
     tree_hash((const char (*)[32]) data, length >> 5, hash);
   }
 }
-POP_WARNINGS
+POP_VS_WARNINGS
 
 extern "C" typedef void hash_f(const void *, size_t, char *);
 struct hash_func {

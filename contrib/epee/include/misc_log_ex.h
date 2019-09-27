@@ -54,7 +54,7 @@
 #endif
 #include "os_defenitions.h"
 #include "warnings.h"
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 
 
@@ -1374,7 +1374,7 @@ namespace log_space
       if(!plogger) return false;
       return plogger->remove_logger(type);
     }
-PUSH_WARNINGS
+PUSH_GCC_WARNINGS
 DISABLE_GCC_WARNING(maybe-uninitialized)
     static int get_set_log_detalisation_level(bool is_need_set = false, int log_level_to_set = LOG_LEVEL_1)
     {
@@ -1386,7 +1386,7 @@ DISABLE_GCC_WARNING(maybe-uninitialized)
       }
       return log_detalisation_level;
     }
-POP_WARNINGS
+POP_GCC_WARNINGS
     static int  get_set_time_level(bool is_need_set = false, int time_log_level = LOG_LEVEL_0)
     {
       static int val_time_log_level = LOG_LEVEL_0;
@@ -1705,6 +1705,6 @@ POP_WARNINGS
 
 }  // namespace epee
 
-POP_WARNINGS
+POP_VS_WARNINGS
 
 #endif //_MISC_LOG_EX_H_

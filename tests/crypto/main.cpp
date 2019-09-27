@@ -15,7 +15,7 @@
 #include "../io.h"
 #include "warnings.h"
 
-PUSH_WARNINGS
+PUSH_GCC_WARNINGS
 DISABLE_GCC_WARNING(strict-aliasing)
 
 
@@ -250,4 +250,4 @@ error:
   }
   return error ? 1 : 0;
 }
-POP_WARNINGS
+POP_GCC_WARNINGS

@@ -45,7 +45,7 @@ namespace epee
       return sizeof(pack_value);
     }
 
-    PUSH_WARNINGS
+    PUSH_GCC_WARNINGS
     DISABLE_GCC_WARNING(strict-aliasing)
       template<class t_stream>
     size_t pack_varint(t_stream& strm, size_t val)
@@ -67,7 +67,7 @@ namespace epee
         return pack_varint_t<uint64_t>(strm, PORTABLE_RAW_SIZE_MARK_INT64, val);
       }
     }
-    POP_WARNINGS
+    POP_GCC_WARNINGS
 
       template<class t_stream>
     bool put_string(t_stream& strm, const std::string& v)

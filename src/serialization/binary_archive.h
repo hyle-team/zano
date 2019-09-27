@@ -16,7 +16,7 @@
 #include "common/varint.h"
 #include "warnings.h"
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4244)
 DISABLE_VS_WARNINGS(4100)
 
@@ -172,4 +172,4 @@ struct binary_archive<true> : public binary_archive_base<std::ostream, true>
   }
 };
 
-POP_WARNINGS
+POP_VS_WARNINGS

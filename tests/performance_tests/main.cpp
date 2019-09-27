@@ -18,6 +18,7 @@
 #include "core_market_performance_test.h"
 #include "serialization_performance_test.h"
 #include "keccak_test.h"
+#include "blake2_test.h"
 
 int main(int argc, char** argv)
 {
@@ -32,8 +33,10 @@ int main(int argc, char** argv)
   set_process_affinity(1);
   set_thread_high_priority();
 
-  performance_timer timer;
-  timer.start();
+  test_blake2();
+
+  //performance_timer timer;
+  //timer.start();
 
   //generate_scratchpad();
   //generate_light_scratchpad(); 
@@ -68,12 +71,12 @@ int main(int argc, char** argv)
   */
   //TEST_PERFORMANCE0(test_is_out_to_acc);
   //TEST_PERFORMANCE0(test_generate_key_image_helper);
-  TEST_PERFORMANCE0(test_generate_key_derivation);
+  //TEST_PERFORMANCE0(test_generate_key_derivation);
   //TEST_PERFORMANCE0(test_generate_key_image);
   //TEST_PERFORMANCE0(test_derive_public_key);
   //TEST_PERFORMANCE0(test_derive_secret_key);
   
-  std::cout << "Tests finished. Elapsed time: " << timer.elapsed_ms() / 1000 << " sec" << std::endl;
+  //std::cout << "Tests finished. Elapsed time: " << timer.elapsed_ms() / 1000 << " sec" << std::endl;
 
   return 0;
 }
