@@ -9,6 +9,8 @@ import icons from '../../assets/icons/icons.json';
 =======
 >>>>>>> contact service
 
+import icons from '../../assets/icons/icons.json';
+
 @Component({
   selector: 'app-sidebar',
   templateUrl: './sidebar.component.html',

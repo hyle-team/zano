@@ -37,6 +37,8 @@ export class LoginComponent implements OnInit, OnDestroy {
 =======
 >>>>>>> contact service
 
+  logo = icons.logo;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
