@@ -1534,12 +1534,12 @@ int main(int argc, char* argv[])
 
 #ifdef WIN32
   // windows: convert argv_w into UTF-8-encoded std::string the same way it is in Linux and macOS
-  std::vector<std::string> argv_str;
-  std::vector<const char*> argv_vec;
+  std::vector<std::string> argv_str(argc, "");
+  std::vector<const char*> argv_vec(argc, nullptr);
   for (size_t i = 0; i < argc; ++i)
   {
-    argv_str.push_back( epee::string_encoding::wstring_to_utf8( argv_w[i] ) );
-    argv_vec.push_back( argv_str.back().c_str() );
+    argv_str[i] = epee::string_encoding::wstring_to_utf8( argv_w[i] );
+    argv_vec[i] = argv_str[i].c_str();
   }
   const char* const* argv = argv_vec.data();
 #endif
