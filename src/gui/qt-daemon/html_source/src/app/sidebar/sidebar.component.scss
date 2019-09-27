@@ -7,6 +7,23 @@
   max-width: 25rem;
 }
 
+.animated {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 1.2rem;
+
+  &::ng-deep svg {
+
+    width: 2rem;
+    height: 2rem;
+  
+    path, circle, polygon {
+      fill: #4db1ff;
+    }
+  } 
+}
+
 .sidebar-accounts {
   position: relative;
   display: flex;
@@ -204,8 +221,8 @@
 
       .icon {
         margin-right: 1.2rem;
-        width: 1.7rem;
-        height: 1.7rem;
+        width: 2rem;
+        height: 2rem;
 
         &.contacts {
           mask: url(../../assets/icons/contacts.svg) no-repeat center;
