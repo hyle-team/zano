@@ -216,7 +216,7 @@ namespace string_tools
     return t_pod;
   }
   //----------------------------------------------------------------------------
-PUSH_WARNINGS
+PUSH_GCC_WARNINGS
 DISABLE_GCC_WARNING(maybe-uninitialized)
   template<class XType>
   inline bool get_xtype_from_string(OUT XType& val, const std::string& str_id)
@@ -247,7 +247,7 @@ DISABLE_GCC_WARNING(maybe-uninitialized)
 
     return true;
   }
-POP_WARNINGS
+POP_GCC_WARNINGS
 	//---------------------------------------------------
 	template<typename int_t>
 	bool get_xnum_from_hex_string(const std::string str, int_t& res )

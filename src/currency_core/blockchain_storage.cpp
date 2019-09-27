@@ -1820,8 +1820,8 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
     main_cumul_diff.pow_diff = main_pow_diff_end - main_pow_diff_begin;
 
     //TODO: measurement of precise cumulative difficult
-    wide_difficulty_type alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
-    wide_difficulty_type main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+    boost::multiprecision::uint1024_t alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
+    boost::multiprecision::uint1024_t main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
     LOG_PRINT_L1("[FORK_CHOICE]: " << ENDL 
       << "difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
       << "difficulty_pos_at_split_point:" << difficulty_pos_at_split_point << ENDL

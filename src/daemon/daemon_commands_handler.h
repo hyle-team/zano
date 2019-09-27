@@ -17,7 +17,7 @@
 #include "currency_core/bc_offers_service.h"
 #include "serialization/binary_utils.h"
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 
 class daemon_commands_handler
@@ -874,4 +874,4 @@ private:
 
 
 };
-POP_WARNINGS
+POP_VS_WARNINGS

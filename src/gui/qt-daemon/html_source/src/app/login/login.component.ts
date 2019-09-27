@@ -6,6 +6,8 @@ import {VariablesService} from '../_helpers/services/variables.service';
 import {ModalService} from '../_helpers/services/modal.service';
 import {Wallet} from '../_helpers/models/wallet.model';
 
+import icons from '../../assets/icons/icons.json';
+
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
@@ -27,6 +29,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   });
 
   type = 'reg';
+
+  logo = icons.logo;
 
   constructor(
     private route: ActivatedRoute,

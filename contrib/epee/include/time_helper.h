@@ -59,10 +59,10 @@ namespace misc_utils
 
 		char tmpbuf[200] = {0};
 		tm* pt = NULL;
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4996)
 		pt = localtime(&time_);
-POP_WARNINGS
+POP_VS_WARNINGS
 
 		if(pt)
 			strftime( tmpbuf, 199, "%d.%m.%Y %H:%M:%S", pt );
@@ -81,10 +81,10 @@ POP_WARNINGS
 
 		char tmpbuf[200] = {0};
 		tm* pt = NULL;
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4996)
 		pt = localtime(&time_);
-POP_WARNINGS
+POP_VS_WARNINGS
 
 		if(pt)
 			strftime( tmpbuf, 199, "%Y_%m_%d %H_%M_%S", pt );
@@ -109,10 +109,10 @@ POP_WARNINGS
 	{
 		char tmpbuf[200] = {0};
 		tm* pt = NULL;
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4996)
 		pt = gmtime(&time_);
-POP_WARNINGS
+POP_VS_WARNINGS
 		strftime( tmpbuf, 199, "%a, %d %b %Y %H:%M:%S GMT", pt );
 		return tmpbuf;
 	}
@@ -126,7 +126,7 @@ POP_WARNINGS
 			tail = -tail;
 			res = "-";
 		}
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4244)
 		int days = tail/(60*60*24);
 		tail = tail%(60*60*24);
@@ -135,7 +135,7 @@ DISABLE_VS_WARNINGS(4244)
 		int minutes = tail/(60);
 		tail = tail%(60);
 		int seconds = tail;
-POP_WARNINGS
+POP_VS_WARNINGS
 		res += std::string("d") + boost::lexical_cast<std::string>(days) + ".h" + boost::lexical_cast<std::string>(hours) + ".m" + boost::lexical_cast<std::string>(minutes) + ".s" + boost::lexical_cast<std::string>(seconds);
 		return res;
 	}
