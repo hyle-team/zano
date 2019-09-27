@@ -1439,8 +1439,8 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   a_tx_payer.acc_addr = miner_acc.get_keys().m_account_address;
   currency::tx_comment a_tx_comment = AUTO_VAL_INIT(a_tx_comment);
   a_tx_comment.comment = "Comandante Che Guevara";
-  currency::tx_message a_tx_message = AUTO_VAL_INIT(a_tx_message);
-  a_tx_message.msg = "Hasta Siempre, Comandante";
+  std::string a_tx_message = AUTO_VAL_INIT(a_tx_message);
+  a_tx_message = "Hasta Siempre, Comandante";
   
 
   {

@@ -21,7 +21,7 @@
 #include "warnings.h"
 #include "crypto/hash.h"
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
 namespace currency
@@ -159,4 +159,4 @@ namespace currency
    };
 }
 
-POP_WARNINGS
+POP_VS_WARNINGS

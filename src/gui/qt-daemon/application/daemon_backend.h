@@ -8,7 +8,7 @@
 
 #include <boost/program_options.hpp>
 #include "warnings.h"
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 DISABLE_VS_WARNINGS(4503)
 #include "include_base_utils.h"
@@ -30,7 +30,7 @@ using namespace epee;
 #include "wallet/wallet2.h"
 #include "wallet_id_adapter.h"
 
-POP_WARNINGS
+POP_VS_WARNINGS
 
 namespace po = boost::program_options;
 

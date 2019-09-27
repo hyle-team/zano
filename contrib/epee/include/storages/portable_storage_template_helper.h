@@ -101,7 +101,7 @@ namespace epee
       return load_t_from_binary(out, f_buff);
     }
     //-----------------------------------------------------------------------------------------------------------
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
     template<class t_struct>
     bool store_t_to_binary(const t_struct& str_in, std::string& binary_buff, size_t indent = 0)
@@ -110,7 +110,7 @@ DISABLE_VS_WARNINGS(4100)
       str_in.store(ps);
       return ps.store_to_binary(binary_buff);
     }
-POP_WARNINGS
+POP_VS_WARNINGS
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
     std::string store_t_to_binary(const t_struct& str_in, size_t indent = 0)
