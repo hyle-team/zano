@@ -87,6 +87,13 @@ struct core_critical_error_handler_t : public currency::i_critical_error_handler
   bool dont_stop_on_low_space;
 };
 
+void terminate_handler_func()
+{
+  LOG_ERROR("\n\nTERMINATE HANDLER\n"); // should print callstack
+  std::fflush(nullptr); // all open output streams are flushed
+  std::abort(); // default terminate handler's behavior
+}
+
 int main(int argc, char* argv[])
 {
   try
@@ -111,6 +118,9 @@ int main(int argc, char* argv[])
 
   // setup custom callstack retrieving function
   epee::misc_utils::get_callstack(tools::get_callstack);
+
+  // setup custom terminate functions
+  std::set_terminate(&terminate_handler_func);
 
   po::options_description desc_cmd_only("Command line options");
   po::options_description desc_cmd_sett("Command line options and settings options", 130, 83);
@@ -162,8 +172,8 @@ int main(int argc, char* argv[])
     std::string data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
     std::string config = command_line::get_arg(vm, command_line::arg_config_file);
 
-    boost::filesystem::path data_dir_path(data_dir);
-    boost::filesystem::path config_path(config);
+    boost::filesystem::path data_dir_path(epee::string_encoding::utf8_to_wstring(data_dir));
+    boost::filesystem::path config_path(epee::string_encoding::utf8_to_wstring(config));
     if (!config_path.has_parent_path())
     {
       config_path = data_dir_path / config_path;

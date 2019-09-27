@@ -24,6 +24,8 @@ using namespace epee;
 
 #include <boost/asio.hpp>
 
+#include "string_coding.h"
+
 namespace tools
 {
   std::function<void(void)> signal_handler::m_handler;
@@ -450,18 +452,22 @@ std::string get_nix_version_display_string()
 
 
 #ifdef WIN32
-  std::string get_special_folder_path(int nfolder, bool iscreate)
+  std::wstring get_special_folder_path_w(int nfolder, bool iscreate)
   {
-    namespace fs = boost::filesystem;
-    char psz_path[MAX_PATH] = "";
+    wchar_t psz_path[MAX_PATH] = L"";
 
-    if(SHGetSpecialFolderPathA(NULL, psz_path, nfolder, iscreate))
+    if (SHGetSpecialFolderPathW(NULL, psz_path, nfolder, iscreate))
     {
       return psz_path;
     }
 
-    LOG_ERROR("SHGetSpecialFolderPathA() failed, could not obtain requested path.");
-    return "";
+    LOG_ERROR("SHGetSpecialFolderPathW(" << nfolder << ", " << iscreate << ") failed, could not obtain requested path.");
+    return L"";
+  }
+
+  std::string get_special_folder_path_utf8(int nfolder, bool iscreate)
+  {
+    return epee::string_encoding::wstring_to_utf8(get_special_folder_path_w(nfolder, iscreate));
   }
 #endif
 
@@ -476,9 +482,9 @@ std::string get_nix_version_display_string()
 #ifdef WIN32
     // Windows
 #ifdef _M_X64
-    config_folder = get_special_folder_path(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT;
+    config_folder = get_special_folder_path_utf8(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT;
 #else 
-    config_folder = get_special_folder_path(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT + "-x86";
+    config_folder = get_special_folder_path_utf8(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT + "-x86";
 #endif 
 #else
     std::string pathRet;
@@ -518,7 +524,7 @@ std::string get_nix_version_display_string()
     std::string wallets_dir;
 #ifdef WIN32
     // Windows
-    wallets_dir = get_special_folder_path(CSIDL_PERSONAL, true) + "/" + CURRENCY_NAME_BASE;
+    wallets_dir = get_special_folder_path_utf8(CSIDL_PERSONAL, true) + "/" + CURRENCY_NAME_BASE;
 #else
     std::string pathRet;
     char* pszHome = getenv("HOME");
@@ -553,7 +559,7 @@ std::string get_nix_version_display_string()
   {
     namespace fs = boost::filesystem;
     boost::system::error_code ec;
-    fs::path fs_path(path);
+    fs::path fs_path = epee::string_encoding::utf8_to_wstring(path);
     if (fs::is_directory(fs_path, ec))
     {
       return true;
@@ -651,39 +657,5 @@ std::string get_nix_version_display_string()
     std::ifstream in(log_filename, std::ifstream::ate | std::ifstream::binary);
     return static_cast<uint64_t>(in.tellg());
   }
-
-  int64_t get_ntp_time(const std::string& host_name)
-  {
-    try
-    {
-      boost::asio::io_service io_service;
-      boost::asio::ip::udp::resolver resolver(io_service);
-      boost::asio::ip::udp::resolver::query query(boost::asio::ip::udp::v4(), host_name, "ntp");
-      boost::asio::ip::udp::endpoint receiver_endpoint = *resolver.resolve(query);
-      boost::asio::ip::udp::socket socket(io_service);
-      socket.open(boost::asio::ip::udp::v4());
-
-      boost::array<unsigned char, 48> send_buf = { { 010, 0, 0, 0, 0, 0, 0, 0, 0 } };
-      socket.send_to(boost::asio::buffer(send_buf), receiver_endpoint);
-
-      boost::array<unsigned long, 1024> recv_buf;
-      boost::asio::ip::udp::endpoint sender_endpoint;
-      size_t len = socket.receive_from(boost::asio::buffer(recv_buf), sender_endpoint);
-
-      time_t time_recv = ntohl((time_t)recv_buf[4]);
-      time_recv -= 2208988800U;  //Unix time starts from 01/01/1970 == 2208988800U
-      return time_recv;
-    }
-    catch (const std::exception& e)
-    {
-      LOG_PRINT_L2("get_ntp_time(): exception: " << e.what());
-      return 0;
-    }
-    catch (...)
-    {
-      return 0;
-    }
-  }
-
 
 } // namespace tools

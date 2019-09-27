@@ -1890,7 +1890,7 @@ void wallet2::load_keys2ki(bool create_if_not_exist, bool& need_to_resync)
     m_pending_key_images.clear();
     for (size_t i = 0, size = m_pending_key_images_file_container.size(); i < size; ++i)
     {
-      out_key_to_ki item = AUTO_VAL_INIT(item);
+      out_key_to_ki item = AUTO_VAL_INIT_T(out_key_to_ki);
       ok = m_pending_key_images_file_container.get_item(i, item);
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(ok, "m_pending_key_images_file_container.get_item() failed for index " << i << ", size: " << m_pending_key_images_file_container.size());
       ok = m_pending_key_images.insert(std::make_pair(item.out_key, item.key_image)).second;
@@ -4002,7 +4002,7 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
 //----------------------------------------------------------------------------------------------------
 void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx)
 {
-  TIME_MEASURE_START_MS(construct_tx_time);
+  //TIME_MEASURE_START_MS(construct_tx_time);
   bool r = currency::construct_tx(m_account.get_keys(),
     ftp.sources,
     ftp.prepared_destinations,
@@ -4016,10 +4016,10 @@ void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::trans
     ftp.tx_outs_attr,
     ftp.shuffle,
     ftp.flags);
-  TIME_MEASURE_FINISH_MS(construct_tx_time);
+  //TIME_MEASURE_FINISH_MS(construct_tx_time);
   THROW_IF_FALSE_WALLET_EX(r, error::tx_not_constructed, ftp.sources, ftp.prepared_destinations, ftp.unlock_time);
 
-  TIME_MEASURE_START_MS(sign_ms_input_time);
+  //TIME_MEASURE_START_MS(sign_ms_input_time);
   if (ftp.multisig_id != currency::null_hash)
   {
     // In case there's multisig input is used -- sign it partially with this wallet's keys (we don't have any others here).
@@ -4031,21 +4031,21 @@ void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::trans
     r = sign_multisig_input_in_tx(tx, 0, m_account.get_keys(), ms_source_tx, &is_tx_input_fully_signed); // it's assumed that ms input is the first one (index 0)
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r && !is_tx_input_fully_signed, "sign_multisig_input_in_tx failed: r = " << r << ", is_tx_input_fully_signed = " << is_tx_input_fully_signed);
   }
-  TIME_MEASURE_FINISH_MS(sign_ms_input_time);
+  //TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
   m_tx_keys.insert(std::make_pair(get_transaction_hash(tx), tx_key));
 
   THROW_IF_FALSE_WALLET_EX(get_object_blobsize(tx) < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, tx, m_upper_transaction_size_limit);
 
-  TIME_MEASURE_START(send_transaction_to_network_time);
+  //TIME_MEASURE_START(send_transaction_to_network_time);
   if (broadcast_tx)
     send_transaction_to_network(tx);
-  TIME_MEASURE_FINISH(send_transaction_to_network_time);
+  //TIME_MEASURE_FINISH(send_transaction_to_network_time);
 
-  TIME_MEASURE_START(add_sent_tx_detailed_info_time);
+  //TIME_MEASURE_START(add_sent_tx_detailed_info_time);
   if (broadcast_tx)
     add_sent_tx_detailed_info(tx, ftp.prepared_destinations, ftp.selected_transfers);
-  TIME_MEASURE_FINISH(add_sent_tx_detailed_info_time);
+  //TIME_MEASURE_FINISH(add_sent_tx_detailed_info_time);
 
   /* TODO
   WLT_LOG_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"

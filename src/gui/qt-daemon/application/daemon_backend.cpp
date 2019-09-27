@@ -66,6 +66,13 @@ daemon_backend::~daemon_backend()
   stop();
 }
 
+void terminate_handler_func()
+{
+  LOG_ERROR("\n\nTERMINATE HANDLER\n"); // should print callstack
+  std::fflush(nullptr); // all open output streams are flushed
+  std::abort(); // default terminate handler's behavior
+}
+
 bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
 {
   m_stop_singal_sent = false;
@@ -87,6 +94,9 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
 
   // setup custom callstack retrieving function
   epee::misc_utils::get_callstack(tools::get_callstack);
+
+  // setup custom terminate functions
+  std::set_terminate(&terminate_handler_func);
 
   //#if !defined(NDEBUG)
   //  log_space::log_singletone::add_logger(LOGGER_DEBUGGER, nullptr, nullptr);
@@ -144,8 +154,8 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
     m_data_dir = command_line::get_arg(m_vm, command_line::arg_data_dir);
     std::string config = command_line::get_arg(m_vm, command_line::arg_config_file);
 
-    boost::filesystem::path data_dir_path(m_data_dir);
-    boost::filesystem::path config_path(config);
+    boost::filesystem::path data_dir_path(epee::string_encoding::utf8_to_wstring(m_data_dir));
+    boost::filesystem::path config_path(epee::string_encoding::utf8_to_wstring(config));
     if (!config_path.has_parent_path())
     {
       config_path = data_dir_path / config_path;
@@ -383,6 +393,7 @@ bool daemon_backend::deinit_local_daemon()
   LOG_PRINT_L0("Deinitializing p2p...");
   //dsi.text_state = "Deinitializing p2p";
   m_pview->update_daemon_status(dsi);
+  m_p2psrv.deinit();
 
   m_ccore.set_currency_protocol(NULL);
   m_cprotocol.set_p2p_endpoint(NULL);
@@ -429,7 +440,8 @@ void daemon_backend::main_worker(const po::variables_map& m_vm)
     //m_pview->update_daemon_status(dsi);
     try
     {
-      wo.second.stop = true;
+      wo.second.major_stop = true;
+      wo.second.stop_for_refresh = true;
       wo.second.w.unlocked_get()->stop();
 
       wo.second.w->get()->store();
@@ -543,7 +555,8 @@ void daemon_backend::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
 {
   wo.wallet_id = id;
   wo.do_mining = false;
-  wo.stop = false;
+  wo.major_stop = false;
+  wo.stop_for_refresh = false;
   wo.plast_daemon_height = &m_last_daemon_height;
   wo.plast_daemon_network_state = &m_last_daemon_network_state;
   wo.plast_daemon_is_disconnected = &m_last_daemon_is_disconnected;
@@ -837,7 +850,8 @@ std::string daemon_backend::close_wallet(size_t wallet_id)
 
   try
   {
-    it->second.stop = true;
+    it->second.major_stop = true;
+    it->second.stop_for_refresh = true;
     it->second.w.unlocked_get()->stop();
 
     it->second.w->get()->store();
@@ -1488,8 +1502,9 @@ void daemon_backend::wallet_vs_options::worker_func()
   epee::math_helper::once_a_time_seconds<1> scan_pool_interval;
   epee::math_helper::once_a_time_seconds<POS_WALLET_MINING_SCAN_INTERVAL> pos_minin_interval;
   view::wallet_status_info wsi = AUTO_VAL_INIT(wsi);
-  while (!stop)
+  while (!major_stop)
   {
+    stop_for_refresh = false;
     try
     {
       wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
@@ -1516,7 +1531,7 @@ void daemon_backend::wallet_vs_options::worker_func()
             prepare_wallet_status_info(*this, wsi);
             pview->update_wallet_status(wsi);
           }
-          w->get()->refresh(stop);
+          w->get()->refresh(stop_for_refresh);
           w->get()->resend_unconfirmed();
           {
             auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')
@@ -1548,11 +1563,11 @@ void daemon_backend::wallet_vs_options::worker_func()
         });
       }
 
-      if (stop)
+      if (major_stop || stop_for_refresh)
         break;
       //******************************************************************************************
       //mining zone
-      if (do_mining)
+      if (do_mining && *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online)
       {
         pos_minin_interval.do_call([this](){
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
@@ -1614,7 +1629,8 @@ void daemon_backend::wallet_vs_options::worker_func()
 daemon_backend::wallet_vs_options::~wallet_vs_options()
 {
   do_mining = false;
-  stop = true;
+  major_stop = true;
+  stop_for_refresh = true;
   break_mining_loop = true;
   if (miner_thread.joinable())
     miner_thread.join();

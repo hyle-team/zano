@@ -70,6 +70,9 @@ public:
     m_cmd_binder.set_handler("print_tx_outputs_usage", boost::bind(&daemon_commands_handler::print_tx_outputs_usage, this, _1), "Analyse if tx outputs for involved in subsequent transactions");
     m_cmd_binder.set_handler("print_difficulties_of_last_n_blocks", boost::bind(&daemon_commands_handler::print_difficulties_of_last_n_blocks, this, _1), "Print difficulties of last n blocks");
 
+#ifdef _DEBUG
+    m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, _1), "DEBUG: set core time adjustment");
+#endif
   }
 
   bool start_handling()
@@ -499,8 +502,15 @@ private:
     bool r = m_srv.get_payload_object().get_core().get_blockchain_storage().get_main_blocks_rpc_details(height, 1, false, blocks);
     if (r && blocks.size())
     {
+      currency::block b = AUTO_VAL_INIT(b);
+      m_srv.get_payload_object().get_core().get_blockchain_storage().get_block_by_height(height, b);
+      currency::blobdata blob = block_to_blob(b);
+      std::string block_hex = epee::string_tools::buff_to_hex_nodelimer(blob);
+
       currency::block_rpc_extended_info& rbei = blocks.back();
-      LOG_PRINT_GREEN("------------------ block_id: " << rbei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(rbei), LOG_LEVEL_0);
+      LOG_PRINT_GREEN("------------------ block_id: " << rbei.id << " ------------------" << 
+        ENDL << epee::serialization::store_t_to_json(rbei) << ENDL
+        << " ------------------ hex_blob: " << ENDL << block_hex, LOG_LEVEL_0);
     }
     else
     {
@@ -523,8 +533,14 @@ private:
 
     if (r)
     {
+      currency::block b = AUTO_VAL_INIT(b);
+      m_srv.get_payload_object().get_core().get_blockchain_storage().get_block_by_hash(block_hash, b);
+      currency::blobdata blob = block_to_blob(b);
+      std::string block_hex = epee::string_tools::buff_to_hex_nodelimer(blob);
       //      currency::block& block = bei.bl;
-      LOG_PRINT_GREEN("------------------ block_id: " << bei.id << " ------------------" << ENDL << epee::serialization::store_t_to_json(bei), LOG_LEVEL_0);
+      LOG_PRINT_GREEN("------------------ block_id: " << bei.id << " ------------------" << ENDL 
+        << epee::serialization::store_t_to_json(bei) << ENDL 
+        << " ------------------ hex_blob: " << ENDL << block_hex, LOG_LEVEL_0);
     }
     else
     {
@@ -811,7 +827,49 @@ private:
     LOG_PRINT_L0(ENDL << epee::deadlock_guard_singleton::get_dlg_state());
     return true;
   }
+  //--------------------------------------------------------------------------------
+#ifdef _DEBUG  
+  static std::atomic<int64_t>& debug_core_time_shift_accessor()
+  {
+    static std::atomic<int64_t> time_shift(0);
+    return time_shift;
+  }
 
+  static uint64_t debug_core_time_function()
+  {
+    return (int64_t)time(NULL) + debug_core_time_shift_accessor().load(std::memory_order_relaxed);
+  }
+
+  bool debug_set_time_adj(const std::vector<std::string>& args)
+  {
+    if (args.size() != 1)
+    {
+      LOG_PRINT_RED("one arg required: signed time shift in seconds", LOG_LEVEL_0);
+      return false;
+    }
+
+    int64_t time_shift = 0;
+    if (!epee::string_tools::string_to_num_fast(args[0], time_shift))
+    {
+      LOG_PRINT_RED("could not parse: " << args[0], LOG_LEVEL_0);
+      return false;
+    }
+
+    uint64_t time_before = debug_core_time_function();
+    debug_core_time_shift_accessor().store(time_shift);
+    uint64_t time_after = debug_core_time_function();
+
+    currency::blockchain_storage& bcs = m_srv.get_payload_object().get_core().get_blockchain_storage();
+
+    currency::core_runtime_config crc = bcs.get_core_runtime_config();
+    crc.get_core_time = &debug_core_time_function;
+    bcs.set_core_runtime_config(crc);
+
+    LOG_PRINT_L0("debug time shift set to " << time_shift << " : time before: " << time_before << ", time_after: " << time_after);
+
+    return true;
+  }
+#endif
 
 
 

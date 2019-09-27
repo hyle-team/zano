@@ -39,15 +39,18 @@
       "SYNCING": "Syncing wallet"
     },
     "CONTACTS": "Contacts",
+    "CONTACTS_TOOLTIP": "Contacts option available only with Master Password enabled",
     "SETTINGS": "Settings",
     "LOG_OUT": "Log out",
+    "LOG_OUT_TOOLTIP": "Logout option available only with Master Password enabled",
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
       "ONLINE": "Online",
       "ERROR": "System error",
       "COMPLETE": "Completion",
-      "SYNCING": "Syncing blockchain",
-      "LOADING": "Loading blockchain data"
+      "SYNCING": "Syncing block",
+      "LOADING": "Loading blockchain data",
+      "SLASH": "/"
     },
     "UPDATE": {
       "STANDARD": "Update available",

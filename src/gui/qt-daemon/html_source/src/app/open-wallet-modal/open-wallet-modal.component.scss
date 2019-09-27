@@ -16,7 +16,8 @@
   background-position: center;
   background-size: 200%;
   padding: 2rem;
-  width: 34rem;
+  min-width: 34rem;
+  max-width: 64rem;
 
   .title {
     font-size: 1.8rem;
@@ -28,6 +29,8 @@
     .wallet-path {
       font-size: 1.3rem;
       margin: 5rem 0 2rem;
+      word-wrap: break-word;
+      line-height: 2rem;
     }
 
     .wrap-button {

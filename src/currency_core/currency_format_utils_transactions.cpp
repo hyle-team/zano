@@ -88,7 +88,7 @@ namespace currency
       return 0;
     
     CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() > o_i, "unlock_time_array.size=" << ut2.unlock_time_array.size() 
-      << " is less then o_i=" << o_i << " in tx: " << get_transaction_hash(tx));
+      << " is less or equal to o_i=" << o_i << " in tx: " << get_transaction_hash(tx));
 
     return ut2.unlock_time_array[o_i];
   }

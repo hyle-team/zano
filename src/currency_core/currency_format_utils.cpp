@@ -2715,7 +2715,7 @@ namespace currency
 
     boost::multiprecision::uint1024_t basic_sum = boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty) + (boost::multiprecision::uint1024_t(a_pos_cumulative_difficulty)*difficulty_pow_at_split_point) / difficulty_pos_at_split_point;
     boost::multiprecision::uint1024_t res =
-      (basic_sum * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty)*a_pos_cumulative_difficulty);
+      (basic_sum * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(b_pow_cumulative_difficulty)*b_pos_cumulative_difficulty);
 
     if (res > boost::math::tools::max_value<wide_difficulty_type>())
     {

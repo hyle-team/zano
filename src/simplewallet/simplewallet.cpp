@@ -154,11 +154,6 @@ namespace
     return message_writer(color ? epee::log_space::console_color_green : epee::log_space::console_color_default, false, std::string(), LOG_LEVEL_2);
   }
 
-    message_writer success_msg_writer(epee::log_space::console_colors color)
-  {
-    return message_writer(color, true, std::string(), LOG_LEVEL_2);
-  }
-
   message_writer fail_msg_writer()
   {
     return message_writer(epee::log_space::console_color_red, true, "Error: ", LOG_LEVEL_0);
