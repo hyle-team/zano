@@ -609,10 +609,36 @@ bool MainWindow::show_msg_box(const std::string& message)
   return true;
   CATCH_ENTRY2(false);
 }
+
+void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    QByteArray local_msg = msg.toLocal8Bit();
+    const char* msg_type = "";
+    switch (type)
+    {
+    case QtDebugMsg:    msg_type = "DEBG "; break;
+    case QtInfoMsg:     msg_type = "INFO "; break;
+    case QtWarningMsg:  msg_type = "WARN "; break;
+    case QtCriticalMsg: msg_type = "CRIT "; break;
+    case QtFatalMsg:    msg_type = "FATAL "; break;
+    }
+
+    LOG_PRINT("[QT] " << msg_type << local_msg.constData() << " @ " << context.file << ":" << context.line << ", " << (context.function ? context.function : ""), LOG_LEVEL_0);
+}
+
 bool MainWindow::init_backend(int argc, char* argv[])
 {
   TRY_ENTRY();
-  return m_backend.init(argc, argv, this);
+  if (!m_backend.init(argc, argv, this))
+    return false;
+
+  if (m_backend.is_qt_logs_enabled())
+  {
+    qInstallMessageHandler(qt_log_message_handler);
+    QLoggingCategory::setFilterRules("*=true"); // enable all logs
+  }
+
+  return true;
   CATCH_ENTRY2(false);
 }
 

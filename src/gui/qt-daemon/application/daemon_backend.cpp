@@ -40,7 +40,8 @@ daemon_backend::daemon_backend():m_pview(&m_view_stub),
                                  m_offers_service(nullptr), 
                                  m_ui_opt(AUTO_VAL_INIT(m_ui_opt)), 
                                  m_remote_node_mode(false),
-                                 m_is_pos_allowed(false)
+                                 m_is_pos_allowed(false),
+                                 m_qt_logs_enbaled(false)
 {
   m_offers_service.set_disabled(true);
 	//m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
@@ -52,6 +53,7 @@ const command_line::arg_descriptor<std::string> arg_xcode_stub = {"-NSDocumentRe
 const command_line::arg_descriptor<bool> arg_enable_gui_debug_mode = { "gui-debug-mode", "Enable debug options in GUI", false, true };
 const command_line::arg_descriptor<uint32_t> arg_qt_remote_debugging_port = { "remote-debugging-port", "Specify port for Qt remote debugging", 30333, true };
 const command_line::arg_descriptor<std::string> arg_remote_node = { "remote-node", "Switch GUI to work with remote node instead of local daemon", "",  true };
+const command_line::arg_descriptor<bool> arg_enable_qt_logs = { "enable-qt-logs", "Forward Qt log messages into main log", false,  true };
 
 void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 {
@@ -124,9 +126,7 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, arg_enable_gui_debug_mode);
   command_line::add_arg(desc_cmd_sett, arg_qt_remote_debugging_port);
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
-  
-
-
+  command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
 
 
   currency::core::init_options(desc_cmd_sett);
@@ -219,6 +219,8 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
   {
     // configure for remote node
   }
+
+  m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
 
   m_pview->init(path_to_html);
 
