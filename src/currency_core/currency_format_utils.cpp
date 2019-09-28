@@ -1550,8 +1550,8 @@ namespace currency
   bool check_tx_derivation_hint(const transaction& tx, const crypto::key_derivation& derivation)
   {
     bool found_der_xor = false;
-    uint16_t my_derive_xor = get_derivation_hint(derivation);
-    tx_derivation_hint dh = make_tx_derivation_hint_from_uint16(my_derive_xor);
+    uint16_t hint = get_derivation_hint(derivation);
+    tx_derivation_hint dh = make_tx_derivation_hint_from_uint16(hint);
     for (auto& e : tx.extra)
     {
       if (e.type() == typeid(tx_derivation_hint))
