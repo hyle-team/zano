@@ -623,7 +623,16 @@ void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, c
     case QtFatalMsg:    msg_type = "FATAL "; break;
     }
 
-    LOG_PRINT("[QT] " << msg_type << local_msg.constData() << " @ " << context.file << ":" << context.line << ", " << (context.function ? context.function : ""), LOG_LEVEL_0);
+    if (context.file == nullptr && context.function == nullptr)
+    {
+      // no debug info
+      LOG_PRINT("[QT] " << msg_type << local_msg.constData(), LOG_LEVEL_0);
+    }
+    else
+    {
+      // some debug info
+      LOG_PRINT("[QT] " << msg_type << local_msg.constData() << " @ " << (context.file ? context.file : "") << ":" << context.line << ", " << (context.function ? context.function : ""), LOG_LEVEL_0);
+    }
 }
 
 bool MainWindow::init_backend(int argc, char* argv[])
