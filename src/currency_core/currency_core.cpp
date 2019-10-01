@@ -18,6 +18,7 @@ using namespace epee;
 #include "currency_core/currency_config.h"
 #include "currency_format_utils.h"
 #include "misc_language.h"
+#include "string_coding.h"
 
 #define MINIMUM_REQUIRED_FREE_SPACE_BYTES (1024 * 1024 * 100)
 
@@ -717,10 +718,27 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::check_if_free_space_critically_low(uint64_t* p_available_space /* = nullptr */)
   {
-    boost::filesystem::space_info si = boost::filesystem::space(m_config_folder);
-    if (p_available_space != nullptr)
-      *p_available_space = si.available;
-    return si.available < MINIMUM_REQUIRED_FREE_SPACE_BYTES;
+    namespace fs = boost::filesystem;
+
+    try
+    {
+      CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(m_config_folder), false, "create_directories_if_necessary failed: " << m_config_folder);
+      std::wstring config_folder_w = epee::string_encoding::utf8_to_wstring(m_config_folder);
+      fs::space_info si = fs::space(config_folder_w);
+      if (p_available_space != nullptr)
+        *p_available_space = si.available;
+      return si.available < MINIMUM_REQUIRED_FREE_SPACE_BYTES;
+    }
+    catch (std::exception& e)
+    {
+      LOG_ERROR("failed to determine free space: " << e.what());
+      return false;
+    }
+    catch (...)
+    {
+      LOG_ERROR("failed to determine free space: unknown exception");
+      return false;
+    }
   }
 
   void core::check_free_space()

@@ -8,7 +8,7 @@
 
 #include <boost/program_options.hpp>
 #include "warnings.h"
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 DISABLE_VS_WARNINGS(4503)
 #include "include_base_utils.h"
@@ -30,7 +30,7 @@ using namespace epee;
 #include "wallet/wallet2.h"
 #include "wallet_id_adapter.h"
 
-POP_WARNINGS
+POP_VS_WARNINGS
 
 namespace po = boost::program_options;
 
@@ -142,6 +142,7 @@ public:
   void unsubscribe_to_core_events();
   void get_gui_options(view::gui_options& opt);
   std::string get_wallet_log_prefix(size_t wallet_id) const;
+  bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
 
 private:
   void main_worker(const po::variables_map& vm);
@@ -187,6 +188,7 @@ private:
   currency::core_rpc_server m_rpc_server;
 
   bool m_remote_node_mode;
+  bool m_qt_logs_enbaled;
   std::atomic<bool> m_is_pos_allowed;
 
 

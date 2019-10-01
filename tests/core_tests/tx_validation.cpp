@@ -791,12 +791,12 @@ bool gen_crypted_attachments::generate(std::vector<test_event_entry>& events) co
 
   pr.acc_addr = miner_account.get_keys().m_account_address;
   cm.comment = "Comandante Che Guevara";
-  ms.msg = "Hasta Siempre, Comandante";
+  //ms.msg = "Hasta Siempre, Comandante";
 
   std::vector<currency::attachment_v> attachments;
   attachments.push_back(pr);
   attachments.push_back(cm);
-  attachments.push_back(ms);
+  //attachments.push_back(ms);
 
   MAKE_TX_LIST_START(events, txs_list, miner_account, bob_account, MK_TEST_COINS(1), blk_5);
   MAKE_TX_LIST_ATTACH(events, txs_list, miner_account, bob_account, MK_TEST_COINS(1), blk_5, attachments);
@@ -934,7 +934,7 @@ bool gen_crypted_attachments::check_crypted_tx(currency::core& c, size_t ev_inde
   std::vector<payload_items_v> at;
   bool r = currency::decrypt_payload_items(true, *ptx_from_bc, bob_acc.get_keys(), at);
   CHECK_EQ(r, true);
-  CHECK_EQ(at.size(), 8); // custom attachments: 1) tx_payer, 2) tx_comment, 3) tx_message; system attachments: 4) tx_crypto_checksum; system extra: 5) tx pub key, 6) extra_attachment_info
+  CHECK_EQ(at.size(), 7); // custom attachments: 1) tx_payer, 2) tx_comment, 3) std::string; system attachments: 4) tx_crypto_checksum; system extra: 5) tx pub key, 6) extra_attachment_info
 
   currency::tx_payer decrypted_pr = AUTO_VAL_INIT(decrypted_pr);
   r = get_type_in_variant_container(at, decrypted_pr);
@@ -958,16 +958,16 @@ bool gen_crypted_attachments::check_crypted_tx(currency::core& c, size_t ev_inde
     return false;
   }
 
-  currency::tx_message decrypted_message = AUTO_VAL_INIT(decrypted_message);
-  r = get_type_in_variant_container(at, decrypted_message);
-  CHECK_AND_ASSERT_MES(r, false, "get_type_in_variant_container failed");
-  if (ms.msg != decrypted_message.msg)
-  {
-    LOG_ERROR("decrypted wrong data: "
-      << decrypted_message.msg
-      << "expected:" << ms.msg);
-    return false;
-  }
+//   currency::tx_message decrypted_message = AUTO_VAL_INIT(decrypted_message);
+//   r = get_type_in_variant_container(at, decrypted_message);
+//   CHECK_AND_ASSERT_MES(r, false, "get_type_in_variant_container failed");
+//   if (ms.msg != decrypted_message.msg)
+//   {
+//     LOG_ERROR("decrypted wrong data: "
+//       << decrypted_message.msg
+//       << "expected:" << ms.msg);
+//     return false;
+//   }
 
   // now cancel attachment
 
