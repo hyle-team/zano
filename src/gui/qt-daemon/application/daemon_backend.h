@@ -90,23 +90,19 @@ public:
   std::string run_wallet(uint64_t wallet_id);
   std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist);
   std::string get_wallet_info(size_t wallet_id, view::wallet_info& wi);
-  std::string get_contracts(size_t wallet_id, std::vector<tools::wallet_rpc::escrow_contract_details>& contracts);
-  std::string create_proposal(size_t wallet_id, const bc_services::contract_private_details& escrow, const std::string& payment_id,
-    uint64_t expiration_period,
-    uint64_t fee, 
-    uint64_t b_fee);
+  std::string get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts);
+  std::string create_proposal(const view::create_proposal_param_gui& cpp);
   std::string accept_proposal(size_t wallet_id, const crypto::hash& contract_id);
   std::string release_contract(size_t wallet_id, const crypto::hash& contract_id, const std::string& contract_over_type);
   std::string request_cancel_contract(size_t wallet_id, const crypto::hash& contract_id, uint64_t fee, uint64_t expiration_period);
   std::string accept_cancel_contract(size_t wallet_id, const crypto::hash& contract_id);
   
-
   std::string get_wallet_info(wallet_vs_options& w, view::wallet_info& wi);
   std::string close_wallet(size_t wallet_id);
   std::string push_offer(size_t wallet_id, const bc_services::offer_details_ex& od, currency::transaction& res_tx);
   std::string cancel_offer(const view::cancel_offer_param& co, currency::transaction& res_tx);
   std::string push_update_offer(const bc_services::update_offer_details& uo, currency::transaction& res_tx);
-  //std::string get_all_offers(currency::COMMAND_RPC_GET_ALL_OFFERS::response& od);
+  //std::string get_all_offers(currency::COMMAND_RPC_GET_OFFERS_EX::response& od);
   std::string get_offers_ex(const bc_services::core_offers_filter& cof, std::list<bc_services::offer_details_ex>& offers, uint64_t& total_count);
   std::string get_aliases(view::alias_set& al_set);
   std::string get_alias_info_by_address(const std::string& addr, currency::alias_rpc_details& res_details);
@@ -119,7 +115,7 @@ public:
   std::string start_pos_mining(uint64_t wallet_id);
   std::string stop_pos_mining(uint64_t wallet_id);
   std::string check_available_sources(uint64_t wallet_id, std::list<uint64_t>& amounts);
-  std::string get_mining_history(uint64_t wallet_id, tools::wallet_rpc::mining_history& wrpc);
+  std::string get_mining_history(uint64_t wallet_id, tools::wallet_public::mining_history& wrpc);
   std::string get_wallet_restore_info(uint64_t wallet_id, std::string& restore_key);
   std::string backup_wallet(uint64_t wallet_id, const std::wstring& path);
   std::string reset_wallet_password(uint64_t wallet_id, const std::string& pass);
@@ -158,10 +154,10 @@ private:
   static void prepare_wallet_status_info(wallet_vs_options& wo, view::wallet_status_info& wsi);
   //----- i_backend_wallet_callback ------
   virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block);
-	virtual void on_transfer2(size_t wallet_id, const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined);
+	virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined);
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/);
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/);
-  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_rpc::wallet_transfer_info& wti);
+  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
 
   std::thread m_main_worker_thread;
   std::atomic<bool> m_stop_singal_sent;

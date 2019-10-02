@@ -32,10 +32,10 @@ bool wallet_rpc_integrated_address::generate(std::vector<test_event_entry>& even
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
-  tools::wallet_rpc::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request  mia_req = AUTO_VAL_INIT(mia_req);
-  tools::wallet_rpc::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response mia_res = AUTO_VAL_INIT(mia_res);
-  tools::wallet_rpc::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::request  sia_req = AUTO_VAL_INIT(sia_req);
-  tools::wallet_rpc::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::response sia_res = AUTO_VAL_INIT(sia_res);
+  tools::wallet_public::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request  mia_req = AUTO_VAL_INIT(mia_req);
+  tools::wallet_public::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response mia_res = AUTO_VAL_INIT(mia_res);
+  tools::wallet_public::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::request  sia_req = AUTO_VAL_INIT(sia_req);
+  tools::wallet_public::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::response sia_res = AUTO_VAL_INIT(sia_res);
 
   // 1. make_integrated_address with empty payment id (should use a random payment id instead) + on_split_integrated_address
   mia_req.payment_id = "";
@@ -114,15 +114,15 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
-  tools::wallet_rpc::COMMAND_RPC_TRANSFER::request  req = AUTO_VAL_INIT(req);
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request  req = AUTO_VAL_INIT(req);
   req.fee = TESTS_DEFAULT_FEE;
   req.mixin = 0;
-  tools::wallet_rpc::trnsfer_destination tds = AUTO_VAL_INIT(tds);
+  tools::wallet_public::trnsfer_destination tds = AUTO_VAL_INIT(tds);
   tds.address = alice_integrated_address;
   tds.amount = MK_TEST_COINS(3);
   req.destinations.push_back(tds);
   
-  tools::wallet_rpc::COMMAND_RPC_TRANSFER::response res = AUTO_VAL_INIT(res);
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response res = AUTO_VAL_INIT(res);
 
   // 1. integrated address + external payment id => the following should fail
   req.payment_id = "90210";
@@ -152,7 +152,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
 
   // 3. standard address + invalid external payment id => fail
   req.destinations.clear();
-  tools::wallet_rpc::trnsfer_destination tds2 = AUTO_VAL_INIT(tds2);
+  tools::wallet_public::trnsfer_destination tds2 = AUTO_VAL_INIT(tds2);
   tds2.address = m_accounts[ALICE_ACC_IDX].get_public_address_str();
   tds2.amount = MK_TEST_COINS(7);
   req.destinations.push_back(tds2);
