@@ -179,6 +179,12 @@
       "CONTRACTS": "Contracts",
       "MESSAGES": "Messages",
       "STAKING": "Staking"
+    },
+    "TOOLTIPS": {
+      "EDIT_ALIAS": "Edit alias",
+      "TRANSFER_ALIAS": "Transfer alias",
+      "SETTINGS": "Settings",
+      "CLOSE": "Close wallet"
     }
   },
   "WALLET_DETAILS": {
