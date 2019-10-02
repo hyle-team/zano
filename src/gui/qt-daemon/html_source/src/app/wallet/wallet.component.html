@@ -8,12 +8,18 @@
     <div class="alias" *ngIf="variablesService.currentWallet.alias.hasOwnProperty('name') && variablesService.currentWallet.loaded && variablesService.daemon_state === 2">
       <span>{{variablesService.currentWallet.alias['name']}}</span>
       <ng-container *ngIf="variablesService.currentWallet.alias_available">
+<<<<<<< HEAD
         <i class="icon edit" [routerLink]="['/edit-alias']" tooltip="{{ 'WALLET.TOOLTIPS.EDIT_ALIAS' | translate }}" placement="bottom-right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500"></i>
         <i class="icon transfer" [routerLink]="['/transfer-alias']" tooltip="{{ 'WALLET.TOOLTIPS.TRANSFER_ALIAS' | translate }}" placement="right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500"></i>
+=======
+        <i class="icon edit" [routerLink]="['/edit-alias']" tooltip="{{ 'WALLET.TOOLTIPS.EDIT_ALIAS' | translate }}" placement="bottom-right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500"></i>
+        <i class="icon transfer" [routerLink]="['/transfer-alias']" tooltip="{{ 'WALLET.TOOLTIPS.TRANSFER_ALIAS' | translate }}" placement="right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500"></i>
+>>>>>>> tooltips
       </ng-container>
     </div>
   </div>
   <div>
+<<<<<<< HEAD
     <button [routerLink]="['/details']" routerLinkActive="active" tooltip="{{ 'WALLET.TOOLTIPS.SETTINGS' | translate }}" placement="left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
       <i class="icon details"></i>
     </button>
@@ -22,6 +28,12 @@
 =======
     <button type="button" (click)="closeWallet()">
 >>>>>>> test details & close btn
+=======
+    <button [routerLink]="['/details']" routerLinkActive="active" tooltip="{{ 'WALLET.TOOLTIPS.SETTINGS' | translate }}" placement="left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500">
+      <i class="icon details"></i>
+    </button>
+    <button type="button" (click)="closeWallet()" tooltip="{{ 'WALLET.TOOLTIPS.CLOSE' | translate }}" placement="bottom-right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500">
+>>>>>>> tooltips
       <i class="icon close-wallet"></i>
     </button>
   </div>
