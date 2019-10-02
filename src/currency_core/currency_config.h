@@ -187,8 +187,10 @@
 #define CURRENCY_CORE_INSTANCE_LOCK_FILE                "lock.lck"
 
 
-#define CURRENCY_POOLDATA_FOLDERNAME                    "poolstate"
-#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME              "blockchain"
+#define CURRENCY_POOLDATA_FOLDERNAME_OLD                "poolstate"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD          "blockchain"
+#define CURRENCY_POOLDATA_FOLDERNAME                    "poolstate_lmdb_v1"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME              "blockchain_lmdb_v1"
 #define P2P_NET_DATA_FILENAME                           "p2pstate.bin"
 #define MINER_CONFIG_FILENAME                           "miner_conf.json"
 #define GUI_SECURE_CONFIG_FILENAME                      "gui_secure_conf.bin"
@@ -200,7 +202,7 @@
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3
 #define CURRENT_BLOCK_EXTENDED_INFO_ARCHIVE_VER         1
 
-#define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 8
+#define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 9
 #define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  1
 
 
@@ -217,11 +219,10 @@
 #define BLOCK_MINOR_VERSION_GENESIS                     0
 #define BLOCK_MAJOR_VERSION_INITAL                      0
 #ifndef TESTNET
-#define ZANO_HARDFORK_1_AFTER_HEIGHT                    172200
+#define ZANO_HARDFORK_1_AFTER_HEIGHT                    194624
 #else
 #define ZANO_HARDFORK_1_AFTER_HEIGHT                    1440
 #endif
-
 
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");

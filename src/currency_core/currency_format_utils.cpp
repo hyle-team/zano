@@ -516,6 +516,17 @@ namespace currency
     return r;
   }
   //---------------------------------------------------------------
+  uint16_t get_derivation_hint(const crypto::key_derivation& derivation)
+  {
+    crypto::hash h = blake2_hash(&derivation, sizeof(derivation));
+
+    uint16_t* pderiv_hash_as_array = (uint16_t*)&h;
+    uint16_t res = pderiv_hash_as_array[0];
+    for (size_t i = 1; i != sizeof(h) / sizeof(uint16_t); i++)
+      res ^= pderiv_hash_as_array[i];
+    return res;
+  }
+  //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str)
   {
     crypto::hash h = crypto::cn_fast_hash(str.data(), str.size());
@@ -523,14 +534,21 @@ namespace currency
     return phash_as_array[0] ^ phash_as_array[1] ^ phash_as_array[2] ^ phash_as_array[3];
   }
   //---------------------------------------------------------------
-  uint16_t get_derivation_xor(const crypto::key_derivation& derivation)
+  tx_derivation_hint make_tx_derivation_hint_from_uint16(uint16_t hint)
   {
-    uint16_t* pderiv_as_array = (uint16_t*)&derivation;
-    uint16_t res = pderiv_as_array[0];
-    for (size_t i = 1; i != sizeof(derivation) / sizeof(uint16_t); i++)
-      res ^= pderiv_as_array[i];
-    return res;
+    tx_derivation_hint dh = AUTO_VAL_INIT(dh);
+    dh.msg.assign((const char*)&hint, sizeof(hint));
+    return dh;
   }
+  //---------------------------------------------------------------
+//   bool get_uint16_from_tx_derivation_hint(const tx_derivation_hint& dh, uint16_t& hint)
+//   {
+//     tx_derivation_hint dh;
+//     if (dh.msg.size() != sizeof(hint))
+//       return false;
+//     hint = *((uint16_t*)dh.msg.data());
+//     return true;
+//   }  
   //---------------------------------------------------------------
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr)
   {
@@ -551,12 +569,12 @@ namespace currency
         crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
         bool r = derive_public_key_from_target_address(apa, tx_sec_key, output_index, out_eph_public_key, derivation);
         CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
-        etc_tx_derivation_hint dh = AUTO_VAL_INIT(dh);        
-        dh.v = get_derivation_xor(derivation);
-        if (deriv_cache.count(dh.v) == 0)
+
+        uint16_t hint = get_derivation_hint(derivation);
+        if (deriv_cache.count(hint) == 0)
         {          
-          tx.extra.push_back(dh);
-          deriv_cache.insert(dh.v);
+          tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
+          deriv_cache.insert(hint);
         }
       }
       target_keys.push_back(out_eph_public_key);
@@ -646,11 +664,6 @@ namespace currency
       crypto::chacha_crypt(m.acc_addr, m_key);
       m_was_crypted_entries = true;
     }
-    void operator()(tx_message& m)
-    {
-      crypto::chacha_crypt(m.msg, m_key);
-      m_was_crypted_entries = true;
-    }
     void operator()(tx_service_attachment& sa)
     {
       if (sa.flags&TX_SERVICE_ATTACHMENT_DEFLATE_BODY)
@@ -684,13 +697,6 @@ namespace currency
       tx_comment local_comment = comment;
       crypto::chacha_crypt(local_comment.comment, rkey);
       rdecrypted_att.push_back(local_comment);
-    }
-
-    void operator()(const tx_message& m)
-    {
-      tx_message local_msg = m;
-      crypto::chacha_crypt(local_msg.msg, rkey);
-      rdecrypted_att.push_back(local_msg);
     }
 
     void operator()(const tx_service_attachment& sa)
@@ -1544,14 +1550,19 @@ namespace currency
   bool check_tx_derivation_hint(const transaction& tx, const crypto::key_derivation& derivation)
   {
     bool found_der_xor = false;
-    uint16_t my_derive_xor = get_derivation_xor(derivation);
+    uint16_t hint = get_derivation_hint(derivation);
+    tx_derivation_hint dh = make_tx_derivation_hint_from_uint16(hint);
     for (auto& e : tx.extra)
     {
-      if (e.type() == typeid(etc_tx_derivation_hint))
+      if (e.type() == typeid(tx_derivation_hint))
       {
-        found_der_xor = true;
-        if (my_derive_xor == boost::get<etc_tx_derivation_hint>(e).v)
-          return true;
+        const tx_derivation_hint& tdh = boost::get<tx_derivation_hint>(e);
+        if (tdh.msg.size() == sizeof(uint16_t))
+        {
+          found_der_xor = true;
+          if (dh.msg == tdh.msg)
+            return true;
+        }
       }
     }
     //if tx doesn't have any hints - feature is not supported, use full scan
@@ -1726,7 +1737,13 @@ namespace currency
     }
     return true;
   }
-
+  //------------------------------------------------------------------
+  bool validate_password(const std::string& password)
+  {
+    static const std::string allowed_password_symbols = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!?@#$%^&*_+|{}[]()<>:;\"'-=\\/.,";
+    size_t n = password.find_first_not_of(allowed_password_symbols, 0);
+    return n == std::string::npos;
+  }
 
   //------------------------------------------------------------------
 #define ANTI_OVERFLOW_AMOUNT       1000000
@@ -2204,9 +2221,9 @@ namespace currency
 
       return true;
     }
-    bool operator()(const tx_message& ee)
+    bool operator()(const tx_derivation_hint& ee)
     {
-      tv.type = "message";
+      tv.type = "derivation_hint";
       tv.short_view = std::to_string(ee.msg.size()) + " bytes";
       tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(ee.msg);
 
@@ -2220,7 +2237,7 @@ namespace currency
 
       return true;
     }
-    bool operator()(const etc_tx_derivation_hint& dh)
+    bool operator()(const etc_tx_uint16_t& dh)
     {
       tv.type = "XOR";
       tv.short_view = epee::string_tools::pod_to_hex(dh);
@@ -2702,7 +2719,7 @@ namespace currency
   }
 
 
-  wide_difficulty_type get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
+  boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
     const difficulties& a_diff,
     const difficulties& b_diff )
@@ -2715,22 +2732,22 @@ namespace currency
 
     boost::multiprecision::uint1024_t basic_sum = boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty) + (boost::multiprecision::uint1024_t(a_pos_cumulative_difficulty)*difficulty_pow_at_split_point) / difficulty_pos_at_split_point;
     boost::multiprecision::uint1024_t res =
-      (basic_sum * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty)*a_pos_cumulative_difficulty);
+      (basic_sum * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(b_pow_cumulative_difficulty)*b_pos_cumulative_difficulty);
 
-    if (res > boost::math::tools::max_value<wide_difficulty_type>())
-    {
-      ASSERT_MES_AND_THROW("[INTERNAL ERROR]: Failed to get_a_to_b_relative_cumulative_difficulty, res = " << res << ENDL
-        << ", difficulty_pos_at_split_point: " << difficulty_pos_at_split_point << ENDL
-        << ", difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
-        << ", a_pos_cumulative_difficulty:" << a_pos_cumulative_difficulty << ENDL
-        << ", b_pos_cumulative_difficulty:" << b_pos_cumulative_difficulty << ENDL
-        << ", a_pow_cumulative_difficulty:" << a_pow_cumulative_difficulty << ENDL
-        << ", b_pow_cumulative_difficulty:" << b_pow_cumulative_difficulty << ENDL       
-      );
-    }
+//     if (res > boost::math::tools::max_value<wide_difficulty_type>())
+//     {
+//       ASSERT_MES_AND_THROW("[INTERNAL ERROR]: Failed to get_a_to_b_relative_cumulative_difficulty, res = " << res << ENDL
+//         << ", difficulty_pos_at_split_point: " << difficulty_pos_at_split_point << ENDL
+//         << ", difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
+//         << ", a_pos_cumulative_difficulty:" << a_pos_cumulative_difficulty << ENDL
+//         << ", b_pos_cumulative_difficulty:" << b_pos_cumulative_difficulty << ENDL
+//         << ", a_pow_cumulative_difficulty:" << a_pow_cumulative_difficulty << ENDL
+//         << ", b_pow_cumulative_difficulty:" << b_pow_cumulative_difficulty << ENDL       
+//       );
+//     }
     TRY_ENTRY();
-    wide_difficulty_type short_res = res.convert_to<wide_difficulty_type>();
-    return short_res;
+//    wide_difficulty_type short_res = res.convert_to<wide_difficulty_type>();
+    return res;
     CATCH_ENTRY_WITH_FORWARDING_EXCEPTION();
   }
 

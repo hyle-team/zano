@@ -9,6 +9,8 @@
 #include <string>
 #include <iostream>
 
+#define USE_INSECURE_RANDOM_RPNG_ROUTINES // turns on pseudorandom number generator manupulations for tests
+
 #include "currency_core/currency_basic.h"
 #include "currency_core/currency_core.h"
 #include "wallet/wallet2.h"
@@ -1124,13 +1126,13 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 #define MAKE_TX_ATTACH(EVENTS, TX_VAR, FROM, TO, AMOUNT, HEAD, ATTACH) MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, HEAD, ATTACH)
 
-#define MAKE_MINER_TX_AND_KEY_MANUALLY(TX, BLK, KEY)                                                      \
-  transaction TX;                                                                                         \
-  if (!construct_miner_tx_manually(get_block_height(BLK) + 1, generator.get_already_generated_coins(BLK), \
-    miner_account.get_keys().m_account_address, TX, 0, KEY))                                              \
+#define MAKE_MINER_TX_AND_KEY_MANUALLY(TX, PREV_BLOCK, P_KEYPAIR)                                                       \
+  transaction TX;                                                                                                       \
+  if (!construct_miner_tx_manually(get_block_height(PREV_BLOCK) + 1, generator.get_already_generated_coins(PREV_BLOCK), \
+    miner_account.get_keys().m_account_address, TX, 0, P_KEYPAIR))                                                      \
     return false;
 
-#define MAKE_MINER_TX_MANUALLY(TX, BLK) MAKE_MINER_TX_AND_KEY_MANUALLY(TX, BLK, 0)
+#define MAKE_MINER_TX_MANUALLY(TX, PREV_BLOCK) MAKE_MINER_TX_AND_KEY_MANUALLY(TX, PREV_BLOCK, nullptr)
 
 #define SET_EVENT_VISITOR_SETT(VEC_EVENTS, SETT, VAL) VEC_EVENTS.push_back(event_visitor_settings(SETT, VAL));
 

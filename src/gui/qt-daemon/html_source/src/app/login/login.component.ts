@@ -6,6 +6,8 @@ import {VariablesService} from '../_helpers/services/variables.service';
 import {ModalService} from '../_helpers/services/modal.service';
 import {Wallet} from '../_helpers/models/wallet.model';
 
+import icons from '../../assets/icons/icons.json';
+
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
@@ -27,6 +29,8 @@ export class LoginComponent implements OnInit, OnDestroy {
   });
 
   type = 'reg';
+
+  logo = icons.logo;
 
   constructor(
     private route: ActivatedRoute,
@@ -108,6 +112,8 @@ export class LoginComponent implements OnInit, OnDestroy {
         this.variablesService.dataIsLoaded = true;
         this.variablesService.startCountdown();
         this.variablesService.appPass = appPass;
+        const isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
+
         if (this.variablesService.wallets.length) {
           this.ngZone.run(() => {
             this.router.navigate(['/wallet/' + this.variablesService.wallets[0].wallet_id]);
@@ -131,7 +137,7 @@ export class LoginComponent implements OnInit, OnDestroy {
           }
         }
         if (!data.hasOwnProperty('wallets') && !data.hasOwnProperty('contacts')) {
-          if (data.length !== 0) {
+          if (data.length !== 0  && !isEmptyObject) {
             this.getWalletData(data);
           } else {
             this.ngZone.run(() => {

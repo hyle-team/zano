@@ -21,7 +21,7 @@
 #include "warnings.h"
 #include "crypto/hash.h"
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
 namespace currency
@@ -136,8 +136,9 @@ namespace currency
 
      void notify_blockchain_update_listeners();
 
+     bool check_if_free_space_critically_low(uint64_t* p_available_space = nullptr);
      void check_free_space();
-
+     
 
      blockchain_storage m_blockchain_storage;
      tx_memory_pool m_mempool;
@@ -158,4 +159,4 @@ namespace currency
    };
 }
 
-POP_WARNINGS
+POP_VS_WARNINGS

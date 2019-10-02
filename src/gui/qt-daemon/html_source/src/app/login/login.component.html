@@ -2,7 +2,7 @@
 
   <div class="wrap-login">
 
-    <div class="logo"></div>
+    <div class="logo" [innerHTML]="logo | safeHTML"></div>
 
     <form *ngIf="type === 'reg'" class="form-login" [formGroup]="regForm" (ngSubmit)="onSubmitCreatePass()">
 

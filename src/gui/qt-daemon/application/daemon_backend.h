@@ -8,7 +8,7 @@
 
 #include <boost/program_options.hpp>
 #include "warnings.h"
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 DISABLE_VS_WARNINGS(4503)
 #include "include_base_utils.h"
@@ -30,7 +30,7 @@ using namespace epee;
 #include "wallet/wallet2.h"
 #include "wallet_id_adapter.h"
 
-POP_WARNINGS
+POP_VS_WARNINGS
 
 namespace po = boost::program_options;
 
@@ -56,7 +56,10 @@ public:
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
     std::atomic<bool> do_mining;
-    std::atomic<bool> stop;
+    std::atomic<bool> major_stop;
+    std::atomic<bool> stop_for_refresh; //use separate var for passing to "refresh" member function, 
+                                        //because it can be changed there due to internal interruption logis
+
     std::atomic<bool> break_mining_loop;
     std::atomic<uint64_t> wallet_state;
     std::atomic<uint64_t> last_wallet_synch_height;
@@ -135,6 +138,7 @@ public:
   void unsubscribe_to_core_events();
   void get_gui_options(view::gui_options& opt);
   std::string get_wallet_log_prefix(size_t wallet_id) const;
+  bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
 
 private:
   void main_worker(const po::variables_map& vm);
@@ -180,6 +184,7 @@ private:
   currency::core_rpc_server m_rpc_server;
 
   bool m_remote_node_mode;
+  bool m_qt_logs_enbaled;
   std::atomic<bool> m_is_pos_allowed;
 
 

@@ -164,7 +164,7 @@ namespace currency
         else
         {
           // this tx has no fee 
-          LOG_ERROR("Transaction with id= " << id << " has too small fee: " << tx_fee << ", expected fee: " << m_blockchain.get_core_runtime_config().tx_pool_min_fee);
+          LOG_PRINT_RED_L0("Transaction with id= " << id << " has too small fee: " << tx_fee << ", expected fee: " << m_blockchain.get_core_runtime_config().tx_pool_min_fee);
           tvc.m_verification_failed = false;
           tvc.m_should_be_relayed = false;
           tvc.m_added_to_pool = false;
@@ -1120,19 +1120,30 @@ namespace currency
   {
     m_config_folder = config_folder;
 
-    LOG_PRINT_L0("Loading blockchain...");
+    uint64_t cache_size_l1 = CACHE_SIZE;
+    LOG_PRINT_GREEN("Using pool db file cache size(L1): " << cache_size_l1, LOG_LEVEL_0);
+
+    // remove old incompartible DB
+    const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME_OLD;
+    if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
+    {
+      LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
+      boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
+    }
+
     const std::string db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME;
-    
+    LOG_PRINT_L0("Loading blockchain from " << db_folder_path << "...");
+
     bool db_opened_okay = false;
     for(size_t loading_attempt_no = 0; loading_attempt_no < 2; ++loading_attempt_no)
     {
-      bool res = m_db.open(db_folder_path);
+      bool res = m_db.open(db_folder_path, cache_size_l1);
       if (!res)
       {
         // if DB could not be opened -- try to remove the whole folder and re-open DB
         LOG_PRINT_YELLOW("Failed to initialize database in folder: " << db_folder_path << ", first attempt", LOG_LEVEL_0);
-        boost::filesystem::remove_all(db_folder_path);
-        res = m_db.open(db_folder_path);
+        boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
+        res = m_db.open(db_folder_path, cache_size_l1);
         CHECK_AND_ASSERT_MES(res, false, "Failed to initialize database in folder: " << db_folder_path << ", second attempt");
       }
 
@@ -1171,7 +1182,7 @@ namespace currency
         m_db_alias_addresses.deinit();
         m_db_solo_options.deinit();
         m_db.close();
-        size_t files_removed = boost::filesystem::remove_all(db_folder_path);
+        size_t files_removed = boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
         LOG_PRINT_L1(files_removed << " files at " << db_folder_path << " removed");
 
         // try to re-create DB and re-init containers

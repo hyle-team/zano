@@ -63,6 +63,7 @@ namespace currency
       FIELD(block_cumulative_size)
       FIELD(cumulative_diff_adjusted)
       FIELD(cumulative_diff_precise)
+      FIELD(cumulative_diff_precise_adjusted)
       FIELD(difficulty)
       FIELD(already_generated_coins)
       FIELD(stake_hash)

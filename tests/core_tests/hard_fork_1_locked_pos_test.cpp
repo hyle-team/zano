@@ -21,7 +21,7 @@ hard_fork_1_locked_mining_test::hard_fork_1_locked_mining_test()
 
 bool hard_fork_1_locked_mining_test::generate(std::vector<test_event_entry>& events) const
 {
-  random_state_test_restorer::reset_random();
+  // Test idea: make sure PoS mining on locked coins is possible
 
   GENERATE_ACCOUNT(preminer_acc);
   GENERATE_ACCOUNT(miner_acc);
@@ -36,20 +36,30 @@ bool hard_fork_1_locked_mining_test::generate(std::vector<test_event_entry>& eve
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
-  //construc tx that locks transaction for some period of time
-  // make a couple of huge txs
+  //construct tx that locks coins for some period of time
+  //make a couple of huge txs
   bool r = false;
   std::vector<extra_v> extra;
 
   std::vector<tx_source_entry> sources_1;
-  r = fill_tx_sources(sources_1, events, blk_0r, miner_acc.get_keys(), 2000000000000+TESTS_DEFAULT_FEE, 0);
+  r = fill_tx_sources(sources_1, events, blk_0r, miner_acc.get_keys(), CURRENCY_BLOCK_REWARD + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-  std::vector<tx_destination_entry> destinations({ tx_destination_entry(2010000000000, pos_miner_acc.get_public_address()) });
+  std::vector<tx_destination_entry> destinations({ tx_destination_entry(CURRENCY_BLOCK_REWARD, pos_miner_acc.get_public_address()) });
   crypto::secret_key stub;
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources_1, destinations, extra, empty_attachment, tx_1, stub, get_block_height(blk_0r)+2000);
+  uint64_t unlock_time = get_block_height(blk_0r) + 2000;
+  r = construct_tx(miner_acc.get_keys(), sources_1, destinations, extra, empty_attachment, tx_1, stub, unlock_time);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1); // push it to the pool  
+
+  uint64_t ut1 = get_tx_x_detail<etc_tx_details_unlock_time>(tx_1);
+  etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
+  get_type_in_variant_container(tx_1.extra, ut2);
+  std::stringstream ss;
+  for (auto v : ut2.unlock_time_array)
+    ss << v << " ";
+  LOG_PRINT_YELLOW("tx1: ut1: " << ut1 << ", ut2: " << ss.str(), LOG_LEVEL_0);
+
   
   MAKE_NEXT_BLOCK_TX1(events, blk_0r_tx, blk_0r, miner_acc, tx_1);
 
@@ -61,13 +71,30 @@ bool hard_fork_1_locked_mining_test::generate(std::vector<test_event_entry>& eve
     events.push_back(event_core_time(next_blk_pow.timestamp - 10));
     last_block = next_blk_pow;
   }
+
+  MAKE_NEXT_BLOCK(events, blk_1, last_block, miner_acc);
+  MAKE_NEXT_POS_BLOCK(events, blk_2, blk_1, miner_acc, miner_acc_lst);
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
   
   std::list<currency::account_base> accounts_2;
   accounts_2.push_back(pos_miner_acc);
-  //let's try to mint PoS block from locked account
+  //mint PoS block from locked account into an altchain
   MAKE_NEXT_POS_BLOCK(events, next_blk_pos, last_block, pos_miner_acc, accounts_2);
 
-  DO_CALLBACK(events, "c1");
+  // switch chains
+  MAKE_NEXT_BLOCK(events, blk_2a, next_blk_pos, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_3a, blk_2a, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_4a, blk_3a, miner_acc);
+
+  // make sure switch happened
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_4a));
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_4ar, blk_4a, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // mint another PoS block from locked account
+  MAKE_NEXT_POS_BLOCK(events, blk_5a, blk_4ar, pos_miner_acc, accounts_2);
+
+
   return true;
 }
 

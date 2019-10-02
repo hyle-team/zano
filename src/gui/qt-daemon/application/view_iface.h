@@ -11,7 +11,7 @@
 #ifndef Q_MOC_RUN
 #include "warnings.h"
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 DISABLE_VS_WARNINGS(4503)
 #include "serialization/keyvalue_serialization.h"
@@ -20,7 +20,7 @@ DISABLE_VS_WARNINGS(4503)
 #include "wallet/wallet_public_structs_defs.h"
 #include "currency_core/offers_services_helpers.h"
 #include "currency_core/basic_api_response_codes.h"
-POP_WARNINGS
+POP_VS_WARNINGS
 
 #endif
 

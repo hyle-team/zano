@@ -1,4 +1,9 @@
+// Copyright (c) 2019 Zano Project
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <algorithm>
+
+#define USE_INSECURE_RANDOM_RPNG_ROUTINES // turns on random manupulation for tests
 
 #include "gtest/gtest.h"
 #include "currency_core/currency_format_utils.h"
@@ -8,7 +13,6 @@
 #include "common/util.h"
 #include "misc_log_ex.h"
 #include "crypto/crypto.h"
-#include "../core_tests/random_helper.h"
 #include "serialization/serialization.h"
 #include "file_io_utils.h"
 
@@ -29,8 +33,9 @@ TEST(db_accessor_tests, cached_key_value_accessor_test)
   tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> m_container(m_db);
   const std::string folder_name = "./TEST_cached_key_value_accessor_test";
   tools::create_directories_if_necessary(folder_name);
+  uint64_t cache_size = CACHE_SIZE;
   
-  ASSERT_TRUE(m_db.open(folder_name));
+  ASSERT_TRUE(m_db.open(folder_name, cache_size));
   ASSERT_TRUE(m_container.init("container"));
 
   ... TODO ...
@@ -46,7 +51,8 @@ TEST(db_accessor_tests_2, recoursive_tx_test)
 
   const std::string folder_name = "./TEST_db_recursive_tx";
   tools::create_directories_if_necessary(folder_name);
-  ASSERT_TRUE(m_db.open(folder_name));
+  uint64_t cache_size = CACHE_SIZE;
+  ASSERT_TRUE(m_db.open(folder_name, cache_size));
   ASSERT_TRUE(m_container.init("zzzz") );
 
   bool tx_result = m_container.begin_transaction();
@@ -309,7 +315,7 @@ struct bcs_stub_t
 
 TEST(db_accessor_tests, median_db_cache_test)
 {
-  random_state_test_restorer::reset_random(); // make this test deterministic (the same crypto::rand() sequence)
+  crypto::random_prng_initialize_with_seed(0); // make this test deterministic (the same crypto::rand() sequence)
 
   epee::shared_recursive_mutex m_rw_lock;
   tools::db::basic_db_accessor m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_rw_lock);
@@ -317,7 +323,8 @@ TEST(db_accessor_tests, median_db_cache_test)
   const std::string folder_name = "./TEST_median_db_cache";
   const std::string naive_median_serialization_filename = folder_name + "/naive_median";
   tools::create_directories_if_necessary(folder_name);
-  ASSERT_TRUE(m_db.open(folder_name));
+  uint64_t cache_size = CACHE_SIZE;
+  ASSERT_TRUE(m_db.open(folder_name, cache_size));
   ASSERT_TRUE(m_tx_fee_median.init("median_fee"));
   m_db.begin_transaction();
 

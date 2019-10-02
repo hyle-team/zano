@@ -40,6 +40,7 @@ import { IntToMoneyPipe } from './_helpers/pipes/int-to-money.pipe';
 import { HistoryTypeMessagesPipe } from './_helpers/pipes/history-type-messages.pipe';
 import { ContractStatusMessagesPipe } from './_helpers/pipes/contract-status-messages.pipe';
 import { ContractTimeLeftPipe } from './_helpers/pipes/contract-time-left.pipe';
+import { SafeHTMLPipe } from './_helpers/pipes/safe-html.pipe';
 import { TooltipDirective } from './_helpers/directives/tooltip.directive';
 import { InputValidateDirective } from './_helpers/directives/input-validate/input-validate.directive';
 import { StakingSwitchComponent } from './_helpers/directives/staking-switch/staking-switch.component';
@@ -118,7 +119,8 @@ export function highchartsFactory() {
     ContactsComponent,
     AddContactsComponent,
     ContactSendComponent,
-    ExportImportComponent
+    ExportImportComponent,
+    SafeHTMLPipe
   ],
   imports: [
     BrowserModule,

@@ -770,35 +770,13 @@ namespace currency
   #define TIME_SYNC_DELTA_RING_BUFFER_SIZE         8
   #define TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE  (60 * 5)               // max acceptable difference between time delta median among peers and local time (seconds)
   #define TIME_SYNC_NTP_TO_LOCAL_MAX_DIFFERENCE    (60 * 5)               // max acceptable difference between NTP time and local time (seconds)
-  #define TIME_SYNC_NTP_SERVERS                    { "time.google.com", "0.pool.ntp.org", "1.pool.ntp.org", "2.pool.ntp.org", "3.pool.ntp.org" }
-  #define TIME_SYNC_NTP_ATTEMPTS_COUNT             3                      // max number of attempts when getting time from NTP server
-
-  static int64_t get_ntp_time()
-  {
-    static const std::vector<std::string> ntp_servers TIME_SYNC_NTP_SERVERS;
-
-    for (size_t att = 0; att < TIME_SYNC_NTP_ATTEMPTS_COUNT; ++att)
-    {
-      size_t i = 0;
-      crypto::generate_random_bytes(sizeof(i), &i);
-      const std::string& ntp_server = ntp_servers[i % ntp_servers.size()];
-      LOG_PRINT_L3("NTP: trying to get time from " << ntp_server);
-      int64_t time = tools::get_ntp_time(ntp_server);
-      if (time > 0)
-      {
-        LOG_PRINT_L2("NTP: " << ntp_server << " responded with " << time << " (" << epee::misc_utils::get_time_str_v2(time) << ")");
-        return time;
-      }
-      LOG_PRINT_L2("NTP: cannot get time from " << ntp_server);
-    }
-
-    return 0; // smth went wrong
-  }
 
   template<class t_core>
   bool t_currency_protocol_handler<t_core>::add_time_delta_and_check_time_sync(int64_t time_delta)
   {
     CRITICAL_REGION_LOCAL(m_time_deltas_lock);
+
+    auto get_core_time = [this] { return m_core.get_blockchain_storage().get_core_runtime_config().get_core_time(); };
 
     m_time_deltas.push_back(time_delta);
     while (m_time_deltas.size() > TIME_SYNC_DELTA_RING_BUFFER_SIZE)
@@ -813,7 +791,8 @@ namespace currency
     LOG_PRINT_MAGENTA("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ")", LOG_LEVEL_2);
     if (std::abs(m_last_median2local_time_difference) > TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE)
     {
-      int64_t ntp_time = get_ntp_time();
+      int64_t ntp_time = tools::get_ntp_time();
+      LOG_PRINT_L2("NTP: received time " << ntp_time << " (" << epee::misc_utils::get_time_str_v2(ntp_time) << "), diff: " << std::showpos << get_core_time() - ntp_time);
       if (ntp_time == 0)
       {
         // error geting ntp time
@@ -823,7 +802,7 @@ namespace currency
 
       // got ntp time correctly
       // update local time, because getting ntp time could be time consuming
-      uint64_t local_time_2 = m_core.get_blockchain_storage().get_core_runtime_config().get_core_time();
+      uint64_t local_time_2 = get_core_time();
       m_last_ntp2local_time_difference = local_time_2 - ntp_time;
       if (std::abs(m_last_ntp2local_time_difference) > TIME_SYNC_NTP_TO_LOCAL_MAX_DIFFERENCE)
       {

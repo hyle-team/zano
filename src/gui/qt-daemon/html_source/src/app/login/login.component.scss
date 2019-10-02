@@ -14,9 +14,12 @@
       max-width: 40rem;
 
       .logo {
-        background: url(../../assets/icons/logo.svg) no-repeat center;
-        width: 100%;
-        height: 15rem;
+        display: flex;
+        justify-content: center;
+
+        &::ng-deep svg {
+          width: 14rem;
+        }
       }
 
       .form-login {

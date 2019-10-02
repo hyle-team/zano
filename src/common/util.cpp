@@ -10,6 +10,7 @@ using namespace epee;
 
 #include "util.h"
 #include "currency_core/currency_config.h"
+#include "version.h"
 
 #ifdef WIN32
 #include <windows.h>
@@ -22,6 +23,8 @@ using namespace epee;
 #endif
 
 #include <boost/asio.hpp>
+
+#include "string_coding.h"
 
 namespace tools
 {
@@ -362,7 +365,69 @@ namespace tools
       return pszOS;
     }
   }
-#else
+
+  void signal_handler::GenerateCrashDump(EXCEPTION_POINTERS *pep /* = NULL*/)
+  {
+    SYSTEMTIME sysTime = { 0 };
+    GetSystemTime(&sysTime);
+    // get the computer name
+    char compName[MAX_COMPUTERNAME_LENGTH + 1] = { 0 };
+    DWORD compNameLen = ARRAYSIZE(compName);
+    GetComputerNameA(compName, &compNameLen);
+    // build the filename: APPNAME_COMPUTERNAME_DATE_TIME.DMP
+    char path[MAX_PATH*10] = { 0 };
+    std::string folder = epee::log_space::log_singletone::get_default_log_folder();
+    sprintf_s(path, ARRAYSIZE(path),"%s\\crashdump_" PROJECT_VERSION_LONG "_%s_%04u-%02u-%02u_%02u-%02u-%02u.dmp",
+      folder.c_str(), compName, sysTime.wYear, sysTime.wMonth, sysTime.wDay,
+      sysTime.wHour, sysTime.wMinute, sysTime.wSecond);
+
+    HANDLE hFile = CreateFileA(path, GENERIC_READ | GENERIC_WRITE,
+      0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if ((hFile != NULL) && (hFile != INVALID_HANDLE_VALUE))
+    {
+      // Create the minidump 
+      MINIDUMP_EXCEPTION_INFORMATION mdei;
+
+      mdei.ThreadId = GetCurrentThreadId();
+      mdei.ExceptionPointers = pep;
+      mdei.ClientPointers = FALSE;
+
+      MINIDUMP_CALLBACK_INFORMATION mci;
+
+      mci.CallbackRoutine = (MINIDUMP_CALLBACK_ROUTINE)MyMiniDumpCallback;
+      mci.CallbackParam = 0;
+
+      MINIDUMP_TYPE mdt = (MINIDUMP_TYPE)(MiniDumpWithPrivateReadWriteMemory |
+        MiniDumpWithDataSegs |
+        MiniDumpWithHandleData |
+        MiniDumpWithFullMemoryInfo |
+        MiniDumpWithThreadInfo |
+        MiniDumpWithUnloadedModules);
+
+      BOOL rv = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
+        hFile, mdt, (pep != 0) ? &mdei : 0, 0, &mci);
+
+      if (!rv)
+      {
+        LOG_ERROR("Minidump file create FAILED(error " << GetLastError() << ") on path: " <<  path);
+      }
+      else
+      {
+        LOG_PRINT_L0("Minidump file created on path: " << path);
+      }
+      // Close the file 
+      CloseHandle(hFile);
+    }
+    else
+    {
+      LOG_ERROR("Minidump FAILED to create file (error " << GetLastError() << ") on path: " << path);
+    }
+  }
+
+
+
+#else // ifdef WIN32
 std::string get_nix_version_display_string()
 {
   utsname un;
@@ -387,18 +452,22 @@ std::string get_nix_version_display_string()
 
 
 #ifdef WIN32
-  std::string get_special_folder_path(int nfolder, bool iscreate)
+  std::wstring get_special_folder_path_w(int nfolder, bool iscreate)
   {
-    namespace fs = boost::filesystem;
-    char psz_path[MAX_PATH] = "";
+    wchar_t psz_path[MAX_PATH] = L"";
 
-    if(SHGetSpecialFolderPathA(NULL, psz_path, nfolder, iscreate))
+    if (SHGetSpecialFolderPathW(NULL, psz_path, nfolder, iscreate))
     {
       return psz_path;
     }
 
-    LOG_ERROR("SHGetSpecialFolderPathA() failed, could not obtain requested path.");
-    return "";
+    LOG_ERROR("SHGetSpecialFolderPathW(" << nfolder << ", " << iscreate << ") failed, could not obtain requested path.");
+    return L"";
+  }
+
+  std::string get_special_folder_path_utf8(int nfolder, bool iscreate)
+  {
+    return epee::string_encoding::wstring_to_utf8(get_special_folder_path_w(nfolder, iscreate));
   }
 #endif
 
@@ -413,9 +482,9 @@ std::string get_nix_version_display_string()
 #ifdef WIN32
     // Windows
 #ifdef _M_X64
-    config_folder = get_special_folder_path(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT;
+    config_folder = get_special_folder_path_utf8(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT;
 #else 
-    config_folder = get_special_folder_path(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT + "-x86";
+    config_folder = get_special_folder_path_utf8(CSIDL_APPDATA, true) + "/" + CURRENCY_NAME_SHORT + "-x86";
 #endif 
 #else
     std::string pathRet;
@@ -455,7 +524,7 @@ std::string get_nix_version_display_string()
     std::string wallets_dir;
 #ifdef WIN32
     // Windows
-    wallets_dir = get_special_folder_path(CSIDL_PERSONAL, true) + "/" + CURRENCY_NAME_BASE;
+    wallets_dir = get_special_folder_path_utf8(CSIDL_PERSONAL, true) + "/" + CURRENCY_NAME_BASE;
 #else
     std::string pathRet;
     char* pszHome = getenv("HOME");
@@ -490,7 +559,7 @@ std::string get_nix_version_display_string()
   {
     namespace fs = boost::filesystem;
     boost::system::error_code ec;
-    fs::path fs_path(path);
+    fs::path fs_path = epee::string_encoding::utf8_to_wstring(path);
     if (fs::is_directory(fs_path, ec))
     {
       return true;
@@ -588,39 +657,5 @@ std::string get_nix_version_display_string()
     std::ifstream in(log_filename, std::ifstream::ate | std::ifstream::binary);
     return static_cast<uint64_t>(in.tellg());
   }
-
-  int64_t get_ntp_time(const std::string& host_name)
-  {
-    try
-    {
-      boost::asio::io_service io_service;
-      boost::asio::ip::udp::resolver resolver(io_service);
-      boost::asio::ip::udp::resolver::query query(boost::asio::ip::udp::v4(), host_name, "ntp");
-      boost::asio::ip::udp::endpoint receiver_endpoint = *resolver.resolve(query);
-      boost::asio::ip::udp::socket socket(io_service);
-      socket.open(boost::asio::ip::udp::v4());
-
-      boost::array<unsigned char, 48> send_buf = { { 010, 0, 0, 0, 0, 0, 0, 0, 0 } };
-      socket.send_to(boost::asio::buffer(send_buf), receiver_endpoint);
-
-      boost::array<unsigned long, 1024> recv_buf;
-      boost::asio::ip::udp::endpoint sender_endpoint;
-      size_t len = socket.receive_from(boost::asio::buffer(recv_buf), sender_endpoint);
-
-      time_t time_recv = ntohl((time_t)recv_buf[4]);
-      time_recv -= 2208988800U;  //Unix time starts from 01/01/1970 == 2208988800U
-      return time_recv;
-    }
-    catch (const std::exception& e)
-    {
-      LOG_PRINT_L2("get_ntp_time(): exception: " << e.what());
-      return 0;
-    }
-    catch (...)
-    {
-      return 0;
-    }
-  }
-
 
 } // namespace tools

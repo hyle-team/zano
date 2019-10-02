@@ -35,7 +35,7 @@ using namespace epee;
 
 #define CURRENT_P2P_STORAGE_ARCHIVE_VER    (CURRENCY_FORMATION_VERSION+13)
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
 namespace nodetool
@@ -131,11 +131,14 @@ namespace nodetool
       HANDLE_INVOKE_T2(COMMAND_TIMED_SYNC, &node_server::handle_timed_sync)
       HANDLE_INVOKE_T2(COMMAND_PING, &node_server::handle_ping)
 #ifdef ALLOW_DEBUG_COMMANDS
-      HANDLE_INVOKE_T2(COMMAND_REQUEST_STAT_INFO, &node_server::handle_get_stat_info)
-      HANDLE_INVOKE_T2(COMMAND_REQUEST_NETWORK_STATE, &node_server::handle_get_network_state)
-      HANDLE_INVOKE_T2(COMMAND_REQUEST_PEER_ID, &node_server::handle_get_peer_id)
-      HANDLE_INVOKE_T2(COMMAND_REQUEST_LOG, &node_server::handle_request_log)
-      HANDLE_INVOKE_T2(COMMAND_SET_LOG_LEVEL, &node_server::handle_set_log_level)
+      if (m_debug_requests_enabled)
+      {
+        HANDLE_INVOKE_T2(COMMAND_REQUEST_STAT_INFO, &node_server::handle_get_stat_info)
+        HANDLE_INVOKE_T2(COMMAND_REQUEST_NETWORK_STATE, &node_server::handle_get_network_state)
+        HANDLE_INVOKE_T2(COMMAND_REQUEST_PEER_ID, &node_server::handle_get_peer_id)
+        HANDLE_INVOKE_T2(COMMAND_REQUEST_LOG, &node_server::handle_request_log)
+        HANDLE_INVOKE_T2(COMMAND_SET_LOG_LEVEL, &node_server::handle_set_log_level)
+      }
 #endif
       CHAIN_INVOKE_MAP_TO_OBJ_FORCE_CONTEXT(m_payload_handler, typename t_payload_net_handler::connection_context&)
     END_INVOKE_MAP2()
@@ -239,6 +242,7 @@ namespace nodetool
     bool m_allow_local_ip;
     bool m_hide_my_port;
     bool m_offline_mode;
+    bool m_debug_requests_enabled;
     uint64_t m_startup_time;
 
     //critical_section m_connections_lock;
@@ -296,4 +300,4 @@ namespace nodetool
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL NULL
 
-POP_WARNINGS
+POP_VS_WARNINGS

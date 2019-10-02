@@ -8,7 +8,11 @@
 
 #include "common/pod-class.h"
 #include "generic-ops.h"
-
+#include "warnings.h"
+PUSH_VS_WARNINGS
+DISABLE_VS_WARNINGS(4804)
+#include "blake2.h"
+POP_VS_WARNINGS
 namespace crypto {
 
   extern "C" {
@@ -39,6 +43,12 @@ namespace crypto {
 
   inline void tree_hash(const hash *hashes, std::size_t count, hash &root_hash) {
     tree_hash(reinterpret_cast<const char (*)[HASH_SIZE]>(hashes), count, reinterpret_cast<char *>(&root_hash));
+  }
+
+  inline hash blake2_hash(const void *data, std::size_t length) {
+    hash h;
+    blake2(&h, sizeof(h), data, length, nullptr, 0);
+    return h;
   }
 
 }

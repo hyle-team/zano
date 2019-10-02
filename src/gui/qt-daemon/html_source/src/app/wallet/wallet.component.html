@@ -33,8 +33,11 @@
 <div class="tabs">
   <div class="tabs-header">
     <ng-container *ngFor="let tab of tabs; let index = index">
-      <div class="tab" [class.active]="tab.active" [class.disabled]="(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && (variablesService.daemon_state !== 2 || !variablesService.currentWallet.loaded)" (click)="changeTab(index)">
-        <i class="icon" [ngClass]="tab.icon"></i>
+      <div class="tab" [class.active]="tab.active" [class.disabled]="(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && (variablesService.daemon_state !== 2 || !variablesService.currentWallet.loaded)" (click)="changeTab(index)" (mouseover)="itemHovered(index, true)" (mouseleave)="itemHovered(index, false)">
+        <i class="icon" [ngClass]="tab.icon"  *ngIf="!tab.itemHovered; else svgAnimated"></i>
+        <ng-template #svgAnimated>
+          <div class="animated" [innerHTML]="tab.animated | safeHTML"></div>
+        </ng-template>
         <span>{{ tab.title | translate }}</span>
         <span class="indicator" *ngIf="tab.indicator">{{variablesService.currentWallet.new_contracts}}</span>
       </div>

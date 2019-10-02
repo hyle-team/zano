@@ -1,11 +1,10 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2019 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project 
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
 #include  <thread>
-
 
 #include "include_base_utils.h"
 
@@ -17,9 +16,6 @@ namespace tools
 {
   namespace db
   {
-
-
-
     class lmdb_db_backend : public i_db_backend
     {
 
@@ -38,11 +34,7 @@ namespace tools
       boost::recursive_mutex m_cs;
       boost::recursive_mutex m_write_exclusive_lock;
       std::map<std::thread::id, transactions_list> m_txs; // size_t -> count of nested read_only transactions
-      std::atomic<uint64_t> m_commits_count;
-      
       bool pop_tx_entry(tx_entry& txe);
-
-
     public:
       lmdb_db_backend();
       ~lmdb_db_backend();
@@ -52,7 +44,7 @@ namespace tools
       bool begin_transaction(bool read_only = false);
       bool commit_transaction();
       void abort_transaction();
-      bool open(const std::string& path, uint64_t flags = 0);
+      bool open(const std::string& path, uint64_t cache_sz = CACHE_SIZE);
       bool open_container(const std::string& name, container_handle& h);
       bool erase(container_handle h, const char* k, size_t s);
       bool get(container_handle h, const char* k, size_t s, std::string& res_buff);
@@ -64,7 +56,6 @@ namespace tools
       //-------------------------------------------------------------------------------------
       bool have_tx();
       MDB_txn* get_current_tx();
-      bool resize_if_needed();
 
     };
   }
