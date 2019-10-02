@@ -1737,7 +1737,13 @@ namespace currency
     }
     return true;
   }
-
+  //------------------------------------------------------------------
+  bool validate_password(const std::string& password)
+  {
+    static const std::string allowed_password_symbols = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!?@#$%^&*_+|{}[]()<>:;\"'-=\\/.,";
+    size_t n = password.find_first_not_of(allowed_password_symbols, 0);
+    return n == std::string::npos;
+  }
 
   //------------------------------------------------------------------
 #define ANTI_OVERFLOW_AMOUNT       1000000
