@@ -3,6 +3,7 @@ import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
 import {FormControl, FormGroup} from '@angular/forms';
 import {Location} from '@angular/common';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-settings',
@@ -14,6 +15,28 @@ export class SettingsComponent implements OnInit {
   theme: string;
   scale: number;
   changeForm: any;
+  languagesOptions = [
+    {
+      name: 'en',
+      language: 'SETTINGS.LANGUAGE.EN'
+    },
+    {
+      name: 'fr',
+      language: 'SETTINGS.LANGUAGE.FR'
+    },
+    {
+      name: 'de',
+      language: 'SETTINGS.LANGUAGE.DE'
+    },
+    {
+      name: 'it',
+      language: 'SETTINGS.LANGUAGE.IT'
+    },
+    {
+      name: 'pt',
+      language: 'SETTINGS.LANGUAGE.PT'
+    }
+  ];
   appLockOptions = [
     {
       id: 5,
@@ -79,6 +102,7 @@ export class SettingsComponent implements OnInit {
     public variablesService: VariablesService,
     private backend: BackendService,
     private location: Location,
+    public translate: TranslateService,
     private ngZone: NgZone
   ) {
     this.theme = this.variablesService.settings.theme;
@@ -133,15 +157,14 @@ export class SettingsComponent implements OnInit {
           } else {
             console.log(data['error_code']);
           }
-        
-        })
+        });
       } else {
         this.backend.dropSecureAppData();
       }
       this.changeForm.reset();
     }
   }
-  
+
   onLockChange() {
     if (this.variablesService.appLogin) {
       this.variablesService.restartCountdown();
@@ -151,6 +174,11 @@ export class SettingsComponent implements OnInit {
 
   onLogChange() {
     this.backend.setLogLevel(this.variablesService.settings.appLog);
+    this.backend.storeAppData();
+  }
+
+  onLanguageChange() {
+    this.translate.use(this.variablesService.settings.language);
     this.backend.storeAppData();
   }
 

@@ -32,6 +32,25 @@
     </div>
 
     <div class="lock-selection">
+      <label class="lock-selection-title">{{ 'SETTINGS.LANGUAGE.TITLE' | translate }}</label>
+      <ng-select class="custom-select"
+                 [items]="languagesOptions"
+                 bindValue="name"
+                 bindLabel="language"
+                 [(ngModel)]="variablesService.settings.language"
+                 [clearable]="false"
+                 [searchable]="false"
+                 (change)="onLanguageChange()">
+        <ng-template ng-label-tmp let-item="item">
+          {{item.language | translate}}
+        </ng-template>
+        <ng-template ng-option-tmp let-item="item" let-index="index">
+          {{item.language | translate}}
+        </ng-template>
+      </ng-select>
+    </div>
+
+    <div class="lock-selection">
       <label class="lock-selection-title">{{ 'SETTINGS.APP_LOCK.TITLE' | translate }}</label>
       <ng-select class="custom-select"
                  [items]="appLockOptions"

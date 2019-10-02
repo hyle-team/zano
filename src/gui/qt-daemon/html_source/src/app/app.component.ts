@@ -38,7 +38,7 @@ export class AppComponent implements OnInit, OnDestroy {
     private intToMoneyPipe: IntToMoneyPipe,
     private modalService: ModalService
   ) {
-    translate.addLangs(['en', 'fr']);
+    translate.addLangs(['en', 'fr', 'de', 'it', 'pt']);
     translate.setDefaultLang('en');
     // const browserLang = translate.getBrowserLang();
     // translate.use(browserLang.match(/en|fr/) ? browserLang : 'en');
@@ -62,7 +62,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_SHOW'),
         this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_MINIMIZE')
       ];
-      this.backend.setBackendLocalization(stringsArray, 'en');
+      this.backend.setBackendLocalization(stringsArray, this.variablesService.settings.language);
     } else {
       console.warn('wait translate use');
       setTimeout(() => {
@@ -516,7 +516,7 @@ export class AppComponent implements OnInit, OnDestroy {
           this.variablesService.settings.theme = this.variablesService.defaultTheme;
           this.renderer.addClass(document.body, 'theme-' + this.variablesService.settings.theme);
         }
-
+        this.translate.use(this.variablesService.settings.language);
         this.setBackendLocalization();
 
         this.backend.setLogLevel(this.variablesService.settings.appLog);
