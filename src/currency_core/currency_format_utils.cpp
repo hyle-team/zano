@@ -1550,8 +1550,8 @@ namespace currency
   bool check_tx_derivation_hint(const transaction& tx, const crypto::key_derivation& derivation)
   {
     bool found_der_xor = false;
-    uint16_t my_derive_xor = get_derivation_hint(derivation);
-    tx_derivation_hint dh = make_tx_derivation_hint_from_uint16(my_derive_xor);
+    uint16_t hint = get_derivation_hint(derivation);
+    tx_derivation_hint dh = make_tx_derivation_hint_from_uint16(hint);
     for (auto& e : tx.extra)
     {
       if (e.type() == typeid(tx_derivation_hint))
@@ -1737,7 +1737,13 @@ namespace currency
     }
     return true;
   }
-
+  //------------------------------------------------------------------
+  bool validate_password(const std::string& password)
+  {
+    static const std::string allowed_password_symbols = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!?@#$%^&*_+|{}[]()<>:;\"'-=\\/.,";
+    size_t n = password.find_first_not_of(allowed_password_symbols, 0);
+    return n == std::string::npos;
+  }
 
   //------------------------------------------------------------------
 #define ANTI_OVERFLOW_AMOUNT       1000000

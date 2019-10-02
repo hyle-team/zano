@@ -1962,6 +1962,7 @@ void wallet2::assign_account(const currency::account_base& acc)
 //----------------------------------------------------------------------------------------------------
 void wallet2::generate(const std::wstring& path, const std::string& pass)
 {
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass), "new wallet generation failed: password contains forbidden characters")
   clear();
   prepare_file_names(path);
   m_password = pass;

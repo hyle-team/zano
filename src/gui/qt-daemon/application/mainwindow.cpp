@@ -609,10 +609,45 @@ bool MainWindow::show_msg_box(const std::string& message)
   return true;
   CATCH_ENTRY2(false);
 }
+
+void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    QByteArray local_msg = msg.toLocal8Bit();
+    const char* msg_type = "";
+    switch (type)
+    {
+    case QtDebugMsg:    msg_type = "DEBG "; break;
+    case QtInfoMsg:     msg_type = "INFO "; break;
+    case QtWarningMsg:  msg_type = "WARN "; break;
+    case QtCriticalMsg: msg_type = "CRIT "; break;
+    case QtFatalMsg:    msg_type = "FATAL "; break;
+    }
+
+    if (context.file == nullptr && context.function == nullptr)
+    {
+      // no debug info
+      LOG_PRINT("[QT] " << msg_type << local_msg.constData(), LOG_LEVEL_0);
+    }
+    else
+    {
+      // some debug info
+      LOG_PRINT("[QT] " << msg_type << local_msg.constData() << " @ " << (context.file ? context.file : "") << ":" << context.line << ", " << (context.function ? context.function : ""), LOG_LEVEL_0);
+    }
+}
+
 bool MainWindow::init_backend(int argc, char* argv[])
 {
   TRY_ENTRY();
-  return m_backend.init(argc, argv, this);
+  if (!m_backend.init(argc, argv, this))
+    return false;
+
+  if (m_backend.is_qt_logs_enabled())
+  {
+    qInstallMessageHandler(qt_log_message_handler);
+    QLoggingCategory::setFilterRules("*=true"); // enable all logs
+  }
+
+  return true;
   CATCH_ENTRY2(false);
 }
 
@@ -999,6 +1034,7 @@ void MainWindow::on_complete_events()
   }
   CATCH_ENTRY2(void());
 }
+
 void MainWindow::on_clear_events()
 {
   TRY_ENTRY();
@@ -1020,9 +1056,13 @@ QString MainWindow::get_secure_app_data(const QString& param)
   }
 
   std::string app_data_buff;
-  bool r = file_io_utils::load_file_to_string(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME, app_data_buff);
+  std::string filename = m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME;
+  bool r = file_io_utils::load_file_to_string(filename, app_data_buff);
   if (!r)
+  {
+    LOG_PRINT_L1("config file was not loaded: " << m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME);
     return "";
+  }
 
   if (app_data_buff.size() < sizeof(app_data_file_binary_header))
   {
@@ -1045,23 +1085,38 @@ QString MainWindow::get_secure_app_data(const QString& param)
 
   m_master_password = pwd.pass;
 
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  LOG_PRINT_L0("get_secure_app_data, pass hash: " << master_password_hash);
+
   return app_data_buff.substr(sizeof(app_data_file_binary_header)).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
 QString MainWindow::set_master_password(const QString& param)
 {
+  view::api_response ar;
+
   view::password_data pwd = AUTO_VAL_INIT(pwd);
 
   if (!epee::serialization::load_t_from_json(pwd, param.toStdString()))
   {
-    view::api_response ar;
     ar.error_code = API_RETURN_CODE_BAD_ARG;
     return MAKE_RESPONSE(ar);
   }
+
+  if (!currency::validate_password(pwd.pass))
+  {
+    ar.error_code = API_RETURN_CODE_BAD_ARG;
+    return MAKE_RESPONSE(ar);
+  }
+
   m_master_password = pwd.pass;
 
-  view::api_response ar;
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  LOG_PRINT_L0("set_master_password, pass hash: " << master_password_hash);
+
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
 }
@@ -1076,11 +1131,18 @@ QString MainWindow::check_master_password(const QString& param)
     ar.error_code = API_RETURN_CODE_BAD_ARG;
     return MAKE_RESPONSE(ar);
   }
+
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  crypto::hash pwd_pre_hash = crypto::cn_fast_hash(pwd.pass.c_str(), pwd.pass.length());
+  crypto::hash pwd_hash = crypto::cn_fast_hash(&pwd_pre_hash, sizeof pwd_pre_hash);
  
   if (m_master_password != pwd.pass)
   {
     ar.error_code = API_RETURN_CODE_WRONG_PASSWORD;
-  }else
+    LOG_PRINT_L0("check_master_password: pwd hash: " << pwd_hash << ", expected: " << master_password_hash);
+  }
+  else
   {
     ar.error_code = API_RETURN_CODE_OK;
   }
@@ -1099,18 +1161,27 @@ QString MainWindow::store_app_data(const QString& param)
     return MAKE_RESPONSE(ar);
   }
 
-  //bool r = file_io_utils::save_string_to_file(m_backend.get_config_folder() + "/" + GUI_CONFIG_FILENAME, param.toStdString());
-  bool r = file_io_utils::save_string_to_file(m_backend.get_config_folder() + "/" + GUI_CONFIG_FILENAME, param.toStdString());
-  //view::api_response ar;
-  if (r)
-    ar.error_code = API_RETURN_CODE_OK;
-  else
-    ar.error_code = API_RETURN_CODE_FAIL;
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  LOG_PRINT_L0("store_app_data, pass hash: " << master_password_hash);
 
-  //ar.error_code = store_to_file((m_backend.get_config_folder() + "/" + GUI_CONFIG_FILENAME).c_str(), param).toStdString();
+  std::string filename = m_backend.get_config_folder() + "/" + GUI_CONFIG_FILENAME;
+  bool r = file_io_utils::save_string_to_file(filename, param.toStdString());
+  if (r)
+  {
+    ar.error_code = API_RETURN_CODE_OK;
+    LOG_PRINT_L1("config saved: " << filename);
+  }
+  else
+  {
+    ar.error_code = API_RETURN_CODE_FAIL;
+    LOG_PRINT_L1("config save failed: " << filename);
+  }
+
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+
 QString MainWindow::is_file_exist(const QString& path)
 {
   TRY_ENTRY();
@@ -1123,7 +1194,7 @@ QString MainWindow::is_file_exist(const QString& path)
   }
   catch (const std::exception& ex)
   {
-    LOG_ERROR("FILED TO STORE TO FILE: " << path.toStdString() << " ERROR:" << ex.what());
+    LOG_ERROR("failed to check file existance: " << path.toStdString() << " ERROR:" << ex.what());
     return QString(API_RETURN_CODE_ALREADY_EXISTS) + ": " + ex.what();
   }
 
@@ -1133,6 +1204,7 @@ QString MainWindow::is_file_exist(const QString& path)
   }
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
+
 QString MainWindow::store_to_file(const QString& path, const QString& buff)
 {
   TRY_ENTRY();
@@ -1220,6 +1292,10 @@ QString MainWindow::store_secure_app_data(const QString& param)
     ar.error_code = API_RETURN_CODE_OK;
   else
     ar.error_code = API_RETURN_CODE_FAIL;
+
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  LOG_PRINT_L0("store_secure_app_data, r = " << r << ", pass hash: " << master_password_hash);
 
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
