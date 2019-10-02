@@ -157,6 +157,7 @@
       "TIME3": "1 hour",
       "TIME4": "Never"
     },
+<<<<<<< HEAD
     "SCALE": {
       "75": "75% scale", 
       "100": "100% scale",
@@ -165,6 +166,10 @@
     },
     "LANGUAGE": {
       "TITLE": "Language",
+=======
+    "LANGUAGE": {
+      "TITLE": "Languages",
+>>>>>>> fix logo, sidebar tooltip delay, multi languages
       "EN": "English",
       "FR": "French",
       "DE": "Deutsch",

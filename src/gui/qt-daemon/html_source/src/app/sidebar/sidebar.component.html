@@ -39,6 +39,7 @@
 </div>
 <div class="sidebar-settings">
 <<<<<<< HEAD
+<<<<<<< HEAD
   <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
     <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" 
       [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
@@ -78,6 +79,9 @@
     <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
 >>>>>>> fix logout without master pass
 =======
+=======
+  <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500">
+>>>>>>> fix logo, sidebar tooltip delay, multi languages
     <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" 
       [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
 >>>>>>> animated icons
@@ -118,10 +122,14 @@
     </button>
   </div>
 <<<<<<< HEAD
+<<<<<<< HEAD
   <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
 =======
   <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500">
 >>>>>>> fix logout without master pass
+=======
+  <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500">
+>>>>>>> fix logo, sidebar tooltip delay, multi languages
     <button (click)="logOut()" [class.disabled]="variablesService.appPass === ''" [disabled]="variablesService.appPass === ''">
       <i class="icon logout"></i>
       <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
