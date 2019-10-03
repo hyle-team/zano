@@ -57,12 +57,14 @@ import { ContactsComponent } from './contacts/contacts.component';
 import { AddContactsComponent } from './add-contacts/add-contacts.component';
 import { ContactSendComponent } from './contact-send/contact-send.component';
 import { ExportImportComponent } from './export-import/export-import.component';
+import { ConfirmModalComponent } from './_helpers/directives/confirm-modal/confirm-modal.component';
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json');
 }
 
 import { PapaParseModule } from 'ngx-papaparse';
+
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
@@ -120,7 +122,8 @@ export function highchartsFactory() {
     AddContactsComponent,
     ContactSendComponent,
     ExportImportComponent,
-    SafeHTMLPipe
+    SafeHTMLPipe,
+    ConfirmModalComponent
   ],
   imports: [
     BrowserModule,
@@ -150,7 +153,8 @@ export function highchartsFactory() {
   ],
   entryComponents: [
     ModalContainerComponent,
-    SendModalComponent
+    SendModalComponent,
+    ConfirmModalComponent
   ],
   bootstrap: [AppComponent]
 })

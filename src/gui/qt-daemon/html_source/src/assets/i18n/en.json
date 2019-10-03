@@ -180,6 +180,7 @@
     "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
     "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
     "LOCKED_BALANCE_LINK": "What does that mean?",
+    "CLOSE_MESSAGE": "<span class=\"message\">Remove wallet from the list</span> <br> <span>(To access it you’ll have to add it again)</span>",
     "TABS": {
       "SEND": "Send",
       "RECEIVE": "Receive",
@@ -467,7 +468,8 @@
     "ERROR": "Error",
     "SUCCESS": "Success",
     "INFO": "Information",
-    "OK": "OK"
+    "OK": "OK",
+    "CANCEL": "Cancel"
   },
   "CONFIRM": {
     "BUTTON_CONFIRM": "Send",
