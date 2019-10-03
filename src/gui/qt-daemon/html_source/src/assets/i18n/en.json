@@ -198,10 +198,14 @@
     "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
     "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
     "LOCKED_BALANCE_LINK": "What does that mean?",
+<<<<<<< HEAD
     "CONFIRM": {
       "TITLE": "Remove wallet from the list?",
       "MESSAGE": "To access it you’ll have to add it again"
     },
+=======
+    "CLOSE_MESSAGE": "<span class=\"message\">Remove wallet from the list</span> <br> <span>(To access it you’ll have to add it again)</span>",
+>>>>>>> confirm modal
     "TABS": {
       "SEND": "Send",
       "RECEIVE": "Receive",
@@ -491,6 +495,7 @@
     "INFO": "Information",
     "OK": "OK",
     "CANCEL": "Cancel"
+<<<<<<< HEAD
   },
   "CONFIRM": {
     "BUTTON_CONFIRM": "Send",
@@ -502,6 +507,8 @@
       "TO": "To",
       "COMMENT": "Comment"
     }
+=======
+>>>>>>> confirm modal
   },
   "CONFIRM": {
     "BUTTON_CONFIRM": "Send",

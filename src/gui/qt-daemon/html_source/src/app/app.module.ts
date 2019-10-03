@@ -62,11 +62,15 @@ import { AddContactsComponent } from './add-contacts/add-contacts.component';
 import { ContactSendComponent } from './contact-send/contact-send.component';
 import { ExportImportComponent } from './export-import/export-import.component';
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { ConfirmModalComponent } from './_helpers/directives/confirm-modal/confirm-modal.component';
 =======
 >>>>>>> confirm modal
 =======
 >>>>>>> contact service
+=======
+import { ConfirmModalComponent } from './_helpers/directives/confirm-modal/confirm-modal.component';
+>>>>>>> confirm modal
 
 export function HttpLoaderFactory(httpClient: HttpClient) {
   return new TranslateHttpLoader(httpClient, './assets/i18n/', '.json');
@@ -74,9 +78,13 @@ export function HttpLoaderFactory(httpClient: HttpClient) {
 
 import { PapaParseModule } from 'ngx-papaparse';
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> contact service
+=======
+
+>>>>>>> confirm modal
 // import * as more from 'highcharts/highcharts-more.src';
 // import * as exporting from 'highcharts/modules/exporting.src';
 // import * as highstock from 'highcharts/modules/stock.src';
@@ -150,8 +158,13 @@ export function highchartsFactory() {
 >>>>>>> contact service
 =======
     ExportImportComponent,
+<<<<<<< HEAD
     SafeHTMLPipe
 >>>>>>> icons functional
+=======
+    SafeHTMLPipe,
+    ConfirmModalComponent
+>>>>>>> confirm modal
   ],
   imports: [
     BrowserModule,
@@ -182,10 +195,15 @@ export function highchartsFactory() {
   entryComponents: [
     ModalContainerComponent,
 <<<<<<< HEAD
+<<<<<<< HEAD
     SendModalComponent,
     ConfirmModalComponent
 =======
     SendModalComponent
+>>>>>>> confirm modal
+=======
+    SendModalComponent,
+    ConfirmModalComponent
 >>>>>>> confirm modal
   ],
   bootstrap: [AppComponent]

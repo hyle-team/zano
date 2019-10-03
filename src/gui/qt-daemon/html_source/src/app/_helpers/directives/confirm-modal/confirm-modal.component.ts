@@ -7,7 +7,10 @@ import { Component, OnInit, Input, Output, EventEmitter, ViewChild, ElementRef }
 })
 export class ConfirmModalComponent implements OnInit {
 
+<<<<<<< HEAD
   @Input() title: string;
+=======
+>>>>>>> confirm modal
   @Input() message: string;
   @Output() confirmed: EventEmitter<boolean> = new EventEmitter<boolean>();
   @ViewChild('btn') button: ElementRef;

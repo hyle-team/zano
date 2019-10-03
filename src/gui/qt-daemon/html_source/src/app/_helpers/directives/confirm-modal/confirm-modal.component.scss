@@ -15,12 +15,20 @@
   flex-direction: column;
   background-position: center;
   background-size: 200%;
+<<<<<<< HEAD
   padding: 3rem;
+=======
+  padding: 2rem;
+>>>>>>> confirm modal
   min-width: 34rem;
   max-width: 60rem;
 
   .content {
     display: flex;
+<<<<<<< HEAD
+=======
+    margin: 1.2rem 0;
+>>>>>>> confirm modal
 
     .icon {
       flex: 0 0 auto;
@@ -39,12 +47,15 @@
       justify-content: center;
       margin-left: 2rem;
 
+<<<<<<< HEAD
       .title {
         font-size: 1.8rem;
         font-weight: 600;
         line-height: 2.2rem;
       }
 
+=======
+>>>>>>> confirm modal
       .message {
         font-size: 1.3rem;
         line-height: 1.8rem;
@@ -55,12 +66,19 @@
 
   .wrap-btn {
     display: flex;
+<<<<<<< HEAD
     justify-content: space-between;
     width: 100%;
     margin-top: 3.5rem;
   }
   
   .action-button {
+=======
+  }
+  
+  .action-button {
+    margin: 1.2rem auto 0.6rem;
+>>>>>>> confirm modal
     width: 10rem;
     height: 2.4rem;
   }
