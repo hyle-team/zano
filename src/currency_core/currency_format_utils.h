@@ -21,13 +21,13 @@
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "difficulty.h"
-//#include "offers_services_helpers.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "bc_payments_id_service.h"
 #include "bc_attachments_helpers_basic.h"
 #include "blockchain_storage_basic.h"
 #include "currency_format_utils_blocks.h"
 #include "currency_format_utils_transactions.h"
+
 
 // ------ get_tx_type_definition -------------
 #define       GUI_TX_TYPE_NORMAL                  0
@@ -163,6 +163,7 @@ namespace currency
   uint64_t get_string_uint64_hash(const std::string& str);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
   bool validate_alias_name(const std::string& al);
+  bool validate_password(const std::string& password);
   void get_attachment_extra_info_details(const std::vector<attachment_v>& attachment, extra_attachment_info& eai);
   bool construct_tx(const account_keys& sender_account_keys, 
     const std::vector<tx_source_entry>& sources, 
@@ -604,7 +605,7 @@ namespace currency
     wide_difficulty_type pow_diff;
   };
 
-  wide_difficulty_type get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
+  boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
     const difficulties& a_diff, 
     const difficulties& b_diff

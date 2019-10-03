@@ -11,16 +11,16 @@
 #ifndef Q_MOC_RUN
 #include "warnings.h"
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 DISABLE_VS_WARNINGS(4503)
 #include "serialization/keyvalue_serialization.h"
 #include "storages/portable_storage_template_helper.h"
 #include "rpc/core_rpc_server_commands_defs.h"
-#include "wallet/wallet_rpc_server_commans_defs.h"
+#include "wallet/wallet_public_structs_defs.h"
 #include "currency_core/offers_services_helpers.h"
 #include "currency_core/basic_api_response_codes.h"
-POP_WARNINGS
+POP_VS_WARNINGS
 
 #endif
 
@@ -340,7 +340,7 @@ public:
 
   struct transfer_event_info
   {
-    tools::wallet_rpc::wallet_transfer_info ti;
+    tools::wallet_public::wallet_transfer_info ti;
     uint64_t unlocked_balance;
     uint64_t balance;
 		uint64_t total_mined;
@@ -357,8 +357,8 @@ public:
 
   struct transfers_array
   {
-    std::vector<tools::wallet_rpc::wallet_transfer_info> unconfirmed;
-    std::vector<tools::wallet_rpc::wallet_transfer_info> history;
+    std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
+    std::vector<tools::wallet_public::wallet_transfer_info> history;
     uint64_t total_history_items;
 
     BEGIN_KV_SERIALIZE_MAP()
@@ -435,16 +435,6 @@ public:
     std::list<wallet_entry_info> wallets;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallets)
-    END_KV_SERIALIZE_MAP()
-  };
-
-
-  struct contracts_array
-  {
-    std::vector<tools::wallet_rpc::escrow_contract_details> contracts;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(contracts)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -583,24 +573,6 @@ public:
   };
 
 
-  struct create_proposal_param
-  {
-    uint64_t wallet_id;
-    bc_services::contract_private_details details;
-    std::string payment_id;
-    uint64_t expiration_period;
-    uint64_t fee;
-    uint64_t b_fee;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(wallet_id)
-      KV_SERIALIZE(details)
-      KV_SERIALIZE(payment_id)
-      KV_SERIALIZE(expiration_period)
-      KV_SERIALIZE(fee)
-      KV_SERIALIZE(b_fee)
-    END_KV_SERIALIZE_MAP()
-  };
 
   struct wallet_and_contract_id_param
   {
@@ -614,7 +586,7 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
-  struct accept_proposal_param : public wallet_and_contract_id_param
+  struct release_contract_param : public wallet_and_contract_id_param
   {
     std::string release_type;
 
@@ -644,7 +616,16 @@ public:
       KV_SERIALIZE(expiration_period)
       KV_CHAIN_BASE(contract_and_fee_param)
     END_KV_SERIALIZE_MAP()
+  };
 
+  struct create_proposal_param_gui : public tools::wallet_public::create_proposal_param
+  {
+    uint64_t wallet_id;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_CHAIN_BASE(tools::wallet_public::create_proposal_param)
+    END_KV_SERIALIZE_MAP()
   };
 
   struct address_validation_response

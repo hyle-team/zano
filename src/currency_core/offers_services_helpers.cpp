@@ -17,17 +17,7 @@
 
 namespace bc_services
 {
-  std::string transform_double_to_string(const double& a)
-  {
-    return std::to_string(a);
-  }
 
-  double transform_string_to_double(const std::string& d)
-  {
-    double n = 0;
-    epee::string_tools::get_xtype_from_string(n, d);
-    return n;
-  }
 
   bool order_offers_by_timestamp(const offer_details_ex* a, const offer_details_ex* b)
   {

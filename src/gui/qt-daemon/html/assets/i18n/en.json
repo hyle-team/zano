@@ -150,6 +150,14 @@
       "TIME3": "1 hour",
       "TIME4": "Never"
     },
+    "LANGUAGE": {
+      "TITLE": "Languages",
+      "EN": "English",
+      "FR": "French",
+      "DE": "Deutsch",
+      "IT": "Italian",
+      "PT": "Portuguese"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
       "OLD": "Old password",
@@ -172,6 +180,7 @@
     "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
     "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
     "LOCKED_BALANCE_LINK": "What does that mean?",
+    "CLOSE_MESSAGE": "<span class=\"message\">Remove wallet from the list</span> <br> <span>(To access it you’ll have to add it again)</span>",
     "TABS": {
       "SEND": "Send",
       "RECEIVE": "Receive",
@@ -179,6 +188,12 @@
       "CONTRACTS": "Contracts",
       "MESSAGES": "Messages",
       "STAKING": "Staking"
+    },
+    "TOOLTIPS": {
+      "EDIT_ALIAS": "Edit alias",
+      "TRANSFER_ALIAS": "Transfer alias",
+      "SETTINGS": "Settings",
+      "CLOSE": "Close wallet"
     }
   },
   "WALLET_DETAILS": {
@@ -453,7 +468,8 @@
     "ERROR": "Error",
     "SUCCESS": "Success",
     "INFO": "Information",
-    "OK": "OK"
+    "OK": "OK",
+    "CANCEL": "Cancel"
   },
   "CONFIRM": {
     "BUTTON_CONFIRM": "Send",

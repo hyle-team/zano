@@ -225,10 +225,10 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
 
   // remove old incompatible DB
   const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
-  if (boost::filesystem::exists(old_db_folder_path))
+  if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
   {
     LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
-    boost::filesystem::remove_all(old_db_folder_path);
+    boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
   }
 
   const std::string db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME;
@@ -242,7 +242,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     {
       // if DB could not be opened -- try to remove the whole folder and re-open DB
       LOG_PRINT_YELLOW("Failed to initialize database in folder: " << db_folder_path << ", first attempt", LOG_LEVEL_0);
-      boost::filesystem::remove_all(db_folder_path);
+      boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
       res = m_db.open(db_folder_path, cache_size_l1);
       CHECK_AND_ASSERT_MES(res, false, "Failed to initialize database in folder: " << db_folder_path << ", second attempt");
     }
@@ -312,7 +312,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_addr_to_alias.deinit();
       m_db_per_block_gindex_incs.deinit();
       m_db.close();
-      size_t files_removed = boost::filesystem::remove_all(db_folder_path);
+      size_t files_removed = boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
       LOG_PRINT_L1(files_removed << " files at " << db_folder_path << " removed");
 
       // try to re-create DB and re-init containers
@@ -1821,8 +1821,8 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
     main_cumul_diff.pow_diff = main_pow_diff_end - main_pow_diff_begin;
 
     //TODO: measurement of precise cumulative difficult
-    wide_difficulty_type alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
-    wide_difficulty_type main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+    boost::multiprecision::uint1024_t alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
+    boost::multiprecision::uint1024_t main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
     LOG_PRINT_L1("[FORK_CHOICE]: " << ENDL 
       << "difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
       << "difficulty_pos_at_split_point:" << difficulty_pos_at_split_point << ENDL
@@ -2644,7 +2644,8 @@ void blockchain_storage::print_blockchain_with_tx(uint64_t start_index, uint64_t
 {
   boost::filesystem::ofstream ss;
   ss.exceptions(/*std::ifstream::failbit |*/ std::ifstream::badbit);
-  ss.open(log_space::log_singletone::get_default_log_folder() + "/blockchain_with_tx.txt", std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+  ss.open(epee::string_encoding::utf8_to_wstring(log_space::log_singletone::get_default_log_folder() + "/blockchain_with_tx.txt"),
+    std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
 
 
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -2723,7 +2724,6 @@ void blockchain_storage::print_db_cache_perfeormance_data() const
 void blockchain_storage::get_last_n_x_blocks(uint64_t n, bool pos_blocks, std::list<std::shared_ptr<const block_extended_info>>& blocks) const
 {
   uint64_t count = 0;
-  bool looking_for_a_pos = true;
   for (uint64_t i = m_db_blocks.size() - 1; i != 0; --i)
   {
     auto block_ptr = m_db_blocks[i];
@@ -4870,7 +4870,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       CHECK_AND_ASSERT_MES_NO_RET(add_res, "handle_block_to_main_chain: failed to add transaction back to transaction pool");
       purge_block_data_from_blockchain(bl, tx_processed_count);
       add_block_as_invalid(bl, id);
-      LOG_PRINT_L0("Block with id " << id << " added as invalid becouse of wrong inputs in transactions");
+      LOG_PRINT_L0("Block with id " << id << " added as invalid because of wrong inputs in transactions");
       bvc.m_verification_failed = true;
       return false;
     }
@@ -5370,7 +5370,7 @@ bool blockchain_storage::build_stake_modifier(stake_modifier_type& sm, const alt
   else
   {
     bool r = string_tools::parse_tpod_from_hex_string(POS_STARTER_KERNEL_HASH, sm.last_pos_kernel_id);
-    CHECK_AND_ASSERT_MES(r, false, "Failed to parse POS_STARTER_MODFIFIER");
+    CHECK_AND_ASSERT_MES(r, false, "Failed to parse POS_STARTER_KERNEL_HASH");
   }
 
   sm.last_pow_id = get_block_hash(pbei_last_pow->bl);

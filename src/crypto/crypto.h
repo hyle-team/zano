@@ -17,7 +17,7 @@
 #include "warnings.h"
 
 
-PUSH_WARNINGS
+PUSH_GCC_WARNINGS
 DISABLE_CLANG_WARNING(unused-private-field)
 
 
@@ -236,3 +236,4 @@ POD_MAKE_COMPARABLE(crypto, signature)
 POD_MAKE_COMPARABLE(crypto, key_derivation)
 POD_MAKE_LESS_OPERATOR(crypto, hash)
 POD_MAKE_LESS_OPERATOR(crypto, key_image)
+POP_GCC_WARNINGS

@@ -14,7 +14,6 @@
 #include "storages/portable_storage_base.h"
 #include "currency_core/offers_service_basics.h"
 #include "currency_core/basic_api_response_codes.h"
-
 namespace currency
 {
   //-----------------------------------------------
@@ -1505,12 +1504,13 @@ namespace currency
   };
 
 
-  struct COMMAND_RPC_GET_ALL_OFFERS
+  struct COMMAND_RPC_GET_OFFERS_EX
   {
     struct request
     {
-
+      bc_services::core_offers_filter filter;
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(filter)
       END_KV_SERIALIZE_MAP()
     };
 

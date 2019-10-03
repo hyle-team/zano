@@ -17,6 +17,7 @@
 #include "crypto/hash.h"
 #include "misc_language.h"
 #include "p2p/p2p_protocol_defs.h"
+#include "ntp.h"
 
 #if defined(WIN32) 
 #include <dbghelp.h>
@@ -274,6 +275,4 @@ namespace tools
     static std::function<void(int, void*)>  m_fatal_handler;
   };
 
-
-  int64_t get_ntp_time(const std::string& host_name);
 }

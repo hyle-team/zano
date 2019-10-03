@@ -36,6 +36,7 @@ namespace nodetool
     const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_seed_node      = {"seed-node", "Connect to a node to retrieve peer addresses, and disconnect"};
     const command_line::arg_descriptor<bool>                      arg_p2p_hide_my_port   = {"hide-my-port", "Do not announce yourself as peerlist candidate", false, true}; 
     const command_line::arg_descriptor<bool>                      arg_p2p_offline_mode   = { "offline-mode", "Don't connect to any node and reject any connections", false, true };
+    const command_line::arg_descriptor<bool>                      arg_p2p_disable_debug_reqs = { "disable-debug-p2p-requests", "Disable p2p debug requests", false, true };
 }
 
   //-----------------------------------------------------------------------------------
@@ -51,6 +52,7 @@ namespace nodetool
     command_line::add_arg(desc, arg_p2p_seed_node);    
     command_line::add_arg(desc, arg_p2p_hide_my_port);   
     command_line::add_arg(desc, arg_p2p_offline_mode);
+    command_line::add_arg(desc, arg_p2p_disable_debug_reqs);
     command_line::add_arg(desc, arg_p2p_use_only_priority_nodes);       
   }
   //-----------------------------------------------------------------------------------
@@ -158,6 +160,7 @@ namespace nodetool
     m_external_port = command_line::get_arg(vm, arg_p2p_external_port);
     m_allow_local_ip = command_line::get_arg(vm, arg_p2p_allow_local_ip);
     m_offline_mode = command_line::get_arg(vm, arg_p2p_offline_mode);
+    m_debug_requests_enabled = !command_line::get_arg(vm, arg_p2p_disable_debug_reqs);
 
     if (m_offline_mode)
     {

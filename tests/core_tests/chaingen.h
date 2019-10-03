@@ -9,6 +9,8 @@
 #include <string>
 #include <iostream>
 
+#define USE_INSECURE_RANDOM_RPNG_ROUTINES // turns on pseudorandom number generator manupulations for tests
+
 #include "currency_core/currency_basic.h"
 #include "currency_core/currency_core.h"
 #include "wallet/wallet2.h"

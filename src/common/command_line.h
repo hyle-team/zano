@@ -122,7 +122,7 @@ namespace command_line
   boost::program_options::basic_parsed_options<charT> parse_command_line(int argc, const charT* const argv[],
     const boost::program_options::options_description& desc, bool allow_unregistered = false)
   {
-    auto parser = boost::program_options::command_line_parser(argc, argv);
+    auto parser = boost::program_options::basic_command_line_parser<charT>(argc, argv);
     parser.options(desc);
     if (allow_unregistered)
     {
@@ -187,4 +187,5 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_disable_upnp;
   extern const arg_descriptor<bool>        arg_disable_stop_if_time_out_of_sync;
   extern const arg_descriptor<bool>        arg_disable_stop_on_low_free_space;
+  extern const arg_descriptor<bool>        arg_enable_offers_service;
 }

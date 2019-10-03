@@ -27,11 +27,20 @@ struct pos_block_builder
   void step4_generate_coinbase_tx(size_t median_size,
     const boost::multiprecision::uint128_t& already_generated_coins,
     const currency::account_public_address &reward_receiver_address,
+    const currency::account_public_address &stakeholder_address,
     const currency::blobdata& extra_nonce = currency::blobdata(),
     size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
     const currency::extra_alias_entry& alias = currency::extra_alias_entry(),
     currency::keypair tx_one_time_key = currency::keypair::generate());
-  
+
+  void step4_generate_coinbase_tx(size_t median_size,
+    const boost::multiprecision::uint128_t& already_generated_coins,
+    const currency::account_public_address &reward_and_stake_receiver_address,
+    const currency::blobdata& extra_nonce = currency::blobdata(),
+    size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
+    const currency::extra_alias_entry& alias = currency::extra_alias_entry(),
+    currency::keypair tx_one_time_key = currency::keypair::generate());
+
   void step5_sign(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const crypto::public_key& stake_tx_out_pub_key, const currency::account_base& stakeholder_account);
 
   currency::block         m_block;
@@ -50,11 +59,11 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
   uint64_t pos_stake_amount,
   crypto::key_image pos_stake_keyimage,
   size_t pos_stake_gindex,
-  const currency::account_public_address &miner_address,
+  const currency::account_public_address &reward_receiving_address,
+  const currency::account_public_address &stakeholder_address,
   currency::transaction& tx,
   const currency::blobdata& extra_nonce = currency::blobdata(),
   size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
-  const currency::extra_alias_entry& alias = currency::extra_alias_entry(),
   currency::keypair tx_one_time_key = currency::keypair::generate());
 
 bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::block& prev_block, const currency::block& coinstake_scr_block, const currency::account_base& acc,
