@@ -63,6 +63,8 @@ export class VariablesService {
 =======
 >>>>>>> contact service
 
+  public pattern = '^[a-zA-Z0-9_.\\\]\*\|\~\!\?\@\#\$\%\^\&\+\{\}\(\)\<\>\:\;\"\'\-\=\/\,\[\\\\]*$';
+
   getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);
   getHeightMaxEvent = new BehaviorSubject(null);
