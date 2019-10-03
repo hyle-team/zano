@@ -1,5 +1,5 @@
 import {Component, NgZone, OnInit, OnDestroy} from '@angular/core';
-import {FormGroup, FormControl} from '@angular/forms';
+import {FormGroup, FormControl, Validators} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
@@ -18,11 +18,13 @@ export class LoginComponent implements OnInit, OnDestroy {
   queryRouting;
 
   regForm = new FormGroup({
-    password: new FormControl(''),
+    password: new FormControl('',
+    Validators.pattern(this.variablesService.pattern)),
     confirmation: new FormControl('')
-  }, function (g: FormGroup) {
+  }, [function (g: FormGroup) {
     return g.get('password').value === g.get('confirmation').value ? null : {'mismatch': true};
-  });
+  }
+]);
 
   authForm = new FormGroup({
     password: new FormControl('')

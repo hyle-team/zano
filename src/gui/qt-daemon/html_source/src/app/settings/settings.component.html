@@ -97,6 +97,11 @@
       <div class="input-block">
         <label for="new-password">{{ 'SETTINGS.MASTER_PASSWORD.NEW' | translate }}</label>
         <input type="password" id="new-password" formControlName="new_password" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
+        <div class="error-block" *ngIf="changeForm.controls['new_password'].dirty && changeForm.controls['new_password'].errors">
+          <div *ngIf="changeForm.controls['new_password'].errors.pattern">
+            {{ 'ERRORS.WRONG_PASSWORD' | translate }}
+          </div>
+        </div>
       </div>
 
       <div class="input-block">

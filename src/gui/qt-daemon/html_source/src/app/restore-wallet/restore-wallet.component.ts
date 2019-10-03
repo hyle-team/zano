@@ -24,7 +24,7 @@ export class RestoreWalletComponent implements OnInit {
       return null;
     }]),
     key: new FormControl('', Validators.required),
-    password: new FormControl(''),
+    password: new FormControl('', Validators.pattern(this.variablesService.pattern)),
     confirm: new FormControl('')
   }, function (g: FormGroup) {
     return g.get('password').value === g.get('confirm').value ? null : {'confirm_mismatch': true};

@@ -1,7 +1,7 @@
 import {Component, NgZone, OnInit, Renderer2} from '@angular/core';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
-import {FormControl, FormGroup} from '@angular/forms';
+import {FormControl, FormGroup, Validators} from '@angular/forms';
 import {Location} from '@angular/common';
 import { TranslateService } from '@ngx-translate/core';
 
@@ -109,7 +109,7 @@ export class SettingsComponent implements OnInit {
     this.scale = this.variablesService.settings.scale;
     this.changeForm = new FormGroup({
       password: new FormControl(''),
-      new_password: new FormControl(''),
+      new_password: new FormControl('', Validators.pattern(this.variablesService.pattern)),
       new_confirmation: new FormControl('')
     }, [(g: FormGroup) => {
       return g.get('new_password').value === g.get('new_confirmation').value ? null : {'confirm_mismatch': true};
