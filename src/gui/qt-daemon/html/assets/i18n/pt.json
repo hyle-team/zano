@@ -75,10 +75,14 @@
       "ERROR": "Erro de sistema",
       "COMPLETE": "Conclusão",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "SYNCING": "Syncing block",
 =======
       "SYNCING": "A sincronizar blockchain",
 >>>>>>> fix conf. pop up, tooltip delay, rebuild html
+=======
+      "SYNCING": "Syncing block",
+>>>>>>> rebuild html
       "LOADING": "A carregar informação da blockchain"
     },
     "UPDATE": {

@@ -63,10 +63,14 @@
       "ERROR": "Errore di sistema",
       "COMPLETE": "Completata",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "SYNCING": "Syncing block",
 =======
       "SYNCING": "Sincronizzazione blockchain",
 >>>>>>> rebuild
+=======
+      "SYNCING": "Syncing block",
+>>>>>>> rebuild html
       "LOADING": "Caricamento dati blockchain"
     },
     "UPDATE": {

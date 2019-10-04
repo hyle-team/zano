@@ -158,15 +158,21 @@
       "TIME4": "Never"
     },
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> rebuild html
     "SCALE": {
       "75": "75% scale", 
       "100": "100% scale",
       "125": "125% scale",
       "150": "150% scale"
     },
+<<<<<<< HEAD
     "LANGUAGE": {
       "TITLE": "Language",
 =======
+=======
+>>>>>>> rebuild html
     "LANGUAGE": {
 <<<<<<< HEAD
       "TITLE": "Languages",
