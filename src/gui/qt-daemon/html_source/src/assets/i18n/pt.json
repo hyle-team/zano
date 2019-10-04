@@ -484,8 +484,8 @@
       "MONTH": "mês"
     },
     "SWITCH": {
-      "ON": "LIGADO",
-      "OFF": "DESLIGADO"
+      "ON": "ON",
+      "OFF": "OFF"
     }
   },
   "CONTACTS": {
