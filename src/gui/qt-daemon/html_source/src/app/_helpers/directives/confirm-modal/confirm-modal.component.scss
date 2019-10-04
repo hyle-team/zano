@@ -15,13 +15,12 @@
   flex-direction: column;
   background-position: center;
   background-size: 200%;
-  padding: 2rem;
+  padding: 3rem;
   min-width: 34rem;
   max-width: 60rem;
 
   .content {
     display: flex;
-    margin: 1.2rem 0;
 
     .icon {
       flex: 0 0 auto;
@@ -56,10 +55,12 @@
 
   .wrap-btn {
     display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 3.5rem;
   }
   
   .action-button {
-    margin: 1.2rem auto 0.6rem;
     width: 10rem;
     height: 2.4rem;
   }
