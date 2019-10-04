@@ -450,12 +450,12 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-//   bool core_rpc_server::on_rpc_get_all_offers(const COMMAND_RPC_GET_ALL_OFFERS::request& req, COMMAND_RPC_GET_ALL_OFFERS::response& res, connection_context& cntx)
-//   {
-//     m_core.get_blockchain_storage().get_all_offers(res.offers);
-//     res.status = CORE_RPC_STATUS_OK;
-//     return true;
-//   }
+  bool core_rpc_server::on_get_offers_ex(const COMMAND_RPC_GET_OFFERS_EX::request& req, COMMAND_RPC_GET_OFFERS_EX::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+    m_of.get_offers_ex(req.filter, res.offers, res.total_offers, m_core.get_blockchain_storage().get_core_runtime_config().get_core_time());
+    res.status = CORE_RPC_STATUS_OK;
+    return true;
+  }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx)
   {

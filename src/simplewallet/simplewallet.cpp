@@ -678,7 +678,7 @@ bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::v
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool print_wti(const tools::wallet_rpc::wallet_transfer_info& wti)
+bool print_wti(const tools::wallet_public::wallet_transfer_info& wti)
 {
   epee::log_space::console_colors cl;
   if (wti.is_income)
@@ -713,8 +713,8 @@ bool print_wti(const tools::wallet_rpc::wallet_transfer_info& wti)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
 {
-  std::vector<tools::wallet_rpc::wallet_transfer_info> unconfirmed;
-  std::vector<tools::wallet_rpc::wallet_transfer_info> recent;
+  std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
+  std::vector<tools::wallet_public::wallet_transfer_info> recent;
   m_wallet->get_recent_transfers_history(recent, 0, 0);
   m_wallet->get_unconfirmed_transfers(unconfirmed);
   //workaround for missed fee
@@ -738,8 +738,8 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::list_recent_transfers_ex(const std::vector<std::string>& args)
 {
-  std::vector<tools::wallet_rpc::wallet_transfer_info> unconfirmed;
-  std::vector<tools::wallet_rpc::wallet_transfer_info> recent;
+  std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
+  std::vector<tools::wallet_public::wallet_transfer_info> recent;
   m_wallet->get_recent_transfers_history(recent, 0, 0);
   m_wallet->get_unconfirmed_transfers(unconfirmed);
   //workaround for missed fee

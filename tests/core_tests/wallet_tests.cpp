@@ -6,7 +6,7 @@
 #include "chaingen.h"
 #include "wallet_tests.h"
 #include "wallet_test_core_proxy.h"
-#include "../../src/wallet/wallet_rpc_server_commans_defs.h"
+#include "../../src/wallet/wallet_public_structs_defs.h"
 #include "offers_helper.h"
 #include "string_coding.h"
 #include "random_helper.h"
@@ -24,9 +24,9 @@ const currency::account_base null_account = AUTO_VAL_INIT(null_account);
 
 struct wlt_lambda_on_transfer2_wrapper : public tools::i_wallet2_callback
 {
-  typedef std::function<bool(const tools::wallet_rpc::wallet_transfer_info&, uint64_t, uint64_t, uint64_t)> Func;
+  typedef std::function<bool(const tools::wallet_public::wallet_transfer_info&, uint64_t, uint64_t, uint64_t)> Func;
   wlt_lambda_on_transfer2_wrapper(Func callback) : m_result(false), m_callback(callback) {}
-  virtual void on_transfer2(const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override
   {
     m_result = m_callback(wti, balance, unlocked_balance, total_mined);
   }
@@ -669,7 +669,7 @@ bool gen_wallet_unconfirmed_outdated_tx::c1(currency::core& c, size_t ev_index, 
   if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(200), 0, 0, MK_TEST_COINS(200), 0))
     return false;
 
-  std::vector<tools::wallet_rpc::wallet_transfer_info> trs;
+  std::vector<tools::wallet_public::wallet_transfer_info> trs;
   alice_wlt->get_unconfirmed_transfers(trs);
   CHECK_AND_ASSERT_MES(trs.size() == 1, false, "Incorrect num of unconfirmed tx");
 
@@ -697,7 +697,7 @@ bool gen_wallet_unconfirmed_outdated_tx::c2(currency::core& c, size_t ev_index, 
   if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(700), 0, 0, MK_TEST_COINS(700), 0))
     return false;
 
-  std::vector<tools::wallet_rpc::wallet_transfer_info> trs;
+  std::vector<tools::wallet_public::wallet_transfer_info> trs;
   alice_wlt->get_unconfirmed_transfers(trs);
   CHECK_AND_ASSERT_MES(trs.size() == 2, false, "Incorrect num of unconfirmed tx");
   CHECK_AND_ASSERT_MES(trs[0].timestamp != trs[1].timestamp, false, "wallet set the same timestamp for unconfirmed txs which came not simultaneously");
@@ -726,7 +726,7 @@ bool gen_wallet_unconfirmed_outdated_tx::c3(currency::core& c, size_t ev_index, 
   if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(500), 0, 0, MK_TEST_COINS(500), 0))
     return false;
 
-  std::vector<tools::wallet_rpc::wallet_transfer_info> trs;
+  std::vector<tools::wallet_public::wallet_transfer_info> trs;
   alice_wlt->get_unconfirmed_transfers(trs);
   CHECK_AND_ASSERT_MES(trs.size() == 1, false, "Incorrect num of unconfirmed tx");
 
@@ -1551,7 +1551,7 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   return true;
 }
 
-void gen_wallet_decrypted_attachments::on_transfer2(const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
+void gen_wallet_decrypted_attachments::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
 {
   m_on_transfer2_called = true;
   //try {
@@ -1777,7 +1777,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
 
   uint64_t biggest_alias_reward = get_alias_coast_from_fee("a", TESTS_DEFAULT_FEE);
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [biggest_alias_reward](const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+    [biggest_alias_reward](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
       return std::count(wti.recipients_aliases.begin(), wti.recipients_aliases.end(), "minerminer") == 1 &&
         wti.amount == biggest_alias_reward;
     }
@@ -3259,7 +3259,7 @@ bool wallet_unconfimed_tx_balance::c1(currency::core& c, size_t ev_index, const 
   bool callback_is_ok = false;
   // this callback will ba called from within wallet2::transfer() below
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&callback_is_ok](const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool
+    [&callback_is_ok](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool
     {
       CHECK_AND_ASSERT_MES(balance == MK_TEST_COINS(70), false, "invalid balance: " << print_money_brief(balance));
       CHECK_AND_ASSERT_MES(unlocked_balance == MK_TEST_COINS(50), false, "invalid unlocked_balance: " << print_money_brief(unlocked_balance));

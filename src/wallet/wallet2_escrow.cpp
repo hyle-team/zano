@@ -16,7 +16,7 @@ using namespace currency;
 namespace tools
 {
 //-----------------------------------------------------------------------------------------------------
-bool wallet2::validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::proposal_body& prop,
+bool wallet2::validate_escrow_proposal(const wallet_public::wallet_transfer_info& wti, const bc_services::proposal_body& prop,
   std::vector<payload_items_v>& decrypted_items,       /* OUT */
   crypto::hash& ms_id,                                 /* OUT */
   bc_services::contract_private_details& cpd           /* OUT */
@@ -244,7 +244,7 @@ bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_n
 #undef LOC_CHK
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::validate_escrow_contract(const wallet_rpc::wallet_transfer_info& wti, const bc_services::contract_private_details& cpd, bool is_a,
+bool wallet2::validate_escrow_contract(const wallet_public::wallet_transfer_info& wti, const bc_services::contract_private_details& cpd, bool is_a,
   const std::vector<currency::payload_items_v>& decrypted_items,
   crypto::hash& ms_id,                             /* OUT */
   bc_services::escrow_relese_templates_body& rtb   /* OUT */)
@@ -307,7 +307,7 @@ uint64_t wallet2::get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id
 // TODO move here:
 // bool wallet2::handle_contract()
 //----------------------------------------------------------------------------------------------------
-bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
+bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, const wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
   const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd, const currency::transaction& source_tx,
   size_t source_ms_out_index, const currency::account_keys& b_keys, uint64_t minimum_release_fee) const
 {
@@ -402,7 +402,7 @@ bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, co
 #undef LOC_CHK
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::validate_escrow_cancel_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
+bool wallet2::validate_escrow_cancel_proposal(const wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
   const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd, const currency::transaction& proposal_template_tx)
 {
 #define LOC_CHK(cond, mes) WLT_CHECK_AND_ASSERT_MES(cond, false, "Invalid escrow cancellation request: " << mes << ". ms id: " << ms_id << ", tx: " << get_transaction_hash(wti.tx));

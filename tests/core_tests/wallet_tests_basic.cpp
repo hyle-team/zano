@@ -6,7 +6,7 @@
 #include "chaingen.h"
 #include "wallet_tests.h"
 #include "wallet_test_core_proxy.h"
-#include "../../src/wallet/wallet_rpc_server_commans_defs.h"
+#include "../../src/wallet/wallet_public_structs_defs.h"
 #include "offers_helper.h"
 #include "string_coding.h"
 

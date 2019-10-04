@@ -140,6 +140,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_show_rpc_autodoc);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_if_time_out_of_sync);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_on_low_free_space);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_enable_offers_service);
 
 
   arg_market_disable.default_value = true;
@@ -233,8 +234,14 @@ int main(int argc, char* argv[])
     command_line::get_arg(vm, command_line::arg_disable_stop_on_low_free_space));
   ccore.set_critical_error_handler(&cceh);
 
-  //ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
-  std::shared_ptr<currency::stratum_server> stratum_server_ptr;
+
+  if (command_line::get_arg(vm, command_line::arg_enable_offers_service))
+  {
+    ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
+  }
+  
+  
+  std::shared_ptr<currency::stratum_server> stratum_server_ptr; 
   if (stratum_enabled)
     stratum_server_ptr = std::make_shared<currency::stratum_server>(&ccore);
 
