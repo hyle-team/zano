@@ -158,15 +158,21 @@
       "TIME4": "Never"
     },
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> scale settings
     "SCALE": {
       "75": "75% scale", 
       "100": "100% scale",
       "125": "125% scale",
       "150": "150% scale"
     },
+<<<<<<< HEAD
     "LANGUAGE": {
       "TITLE": "Language",
 =======
+=======
+>>>>>>> scale settings
     "LANGUAGE": {
 <<<<<<< HEAD
       "TITLE": "Languages",
