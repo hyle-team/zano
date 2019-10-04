@@ -1,8 +1,12 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { Component, OnInit, NgZone } from '@angular/core';
 =======
 import { Component, OnInit } from '@angular/core';
 >>>>>>> contact service
+=======
+import { Component, OnInit, NgZone } from '@angular/core';
+>>>>>>> new contacts display  after open import file
 import { Location } from '@angular/common';
 import { BackendService } from '../_helpers/services/backend.service';
 import { VariablesService } from '../_helpers/services/variables.service';
@@ -11,9 +15,13 @@ import { ModalService } from '../_helpers/services/modal.service';
 import { Papa } from 'ngx-papaparse';
 import { TranslateService } from '@ngx-translate/core';
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { Router } from '@angular/router';
 =======
 >>>>>>> contact service
+=======
+import { Router } from '@angular/router';
+>>>>>>> new contacts display  after open import file
 
 @Component({
   selector: 'app-export-import',
@@ -30,12 +38,18 @@ export class ExportImportComponent implements OnInit {
     private modalService: ModalService,
     private papa: Papa,
 <<<<<<< HEAD
+<<<<<<< HEAD
     private translate: TranslateService,
     private router: Router,
     private ngZone: NgZone
 =======
     private translate: TranslateService
 >>>>>>> contact service
+=======
+    private translate: TranslateService,
+    private router: Router,
+    private ngZone: NgZone
+>>>>>>> new contacts display  after open import file
   ) {}
 
   ngOnInit() {}
@@ -113,6 +127,7 @@ export class ExportImportComponent implements OnInit {
                   }
                   this.backend.getContactAlias();
 <<<<<<< HEAD
+<<<<<<< HEAD
                   this.ngZone.run(() => {
                     this.router.navigate(['/contacts']);
                   });
@@ -122,6 +137,11 @@ export class ExportImportComponent implements OnInit {
                     'CONTACTS.SUCCESS_IMPORT'
                   );
 >>>>>>> contact service
+=======
+                  this.ngZone.run(() => {
+                    this.router.navigate(['/contacts']);
+                  });
+>>>>>>> new contacts display  after open import file
                 }
                 if (elements.errors.length) {
                   this.modalService.prepareModal(
@@ -146,7 +166,7 @@ export class ExportImportComponent implements OnInit {
       delete contact.alias;
       contacts.push(contact);
     });
-    
+
     this.backend.saveFileDialog(
       '',
       '*',
@@ -164,6 +184,7 @@ export class ExportImportComponent implements OnInit {
         const path = this.isValid(file_data.path) ? file_data.path : `${file_data.path}.csv`;
         if (file_status && this.isValid(path) && this.variablesService.contacts.length) {
           this.backend.storeFile(path, this.papa.unparse(contacts));
+<<<<<<< HEAD
 <<<<<<< HEAD
         }
         if (!(file_data.error_code === 'CANCELED') && !this.isValid(path)) {
@@ -183,6 +204,8 @@ export class ExportImportComponent implements OnInit {
             'success',
             'CONTACTS.SUCCESS_EXPORT'
           );
+=======
+>>>>>>> new contacts display  after open import file
         }
         if (!(file_data.error_code === 'CANCELED') && !this.isValid(path)) {
           this.modalService.prepareModal('error', 'CONTACTS.ERROR_EXPORT');

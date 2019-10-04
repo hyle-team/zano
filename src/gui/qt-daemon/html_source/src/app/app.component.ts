@@ -174,10 +174,14 @@ export class AppComponent implements OnInit, OnDestroy {
         this.variablesService.setHeightApp(data.height);
         this.variablesService.setHeightMax(data.max_net_seen_height);
 <<<<<<< HEAD
+<<<<<<< HEAD
         this.backend.getContactAlias();
 =======
 
 >>>>>>> fix countdown + counter of blocks
+=======
+        this.backend.getContactAlias();
+>>>>>>> new contacts display  after open import file
         this.ngZone.run(() => {
           this.variablesService.daemon_state = data['daemon_network_state'];
           if (data['daemon_network_state'] === 1) {
