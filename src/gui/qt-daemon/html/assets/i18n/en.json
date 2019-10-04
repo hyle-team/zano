@@ -168,8 +168,12 @@
       "TITLE": "Language",
 =======
     "LANGUAGE": {
+<<<<<<< HEAD
       "TITLE": "Languages",
 >>>>>>> rebuild html
+=======
+      "TITLE": "Language",
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
       "EN": "English",
       "FR": "French",
       "DE": "Deutsch",
@@ -199,13 +203,19 @@
     "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
     "LOCKED_BALANCE_LINK": "What does that mean?",
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     "CONFIRM": {
       "TITLE": "Remove wallet from the list?",
       "MESSAGE": "To access it you’ll have to add it again"
     },
+<<<<<<< HEAD
 =======
     "CLOSE_MESSAGE": "<span class=\"message\">Remove wallet from the list</span> <br> <span>(To access it you’ll have to add it again)</span>",
 >>>>>>> rebuild html
+=======
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     "TABS": {
       "SEND": "Send",
       "RECEIVE": "Receive",

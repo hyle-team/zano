@@ -8,9 +8,13 @@ import { Component, OnInit, Input, Output, EventEmitter, ViewChild, ElementRef }
 export class ConfirmModalComponent implements OnInit {
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   @Input() title: string;
 =======
 >>>>>>> confirm modal
+=======
+  @Input() title: string;
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
   @Input() message: string;
   @Output() confirmed: EventEmitter<boolean> = new EventEmitter<boolean>();
   @ViewChild('btn') button: ElementRef;

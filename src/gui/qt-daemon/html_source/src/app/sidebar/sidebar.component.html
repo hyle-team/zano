@@ -40,6 +40,7 @@
 <div class="sidebar-settings">
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
     <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" 
       [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
@@ -82,6 +83,9 @@
 =======
   <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500">
 >>>>>>> fix logo, sidebar tooltip delay, multi languages
+=======
+  <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" 
       [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
 >>>>>>> animated icons
@@ -123,6 +127,7 @@
   </div>
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
 =======
   <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500">
@@ -130,6 +135,9 @@
 =======
   <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500">
 >>>>>>> fix logo, sidebar tooltip delay, multi languages
+=======
+  <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     <button (click)="logOut()" [class.disabled]="variablesService.appPass === ''" [disabled]="variablesService.appPass === ''">
       <i class="icon logout"></i>
       <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>

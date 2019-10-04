@@ -1,6 +1,9 @@
 {
   "LOGIN": {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     "SETUP_MASTER_PASS": "Configurar password mestra",
     "SETUP_CONFIRM_PASS": "Confirmar a password",
     "MASTER_PASS": "Password mestra",
@@ -8,6 +11,7 @@
     "BUTTON_SKIP": "Saltar",
     "BUTTON_RESET": "Redefinir",
     "INCORRECT_PASSWORD": "Password inválida",
+<<<<<<< HEAD
 =======
     "SETUP_MASTER_PASS": "Setup master password",
     "SETUP_CONFIRM_PASS": "Confirm the password",
@@ -17,6 +21,8 @@
     "BUTTON_RESET": "Reset",
     "INCORRECT_PASSWORD": "Invalid password",
 >>>>>>> rebuild html
+=======
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Password é obrigatória",
       "CONFIRM_REQUIRED": "Confirmação é obrigatória",
@@ -49,6 +55,7 @@
       "SYNCING": "A sincronizar carteira"
     },
 <<<<<<< HEAD
+<<<<<<< HEAD
     "CONTACTS": "Contactos",
     "SETTINGS": "Definições",
     "LOG_OUT": "Terminar sessão",
@@ -57,12 +64,21 @@
     "SETTINGS": "Settings",
     "LOG_OUT": "Log out",
 >>>>>>> rebuild
+=======
+    "CONTACTS": "Contactos",
+    "SETTINGS": "Definições",
+    "LOG_OUT": "Terminar sessão",
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     "SYNCHRONIZATION": {
       "OFFLINE": "Offline",
       "ONLINE": "Online",
       "ERROR": "Erro de sistema",
       "COMPLETE": "Conclusão",
+<<<<<<< HEAD
       "SYNCING": "Syncing block",
+=======
+      "SYNCING": "A sincronizar blockchain",
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
       "LOADING": "A carregar informação da blockchain"
     },
     "UPDATE": {
@@ -211,6 +227,7 @@
     "NAME": {
       "LABEL": "Alias",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "PLACEHOLDER": "@ Introduzir alias",
       "TOOLTIP": "Um alias é uma forma abreviada da sua conta. Um alias só pode incluir letras, números e caracteres latinos “.” e “-”. Deve começar com “@”."
     },
@@ -224,15 +241,24 @@
 =======
       "PLACEHOLDER": "@ Enter alias",
       "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
+=======
+      "PLACEHOLDER": "@ Introduzir alias",
+      "TOOLTIP": "Um alias é uma forma abreviada da sua conta. Um alias só pode incluir letras, números e caracteres latinos “.” e “-”. Deve começar com “@”."
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     },
     "COMMENT": {
-      "LABEL": "Comment",
+      "LABEL": "Comentar",
       "PLACEHOLDER": "",
-      "TOOLTIP": "The comment will be visible to anyone who wants to make a payment to your alias. You can provide details about your business, contacts, or include any text. Comments can be edited later."
+      "TOOLTIP": "O comentário ficará visível para quem quiser efetuar um pagamento para o seu alias. Pode fornecer detalhes sobre sua empresa, contatos ou incluir qualquer texto. Os comentários podem ser editados posteriormente."
     },
+<<<<<<< HEAD
     "COST": "Alias fee {{value}} {{currency}}",
     "BUTTON_ASSIGN": "Assign",
 >>>>>>> rebuild
+=======
+    "COST": "Taxa de Alias {{value}} {{currency}}",
+    "BUTTON_ASSIGN": "Atribuir",
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Nome é necessário",
       "NAME_WRONG": "Alias tem nome errado",
@@ -248,6 +274,7 @@
     "NAME": {
       "LABEL": "Alias",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "PLACEHOLDER": "@ Introduzir alias"
     },
     "COMMENT": {
@@ -258,6 +285,12 @@
     "COMMENT": {
       "LABEL": "Comment",
 >>>>>>> rebuild
+=======
+      "PLACEHOLDER": "@ Introduzir alias"
+    },
+    "COMMENT": {
+      "LABEL": "Comentário",
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
       "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
@@ -265,16 +298,22 @@
       "MAX_LENGTH": "Atingido comprimento máximo do comentário"
     },
 <<<<<<< HEAD
+<<<<<<< HEAD
     "COST": "Taxa {{value}} {{currency}}",
     "BUTTON_EDIT": "Editar"
 =======
     "COST": "Fee {{value}} {{currency}}",
     "BUTTON_EDIT": "Edit"
 >>>>>>> rebuild
+=======
+    "COST": "Taxa {{value}} {{currency}}",
+    "BUTTON_EDIT": "Editar"
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
   },
   "TRANSFER_ALIAS": {
     "NAME": {
       "LABEL": "Alias",
+<<<<<<< HEAD
 <<<<<<< HEAD
       "PLACEHOLDER": "@ Introduzir alias"
     },
@@ -286,14 +325,21 @@
       "LABEL": "Transferir para",
 =======
       "PLACEHOLDER": "@ Enter alias"
+=======
+      "PLACEHOLDER": "@ Introduzir alias"
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     },
     "COMMENT": {
-      "LABEL": "Comment",
+      "LABEL": "Comentar",
       "PLACEHOLDER": ""
     },
     "ADDRESS": {
+<<<<<<< HEAD
       "LABEL": "Transfer to",
 >>>>>>> rebuild
+=======
+      "LABEL": "Transferir para",
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
       "PLACEHOLDER": ""
     },
     "FORM_ERRORS": {
@@ -302,16 +348,22 @@
       "NO_MONEY": "Não tem fundos suficientes para transferir esse alias"
     },
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     "COST": "Taxa de Transferência {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Transferir",
     "BUTTON_CANCEL": "Cancelar",
     "REQUEST_SEND_REG": "O alias será transferido em 10 minutos"
+<<<<<<< HEAD
 =======
     "COST": "Transfer fee {{value}} {{currency}}",
     "BUTTON_TRANSFER": "Transfer",
     "BUTTON_CANCEL": "Cancel",
     "REQUEST_SEND_REG": "The alias will be transferred within 10 minutes"
 >>>>>>> rebuild
+=======
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
   },
   "SEND": {
     "ADDRESS": "Endereço",
@@ -513,6 +565,7 @@
   },
   "CONFIRM": {
 <<<<<<< HEAD
+<<<<<<< HEAD
     "BUTTON_CONFIRM": "Enviar",
     "BUTTON_CANCEL": "Cancelar",
     "TITLE": "Confirmar transação",
@@ -531,6 +584,16 @@
       "TO": "To",
       "COMMENT": "Comment"
 >>>>>>> rebuild
+=======
+    "BUTTON_CONFIRM": "Enviar",
+    "BUTTON_CANCEL": "Cancelar",
+    "TITLE": "Confirmar transação",
+    "MESSAGE": {
+      "SEND": "Enviar",
+      "FROM": "De",
+      "TO": "Para",
+      "COMMENT": "Comentário"
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     }
   },
   "STAKING": {
@@ -554,12 +617,15 @@
       "MONTH": "mês"
     },
     "SWITCH": {
-      "ON": "ON",
-      "OFF": "OFF"
+      "ON": "LIGADO",
+      "OFF": "DESLIGADO"
     }
   },
   "CONTACTS": {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     "TITLE": "Lista de Contactos",
     "IMPORT_EXPORT": "Importar ou exportar contactos",
     "IMPORT": "Importar",
@@ -570,6 +636,7 @@
     "SEND_TO": "Para",
     "OPEN_ADD_WALLET": "Abrir/Adicionar carteira",
     "COPY": "- Copiar",
+<<<<<<< HEAD
     "TABLE": {
       "NAME": "Nome",
       "ALIAS": "Alias",
@@ -621,37 +688,40 @@
     "SEND_TO": "To",
     "OPEN_ADD_WALLET": "Open/Add wallet",
     "COPY": "- Copy",
+=======
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
     "TABLE": {
-      "NAME": "Name",
+      "NAME": "Nome",
       "ALIAS": "Alias",
-      "ADDRESS": "Address",
-      "NOTES": "Notes",
-      "EMPTY": "Contact list is empty"
+      "ADDRESS": "Endereço",
+      "NOTES": "Notas",
+      "EMPTY": "Lista de contactos está vazia"
     },
     "FORM": {
-      "NAME": "Name",
-      "ADDRESS": "Address",
-      "NOTES": "Notes"
+      "NAME": "Nome",
+      "ADDRESS": "Endereço",
+      "NOTES": "Notas"
     },
     "FORM_ERRORS": {
-      "NAME_REQUIRED": "Name is required",
-      "NAME_DUBLICATED": "Name is dublicated",
-      "ADDRESS_REQUIRED": "Address is required",
-      "ADDRESS_NOT_VALID": "Address not valid",
-      "SET_MASTER_PASSWORD": "Set master password",
-      "ADDRESS_DUBLICATED": "Address is dublicated",
-      "MAX_LENGTH": "Maximum notes length reached",
-      "NAME_LENGTH": "The name must be 4-25 characters long"
+      "NAME_REQUIRED": "Nome é necessário",
+      "NAME_DUBLICATED": "Nome está duplicado",
+      "ADDRESS_REQUIRED": "Endereço é necessário",
+      "ADDRESS_NOT_VALID": "Endereço inválido",
+      "SET_MASTER_PASSWORD": "Definir password mestra",
+      "ADDRESS_DUBLICATED": "Endereço está duplicado",
+      "MAX_LENGTH": "Atingido comprimento máximo das Notas",
+      "NAME_LENGTH": "O alias deve ter entre 4 e 25 caracteres"
     },
     "BUTTON": {
-      "SEND": "Send",
-      "EDIT": "Edit",
-      "DELETE": "Delete",
-      "ADD": "Add contact",
-      "ADD_EDIT": "Add/Save",
-      "GO_TO_WALLET": "Go to wallet",
-      "IMPORT_EXPORT": "Import/export"
+      "SEND": "Enviar",
+      "EDIT": "Editar",
+      "DELETE": "Eliminar",
+      "ADD": "Adicionar contacto",
+      "ADD_EDIT": "Adicionar/Guardar",
+      "GO_TO_WALLET": "Ir para carteira",
+      "IMPORT_EXPORT": "Importar/exportar"
     },
+<<<<<<< HEAD
     "SUCCESS_SENT": "Contact added",
     "SUCCESS_SAVE": "Contact is edited",
     "SUCCESS_IMPORT": "Contacts are imported",
@@ -671,6 +741,17 @@
     "ERROR_EMPTY_LIST": "Contact list is empty",
     "ERROR_IMPORT_EMPTY": "File is empty"
 >>>>>>> fix data.foreach & rebuild html
+=======
+    "SUCCESS_SENT": "Contacto adicionado",
+    "SUCCESS_SAVE": "Contacto editado",
+    "SUCCESS_IMPORT": "Contactos importados",
+    "SUCCESS_EXPORT": "Contactos exportados",
+    "ERROR_IMPORT": "Erro ocorrido na leitura de ficheiro!",
+    "ERROR_TYPE_FILE": "Por favor importe um ficheiro .csv válido",
+    "ERROR_EXPORT": "Tipo de ficheiro inválido. Guarde ficheiro como .csv",
+    "ERROR_EMPTY_LIST": "Lista de contactos está vazia",
+    "ERROR_IMPORT_EMPTY": "Ficheiro está vazio"
+>>>>>>> fix conf. pop up, tooltip delay, rebuild html
   },
   "ERRORS": {
     "NO_MONEY": "Sem dinheiro suficiente",
