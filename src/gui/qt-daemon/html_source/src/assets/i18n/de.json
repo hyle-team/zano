@@ -55,10 +55,14 @@
       "ERROR": "Systemfehler",
       "COMPLETE": "Abschluss",
 <<<<<<< HEAD
+<<<<<<< HEAD
       "SYNCING": "Syncing block",
 =======
       "SYNCING": "Synchronisiere Blockchain",
 >>>>>>> commit
+=======
+      "SYNCING": "Syncing block",
+>>>>>>> change syncing text
       "LOADING": "Lade Blockchain-Daten"
     },
     "UPDATE": {
