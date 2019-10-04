@@ -47,7 +47,7 @@
   </div>
   <ng-template #contactsShow>
     <div class="wrap-button" routerLinkActive="active">
-      <button (click)="contactsRoute()"
+      <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2" [disabled]="variablesService.daemon_state !== 2"
         (mouseover)="menuItem = true"
         (mouseleave)="menuItem = false"
       >
