@@ -10,14 +10,14 @@
 //#include "initializer.h"
 #include "random.h"
 
-static void generate_system_random_bytes(size_t n, void *result);
+static_assert(RANDOM_STATE_SIZE >= HASH_DATA_AREA, "Invalid RANDOM_STATE_SIZE");
 
 #if defined(_WIN32)
 
 #include <windows.h>
 #include <wincrypt.h>
 
-static void generate_system_random_bytes(size_t n, void *result) {
+void generate_system_random_bytes(size_t n, void *result) {
   HCRYPTPROV prov;
 #define must_succeed(x) do if (!(x)) assert(0); while (0)
   if(!CryptAcquireContext(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT))
@@ -40,7 +40,7 @@ static void generate_system_random_bytes(size_t n, void *result) {
 #include <sys/types.h>
 #include <unistd.h>
 
-static void generate_system_random_bytes(size_t n, void *result) {
+void generate_system_random_bytes(size_t n, void *result) {
   int fd;
   if ((fd = open("/dev/urandom", O_RDONLY | O_NOCTTY | O_CLOEXEC)) < 0) {
     err(EXIT_FAILURE, "open /dev/urandom");
@@ -68,7 +68,7 @@ static void generate_system_random_bytes(size_t n, void *result) {
 
 #endif
 
-/* static */ union hash_state state; // NOTE: 'static' is commented out here to be able to store/load global random generator state in tests (see also random_helper.h)
+static union hash_state state;
 
 #if !defined(NDEBUG)
 static volatile int curstate; /* To catch thread safety problems. */
@@ -103,6 +103,57 @@ void grant_random_initialize(void)
     init_random();
     initalized = true;
   }
+}
+
+void random_prng_initialize_with_seed(uint64_t seed)
+{
+  grant_random_initialize();
+#if !defined(NDEBUG)
+  assert(curstate == 1);
+  curstate = 3;
+#endif
+  memset(&state, 0, sizeof state);
+  memcpy(&state, &seed, sizeof seed);
+  for(size_t i = 0, count = seed & 31; i < count; ++i)
+    hash_permutation(&state);
+#if !defined(NDEBUG)
+  assert(curstate == 3);
+  curstate = 1;
+#endif
+}
+
+void random_prng_get_state(void *state_buffer, const size_t buffer_size)
+{
+  grant_random_initialize();
+#if !defined(NDEBUG)
+  assert(curstate == 1);
+  curstate = 4;
+#endif
+
+  assert(sizeof state == buffer_size);
+  memcpy(state_buffer, &state, buffer_size);
+
+#if !defined(NDEBUG)
+  assert(curstate == 4);
+  curstate = 1;
+#endif
+}
+
+void random_prng_set_state(const void *state_buffer, const size_t buffer_size)
+{
+  grant_random_initialize();
+#if !defined(NDEBUG)
+  assert(curstate == 1);
+  curstate = 5;
+#endif
+
+  assert(sizeof state == buffer_size);
+  memcpy(&state, state_buffer, buffer_size);
+
+#if !defined(NDEBUG)
+  assert(curstate == 5);
+  curstate = 1;
+#endif
 }
 
 void generate_random_bytes(size_t n, void *result) {

@@ -42,6 +42,7 @@
 #include <boost/filesystem.hpp>
 #include "warnings.h"
 #include "auto_val_init.h"
+#include "string_coding.h"
 
 
 #ifndef OUT
@@ -215,7 +216,7 @@ namespace string_tools
     return t_pod;
   }
   //----------------------------------------------------------------------------
-PUSH_WARNINGS
+PUSH_GCC_WARNINGS
 DISABLE_GCC_WARNING(maybe-uninitialized)
   template<class XType>
   inline bool get_xtype_from_string(OUT XType& val, const std::string& str_id)
@@ -246,7 +247,7 @@ DISABLE_GCC_WARNING(maybe-uninitialized)
 
     return true;
   }
-POP_WARNINGS
+POP_GCC_WARNINGS
 	//---------------------------------------------------
 	template<typename int_t>
 	bool get_xnum_from_hex_string(const std::string str, int_t& res )
@@ -536,38 +537,15 @@ POP_WARNINGS
 		return module_folder;
 	}
   //----------------------------------------------------------------------------
-#ifdef _WIN32
-  inline std::string get_current_module_path()
+  inline bool set_module_name_and_folder(const std::string& path_to_process_)
   {
-    char pname [5000] = {0};
-    GetModuleFileNameA( NULL, pname, sizeof(pname));
-    pname[sizeof(pname)-1] = 0; //be happy ;)
-    return pname;
-  }
-#endif
-	//----------------------------------------------------------------------------
-	inline bool set_module_name_and_folder(const std::string& path_to_process_)
-	{
-                std::string path_to_process = path_to_process_;
-                boost::system::error_code ec;
-                path_to_process = boost::filesystem::canonical(path_to_process, ec).string();
-            #ifdef _WIN32
-                path_to_process = get_current_module_path();
-            #endif
-		std::string::size_type a = path_to_process.rfind( '\\' );
-		if(a == std::string::npos )
-		{
-			a = path_to_process.rfind( '/' );
-		}
-		if ( a != std::string::npos )
-		{	
-			get_current_module_name() = path_to_process.substr(a+1, path_to_process.size());
-			get_current_module_folder() = path_to_process.substr(0, a);
-			return true;
-		}else
-			return false;
+    boost::filesystem::path path(epee::string_encoding::utf8_to_wstring(path_to_process_));
 
-	}
+    get_current_module_folder() = epee::string_encoding::wstring_to_utf8(path.parent_path().wstring());
+    get_current_module_name() = epee::string_encoding::wstring_to_utf8(path.filename().wstring());
+
+    return true;
+  }
 	//----------------------------------------------------------------------------
 	inline bool trim_left(std::string& str)
 	{

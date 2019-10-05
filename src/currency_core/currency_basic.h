@@ -255,13 +255,13 @@ namespace currency
     END_SERIALIZE()
   };
 
-  struct tx_message
+  struct tx_derivation_hint
   {
     std::string msg;
 
     BEGIN_SERIALIZE()
       FIELD(msg)
-      END_SERIALIZE()
+    END_SERIALIZE()
   };
 
   struct tx_service_attachment
@@ -382,7 +382,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-  struct etc_tx_derivation_hint 
+  struct etc_tx_uint16_t 
   {
     uint16_t v;
     BEGIN_SERIALIZE()
@@ -390,7 +390,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector<tx_service_attachment, tx_comment, tx_payer, tx_receiver, tx_message, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time, etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_derivation_hint, etc_tx_details_unlock_time2> all_payload_types;
+  typedef boost::mpl::vector<tx_service_attachment, tx_comment, tx_payer, tx_receiver, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time, etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_uint16_t, etc_tx_details_unlock_time2> all_payload_types;
   typedef boost::make_variant_over<all_payload_types>::type attachment_v;
   typedef boost::make_variant_over<all_payload_types>::type extra_v;
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -602,7 +602,7 @@ SET_VARIANT_TAGS(currency::tx_comment, 7, "comment");
 SET_VARIANT_TAGS(currency::tx_payer, 8, "payer");
 SET_VARIANT_TAGS(std::string, 9, "string");
 SET_VARIANT_TAGS(currency::tx_crypto_checksum, 10, "checksum");
-SET_VARIANT_TAGS(currency::tx_message, 11, "message");
+SET_VARIANT_TAGS(currency::tx_derivation_hint, 11, "derivation_hint");
 SET_VARIANT_TAGS(currency::tx_service_attachment, 12, "attachment");
 //SET_VARIANT_TAGS(currency::tx_onetime_secret_key, 13, "sec_key");
 SET_VARIANT_TAGS(currency::etc_tx_details_unlock_time, 14, "unlock_time");
@@ -616,7 +616,7 @@ SET_VARIANT_TAGS(currency::extra_user_data, 19, "user_data");
 SET_VARIANT_TAGS(currency::extra_alias_entry, 20, "alias_entry");
 SET_VARIANT_TAGS(currency::extra_padding, 21, "extra_padding");
 SET_VARIANT_TAGS(crypto::public_key, 22, "pub_key");
-SET_VARIANT_TAGS(currency::etc_tx_derivation_hint, 23, "derive_hint");
+SET_VARIANT_TAGS(currency::etc_tx_uint16_t, 23, "etc_tx_uint16");
 SET_VARIANT_TAGS(uint16_t, 24, "derive_xor");
 //txout_v 
 SET_VARIANT_TAGS(currency::ref_by_id, 25, "ref_by_id");

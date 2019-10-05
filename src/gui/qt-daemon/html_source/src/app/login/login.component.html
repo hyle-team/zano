@@ -2,13 +2,18 @@
 
   <div class="wrap-login">
 
-    <div class="logo"></div>
+    <div class="logo" [innerHTML]="logo | safeHTML"></div>
 
     <form *ngIf="type === 'reg'" class="form-login" [formGroup]="regForm" (ngSubmit)="onSubmitCreatePass()">
 
       <div class="input-block">
         <label for="master-pass">{{ 'LOGIN.SETUP_MASTER_PASS' | translate }}</label>
         <input type="password" id="master-pass" formControlName="password" (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
+        <div class="error-block" *ngIf="regForm.controls['password'].dirty && regForm.controls['password'].errors">
+          <div *ngIf="regForm.controls['password'].errors.pattern">
+            {{ 'ERRORS.WRONG_PASSWORD' | translate }}
+          </div>
+        </div>
       </div>
 
       <div class="input-block">
@@ -22,7 +27,7 @@
       </div>
 
       <div class="wrap-button">
-        <button type="submit" class="blue-button" [disabled]="!regForm.controls['password'].value.length || !regForm.controls['confirmation'].value.length || (regForm.errors && regForm.errors['mismatch'])">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>
+        <button type="submit" class="blue-button" [disabled]="!regForm.controls['password'].value.length || !regForm.controls['confirmation'].value.length || (regForm.errors && regForm.errors['mismatch']) || regForm.controls['password'].errors">{{ 'LOGIN.BUTTON_NEXT' | translate }}</button>
         <button type="button" class="blue-button" (click)="onSkipCreatePass()" [disabled]="regForm.controls['password'].value.length || regForm.controls['confirmation'].value.length">{{ 'LOGIN.BUTTON_SKIP' | translate }}</button>
       </div>
 

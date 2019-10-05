@@ -1,4 +1,9 @@
+// Copyright (c) 2019 Zano Project
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <algorithm>
+
+#define USE_INSECURE_RANDOM_RPNG_ROUTINES // turns on random manupulation for tests
 
 #include "gtest/gtest.h"
 #include "currency_core/currency_format_utils.h"
@@ -8,7 +13,6 @@
 #include "common/util.h"
 #include "misc_log_ex.h"
 #include "crypto/crypto.h"
-#include "../core_tests/random_helper.h"
 #include "serialization/serialization.h"
 #include "file_io_utils.h"
 
@@ -311,7 +315,7 @@ struct bcs_stub_t
 
 TEST(db_accessor_tests, median_db_cache_test)
 {
-  random_state_test_restorer::reset_random(); // make this test deterministic (the same crypto::rand() sequence)
+  crypto::random_prng_initialize_with_seed(0); // make this test deterministic (the same crypto::rand() sequence)
 
   epee::shared_recursive_mutex m_rw_lock;
   tools::db::basic_db_accessor m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_rw_lock);

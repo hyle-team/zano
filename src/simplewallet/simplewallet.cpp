@@ -154,11 +154,6 @@ namespace
     return message_writer(color ? epee::log_space::console_color_green : epee::log_space::console_color_default, false, std::string(), LOG_LEVEL_2);
   }
 
-    message_writer success_msg_writer(epee::log_space::console_colors color)
-  {
-    return message_writer(color, true, std::string(), LOG_LEVEL_2);
-  }
-
   message_writer fail_msg_writer()
   {
     return message_writer(epee::log_space::console_color_red, true, "Error: ", LOG_LEVEL_0);
@@ -336,7 +331,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   }
   else
   {
-    bool r = open_wallet(epee::string_encoding::convert_to_ansii(m_wallet_file), pwd_container.password());
+    bool r = open_wallet(m_wallet_file, pwd_container.password());
     CHECK_AND_ASSERT_MES(r, false, "could not open account");
   }
 
@@ -384,7 +379,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   m_wallet->set_do_rise_transfer(false);
   try
   {
-    m_wallet->generate(epee::string_encoding::convert_to_unicode(m_wallet_file), password);
+    m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
     message_writer(epee::log_space::console_color_white, true) << "Generated new wallet: " << m_wallet->get_account().get_public_address_str();
     std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_view_secret_key) << std::endl << std::flush;
     if(m_do_not_set_date)
@@ -426,7 +421,7 @@ bool simple_wallet::restore_wallet(const std::string &wallet_file, const std::st
   m_wallet->set_do_rise_transfer(false);
   try
   {
-    m_wallet->restore(epee::string_encoding::convert_to_unicode(wallet_file), password, restore_seed);
+    m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, restore_seed);
     message_writer(epee::log_space::console_color_white, true) << "Wallet restored: " << m_wallet->get_account().get_public_address_str();
     std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_view_secret_key) << std::endl << std::flush;
     if (m_do_not_set_date)
@@ -462,7 +457,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
   {
     try
     {
-      m_wallet->load(epee::string_encoding::convert_to_unicode(m_wallet_file), password);
+      m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
       message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
 
       if (m_print_brain_wallet)
@@ -683,7 +678,7 @@ bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::v
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool print_wti(const tools::wallet_rpc::wallet_transfer_info& wti)
+bool print_wti(const tools::wallet_public::wallet_transfer_info& wti)
 {
   epee::log_space::console_colors cl;
   if (wti.is_income)
@@ -718,8 +713,8 @@ bool print_wti(const tools::wallet_rpc::wallet_transfer_info& wti)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
 {
-  std::vector<tools::wallet_rpc::wallet_transfer_info> unconfirmed;
-  std::vector<tools::wallet_rpc::wallet_transfer_info> recent;
+  std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
+  std::vector<tools::wallet_public::wallet_transfer_info> recent;
   m_wallet->get_recent_transfers_history(recent, 0, 0);
   m_wallet->get_unconfirmed_transfers(unconfirmed);
   //workaround for missed fee
@@ -743,8 +738,8 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::list_recent_transfers_ex(const std::vector<std::string>& args)
 {
-  std::vector<tools::wallet_rpc::wallet_transfer_info> unconfirmed;
-  std::vector<tools::wallet_rpc::wallet_transfer_info> recent;
+  std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
+  std::vector<tools::wallet_public::wallet_transfer_info> recent;
   m_wallet->get_recent_transfers_history(recent, 0, 0);
   m_wallet->get_unconfirmed_transfers(unconfirmed);
   //workaround for missed fee
@@ -1517,7 +1512,11 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+#ifdef WIN32
+int wmain( int argc, wchar_t* argv_w[ ], wchar_t* envp[ ] )
+#else
 int main(int argc, char* argv[])
+#endif
 {
 #ifdef WIN32
   _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -1532,6 +1531,18 @@ int main(int argc, char* argv[])
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
     std::fflush(nullptr);
   });
+
+#ifdef WIN32
+  // windows: convert argv_w into UTF-8-encoded std::string the same way it is in Linux and macOS
+  std::vector<std::string> argv_str(argc, "");
+  std::vector<const char*> argv_vec(argc, nullptr);
+  for (size_t i = 0; i < argc; ++i)
+  {
+    argv_str[i] = epee::string_encoding::wstring_to_utf8( argv_w[i] );
+    argv_vec[i] = argv_str[i].c_str();
+  }
+  const char* const* argv = argv_vec.data();
+#endif
 
   string_tools::set_module_name_and_folder(argv[0]);
 
@@ -1667,7 +1678,7 @@ int main(int argc, char* argv[])
       try
       {
         LOG_PRINT_L0("Loading wallet...");
-        wal.load(epee::string_encoding::convert_to_unicode(wallet_file), pwd_container.password());
+        wal.load(epee::string_encoding::utf8_to_wstring(wallet_file), pwd_container.password());
       }
       catch (const tools::error::wallet_load_notice_wallet_restored& e)
       {
