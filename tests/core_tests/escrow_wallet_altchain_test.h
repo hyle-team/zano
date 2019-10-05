@@ -14,7 +14,7 @@ enum { eam_contract_state_initial = 0, eam_contract_state_none = (uint32_t)(-1) 
 
 enum { eam_tx_unknown = 0, eam_tx_make, eam_tx_confirm, eam_tx_make_and_confirm }; // make = construct tx and send it to the pool; confirm = put tx into a block
 
-using contract_states = tools::wallet_rpc::escrow_contract_details_basic;
+using contract_states = tools::wallet_public::escrow_contract_details_basic;
 
 struct eam_event_noop
 {

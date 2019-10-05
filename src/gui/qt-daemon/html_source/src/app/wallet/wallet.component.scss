@@ -50,6 +50,7 @@
       height: 1.7rem;
 
       &.account {
+        height: 1.6rem;
         mask: url(../../assets/icons/account.svg) no-repeat center;
       }
 
@@ -60,6 +61,7 @@
       &.details {
         mask: url(../../assets/icons/details-settings.svg) no-repeat center;
         margin-right: 0;
+        height: 1.8rem;
       }
 
       &.close-wallet {
@@ -105,6 +107,7 @@
     height: 1.7rem;
 
     &.copy {
+      width: 1.8rem;
       mask: url(../../assets/icons/copy.svg) no-repeat center;
 
       &:hover {
@@ -158,10 +161,27 @@
       padding: 0 1rem;
       height: 5rem;
 
+      .animated {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-right: 1.3rem;
+      }
+      
+      .animated ::ng-deep svg {
+      
+        width: 2rem;
+        height: 2rem;
+      
+        path, circle, polygon {
+          fill: #4db1ff;
+        }
+      }
+
       .icon {
         margin-right: 1.3rem;
-        width: 1.7rem;
-        height: 1.7rem;
+        width: 2rem;
+        height: 2rem;
 
         &.send {
           mask: url(../../assets/icons/send.svg) no-repeat center;

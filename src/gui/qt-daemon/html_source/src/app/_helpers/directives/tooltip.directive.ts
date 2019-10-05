@@ -13,6 +13,7 @@ export class TooltipDirective implements OnDestroy {
   @Input() placement: string;
   @Input() tooltipClass: string;
   @Input() timeout = 0;
+  @Input() timeDelay = 0;
   @Input() delay = 0;
   @Input() showWhenNoOverflow = true;
   @Output() onHide = new EventEmitter<boolean>();
@@ -23,6 +24,8 @@ export class TooltipDirective implements OnDestroy {
   removeTooltipTimeout;
   removeTooltipTimeoutInner;
 
+  removeTooltipTimeDelay;
+
   constructor(private el: ElementRef, private renderer: Renderer2, private route: ActivatedRoute) {
   }
 
@@ -30,7 +33,13 @@ export class TooltipDirective implements OnDestroy {
     if (this.showWhenNoOverflow || (!this.showWhenNoOverflow && this.el.nativeElement.offsetWidth < this.el.nativeElement.scrollWidth)) {
       this.cursor = 'pointer';
       if (!this.tooltip) {
-        this.show();
+        if (this.timeDelay !== 0) {
+        this.removeTooltipTimeDelay = setTimeout(() => {
+          this.show();
+        }, this.timeDelay);
+        } else {
+          this.show();
+        }
       } else {
         this.cancelHide();
       }
@@ -38,6 +47,7 @@ export class TooltipDirective implements OnDestroy {
   }
 
   @HostListener('mouseleave') onMouseLeave() {
+    clearTimeout(this.removeTooltipTimeDelay);
     if (this.tooltip) {
       this.hide();
     }
@@ -222,6 +232,7 @@ export class TooltipDirective implements OnDestroy {
   ngOnDestroy() {
     clearTimeout(this.removeTooltipTimeout);
     clearTimeout(this.removeTooltipTimeoutInner);
+    clearTimeout(this.removeTooltipTimeDelay);
     if (this.tooltip) {
       this.renderer.removeChild(document.body, this.tooltip);
       this.tooltip = null;

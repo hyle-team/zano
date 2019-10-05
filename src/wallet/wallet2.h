@@ -23,7 +23,7 @@
 #include "currency_core/account_boost_serialization.h"
 #include "currency_core/currency_format_utils.h"
 
-#include "wallet_rpc_server_commans_defs.h"
+#include "wallet_public_structs_defs.h"
 #include "currency_core/currency_format_utils.h"
 #include "common/unordered_containers_boost_serialization.h"
 #include "storages/portable_storage_template_helper.h"
@@ -34,7 +34,6 @@
 #include "wallet_errors.h"
 #include "eos/portable_archive.hpp"
 #include "currency_core/core_runtime_config.h"
-#include "currency_core/offers_services_helpers.h"
 #include "currency_core/bc_offers_serialization.h"
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
@@ -63,6 +62,7 @@ ENABLE_CHANNEL_BY_DEFAULT("wallet");
 #define WLT_CHECK_AND_ASSERT_MES(expr, ret, msg) CHECK_AND_ASSERT_MES(expr, ret, "[W:" << m_log_prefix << "]" << msg)
 #define WLT_CHECK_AND_ASSERT_MES_NO_RET(expr, msg) CHECK_AND_ASSERT_MES_NO_RET(expr, "[W:" << m_log_prefix << "]" << msg)
 #define WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, "[W:" << m_log_prefix << "]" << msg)
+#define WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, "[W:" << m_log_prefix << "]" << msg)
 
 class test_generator;
 
@@ -91,10 +91,10 @@ namespace tools
     virtual ~i_wallet2_callback() = default;
 
     virtual void on_new_block(uint64_t /*height*/, const currency::block& /*block*/) {}
-    virtual void on_transfer2(const wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) {}
+    virtual void on_transfer2(const wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) {}
     virtual void on_pos_block_found(const currency::block& /*block*/) {}
     virtual void on_sync_progress(const uint64_t& /*percents*/) {}
-    virtual void on_transfer_canceled(const wallet_rpc::wallet_transfer_info& wti) {}
+    virtual void on_transfer_canceled(const wallet_public::wallet_transfer_info& wti) {}
   };
 
   struct tx_dust_policy
@@ -432,7 +432,7 @@ namespace tools
 
     typedef std::deque<transfer_details> transfer_container;
     typedef std::unordered_map<crypto::hash, transfer_details_base> multisig_transfer_container;
-    typedef std::unordered_map<crypto::hash, tools::wallet_rpc::escrow_contract_details_basic> escrow_contracts_container;
+    typedef std::unordered_map<crypto::hash, tools::wallet_public::escrow_contract_details_basic> escrow_contracts_container;
     typedef std::map<uint64_t, std::set<size_t> > free_amounts_cache_type;
 
 
@@ -459,9 +459,9 @@ namespace tools
     currency::account_base& get_account() { return m_account; }
     const currency::account_base& get_account() const { return m_account; }
 
-    void get_recent_transfers_history(std::vector<wallet_rpc::wallet_transfer_info>& trs, size_t offset, size_t count);
+    void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count);
     uint64_t get_recent_transfers_total_count();
-    void get_unconfirmed_transfers(std::vector<wallet_rpc::wallet_transfer_info>& trs);
+    void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs);
     void init(const std::string& daemon_address = "http://localhost:8080");
     bool deinit();
 
@@ -580,6 +580,11 @@ namespace tools
       std::vector<uint64_t>& selected_transfers, 
       crypto::secret_key& one_time_key);
 
+
+    void send_escrow_proposal(const wallet_public::create_proposal_param& wp,
+      currency::transaction &proposal_tx,
+      currency::transaction &escrow_template_tx);
+
     void send_escrow_proposal(const bc_services::contract_private_details& ecrow_detaild,
       size_t fake_outputs_count,
       uint64_t unlock_time,
@@ -686,16 +691,16 @@ namespace tools
     bool reset_history();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
-    void get_mining_history(wallet_rpc::mining_history& hist);
+    void get_mining_history(wallet_public::mining_history& hist);
     void set_core_runtime_config(const currency::core_runtime_config& pc);  
     currency::core_runtime_config& get_core_runtime_config();
     bool backup_keys(const std::string& path);
     bool reset_password(const std::string& pass);
     bool is_password_valid(const std::string& pass);
-    bool get_actual_offers(std::list<bc_services::offer_details_ex>& offers, bool fake = false);
+    bool get_actual_offers(std::list<bc_services::offer_details_ex>& offers);
     bool get_fake_offers(std::list<bc_services::offer_details_ex>& offers, uint64_t amount);
-    bool process_contract_info(wallet_rpc::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_attach);
-    bool handle_proposal(wallet_rpc::wallet_transfer_info& wti, const bc_services::proposal_body& prop);
+    bool process_contract_info(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_attach);
+    bool handle_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::proposal_body& prop);
     void accept_proposal(const crypto::hash& contract_id, uint64_t b_acceptance_fee, currency::transaction* p_acceptance_tx = nullptr);
     void finish_contract(const crypto::hash& contract_id, const std::string& release_type, currency::transaction* p_release_tx = nullptr);
     void request_cancel_contract(const crypto::hash& contract_id, uint64_t fee, uint64_t expiration_period, currency::transaction* p_cancellation_proposal_tx = nullptr);
@@ -751,11 +756,11 @@ private:
                                  const std::vector<currency::tx_destination_entry>& splitted_dsts);
     bool read_money_transfer2_details_from_tx(const currency::transaction& tx,
                                                         const std::vector<currency::tx_destination_entry>& splitted_dsts, 
-                                                        wallet_rpc::wallet_transfer_info_details& wtd);
+                                                        wallet_public::wallet_transfer_info_details& wtd);
 
     void update_current_tx_limit();
-    void prepare_wti(wallet_rpc::wallet_transfer_info& wti, uint64_t height, uint64_t timestamp, const currency::transaction& tx, uint64_t amount, const money_transfer2_details& td);
-    void prepare_wti_decrypted_attachments(wallet_rpc::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att);
+    void prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t height, uint64_t timestamp, const currency::transaction& tx, uint64_t amount, const money_transfer2_details& td);
+    void prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att);
     void handle_money_received2(const currency::block& b,
                                 const currency::transaction& tx, 
                                 uint64_t amount, 
@@ -774,7 +779,7 @@ private:
     bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time);
     bool scan_unconfirmed_outdate_tx();
     const currency::transaction& get_transaction_by_id(const crypto::hash& tx_hash);
-    void rise_on_transfer2(const wallet_rpc::wallet_transfer_info& wti);
+    void rise_on_transfer2(const wallet_public::wallet_transfer_info& wti);
     void process_genesis_if_needed(const currency::block& genesis);
     bool build_escrow_proposal(bc_services::contract_private_details& ecrow_details, uint64_t fee, uint64_t unlock_time, currency::tx_service_attachment& att, std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
@@ -786,14 +791,14 @@ private:
       const tx_dust_policy& dust_policy,
       const std::vector<currency::tx_destination_entry>& dsts,
       std::vector<currency::tx_destination_entry>& final_detinations);
-    bool handle_contract(wallet_rpc::wallet_transfer_info& wti, const bc_services::contract_private_details& cntr, const std::vector<currency::payload_items_v>& decrypted_attach);
-    bool handle_release_contract(wallet_rpc::wallet_transfer_info& wti, const std::string& release_instruction);
-    bool handle_cancel_proposal(wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb, const std::vector<currency::payload_items_v>& decrypted_attach);
+    bool handle_contract(wallet_public::wallet_transfer_info& wti, const bc_services::contract_private_details& cntr, const std::vector<currency::payload_items_v>& decrypted_attach);
+    bool handle_release_contract(wallet_public::wallet_transfer_info& wti, const std::string& release_instruction);
+    bool handle_cancel_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb, const std::vector<currency::payload_items_v>& decrypted_attach);
     bool handle_expiration_list(uint64_t tx_expiration_ts_median);
     void handle_contract_expirations(uint64_t tx_expiration_ts_median);
 
-    void change_contract_state(wallet_rpc::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_rpc::wallet_transfer_info& wti) const;
-    void change_contract_state(wallet_rpc::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
+    void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_public::wallet_transfer_info& wti) const;
+    void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
 
 
     uint64_t get_tx_expiration_median() const;
@@ -801,25 +806,25 @@ private:
     void print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee = UINT64_MAX);
 
     // Validates escrow template tx in assumption it's related to wallet's account (wallet's account is either A or B party in escrow process)
-    bool validate_escrow_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::proposal_body& prop,
+    bool validate_escrow_proposal(const wallet_public::wallet_transfer_info& wti, const bc_services::proposal_body& prop,
       std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd);
 
     bool validate_escrow_release(const currency::transaction& tx, bool release_type_normal, const bc_services::contract_private_details& cpd,
       const currency::txout_multisig& source_ms_out, const crypto::hash& ms_id, size_t source_ms_out_index, const currency::transaction& source_tx, const currency::account_keys& a_keys) const;
 
-    bool validate_escrow_contract(const wallet_rpc::wallet_transfer_info& wti, const bc_services::contract_private_details& cpd, bool is_a,
+    bool validate_escrow_contract(const wallet_public::wallet_transfer_info& wti, const bc_services::contract_private_details& cpd, bool is_a,
       const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::escrow_relese_templates_body& rtb);
 
-    bool validate_escrow_cancel_release(const currency::transaction& tx, const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
+    bool validate_escrow_cancel_release(const currency::transaction& tx, const wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
       const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd, const currency::transaction& source_tx,
       size_t source_ms_out_index, const currency::account_keys& b_keys, uint64_t minimum_release_fee) const;
       
-    bool validate_escrow_cancel_proposal(const wallet_rpc::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
+    bool validate_escrow_cancel_proposal(const wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb,
       const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd,
       const currency::transaction& proposal_template_tx);
 
     
-    void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_rpc::wallet_transfer_info_details& res_td) const;
+    void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_public::wallet_transfer_info_details& res_td) const;
     void print_source_entry(const currency::tx_source_entry& src) const;
 
     void init_log_prefix();
@@ -859,9 +864,9 @@ private:
     uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
 
     std::atomic<bool> m_stop;
-    std::vector<wallet_rpc::wallet_transfer_info> m_transfer_history;
+    std::vector<wallet_public::wallet_transfer_info> m_transfer_history;
     std::unordered_map<crypto::hash, currency::transaction> m_unconfirmed_in_transfers;
-    std::unordered_map<crypto::hash, tools::wallet_rpc::wallet_transfer_info> m_unconfirmed_txs;
+    std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> m_unconfirmed_txs;
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
     std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
 
@@ -887,7 +892,7 @@ private:
 } // namespace tools
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
-BOOST_CLASS_VERSION(tools::wallet_rpc::wallet_transfer_info, 9)
+BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 9)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 2)
 
 
@@ -932,14 +937,14 @@ namespace boost
     }
     
     template <class Archive>
-    inline void serialize(Archive& a, tools::wallet_rpc::wallet_transfer_info_details& x, const boost::serialization::version_type ver)
+    inline void serialize(Archive& a, tools::wallet_public::wallet_transfer_info_details& x, const boost::serialization::version_type ver)
     {
       a & x.rcv;
       a & x.spn;
     }
 
     template <class Archive>
-    inline void serialize(Archive& a, tools::wallet_rpc::wallet_transfer_info& x, const boost::serialization::version_type ver)
+    inline void serialize(Archive& a, tools::wallet_public::wallet_transfer_info& x, const boost::serialization::version_type ver)
     {      
 
       a & x.amount;
@@ -975,7 +980,7 @@ namespace boost
     }
 
     template <class Archive>
-    inline void serialize(Archive& a, tools::wallet_rpc::escrow_contract_details_basic& x, const boost::serialization::version_type ver)
+    inline void serialize(Archive& a, tools::wallet_public::escrow_contract_details_basic& x, const boost::serialization::version_type ver)
     {
       a & x.state;
       a & x.is_a;
@@ -992,9 +997,9 @@ namespace boost
     }
 
     template <class Archive>
-    inline void serialize(Archive& a, tools::wallet_rpc::escrow_contract_details& x, const boost::serialization::version_type ver)
+    inline void serialize(Archive& a, tools::wallet_public::escrow_contract_details& x, const boost::serialization::version_type ver)
     {
-      a & static_cast<tools::wallet_rpc::escrow_contract_details_basic&>(x);
+      a & static_cast<tools::wallet_public::escrow_contract_details_basic&>(x);
       a & x.contract_id;
     }
 

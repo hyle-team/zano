@@ -118,7 +118,7 @@ struct gen_crypted_attachments : test_chain_unit_enchanced
   mutable uint64_t offers_before_canel;
   mutable currency::tx_payer pr;
   mutable currency::tx_comment cm;
-  mutable currency::tx_message ms;
+  //mutable currency::tx_message ms;
 };
 
 struct gen_tx_extra_double_entry : test_chain_unit_enchanced

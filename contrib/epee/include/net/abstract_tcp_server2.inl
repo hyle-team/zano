@@ -36,7 +36,7 @@
 #include "misc_language.h"
 #include "warnings.h"
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 namespace epee {
 namespace net_utils {
 /************************************************************************/
@@ -474,7 +474,7 @@ bool boosted_tcp_server<t_protocol_handler>::init_server(uint32_t port, const st
   CATCH_ENTRY_L0("boosted_tcp_server<t_protocol_handler>::init_server", false);
 }
 //-----------------------------------------------------------------------------
-PUSH_WARNINGS
+PUSH_GCC_WARNINGS
 DISABLE_GCC_WARNING(maybe-uninitialized)
 template<class t_protocol_handler>
 bool boosted_tcp_server<t_protocol_handler>::init_server(const std::string port, const std::string& address)
@@ -487,7 +487,7 @@ bool boosted_tcp_server<t_protocol_handler>::init_server(const std::string port,
   }
   return this->init_server(p, address);
 }
-POP_WARNINGS
+POP_GCC_WARNINGS
 //---------------------------------------------------------------------------------
 template<class t_protocol_handler>
 bool boosted_tcp_server<t_protocol_handler>::worker_thread()
@@ -794,4 +794,4 @@ bool boosted_tcp_server<t_protocol_handler>::connect_async(const std::string& ad
 }
 }  // namespace net_utils
 }  // namespace epee
-POP_WARNINGS
+POP_VS_WARNINGS

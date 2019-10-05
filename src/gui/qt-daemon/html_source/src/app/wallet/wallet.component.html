@@ -8,16 +8,16 @@
     <div class="alias" *ngIf="variablesService.currentWallet.alias.hasOwnProperty('name') && variablesService.currentWallet.loaded && variablesService.daemon_state === 2">
       <span>{{variablesService.currentWallet.alias['name']}}</span>
       <ng-container *ngIf="variablesService.currentWallet.alias_available">
-        <i class="icon edit" [routerLink]="['/edit-alias']"></i>
-        <i class="icon transfer" [routerLink]="['/transfer-alias']"></i>
+        <i class="icon edit" [routerLink]="['/edit-alias']" tooltip="{{ 'WALLET.TOOLTIPS.EDIT_ALIAS' | translate }}" placement="bottom-right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500"></i>
+        <i class="icon transfer" [routerLink]="['/transfer-alias']" tooltip="{{ 'WALLET.TOOLTIPS.TRANSFER_ALIAS' | translate }}" placement="right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500"></i>
       </ng-container>
     </div>
   </div>
   <div>
-    <button [routerLink]="['/details']" routerLinkActive="active">
+    <button [routerLink]="['/details']" routerLinkActive="active" tooltip="{{ 'WALLET.TOOLTIPS.SETTINGS' | translate }}" placement="left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
       <i class="icon details"></i>
     </button>
-    <button type="button" (click)="closeWallet()">
+    <button type="button" (click)="showDialog()" tooltip="{{ 'WALLET.TOOLTIPS.CLOSE' | translate }}" placement="bottom-right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
       <i class="icon close-wallet"></i>
     </button>
   </div>
@@ -33,8 +33,11 @@
 <div class="tabs">
   <div class="tabs-header">
     <ng-container *ngFor="let tab of tabs; let index = index">
-      <div class="tab" [class.active]="tab.active" [class.disabled]="(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && (variablesService.daemon_state !== 2 || !variablesService.currentWallet.loaded)" (click)="changeTab(index)">
-        <i class="icon" [ngClass]="tab.icon"></i>
+      <div class="tab" [class.active]="tab.active" [class.disabled]="(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && (variablesService.daemon_state !== 2 || !variablesService.currentWallet.loaded)" (click)="changeTab(index)" (mouseover)="itemHovered(index, true)" (mouseleave)="itemHovered(index, false)">
+        <i class="icon" [ngClass]="tab.icon"  *ngIf="!tab.itemHovered; else svgAnimated"></i>
+        <ng-template #svgAnimated>
+          <div class="animated" [innerHTML]="tab.animated | safeHTML"></div>
+        </ng-template>
         <span>{{ tab.title | translate }}</span>
         <span class="indicator" *ngIf="tab.indicator">{{variablesService.currentWallet.new_contracts}}</span>
       </div>
@@ -45,3 +48,4 @@
   </div>
 </div>
 
+<app-confirm-modal *ngIf="isModalDialogVisible" [title]=" 'WALLET.CONFIRM.TITLE' | translate " [message]=" 'WALLET.CONFIRM.MESSAGE' | translate " (confirmed)="confirmed($event)"></app-confirm-modal>

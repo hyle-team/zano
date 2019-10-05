@@ -4,6 +4,8 @@ import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
 import { ModalService } from '../_helpers/services/modal.service';
 
+import icons from '../../assets/icons/icons.json';
+
 @Component({
   selector: 'app-sidebar',
   templateUrl: './sidebar.component.html',
@@ -13,6 +15,10 @@ export class SidebarComponent implements OnInit, OnDestroy {
   walletSubRouting;
 
   walletActive: number;
+
+  contacts = icons.contacts;
+  settings = icons.settings;
+  exit = icons.exit;
 
   constructor(
     private route: ActivatedRoute,

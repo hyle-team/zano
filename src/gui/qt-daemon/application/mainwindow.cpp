@@ -316,12 +316,12 @@ bool MainWindow::load_app_config()
   CATCH_ENTRY2(false);
 }
 
-bool MainWindow::init(const std::string& htmlPath)
+bool MainWindow::init(const std::string& html_path)
 {
   TRY_ENTRY();
   //QtWebEngine::initialize();
-  init_tray_icon(htmlPath);
-  set_html_path(htmlPath);
+  init_tray_icon(html_path);
+  set_html_path(html_path);
 
   m_backend.subscribe_to_core_events(this);
 
@@ -354,7 +354,7 @@ void MainWindow::on_menu_show()
   CATCH_ENTRY2(void());
 }
 
-void MainWindow::init_tray_icon(const std::string& htmlPath)
+void MainWindow::init_tray_icon(const std::string& html_path)
 {
   TRY_ENTRY();
   if (!QSystemTrayIcon::isSystemTrayAvailable())
@@ -384,14 +384,14 @@ void MainWindow::init_tray_icon(const std::string& htmlPath)
 
   //setup icon
 #ifdef TARGET_OS_MAC
-  m_normal_icon_path = htmlPath + "/files/app22macos.png"; // X11 tray icon size is 22x22
-  m_blocked_icon_path = htmlPath + "/files/app22macos_blocked.png"; // X11 tray icon size is 22x22
+  m_normal_icon_path = html_path + "/files/app22macos.png"; // X11 tray icon size is 22x22
+  m_blocked_icon_path = html_path + "/files/app22macos_blocked.png"; // X11 tray icon size is 22x22
 #else
-  m_normal_icon_path = htmlPath + "/files/app22windows.png"; // X11 tray icon size is 22x22
-  m_blocked_icon_path = htmlPath + "/files/app22windows_blocked.png"; // X11 tray icon size
+  m_normal_icon_path = html_path + "/files/app22windows.png"; // X11 tray icon size is 22x22
+  m_blocked_icon_path = html_path + "/files/app22windows_blocked.png"; // X11 tray icon size
 #endif
                                                                       //setWindowIcon(QIcon(iconPath.c_str()));
-  QIcon qi(m_normal_icon_path.c_str());
+  QIcon qi( QString::fromWCharArray(epee::string_encoding::utf8_to_wstring(m_normal_icon_path).c_str()) );
   qi.setIsMask(true);
   m_tray_icon->setIcon(qi);
   m_tray_icon->setToolTip(CURRENCY_NAME_BASE);
@@ -411,7 +411,7 @@ void MainWindow::bool_toggle_icon(const QString& param)
   else
     path = m_normal_icon_path;
 
-  QIcon qi(path.c_str());
+  QIcon qi( QString::fromWCharArray(epee::string_encoding::utf8_to_wstring(path).c_str()) );
   qi.setIsMask(true);
   m_tray_icon->setIcon(qi);
   CATCH_ENTRY2(void());
@@ -609,10 +609,45 @@ bool MainWindow::show_msg_box(const std::string& message)
   return true;
   CATCH_ENTRY2(false);
 }
+
+void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    QByteArray local_msg = msg.toLocal8Bit();
+    const char* msg_type = "";
+    switch (type)
+    {
+    case QtDebugMsg:    msg_type = "DEBG "; break;
+    case QtInfoMsg:     msg_type = "INFO "; break;
+    case QtWarningMsg:  msg_type = "WARN "; break;
+    case QtCriticalMsg: msg_type = "CRIT "; break;
+    case QtFatalMsg:    msg_type = "FATAL "; break;
+    }
+
+    if (context.file == nullptr && context.function == nullptr)
+    {
+      // no debug info
+      LOG_PRINT("[QT] " << msg_type << local_msg.constData(), LOG_LEVEL_0);
+    }
+    else
+    {
+      // some debug info
+      LOG_PRINT("[QT] " << msg_type << local_msg.constData() << " @ " << (context.file ? context.file : "") << ":" << context.line << ", " << (context.function ? context.function : ""), LOG_LEVEL_0);
+    }
+}
+
 bool MainWindow::init_backend(int argc, char* argv[])
 {
   TRY_ENTRY();
-  return m_backend.init(argc, argv, this);
+  if (!m_backend.init(argc, argv, this))
+    return false;
+
+  if (m_backend.is_qt_logs_enabled())
+  {
+    qInstallMessageHandler(qt_log_message_handler);
+    QLoggingCategory::setFilterRules("*=true"); // enable all logs
+  }
+
+  return true;
   CATCH_ENTRY2(false);
 }
 
@@ -771,7 +806,7 @@ bool MainWindow::set_html_path(const std::string& path)
   TRY_ENTRY();
   //init_tray_icon(path);
 #ifdef _MSC_VER
-  QString url = QString::fromUtf8(epee::string_encoding::convert_ansii_to_utf8(path).c_str()) + "/index.html";
+  QString url = QString::fromUtf8(path.c_str()) + "/index.html";
   load_file(url);
 #else
 //  load_file(QString((std::string("file://") + path + "/index.html").c_str()));
@@ -999,6 +1034,7 @@ void MainWindow::on_complete_events()
   }
   CATCH_ENTRY2(void());
 }
+
 void MainWindow::on_clear_events()
 {
   TRY_ENTRY();
@@ -1020,9 +1056,13 @@ QString MainWindow::get_secure_app_data(const QString& param)
   }
 
   std::string app_data_buff;
-  bool r = file_io_utils::load_file_to_string(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME, app_data_buff);
+  std::string filename = m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME;
+  bool r = file_io_utils::load_file_to_string(filename, app_data_buff);
   if (!r)
+  {
+    LOG_PRINT_L1("config file was not loaded: " << m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME);
     return "";
+  }
 
   if (app_data_buff.size() < sizeof(app_data_file_binary_header))
   {
@@ -1037,7 +1077,7 @@ QString MainWindow::get_secure_app_data(const QString& param)
   const app_data_file_binary_header* phdr = reinterpret_cast<const app_data_file_binary_header*>(app_data_buff.data());
   if (phdr->m_signature != APP_DATA_FILE_BINARY_SIGNATURE)
   {
-    LOG_ERROR("password missmatch: provided pass: " << pwd.pass);
+    LOG_ERROR("password missmatch");
     view::api_response ar;
     ar.error_code = API_RETURN_CODE_WRONG_PASSWORD;
     return MAKE_RESPONSE(ar);
@@ -1045,23 +1085,38 @@ QString MainWindow::get_secure_app_data(const QString& param)
 
   m_master_password = pwd.pass;
 
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  LOG_PRINT_L0("get_secure_app_data, pass hash: " << master_password_hash);
+
   return app_data_buff.substr(sizeof(app_data_file_binary_header)).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
 QString MainWindow::set_master_password(const QString& param)
 {
+  view::api_response ar;
+
   view::password_data pwd = AUTO_VAL_INIT(pwd);
 
   if (!epee::serialization::load_t_from_json(pwd, param.toStdString()))
   {
-    view::api_response ar;
     ar.error_code = API_RETURN_CODE_BAD_ARG;
     return MAKE_RESPONSE(ar);
   }
+
+  if (!currency::validate_password(pwd.pass))
+  {
+    ar.error_code = API_RETURN_CODE_BAD_ARG;
+    return MAKE_RESPONSE(ar);
+  }
+
   m_master_password = pwd.pass;
 
-  view::api_response ar;
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  LOG_PRINT_L0("set_master_password, pass hash: " << master_password_hash);
+
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
 }
@@ -1076,11 +1131,18 @@ QString MainWindow::check_master_password(const QString& param)
     ar.error_code = API_RETURN_CODE_BAD_ARG;
     return MAKE_RESPONSE(ar);
   }
+
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  crypto::hash pwd_pre_hash = crypto::cn_fast_hash(pwd.pass.c_str(), pwd.pass.length());
+  crypto::hash pwd_hash = crypto::cn_fast_hash(&pwd_pre_hash, sizeof pwd_pre_hash);
  
   if (m_master_password != pwd.pass)
   {
     ar.error_code = API_RETURN_CODE_WRONG_PASSWORD;
-  }else
+    LOG_PRINT_L0("check_master_password: pwd hash: " << pwd_hash << ", expected: " << master_password_hash);
+  }
+  else
   {
     ar.error_code = API_RETURN_CODE_OK;
   }
@@ -1099,18 +1161,27 @@ QString MainWindow::store_app_data(const QString& param)
     return MAKE_RESPONSE(ar);
   }
 
-  //bool r = file_io_utils::save_string_to_file(m_backend.get_config_folder() + "/" + GUI_CONFIG_FILENAME, param.toStdString());
-  bool r = file_io_utils::save_string_to_file(m_backend.get_config_folder() + "/" + GUI_CONFIG_FILENAME, param.toStdString());
-  //view::api_response ar;
-  if (r)
-    ar.error_code = API_RETURN_CODE_OK;
-  else
-    ar.error_code = API_RETURN_CODE_FAIL;
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  LOG_PRINT_L0("store_app_data, pass hash: " << master_password_hash);
 
-  //ar.error_code = store_to_file((m_backend.get_config_folder() + "/" + GUI_CONFIG_FILENAME).c_str(), param).toStdString();
+  std::string filename = m_backend.get_config_folder() + "/" + GUI_CONFIG_FILENAME;
+  bool r = file_io_utils::save_string_to_file(filename, param.toStdString());
+  if (r)
+  {
+    ar.error_code = API_RETURN_CODE_OK;
+    LOG_PRINT_L1("config saved: " << filename);
+  }
+  else
+  {
+    ar.error_code = API_RETURN_CODE_FAIL;
+    LOG_PRINT_L1("config save failed: " << filename);
+  }
+
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+
 QString MainWindow::is_file_exist(const QString& path)
 {
   TRY_ENTRY();
@@ -1123,7 +1194,7 @@ QString MainWindow::is_file_exist(const QString& path)
   }
   catch (const std::exception& ex)
   {
-    LOG_ERROR("FILED TO STORE TO FILE: " << path.toStdString() << " ERROR:" << ex.what());
+    LOG_ERROR("failed to check file existance: " << path.toStdString() << " ERROR:" << ex.what());
     return QString(API_RETURN_CODE_ALREADY_EXISTS) + ": " + ex.what();
   }
 
@@ -1133,6 +1204,7 @@ QString MainWindow::is_file_exist(const QString& path)
   }
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
+
 QString MainWindow::store_to_file(const QString& path, const QString& buff)
 {
   TRY_ENTRY();
@@ -1221,6 +1293,10 @@ QString MainWindow::store_secure_app_data(const QString& param)
   else
     ar.error_code = API_RETURN_CODE_FAIL;
 
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  LOG_PRINT_L0("store_secure_app_data, r = " << r << ", pass hash: " << master_password_hash);
+
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1232,7 +1308,7 @@ QString MainWindow::have_secure_app_data()
   view::api_response ar = AUTO_VAL_INIT(ar);
 
   boost::system::error_code ec;
-  if (boost::filesystem::exists(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME, ec))
+  if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME), ec))
     ar.error_code = API_RETURN_CODE_TRUE;
   else
     ar.error_code = API_RETURN_CODE_FALSE;
@@ -1240,6 +1316,7 @@ QString MainWindow::have_secure_app_data()
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+
 QString MainWindow::drop_secure_app_data()
 {
   TRY_ENTRY();
@@ -1247,13 +1324,14 @@ QString MainWindow::drop_secure_app_data()
   view::api_response ar = AUTO_VAL_INIT(ar);
 
   boost::system::error_code ec;
-  if (boost::filesystem::remove(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME, ec))
+  if (boost::filesystem::remove(epee::string_encoding::utf8_to_wstring(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME), ec))
     ar.error_code = API_RETURN_CODE_TRUE;
   else
     ar.error_code = API_RETURN_CODE_FALSE;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+
 QString MainWindow::get_all_aliases()
 {
   TRY_ENTRY();
@@ -1333,7 +1411,7 @@ QString MainWindow::get_log_level(const QString& param)
 //     return MAKE_RESPONSE(ar);
 //   }
 // 
-//   currency::COMMAND_RPC_GET_ALL_OFFERS::response rp = AUTO_VAL_INIT(rp);
+//   currency::COMMAND_RPC_GET_OFFERS_EX::response rp = AUTO_VAL_INIT(rp);
 //   ar.error_code = m_backend.get_all_offers(rp);
 // 
 //   std::string buff = epee::serialization::store_t_to_json(rp);
@@ -1422,7 +1500,7 @@ QString MainWindow::get_contracts(const QString& param)
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::wallet_id_obj, owd);
-  PREPARE_RESPONSE(view::contracts_array, ar);
+  PREPARE_RESPONSE(tools::wallet_public::contracts_array, ar);
   ar.error_code = m_backend.get_contracts(owd.wallet_id, ar.response_data.contracts);
 
   return MAKE_RESPONSE(ar);
@@ -1433,14 +1511,12 @@ QString MainWindow::create_proposal(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(view::create_proposal_param, cpp);
-  PREPARE_RESPONSE(view::contracts_array, ar);
-  ar.error_code = m_backend.create_proposal(cpp.wallet_id, cpp.details, cpp.payment_id, cpp.expiration_period, cpp.fee, cpp.b_fee);
+  PREPARE_ARG_FROM_JSON(view::create_proposal_param_gui, cpp);
+  PREPARE_RESPONSE(tools::wallet_public::contracts_array, ar);
+  ar.error_code = m_backend.create_proposal(cpp);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
-
-
 
 
 QString MainWindow::accept_proposal(const QString& param)
@@ -1459,7 +1535,7 @@ QString MainWindow::release_contract(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(view::accept_proposal_param, rcp);
+  PREPARE_ARG_FROM_JSON(view::release_contract_param, rcp);
   PREPARE_RESPONSE(view::api_void, ar);
 
   ar.error_code = m_backend.release_contract(rcp.wallet_id, rcp.contract_id, rcp.release_type);
@@ -1536,7 +1612,7 @@ QString MainWindow::get_my_offers(const QString& param)
   LOG_API_TIMING();
   //return que_call2<view::open_wallet_request>("open_wallet", param, [this](const view::open_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(bc_services::core_offers_filter, f);
-  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_ALL_OFFERS::response, ar);
+  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_OFFERS_EX::response, ar);
   ar.error_code = m_backend.get_my_offers(f, ar.response_data.offers);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -1546,7 +1622,7 @@ QString MainWindow::get_fav_offers(const QString& param)
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::get_fav_offers_request, f);
-  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_ALL_OFFERS::response, ar);
+  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_OFFERS_EX::response, ar);
   ar.error_code = m_backend.get_fav_offers(f.ids, f.filter, ar.response_data.offers);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -1589,7 +1665,7 @@ QString MainWindow::get_offers_ex(const QString& param)
   LOG_API_TIMING();
   //return que_call2<bc_services::core_offers_filter>("get_offers_ex", param, [this](const bc_services::core_offers_filter& f, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(bc_services::core_offers_filter, f);
-  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_ALL_OFFERS::response, ar);
+  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_OFFERS_EX::response, ar);
   ar.error_code = m_backend.get_offers_ex(f, ar.response_data.offers, ar.response_data.total_offers);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -1603,7 +1679,6 @@ QString MainWindow::push_offer(const QString& param)
   //return que_call2<view::push_offer_param>("push_offer", param, [this](const view::push_offer_param& a, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::push_offer_param, a);
   PREPARE_RESPONSE(view::transfer_response, ar);
-
 
   currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
 
@@ -1683,7 +1758,7 @@ QString MainWindow::get_mining_history(const QString& param)
   LOG_API_TIMING();
   //return prepare_call<view::wallet_id_obj, tools::wallet_rpc::mining_history>("get_mining_history", param, [this](const view::wallet_id_obj& a, view::api_response& ar) {
   PREPARE_ARG_FROM_JSON(view::wallet_id_obj, a);
-  PREPARE_RESPONSE(tools::wallet_rpc::mining_history, ar);
+  PREPARE_RESPONSE(tools::wallet_public::mining_history, ar);
 
   ar.error_code = m_backend.get_mining_history(a.wallet_id, ar.response_data);
   if (ar.error_code != API_RETURN_CODE_OK)

@@ -31,10 +31,10 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/archive/archive_exception.hpp>
 #include <boost/archive/basic_archive.hpp>
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
   DISABLE_VS_WARNINGS(4800)
   #include <boost/archive/basic_binary_iarchive.hpp>
-POP_WARNINGS
+POP_VS_WARNINGS
 #include <boost/archive/basic_binary_iprimitive.hpp>
 #include <boost/archive/basic_binary_oarchive.hpp>
 #include <boost/archive/basic_binary_oprimitive.hpp>

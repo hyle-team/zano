@@ -17,12 +17,12 @@ using namespace currency;
 
 struct wallet_tests_callback_handler : public tools::i_wallet2_callback
 {
-  virtual void on_transfer2(const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) 
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) 
   {
     all_wtis.push_back(wti);
   }
 
-  std::vector<tools::wallet_rpc::wallet_transfer_info> all_wtis;
+  std::vector<tools::wallet_public::wallet_transfer_info> all_wtis;
 };
 
 escrow_wallet_test::escrow_wallet_test()
@@ -136,8 +136,8 @@ bool escrow_wallet_test::prepare_proposal_accepted_test(currency::core& c, const
   CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.is_a == true, false, "Incorrect contracts_buyer state");
   CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.is_a == false, false, "Incorrect contracts_seller state");
 
-  CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.state == tools::wallet_rpc::escrow_contract_details_basic::proposal_sent, false, "Incorrect contracts_buyer state");
-  CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.state == tools::wallet_rpc::escrow_contract_details_basic::proposal_sent, false, "Incorrect contracts_seller state");
+  CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::proposal_sent, false, "Incorrect contracts_buyer state");
+  CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::proposal_sent, false, "Incorrect contracts_seller state");
 
   CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->first == multisig_id, false, "Incorrect contracts_buyer state");
   CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->first == multisig_id, false, "Incorrect contracts_seller state");
@@ -160,8 +160,8 @@ bool escrow_wallet_test::prepare_proposal_accepted_test(currency::core& c, const
   CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.is_a == true, false, "Incorrect contracts_buyer state");
   CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.is_a == false, false, "Incorrect contracts_seller state");
 
-  CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.state == tools::wallet_rpc::escrow_contract_details_basic::contract_accepted, false, "Incorrect contracts_buyer state");
-  CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.state == tools::wallet_rpc::escrow_contract_details_basic::contract_accepted, false, "Incorrect contracts_seller state");
+  CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::contract_accepted, false, "Incorrect contracts_buyer state");
+  CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::contract_accepted, false, "Incorrect contracts_seller state");
 
   tools::wallet2::multisig_transfer_container  ms_buyer, ms_seller;
   wallet_buyer->get_multisig_transfers(ms_buyer);
@@ -183,16 +183,16 @@ bool escrow_wallet_test::exec_test_with_specific_release_type(currency::core& c,
   // release contract
   //----------------------
   std::string release_instruction;
-  tools::wallet_rpc::escrow_contract_details_basic::contract_state expected_state = AUTO_VAL_INIT(expected_state);
+  tools::wallet_public::escrow_contract_details_basic::contract_state expected_state = AUTO_VAL_INIT(expected_state);
   if (release_normal)
   {
     release_instruction = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_NORMAL;
-    expected_state = tools::wallet_rpc::escrow_contract_details_basic::contract_released_normal;
+    expected_state = tools::wallet_public::escrow_contract_details_basic::contract_released_normal;
   }
   else
   {
     release_instruction = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_BURN;
-    expected_state = tools::wallet_rpc::escrow_contract_details_basic::contract_released_burned;
+    expected_state = tools::wallet_public::escrow_contract_details_basic::contract_released_burned;
   }
 
   tools::wallet2::escrow_contracts_container contracts_buyer, contracts_seller;
@@ -246,8 +246,8 @@ bool escrow_wallet_test::exec_test_with_cancel_release_type(currency::core& c, c
   CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.is_a == true, false, "Incorrect contracts_buyer state");
   CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.is_a == false, false, "Incorrect contracts_seller state");
 
-  CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.state == tools::wallet_rpc::escrow_contract_details_basic::contract_cancel_proposal_sent, false, "Incorrect contracts_buyer state");
-  CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.state == tools::wallet_rpc::escrow_contract_details_basic::contract_cancel_proposal_sent, false, "Incorrect contracts_seller state");
+  CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::contract_cancel_proposal_sent, false, "Incorrect contracts_buyer state");
+  CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::contract_cancel_proposal_sent, false, "Incorrect contracts_seller state");
 
   //cancel contract
   wallet_seller->accept_cancel_contract(multisig_id);
@@ -264,8 +264,8 @@ bool escrow_wallet_test::exec_test_with_cancel_release_type(currency::core& c, c
   CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.is_a == true, false, "Incorrect contracts_buyer state");
   CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.is_a == false, false, "Incorrect contracts_seller state");
 
-  CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.state == tools::wallet_rpc::escrow_contract_details_basic::contract_released_cancelled, false, "Incorrect contracts_buyer state");
-  CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.state == tools::wallet_rpc::escrow_contract_details_basic::contract_released_cancelled, false, "Incorrect contracts_seller state");
+  CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::contract_released_cancelled, false, "Incorrect contracts_buyer state");
+  CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::contract_released_cancelled, false, "Incorrect contracts_seller state");
   return true;
 }
 
@@ -642,7 +642,7 @@ bool escrow_incorrect_proposal::check_normal_proposal(currency::core& c, size_t 
   alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice didn't receive escrow proposal");
   CHECK_AND_ASSERT_MES(contracts.begin()->second.is_a == false, false, "proposal has wrong is_a");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::proposal_sent, false, "proposal has invalid state");
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::proposal_sent, false, "proposal has invalid state");
   crypto::hash contract_id = contracts.begin()->first;
   bc_services::contract_private_details cpd = contracts.begin()->second.private_detailes;
 
@@ -794,7 +794,7 @@ bool escrow_proposal_expiration::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
   // make sure Bob has received correct escrow proposal
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
 
   // mine few block to shift the timestamp median far enough
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW);
@@ -807,7 +807,7 @@ bool escrow_proposal_expiration::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_MES(alice_balance == alice_expected_balance, false, "Alice has incorrect balance after her proposal is expired: " << alice_balance << ", expected: " << alice_expected_balance);
 
   // check Bob's contracts
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW), false, "");
 
   // try to accept expired proposal -- an exception should be thrown
   r = false;
@@ -860,8 +860,8 @@ bool escrow_proposal_expiration::c2(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_MES(ms_id != null_hash, false, "Can't obtain multisig id from escrow template tx");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 0), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, 0), false, "");
 
   // mine a few blocks with no txs
   for (size_t i = 0; i < TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1; ++i)
@@ -880,8 +880,8 @@ bool escrow_proposal_expiration::c2(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // check contract status, should remain the same
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
 
   // try to accept expired proposal -- an exception should be thrown
   r = false;
@@ -903,8 +903,8 @@ bool escrow_proposal_expiration::c2(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // check contract status, should remain the same
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
 
   // try to accept expired proposal -- an exception should be thrown
   r = false;
@@ -997,8 +997,8 @@ bool escrow_proposal_and_accept_expiration::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(ms_id != null_hash, false, "Can't obtain multisig id from escrow template tx");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 0), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, 0), false, "");
 
   // accept unconfirmed proposal
   try
@@ -1012,8 +1012,8 @@ bool escrow_proposal_and_accept_expiration::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   LOG_PRINT("Tx pool:" << ENDL << c.get_tx_pool().print_pool(true), LOG_LEVEL_0);
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, ms_id, 0), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, ms_id, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, ms_id, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, ms_id, 0), false, "");
 
   LOG_PRINT_CYAN("%%%%% Escrow proposal accepted (unconfirmed), Alice's transfers: " << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
   LOG_PRINT_CYAN("%%%%% Escrow proposal accepted (unconfirmed), Bob's transfers: " << ENDL << bob_wlt->dump_trunsfers(), LOG_LEVEL_0);
@@ -1038,8 +1038,8 @@ bool escrow_proposal_and_accept_expiration::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // check contract status, should remain the same
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
 
   LOG_PRINT_CYAN("%%%%% Escrow acceptance tx expired and removed from tx pool, Alice's transfers: " << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
   LOG_PRINT_CYAN("%%%%% Escrow acceptance tx expired and removed from tx pool, Bob's transfers: " << ENDL << bob_wlt->dump_trunsfers(), LOG_LEVEL_0);
@@ -1064,8 +1064,8 @@ bool escrow_proposal_and_accept_expiration::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent, ms_id, 1), false, "");
 
   // try to accept expired proposal -- an exception should be thrown
   r = false;
@@ -1328,7 +1328,7 @@ bool escrow_incorrect_proposal_acceptance::check_normal_acceptance(currency::cor
 
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == m_cpd, false, "Alice has invalid contract's private details");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_accepted, false, "Alice has invalid contract state: " << contracts.begin()->second.state);
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_accepted, false, "Alice has invalid contract state: " << contracts.begin()->second.state);
 
   crypto::hash ms_id = contracts.begin()->first;
 
@@ -1348,7 +1348,7 @@ bool escrow_incorrect_proposal_acceptance::check_normal_acceptance(currency::cor
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Bob has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == m_cpd, false, "Bob has invalid contract's private details");
 
-  uint8_t contract_expected_state = release_normal ? tools::wallet_rpc::escrow_contract_details::contract_released_normal : tools::wallet_rpc::escrow_contract_details::contract_released_burned;
+  uint8_t contract_expected_state = release_normal ? tools::wallet_public::escrow_contract_details::contract_released_normal : tools::wallet_public::escrow_contract_details::contract_released_burned;
   CHECK_AND_ASSERT_MES(contracts.begin()->second.state == contract_expected_state, false, "Bob has invalid contract state: " << contracts.begin()->second.state << " expected: " << contract_expected_state);
 
   uint64_t bob_balance_end = bob_wlt->balance();
@@ -1410,7 +1410,7 @@ bool escrow_incorrect_proposal_acceptance::check_incorrect_acceptance(currency::
   }
 
   // check it here in order to let more bugs show off with finish_contract()
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::proposal_sent, false, "Alice has invalid contract state: " << contracts.begin()->second.state);
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::proposal_sent, false, "Alice has invalid contract state: " << contracts.begin()->second.state);
   CHECK_AND_ASSERT_MES(exception_on_finish_contract, false, "Alice was able to finish contract: " << param);
 
   return true;
@@ -1717,7 +1717,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
   tools::wallet2::escrow_contracts_container contracts;
   r = bob_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Bob failed");
-  CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_rpc::escrow_contract_details::proposal_sent, "Bob"), false, "wrong contract");
+  CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_public::escrow_contract_details::proposal_sent, "Bob"), false, "wrong contract");
   CHECK_AND_ASSERT_MES(contracts.begin()->second.payment_id == cd.payment_id, false, "incorrect payment_id was found in Bob's contract: " << contracts.begin()->second.payment_id << ", expected: " << cd.payment_id);
   crypto::hash ms_id = contracts.begin()->first;
 
@@ -1756,7 +1756,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "incorrect contracts size for Alice: " << contracts.size());
-  CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_rpc::escrow_contract_details::contract_accepted, "Alice"), false, "wrong contract");
+  CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_public::escrow_contract_details::contract_accepted, "Alice"), false, "wrong contract");
   CHECK_AND_ASSERT_MES(contracts.begin()->second.payment_id == cd.payment_id, false, "incorrect payment_id was found in Alice's contract: " << contracts.begin()->second.payment_id << ", expected: " << cd.payment_id);
 
   // request cancellation if needed (normal/burn release should be still possible after that)
@@ -1789,7 +1789,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     contracts.clear();
     r = alice_wlt->get_contracts(contracts);
     CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
-    CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, "Alice"), false, "wrong contract state");
+    CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, "Alice"), false, "wrong contract state");
 
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", alice_expected_balance, 0, INVALID_BALANCE_VAL, 0, 0), false, "");
 
@@ -1797,7 +1797,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     contracts.clear();
     r = bob_wlt->get_contracts(contracts);
     CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Bob failed");
-    CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, "Bob"), false, "wrong contract state");
+    CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, "Bob"), false, "wrong contract state");
 
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", bob_expected_balance, 0, INVALID_BALANCE_VAL, 0, 0), false, "");
   }
@@ -1833,7 +1833,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     contracts.clear();
     r = alice_wlt->get_contracts(contracts);
     CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
-    tools::wallet_rpc::escrow_contract_details::contract_state expected_state = cd.is_release_normal() ? tools::wallet_rpc::escrow_contract_details::contract_released_normal : tools::wallet_rpc::escrow_contract_details::contract_released_burned;
+    tools::wallet_public::escrow_contract_details::contract_state expected_state = cd.is_release_normal() ? tools::wallet_public::escrow_contract_details::contract_released_normal : tools::wallet_public::escrow_contract_details::contract_released_burned;
     CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, expected_state, "Alice"), false, "wrong contract");
 
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", alice_expected_balance, 0, INVALID_BALANCE_VAL, 0, 0), false, "");
@@ -1843,7 +1843,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     contracts.clear();
     r = bob_wlt->get_contracts(contracts);
     CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Bob failed");
-    expected_state = cd.is_release_normal() ? tools::wallet_rpc::escrow_contract_details::contract_released_normal : tools::wallet_rpc::escrow_contract_details::contract_released_burned;
+    expected_state = cd.is_release_normal() ? tools::wallet_public::escrow_contract_details::contract_released_normal : tools::wallet_public::escrow_contract_details::contract_released_burned;
     CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, expected_state, "Bob"), false, "wrong contract");
 
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", bob_expected_balance, 0, INVALID_BALANCE_VAL, 0, 0), false, "");
@@ -1880,7 +1880,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     contracts.clear();
     r = alice_wlt->get_contracts(contracts);
     CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
-    CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, "Alice"), false, "wrong contract state");
+    CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_public::escrow_contract_details::contract_released_cancelled, "Alice"), false, "wrong contract state");
 
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", alice_expected_balance, 0, INVALID_BALANCE_VAL, 0, 0), false, "");
 
@@ -1888,7 +1888,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
     contracts.clear();
     r = bob_wlt->get_contracts(contracts);
     CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Bob failed");
-    CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, "Bob"), false, "wrong contract state");
+    CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_public::escrow_contract_details::contract_released_cancelled, "Bob"), false, "wrong contract state");
 
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", bob_expected_balance, 0, INVALID_BALANCE_VAL, 0, 0), false, "");
   }
@@ -2113,14 +2113,14 @@ bool escrow_incorrect_cancel_proposal::check_normal_cancel_proposal(currency::co
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == m_cpd, false, "Alice has invalid contract's private details");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, false, "Alice has invalid contract state: " << contracts.begin()->second.state);
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, false, "Alice has invalid contract state: " << contracts.begin()->second.state);
 
   contracts.clear();
   r = bob_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Bob failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Bob has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == m_cpd, false, "Bob has invalid contract's private details");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, false, "Bob has invalid contract state: " << contracts.begin()->second.state);
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, false, "Bob has invalid contract state: " << contracts.begin()->second.state);
 
   crypto::hash ms_id = contracts.begin()->first;
   bob_wlt->accept_cancel_contract(ms_id);
@@ -2136,7 +2136,7 @@ bool escrow_incorrect_cancel_proposal::check_normal_cancel_proposal(currency::co
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == m_cpd, false, "Alice has invalid contract's private details");
-  uint8_t contract_expected_state = tools::wallet_rpc::escrow_contract_details::contract_released_cancelled;
+  uint8_t contract_expected_state = tools::wallet_public::escrow_contract_details::contract_released_cancelled;
   CHECK_AND_ASSERT_MES(contracts.begin()->second.state == contract_expected_state, false, "Alice has invalid contract state: " << contracts.begin()->second.state << " expected: " << contract_expected_state);
 
   uint64_t alice_balance_end = alice_wlt->balance();
@@ -2223,8 +2223,8 @@ bool escrow_incorrect_cancel_proposal::check_incorrect_cancel_proposal_internal(
   }
 
   // check it here in order to let more bugs show off with finish_contract()
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_accepted ||
-    contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, false, "Bob has invalid contract state: " << contracts.begin()->second.state); // It's ok for Bob to be mistaken about state, for ex: in case of too late cancellation acceptance
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_accepted ||
+    contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, false, "Bob has invalid contract state: " << contracts.begin()->second.state); // It's ok for Bob to be mistaken about state, for ex: in case of too late cancellation acceptance
   CHECK_AND_ASSERT_MES(exception_on_cancel_contract, false, "Bob was able to cancel escrow contract, requested with invalid cancellation request.");
 
   return true;
@@ -2384,7 +2384,7 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == cpd, false, "Alice has invalid contract's private details");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::proposal_sent, false, "Alice has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::proposal_sent, false, "Alice has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
   crypto::hash contract_id = contracts.begin()->first;
 
   // mine a block, containing escrow proposal tx
@@ -2399,7 +2399,7 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Bob failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Bob has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == cpd, false, "Bob has invalid contract's private details");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::proposal_sent, false, "Bob has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::proposal_sent, false, "Bob has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
   
   // Bob accepts the proposal
   LOG_PRINT_GREEN("\n" "bob_wlt->accept_proposal()", LOG_LEVEL_0);
@@ -2417,7 +2417,7 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == cpd, false, "Alice has invalid contract's private details");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_accepted, false, "Alice has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_accepted, false, "Alice has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   // Alice requests cancellation
   LOG_PRINT_GREEN("\n" "alice_wlt->request_cancel_contract()", LOG_LEVEL_0);
@@ -2435,14 +2435,14 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
   contracts.clear();
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Alice failed or returned wrong contracts count: " << contracts.size());
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, false, "Alice has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, false, "Alice has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   bob_wlt->refresh();
   bob_wlt->scan_tx_pool(stub_bool);
   contracts.clear();
   r = bob_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Bob failed or returned wrong contracts count: " << contracts.size());
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, false, "Bob has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, false, "Bob has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   // don't mine block, try to accept cancellation on-the-fly
   LOG_PRINT_GREEN("\n" "bob_wlt->accept_cancel_contract()", LOG_LEVEL_0);
@@ -2458,13 +2458,13 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
   contracts.clear();
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Alice failed or returned wrong contracts count: " << contracts.size());
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, false, "Alice has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_released_cancelled, false, "Alice has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   bob_wlt->scan_tx_pool(stub_bool);
   contracts.clear();
   r = bob_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Bob failed or returned wrong contracts count: " << contracts.size());
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, false, "Bob has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_released_cancelled, false, "Bob has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   // mine a block containing only cancel_request_acceptance_tx (this should trigger contracts' states swtiching into contract_released_cancelled) 
   LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime_with_given_txs(cancel_request_acceptance_tx)", LOG_LEVEL_0);
@@ -2477,14 +2477,14 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
   contracts.clear();
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Alice failed or returned wrong contracts count: " << contracts.size());
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, false, "Alice has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_released_cancelled, false, "Alice has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   bob_wlt->refresh();
   bob_wlt->scan_tx_pool(stub_bool);
   contracts.clear();
   r = bob_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Bob failed or returned wrong contracts count: " << contracts.size());
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, false, "Bob has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_released_cancelled, false, "Bob has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
 
   // mine a block containing only cancel_request_tx (this SHOULD NOT trigger contracts' states swtiching into contract_cancel_proposal_sent or anything) 
@@ -2498,14 +2498,14 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
   contracts.clear();
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Alice failed or returned wrong contracts count: " << contracts.size());
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, false, "Alice has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_released_cancelled, false, "Alice has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   bob_wlt->refresh();
   bob_wlt->scan_tx_pool(stub_bool);
   contracts.clear();
   r = bob_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Bob failed or returned wrong contracts count: " << contracts.size());
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, false, "Bob has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_released_cancelled, false, "Bob has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   return true;
 }
@@ -2585,7 +2585,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == cpd, false, "Alice has invalid contract's private details");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::proposal_sent, false, "Alice has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::proposal_sent, false, "Alice has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
   crypto::hash contract_id = contracts.begin()->first;
 
   uint64_t alice_blocked_transfers_sum = 0;
@@ -2603,7 +2603,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Bob failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Bob has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == cpd, false, "Bob has invalid contract's private details");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::proposal_sent, false, "Bob has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::proposal_sent, false, "Bob has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   // Bob accepts the proposal
   LOG_PRINT_GREEN("\n" "bob_wlt->accept_proposal()", LOG_LEVEL_0);
@@ -2624,7 +2624,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == cpd, false, "Alice has invalid contract's private details");
-  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_rpc::escrow_contract_details::contract_accepted, false, "Alice has invalid contract state: " << tools::wallet_rpc::get_escrow_contract_state_name(contracts.begin()->second.state));
+  CHECK_AND_ASSERT_MES(contracts.begin()->second.state == tools::wallet_public::escrow_contract_details::contract_accepted, false, "Alice has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state));
 
   // ===== (1/2) =====
   // Alice requests cancellation for the first time -- this request will not be included into a block and will expire in tx pool
@@ -2645,8 +2645,8 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(extract_cancellation_template_tx_from_request_tx(cancel_request_tx, m_accounts[BOB_ACC_IDX].get_keys(), tx_cancel_template), false, "extract_calcellation_template_tx_from_request_tx failed");
 
   // contract state in wallets should be cancel_proposal_sent for both parties
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 0), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, 1), false, "");
 
   // mine a few blocks with no txs to shift expiration median
   for(size_t i = 0; i < 7; ++i)
@@ -2675,8 +2675,8 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(r, false, "accept_cancel_contract succeeded, but it was excepted to fail");
 
   // as cancellation request is expired, contract state should be contract_accepted for both
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 7), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 7), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 7), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 7), false, "");
 
   // mine a block containing cancel_request_tx (already expired) -- should be okay
   LOG_PRINT_GREEN("\n\n\n" "mine_next_pow_block_in_playtime() -- including expires contract cancellation request" "\n\n", LOG_LEVEL_0);
@@ -2685,8 +2685,8 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // expired cancellation request--even included into a block--should be ignored, contract state remains the same
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 1), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 1), false, "");
 
   // check balances
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", alice_start_balance - TESTS_DEFAULT_FEE - cpd.amount_a_pledge - cpd.amount_to_pay - TESTS_DEFAULT_FEE), false, "");
@@ -2710,8 +2710,8 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(extract_cancellation_template_tx_from_request_tx(cancel_request_tx, m_accounts[BOB_ACC_IDX].get_keys(), tx_cancel_template), false, "extract_calcellation_template_tx_from_request_tx failed");
 
   // contract state in wallets should be cancel_proposal_sent for both parties, as new cancellation request was handled
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 0), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, 0), false, "");
 
   // mine a block containing cancel_request_tx
   LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime()", LOG_LEVEL_0);
@@ -2720,8 +2720,8 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // contracts' states should not change after receiving a block
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 1), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, 1), false, "");
 
   // mine one more block (it's necessary for triggering expiration checks in wallets and shifting an expiration ts median)
   LOG_PRINT_GREEN("\n" "mine_next_pow_block_in_playtime()", LOG_LEVEL_0);
@@ -2747,8 +2747,8 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(r, false, "accept_cancel_contract succeeded, but it was excepted to fail");
 
   // check contracts again - their state should change back to contract_accepted
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 7), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 7), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 7), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 7), false, "");
 
   // check balances
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", alice_start_balance - TESTS_DEFAULT_FEE - cpd.amount_a_pledge - cpd.amount_to_pay - TESTS_DEFAULT_FEE - TESTS_DEFAULT_FEE), false, "");
@@ -2827,8 +2827,8 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   LOG_PRINT_GREEN("\n" "alice_wlt->send_escrow_proposal()", LOG_LEVEL_0);
   alice_wlt->send_escrow_proposal(cpd, 0, 0, expiration_time, TX_DEFAULT_FEE, b_release_fee, "", proposal_tx, escrow_template_tx);
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::proposal_sent), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent), false, "");
   
   tools::wallet2::escrow_contracts_container contracts;
   r = alice_wlt->get_contracts(contracts);
@@ -2844,7 +2844,7 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::proposal_sent), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent), false, "");
 
   // Bob accepts the proposal
   LOG_PRINT_GREEN("\n" "bob_wlt->accept_proposal()", LOG_LEVEL_0);
@@ -2859,7 +2859,7 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 2), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 2), false, "");
 
   // Alice requests cancellation
   uint64_t cancel_request_expiration_period = DIFFICULTY_TOTAL_TARGET;
@@ -2872,8 +2872,8 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // contract state in wallets should be cancel_proposal_sent for both parties
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 1), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_cancel_proposal_sent, 2), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, 1), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_cancel_proposal_sent, 2), false, "");
 
   LOG_PRINT_GREEN("%%%%% Bob : accept_cancel_contract()", LOG_LEVEL_0);
   bob_wlt->accept_cancel_contract(contract_id);
@@ -2886,8 +2886,8 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   transaction cancel_accept_tx = txs.front();
 
   // contract state in wallets should be cancel_proposal_sent for both parties
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, 0), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_released_cancelled, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_released_cancelled, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_released_cancelled, 0), false, "");
 
   // mine a few blocks with no txs to shift expiration median, cancellation acceptance is still in the pool
   for(size_t i = 0; i < 7; ++i)
@@ -2901,8 +2901,8 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(is_tx_expired(cancel_accept_tx, c.get_blockchain_storage().get_tx_expiration_median()), false, "cancel_accept_tx did not expire");
 
   // as cancellation acceptance is expired, contract state should be contract_accepted for both
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 7), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 7), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 7), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 7), false, "");
 
   // check final balances
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", alice_start_balance - TESTS_DEFAULT_FEE - cpd.amount_a_pledge - cpd.amount_to_pay - TESTS_DEFAULT_FEE), false, "");
@@ -2920,8 +2920,8 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(!r, false, "mine_next_pow_block_in_playtime_with_given_txs should have been failed as block contains expired tx");
 
   // no changes with contract state expected
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 0), false, "");
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_rpc::escrow_contract_details::contract_accepted, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 0), false, "");
 
   // no changes with balances expected
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", alice_start_balance - TESTS_DEFAULT_FEE - cpd.amount_a_pledge - cpd.amount_to_pay - TESTS_DEFAULT_FEE), false, "");

@@ -27,8 +27,27 @@
 
     <div class="scale-selection">
       <button type="button" class="button-block" [class.active]="item.id === variablesService.settings.scale" *ngFor="let item of appScaleOptions" (click)="setScale(item.id)">
-        <span class="label">{{item.name}}</span>
+        <span class="label">{{item.name | translate}}</span>
       </button>
+    </div>
+
+    <div class="lock-selection">
+      <label class="lock-selection-title">{{ 'SETTINGS.LANGUAGE.TITLE' | translate }}</label>
+      <ng-select class="custom-select"
+                 [items]="languagesOptions"
+                 bindValue="name"
+                 bindLabel="language"
+                 [(ngModel)]="variablesService.settings.language"
+                 [clearable]="false"
+                 [searchable]="false"
+                 (change)="onLanguageChange()">
+        <ng-template ng-label-tmp let-item="item">
+          {{item.language | translate}}
+        </ng-template>
+        <ng-template ng-option-tmp let-item="item" let-index="index">
+          {{item.language | translate}}
+        </ng-template>
+      </ng-select>
     </div>
 
     <div class="lock-selection">
@@ -78,6 +97,11 @@
       <div class="input-block">
         <label for="new-password">{{ 'SETTINGS.MASTER_PASSWORD.NEW' | translate }}</label>
         <input type="password" id="new-password" formControlName="new_password" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
+        <div class="error-block" *ngIf="changeForm.controls['new_password'].dirty && changeForm.controls['new_password'].errors">
+          <div *ngIf="changeForm.controls['new_password'].errors.pattern">
+            {{ 'ERRORS.WRONG_PASSWORD' | translate }}
+          </div>
+        </div>
       </div>
 
       <div class="input-block">

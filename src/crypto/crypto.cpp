@@ -304,7 +304,7 @@ namespace crypto {
     ge_tobytes(&image, &point2);
   }
 
-PUSH_WARNINGS
+PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4200)
 struct rs_comm_entry
 {
@@ -314,7 +314,7 @@ struct rs_comm_entry
     hash h;
     struct rs_comm_entry ab[];
   };
-POP_WARNINGS
+POP_VS_WARNINGS
 
   static inline size_t rs_comm_size(size_t pubs_count) {
     return sizeof(rs_comm)+pubs_count * sizeof(rs_comm_entry);

@@ -38,27 +38,40 @@
   </div>
 </div>
 <div class="sidebar-settings">
-  <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500">
-    <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
+  <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
+    <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" 
+      [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
       <i class="icon contacts"></i>
       <span>{{ 'SIDEBAR.CONTACTS' | translate }}</span>
     </button>
   </div>
   <ng-template #contactsShow>
     <div class="wrap-button" routerLinkActive="active">
-      <button (click)="contactsRoute()">
-        <i class="icon contacts"></i>
+      <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2" [disabled]="variablesService.daemon_state !== 2"
+        (mouseover)="menuItem = true"
+        (mouseleave)="menuItem = false"
+      >
+        <i class="icon contacts" *ngIf="!menuItem; else svgContacts"></i>
+        <ng-template #svgContacts>
+          <div class="animated" [innerHTML]="contacts | safeHTML"></div>
+        </ng-template>
         <span>{{ 'SIDEBAR.CONTACTS' | translate }}</span>
       </button>
     </div>
   </ng-template>
   <div class="wrap-button" routerLinkActive="active">
-    <button [routerLink]="['/settings']">
-      <i class="icon settings"></i>
+    <button [routerLink]="['/settings']"
+      (mouseover)="menuItemHovered = true"
+      (mouseleave)="menuItemHovered = false"
+    >
+      <i class="icon settings" *ngIf="!menuItemHovered; else svgSetting"></i>
+      <ng-template #svgSetting>
+        <div class="animated" [innerHTML]="settings | safeHTML"></div>
+      </ng-template>
       <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>
     </button>
   </div>
-  <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500">
+  <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
     <button (click)="logOut()" [class.disabled]="variablesService.appPass === ''" [disabled]="variablesService.appPass === ''">
       <i class="icon logout"></i>
       <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
@@ -66,8 +79,15 @@
   </div>
   <ng-template #masterPass>
     <div class="wrap-button">
-      <button (click)="logOut()">
-        <i class="icon logout"></i>
+      <button 
+      (mouseover)="itemHovered = true"
+      (mouseleave)="itemHovered = false"
+      (click)="logOut()">
+        <i class="icon logout" *ngIf="!itemHovered; else svgLogout"></i>
+        <ng-template #svgLogout>
+          <div class="animated" [innerHTML]="exit | safeHTML"></div>
+        </ng-template>
+        
         <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>
       </button>
     </div>

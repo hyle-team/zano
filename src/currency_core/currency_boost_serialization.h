@@ -107,7 +107,7 @@ namespace boost
       a & x.derivation_hash;
     }
     template <class Archive>
-    inline void serialize(Archive &a, currency::tx_message &x, const boost::serialization::version_type ver)
+    inline void serialize(Archive &a, currency::tx_derivation_hint &x, const boost::serialization::version_type ver)
     {
       a & x.msg;
     }
@@ -211,7 +211,7 @@ namespace boost
     }
 
     template <class Archive>
-    inline void serialize(Archive &a, currency::etc_tx_derivation_hint &at, const boost::serialization::version_type ver)
+    inline void serialize(Archive &a, currency::etc_tx_uint16_t&at, const boost::serialization::version_type ver)
     {
       a & at.v;
     }

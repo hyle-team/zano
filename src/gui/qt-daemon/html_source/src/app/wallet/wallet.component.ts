@@ -6,6 +6,8 @@ import {TranslateService} from '@ngx-translate/core';
 import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
 import {Subscription} from 'rxjs';
 
+import icons from '../../assets/icons/icons.json';
+
 @Component({
   selector: 'app-wallet',
   templateUrl: './wallet.component.html',
@@ -19,6 +21,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   copyAnimation = false;
   copyAnimationTimeout;
   balanceTooltip;
+  isModalDialogVisible = false;
 
   @ViewChild('scrolledContent') private scrolledContent: ElementRef;
 
@@ -28,42 +31,54 @@ export class WalletComponent implements OnInit, OnDestroy {
       icon: 'history',
       link: '/history',
       indicator: false,
-      active: true
+      active: true,
+      animated: icons.history,
+      itemHovered: false
     },
     {
       title: 'WALLET.TABS.SEND',
       icon: 'send',
       link: '/send',
       indicator: false,
-      active: false
+      active: false,
+      animated: icons.send,
+      itemHovered: false
     },
     {
       title: 'WALLET.TABS.RECEIVE',
       icon: 'receive',
       link: '/receive',
       indicator: false,
-      active: false
+      active: false,
+      animated: icons.receive,
+      itemHovered: false
     },
     {
       title: 'WALLET.TABS.CONTRACTS',
       icon: 'contracts',
       link: '/contracts',
       indicator: 1,
-      active: false
+      active: false,
+      animated: icons.contracts,
+      itemHovered: false
     },
     /*{
       title: 'WALLET.TABS.MESSAGES',
       icon: 'messages',
       link: '/messages',
       indicator: 32,
-      active: false
+      active: false,
+      animated: icons.messages,
+      itemHovered: false
     },*/
     {
       title: 'WALLET.TABS.STAKING',
       icon: 'staking',
       link: '/staking',
       indicator: false,
-      active: false
+      active: false,
+      animated: icons.staking,
+      itemHovered: false
     }
   ];
   aliasSubscription: Subscription;
@@ -128,6 +143,10 @@ export class WalletComponent implements OnInit, OnDestroy {
     });
   }
 
+  itemHovered(index, state: boolean) {
+    this.tabs[index].itemHovered = state;
+  }
+
   copyAddress() {
     this.backend.setClipboard(this.variablesService.currentWallet.address);
     this.copyAnimation = true;
@@ -162,6 +181,17 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   openInBrowser(link) {
     this.backend.openUrlInBrowser(link);
+  }
+
+  showDialog() {
+    this.isModalDialogVisible = true;
+  }
+
+  confirmed(confirmed: boolean) {
+    if (confirmed) {
+      this.closeWallet();
+    }
+    this.isModalDialogVisible = false;
   }
 
   closeWallet() {

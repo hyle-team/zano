@@ -40,7 +40,8 @@ daemon_backend::daemon_backend():m_pview(&m_view_stub),
                                  m_offers_service(nullptr), 
                                  m_ui_opt(AUTO_VAL_INIT(m_ui_opt)), 
                                  m_remote_node_mode(false),
-                                 m_is_pos_allowed(false)
+                                 m_is_pos_allowed(false),
+                                 m_qt_logs_enbaled(false)
 {
   m_offers_service.set_disabled(true);
 	//m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
@@ -52,6 +53,7 @@ const command_line::arg_descriptor<std::string> arg_xcode_stub = {"-NSDocumentRe
 const command_line::arg_descriptor<bool> arg_enable_gui_debug_mode = { "gui-debug-mode", "Enable debug options in GUI", false, true };
 const command_line::arg_descriptor<uint32_t> arg_qt_remote_debugging_port = { "remote-debugging-port", "Specify port for Qt remote debugging", 30333, true };
 const command_line::arg_descriptor<std::string> arg_remote_node = { "remote-node", "Switch GUI to work with remote node instead of local daemon", "",  true };
+const command_line::arg_descriptor<bool> arg_enable_qt_logs = { "enable-qt-logs", "Forward Qt log messages into main log", false,  true };
 
 void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 {
@@ -64,6 +66,13 @@ void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 daemon_backend::~daemon_backend()
 {
   stop();
+}
+
+void terminate_handler_func()
+{
+  LOG_ERROR("\n\nTERMINATE HANDLER\n"); // should print callstack
+  std::fflush(nullptr); // all open output streams are flushed
+  std::abort(); // default terminate handler's behavior
 }
 
 bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
@@ -87,6 +96,9 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
 
   // setup custom callstack retrieving function
   epee::misc_utils::get_callstack(tools::get_callstack);
+
+  // setup custom terminate functions
+  std::set_terminate(&terminate_handler_func);
 
   //#if !defined(NDEBUG)
   //  log_space::log_singletone::add_logger(LOGGER_DEBUGGER, nullptr, nullptr);
@@ -114,9 +126,7 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, arg_enable_gui_debug_mode);
   command_line::add_arg(desc_cmd_sett, arg_qt_remote_debugging_port);
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
-  
-
-
+  command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
 
 
   currency::core::init_options(desc_cmd_sett);
@@ -144,8 +154,8 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
     m_data_dir = command_line::get_arg(m_vm, command_line::arg_data_dir);
     std::string config = command_line::get_arg(m_vm, command_line::arg_config_file);
 
-    boost::filesystem::path data_dir_path(m_data_dir);
-    boost::filesystem::path config_path(config);
+    boost::filesystem::path data_dir_path(epee::string_encoding::utf8_to_wstring(m_data_dir));
+    boost::filesystem::path config_path(epee::string_encoding::utf8_to_wstring(config));
     if (!config_path.has_parent_path())
     {
       config_path = data_dir_path / config_path;
@@ -209,6 +219,8 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
   {
     // configure for remote node
   }
+
+  m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
 
   m_pview->init(path_to_html);
 
@@ -383,6 +395,7 @@ bool daemon_backend::deinit_local_daemon()
   LOG_PRINT_L0("Deinitializing p2p...");
   //dsi.text_state = "Deinitializing p2p";
   m_pview->update_daemon_status(dsi);
+  m_p2psrv.deinit();
 
   m_ccore.set_currency_protocol(NULL);
   m_cprotocol.set_p2p_endpoint(NULL);
@@ -1118,7 +1131,7 @@ std::string daemon_backend::get_wallet_info(size_t wallet_id, view::wallet_info&
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   return get_wallet_info(w, wi);
 }
-std::string daemon_backend::get_contracts(size_t wallet_id, std::vector<tools::wallet_rpc::escrow_contract_details>& contracts)
+std::string daemon_backend::get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts)
 {
   tools::wallet2::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(wallet_id, w);
@@ -1135,49 +1148,45 @@ std::string daemon_backend::get_contracts(size_t wallet_id, std::vector<tools::w
   size_t i = 0;
   for (auto& c: cc)
   {
-    static_cast<tools::wallet_rpc::escrow_contract_details_basic&>(contracts[i]) = c.second;
+    static_cast<tools::wallet_public::escrow_contract_details_basic&>(contracts[i]) = c.second;
     contracts[i].contract_id = c.first; 
     i++;
   }
 
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::create_proposal(size_t wallet_id, 
-  const bc_services::contract_private_details& escrow_details,
-  const std::string& payment_id, 
-  uint64_t expiration_period, 
-  uint64_t fee, 
-  uint64_t b_fee)
+std::string daemon_backend::create_proposal(const view::create_proposal_param_gui& cpp)
 {
-  tools::wallet2::escrow_contracts_container cc;
-  GET_WALLET_OPT_BY_ID(wallet_id, w);
+  //tools::wallet2::escrow_contracts_container cc;
+  GET_WALLET_OPT_BY_ID(cpp.wallet_id, w);
   try
   {
     currency::transaction tx = AUTO_VAL_INIT(tx);
     currency::transaction template_tx = AUTO_VAL_INIT(template_tx);
-    w.w->get()->send_escrow_proposal(escrow_details, 0, 0, expiration_period, fee, b_fee, payment_id, tx, template_tx);
+    w.w->get()->send_escrow_proposal(cpp, tx, template_tx);
     //TODO: add some 
     return API_RETURN_CODE_OK;
   }
   catch (const tools::error::not_enough_money& e)
   {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "send_escrow_proposal error: API_RETURN_CODE_NOT_ENOUGH_MONEY: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(cpp.wallet_id) + "send_escrow_proposal error: API_RETURN_CODE_NOT_ENOUGH_MONEY: " << e.what());
     std::string err_code = API_RETURN_CODE_NOT_ENOUGH_MONEY;
     return err_code;
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "send_escrow_proposal error: " << e.what());
+    LOG_ERROR(get_wallet_log_prefix(cpp.wallet_id) + "send_escrow_proposal error: " << e.what());
     std::string err_code = API_RETURN_CODE_INTERNAL_ERROR;
     err_code += std::string(":") + e.what();
     return err_code;
   }
   catch (...)
   {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "send_escrow_proposal error: unknown error");
+    LOG_ERROR(get_wallet_log_prefix(cpp.wallet_id) + "send_escrow_proposal error: unknown error");
     return API_RETURN_CODE_INTERNAL_ERROR;
   }
 }
+
 std::string daemon_backend::accept_proposal(size_t wallet_id, const crypto::hash& contract_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
@@ -1287,7 +1296,7 @@ std::string daemon_backend::start_pos_mining(uint64_t wallet_id)
   wo.need_to_update_wallet_info = true;
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::get_mining_history(uint64_t wallet_id, tools::wallet_rpc::mining_history& mh)
+std::string daemon_backend::get_mining_history(uint64_t wallet_id, tools::wallet_public::mining_history& mh)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
@@ -1410,10 +1419,10 @@ std::string daemon_backend::push_update_offer(const bc_services::update_offer_de
   }
 }
 
-// std::string daemon_backend::get_all_offers(currency::COMMAND_RPC_GET_ALL_OFFERS::response& od)
+// std::string daemon_backend::get_all_offers(currency::COMMAND_RPC_GET_OFFERS_EX::response& od)
 // {
-//   currency::COMMAND_RPC_GET_ALL_OFFERS::request rq = AUTO_VAL_INIT(rq);
-//   m_rpc_proxy->call_COMMAND_RPC_GET_ALL_OFFERS(rq, od);
+//   currency::COMMAND_RPC_GET_OFFERS_EX::request rq = AUTO_VAL_INIT(rq);
+//   m_rpc_proxy->call_COMMAND_RPC_GET_OFFERS_EX(rq, od);
 //   return API_RETURN_CODE_OK;
 // }
 
@@ -1443,7 +1452,7 @@ void daemon_backend::on_new_block(size_t wallet_id, uint64_t /*height*/, const c
 
 }
 
-void daemon_backend::on_transfer2(size_t wallet_id, const tools::wallet_rpc::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
+void daemon_backend::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
 {
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
@@ -1466,7 +1475,7 @@ void daemon_backend::on_sync_progress(size_t wallet_id, const uint64_t& percents
   wspp.wallet_id = wallet_id;
   m_pview->wallet_sync_progress(wspp);
 }
-void daemon_backend::on_transfer_canceled(size_t wallet_id, const tools::wallet_rpc::wallet_transfer_info& wti)
+void daemon_backend::on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti)
 {
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
@@ -1526,7 +1535,7 @@ void daemon_backend::wallet_vs_options::worker_func()
             auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')
             auto offers_list_proxy = *offers; // than get locked exclusive access to offers
             offers_list_proxy->clear();
-            (*w_ptr)->get_actual_offers(*offers_list_proxy, false);
+            (*w_ptr)->get_actual_offers(*offers_list_proxy);
           }
 
           wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_ready;

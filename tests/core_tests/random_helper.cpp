@@ -6,6 +6,21 @@
 #include "chaingen.h"
 #include "random_helper.h"
 
+random_state_test_restorer::random_state_test_restorer()
+{
+  crypto::random_prng_get_state(&m_state, sizeof m_state);
+}
+
+random_state_test_restorer::~random_state_test_restorer()
+{
+  crypto::random_prng_set_state(&m_state, sizeof m_state);
+}
+
+void random_state_test_restorer::reset_random(uint64_t seed /* = 0 */)
+{
+  crypto::random_prng_initialize_with_seed(seed);
+}
+
 std::string get_random_text(size_t len)
 {
   static const char     text_chars[]    = "abcdefghijklmnopqrstuvwxyz" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "0123456789" "~!@#$%^&*()-=_+\\/?,.<>|{}[]`';:\" ";
@@ -45,7 +60,7 @@ bool random_state_manupulation_test()
   // NOTE: If the test fails, it's most likely that random state permutation procedure was changed OR the state can't be correctly stored/loaded.
 
   static const uint64_t my_own_random_seed = 4669201609102990671;
-  static const char*    my_random_str = "18b79ebb56744e9bafa462631c6f7d760af2b788";
+  static const char*    my_random_str = "760af2b78894c6a441731e2b354011da6ac98ddc";
   static const size_t   rnd_buf_len = 20;
 
   uint64_t first_random_after_state_saved = 0;
