@@ -27,7 +27,7 @@
 
     <div class="scale-selection">
       <button type="button" class="button-block" [class.active]="item.id === variablesService.settings.scale" *ngFor="let item of appScaleOptions" (click)="setScale(item.id)">
-        <span class="label">{{item.name}}</span>
+        <span class="label">{{item.name | translate}}</span>
       </button>
     </div>
 

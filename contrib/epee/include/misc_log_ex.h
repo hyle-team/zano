@@ -45,6 +45,7 @@
 #include <boost/cstdint.hpp>
 #include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
 #endif
 #if defined(WIN32)
