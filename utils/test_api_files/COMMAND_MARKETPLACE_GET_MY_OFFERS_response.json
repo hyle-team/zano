@@ -1,0 +1,51 @@
+{
+  "id": 0,
+  "jsonrpc": "2.0",
+  "result": {
+    "offers": [{
+      "ap": "20",
+      "at": "1",
+      "b": "",
+      "cat": "CLS:MAN:TSH",
+      "cnt": "Skype: some_skype, discord: some_user#01012",
+      "com": "Some nice comments about tshirt",
+      "do": "Additional conditions",
+      "et": 10,
+      "fee": 10000000000,
+      "index_in_tx": 0,
+      "lci": "",
+      "lco": "World Wide",
+      "ot": 1,
+      "p": "USD",
+      "pt": "Credit cards, BTC, ZANO, ETH",
+      "security": "0000000000000000000000000000000000000000000000000000000000000000",
+      "t": "T-shirt with Zano logo, made by Crypjunkie",
+      "timestamp": 1570219600,
+      "tx_hash": "6ba12c5d2c66d31f770bfdc88ae9dc90d007b9b33f946fc7c1d9750f8655331c",
+      "tx_original_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    },{
+      "ap": "20",
+      "at": "1",
+      "b": "",
+      "cat": "CLS:MAN:TSH",
+      "cnt": "Skype: some_skype, discord: some_user#01012",
+      "com": "Some nice comments about tshirt",
+      "do": "Additional conditions",
+      "et": 10,
+      "fee": 10000000000,
+      "index_in_tx": 0,
+      "lci": "",
+      "lco": "World Wide",
+      "ot": 1,
+      "p": "USD",
+      "pt": "Credit cards, BTC, ZANO, ETH",
+      "security": "0000000000000000000000000000000000000000000000000000000000000000",
+      "t": "T-shirt with Zano logo, made by Crypjunkie",
+      "timestamp": 1570219840,
+      "tx_hash": "2987b671cc337203628a3a1bb7ac811e41f110864d6162d3c2276d2c79f694d6",
+      "tx_original_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    }],
+    "status": "",
+    "total_offers": 0
+  }
+}

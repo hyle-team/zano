@@ -19,7 +19,7 @@ namespace bc_services
   {
 
     //fields filled in UI
-    uint8_t offer_type;             // OFFER_TYPE_PRIMARY_TO_TARGET - 0, OFFER_TYPE_TARGET_TO_PRIMARY - 1 etc.
+    uint8_t offer_type;             // OFFER_TYPE_PRIMARY_TO_TARGET(SELL ORDER) - 0, OFFER_TYPE_TARGET_TO_PRIMARY(BUY ORDER) - 1 etc.
     uint64_t amount_primary;        // amount of the currency
     uint64_t amount_target;         // amount of other currency or goods
     std::string bonus;              //
