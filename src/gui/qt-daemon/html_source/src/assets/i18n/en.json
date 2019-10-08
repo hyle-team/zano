@@ -150,8 +150,14 @@
       "TIME3": "1 hour",
       "TIME4": "Never"
     },
+    "SCALE": {
+      "75": "75% scale", 
+      "100": "100% scale",
+      "125": "125% scale",
+      "150": "150% scale"
+    },
     "LANGUAGE": {
-      "TITLE": "Languages",
+      "TITLE": "Language",
       "EN": "English",
       "FR": "French",
       "DE": "Deutsch",
@@ -180,7 +186,10 @@
     "AVAILABLE_BALANCE": "Available <b>{{available}} {{currency}}<b/>",
     "LOCKED_BALANCE": "Locked <b>{{locked}} {{currency}}<b/>",
     "LOCKED_BALANCE_LINK": "What does that mean?",
-    "CLOSE_MESSAGE": "<span class=\"message\">Remove wallet from the list</span> <br> <span>(To access it you’ll have to add it again)</span>",
+    "CONFIRM": {
+      "TITLE": "Remove wallet from the list?",
+      "MESSAGE": "To access it you’ll have to add it again"
+    },
     "TABS": {
       "SEND": "Send",
       "RECEIVE": "Receive",

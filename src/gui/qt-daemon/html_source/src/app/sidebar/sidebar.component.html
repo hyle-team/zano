@@ -38,7 +38,7 @@
   </div>
 </div>
 <div class="sidebar-settings">
-  <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500">
+  <div class="wrap-button" routerLinkActive="active" *ngIf="variablesService.appPass === ''; else contactsShow" tooltip="{{ 'SIDEBAR.CONTACTS_TOOLTIP' | translate }}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
     <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''" 
       [disabled]="variablesService.daemon_state !== 2 || variablesService.appPass === ''">
       <i class="icon contacts"></i>
@@ -47,7 +47,7 @@
   </div>
   <ng-template #contactsShow>
     <div class="wrap-button" routerLinkActive="active">
-      <button (click)="contactsRoute()"
+      <button (click)="contactsRoute()" [class.disabled]="variablesService.daemon_state !== 2" [disabled]="variablesService.daemon_state !== 2"
         (mouseover)="menuItem = true"
         (mouseleave)="menuItem = false"
       >
@@ -71,7 +71,7 @@
       <span>{{ 'SIDEBAR.SETTINGS' | translate }}</span>
     </button>
   </div>
-  <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="1500">
+  <div class="wrap-button" *ngIf="variablesService.appPass === ''; else masterPass" tooltip="{{ 'SIDEBAR.LOG_OUT_TOOLTIP' | translate }}" placement="bottom" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
     <button (click)="logOut()" [class.disabled]="variablesService.appPass === ''" [disabled]="variablesService.appPass === ''">
       <i class="icon logout"></i>
       <span>{{ 'SIDEBAR.LOG_OUT' | translate }}</span>

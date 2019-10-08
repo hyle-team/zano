@@ -58,19 +58,19 @@ export class SettingsComponent implements OnInit {
   appScaleOptions = [
     {
       id: 7.5,
-      name: '75% scale'
+      name: 'SETTINGS.SCALE.75'
     },
     {
       id: 10,
-      name: '100% scale'
+      name: 'SETTINGS.SCALE.100'
     },
     {
       id: 12.5,
-      name: '125% scale'
+      name: 'SETTINGS.SCALE.125'
     },
     {
       id: 15,
-      name: '150% scale'
+      name: 'SETTINGS.SCALE.150'
     }
   ];
   appLogOptions = [

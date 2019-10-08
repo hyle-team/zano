@@ -232,6 +232,7 @@ export class TooltipDirective implements OnDestroy {
   ngOnDestroy() {
     clearTimeout(this.removeTooltipTimeout);
     clearTimeout(this.removeTooltipTimeoutInner);
+    clearTimeout(this.removeTooltipTimeDelay);
     if (this.tooltip) {
       this.renderer.removeChild(document.body, this.tooltip);
       this.tooltip = null;

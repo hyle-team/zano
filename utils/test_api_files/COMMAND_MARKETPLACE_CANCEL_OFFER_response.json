@@ -1,0 +1,8 @@
+{
+  "id": 0,
+  "jsonrpc": "2.0",
+  "result": {
+    "tx_blob_size": 368,
+    "tx_hash": "d52014dae0b65168e0551acef9e95972041f3f38d92455d18c8b886baece3d90"
+  }
+}

@@ -46,7 +46,7 @@
       "ONLINE": "En ligne",
       "ERROR": "Erreur de système",
       "COMPLETE": "Fermeture",
-      "SYNCING": "Synchronisation de la blockchain",
+      "SYNCING": "Syncing block",
       "LOADING": "Chargement des données de la blockchain"
     },
     "UPDATE": {
