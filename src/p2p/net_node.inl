@@ -483,6 +483,12 @@ namespace nodetool
         return;
       }
 
+      if (!check_remote_client_version(rsp.payload_data.client_version))
+      {
+        LOG_PRINT_CCONTEXT_L2("COMMAND_HANDSHAKE Failed, wrong client version: " << rsp.payload_data.client_version << ", closing connection.");
+        return;
+      }
+
       if(!handle_maintainers_entry(rsp.maintrs_entry))
       {
         LOG_ERROR_CCONTEXT("COMMAND_HANDSHAKE Failed, wrong maintainers entry!, closing connection.");
