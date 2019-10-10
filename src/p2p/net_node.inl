@@ -485,7 +485,7 @@ namespace nodetool
 
       if (!tools::check_remote_client_version(rsp.payload_data.client_version))
       {
-        LOG_PRINT_CCONTEXT_L2("COMMAND_HANDSHAKE Failed, wrong client version: " << rsp.payload_data.client_version << ", closing connection.");
+        LOG_ERROR_CCONTEXT("COMMAND_HANDSHAKE Failed, wrong client version: " << rsp.payload_data.client_version << ", closing connection.");
         return;
       }
 
@@ -1307,6 +1307,14 @@ namespace nodetool
     {
       LOG_ERROR_CCONTEXT("COMMAND_HANDSHAKE came, but seems that connection already have associated peer_id (double COMMAND_HANDSHAKE?)");
       drop_connection(context);
+      return 1;
+    }
+
+    if (!tools::check_remote_client_version(rsp.payload_data.client_version))
+    {
+      LOG_PRINT_CCONTEXT_L2("COMMAND_HANDSHAKE: wrong client version: " << rsp.payload_data.client_version << ", closing connection.");
+      drop_connection(context);
+      add_ip_fail(context.m_remote_ip);
       return 1;
     }
 
