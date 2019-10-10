@@ -3,10 +3,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "gtest/gtest.h"
-#include "version.h"
+#include "common/util.h"
 
 TEST(p2p_client_version, test_1)
 {
+  using namespace tools;
+
   // good
   
   ASSERT_TRUE(check_remote_client_version("10.101.999.28391[deadbeef31337-dirty]"));

@@ -30,6 +30,8 @@ namespace tools
   std::string get_default_user_dir();
   std::string get_current_username();
   std::string get_os_version_string();
+  bool check_remote_client_version(const std::string& client_ver);
+
   bool create_directories_if_necessary(const std::string& path);
   std::error_code replace_file(const std::string& replacement_name, const std::string& replaced_name);
 
