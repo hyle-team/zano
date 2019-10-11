@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
   //_CrtSetAllocHook(alloc_hook);
 
 #endif
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
+  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
   log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet");
   LOG_PRINT_L0("Starting...");
@@ -220,7 +220,7 @@ int main(int argc, char* argv[])
 
   //create objects and link them
   bc_services::bc_offers_service offers_service(nullptr);
-  offers_service.set_disabled(true);
+  offers_service.set_disabled(true); //disable by default
   currency::core ccore(NULL);
   currency::t_currency_protocol_handler<currency::core> cprotocol(ccore, NULL );
   p2psrv_t p2psrv(cprotocol);
@@ -237,8 +237,10 @@ int main(int argc, char* argv[])
 
   if (command_line::get_arg(vm, command_line::arg_enable_offers_service))
   {
+    offers_service.set_disabled(false);
     ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
   }
+
   
   
   std::shared_ptr<currency::stratum_server> stratum_server_ptr; 
@@ -270,9 +272,10 @@ int main(int argc, char* argv[])
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize p2p server.");
   LOG_PRINT_L0("P2p server initialized OK on port: " << p2psrv.get_this_peer_port());
 
+  tools::miniupnp_helper upnp_helper;
+
   if (!command_line::get_arg(vm, command_line::arg_disable_upnp))
   {
-    tools::miniupnp_helper upnp_helper;
     LOG_PRINT_L0("Starting UPnP");
     upnp_helper.start_regular_mapping(p2psrv.get_this_peer_port(), p2psrv.get_this_peer_port(), 20*60*1000);
   }
