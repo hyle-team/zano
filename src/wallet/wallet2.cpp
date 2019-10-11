@@ -28,6 +28,8 @@ using namespace epee;
 #include "version.h"
 using namespace currency;
 
+#define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
+
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
@@ -1965,6 +1967,9 @@ void wallet2::generate(const std::wstring& path, const std::string& pass)
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass), "new wallet generation failed: password contains forbidden characters")
   clear();
   prepare_file_names(path);
+
+  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
+
   m_password = pass;
   m_account.generate();
   init_log_prefix();
@@ -2000,6 +2005,9 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
 {
   clear();
   prepare_file_names(wallet_);
+
+  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
+
   m_password = password;
 
   std::string keys_buff;
@@ -2058,35 +2066,55 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 {
   LOG_PRINT_L0("(before storing: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
+  check_for_free_space_and_throw_if_it_lacks(path_to_save);
+
+  std::string ascii_path_to_save = epee::string_encoding::convert_to_ansii(path_to_save);
+
   //prepare data
   std::string keys_buff;
   bool r = store_keys(keys_buff, password);
-  CHECK_AND_ASSERT_THROW_MES(r, "failed to store_keys for wallet " << epee::string_encoding::convert_to_ansii(m_wallet_file));
-
-  wallet_file_binary_header wbh = AUTO_VAL_INIT(wbh);
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store_keys for wallet " << ascii_path_to_save);
 
   //store data
-
+  wallet_file_binary_header wbh = AUTO_VAL_INIT(wbh);
   wbh.m_signature = WALLET_FILE_SIGNATURE;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
   wbh.m_cb_body = 1000;
-
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
+  uint64_t ts = m_core_runtime_config.get_core_time();
 
-  //std::ofstream data_file;
+  // save to tmp file, then rename
+  boost::filesystem::path tmp_file_path = boost::filesystem::path(path_to_save);
+  tmp_file_path += L".newtmp_" + std::to_wstring(ts);
+
   boost::filesystem::ofstream data_file;
-  data_file.open(path_to_save, std::ios_base::binary | std::ios_base::out | std::ios::trunc);
-  CHECK_AND_ASSERT_THROW_MES(!data_file.fail(), "failed to open binary wallet file for saving: " << epee::string_encoding::convert_to_ansii(m_wallet_file));
+  data_file.open(tmp_file_path, std::ios_base::binary | std::ios_base::out | std::ios::trunc);
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!data_file.fail(), "failed to open binary wallet file for saving: " << tmp_file_path.string());
   data_file << header_buff << keys_buff;
-  WLT_LOG_L0("Storing to file...");
+
+  WLT_LOG_L0("Storing to " << tmp_file_path.string() << " ...");
 
   r = tools::portble_serialize_obj_to_stream(*this, data_file);
-  CHECK_AND_ASSERT_THROW_MES(r, "failed to portble_serialize_obj_to_stream for wallet " << epee::string_encoding::convert_to_ansii(m_wallet_file));
+  if (!r)
+  {
+    boost::filesystem::remove(tmp_file_path); // remove tmp file if smth went wrong
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "portble_serialize_obj_to_stream failed for wallet " << tmp_file_path.string());
+  }
 
   data_file.flush();
   data_file.close();
+
+  // for the sake of safety perform a double-renaming: wallet file -> old tmp, new tmp -> wallet file, remove old tmp
+  
+  boost::filesystem::path tmp_old_file_path = boost::filesystem::path(path_to_save);
+  tmp_old_file_path += L".oldtmp_" + std::to_wstring(ts);
+
+  if (boost::filesystem::is_regular_file(path_to_save))
+    boost::filesystem::rename(path_to_save, tmp_old_file_path);
+  boost::filesystem::rename(tmp_file_path, path_to_save);
+  boost::filesystem::remove(tmp_old_file_path);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
@@ -2132,6 +2160,47 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
   // TODO additional clearing for watch-only wallet's data
 
   wo.store(path_to_save, password);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::check_for_free_space_and_throw_if_it_lacks(const std::wstring& wallet_filename, uint64_t exact_size_needed_if_known /* = UINT64_MAX */)
+{
+  namespace fs = boost::filesystem;
+
+  try
+  {
+    fs::path wallet_file_path(wallet_filename);
+    fs::path base_path = wallet_file_path.parent_path();
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(fs::is_directory(base_path), "directory does not exist: " << base_path.string());
+
+    uint64_t min_free_size = exact_size_needed_if_known;
+    if (min_free_size == UINT64_MAX)
+    {
+      // if exact size needed is unknown -- determine it as
+      // twice the original wallet file size or MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES, which one is bigger
+      min_free_size = MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES;
+      if (fs::is_regular_file(wallet_file_path))
+        min_free_size = std::max(min_free_size, 2 * fs::file_size(wallet_file_path));
+    }
+    else
+    {
+      min_free_size += 1024 * 1024 * 10; // add a little for FS overhead and so
+    }
+
+    fs::space_info si = fs::space(base_path);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(si.available > min_free_size, "free space at " << base_path.string() << " is too low: " << si.available << ", required minimum is: " << min_free_size);
+  }
+  catch (tools::error::wallet_common_error&)
+  {
+    throw;
+  }
+  catch (std::exception& e)
+  {
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: " << e.what());
+  }
+  catch (...)
+  {
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: unknown exception");
+  }
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::unlocked_balance() const

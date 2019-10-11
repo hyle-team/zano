@@ -174,7 +174,8 @@ namespace currency
         "That means that current software is outdated, please updated it." << 
         "Current heigh lay under checkpoints on remote host, so it is not possible validate this transactions on local host, disconnecting.", LOG_LEVEL_0);
       return false;
-    }else if (m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height)
+    }
+    else if (m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height)
     {
       LOG_PRINT_MAGENTA("Remote node have longer checkpoints zone( " << hshd.last_checkpoint_height <<  ") " <<
         "that local (" << m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() << ")" << 
