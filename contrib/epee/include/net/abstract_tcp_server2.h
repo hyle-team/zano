@@ -135,10 +135,10 @@ class connection
   volatile bool m_is_multithreaded;
   std::list<boost::shared_ptr<connection<t_protocol_handler>>> m_self_refs;  // add_ref/release support
   critical_section m_self_refs_lock;
-
-  //this should be the last one, because it could be wait on destructor, while other activities possible on other threads
-  t_protocol_handler m_protocol_handler;
-  //typename t_protocol_handler::config_type m_dummy_config;
+  
+  t_protocol_handler m_protocol_handler; 
+  //this should be the last line with m_protocol_handler, because it could be wait on destructor, while other activities possible on other threads
+  //DON'T ADD ANYTHING HERE!!!
 };
 
 /************************************************************************/
