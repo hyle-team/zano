@@ -166,14 +166,14 @@
     },
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
-      "OLD": "Old password",
+      "OLD": "Current password",
       "NEW": "New password",
       "CONFIRM": "New password confirmation",
       "BUTTON": "Save"
     },
     "FORM_ERRORS": {
       "PASS_REQUIRED": "Password is required",
-      "PASS_NOT_MATCH": "Old password not match",
+      "PASS_NOT_MATCH": "Incorrect password",
       "CONFIRM_NOT_MATCH": "Confirm password not match"
     },
     "LAST_BUILD": "Current build: {{value}}",
