@@ -75,10 +75,16 @@ struct core_critical_error_handler_t : public currency::i_critical_error_handler
     
     LOG_ERROR(ENDL << ENDL << "Free space at data directory is critically low (" << available / (1024 * 1024) << " MB, while " << required / (1024 * 1024) << " MB is required), daemon will stop immediately" << ENDL << ENDL);
 
+    /*
+    temporary disable daemon stop due to issue #133
+    */
+    return false;
+    /*
     // stop handling
     dch.stop_handling();
     p2psrv.send_stop_signal();
     return true; // the caller must stop processing
+    */
   }
 
   daemon_commands_handler& dch;
