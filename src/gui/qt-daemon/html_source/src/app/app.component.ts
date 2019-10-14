@@ -15,7 +15,8 @@ import {ModalService} from './_helpers/services/modal.service';
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit, OnDestroy {
-
+  
+  intervalUpdatePriceState;
   intervalUpdateContractsState;
   expMedTsEvent;
   onQuitRequest = false;
@@ -547,6 +548,10 @@ export class AppComponent implements OnInit, OnDestroy {
       console.log(error);
     });
     this.getMoneyEquivalent();
+
+    this.intervalUpdatePriceState = setInterval(() => {
+      this.getMoneyEquivalent();
+    }, 30000);
   }
 
   getMoneyEquivalent() {
@@ -565,7 +570,7 @@ export class AppComponent implements OnInit, OnDestroy {
         console.warn('api.coingecko.com error: ', error);
         setTimeout(() => {
           this.getMoneyEquivalent();
-        }, 60000);
+        }, 30000);
       }
     )
   }
@@ -672,6 +677,9 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     if (this.intervalUpdateContractsState) {
       clearInterval(this.intervalUpdateContractsState);
+    }
+    if (this.intervalUpdatePriceState) {
+      clearInterval(this.intervalUpdatePriceState);
     }
     this.expMedTsEvent.unsubscribe();
   }
