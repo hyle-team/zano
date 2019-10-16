@@ -147,3 +147,13 @@ struct tx_expiration_time_and_chain_switching : public test_chain_unit_enchanced
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
+
+struct tx_key_image_pool_conflict : public test_chain_unit_enchanced
+{
+  tx_key_image_pool_conflict();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable currency::account_base m_miner_acc;
+};
