@@ -2170,6 +2170,8 @@ void wallet2::check_for_free_space_and_throw_if_it_lacks(const std::wstring& wal
   {
     fs::path wallet_file_path(wallet_filename);
     fs::path base_path = wallet_file_path.parent_path();
+    if (base_path.empty())
+      base_path = fs::path(".");
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(fs::is_directory(base_path), "directory does not exist: " << base_path.string());
 
     uint64_t min_free_size = exact_size_needed_if_known;
