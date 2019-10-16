@@ -297,6 +297,7 @@ public:
   bool check_tx_pool_empty(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_tx_pool_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool print_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool remove_stuck_txs(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_offers_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
 protected:
