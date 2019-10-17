@@ -49,6 +49,7 @@ void free_space_check()
   boost::filesystem::path current_path(".");
 
   size_t counter = 0;
+  bool need_backspace = false;
   while (true)
   {
     std::this_thread::sleep_for(std::chrono::milliseconds( 900 ));
@@ -59,26 +60,37 @@ void free_space_check()
       {
         // free space is ok
         counter = (counter + 1) % 4;
-        std::cout << '\b';
+        if (need_backspace)
+          std::cout << '\b';
         std::cout << ( counter == 0 ? '*' : counter == 1 ? '\\' : counter == 2 ? '|' : '/' );
+        std::cout << std::flush;
+        need_backspace = true;
         continue;
       }
       // free space is not ok!
-      LOG_PRINT_YELLOW("free space available: " << si.available, LOG_LEVEL_0);
+      LOG_PRINT_YELLOW("1) fs::space() : available: " << si.available << ", free: " << si.free << ", capacity: " << si.capacity, LOG_LEVEL_0);
 #ifdef WIN32
       output = exec("dir");
 #else
       output = exec("df -h");
 #endif
       LOG_PRINT_YELLOW(output, LOG_LEVEL_0);
+
+      // try one again asap
+      si = fs::space(current_path);
+      LOG_PRINT_YELLOW("2) fs::space() : available: " << si.available << ", free: " << si.free << ", capacity: " << si.capacity, LOG_LEVEL_0);
+
+      need_backspace = false;
     }
     catch (std::exception& e)
     {
       LOG_ERROR("failed to determine free space: " << e.what());
+      need_backspace = false;
     }
     catch (...)
     {
       LOG_ERROR("failed to determine free space: unknown exception");
+      need_backspace = false;
     }
   }
 
