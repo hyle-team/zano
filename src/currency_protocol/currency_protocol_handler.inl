@@ -94,22 +94,32 @@ namespace currency
       << std::setw(20) << "Peer id"
       << std::setw(25) << "Recv/Sent (idle,sec)"
       << std::setw(25) << "State"
-      << std::setw(20) << "Livetime(seconds)" 
+      << std::setw(20) << "Livetime" 
       << std::setw(20) << "Client version" << ENDL;
 
+    size_t incoming_count = 0, outgoing_count = 0;
+    std::multimap<time_t, std::string> conn_map;
     m_p2p->for_each_connection([&](const connection_context& cntxt, nodetool::peerid_type peer_id)
     {
-      ss << std::setw(29) << std::left << std::string(cntxt.m_is_income ? "[INC]":"[OUT]") + 
+      std::stringstream conn_ss;
+      time_t livetime = time(NULL) - cntxt.m_started;
+      conn_ss << std::setw(29) << std::left << std::string(cntxt.m_is_income ? "[INC]":"[OUT]") + 
         string_tools::get_ip_string_from_int32(cntxt.m_remote_ip) + ":" + std::to_string(cntxt.m_remote_port) 
         << std::setw(20) << std::hex << peer_id
         << std::setw(25) << std::to_string(cntxt.m_recv_cnt)+ "(" + std::to_string(time(NULL) - cntxt.m_last_recv) + ")" + "/" + std::to_string(cntxt.m_send_cnt) + "(" + std::to_string(time(NULL) - cntxt.m_last_send) + ")"
         << std::setw(25) << get_protocol_state_string(cntxt.m_state)
-        << std::setw(20) << std::to_string(time(NULL) - cntxt.m_started) 
+        << std::setw(20) << epee::misc_utils::get_time_interval_string(livetime) 
         << std::setw(20) << cntxt.m_remote_version
         << ENDL;
+      conn_map.insert(std::make_pair(livetime, conn_ss.str()));
+      (cntxt.m_is_income ? incoming_count : outgoing_count) += 1;
       return true;
     });
-    LOG_PRINT_L0("Connections: " << ENDL << ss.str());
+
+    for(auto it = conn_map.rbegin(); it != conn_map.rend(); ++it)
+      ss << it->second;
+
+    LOG_PRINT_L0("Connections (" << incoming_count << " in, " << outgoing_count << " out, " << incoming_count + outgoing_count << " total):" << ENDL << ss.str());
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
@@ -723,13 +733,14 @@ namespace currency
       if (req.txs.size())
       {
         post_notify<NOTIFY_NEW_TRANSACTIONS>(req, cc);
-        print_connection_context_short(cc, debug_ss);
-        debug_ss << ": " << req.txs.size() << ENDL;
+
+        if (debug_ss.tellp())
+          debug_ss << ", ";
+        debug_ss << cc << ": " << req.txs.size();
       }
     }
     TIME_MEASURE_FINISH_MS(ms);
-    LOG_PRINT_GREEN("[POST RELAY] NOTIFY_NEW_TRANSACTIONS relayed (" << ms << "ms)contexts list: " << debug_ss.str(), LOG_LEVEL_2);
-
+    LOG_PRINT_GREEN("[POST RELAY] NOTIFY_NEW_TRANSACTIONS relayed (" << ms << "ms) to: " << debug_ss.str(), LOG_LEVEL_2);
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
