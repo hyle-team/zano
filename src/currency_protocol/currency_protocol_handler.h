@@ -22,7 +22,7 @@
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
-#define ASYNC_RELAY_MODE
+#define ASYNC_RELAY_MODE // relay transactions asyncronously via m_relay_que
 
 namespace currency
 {
@@ -117,25 +117,25 @@ namespace currency
     int64_t m_last_ntp2local_time_difference;
 
     template<class t_parametr>
-      bool post_notify(typename t_parametr::request& arg, currency_connection_context& context)
-      {
-        LOG_PRINT_L2("[POST]" << typeid(t_parametr).name() << " to " << context);
-        std::string blob;
-        epee::serialization::store_t_to_binary(arg, blob);
-        return m_p2p->invoke_notify_to_peer(t_parametr::ID, blob, context);
-      }
+    bool post_notify(typename t_parametr::request& arg, currency_connection_context& context)
+    {
+      LOG_PRINT_L3("[POST]" << typeid(t_parametr).name() << " to " << context);
+      std::string blob;
+      epee::serialization::store_t_to_binary(arg, blob);
+      return m_p2p->invoke_notify_to_peer(t_parametr::ID, blob, context);
+    }
 
-      template<class t_parametr>
-      bool relay_post_notify(typename t_parametr::request& arg, currency_connection_context& exlude_context)
-      {        
-        std::string arg_buff;
-        epee::serialization::store_t_to_binary(arg, arg_buff);
-        std::list<epee::net_utils::connection_context_base> relayed_peers;
-        bool r = m_p2p->relay_notify_to_all(t_parametr::ID, arg_buff, exlude_context, relayed_peers);
+    template<class t_parametr>
+    bool relay_post_notify(typename t_parametr::request& arg, currency_connection_context& exlude_context)
+    {        
+      std::string arg_buff;
+      epee::serialization::store_t_to_binary(arg, arg_buff);
+      std::list<epee::net_utils::connection_context_base> relayed_peers;
+      bool r = m_p2p->relay_notify_to_all(t_parametr::ID, arg_buff, exlude_context, relayed_peers);
 
-        LOG_PRINT_GREEN("[POST RELAY] " << typeid(t_parametr).name() << " relayed contexts list: " << print_connection_context_list(relayed_peers, ", "), LOG_LEVEL_2);
-        return r;
-      }
+      LOG_PRINT_GREEN("[POST RELAY] " << typeid(t_parametr).name() << " to (" << relayed_peers.size() << "): " << print_connection_context_list(relayed_peers, ", "), LOG_LEVEL_2);
+      return r;
+    }
   };
 }
 

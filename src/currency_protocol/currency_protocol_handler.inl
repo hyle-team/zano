@@ -245,7 +245,6 @@ namespace currency
     if(context.m_state != currency_connection_context::state_normal)
       return 1;
 
-    
     //check if block already exists
     block b = AUTO_VAL_INIT(b);
     block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -255,6 +254,7 @@ namespace currency
       m_p2p->drop_connection(context);
       return 1;
     }
+
     crypto::hash block_id = get_block_hash(b);
     LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK " << block_id << " HEIGHT " << get_block_height(b) << " (hop " << arg.hop << ")", LOG_LEVEL_2);
 
@@ -324,11 +324,11 @@ namespace currency
       m_p2p->drop_connection(context);
       return 1;
     }
-    LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK EXTRA: id: " << block_id 
-      << ",bvc.m_added_to_main_chain " << bvc.m_added_to_main_chain
-      //<< ",prevalidate_result " << prevalidate_relayed
-      << ",bvc.added_to_altchain " << bvc.added_to_altchain
-      << ",bvc.m_marked_as_orphaned " << bvc.m_marked_as_orphaned, LOG_LEVEL_2);
+    LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK EXTRA " << block_id 
+      << " bvc.m_added_to_main_chain=" << bvc.m_added_to_main_chain
+      //<< ", prevalidate_result=" << prevalidate_relayed
+      << ", bvc.added_to_altchain=" << bvc.added_to_altchain
+      << ", bvc.m_marked_as_orphaned=" << bvc.m_marked_as_orphaned, LOG_LEVEL_2);
 
     if (bvc.m_added_to_main_chain || (bvc.added_to_altchain && bvc.height_difference < 2))
     { 
