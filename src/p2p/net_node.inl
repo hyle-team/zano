@@ -688,9 +688,11 @@ namespace nodetool
       LOG_PRINT_CC_L0(con, "Failed to HANDSHAKE with peer "
         << string_tools::get_ip_string_from_int32(na.ip)
         << ":" << string_tools::num_to_string_fast(na.port)
-        /*<< ", try " << try_count*/);
+        << ", closing connection");
+      m_net_server.get_config_object().close(con.m_connection_id);
       return false;
     }
+
     if(just_take_peerlist)
     {
       m_net_server.get_config_object().close(con.m_connection_id);
