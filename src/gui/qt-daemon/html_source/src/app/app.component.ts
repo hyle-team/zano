@@ -15,7 +15,8 @@ import {ModalService} from './_helpers/services/modal.service';
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit, OnDestroy {
-
+  
+  intervalUpdatePriceState;
   intervalUpdateContractsState;
   expMedTsEvent;
   onQuitRequest = false;
@@ -38,7 +39,7 @@ export class AppComponent implements OnInit, OnDestroy {
     private intToMoneyPipe: IntToMoneyPipe,
     private modalService: ModalService
   ) {
-    translate.addLangs(['en', 'fr']);
+    translate.addLangs(['en', 'fr', 'de', 'it', 'pt']);
     translate.setDefaultLang('en');
     // const browserLang = translate.getBrowserLang();
     // translate.use(browserLang.match(/en|fr/) ? browserLang : 'en');
@@ -62,7 +63,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_SHOW'),
         this.translate.instant('BACKEND_LOCALIZATION.TRAY_MENU_MINIMIZE')
       ];
-      this.backend.setBackendLocalization(stringsArray, 'en');
+      this.backend.setBackendLocalization(stringsArray, this.variablesService.settings.language);
     } else {
       console.warn('wait translate use');
       setTimeout(() => {
@@ -173,7 +174,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.variablesService.last_build_displaymode = data.last_build_displaymode;
         this.variablesService.setHeightApp(data.height);
         this.variablesService.setHeightMax(data.max_net_seen_height);
-
+        this.backend.getContactAlias();
         this.ngZone.run(() => {
           this.variablesService.daemon_state = data['daemon_network_state'];
           if (data['daemon_network_state'] === 1) {
@@ -516,7 +517,7 @@ export class AppComponent implements OnInit, OnDestroy {
           this.variablesService.settings.theme = this.variablesService.defaultTheme;
           this.renderer.addClass(document.body, 'theme-' + this.variablesService.settings.theme);
         }
-
+        this.translate.use(this.variablesService.settings.language);
         this.setBackendLocalization();
 
         this.backend.setLogLevel(this.variablesService.settings.appLog);
@@ -547,6 +548,10 @@ export class AppComponent implements OnInit, OnDestroy {
       console.log(error);
     });
     this.getMoneyEquivalent();
+
+    this.intervalUpdatePriceState = setInterval(() => {
+      this.getMoneyEquivalent();
+    }, 30000);
   }
 
   getMoneyEquivalent() {
@@ -565,7 +570,7 @@ export class AppComponent implements OnInit, OnDestroy {
         console.warn('api.coingecko.com error: ', error);
         setTimeout(() => {
           this.getMoneyEquivalent();
-        }, 60000);
+        }, 30000);
       }
     )
   }
@@ -672,6 +677,9 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     if (this.intervalUpdateContractsState) {
       clearInterval(this.intervalUpdateContractsState);
+    }
+    if (this.intervalUpdatePriceState) {
+      clearInterval(this.intervalUpdatePriceState);
     }
     this.expMedTsEvent.unsubscribe();
   }

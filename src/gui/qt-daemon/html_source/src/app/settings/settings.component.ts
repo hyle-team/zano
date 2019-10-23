@@ -1,8 +1,9 @@
 import {Component, NgZone, OnInit, Renderer2} from '@angular/core';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
-import {FormControl, FormGroup} from '@angular/forms';
+import {FormControl, FormGroup, Validators} from '@angular/forms';
 import {Location} from '@angular/common';
+import { TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-settings',
@@ -14,6 +15,28 @@ export class SettingsComponent implements OnInit {
   theme: string;
   scale: number;
   changeForm: any;
+  languagesOptions = [
+    {
+      name: 'en',
+      language: 'SETTINGS.LANGUAGE.EN'
+    },
+    {
+      name: 'fr',
+      language: 'SETTINGS.LANGUAGE.FR'
+    },
+    {
+      name: 'de',
+      language: 'SETTINGS.LANGUAGE.DE'
+    },
+    {
+      name: 'it',
+      language: 'SETTINGS.LANGUAGE.IT'
+    },
+    {
+      name: 'pt',
+      language: 'SETTINGS.LANGUAGE.PT'
+    }
+  ];
   appLockOptions = [
     {
       id: 5,
@@ -35,19 +58,19 @@ export class SettingsComponent implements OnInit {
   appScaleOptions = [
     {
       id: 7.5,
-      name: '75% scale'
+      name: 'SETTINGS.SCALE.75'
     },
     {
       id: 10,
-      name: '100% scale'
+      name: 'SETTINGS.SCALE.100'
     },
     {
       id: 12.5,
-      name: '125% scale'
+      name: 'SETTINGS.SCALE.125'
     },
     {
       id: 15,
-      name: '150% scale'
+      name: 'SETTINGS.SCALE.150'
     }
   ];
   appLogOptions = [
@@ -79,13 +102,14 @@ export class SettingsComponent implements OnInit {
     public variablesService: VariablesService,
     private backend: BackendService,
     private location: Location,
+    public translate: TranslateService,
     private ngZone: NgZone
   ) {
     this.theme = this.variablesService.settings.theme;
     this.scale = this.variablesService.settings.scale;
     this.changeForm = new FormGroup({
       password: new FormControl(''),
-      new_password: new FormControl(''),
+      new_password: new FormControl('', Validators.pattern(this.variablesService.pattern)),
       new_confirmation: new FormControl('')
     }, [(g: FormGroup) => {
       return g.get('new_password').value === g.get('new_confirmation').value ? null : {'confirm_mismatch': true};
@@ -133,15 +157,14 @@ export class SettingsComponent implements OnInit {
           } else {
             console.log(data['error_code']);
           }
-        
-        })
+        });
       } else {
         this.backend.dropSecureAppData();
       }
       this.changeForm.reset();
     }
   }
-  
+
   onLockChange() {
     if (this.variablesService.appLogin) {
       this.variablesService.restartCountdown();
@@ -151,6 +174,11 @@ export class SettingsComponent implements OnInit {
 
   onLogChange() {
     this.backend.setLogLevel(this.variablesService.settings.appLog);
+    this.backend.storeAppData();
+  }
+
+  onLanguageChange() {
+    this.translate.use(this.variablesService.settings.language);
     this.backend.storeAppData();
   }
 

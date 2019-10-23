@@ -174,7 +174,8 @@ namespace currency
         "That means that current software is outdated, please updated it." << 
         "Current heigh lay under checkpoints on remote host, so it is not possible validate this transactions on local host, disconnecting.", LOG_LEVEL_0);
       return false;
-    }else if (m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height)
+    }
+    else if (m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height)
     {
       LOG_PRINT_MAGENTA("Remote node have longer checkpoints zone( " << hshd.last_checkpoint_height <<  ") " <<
         "that local (" << m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() << ")" << 
@@ -788,7 +789,7 @@ namespace currency
     std::vector<int64_t> time_deltas_copy(m_time_deltas.begin(), m_time_deltas.end());
 
     m_last_median2local_time_difference = epee::misc_utils::median(time_deltas_copy);
-    LOG_PRINT_MAGENTA("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ")", LOG_LEVEL_2);
+    LOG_PRINT_MAGENTA("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ")", m_last_median2local_time_difference >= 3 ? LOG_LEVEL_2 : LOG_LEVEL_3);
     if (std::abs(m_last_median2local_time_difference) > TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE)
     {
       int64_t ntp_time = tools::get_ntp_time();

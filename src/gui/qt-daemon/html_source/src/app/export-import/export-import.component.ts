@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, NgZone } from '@angular/core';
 import { Location } from '@angular/common';
 import { BackendService } from '../_helpers/services/backend.service';
 import { VariablesService } from '../_helpers/services/variables.service';
@@ -6,6 +6,7 @@ import { Contact } from '../_helpers/models/contact.model';
 import { ModalService } from '../_helpers/services/modal.service';
 import { Papa } from 'ngx-papaparse';
 import { TranslateService } from '@ngx-translate/core';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-export-import',
@@ -21,7 +22,9 @@ export class ExportImportComponent implements OnInit {
     private backend: BackendService,
     private modalService: ModalService,
     private papa: Papa,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private router: Router,
+    private ngZone: NgZone
   ) {}
 
   ngOnInit() {}
@@ -78,10 +81,9 @@ export class ExportImportComponent implements OnInit {
                     });
                   }
                   this.backend.getContactAlias();
-                  this.modalService.prepareModal(
-                    'success',
-                    'CONTACTS.SUCCESS_IMPORT'
-                  );
+                  this.ngZone.run(() => {
+                    this.router.navigate(['/contacts']);
+                  });
                 }
                 if (elements.errors.length) {
                   this.modalService.prepareModal(
@@ -106,7 +108,7 @@ export class ExportImportComponent implements OnInit {
       delete contact.alias;
       contacts.push(contact);
     });
-    
+
     this.backend.saveFileDialog(
       '',
       '*',
@@ -118,10 +120,6 @@ export class ExportImportComponent implements OnInit {
         const path = this.isValid(file_data.path) ? file_data.path : `${file_data.path}.csv`;
         if (file_status && this.isValid(path) && this.variablesService.contacts.length) {
           this.backend.storeFile(path, this.papa.unparse(contacts));
-          this.modalService.prepareModal(
-            'success',
-            'CONTACTS.SUCCESS_EXPORT'
-          );
         }
         if (!(file_data.error_code === 'CANCELED') && !this.isValid(path)) {
           this.modalService.prepareModal('error', 'CONTACTS.ERROR_EXPORT');

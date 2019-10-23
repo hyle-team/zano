@@ -32,6 +32,11 @@
     <div class="input-block">
       <label for="wallet-password">{{ 'CREATE_WALLET.PASS' | translate }}</label>
       <input type="password" id="wallet-password" formControlName="password" [attr.readonly]="walletSaved ? '' : null" (contextmenu)="variablesService.onContextMenuPasteSelect($event)">
+      <div class="error-block" *ngIf="createForm.controls['password'].dirty && createForm.controls['password'].errors">
+        <div *ngIf="createForm.controls['password'].errors.pattern">
+          {{ 'ERRORS.WRONG_PASSWORD' | translate }}
+        </div>
+      </div>
     </div>
 
     <div class="input-block">

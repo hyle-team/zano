@@ -328,7 +328,7 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
       {
         contracts.clear();
         alice_wlt->get_contracts(contracts);
-        CHECK_AND_ASSERT_MES(check_contract_state(contracts, m_etd.cpd, static_cast<tools::wallet_rpc::escrow_contract_details_basic::contract_state>(se.a_state), "Alice"), false, "");
+        CHECK_AND_ASSERT_MES(check_contract_state(contracts, m_etd.cpd, static_cast<tools::wallet_public::escrow_contract_details_basic::contract_state>(se.a_state), "Alice"), false, "");
       }
 
       LOG_PRINT_GREEN("Bob's wallet is refreshing...", LOG_LEVEL_1);
@@ -346,7 +346,7 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
       {
         contracts.clear();
         bob_wlt->get_contracts(contracts);
-        CHECK_AND_ASSERT_MES(check_contract_state(contracts, m_etd.cpd, static_cast<tools::wallet_rpc::escrow_contract_details_basic::contract_state>(se.b_state), "Bob"), false, "");
+        CHECK_AND_ASSERT_MES(check_contract_state(contracts, m_etd.cpd, static_cast<tools::wallet_public::escrow_contract_details_basic::contract_state>(se.b_state), "Bob"), false, "");
       }
 
       mine_empty_block = true;

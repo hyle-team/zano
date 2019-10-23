@@ -21,6 +21,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   copyAnimation = false;
   copyAnimationTimeout;
   balanceTooltip;
+  isModalDialogVisible = false;
 
   @ViewChild('scrolledContent') private scrolledContent: ElementRef;
 
@@ -180,6 +181,17 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   openInBrowser(link) {
     this.backend.openUrlInBrowser(link);
+  }
+
+  showDialog() {
+    this.isModalDialogVisible = true;
+  }
+
+  confirmed(confirmed: boolean) {
+    if (confirmed) {
+      this.closeWallet();
+    }
+    this.isModalDialogVisible = false;
   }
 
   closeWallet() {

@@ -220,6 +220,11 @@ public:
   bool add_invoke_response_handler(const callback_t& cb, uint64_t timeout,  async_protocol_handler& con, int command)
   {
     CRITICAL_REGION_LOCAL(m_invoke_response_handlers_lock);
+    if (m_protocol_released)
+    {
+      LOG_PRINT_L0("ERROR: Adding response handler to a released object");
+      return false;
+    }
     boost::shared_ptr<invoke_response_handler_base> handler(boost::make_shared<invoke_handler<callback_t>>(cb, timeout, con, command));
     m_invoke_response_handlers.push_back(handler);
     LOG_PRINT_L4("[LEVIN_PROTOCOL" << this << "] INVOKE_HANDLER_QUE: PUSH_BACK RESPONSE HANDLER");

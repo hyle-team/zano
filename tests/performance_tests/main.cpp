@@ -19,6 +19,8 @@
 #include "serialization_performance_test.h"
 #include "keccak_test.h"
 #include "blake2_test.h"
+#include "print_struct_to_json.h"
+#include "free_space_check.h"
 
 int main(int argc, char** argv)
 {
@@ -33,7 +35,11 @@ int main(int argc, char** argv)
   set_process_affinity(1);
   set_thread_high_priority();
 
-  test_blake2();
+  //test_blake2();
+
+  free_space_check();
+  
+  //print_struct_to_json();
 
   //performance_timer timer;
   //timer.start();

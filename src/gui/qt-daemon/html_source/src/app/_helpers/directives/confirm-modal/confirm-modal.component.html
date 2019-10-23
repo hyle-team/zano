@@ -1,0 +1,16 @@
+<div class="modal">
+  <div class="content">
+    <i class="icon info"></i>
+    <div class="message-container">
+      <span class="title">{{title}}</span>
+      <span class="message">{{message}}</span>
+
+      <div class="wrap-btn">
+        <button type="button" class="action-button" (click)="onSubmit()" #btn>{{ 'MODALS.OK' | translate }}</button>
+        <button type="button" class="action-button" (click)="onClose()">{{ 'MODALS.CANCEL' | translate }}</button>
+      </div>
+    </div>
+  </div>
+  
+  <button type="button" class="close-button" (click)="onClose()"><i class="icon close"></i></button>
+</div>

@@ -16,6 +16,22 @@ using namespace epee;
 #include "crypto/hash.h"
 #include "wallet_rpc_server_error_codes.h"
 
+#define WALLET_RPC_BEGIN_TRY_ENTRY()     try {
+#define WALLET_RPC_CATCH_TRY_ENTRY()     } \
+        catch (const std::exception& e) \
+        { \
+          er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
+          er.message = e.what(); \
+          return false; \
+        } \
+        catch (...) \
+        { \
+          er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR; \
+          er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR"; \
+          return false; \
+        } 
+
+
 namespace tools
 {
   //-----------------------------------------------------------------------------------
@@ -125,7 +141,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_getbalance(const wallet_rpc::COMMAND_RPC_GET_BALANCE::request& req, wallet_rpc::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_getbalance(const wallet_public::COMMAND_RPC_GET_BALANCE::request& req, wallet_public::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     try
     {
@@ -141,7 +157,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_getaddress(const wallet_rpc::COMMAND_RPC_GET_ADDRESS::request& req, wallet_rpc::COMMAND_RPC_GET_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_getaddress(const wallet_public::COMMAND_RPC_GET_ADDRESS::request& req, wallet_public::COMMAND_RPC_GET_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     try
     {
@@ -156,7 +172,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_transfer(const wallet_rpc::COMMAND_RPC_TRANSFER::request& req, wallet_rpc::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     std::string payment_id;
     if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
@@ -244,22 +260,15 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_store(const wallet_rpc::COMMAND_RPC_STORE::request& req, wallet_rpc::COMMAND_RPC_STORE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_store(const wallet_public::COMMAND_RPC_STORE::request& req, wallet_public::COMMAND_RPC_STORE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
-    try
-    {
-      m_wallet.store();
-    }
-    catch (std::exception& e)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
-      er.message = e.what();
-      return false;
-    }
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    m_wallet.store();
+    WALLET_RPC_CATCH_TRY_ENTRY();
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_get_payments(const wallet_rpc::COMMAND_RPC_GET_PAYMENTS::request& req, wallet_rpc::COMMAND_RPC_GET_PAYMENTS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_get_payments(const wallet_public::COMMAND_RPC_GET_PAYMENTS::request& req, wallet_public::COMMAND_RPC_GET_PAYMENTS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     std::string payment_id;
     if (!currency::parse_payment_id_from_hex_str(req.payment_id, payment_id))
@@ -281,7 +290,7 @@ namespace tools
         if (payment.m_unlock_time > payment.m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE)
           continue;
       }
-      wallet_rpc::payment_details rpc_payment;
+      wallet_public::payment_details rpc_payment;
       rpc_payment.payment_id   = req.payment_id;
       rpc_payment.tx_hash      = epee::string_tools::pod_to_hex(payment.m_tx_hash);
       rpc_payment.amount       = payment.m_amount;
@@ -293,7 +302,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_get_bulk_payments(const wallet_rpc::COMMAND_RPC_GET_BULK_PAYMENTS::request& req, wallet_rpc::COMMAND_RPC_GET_BULK_PAYMENTS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_get_bulk_payments(const wallet_public::COMMAND_RPC_GET_BULK_PAYMENTS::request& req, wallet_public::COMMAND_RPC_GET_BULK_PAYMENTS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     res.payments.clear();
 
@@ -320,7 +329,7 @@ namespace tools
             continue;
         }
 
-        wallet_rpc::payment_details rpc_payment;
+        wallet_public::payment_details rpc_payment;
         rpc_payment.payment_id = payment_id_str;
         rpc_payment.tx_hash = epee::string_tools::pod_to_hex(payment.m_tx_hash);
         rpc_payment.amount = payment.m_amount;
@@ -333,7 +342,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_make_integrated_address(const wallet_rpc::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request& req, wallet_rpc::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_make_integrated_address(const wallet_public::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request& req, wallet_public::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     std::string payment_id;
     if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
@@ -362,7 +371,7 @@ namespace tools
     return !res.integrated_address.empty();
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_split_integrated_address(const wallet_rpc::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::request& req, wallet_rpc::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_split_integrated_address(const wallet_public::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::request& req, wallet_public::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     currency::account_public_address addr;
     std::string payment_id;
@@ -378,40 +387,27 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_sign_transfer(const wallet_rpc::COMMAND_SIGN_TRANSFER::request& req, wallet_rpc::COMMAND_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_sign_transfer(const wallet_public::COMMAND_SIGN_TRANSFER::request& req, wallet_public::COMMAND_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
-    try
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::transaction tx = AUTO_VAL_INIT(tx);
+    std::string tx_unsigned_blob;
+    if (!string_tools::parse_hexstr_to_binbuff(req.tx_unsigned_hex, tx_unsigned_blob))
     {
-      currency::transaction tx = AUTO_VAL_INIT(tx);
-      std::string tx_unsigned_blob;
-      if (!string_tools::parse_hexstr_to_binbuff(req.tx_unsigned_hex, tx_unsigned_blob))
-      {
-        er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
-        er.message = "tx_unsigned_hex is invalid";
-        return false;
-      }
-      std::string tx_signed_blob;
-      m_wallet.sign_transfer(tx_unsigned_blob, tx_signed_blob, tx);
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "tx_unsigned_hex is invalid";
+      return false;
+    }
+    std::string tx_signed_blob;
+    m_wallet.sign_transfer(tx_unsigned_blob, tx_signed_blob, tx);
 
-      res.tx_signed_hex = epee::string_tools::buff_to_hex_nodelimer(tx_signed_blob);
-      res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
-    }
-    catch (const std::exception& e)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
-      er.message = e.what();
-      return false;
-    }
-    catch (...)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
-      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
-      return false;
-    }
+    res.tx_signed_hex = epee::string_tools::buff_to_hex_nodelimer(tx_signed_blob);
+    res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
+    WALLET_RPC_CATCH_TRY_ENTRY();
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_submit_transfer(const wallet_rpc::COMMAND_SUBMIT_TRANSFER::request& req, wallet_rpc::COMMAND_SUBMIT_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_submit_transfer(const wallet_public::COMMAND_SUBMIT_TRANSFER::request& req, wallet_public::COMMAND_SUBMIT_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     std::string tx_signed_blob;
     if (!string_tools::parse_hexstr_to_binbuff(req.tx_signed_hex, tx_signed_blob))
@@ -421,27 +417,122 @@ namespace tools
       return false;
     }
 
-    try
-    {
-      currency::transaction tx = AUTO_VAL_INIT(tx);
-      m_wallet.submit_transfer(tx_signed_blob, tx);
-      res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
-    }
-    catch (const std::exception& e)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
-      er.message = e.what();
-      return false;
-    }
-    catch (...)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
-      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
-      return false;
-    }
+    WALLET_RPC_BEGIN_TRY_ENTRY();    
+    currency::transaction tx = AUTO_VAL_INIT(tx);
+    m_wallet.submit_transfer(tx_signed_blob, tx);
+    res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
+    WALLET_RPC_CATCH_TRY_ENTRY();
 
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_contracts_send_proposal(const wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::request& req, wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();       
+    currency::transaction tx = AUTO_VAL_INIT(tx);
+    currency::transaction template_tx = AUTO_VAL_INIT(template_tx);
+    m_wallet.send_escrow_proposal(req, tx, template_tx);  
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_contracts_accept_proposal(const wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL::request& req, wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY(); 
+    m_wallet.accept_proposal(req.contract_id, req.acceptance_fee);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_contracts_get_all(const wallet_public::COMMAND_CONTRACTS_GET_ALL::request& req, wallet_public::COMMAND_CONTRACTS_GET_ALL::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();    
+    tools::wallet2::escrow_contracts_container ecc;
+    m_wallet.get_contracts(ecc);
+    res.contracts.resize(ecc.size());
+    size_t i = 0;
+    for (auto& c : ecc)
+    {
+      static_cast<tools::wallet_public::escrow_contract_details_basic&>(res.contracts[i]) = c.second;
+      res.contracts[i].contract_id = c.first;
+      i++;
+    }
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_contracts_release(const wallet_public::COMMAND_CONTRACTS_RELEASE::request& req, wallet_public::COMMAND_CONTRACTS_RELEASE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();    
+    m_wallet.finish_contract(req.contract_id, req.release_type);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_contracts_request_cancel(const wallet_public::COMMAND_CONTRACTS_REQUEST_CANCEL::request& req, wallet_public::COMMAND_CONTRACTS_REQUEST_CANCEL::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    m_wallet.request_cancel_contract(req.contract_id, req.fee, req.expiration_period);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_contracts_accept_cancel(const wallet_public::COMMAND_CONTRACTS_ACCEPT_CANCEL::request& req, wallet_public::COMMAND_CONTRACTS_ACCEPT_CANCEL::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();    
+    m_wallet.accept_cancel_contract(req.contract_id);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_marketplace_get_my_offers(const wallet_public::COMMAND_MARKETPLACE_GET_MY_OFFERS::request& req, wallet_public::COMMAND_MARKETPLACE_GET_MY_OFFERS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  { 
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    m_wallet.get_actual_offers(res.offers);
+    size_t offers_count_before_filtering = res.offers.size();
+    bc_services::filter_offers_list(res.offers, req.filter, m_wallet.get_core_runtime_config().get_core_time());
+    LOG_PRINT("get_my_offers(): " << res.offers.size() << " offers returned (" << offers_count_before_filtering << " was before filter)", LOG_LEVEL_1);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_marketplace_push_offer(const wallet_public::COMMAND_MARKETPLACE_PUSH_OFFER::request& req, wallet_public::COMMAND_MARKETPLACE_PUSH_OFFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
+    m_wallet.push_offer(req.od, res_tx);
+
+    res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
+    res.tx_blob_size = currency::get_object_blobsize(res_tx);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_marketplace_push_update_offer(const wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER::request& req, wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
+    m_wallet.update_offer_by_id(req.tx_id, req.no, req.od, res_tx);
+
+    res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
+    res.tx_blob_size = currency::get_object_blobsize(res_tx);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_marketplace_cancel_offer(const wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER::request& req, wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
+    m_wallet.cancel_offer_by_id(req.tx_id, req.no, req.fee, res_tx);
+
+    res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
+    res.tx_blob_size = currency::get_object_blobsize(res_tx);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+
+
 
 } // namespace tools

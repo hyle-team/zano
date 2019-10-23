@@ -18,60 +18,6 @@
 namespace bc_services
 {
 
-  std::string transform_double_to_string(const double& a);
-  double transform_string_to_double(const std::string& d);
-
-
-  struct core_offers_filter
-  {
-    uint64_t order_by;
-    bool reverse;
-    uint64_t offset;
-    uint64_t limit;
-    //filter entry
-    uint64_t timestamp_start;
-    uint64_t timestamp_stop;
-    uint64_t offer_type_mask;
-    uint64_t amount_low_limit;
-    uint64_t amount_up_limit;
-    double rate_low_limit;
-    double rate_up_limit;
-    std::list<std::string> payment_types;
-    std::string location_country;
-    std::string location_city;
-    std::string target;
-    std::string primary;
-    bool bonus;
-    std::string category;
-    std::string keyword;
-    bool fake;
-    uint64_t current_time;
-
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(order_by)
-      KV_SERIALIZE(reverse)
-      KV_SERIALIZE(offset)
-      KV_SERIALIZE(limit)
-      KV_SERIALIZE(timestamp_start)
-      KV_SERIALIZE(timestamp_stop)
-      KV_SERIALIZE(offer_type_mask)
-      KV_SERIALIZE(amount_low_limit)
-      KV_SERIALIZE(amount_up_limit)
-      KV_SERIALIZE_CUSTOM(rate_low_limit, std::string, bc_services::transform_double_to_string, bc_services::transform_string_to_double)
-      KV_SERIALIZE_CUSTOM(rate_up_limit, std::string, bc_services::transform_double_to_string, bc_services::transform_string_to_double)
-      KV_SERIALIZE(payment_types)
-      KV_SERIALIZE(location_country)
-      KV_SERIALIZE(location_city)
-      KV_SERIALIZE(target)
-      KV_SERIALIZE(primary)
-      KV_SERIALIZE(bonus)
-      KV_SERIALIZE(category)
-      KV_SERIALIZE(keyword)
-      KV_SERIALIZE(fake)
-    END_KV_SERIALIZE_MAP()
-  };
-
 
   struct offer_id
   {

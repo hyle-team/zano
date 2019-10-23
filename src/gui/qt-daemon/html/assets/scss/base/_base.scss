@@ -789,6 +789,16 @@ input[type='checkbox'].style-checkbox {
   &.custom-select {
     width: 100%;
 
+    &.ng-select-single {
+      .ng-select-container {
+        .ng-value-container {
+          .ng-value {
+            line-height: 1.8rem;
+          }
+        }
+      }
+    }
+
     .ng-select-container {
       border: none;
       border-radius: 0;
@@ -873,7 +883,7 @@ input[type='checkbox'].style-checkbox {
   }
 }
 
-app-modal-container {
+app-modal-container, app-confirm-modal  {
 
   .modal {
 
