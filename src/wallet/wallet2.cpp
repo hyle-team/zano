@@ -2099,8 +2099,9 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   r = tools::portble_serialize_obj_to_stream(*this, data_file);
   if (!r)
   {
+    data_file.close();
     boost::filesystem::remove(tmp_file_path); // remove tmp file if smth went wrong
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "portble_serialize_obj_to_stream failed for wallet " << tmp_file_path.string());
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "IO error while storing wallet to " << tmp_file_path.string() << " (portble_serialize_obj_to_stream failed)");
   }
 
   data_file.flush();
