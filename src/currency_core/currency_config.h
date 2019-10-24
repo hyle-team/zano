@@ -190,14 +190,9 @@
 #define CURRENCY_POOLDATA_FOLDERNAME_OLD                "poolstate"
 #define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD          "blockchain"
 
-#ifdef DB_ENGINE_LMDB
-  #define CURRENCY_BLOCKCHAINDATA_DB_ENGINE_NAME          "lmdb"
-#elif DB_ENGINE_MDBX
-  #define CURRENCY_BLOCKCHAINDATA_DB_ENGINE_NAME          "mdbx"
-#endif
 
-#define CURRENCY_POOLDATA_FOLDERNAME                    "poolstate_" CURRENCY_BLOCKCHAINDATA_DB_ENGINE_NAME "_v1"
-#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME              "blockchain_" CURRENCY_BLOCKCHAINDATA_DB_ENGINE_NAME "_v1"
+#define CURRENCY_POOLDATA_FOLDERNAME_PREFIX                    "poolstate_"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX              "blockchain_" 
 
 #define P2P_NET_DATA_FILENAME                           "p2pstate.bin"
 #define MINER_CONFIG_FILENAME                           "miner_conf.json"

@@ -4,9 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
-
-#ifdef DB_ENGINE_MDBX
-
+#ifdef ENABLED_ENGINE_MDBX
 #include  <thread>
 
 #include "include_base_utils.h"
@@ -56,6 +54,7 @@ namespace tools
       bool set(container_handle h, const char* k, size_t s, const char* v, size_t vs);
       bool enumerate(container_handle h, i_db_callback* pcb);
       bool get_stat_info(tools::db::stat_info& si);
+      const char* name();
       //-------------------------------------------------------------------------------------
       bool have_tx();
       MDBX_txn* get_current_tx();
@@ -64,5 +63,4 @@ namespace tools
     
   }
 }
-
 #endif

@@ -1,5 +1,4 @@
 
-if (DB_ENGINE STREQUAL "lmdb")
   message("DB ENGINE: lmdb")  
   add_subdirectory(liblmdb)
   if(MSVC)
@@ -8,8 +7,7 @@ if (DB_ENGINE STREQUAL "lmdb")
      # Warnings as used by LMDB itself (LMDB_0.9.23)
      target_compile_options(lmdb PRIVATE -Wall -Wno-unused-parameter -Wbad-function-cast -Wuninitialized)
   endif()
-elseif(DB_ENGINE STREQUAL "mdbx")
-  message("DB ENGINE: mdbx")  
-  add_subdirectory(libmdbx)
-endif()
-
+  if(NOT DISABLE_MDBX)
+     message("DB ENGINE: mdbx")  
+     add_subdirectory(libmdbx)
+  endif()

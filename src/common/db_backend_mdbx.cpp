@@ -2,9 +2,7 @@
 // Copyright (c) 2014-2018 The Louisdor Project 
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-#ifdef DB_ENGINE_MDBX
-
+#ifdef ENABLED_ENGINE_MDBX
 #include "db_backend_mdbx.h"
 #include "misc_language.h"
 #include "string_coding.h"
@@ -392,10 +390,13 @@ namespace tools
       }
       return true;
     }
+    const char* mdbx_db_backend::name()
+    {
+      return "mdbx";
+    }
   }
 }
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL NULL
-
 #endif

@@ -214,12 +214,11 @@ else()
 endif()
 
 set(BUILD_TESTS FALSE CACHE BOOL "Build Zano tests")
-set(DB_ENGINE "lmdb" CACHE STRING "Select database engine")
-if (DB_ENGINE STREQUAL "lmdb")
-  add_definitions(-DDB_ENGINE_LMDB)
-elseif(DB_ENGINE STREQUAL "mdbx")
-  add_definitions(-DDB_ENGINE_MDBX)
-endif() 
+set(DISABLE_MDBX FALSE CACHE BOOL "Exclude mdbx from build(need for a first time)") 
+if(NOT DISABLE_MDBX)
+   add_definitions(-DENABLED_ENGINE_MDBX)
+endif()
+
   
 add_subdirectory(contrib)
 add_subdirectory(src)

@@ -69,7 +69,7 @@ using namespace currency;
 #endif
 #define BLOCK_POS_STRICT_SEQUENCE_LIMIT                               20
 
-
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX                     "_v1"
 
 DISABLE_VS_WARNINGS(4267)
 
@@ -80,7 +80,7 @@ namespace
 }
 
 //------------------------------------------------------------------
-blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::default_db_backend), m_rw_lock),
+blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m_rw_lock),
                                                                  m_db_blocks(m_db),
                                                                  m_db_blocks_index(m_db),
                                                                  m_db_transactions(m_db),
@@ -206,7 +206,13 @@ bool blockchain_storage::validate_instance(const std::string& path)
 bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
 {
 //  CRITICAL_REGION_LOCAL(m_read_lock);
-
+  if (!select_db_engine_from_arg(vm, m_db))
+  {
+    LOG_PRINT_RED_L0("Failed to select db engine");
+    return false;
+  }
+  LOG_PRINT_L0("DB ENGINE USED BY CORE: " << m_db.get_backend()->name());
+  
   if (!validate_instance(config_folder))
   {
     LOG_ERROR("Failed to initialize instance");
@@ -229,8 +235,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
     boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
   }
-
-  const std::string db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME;
+  ;
+  const std::string db_folder_path = m_config_folder + ("/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX) + m_db.get_backend()->name() + CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX;
   LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
 
   bool db_opened_okay = false;
