@@ -2242,6 +2242,9 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
 
   for(auto& utx : m_unconfirmed_txs)
   {
+    if (utx.second.contract.size())
+      continue; // skip unconfirmed contract tx
+
     if (utx.second.is_income)
     {
       balance_total += utx.second.amount;
