@@ -2066,7 +2066,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 {
   LOG_PRINT_L0("(before storing: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
-  check_for_free_space_and_throw_if_it_lacks(path_to_save);
+  // check_for_free_space_and_throw_if_it_lacks(path_to_save); temporary disabled, wallet saving implemented in two-stage scheme to avoid data loss due to lack of space
 
   std::string ascii_path_to_save = epee::string_encoding::convert_to_ansii(path_to_save);
 
