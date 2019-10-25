@@ -103,7 +103,6 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_core_runtime_config(get_default_core_runtime_config()),
                                                                  //m_bei_stub(AUTO_VAL_INIT(m_bei_stub)),
                                                                  m_event_handler(&m_event_handler_stub), 
-                                                                 m_services_mgr(nullptr), 
                                                                  m_interprocess_locker_file(0), 
                                                                  m_current_fee_median(0), 
                                                                  m_current_fee_median_effective_index(0), 

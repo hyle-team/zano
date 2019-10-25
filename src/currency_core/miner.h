@@ -105,7 +105,7 @@ namespace currency
     std::list<boost::thread> m_threads;
     ::critical_section m_threads_lock;
     i_miner_handler* m_phandler;
-    blockchain_storage& m_bc;
+    //blockchain_storage& m_bc;
     account_public_address m_mine_address;
     math_helper::once_a_time_seconds<5> m_update_block_template_interval;
     math_helper::once_a_time_seconds<2> m_update_merge_hr_interval;

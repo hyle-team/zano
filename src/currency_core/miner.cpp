@@ -41,7 +41,7 @@ namespace currency
 
 
   miner::miner(i_miner_handler* phandler, blockchain_storage& bc):m_stop(1),
-    m_bc(bc),
+    //m_bc(bc),
     m_template(boost::value_initialized<block>()),
     m_template_no(0),
     m_diffic(0),
