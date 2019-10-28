@@ -2182,7 +2182,7 @@ void wallet2::check_for_free_space_and_throw_if_it_lacks(const std::wstring& wal
       // twice the original wallet file size or MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES, which one is bigger
       min_free_size = MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES;
       if (fs::is_regular_file(wallet_file_path))
-        min_free_size = std::max(min_free_size, 2 * fs::file_size(wallet_file_path));
+        min_free_size = std::max(min_free_size, 2 * static_cast<uint64_t>(fs::file_size(wallet_file_path)));
     }
     else
     {
