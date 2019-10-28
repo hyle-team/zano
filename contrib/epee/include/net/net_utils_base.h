@@ -117,34 +117,34 @@ namespace net_utils
   //some helpers
 
 
-  inline 
-    std::string print_connection_context(const connection_context_base& ctx)
+  inline std::string print_connection_context(const connection_context_base& ctx)
   {
     std::stringstream ss;
     ss << epee::string_tools::get_ip_string_from_int32(ctx.m_remote_ip) << ":" << ctx.m_remote_port << " " << epee::string_tools::get_str_from_guid_a(ctx.m_connection_id) << (ctx.m_is_income ? " INC":" OUT");
     return ss.str();
   }
 
-  inline
-    void print_connection_context_short(const connection_context_base& ctx, std::stringstream& ss)
+  inline std::ostream &operator <<(std::ostream &o, const connection_context_base& ctx)
   {
-      ss << epee::string_tools::get_ip_string_from_int32(ctx.m_remote_ip) << ":" << ctx.m_remote_port << (ctx.m_is_income ? " INC" : " OUT");
-    }
+    o << epee::string_tools::get_ip_string_from_int32(ctx.m_remote_ip) << ":" << ctx.m_remote_port << (ctx.m_is_income ? " INC" : " OUT");
+    return o;
+  }
 
-  inline 
-    std::string print_connection_context_short(const connection_context_base& ctx)
+  inline std::string print_connection_context_short(const connection_context_base& ctx)
   {
     std::stringstream ss;
-    print_connection_context_short(ctx, ss);
+    ss << ctx;
     return ss.str();
   }
 
-  inline std::string print_connection_context_list(const std::list<connection_context_base>& contexts)
+  inline std::string print_connection_context_list(const std::list<connection_context_base>& contexts, const std::string& delim = std::string("\n"))
   {
     std::stringstream ss;
     for (auto& c : contexts)
     {
-      ss << epee::string_tools::get_ip_string_from_int32(c.m_remote_ip) << ":" << c.m_remote_port << (c.m_is_income ? " INC" : " OUT") << ENDL;
+      if (ss.tellp())
+        ss << delim;
+      ss << c;
     }
     return ss.str();
   }
@@ -179,7 +179,7 @@ namespace net_utils
 
 #define CHECK_AND_ASSERT_MES_CC(condition, return_val, err_message) CHECK_AND_ASSERT_MES(condition, return_val, "[" << epee::net_utils::print_connection_context_short(context) << "]" << err_message)
 
-}
-}
+} // namespace net_utils
+} // namespace epee
 
 #endif //_NET_UTILS_BASE_H_

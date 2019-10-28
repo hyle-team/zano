@@ -511,6 +511,13 @@ namespace nodetool
           return;
         }
 
+        if (is_peer_id_used(rsp.node_data.peer_id))
+        {
+          LOG_PRINT_L0("It seems that peer " << std::hex << rsp.node_data.peer_id << " has already been connected, dropping connection");
+          hsh_result = false;
+          return;
+        }
+
         pi = context.peer_id = rsp.node_data.peer_id;
         m_peerlist.set_peer_just_seen(rsp.node_data.peer_id, context.m_remote_ip, context.m_remote_port);
 
@@ -535,7 +542,7 @@ namespace nodetool
 
     if(!hsh_result)
     {
-      LOG_PRINT_CC_L0(context_, "COMMAND_HANDSHAKE Failed");
+      LOG_PRINT_CC_L0(context_, "COMMAND_HANDSHAKE Failed, closing connection");
       m_net_server.get_config_object().close(context_.m_connection_id);
     }
 
@@ -597,6 +604,26 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
+  bool node_server<t_payload_net_handler>::is_peer_id_used(const peerid_type id)
+  {
+    if (id == m_config.m_peer_id)
+      return true; // ourself
+
+    bool used = false;
+    m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt)
+    {
+      if (id == cntxt.peer_id)
+      {
+        used = true;
+        return false; // stop enumerating
+      }
+      return true;
+    });
+
+    return used;
+  }
+  //-----------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::is_peer_used(const peerlist_entry& peer)
   {
 
@@ -638,7 +665,7 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::try_to_connect_and_handshake_with_new_peer(const net_address& na, bool just_take_peerlist, uint64_t last_seen_stamp, bool white)
   {
-    LOG_PRINT_L0("Connecting to " << string_tools::get_ip_string_from_int32(na.ip)  << ":" << string_tools::num_to_string_fast(na.port) << "(white=" << white << ", last_seen: " << (last_seen_stamp?misc_utils::get_time_interval_string(time(NULL) - last_seen_stamp):"never" ) << ")...");
+    LOG_PRINT_L1("Connecting to " << string_tools::get_ip_string_from_int32(na.ip)  << ":" << string_tools::num_to_string_fast(na.port) << "(white=" << white << ", last_seen: " << (last_seen_stamp?misc_utils::get_time_interval_string(time(NULL) - last_seen_stamp):"never" ) << ")...");
 
     typename net_server::t_connection_context con = AUTO_VAL_INIT(con);
     bool res = m_net_server.connect(string_tools::get_ip_string_from_int32(na.ip),
@@ -647,7 +674,7 @@ namespace nodetool
       con);
     if(!res)
     {
-      LOG_PRINT_L0("Connect failed to "
+      LOG_PRINT_L1("Connect failed to "
         << string_tools::get_ip_string_from_int32(na.ip)
         << ":" << string_tools::num_to_string_fast(na.port)
         /*<< ", try " << try_count*/);
@@ -661,9 +688,11 @@ namespace nodetool
       LOG_PRINT_CC_L0(con, "Failed to HANDSHAKE with peer "
         << string_tools::get_ip_string_from_int32(na.ip)
         << ":" << string_tools::num_to_string_fast(na.port)
-        /*<< ", try " << try_count*/);
+        << ", closing connection");
+      m_net_server.get_config_object().close(con.m_connection_id);
       return false;
     }
+
     if(just_take_peerlist)
     {
       m_net_server.get_config_object().close(con.m_connection_id);
@@ -807,7 +836,10 @@ namespace nodetool
 
       if(is_addr_connected(na))
         continue;
-      try_to_connect_and_handshake_with_new_peer(na);
+      if (!try_to_connect_and_handshake_with_new_peer(na))
+      {
+        LOG_PRINT_L0("connection to priority node " << string_tools::get_ip_string_from_int32(na.ip) << ":" << string_tools::num_to_string_fast(na.port) << " failed");
+      }
     }
     if(m_use_only_priority_peers)
       return true;
@@ -1306,6 +1338,13 @@ namespace nodetool
     if(context.peer_id)
     {
       LOG_ERROR_CCONTEXT("COMMAND_HANDSHAKE came, but seems that connection already have associated peer_id (double COMMAND_HANDSHAKE?)");
+      drop_connection(context);
+      return 1;
+    }
+
+    if (is_peer_id_used(arg.node_data.peer_id))
+    {
+      LOG_PRINT_CCONTEXT_L1("COMMAND_HANDSHAKE came, but seems that peer " << std::hex << arg.node_data.peer_id << " has already been connected to this node, dropping connection");
       drop_connection(context);
       return 1;
     }

@@ -1453,14 +1453,13 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
 
 //------------------------------------------------------------------
 
-tx_key_image_pool_conflict::tx_key_image_pool_conflict()
-{
-  REGISTER_CALLBACK_METHOD(tx_key_image_pool_conflict, c1);
-  REGISTER_CALLBACK_METHOD(tx_key_image_pool_conflict, c2);
-}
-
 bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events) const
 {
+  // Test idea: check tx that is stuck in tx pool because one on its key images is already spent in the blockchain
+  // 1) if it's linked to an alt block -- tx will not be removed as long as linked alt block exists (in order to be able to switch)
+  // 2) if it's not linked to an alt block -- it will be removed after CONFLICT_KEY_IMAGE_SPENT_DEPTH_TO_REMOVE_TX_FROM_POOL confirmations of conflicted tx
+  //    or it will be removed once tx is old enough (CURRENCY_MEMPOOL_TX_LIVETIME)
+
   bool r = false;
 
   m_miner_acc.generate();
@@ -1534,44 +1533,49 @@ bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events)
   // however, it does not remove tx from the pool
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
 
+  //
+  // make sure stuck tx will be removed from the pool when it's too old
+  //
+  
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, m_miner_acc);
 
-  DO_CALLBACK(events, "remove_stuck_txs");
-
   // remove_stuck_txs should not remove anything, tx_1 and tx_2 should be in the pool
+  DO_CALLBACK(events, "remove_stuck_txs");
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
 
   // shift time by CURRENCY_MEMPOOL_TX_LIVETIME
   events.push_back(event_core_time(CURRENCY_MEMPOOL_TX_LIVETIME + 1, true));
 
-  // remove_stuck_txs should remove only tx_2 and left tx_1
+  // remove_stuck_txs should have removed tx_2 because it's too old
   DO_CALLBACK(events, "remove_stuck_txs");
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
+  //
+  // make sure stuck tx will be removed from the pool as soon as one of its key images is spent deep enough in the blockchain
+  // (even if it's not too old to be removed by age)
+  //
+  
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, m_miner_acc);
+
+  // re-add tx_2 with kept_by_block flag
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(tx_2);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+
+  // remove_stuck_txs should not remove anything, tx_1 and tx_2 should be in the pool
+  DO_CALLBACK(events, "remove_stuck_txs");
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+
+  // rewind 50 blocks so tx_0 spending its key image will be deep enough
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_3r, blk_3, m_miner_acc, 50);
+
+  // remove_stuck_txs should remove only tx_2 and left tx_1 (linked to alt block)
+  DO_CALLBACK(events, "remove_stuck_txs");
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
   DO_CALLBACK(events, "print_tx_pool");
 
-  return true;
-}
-
-bool tx_key_image_pool_conflict::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  bool r = false;
-
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "incorrect tx pool count = " << c.get_pool_transactions_count());
-  
-  // try to mine a block and make sure tx_1 is still in the pool (was not added to the blocktemplate)
-  block b;
-  r = mine_next_pow_block_in_playtime(m_miner_acc.get_public_address(), c, &b);
-  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-
-  // make sure tx_1 is still here
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "incorrect tx pool count = " << c.get_pool_transactions_count());
-
-  return true;
-}
-
-bool tx_key_image_pool_conflict::c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
   return true;
 }

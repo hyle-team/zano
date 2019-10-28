@@ -731,6 +731,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(escrow_cancellation_acceptance_expiration);
     // GENERATE_AND_PLAY(escrow_proposal_acceptance_in_alt_chain); -- work in progress
     GENERATE_AND_PLAY(escrow_zero_amounts);
+    GENERATE_AND_PLAY(escrow_acceptance_and_balance);
 
     GENERATE_AND_PLAY(escrow_altchain_meta_test<0>);
     GENERATE_AND_PLAY(escrow_altchain_meta_test<1>);

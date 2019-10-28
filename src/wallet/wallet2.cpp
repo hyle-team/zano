@@ -2066,7 +2066,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 {
   LOG_PRINT_L0("(before storing: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
-  check_for_free_space_and_throw_if_it_lacks(path_to_save);
+  // check_for_free_space_and_throw_if_it_lacks(path_to_save); temporary disabled, wallet saving implemented in two-stage scheme to avoid data loss due to lack of space
 
   std::string ascii_path_to_save = epee::string_encoding::convert_to_ansii(path_to_save);
 
@@ -2099,8 +2099,9 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   r = tools::portble_serialize_obj_to_stream(*this, data_file);
   if (!r)
   {
+    data_file.close();
     boost::filesystem::remove(tmp_file_path); // remove tmp file if smth went wrong
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "portble_serialize_obj_to_stream failed for wallet " << tmp_file_path.string());
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "IO error while storing wallet to " << tmp_file_path.string() << " (portble_serialize_obj_to_stream failed)");
   }
 
   data_file.flush();
@@ -2229,7 +2230,7 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
   
   for(auto& td : m_transfers)
   {
-    if (td.is_spendable() || td.is_reserved_for_escrow())
+    if (td.is_spendable() || (td.is_reserved_for_escrow() && !td.is_spent()))
     {
       balance_total += td.amount();
       if (is_transfer_unlocked(td))
