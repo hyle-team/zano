@@ -56,13 +56,45 @@ bool clean_data_directory()
 {
   std::string config_folder = command_line::get_arg(g_vm, command_line::arg_data_dir);
 
-  static const char* const files[] = { CURRENCY_BLOCKCHAINDATA_FOLDERNAME, CURRENCY_POOLDATA_FOLDERNAME, MINER_CONFIG_FILENAME };
-  for (size_t i = 0; i < sizeof files / sizeof files[0]; ++i)
+  static const std::set<std::string> files = { CURRENCY_POOLDATA_FOLDERNAME_OLD, CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD, P2P_NET_DATA_FILENAME, MINER_CONFIG_FILENAME, GUI_SECURE_CONFIG_FILENAME, GUI_CONFIG_FILENAME, GUI_INTERNAL_CONFIG };
+  static const std::set<std::string> prefixes = { CURRENCY_POOLDATA_FOLDERNAME_PREFIX, CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX };
+
+  std::vector<boost::filesystem::path> entries_to_remove;
+
+  for(auto& entry : boost::make_iterator_range(boost::filesystem::directory_iterator(config_folder), {}))
   {
-    boost::filesystem::path filename(config_folder + "/" + files[i]);
-    if (boost::filesystem::exists(filename))
-      CHECK_AND_ASSERT_MES(boost::filesystem::remove_all(filename), false, "boost::filesystem::remove failed to remove this: " << filename);
+    const std::string& fn_str = entry.path().filename().string();
+    if (files.count(fn_str) != 0)
+    {
+      entries_to_remove.push_back(entry.path());
+      continue;
+    }
+
+    for(auto& p : prefixes)
+    {
+      if (fn_str.find(p) == 0)
+      {
+        entries_to_remove.push_back(entry.path());
+        break;
+      }
+    }
   }
+
+  for (auto& entry : entries_to_remove)
+  {
+    if (!boost::filesystem::exists(entry))
+      continue;
+
+    if (boost::filesystem::remove_all(entry))
+    {
+      LOG_PRINT_L1("coretests: clean_data_directory: " << entry.string() << " removed");
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(false, false, "boost::filesystem::remove failed to remove this: " << entry.string());
+    }
+  }
+
 
   return true;
 }
