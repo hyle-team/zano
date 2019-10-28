@@ -4,25 +4,25 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
-
+#ifdef ENABLED_ENGINE_MDBX
 #include  <thread>
 
 #include "include_base_utils.h"
 
 #include "db_backend_base.h"
-#include "db/liblmdb/lmdb.h"
+#include "db/libmdbx/mdbx.h"
 
 
 namespace tools
 {
   namespace db
   {
-    class lmdb_db_backend : public i_db_backend
+    class mdbx_db_backend : public i_db_backend
     {
 
       struct tx_entry
       {
-        MDB_txn* ptx;
+        MDBX_txn* ptx;
         bool read_only; // needed for thread-top transaction, for figure out if we need to unlock exclusive access
         size_t count;   //count of read-only nested emulated transactions
       };
@@ -30,15 +30,15 @@ namespace tools
 
 
       std::string m_path;
-      MDB_env *m_penv;
+      MDBX_env *m_penv;
 
       boost::recursive_mutex m_cs;
       boost::recursive_mutex m_write_exclusive_lock;
       std::map<std::thread::id, transactions_list> m_txs; // size_t -> count of nested read_only transactions
       bool pop_tx_entry(tx_entry& txe);
     public:
-      lmdb_db_backend();
-      ~lmdb_db_backend();
+      mdbx_db_backend();
+      ~mdbx_db_backend();
 
       //----------------- i_db_backend -----------------------------------------------------
       bool close();
@@ -57,8 +57,10 @@ namespace tools
       const char* name();
       //-------------------------------------------------------------------------------------
       bool have_tx();
-      MDB_txn* get_current_tx();
+      MDBX_txn* get_current_tx();
 
     };
+    
   }
 }
+#endif

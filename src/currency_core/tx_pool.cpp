@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/db_backend_lmdb.h"
+#include "common/db_backend_selector.h"
 #include "tx_pool.h"
 #include "currency_boost_serialization.h"
 #include "currency_core/currency_config.h"
@@ -32,6 +32,8 @@ DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated 
 #define TRANSACTION_POOL_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION 92 // DON'T CHANGE THIS, if you need to resync db! Change TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION instead!
 #define TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION      BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 1
 
+#define CURRENCY_POOLDATA_FOLDERNAME_SUFFIX               "_v1"
+
 #define CONFLICT_KEY_IMAGE_SPENT_DEPTH_TO_REMOVE_TX_FROM_POOL 50 // if there's a conflict in key images between tx in the pool and in the blockchain this much depth in required to remove correspongin tx from pool
 
 #undef LOG_DEFAULT_CHANNEL 
@@ -44,7 +46,7 @@ namespace currency
   tx_memory_pool::tx_memory_pool(blockchain_storage& bchs, i_currency_protocol* pprotocol) :
     m_blockchain(bchs),
     m_pprotocol(pprotocol),
-    m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_dummy_rw_lock),
+    m_db(nullptr, m_dummy_rw_lock),
     m_db_transactions(m_db),
     m_db_black_tx_list(m_db),
     m_db_solo_options(m_db), 
@@ -1141,8 +1143,15 @@ namespace currency
     m_db.commit_transaction();
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::init(const std::string& config_folder)
+  bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
   {
+    if (!select_db_engine_from_arg(vm, m_db))
+    {
+      LOG_PRINT_RED_L0("Failed to select db engine");
+      return false;
+    }
+    LOG_PRINT_L0("DB ENGINE USED BY POOL: " << m_db.get_backend()->name());
+
     m_config_folder = config_folder;
 
     uint64_t cache_size_l1 = CACHE_SIZE;
@@ -1156,7 +1165,8 @@ namespace currency
       boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
     }
 
-    const std::string db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME;
+    const std::string db_folder_path = m_config_folder + ("/" CURRENCY_POOLDATA_FOLDERNAME_PREFIX) + m_db.get_backend()->name() + CURRENCY_POOLDATA_FOLDERNAME_SUFFIX;
+    
     LOG_PRINT_L0("Loading blockchain from " << db_folder_path << "...");
 
     bool db_opened_okay = false;

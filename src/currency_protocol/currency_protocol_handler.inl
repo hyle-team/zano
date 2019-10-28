@@ -800,7 +800,7 @@ namespace currency
     std::vector<int64_t> time_deltas_copy(m_time_deltas.begin(), m_time_deltas.end());
 
     m_last_median2local_time_difference = epee::misc_utils::median(time_deltas_copy);
-    LOG_PRINT_MAGENTA("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ")", m_last_median2local_time_difference >= 3 ? LOG_LEVEL_2 : LOG_LEVEL_3);
+    LOG_PRINT_MAGENTA("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ")", ((m_last_median2local_time_difference >= 3) ? LOG_LEVEL_2 : LOG_LEVEL_3));
     if (std::abs(m_last_median2local_time_difference) > TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE)
     {
       int64_t ntp_time = tools::get_ntp_time();

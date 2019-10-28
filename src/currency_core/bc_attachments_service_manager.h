@@ -27,7 +27,7 @@ namespace currency
   class bc_attachment_services_manager
   {
   public:
-    bc_attachment_services_manager(i_core_event_handler* pcore_event_handler) : m_pcore_event_handler(pcore_event_handler), m_core_runtime_config(get_default_core_runtime_config())
+    bc_attachment_services_manager(/* i_core_event_handler* pcore_event_handler*/) : /*m_pcore_event_handler(pcore_event_handler),*/ m_core_runtime_config(get_default_core_runtime_config())
     {}
   
 
@@ -43,7 +43,7 @@ namespace currency
   
   private:
     std::map<std::string, i_bc_service*> m_services;
-    i_core_event_handler* m_pcore_event_handler;
+    //i_core_event_handler* m_pcore_event_handler;
     core_runtime_config m_core_runtime_config;
 
   };

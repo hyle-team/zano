@@ -147,6 +147,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_if_time_out_of_sync);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_on_low_free_space);
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_offers_service);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_db_engine);  
 
 
   arg_market_disable.default_value = true;

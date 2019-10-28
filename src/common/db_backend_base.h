@@ -45,6 +45,7 @@ namespace tools
       virtual bool clear(container_handle h) = 0;
       virtual bool enumerate(container_handle h, i_db_callback* pcb)=0;
       virtual bool get_stat_info(stat_info& si) = 0;
+      virtual const char* name()=0;
       virtual ~i_db_backend(){};
     };
   }
