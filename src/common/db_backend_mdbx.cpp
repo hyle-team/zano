@@ -56,10 +56,6 @@ namespace tools
       CHECK_AND_ASSERT_MESS_MDBX_DB(res, false, "Unable to mdbx_env_set_mapsize");
       
       m_path = path_;
-#ifdef WIN32
-      m_path = epee::string_encoding::convert_ansii_to_utf8(m_path);
-#endif
-
       CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(m_path), false, "create_directories_if_necessary failed: " << m_path);
 
       res = mdbx_env_open(m_penv, m_path.c_str(), MDBX_NORDAHEAD , 0644);
