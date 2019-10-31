@@ -142,7 +142,7 @@ namespace currency
     uint64_t available_space = 0;
     CHECK_AND_ASSERT_MES(!check_if_free_space_critically_low(&available_space), false, "free space in data folder is critically low: " << std::fixed << available_space / (1024 * 1024) << " MB");
 
-    r = m_mempool.init(m_config_folder);
+    r = m_mempool.init(m_config_folder, vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize memory pool");
 
     r = m_blockchain_storage.init(m_config_folder, vm);

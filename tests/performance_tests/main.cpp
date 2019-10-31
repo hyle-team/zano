@@ -20,6 +20,7 @@
 #include "keccak_test.h"
 #include "blake2_test.h"
 #include "print_struct_to_json.h"
+#include "free_space_check.h"
 
 int main(int argc, char** argv)
 {
@@ -36,7 +37,9 @@ int main(int argc, char** argv)
 
   //test_blake2();
 
-  print_struct_to_json();
+  free_space_check();
+  
+  //print_struct_to_json();
 
   //performance_timer timer;
   //timer.start();

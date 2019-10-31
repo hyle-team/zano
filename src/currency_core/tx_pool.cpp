@@ -9,7 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "common/db_backend_lmdb.h"
+#include "common/db_backend_selector.h"
 #include "tx_pool.h"
 #include "currency_boost_serialization.h"
 #include "currency_core/currency_config.h"
@@ -32,6 +32,10 @@ DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated 
 #define TRANSACTION_POOL_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION 92 // DON'T CHANGE THIS, if you need to resync db! Change TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION instead!
 #define TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION      BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 1
 
+#define CURRENCY_POOLDATA_FOLDERNAME_SUFFIX               "_v1"
+
+#define CONFLICT_KEY_IMAGE_SPENT_DEPTH_TO_REMOVE_TX_FROM_POOL 50 // if there's a conflict in key images between tx in the pool and in the blockchain this much depth in required to remove correspongin tx from pool
+
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "tx_pool"
 ENABLE_CHANNEL_BY_DEFAULT("tx_pool");
@@ -42,7 +46,7 @@ namespace currency
   tx_memory_pool::tx_memory_pool(blockchain_storage& bchs, i_currency_protocol* pprotocol) :
     m_blockchain(bchs),
     m_pprotocol(pprotocol),
-    m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_dummy_rw_lock),
+    m_db(nullptr, m_dummy_rw_lock),
     m_db_transactions(m_db),
     m_db_black_tx_list(m_db),
     m_db_solo_options(m_db), 
@@ -427,17 +431,40 @@ namespace currency
       int64_t tx_age = get_core_time() - tx_entry.receive_time;
       if ((tx_age > CURRENCY_MEMPOOL_TX_LIVETIME ))
       {
-
-        LOG_PRINT_L0("Tx " << h << " removed from tx pool, reason: outdated, age: " << tx_age);
+        LOG_PRINT_L0("tx " << h << " is about to be removed from tx pool, reason: outdated, age: " << tx_age << " = " << misc_utils::get_time_interval_string(tx_age));
         to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
       }
 
       // expiration time check - remove expired
       if (is_tx_expired(tx_entry.tx, tx_expiration_ts_median) )
       {
-        LOG_PRINT_L0("Tx " << h << " removed from tx pool, reason: expired, expiration time: " << get_tx_expiration_time(tx_entry.tx) << ", blockchain median: " << tx_expiration_ts_median);
+        LOG_PRINT_L0("tx " << h << " is about to be removed from tx pool, reason: expired, expiration time: " << get_tx_expiration_time(tx_entry.tx) << ", blockchain median: " << tx_expiration_ts_median);
         to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
       }
+
+      // if a tx has at least one key image already used in blockchain (deep enough) -- remove such tx, as it cannot be added to any block
+      // although it will be removed by the age check above, we consider desireable
+      // to remove it from the pool faster in order to unblock related key images used in the same tx
+      uint64_t should_be_spent_before_height = m_blockchain.get_current_blockchain_size() - 1;
+      if (should_be_spent_before_height > CONFLICT_KEY_IMAGE_SPENT_DEPTH_TO_REMOVE_TX_FROM_POOL)
+      {
+        should_be_spent_before_height -= CONFLICT_KEY_IMAGE_SPENT_DEPTH_TO_REMOVE_TX_FROM_POOL;
+        for (auto& in : tx_entry.tx.vin)
+        {
+          if (in.type() == typeid(txin_to_key))
+          {
+            // if at least one key image is spent deep enought -- remove such tx
+            const crypto::key_image& ki = boost::get<txin_to_key>(in).k_image;
+            if (m_blockchain.have_tx_keyimg_as_spent(ki, should_be_spent_before_height))
+            {
+              LOG_PRINT_L0("tx " << h << " is about to be removed from tx pool, reason: ki was spent in the blockchain before height " << should_be_spent_before_height << ", tx age: " << misc_utils::get_time_interval_string(tx_age));
+              to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
+              return true;
+            }
+          }
+        }
+      }
+
 
       return true;
     });
@@ -1116,8 +1143,15 @@ namespace currency
     m_db.commit_transaction();
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::init(const std::string& config_folder)
+  bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
   {
+    if (!select_db_engine_from_arg(vm, m_db))
+    {
+      LOG_PRINT_RED_L0("Failed to select db engine");
+      return false;
+    }
+    LOG_PRINT_L0("DB ENGINE USED BY POOL: " << m_db.get_backend()->name());
+
     m_config_folder = config_folder;
 
     uint64_t cache_size_l1 = CACHE_SIZE;
@@ -1131,7 +1165,8 @@ namespace currency
       boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
     }
 
-    const std::string db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME;
+    const std::string db_folder_path = m_config_folder + ("/" CURRENCY_POOLDATA_FOLDERNAME_PREFIX) + m_db.get_backend()->name() + CURRENCY_POOLDATA_FOLDERNAME_SUFFIX;
+    
     LOG_PRINT_L0("Loading blockchain from " << db_folder_path << "...");
 
     bool db_opened_okay = false;

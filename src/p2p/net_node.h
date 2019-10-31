@@ -32,6 +32,7 @@ using namespace epee;
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "p2p" 
+ENABLE_CHANNEL_BY_DEFAULT(LOG_DEFAULT_CHANNEL);
 
 #define CURRENT_P2P_STORAGE_ARCHIVE_VER    (CURRENCY_FORMATION_VERSION+13)
 
@@ -198,6 +199,7 @@ namespace nodetool
     bool make_new_connection_from_peerlist(bool use_white_list);
     bool try_to_connect_and_handshake_with_new_peer(const net_address& na, bool just_take_peerlist = false, uint64_t last_seen_stamp = 0, bool white = true);
     size_t get_random_index_with_fixed_probability(size_t max_index);
+    bool is_peer_id_used(const peerid_type id);
     bool is_peer_used(const peerlist_entry& peer);
     bool is_addr_connected(const net_address& peer);  
     template<class t_callback>

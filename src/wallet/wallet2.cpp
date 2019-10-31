@@ -28,6 +28,8 @@ using namespace epee;
 #include "version.h"
 using namespace currency;
 
+#define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
+
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
@@ -571,8 +573,8 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
   //build transaction
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(construct_param, ftp, tx);
-  finalize_transaction(ftp, tx, one_time_key, true);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
+  finalize_transaction(ftp, tx, one_time_key, true);
   print_tx_sent_message(tx, "(contract <" + epee::string_tools::pod_to_hex(contract_id) + ">)", construct_param.fee);
 
   if (p_acceptance_tx != nullptr)
@@ -693,8 +695,8 @@ void wallet2::request_cancel_contract(const crypto::hash& contract_id, uint64_t 
   prepare_transaction(construct_param, ftp);
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::secret_key sk = AUTO_VAL_INIT(sk);
-  finalize_transaction(ftp, tx, sk, true);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been requested for cancellaton with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
+  finalize_transaction(ftp, tx, sk, true);
 
   print_tx_sent_message(tx, "(transport for cancel proposal)", fee);
 
@@ -1965,6 +1967,9 @@ void wallet2::generate(const std::wstring& path, const std::string& pass)
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass), "new wallet generation failed: password contains forbidden characters")
   clear();
   prepare_file_names(path);
+
+  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
+
   m_password = pass;
   m_account.generate();
   init_log_prefix();
@@ -2000,6 +2005,9 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
 {
   clear();
   prepare_file_names(wallet_);
+
+  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
+
   m_password = password;
 
   std::string keys_buff;
@@ -2058,35 +2066,56 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 {
   LOG_PRINT_L0("(before storing: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
+  // check_for_free_space_and_throw_if_it_lacks(path_to_save); temporary disabled, wallet saving implemented in two-stage scheme to avoid data loss due to lack of space
+
+  std::string ascii_path_to_save = epee::string_encoding::convert_to_ansii(path_to_save);
+
   //prepare data
   std::string keys_buff;
   bool r = store_keys(keys_buff, password);
-  CHECK_AND_ASSERT_THROW_MES(r, "failed to store_keys for wallet " << epee::string_encoding::convert_to_ansii(m_wallet_file));
-
-  wallet_file_binary_header wbh = AUTO_VAL_INIT(wbh);
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store_keys for wallet " << ascii_path_to_save);
 
   //store data
-
+  wallet_file_binary_header wbh = AUTO_VAL_INIT(wbh);
   wbh.m_signature = WALLET_FILE_SIGNATURE;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
   wbh.m_cb_body = 1000;
-
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
+  uint64_t ts = m_core_runtime_config.get_core_time();
 
-  //std::ofstream data_file;
+  // save to tmp file, then rename
+  boost::filesystem::path tmp_file_path = boost::filesystem::path(path_to_save);
+  tmp_file_path += L".newtmp_" + std::to_wstring(ts);
+
   boost::filesystem::ofstream data_file;
-  data_file.open(path_to_save, std::ios_base::binary | std::ios_base::out | std::ios::trunc);
-  CHECK_AND_ASSERT_THROW_MES(!data_file.fail(), "failed to open binary wallet file for saving: " << epee::string_encoding::convert_to_ansii(m_wallet_file));
+  data_file.open(tmp_file_path, std::ios_base::binary | std::ios_base::out | std::ios::trunc);
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!data_file.fail(), "failed to open binary wallet file for saving: " << tmp_file_path.string());
   data_file << header_buff << keys_buff;
-  WLT_LOG_L0("Storing to file...");
+
+  WLT_LOG_L0("Storing to " << tmp_file_path.string() << " ...");
 
   r = tools::portble_serialize_obj_to_stream(*this, data_file);
-  CHECK_AND_ASSERT_THROW_MES(r, "failed to portble_serialize_obj_to_stream for wallet " << epee::string_encoding::convert_to_ansii(m_wallet_file));
+  if (!r)
+  {
+    data_file.close();
+    boost::filesystem::remove(tmp_file_path); // remove tmp file if smth went wrong
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "IO error while storing wallet to " << tmp_file_path.string() << " (portble_serialize_obj_to_stream failed)");
+  }
 
   data_file.flush();
   data_file.close();
+
+  // for the sake of safety perform a double-renaming: wallet file -> old tmp, new tmp -> wallet file, remove old tmp
+  
+  boost::filesystem::path tmp_old_file_path = boost::filesystem::path(path_to_save);
+  tmp_old_file_path += L".oldtmp_" + std::to_wstring(ts);
+
+  if (boost::filesystem::is_regular_file(path_to_save))
+    boost::filesystem::rename(path_to_save, tmp_old_file_path);
+  boost::filesystem::rename(tmp_file_path, path_to_save);
+  boost::filesystem::remove(tmp_old_file_path);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
@@ -2134,6 +2163,49 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
   wo.store(path_to_save, password);
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::check_for_free_space_and_throw_if_it_lacks(const std::wstring& wallet_filename, uint64_t exact_size_needed_if_known /* = UINT64_MAX */)
+{
+  namespace fs = boost::filesystem;
+
+  try
+  {
+    fs::path wallet_file_path(wallet_filename);
+    fs::path base_path = wallet_file_path.parent_path();
+    if (base_path.empty())
+      base_path = fs::path(".");
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(fs::is_directory(base_path), "directory does not exist: " << base_path.string());
+
+    uint64_t min_free_size = exact_size_needed_if_known;
+    if (min_free_size == UINT64_MAX)
+    {
+      // if exact size needed is unknown -- determine it as
+      // twice the original wallet file size or MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES, which one is bigger
+      min_free_size = MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES;
+      if (fs::is_regular_file(wallet_file_path))
+        min_free_size = std::max(min_free_size, 2 * static_cast<uint64_t>(fs::file_size(wallet_file_path)));
+    }
+    else
+    {
+      min_free_size += 1024 * 1024 * 10; // add a little for FS overhead and so
+    }
+
+    fs::space_info si = fs::space(base_path);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(si.available > min_free_size, "free space at " << base_path.string() << " is too low: " << si.available << ", required minimum is: " << min_free_size);
+  }
+  catch (tools::error::wallet_common_error&)
+  {
+    throw;
+  }
+  catch (std::exception& e)
+  {
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: " << e.what());
+  }
+  catch (...)
+  {
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: unknown exception");
+  }
+}
+//----------------------------------------------------------------------------------------------------
 uint64_t wallet2::unlocked_balance() const
 {
   uint64_t stub = 0;
@@ -2158,7 +2230,7 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
   
   for(auto& td : m_transfers)
   {
-    if (td.is_spendable() || td.is_reserved_for_escrow())
+    if (td.is_spendable() || (td.is_reserved_for_escrow() && !td.is_spent()))
     {
       balance_total += td.amount();
       if (is_transfer_unlocked(td))
@@ -3284,7 +3356,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   uint64_t expiration_time = m_core_runtime_config.get_core_time() + expiration_period;
   std::vector<uint64_t> selected_transfers_for_template;
   build_escrow_template(ecrow_details, fake_outputs_count, unlock_time, expiration_time, b_release_fee, payment_id, template_tx, selected_transfers_for_template, one_time_key);
-  crypto::hash ms_id = get_multisig_out_id(template_tx, 0);
+  crypto::hash ms_id = get_multisig_out_id(template_tx, get_multisig_out_index(template_tx.vout));
 
   const uint32_t mask_to_mark_escrow_template_locked_transfers = WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION;
   mark_transfers_with_flag(selected_transfers_for_template, mask_to_mark_escrow_template_locked_transfers, "preparing escrow template tx, contract: " + epee::string_tools::pod_to_hex(ms_id));
@@ -4009,6 +4081,10 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
 //----------------------------------------------------------------------------------------------------
 void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx)
 {
+  // NOTE: if broadcast_tx == true callback rise_on_transfer2() may be called at the end of this function.
+  // That callback may call balance(), so it's important to have all used/spending transfers
+  // to be correctly marked with corresponding flags PRIOR to calling finalize_transaction()
+
   //TIME_MEASURE_START_MS(construct_tx_time);
   bool r = currency::construct_tx(m_account.get_keys(),
     ftp.sources,

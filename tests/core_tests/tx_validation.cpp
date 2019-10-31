@@ -1450,3 +1450,132 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
 
   return true;
 }
+
+//------------------------------------------------------------------
+
+bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: check tx that is stuck in tx pool because one on its key images is already spent in the blockchain
+  // 1) if it's linked to an alt block -- tx will not be removed as long as linked alt block exists (in order to be able to switch)
+  // 2) if it's not linked to an alt block -- it will be removed after CONFLICT_KEY_IMAGE_SPENT_DEPTH_TO_REMOVE_TX_FROM_POOL confirmations of conflicted tx
+  //    or it will be removed once tx is old enough (CURRENCY_MEMPOOL_TX_LIVETIME)
+
+  bool r = false;
+
+  m_miner_acc.generate();
+  GENERATE_ACCOUNT(bob_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, m_miner_acc, test_core_time::get_time());
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, m_miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  // make tx_0 : miner -> bob
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  r = fill_tx_sources_and_destinations(events, blk_0r, m_miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  transaction tx_0  = AUTO_VAL_INIT(tx_0);
+  r = construct_tx(m_miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  LOG_PRINT_YELLOW("tx_0 = " << get_transaction_hash(tx_0), LOG_LEVEL_0);
+  // do not push tx_0 into events yet
+
+  // tx_1 spends the same key image as tx_0
+  transaction tx_1 = tx_0;
+  keypair kp = keypair::generate();
+  // change tx pub key to end up with different tx hash
+  update_or_add_field_to_extra(tx_1.extra, kp.pub);
+  r = resign_tx(m_miner_acc.get_keys(), sources, tx_1);
+  CHECK_AND_ASSERT_MES(r, false, "resign_tx failed");
+  LOG_PRINT_YELLOW("tx_1 = " << get_transaction_hash(tx_1), LOG_LEVEL_0);
+
+  // tx_2 spends the same key image as tx_0
+  transaction tx_2 = tx_0;
+  kp = keypair::generate();
+  // change tx pub key to end up with different tx hash
+  update_or_add_field_to_extra(tx_2.extra, kp.pub);
+  r = resign_tx(m_miner_acc.get_keys(), sources, tx_2);
+  CHECK_AND_ASSERT_MES(r, false, "resign_tx failed");
+  LOG_PRINT_YELLOW("tx_2 = " << get_transaction_hash(tx_2), LOG_LEVEL_0);
+
+  events.push_back(tx_1);
+
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+
+  // as long as tx_0 is using the same key image as tx_1, tx_0 and tx_2 can't be added to the pool atm
+  // make sure that it's true
+  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(tx_0);
+  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(tx_2);
+
+  // however, tx_0 and tx_2 can be added with kept_by_block flag (to simulate it's going with blk_1)
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(tx_0);
+  events.push_back(tx_2);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+  
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(3));
+
+  // make a block with tx_0 and put tx_0 to the blockchain
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, m_miner_acc, tx_0);
+
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+
+  // tx_1 and tx_2 is still in the pool
+  // it can never be added to any block as long as blk_1 is in the blockchain due to key image conflict
+
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_2_bad, blk_1, m_miner_acc, tx_1);
+
+  // add tx_1 to alt block, it should go well
+  MAKE_NEXT_BLOCK_TX1(events, blk_1a, blk_0r, m_miner_acc, tx_1);
+
+  // however, it does not remove tx from the pool
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+
+  //
+  // make sure stuck tx will be removed from the pool when it's too old
+  //
+  
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, m_miner_acc);
+
+  // remove_stuck_txs should not remove anything, tx_1 and tx_2 should be in the pool
+  DO_CALLBACK(events, "remove_stuck_txs");
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+
+  // shift time by CURRENCY_MEMPOOL_TX_LIVETIME
+  events.push_back(event_core_time(CURRENCY_MEMPOOL_TX_LIVETIME + 1, true));
+
+  // remove_stuck_txs should have removed tx_2 because it's too old
+  DO_CALLBACK(events, "remove_stuck_txs");
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+
+  //
+  // make sure stuck tx will be removed from the pool as soon as one of its key images is spent deep enough in the blockchain
+  // (even if it's not too old to be removed by age)
+  //
+  
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, m_miner_acc);
+
+  // re-add tx_2 with kept_by_block flag
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(tx_2);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+
+  // remove_stuck_txs should not remove anything, tx_1 and tx_2 should be in the pool
+  DO_CALLBACK(events, "remove_stuck_txs");
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+
+  // rewind 50 blocks so tx_0 spending its key image will be deep enough
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_3r, blk_3, m_miner_acc, 50);
+
+  // remove_stuck_txs should remove only tx_2 and left tx_1 (linked to alt block)
+  DO_CALLBACK(events, "remove_stuck_txs");
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+
+  DO_CALLBACK(events, "print_tx_pool");
+
+  return true;
+}

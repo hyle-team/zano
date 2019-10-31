@@ -201,7 +201,7 @@ namespace tools
 
       udp_blocking_client ubc(sender_endpoint, socket, io_service);
       boost::system::error_code ec;
-      size_t len = ubc.receive(boost::asio::buffer(&packet_received, sizeof packet_received), boost::posix_time::seconds(timeout_sec), ec);
+      size_t len = ubc.receive(boost::asio::buffer(&packet_received, sizeof packet_received), boost::posix_time::seconds(static_cast<long>(timeout_sec)), ec);
       if (ec)
       {
         LOG_PRINT_L3("NTP: get_ntp_time(" << host_name << "): boost error: " << ec.message());
