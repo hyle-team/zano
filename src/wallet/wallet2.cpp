@@ -3356,7 +3356,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   uint64_t expiration_time = m_core_runtime_config.get_core_time() + expiration_period;
   std::vector<uint64_t> selected_transfers_for_template;
   build_escrow_template(ecrow_details, fake_outputs_count, unlock_time, expiration_time, b_release_fee, payment_id, template_tx, selected_transfers_for_template, one_time_key);
-  crypto::hash ms_id = get_multisig_out_id(template_tx, 0);
+  crypto::hash ms_id = get_multisig_out_id(template_tx, get_multisig_out_index(template_tx.vout));
 
   const uint32_t mask_to_mark_escrow_template_locked_transfers = WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION;
   mark_transfers_with_flag(selected_transfers_for_template, mask_to_mark_escrow_template_locked_transfers, "preparing escrow template tx, contract: " + epee::string_tools::pod_to_hex(ms_id));
