@@ -573,8 +573,8 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
   //build transaction
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(construct_param, ftp, tx);
-  finalize_transaction(ftp, tx, one_time_key, true);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
+  finalize_transaction(ftp, tx, one_time_key, true);
   print_tx_sent_message(tx, "(contract <" + epee::string_tools::pod_to_hex(contract_id) + ">)", construct_param.fee);
 
   if (p_acceptance_tx != nullptr)
@@ -695,8 +695,8 @@ void wallet2::request_cancel_contract(const crypto::hash& contract_id, uint64_t 
   prepare_transaction(construct_param, ftp);
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::secret_key sk = AUTO_VAL_INIT(sk);
-  finalize_transaction(ftp, tx, sk, true);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been requested for cancellaton with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
+  finalize_transaction(ftp, tx, sk, true);
 
   print_tx_sent_message(tx, "(transport for cancel proposal)", fee);
 
@@ -4081,6 +4081,10 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
 //----------------------------------------------------------------------------------------------------
 void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx)
 {
+  // NOTE: if broadcast_tx == true callback rise_on_transfer2() may be called at the end of this function.
+  // That callback may call balance(), so it's important to have all used/spending transfers
+  // to be correctly marked with corresponding flags PRIOR to calling finalize_transaction()
+
   //TIME_MEASURE_START_MS(construct_tx_time);
   bool r = currency::construct_tx(m_account.get_keys(),
     ftp.sources,
