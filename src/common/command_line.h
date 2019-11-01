@@ -172,6 +172,9 @@ namespace command_line
     return get_arg<bool, false>(vm, arg);
   }
 
+#define ARG_DB_ENGINE_LMDB   "lmdb"
+#define ARG_DB_ENGINE_MDBX   "mdbx"
+
 
   extern const arg_descriptor<bool>        arg_help;
   extern const arg_descriptor<bool>        arg_version;
@@ -188,4 +191,5 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_disable_stop_if_time_out_of_sync;
   extern const arg_descriptor<bool>        arg_disable_stop_on_low_free_space;
   extern const arg_descriptor<bool>        arg_enable_offers_service;
+  extern const arg_descriptor<std::string> arg_db_engine;
 }

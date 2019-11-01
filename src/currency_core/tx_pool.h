@@ -20,6 +20,7 @@ using namespace epee;
 #include "math_helper.h"
 
 #include "common/db_abstract_accessor.h"
+#include "common/command_line.h"
 
 #include "currency_format_utils.h"
 #include "verification_context.h"
@@ -114,7 +115,7 @@ namespace currency
     void clear();
 
     // load/store operations
-    bool init(const std::string& config_folder);
+    bool init(const std::string& config_folder, const boost::program_options::variables_map& vm);
     bool deinit();
     bool fill_block_template(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
     bool get_transactions(std::list<transaction>& txs) const;

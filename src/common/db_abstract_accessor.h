@@ -95,7 +95,7 @@ namespace tools
       {
         close();
       }
-
+      void reset_backend(std::shared_ptr<i_db_backend> backend) { m_backend = backend; }
       performance_data& get_performance_data_for_handle(container_handle h) const  { return m_performance_data_map[h]; }
       performance_data& get_performance_data_global() const { return m_gperformance_data; }
 

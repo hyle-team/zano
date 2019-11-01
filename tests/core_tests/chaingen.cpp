@@ -2057,6 +2057,7 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_tx_pool_empty);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_tx_pool_count);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, print_tx_pool);
+  REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, remove_stuck_txs);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_offers_count);
 }
 
@@ -2119,6 +2120,16 @@ bool test_chain_unit_enchanced::check_tx_pool_count(currency::core& c, size_t ev
 bool test_chain_unit_enchanced::print_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   LOG_PRINT_L0(ENDL << c.get_tx_pool().print_pool(true));
+  return true;
+}
+
+bool test_chain_unit_enchanced::remove_stuck_txs(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  size_t tx_count_before = c.get_pool_transactions_count();
+  bool r = c.get_tx_pool().remove_stuck_transactions();
+  CHECK_AND_ASSERT_MES(r, false, "remove_stuck_transactions() failed");
+
+  LOG_PRINT_L0("stuck txs removed from the pool, pool tx count: " << tx_count_before << " -> " << c.get_pool_transactions_count());
   return true;
 }
 
