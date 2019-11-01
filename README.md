@@ -1,3 +1,6 @@
+
+[![Coverity Scan](https://scan.coverity.com/projects/18767/badge.svg)](https://scan.coverity.com/projects/zanoproject)
+
 Building
 --------
 
