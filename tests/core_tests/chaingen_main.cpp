@@ -63,7 +63,7 @@ bool clean_data_directory()
 
   for(auto& entry : boost::make_iterator_range(boost::filesystem::directory_iterator(config_folder), {}))
   {
-    const std::string& fn_str = entry.path().filename().string();
+    std::string fn_str = entry.path().filename().string();
     if (files.count(fn_str) != 0)
     {
       entries_to_remove.push_back(entry.path());
