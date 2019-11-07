@@ -574,7 +574,17 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(construct_param, ftp, tx);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
-  finalize_transaction(ftp, tx, one_time_key, true);
+
+  try
+  {
+    finalize_transaction(ftp, tx, one_time_key, true);
+  }
+  catch (...)
+  {
+    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception in finalize_transaction, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
+    throw;
+  }
+
   print_tx_sent_message(tx, "(contract <" + epee::string_tools::pod_to_hex(contract_id) + ">)", construct_param.fee);
 
   if (p_acceptance_tx != nullptr)
@@ -696,7 +706,16 @@ void wallet2::request_cancel_contract(const crypto::hash& contract_id, uint64_t 
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::secret_key sk = AUTO_VAL_INIT(sk);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been requested for cancellaton with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
-  finalize_transaction(ftp, tx, sk, true);
+
+  try
+  {
+    finalize_transaction(ftp, tx, sk, true);
+  }
+  catch (...)
+  {
+    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception in finalize_transaction, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
+    throw;
+  }
 
   print_tx_sent_message(tx, "(transport for cancel proposal)", fee);
 
