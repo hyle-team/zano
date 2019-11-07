@@ -142,23 +142,6 @@ struct escrow_zero_amounts : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
-struct escrow_acceptance_and_balance : public wallet_test
-{
-  escrow_acceptance_and_balance();
-  bool generate(std::vector<test_event_entry>& events) const;
-  bool check_balance_after_proposal_not_confirmed(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  bool check_balance_after_proposal_confirmed(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  bool check_balance_after_acceptance_not_confirmed(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  bool check_balance_after_acceptance_confirmed(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-
-  mutable uint64_t m_alice_bob_start_amount;
-  mutable uint64_t m_alice_bob_start_chunk_amount;
-  mutable uint64_t m_alice_fee_proposal;
-  mutable uint64_t m_bob_fee_release;
-  mutable uint64_t m_bob_fee_accept;
-  mutable bc_services::contract_private_details m_cpd;
-};
-
 struct escrow_balance : public wallet_test
 {
   escrow_balance();
