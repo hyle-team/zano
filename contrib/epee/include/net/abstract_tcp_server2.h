@@ -213,8 +213,8 @@ class boosted_tcp_server
       return true;
     }
 
-    idle_callback_conext_base(boost::asio::io_service& io_serice)
-        : m_timer(io_serice)
+    idle_callback_conext_base(boost::asio::io_service& io_serice): m_timer(io_serice), 
+                                                                   m_period(0)
     {
     }
     boost::asio::deadline_timer m_timer;
