@@ -526,9 +526,11 @@ namespace epee
               << prev_it->second.func_name << " @ " << prev_it->second.block_location << std::endl << "    |" << std::endl << "    V" << std::endl;
             prev_it = current_it;
           }
-
-          ss << prev_it->second.thread_name << "(tid:" << prev_it->first << ")  blocked by locker \"" << lock_name << "(owned by " << (*threads_chain.begin())->second.thread_name << " tid:" << (*threads_chain.begin())->first << ")] at "
-            << func_name << " @ " << location << std::endl;
+          if (prev_it != m_thread_owned_locks.end())
+          {
+            ss << prev_it->second.thread_name << "(tid:" << prev_it->first << ")  blocked by locker \"" << lock_name << "(owned by " << (*threads_chain.begin())->second.thread_name << " tid:" << (*threads_chain.begin())->first << ")] at "
+              << func_name << " @ " << location << std::endl;
+          }
           m_deadlock_journal.push_back(ss.str());
           throw std::runtime_error(ss.str());
         }
