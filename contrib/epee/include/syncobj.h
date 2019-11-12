@@ -607,14 +607,9 @@ namespace epee
 
     ~guarded_critical_region_t()
     {
-      // TODO(unassigned): because one cannot forward-declare macros,
-      //   the circular dependency created by misc_log_ex will not
-      //   allow us to actually use these substitutions.
-      //NESTED_TRY_ENTRY();
-
+      TRY_ENTRY();
       unlock();
-
-      //NESTED_CATCH_ENTRY(__func__);
+      CATCH_ENTRY(void());
     }
 
     void unlock()
