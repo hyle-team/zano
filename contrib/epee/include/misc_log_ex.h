@@ -120,6 +120,7 @@ DISABLE_VS_WARNINGS(4100)
 #endif 
 
 #define LOCATION_SS "[" << LOCAL_FUNCTION_DEF__ << ("] @ " __FILE__ ":" STR(__LINE__))
+#define LOCATION_CSTR ("[" LOCAL_FUNCTION_DEF__ "] @ " __FILE__ ":" STR(__LINE__))
 
 #if !defined(DISABLE_RELEASE_LOGGING)
   #define  ENABLE_LOGGING_INTERNAL

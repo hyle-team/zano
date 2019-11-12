@@ -64,7 +64,6 @@ namespace epee
     if (!epee::string_tools::hex_to_pod(a, res))
       throw std::runtime_error(std::string("Unable to transform \"") + a + "\" to pod type " + typeid(t_pod_type).name());
 		return res;
-    CHECK_AND_ASSERT_THROW_MES
 	}
 
   //basic helpers for blob-to-hex serialization 
