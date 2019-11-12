@@ -696,7 +696,7 @@ namespace nodetool
     if(just_take_peerlist)
     {
       m_net_server.get_config_object().close(con.m_connection_id);
-      LOG_PRINT_CC_GREEN(con, "CONNECTION HANDSHAKED OK AND CLOSED.", LOG_LEVEL_2);
+      LOG_PRINT_CC_GREEN(con, "CONNECTION HANDSHAKED OK AND CLOSED with peer " << string_tools::get_ip_string_from_int32(na.ip) << ":" << string_tools::num_to_string_fast(na.port), LOG_LEVEL_2);
       return true;
     }
 
@@ -707,7 +707,7 @@ namespace nodetool
     m_peerlist.append_with_peer_white(pe_local);
     //update last seen and push it to peerlist manager
 
-    LOG_PRINT_CC_GREEN(con, "CONNECTION HANDSHAKED OK.", LOG_LEVEL_2);
+    LOG_PRINT_CC_GREEN(con, "CONNECTION HANDSHAKED OK with peer " << string_tools::get_ip_string_from_int32(na.ip) << ":" << string_tools::num_to_string_fast(na.port), LOG_LEVEL_2);
     return true;
   }
   //-----------------------------------------------------------------------------------  
