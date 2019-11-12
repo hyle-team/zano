@@ -1130,7 +1130,9 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response res = AUTO_VAL_INIT(res);
   get_short_chain_history(req.block_ids);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
-  THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getblocks.bin");
+  if (!r)
+    throw error::no_connection_to_daemon(LOCATION_CSTR, "getblocks.bin");
+
   if (res.status == CORE_RPC_STATUS_GENESIS_MISMATCH)
   {
     WLT_LOG_MAGENTA("Reseting genesis block...", LOG_LEVEL_0);
@@ -1312,11 +1314,10 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
   currency::COMMAND_RPC_GET_TX_POOL::response res = AUTO_VAL_INIT(res);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_TX_POOL(req, res);
   if (res.status == CORE_RPC_STATUS_BUSY)
-    throw error::daemon_busy("", "get_tx_pool");
-  THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_tx_pool");
-  THROW_IF_TRUE_WALLET_EX(res.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "get_tx_pool");
+    throw error::daemon_busy(LOCATION_CSTR, "get_tx_pool");
+  if (!r)
+    throw error::no_connection_to_daemon(LOCATION_CSTR, "get_tx_pool");
   THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
-  
   
 
   //- @#@ ----- debug 
@@ -1610,22 +1611,22 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
       if(!added_blocks)
         break;
     }
+    catch (error::no_connection_to_daemon&)
+    {
+      blocks_fetched += added_blocks;
+      if (++try_count > 3)
+        return;
+      WLT_LOG_L2("no connection to the daemon, wait and try pull_blocks again (try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ")");
+      std::this_thread::sleep_for(std::chrono::seconds(3));
+    }
     catch (const std::exception& e)
     {
       blocks_fetched += added_blocks;
-      if(try_count < 3)
-      {
-        WLT_LOG_L1("Another try pull_blocks (try_count=" << try_count << "), exception: " << e.what());
-        ++try_count;
-      }
-      else
-      {
-        WLT_LOG_ERROR("pull_blocks failed, try_count=" << try_count << ", exception: " << e.what());
-        return;
-        //throw;
-      }
+      WLT_LOG_ERROR("refresh->pull_blocks failed, try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ", exception: " << e.what());
+      return;
     }
   }
+
   if(last_tx_hash_id != (m_transfers.size() ? get_transaction_hash(m_transfers.back().m_ptx_wallet_info->m_tx) : null_hash))
     received_money = true;
 
