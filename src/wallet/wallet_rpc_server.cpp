@@ -61,24 +61,39 @@ namespace tools
     {
       m_net_server.add_idle_handler([this]() -> bool
       {
-        size_t blocks_fetched = 0;
-        bool received_money = false, ok = false;
-        std::atomic<bool> stop(false);
-        LOG_PRINT_L2("wallet RPC idle: refreshing...");
-        m_wallet.refresh(blocks_fetched, received_money, ok, stop);
-        if (stop)
+        try
         {
-          LOG_PRINT_L1("wallet RPC idle: refresh failed");
-          return true;
-        }
+          size_t blocks_fetched = 0;
+          bool received_money = false, ok = false;
+          std::atomic<bool> stop(false);
+          LOG_PRINT_L2("wallet RPC idle: refreshing...");
+          m_wallet.refresh(blocks_fetched, received_money, ok, stop);
+          if (stop)
+          {
+            LOG_PRINT_L1("wallet RPC idle: refresh failed");
+            return true;
+          }
 
-        if (m_do_mint)
+          if (m_do_mint)
+          {
+            bool has_related_alias_in_unconfirmed = false;
+            LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
+            m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
+            LOG_PRINT_L2("wallet RPC idle: trying to do PoS iteration...");
+            m_wallet.try_mint_pos();
+          }
+        }
+        catch (error::no_connection_to_daemon&)
         {
-          bool has_related_alias_in_unconfirmed = false;
-          LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
-          m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
-          LOG_PRINT_L2("wallet RPC idle: tring to do PoS iteration...");
-          m_wallet.try_mint_pos();
+          LOG_PRINT_RED("no connection to the daemon", LOG_LEVEL_0);
+        }
+        catch(std::exception& e)
+        {
+          LOG_ERROR("exeption caught in wallet_rpc_server::idle_handler: " << e.what());
+        }
+        catch(...)
+        {
+          LOG_ERROR("unknown exeption caught in wallet_rpc_server::idle_handler");
         }
 
         return true;
