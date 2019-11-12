@@ -870,8 +870,10 @@ using namespace std;
         if(!u_c.port)
           u_c.port = 80;//default for http
 
-        res = tr.connect(u_c.host, static_cast<int>(u_c.port), timeout);
-        CHECK_AND_ASSERT_MES(res, false, "failed to connect " << u_c.host << ":" << u_c.port);
+        if (!tr.connect(u_c.host, static_cast<int>(u_c.port), timeout))
+        {
+          LOG_PRINT_L2("invoke_request: cannot connect to " << u_c.host << ":" << u_c.port);
+        }
       }
 
       return tr.invoke(u_c.uri, method, body, ppresponse_info, additional_params);

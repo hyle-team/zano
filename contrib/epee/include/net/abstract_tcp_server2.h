@@ -254,7 +254,14 @@ class boosted_tcp_server
       if(!ptr->call_handler())
         return true;
     }
-    catch(...) {
+    catch(std::exception& e)
+    {
+      LOG_ERROR("exeption caught in boosted_tcp_server::global_timer_handler: " << e.what() << ENDL << "won't be called anymore");
+      return true;
+    }
+    catch(...)
+    {
+      LOG_ERROR("unknown exeption caught in boosted_tcp_server::global_timer_handler, it won't be called anymore");
       return true;
     }
 
