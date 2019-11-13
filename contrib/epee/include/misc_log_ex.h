@@ -1,3 +1,4 @@
+// Copyright (c) 2019, Zano Project
 // Copyright (c) 2019, anonimal <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
@@ -59,6 +60,7 @@ PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
 
 
+#include "misc_helpers.h"
 #include "static_initializer.h"
 #include "string_tools.h"
 #include "time_helper.h"
@@ -106,22 +108,6 @@ DISABLE_VS_WARNINGS(4100)
 #endif
 
 
-#define COMBINE1(X,Y) X##Y  // helper macro
-#define COMBINE(X,Y) COMBINE1(X,Y)
-#define _STR(X) #X
-#define STR(X) _STR(X)
-
-#if defined(_MSC_VER)
-#define LOCAL_FUNCTION_DEF__ __FUNCTION__
-#define UNUSED_ATTRIBUTE
-#else
-#define LOCAL_FUNCTION_DEF__ __PRETTY_FUNCTION__ 
-#define UNUSED_ATTRIBUTE __attribute__((unused))
-#endif 
-
-#define LOCATION_SS "[" << LOCAL_FUNCTION_DEF__ << ("] @ " __FILE__ ":" STR(__LINE__))
-#define LOCATION_CSTR ("[" LOCAL_FUNCTION_DEF__ "] @ " __FILE__ ":" STR(__LINE__))
-
 #if !defined(DISABLE_RELEASE_LOGGING)
   #define  ENABLE_LOGGING_INTERNAL
 #endif
@@ -132,9 +118,6 @@ DISABLE_VS_WARNINGS(4100)
   epee::log_space::log_singletone::enable_channel(ch_name);  return true; \
 });
 
-
-#define TRY_ENTRY()   try {
-#define CATCH_ALL_DO_NOTHING() }catch(...) {} 
 
 #if defined(ENABLE_LOGGING_INTERNAL)
 
@@ -217,67 +200,6 @@ DISABLE_VS_WARNINGS(4100)
 
 #define ENDL std::endl
 
-
-#define CATCH_ENTRY_CUSTOM(location, custom_code, return_val) } \
-  catch(const std::exception& ex) \
-{ \
-  (void)(ex); \
-  LOG_ERROR("Exception at [" << location << "], what=" << ex.what()); \
-  custom_code; \
-  return return_val; \
-} \
-  catch(...) \
-{ \
-  LOG_ERROR("Exception at [" << location << "], generic exception \"...\""); \
-  custom_code; \
-  return return_val; \
-}
-#define CATCH_ENTRY(location, return_val) CATCH_ENTRY_CUSTOM(location, (void)0, return_val)
-#define CATCH_ENTRY2(return_val) CATCH_ENTRY_CUSTOM(LOCATION_SS, (void)0, return_val)
-
-#define CATCH_ENTRY_L0(location, return_val) CATCH_ENTRY(location, return_val)
-#define CATCH_ENTRY_L1(location, return_val) CATCH_ENTRY(location, return_val)
-#define CATCH_ENTRY_L2(location, return_val) CATCH_ENTRY(location, return_val)
-#define CATCH_ENTRY_L3(location, return_val) CATCH_ENTRY(location, return_val)
-#define CATCH_ENTRY_L4(location, return_val) CATCH_ENTRY(location, return_val)
-
-/// @brief Catches TRY_ENTRY without returning
-/// @details Useful within a dtor - but only if nested within another try block
-///    (since we can still potentially throw here). See NESTED_*ENTRY()
-/// @todo Exception dispatcher class
-#define CATCH_ENTRY_NO_RETURN(location, custom_code) } \
-  catch(const std::exception& ex) \
-{ \
-  (void)(ex); \
-  LOG_ERROR("Exception at [" << location << "], what=" << ex.what()); \
-  custom_code; \
-} \
-  catch(...) \
-{ \
-  LOG_ERROR("Exception at [" << location << "], generic exception \"...\""); \
-  custom_code; \
-}
-
-
-#define CATCH_ENTRY_WITH_FORWARDING_EXCEPTION() } \
-  catch(const std::exception& ex) \
-{ \
-  LOG_ERROR("Exception at [" << LOCATION_SS << "], what=" << ex.what()); \
-  throw std::runtime_error(std::string("[EXCEPTION FORWARDED]: ") + ex.what()); \
-} \
-  catch(...) \
-{ \
-  LOG_ERROR("Exception at [" << LOCATION_SS << "], generic unknown exception \"...\""); \
-  throw std::runtime_error("[EXCEPTION FORWARDED]"); \
-}
-
-
-
-#define NESTED_TRY_ENTRY() try { TRY_ENTRY();
-
-#define NESTED_CATCH_ENTRY(location) \
-  CATCH_ENTRY_NO_RETURN(location, {}); \
-  } catch (...) {}
 
 #define ASSERT_MES_AND_THROW(message) {LOG_ERROR(message); std::stringstream ss; ss << message; throw std::runtime_error(ss.str());}
 

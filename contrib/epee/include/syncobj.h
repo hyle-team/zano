@@ -1,4 +1,5 @@
-﻿// Copyright (c) 2019, anonimal, <anonimal@zano.org>
+﻿// Copyright (c) 2019, Zano Project
+// Copyright (c) 2019, anonimal, <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -24,12 +25,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
-
-
-
-
-#ifndef __WINH_OBJ_H__
-#define __WINH_OBJ_H__
+#pragma once
 #include <thread>
 #include <condition_variable>
 #include <atomic>
@@ -40,7 +36,7 @@
 
 #include "singleton.h"
 #include "static_initializer.h"
-
+#include "misc_helpers.h"
 
 //#define DISABLE_DEADLOCK_GUARD
 
@@ -55,9 +51,6 @@
   { \
     LOG_ERROR("MUTEX IS NOT FREE ON DESTRUCTOR: " << #mutex_mame); \
   }
-
-
-
 
 
 namespace epee
@@ -609,7 +602,7 @@ namespace epee
     {
       TRY_ENTRY();
       unlock();
-      CATCH_ENTRY(void());
+      CATCH_ALL_DO_NOTHING();
     }
 
     void unlock()
@@ -713,6 +706,3 @@ namespace epee
 
 
 }
-
-#endif
-
