@@ -2480,7 +2480,7 @@ namespace currency
     div128_32(product_hi, product_lo, static_cast<uint32_t>(median_size), &reward_hi, &reward_lo);
     div128_32(reward_hi, reward_lo, static_cast<uint32_t>(median_size), &reward_hi, &reward_lo);
     CHECK_AND_ASSERT_MES(0 == reward_hi, false, "0 == reward_hi");
-    CHECK_AND_ASSERT_MES(reward_lo < base_reward, false, "reward_lo < base_reward, reward: " << reward << ", base_reward: " << base_reward << ", current_block_size: " << current_block_size << ", median_size: " << median_size);
+    CHECK_AND_ASSERT_MES(reward_lo < base_reward, false, "reward_lo < base_reward, reward_lo: " << reward_lo << ", base_reward: " << base_reward << ", current_block_size: " << current_block_size << ", median_size: " << median_size);
 
     reward = reward_lo;
     return true;
