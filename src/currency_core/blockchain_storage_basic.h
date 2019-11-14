@@ -125,6 +125,26 @@ namespace currency
     }
   };
 
+  typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
 
+  struct create_block_template_params
+  {
+    account_public_address miner_address;
+    account_public_address stakeholder_address;
+    blobdata ex_nonce;
+    bool pos = false;
+    pos_entry pe;
+    std::list<transaction> explicit_txs;
+    fill_block_template_func_t *pcustom_fill_block_template_func;
+  };
+
+  struct create_block_template_response
+  {
+    block b;
+    wide_difficulty_type diffic;
+    uint64_t height;
+  };
+
+  
 
 }

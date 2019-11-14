@@ -521,7 +521,7 @@ namespace tools
       {
         TRY_ENTRY();
         bdb.unbind_parent_container(this);
-        CATCH_ENTRY2(v);
+        CATCH_ALL_DO_NOTHING();
       }
 
       virtual bool on_write_transaction_begin()

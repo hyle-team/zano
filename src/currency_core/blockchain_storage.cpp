@@ -1286,6 +1286,35 @@ bool blockchain_storage::create_block_template(block& b,
                                                const pos_entry& pe,
                                                fill_block_template_func_t custom_fill_block_template_func /* = nullptr */) const
 {
+  create_block_template_params params = AUTO_VAL_INIT(params);
+  params.miner_address = miner_address;
+  params.stakeholder_address = stakeholder_address;
+  params.ex_nonce = ex_nonce;
+  params.pos = pos;
+  params.pe = pe;
+  params.pcustom_fill_block_template_func = custom_fill_block_template_func;
+  create_block_template_response resp = AUTO_VAL_INIT(resp);
+  bool r = create_block_template(params, resp);
+  b = resp.b;
+  diffic = resp.diffic;
+  height = resp.height;  
+  return r;
+}
+
+bool blockchain_storage::create_block_template(const create_block_template_params& params, create_block_template_response& resp) const
+{
+  const account_public_address& miner_address = params.miner_address; 
+  const account_public_address& stakeholder_address = params.stakeholder_address;
+  const blobdata& ex_nonce = params.ex_nonce;
+  bool pos = params.pos;
+  const pos_entry& pe = params.pe;
+  fill_block_template_func_t* pcustom_fill_block_template_func = params.pcustom_fill_block_template_func;
+
+  uint64_t& height = resp.height;
+  block& b = resp.b;
+  wide_difficulty_type& diffic = resp.diffic;
+
+
   size_t median_size;
   boost::multiprecision::uint128_t already_generated_coins;
   CRITICAL_REGION_BEGIN(m_read_lock);
@@ -1321,10 +1350,10 @@ bool blockchain_storage::create_block_template(block& b,
   size_t txs_size;
   uint64_t fee;
   bool block_filled = false;
-  if (custom_fill_block_template_func == nullptr)
+  if (pcustom_fill_block_template_func == nullptr)
     block_filled = m_tx_pool.fill_block_template(b, pos, median_size, already_generated_coins, txs_size, fee, height);
   else
-    block_filled = (*custom_fill_block_template_func)(b, pos, median_size, already_generated_coins, txs_size, fee, height);
+    block_filled = (*pcustom_fill_block_template_func)(b, pos, median_size, already_generated_coins, txs_size, fee, height);
 
   if (!block_filled)
     return false;
