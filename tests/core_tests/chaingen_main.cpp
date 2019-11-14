@@ -655,6 +655,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_run_single_test);  
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
+  command_line::add_arg(desc_options, command_line::arg_db_engine);  
 
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {
