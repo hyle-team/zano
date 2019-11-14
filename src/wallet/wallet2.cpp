@@ -1131,7 +1131,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   get_short_chain_history(req.block_ids);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
   if (!r)
-    throw error::no_connection_to_daemon(LOCATION_CSTR, "getblocks.bin");
+    throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
 
   if (res.status == CORE_RPC_STATUS_GENESIS_MISMATCH)
   {
@@ -1314,9 +1314,9 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
   currency::COMMAND_RPC_GET_TX_POOL::response res = AUTO_VAL_INIT(res);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_TX_POOL(req, res);
   if (res.status == CORE_RPC_STATUS_BUSY)
-    throw error::daemon_busy(LOCATION_CSTR, "get_tx_pool");
+    throw error::daemon_busy(LOCATION_STR, "get_tx_pool");
   if (!r)
-    throw error::no_connection_to_daemon(LOCATION_CSTR, "get_tx_pool");
+    throw error::no_connection_to_daemon(LOCATION_STR, "get_tx_pool");
   THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
   
 

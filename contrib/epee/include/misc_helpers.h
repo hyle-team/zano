@@ -35,12 +35,12 @@
 #define LOCAL_FUNCTION_DEF__ __FUNCTION__
 #define UNUSED_ATTRIBUTE
 #else
-#define LOCAL_FUNCTION_DEF__ __PRETTY_FUNCTION__ 
+#define LOCAL_FUNCTION_DEF__ __FUNCTION__ 
 #define UNUSED_ATTRIBUTE __attribute__((unused))
 #endif 
 
 #define LOCATION_SS "[" << LOCAL_FUNCTION_DEF__ << ("] @ " __FILE__ ":" STR(__LINE__))
-#define LOCATION_CSTR ("[" LOCAL_FUNCTION_DEF__ "] @ " __FILE__ ":" STR(__LINE__))
+#define LOCATION_STR (std::string("[") + LOCAL_FUNCTION_DEF__ + "] @ " __FILE__ ":" STR(__LINE__))
 
 
 //
