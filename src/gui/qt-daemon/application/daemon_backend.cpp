@@ -120,7 +120,6 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
   command_line::add_arg(desc_cmd_sett, command_line::arg_show_details);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_db_engine);
   command_line::add_arg(desc_cmd_sett, arg_alloc_win_console);
   command_line::add_arg(desc_cmd_sett, arg_html_folder);
   command_line::add_arg(desc_cmd_sett, arg_xcode_stub);

@@ -15,27 +15,34 @@ namespace tools
   namespace db
   {
     inline
-      bool select_db_engine_from_arg(const boost::program_options::variables_map& vm, tools::db::basic_db_accessor& rdb)
+    bool select_db_engine_from_arg(const boost::program_options::variables_map& vm, tools::db::basic_db_accessor& rdb)
     {
-      if (command_line::get_arg(vm, command_line::arg_db_engine) == ARG_DB_ENGINE_LMDB)
+      try
       {
-        rdb.reset_backend(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend));
+        if (command_line::get_arg(vm, command_line::arg_db_engine) == ARG_DB_ENGINE_LMDB)
+        {
+          rdb.reset_backend(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend));
+          return true;
+        }
+        else if (command_line::get_arg(vm, command_line::arg_db_engine) == ARG_DB_ENGINE_MDBX)
+        {
+  #ifdef ENABLED_ENGINE_MDBX
+          rdb.reset_backend(std::shared_ptr<tools::db::i_db_backend>(new tools::db::mdbx_db_backend));
+          return true;
+  #else
+          LOG_PRINT_L0(" DB ENGINE: " << ARG_DB_ENGINE_MDBX << " is not suported by this build(see DISABLE_MDBX cmake option), STOPPING");
+          return false;
+  #endif 
+        }
       }
-      else if (command_line::get_arg(vm, command_line::arg_db_engine) == ARG_DB_ENGINE_MDBX)
+      catch (...)
       {
-#ifdef ENABLED_ENGINE_MDBX
-        rdb.reset_backend(std::shared_ptr<tools::db::i_db_backend>(new tools::db::mdbx_db_backend));
-#else
-        LOG_PRINT_L0(" DB ENGINE: " << ARG_DB_ENGINE_MDBX << " is not suported by this build(see DISABLE_MDBX cmake option), STOPPING");
+        LOG_ERROR("internal error: arg_db_engine command-line option could not be read (exception caught)");
         return false;
-#endif 
       }
-      else
-      {
-        LOG_PRINT_RED_L0(" UNKNOWN DB ENGINE: " << command_line::get_arg(vm, command_line::arg_db_engine) << ", STOPPING");
-        return false;
-      }
-      return true;
+
+      LOG_PRINT_RED_L0(" UNKNOWN DB ENGINE: " << command_line::get_arg(vm, command_line::arg_db_engine) << ", STOPPING");
+      return false;
     }
   }
 }

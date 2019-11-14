@@ -152,6 +152,7 @@ void blockchain_storage::init_options(boost::program_options::options_descriptio
 {
   command_line::add_arg(desc, arg_db_cache_l1);
   command_line::add_arg(desc, arg_db_cache_l2);
+  command_line::add_arg(desc, command_line::arg_db_engine);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_block_h_older_then(uint64_t timestamp) const 
