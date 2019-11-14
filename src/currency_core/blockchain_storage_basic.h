@@ -17,7 +17,7 @@
 
 #include "currency_basic.h"
 #include "difficulty.h"
-
+#include "currency_protocol/blobdatatype.h"
 namespace currency
 {
 
