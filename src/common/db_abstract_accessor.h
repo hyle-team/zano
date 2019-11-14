@@ -89,8 +89,11 @@ namespace tools
       mutable performance_data m_gperformance_data;
       mutable std::unordered_map<container_handle, performance_data> m_performance_data_map;
     public:
-      basic_db_accessor(std::shared_ptr<i_db_backend> backend, epee::shared_recursive_mutex& rwlock) :m_backend(backend), m_rwlock(rwlock), m_is_open(false)
-      {}
+      basic_db_accessor(std::shared_ptr<i_db_backend> backend, epee::shared_recursive_mutex& rwlock)
+        : m_backend(backend), m_rwlock(rwlock), m_is_open(false)
+      {
+      }
+
       ~basic_db_accessor()
       {
         close();
@@ -239,8 +242,11 @@ namespace tools
       bool close()
       {
         m_is_open = false;
+        if (!m_backend)
+          return true;
         return m_backend->close();
       }
+
       bool open(const std::string& path, uint64_t cache_sz = CACHE_SIZE)
       {
         bool r = m_backend->open(path, cache_sz);
