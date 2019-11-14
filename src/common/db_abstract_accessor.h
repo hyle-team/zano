@@ -519,7 +519,9 @@ namespace tools
 
       ~basic_key_value_accessor()
       {
+        TRY_ENTRY();
         bdb.unbind_parent_container(this);
+        CATCH_ENTRY2(v);
       }
 
       virtual bool on_write_transaction_begin()
