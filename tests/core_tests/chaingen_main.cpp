@@ -222,7 +222,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     auto after_init_cb = [crc, &alt_chains, &cps, core_time](currency::core& c)
     {
       c.get_blockchain_storage().set_core_runtime_config(crc);           // restore runtime config
-      c.get_blockchain_storage().set_alternative_chains(alt_chains);  // restore alt chains
+      c.get_blockchain_storage().set_alternative_chains(alt_chains);     // restore alt chains
       c.get_blockchain_storage().get_checkpoints() = cps;                // restore checkpoints
       test_core_time::adjust(core_time);                                 // restore core time
     };
@@ -231,7 +231,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     {
       core_time = test_core_time::get_time();                            // save core time
       crc = c.get_blockchain_storage().get_core_runtime_config();        // save runtime config
-      c.get_blockchain_storage().get_alternative_chains(alt_chains);  // save altchains
+      c.get_blockchain_storage().get_alternative_chains(alt_chains);     // save altchains
       cps = c.get_blockchain_storage().get_checkpoints();                // save checkpoints
       if (last_iter)
         core_state_after.fill(c);
@@ -250,7 +250,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if(!postponed_tests.count(#genclass) && (run_single_test.empty() || run_single_test == #genclass))                                              \
+  if(!postponed_tests.count(#genclass) && (run_single_test.empty() || run_single_test == #genclass))       \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -655,7 +655,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_run_single_test);  
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
-  command_line::add_arg(desc_options, command_line::arg_db_engine);  
+  currency::core::init_options(desc_options);
 
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {
