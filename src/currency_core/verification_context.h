@@ -27,5 +27,9 @@ namespace currency
     bool m_already_exists;
     bool added_to_altchain;
     uint64_t height_difference;
+    //this is work like a first-level cache for transactions while block is getting handled. It lets transactions 
+    //associated with the block to get handled directly to core without being handled by tx_pool(which makes full
+    //inputs validation, including signatures check)
+    std::unordered_map<crypto::hash, transaction> m_onboard_transactions; 
   };
 }

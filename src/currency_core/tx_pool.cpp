@@ -987,7 +987,9 @@ namespace currency
     const boost::multiprecision::uint128_t& already_generated_coins,
     size_t &total_size, 
     uint64_t &fee, 
-    uint64_t height)
+    uint64_t height, 
+    const std::list<transaction>& explicit_txs
+  )
   {
     LOCAL_READONLY_TRANSACTION();
     //typedef transactions_container::value_type txv;
@@ -998,8 +1000,8 @@ namespace currency
     txs_v.reserve(m_db_transactions.size());
     std::vector<txv*> txs;
 
-    //std::transform(m_transactions.begin(), m_transactions.end(), txs.begin(), [](txv &a) -> txv * { return &a; });
-    //keep getting it as a values cz db items cache will keep it as unserialied object stored by shared ptrs 
+    
+    //keep getting it as a values cz db items cache will keep it as unserialised object stored by shared ptrs 
     m_db_transactions.enumerate_keys([&](uint64_t i, crypto::hash& k){txs_v.resize(i + 1); txs_v[i].first = k; return true;});
     txs.resize(txs_v.size(), nullptr);
     
@@ -1024,7 +1026,9 @@ namespace currency
       return a_ > b_;
     });
 
-    size_t current_size = 0;
+
+    size_t explicit_total_size = get_objects_blobsize(explicit_txs);
+    size_t current_size = explicit_total_size;
     uint64_t current_fee = 0;
     uint64_t best_money;
     if (!get_block_reward(pos, median_size, CURRENCY_COINBASE_BLOB_RESERVED_SIZE, already_generated_coins, best_money, height)) {
@@ -1132,6 +1136,11 @@ namespace currency
           total_size += txs[i]->second->blob_size;
         }
       }
+    }
+    // add explicit transactions 
+    for (const auto& tx : explicit_txs)
+    {
+      bl.tx_hashes.push_back(get_transaction_hash(tx));
     }
     return true;
   }
