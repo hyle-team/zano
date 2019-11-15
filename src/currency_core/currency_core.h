@@ -118,12 +118,6 @@ namespace currency
      bool add_new_block(const block& b, block_verification_context& bvc);
      bool load_state_data();
      bool parse_tx_from_blob(transaction& tx, crypto::hash& tx_hash, const blobdata& blob);
-     bool check_tx_extra(const transaction& tx);
-
-     bool check_tx_syntax(const transaction& tx);
-     //check correct values, amounts and all lightweight checks not related with database
-     bool check_tx_semantic(const transaction& tx, bool kept_by_block);
-     //check if tx already in memory pool or in main blockchain
 
      bool is_key_image_spent(const crypto::key_image& key_im);
 
@@ -132,7 +126,6 @@ namespace currency
      bool update_miner_block_template();
      bool handle_command_line(const boost::program_options::variables_map& vm);
      bool on_update_blocktemplate_interval();
-     bool check_tx_inputs_keyimages_diff(const transaction& tx);
 
      void notify_blockchain_update_listeners();
 

@@ -19,6 +19,7 @@ using namespace epee;
 #include "currency_format_utils.h"
 #include "misc_language.h"
 #include "string_coding.h"
+#include "tx_semantic_validation.h"
 
 #define MINIMUM_REQUIRED_FREE_SPACE_BYTES (1024 * 1024 * 100)
 
@@ -185,13 +186,15 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::handle_incoming_tx(const blobdata& tx_blob, tx_verification_context& tvc, bool kept_by_block)
   {
+    CHECK_AND_ASSERT_MES(!kept_by_block, false, "Transaction associated with block came throw handle_incoming_tx!(not allowed anymore)");
+
     tvc = boost::value_initialized<tx_verification_context>();
     //want to process all transactions sequentially
     TIME_MEASURE_START_MS(wait_lock_time);
     CRITICAL_REGION_LOCAL(m_incoming_tx_lock);
     TIME_MEASURE_FINISH_MS(wait_lock_time);
 
-    if(tx_blob.size() > get_max_tx_size())
+    if(tx_blob.size() > CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
     {
       LOG_PRINT_L0("WRONG TRANSACTION BLOB, too big size " << tx_blob.size() << ", rejected");
       tvc.m_verification_failed = true;
@@ -210,19 +213,10 @@ namespace currency
     TIME_MEASURE_FINISH_MS(parse_tx_time);
     
 
-    TIME_MEASURE_START_MS(check_tx_syntax_time);
-    if(!check_tx_syntax(tx))
-    {
-      LOG_PRINT_L0("WRONG TRANSACTION BLOB, Failed to check tx " << tx_hash << " syntax, rejected");
-      tvc.m_verification_failed = true;
-      return false;
-    }
-    TIME_MEASURE_FINISH_MS(check_tx_syntax_time);
-
     TIME_MEASURE_START_MS(check_tx_semantic_time);
-    if(!check_tx_semantic(tx, kept_by_block))
+    if(!validate_tx_semantic(tx, tx_blob.size()))
     {
-      LOG_PRINT_L0("WRONG TRANSACTION BLOB, Failed to check tx " << tx_hash << " semantic, rejected");
+      LOG_PRINT_L0("WRONG TRANSACTION SEMANTICS, Failed to check tx " << tx_hash << " semantic, rejected");
       tvc.m_verification_failed = true;
       return false;
     }
@@ -243,7 +237,6 @@ namespace currency
     }
     LOG_PRINT_L2("[CORE HANDLE_INCOMING_TX]: timing " << wait_lock_time
       << "/" << parse_tx_time
-      << "/" << check_tx_syntax_time
       << "/" << check_tx_semantic_time
       << "/" << add_new_tx_time);
     return r;
@@ -296,88 +289,9 @@ namespace currency
     return true;
   }
 
-  //-----------------------------------------------------------------------------------------------
-  bool core::check_tx_semantic(const transaction& tx, bool kept_by_block)
-  {
-    if(!tx.vin.size())
-    {
-      LOG_PRINT_RED_L0("tx with empty inputs, rejected for tx id= " << get_transaction_hash(tx));
-      return false;
-    }
 
-    if(!check_inputs_types_supported(tx))
-    {
-      LOG_PRINT_RED_L0("unsupported input types for tx id= " << get_transaction_hash(tx));
-      return false;
-    }
 
-    if(!check_outs_valid(tx))
-    {
-      LOG_PRINT_RED_L0("tx with invalid outputs, rejected for tx id= " << get_transaction_hash(tx));
-      return false;
-    }
 
-    if(!check_money_overflow(tx))
-    {
-      LOG_PRINT_RED_L0("tx has money overflow, rejected for tx id= " << get_transaction_hash(tx));
-      return false;
-    }
-
-    uint64_t amount_in = 0;
-    get_inputs_money_amount(tx, amount_in);
-    uint64_t amount_out = get_outs_money_amount(tx);
-
-    if(amount_in < amount_out)
-    {
-      LOG_PRINT_RED_L0("tx with wrong amounts: ins " << amount_in << ", outs " << amount_out << ", rejected for tx id= " << get_transaction_hash(tx));
-      return false;
-    }
-
-    if(!kept_by_block && get_object_blobsize(tx) >= m_blockchain_storage.get_current_comulative_blocksize_limit() - CURRENCY_COINBASE_BLOB_RESERVED_SIZE)
-    {
-      LOG_PRINT_RED_L0("tx has too big size " << get_object_blobsize(tx) << ", expected no bigger than " << m_blockchain_storage.get_current_comulative_blocksize_limit() - CURRENCY_COINBASE_BLOB_RESERVED_SIZE);
-      return false;
-    }
-
-    //check if tx use different key images
-    if(!check_tx_inputs_keyimages_diff(tx))
-    {
-      LOG_PRINT_RED_L0("tx inputs have the same key images");
-      return false;
-    }
-    
-    if(!check_tx_extra(tx))
-    {
-      LOG_PRINT_RED_L0("tx has wrong extra, rejected");
-      return false;
-    }
-
-    return true;
-  }
-  //-----------------------------------------------------------------------------------------------
-  bool core::check_tx_extra(const transaction& tx)
-  {
-    tx_extra_info ei = AUTO_VAL_INIT(ei);
-    bool r = parse_and_validate_tx_extra(tx, ei);
-    if(!r)
-      return false;
-    return true;
-  }
-  //-----------------------------------------------------------------------------------------------
-  bool core::check_tx_inputs_keyimages_diff(const transaction& tx)
-  {
-    std::unordered_set<crypto::key_image> ki;
-    BOOST_FOREACH(const auto& in, tx.vin)
-    {
-      if (in.type() == typeid(txin_to_key))
-      {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, false);
-        if (!ki.insert(tokey_in.k_image).second)
-          return false;
-      }
-    }
-    return true;
-  }
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_tx(const transaction& tx, tx_verification_context& tvc, bool kept_by_block)
   {
@@ -626,11 +540,6 @@ namespace currency
   bool core::parse_tx_from_blob(transaction& tx, crypto::hash& tx_hash, const blobdata& blob)
   {
     return parse_and_validate_tx_from_blob(blob, tx, tx_hash);
-  }
-  //-----------------------------------------------------------------------------------------------
-    bool core::check_tx_syntax(const transaction& tx)
-  {
-    return true;
   }
   //-----------------------------------------------------------------------------------------------
   bool core::get_pool_transactions(std::list<transaction>& txs)

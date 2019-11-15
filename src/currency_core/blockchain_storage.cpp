@@ -32,6 +32,7 @@
 #include "storages/portable_storage_template_helper.h"
 #include "basic_pow_helpers.h"
 #include "version.h"
+#include "tx_semantic_validation.h"
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "core"
@@ -4762,6 +4763,18 @@ wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise
   return 0;
 }
 //------------------------------------------------------------------
+bool get_tx_from_cache(const crypto::hash& tx_id, std::unordered_map<crypto::hash, transaction>& tx_cache, transaction& tx, size_t& blob_size, uint64_t fee)
+{
+  auto it = tx_cache.find(tx_id);
+  if (it == tx_cache.end())
+    return false;
+
+  tx = it->second;
+  blob_size = get_object_blobsize(tx);
+  fee = get_tx_fee(tx);
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc)
 {
   TIME_MEASURE_START_PD_MS(block_processing_time_0_ms);
@@ -4882,11 +4895,23 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     transaction tx;
     size_t blob_size = 0;
     uint64_t fee = 0;
-    if(!m_tx_pool.take_tx(tx_id, tx, blob_size, fee))
+
+    bool taken_from_cache = get_tx_from_cache(tx_id, bvc.m_onboard_transactions, tx, blob_size, fee);
+    bool taken_from_pool = m_tx_pool.take_tx(tx_id, tx, blob_size, fee);
+    if(!taken_from_cache && !taken_from_pool)
     {
       LOG_PRINT_L0("Block with id: " << id  << " has at least one unknown transaction with id: " << tx_id);
       purge_block_data_from_blockchain(bl, tx_processed_count);
       //add_block_as_invalid(bl, id);
+      bvc.m_verification_failed = true;
+      return false;
+    }
+
+    if (!validate_tx_semantic(tx, blob_size))
+    {
+      LOG_PRINT_L0("Block with id: " << id << " has at least one transaction with wrong semantic, tx_id: " << tx_id);
+      purge_block_data_from_blockchain(bl, tx_processed_count);
+      //add_block_as_invalid(bl, id);  
       bvc.m_verification_failed = true;
       return false;
     }
@@ -4905,9 +4930,12 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     {
       LOG_PRINT_L0("Block with id: " << id << " has at least one transaction (id: " << tx_id << ") with wrong inputs.");
       currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-      bool add_res = m_tx_pool.add_tx(tx, tvc, true, true);
-      m_tx_pool.add_transaction_to_black_list(tx);
-      CHECK_AND_ASSERT_MES_NO_RET(add_res, "handle_block_to_main_chain: failed to add transaction back to transaction pool");
+      if (taken_from_pool)
+      {
+        bool add_res = m_tx_pool.add_tx(tx, tvc, true, true);
+        m_tx_pool.add_transaction_to_black_list(tx);
+        CHECK_AND_ASSERT_MES_NO_RET(add_res, "handle_block_to_main_chain: failed to add transaction back to transaction pool");
+      }
       purge_block_data_from_blockchain(bl, tx_processed_count);
       add_block_as_invalid(bl, id);
       LOG_PRINT_L0("Block with id " << id << " added as invalid because of wrong inputs in transactions");
@@ -4925,10 +4953,13 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     if(!add_transaction_from_block(tx, tx_id, id, current_bc_size, actual_timestamp))
     {
        LOG_PRINT_L0("Block with id: " << id << " failed to add transaction to blockchain storage");
-       currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-       bool add_res = m_tx_pool.add_tx(tx, tvc, true, true);
-       m_tx_pool.add_transaction_to_black_list(tx);
-       CHECK_AND_ASSERT_MES_NO_RET(add_res, "handle_block_to_main_chain: failed to add transaction back to transaction pool");
+       if (taken_from_pool)
+       {
+         currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+         bool add_res = m_tx_pool.add_tx(tx, tvc, true, true);
+         m_tx_pool.add_transaction_to_black_list(tx);
+         CHECK_AND_ASSERT_MES_NO_RET(add_res, "handle_block_to_main_chain: failed to add transaction back to transaction pool");
+       }
        purge_block_data_from_blockchain(bl, tx_processed_count);
        bvc.m_verification_failed = true;
        return false;

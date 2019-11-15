@@ -92,7 +92,7 @@ namespace currency
   inline void set_tx_flags(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_flags>(tx, v); }
   inline void set_tx_expiration_time(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_expiration_time>(tx, v); }
   account_public_address get_crypt_address_from_destinations(const account_keys& sender_account_keys, const std::vector<tx_destination_entry>& destinations);
-
+  //-----------------------------------------------------------------------------------------------
 
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median);
   uint64_t get_burned_amount(const transaction& tx);
