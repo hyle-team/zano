@@ -4900,6 +4900,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   size_t tx_processed_count = 0;
   uint64_t fee_summary = 0;
   uint64_t burned_coins = 0;
+  std::list<crypto::key_image> block_summary_kimages;
 
   for(const crypto::hash& tx_id : bl.tx_hashes)
   {
@@ -4983,6 +4984,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     ++tx_processed_count;
     if (fee)
       block_fees.push_back(fee);
+
+    read_keyimages_from_tx(tx, block_summary_kimages);
   }
   TIME_MEASURE_FINISH_PD(all_txs_insert_time_5);
 
@@ -5016,8 +5019,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   bei.difficulty = current_diffic;
   if (is_pos_bl)
     bei.stake_hash = proof_hash;
-
-
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -5156,17 +5157,17 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     << "/" << etc_stuff_6    
     << "))");
 
-  on_block_added(bei, id);
+  on_block_added(bei, id, block_summary_kimages);
 
   bvc.m_added_to_main_chain = true;
   return true;
 }
 //------------------------------------------------------------------
-void blockchain_storage::on_block_added(const block_extended_info& bei, const crypto::hash& id)
+void blockchain_storage::on_block_added(const block_extended_info& bei, const crypto::hash& id, const std::list<crypto::key_image>& bsk)
 {
   update_next_comulative_size_limit();
   m_timestamps_median_cache.clear();
-  m_tx_pool.on_blockchain_inc(bei.height, id);
+  m_tx_pool.on_blockchain_inc(bei.height, id, bsk);
 
   update_targetdata_cache_on_block_added(bei);
 

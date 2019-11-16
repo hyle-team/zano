@@ -50,7 +50,7 @@ namespace currency
     m_db_transactions(m_db),
     m_db_black_tx_list(m_db),
     m_db_solo_options(m_db), 
-    m_db_key_images_set(m_db),
+//    m_db_key_images_set(m_db),
     m_db_alias_names(m_db),
     m_db_alias_addresses(m_db),
     m_db_storage_major_compatibility_version(TRANSACTION_POOL_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION, m_db_solo_options)
@@ -255,7 +255,7 @@ namespace currency
     td.receive_time = get_core_time();
 
     m_db_transactions.set(id, td);
-    on_tx_add(tx, kept_by_block);
+    on_tx_add(id, tx, kept_by_block);
 
     TIME_MEASURE_FINISH_PD(update_db_time);
     return true;
@@ -385,7 +385,7 @@ namespace currency
     blob_size = txe_tr->blob_size;
     fee = txe_tr->fee;
     m_db_transactions.erase(id);
-    on_tx_remove(tx, txe_tr->kept_by_block);
+    on_tx_remove(id, tx, txe_tr->kept_by_block);
     set_taken(id);
     return true;
   }
@@ -472,7 +472,7 @@ namespace currency
     for (auto& e : to_delete)
     {
       m_db_transactions.erase(e.hash);
-      on_tx_remove(e.tx, e.kept_by_block);
+      on_tx_remove(e.hash, e.tx, e.kept_by_block);
     }
 
 
@@ -613,8 +613,10 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::on_blockchain_inc(uint64_t new_block_height, const crypto::hash& top_block_id)
+  bool tx_memory_pool::on_blockchain_inc(uint64_t new_block_height, const crypto::hash& top_block_id, const std::list<crypto::key_image>& bsk)
   {
+
+
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -694,36 +696,33 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::insert_key_images(const transaction& tx, bool kept_by_block)
+  bool tx_memory_pool::insert_key_images(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block)
   {
+    CRITICAL_REGION_LOCAL(m_key_images_lock);
     for(const auto& in : tx.vin)
     {
       if (in.type() == typeid(txin_to_key))
       {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, true);//should never fail
-        uint64_t count = 0;
-        auto ki_entry_ptr = m_db_key_images_set.get(tokey_in.k_image);
-        if (ki_entry_ptr.get())
-          count = *ki_entry_ptr;
-        uint64_t count_before = count;
-        ++count;
-        m_db_key_images_set.set(tokey_in.k_image, count);
-        LOG_PRINT_L2("tx pool: key image added: " << tokey_in.k_image << ", from tx " << get_transaction_hash(tx) << ", counter: " << count_before << " -> " << count);
+        const txin_to_key& tokey_in = boost::get<txin_to_key>(in);
+        auto& id_set = m_key_images[tokey_in.k_image];
+        size_t sz_before = id_set.size();
+        id_set.insert(tx_id);
+        LOG_PRINT_L2("tx pool: key image added: " << tokey_in.k_image << ", from tx " << tx_id << ", counter: " << sz_before << " -> " << id_set.size());
       }
     }
     return false;
   }
   //--------------------------------------------------------------------------------- 
-  bool tx_memory_pool::on_tx_add(const transaction& tx, bool kept_by_block)
+  bool tx_memory_pool::on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block)
   {
-    insert_key_images(tx, kept_by_block);
+    insert_key_images(tx_id, tx, kept_by_block);
     insert_alias_info(tx);
     return true;
   }
   //--------------------------------------------------------------------------------- 
-  bool tx_memory_pool::on_tx_remove(const transaction& tx, bool kept_by_block)
+  bool tx_memory_pool::on_tx_remove(const crypto::hash &id, const transaction& tx, bool kept_by_block)
   {
-    remove_key_images(tx, kept_by_block);
+    remove_key_images(id, tx, kept_by_block);
     remove_alias_info(tx);
     return true;
   }
@@ -757,34 +756,33 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------- 
-  bool tx_memory_pool::remove_key_images(const transaction& tx, bool kept_by_block)
+  bool tx_memory_pool::remove_key_images(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block)
   {
+    CRITICAL_REGION_LOCAL(m_key_images_lock);
     for(const auto& in : tx.vin)
     {
       if (in.type() == typeid(txin_to_key))
-      {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, true);//should never fail
-        uint64_t count = 0;
-        auto ki_entry_ptr = m_db_key_images_set.get(tokey_in.k_image);
-        if (!ki_entry_ptr.get() || *ki_entry_ptr == 0)
-        {
-          LOG_ERROR("INTERNAL_ERROR: for tx " << get_transaction_hash(tx) << " key image " << tokey_in.k_image << " not found");
-          continue;
-        }
-        count = *ki_entry_ptr;
-        uint64_t count_before = count;
-        --count;
-        if (count)
-          m_db_key_images_set.set(tokey_in.k_image, count);
-        else
-          m_db_key_images_set.erase(tokey_in.k_image);
-        LOG_PRINT_L2("tx pool: key image removed: " << tokey_in.k_image << ", from tx " << get_transaction_hash(tx) << ", counter: " << count_before << " -> " << count);
+      {        
+        const txin_to_key& tokey_in = boost::get<txin_to_key>(in);
+
+        auto it_map = epee::misc_utils::it_get_or_insert_value_initialized(m_key_images, tokey_in.k_image);
+        auto& id_set = it_map->second;
+        size_t count_before = id_set.size();
+        auto it_set =  id_set.find(tx_id);
+        if(it_set != id_set.end())
+          id_set.erase(it_set);
+
+        size_t count_after = id_set.size();
+        if (id_set.size() == 0)
+          m_key_images.erase(it_map);
+
+        LOG_PRINT_L2("tx pool: key image removed: " << tokey_in.k_image << ", from tx " << tx_id << ", counter: " << count_before << " -> " << count_after);
       }
     }
     return false;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::get_key_images_from_tx_pool(std::unordered_set<crypto::key_image>& key_images) const
+  bool tx_memory_pool::get_key_images_from_tx_pool(key_image_cache& key_images) const
   {
     
     m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
@@ -793,7 +791,7 @@ namespace currency
       {
         if (in.type() == typeid(txin_to_key))
         {
-          key_images.insert(boost::get<txin_to_key>(in).k_image);
+          key_images[boost::get<txin_to_key>(in).k_image].insert(h);
         }
       }
       return true;
@@ -804,9 +802,9 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::have_tx_keyimg_as_spent(const crypto::key_image& key_im)const
   {
-    
-    auto ptr = m_db_key_images_set.find(key_im);
-    if (ptr)
+    CRITICAL_REGION_LOCAL(m_key_images_lock);
+    auto it = m_key_images.find(key_im);
+    if (it != m_key_images.end())
       return true;
     return false;
   }
@@ -826,9 +824,9 @@ namespace currency
     
     m_db.begin_transaction();
     m_db_transactions.clear();
-    m_db_key_images_set.clear();
     m_db.commit_transaction();
     // should m_db_black_tx_list be cleared here?
+    CIRITCAL_OPERATION(m_key_images,clear());
   }
   //---------------------------------------------------------------------------------
   void tx_memory_pool::clear()
@@ -836,8 +834,8 @@ namespace currency
     m_db.begin_transaction();
     m_db_transactions.clear();
     m_db_black_tx_list.clear();
-    m_db_key_images_set.clear();
     m_db.commit_transaction();
+    CIRITCAL_OPERATION(m_key_images,clear());
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::is_transaction_ready_to_go(tx_details& txd, const crypto::hash& id)const 
@@ -1193,8 +1191,8 @@ namespace currency
 
       res = m_db_transactions.init(TRANSACTION_POOL_CONTAINER_TRANSACTIONS);
       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-      res = m_db_key_images_set.init(TRANSACTION_POOL_CONTAINER_KEY_IMAGES);
-      CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+//       res = m_db_key_images_set.init(TRANSACTION_POOL_CONTAINER_KEY_IMAGES);
+//       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
       res = m_db_black_tx_list.init(TRANSACTION_POOL_CONTAINER_BLACK_TX_LIST);
       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
       res = m_db_alias_names.init(TRANSACTION_POOL_CONTAINER_ALIAS_NAMES);
@@ -1220,7 +1218,7 @@ namespace currency
       {
         LOG_PRINT_L1("DB at " << db_folder_path << " is about to be deleted and re-created...");
         m_db_transactions.deinit();
-        m_db_key_images_set.deinit();
+//        m_db_key_images_set.deinit();
         m_db_black_tx_list.deinit();
         m_db_alias_names.deinit();
         m_db_alias_addresses.deinit();
@@ -1252,9 +1250,17 @@ namespace currency
       });
       LOG_PRINT_L2(ss.str());
     }
+
+    load_keyimages_cache();
+
     return true;
   }
-
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::load_keyimages_cache()
+  {
+    CRITICAL_REGION_LOCAL(m_key_images_lock);
+    return get_key_images_from_tx_pool(m_key_images);    
+  }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::deinit()
   {

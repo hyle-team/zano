@@ -108,4 +108,5 @@ namespace currency
   size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
   blobdata tx_to_blob(const transaction& b);
   bool tx_to_blob(const transaction& b, blobdata& b_blob);
+  bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil);
 }
