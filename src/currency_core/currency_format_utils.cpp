@@ -2426,7 +2426,10 @@ namespace currency
       return true;
     return false;
   }
-
+  size_t get_max_block_size()
+  {
+    return CURRENCY_MAX_BLOCK_SIZE;
+  }
   //-----------------------------------------------------------------------------------------------
   uint64_t get_base_block_reward(bool is_pos, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t height)
   {

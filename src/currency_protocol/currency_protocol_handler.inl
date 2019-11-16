@@ -305,14 +305,22 @@ namespace currency
     //now actually process block
     for(auto tx_blob_it = arg.b.txs.begin(); tx_blob_it!=arg.b.txs.end();tx_blob_it++)
     {
-      currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-      m_core.handle_incoming_tx(*tx_blob_it, tvc, true);
-      if(tvc.m_verification_failed)
+      if (tx_blob_it->size() > CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
       {
-        LOG_PRINT_L0("Block verification failed: transaction verification failed, dropping connection");
+        LOG_ERROR("WRONG TRANSACTION BLOB, too big size " << tx_blob_it->size() << ", rejected");
         m_p2p->drop_connection(context);
         return 1;
       }
+
+      crypto::hash tx_hash = null_hash;
+      transaction tx;
+      if (!parse_and_validate_tx_from_blob(*tx_blob_it, tx, tx_hash))
+      {
+        LOG_ERROR("WRONG TRANSACTION BLOB, Failed to parse, rejected");
+        m_p2p->drop_connection(context);
+        return 1;
+      }
+      bvc.m_onboard_transactions[tx_hash] = tx;
     }
     
     m_core.pause_mine();
