@@ -851,7 +851,7 @@ namespace currency
     block_verification_context bvc = AUTO_VAL_INIT(bvc);
     if(!m_core.handle_block_found(b, &bvc))
     {
-      if (bvc.added_to_altchain)
+      if (bvc.m_added_to_altchain)
       {
         error_resp.code = CORE_RPC_ERROR_CODE_BLOCK_ADDED_AS_ALTERNATIVE;
         error_resp.message = "Block added as alternative";

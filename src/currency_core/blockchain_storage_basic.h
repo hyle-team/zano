@@ -145,6 +145,12 @@ namespace currency
     uint64_t height;
   };
 
-  
+  typedef std::unordered_map<crypto::hash, transaction> transactions_map;
+
+  struct block_ws_txs
+  {
+    block b;
+    transactions_map onboard_transactions;
+  };
 
 }

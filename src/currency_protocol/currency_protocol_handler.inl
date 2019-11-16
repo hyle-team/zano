@@ -327,10 +327,10 @@ namespace currency
     LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK EXTRA " << block_id 
       << " bvc.m_added_to_main_chain=" << bvc.m_added_to_main_chain
       //<< ", prevalidate_result=" << prevalidate_relayed
-      << ", bvc.added_to_altchain=" << bvc.added_to_altchain
+      << ", bvc.added_to_altchain=" << bvc.m_added_to_altchain
       << ", bvc.m_marked_as_orphaned=" << bvc.m_marked_as_orphaned, LOG_LEVEL_2);
 
-    if (bvc.m_added_to_main_chain || (bvc.added_to_altchain && bvc.height_difference < 2))
+    if (bvc.m_added_to_main_chain || (bvc.m_added_to_altchain && bvc.m_height_difference < 2))
     { 
       if (true/*!prevalidate_relayed*/)
       {
