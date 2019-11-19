@@ -359,6 +359,7 @@ private:
   size_t m_ev_index;
   test_core_listener* m_core_listener;
 
+  mutable std::unordered_map<crypto::hash, currency::transaction> m_onboard_txs;
   bool m_txs_kept_by_block;
   bool m_skip_txs_blobsize_check;
 
@@ -389,11 +390,19 @@ public:
 
     size_t pool_size = m_c.get_pool_transactions_count();
     currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-    m_c.handle_incoming_tx(tx_blob, tvc, m_txs_kept_by_block);
-    bool tx_added = pool_size + 1 == m_c.get_pool_transactions_count();
-    bool r = check_tx_verification_context(tvc, tx_added, m_ev_index, tx, m_validator);
-    LOCAL_ASSERT(r);
-    CHECK_AND_NO_ASSERT_MES(r, false, "tx verification context check failed");
+    if (m_txs_kept_by_block)
+    {
+      m_onboard_txs[get_transaction_hash(tx)] = tx;
+    }
+    else
+    {
+      m_c.handle_incoming_tx(tx_blob, tvc, m_txs_kept_by_block);
+      bool tx_added = pool_size + 1 == m_c.get_pool_transactions_count();
+      bool r = check_tx_verification_context(tvc, tx_added, m_ev_index, tx, m_validator);
+      LOCAL_ASSERT(r);
+      CHECK_AND_NO_ASSERT_MES(r, false, "tx verification context check failed");
+    }
+
     return true;
   }
 
@@ -403,6 +412,7 @@ public:
       m_core_listener->before_block_pushed_to_core(b, blob_blk, m_c);
 
     currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+    bvc.m_onboard_transactions.swap(m_onboard_txs);
     m_c.handle_incoming_block(blob_blk, bvc);
     bool r = check_block_verification_context(bvc, m_ev_index, b, m_validator);
     CHECK_AND_NO_ASSERT_MES(r, false, "block verification context check failed");

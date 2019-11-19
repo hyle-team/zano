@@ -6077,8 +6077,12 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
   for (auto tx_id : b.tx_hashes)
   {
     std::shared_ptr<transaction> tx_ptr;
-    CHECK_AND_ASSERT_MES(get_transaction_from_pool_or_db(tx_id, tx_ptr, split_height), false, "failed to get alt block tx " << tx_id << " with split_height == " << split_height);
-    transaction& tx = *tx_ptr;
+    auto it = abei.onboard_transactions.find(tx_id);
+    if (it == abei.onboard_transactions.end())
+    {
+      CHECK_AND_ASSERT_MES(get_transaction_from_pool_or_db(tx_id, tx_ptr, split_height), false, "failed to get alt block tx " << tx_id << " with split_height == " << split_height);
+    }
+    const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
     CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid tx: tx.signatures.size() == " << tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {

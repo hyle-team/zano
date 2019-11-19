@@ -503,7 +503,6 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::handle_incoming_block(const blobdata& block_blob, block_verification_context& bvc, bool update_miner_blocktemplate)
   {
-    bvc = AUTO_VAL_INIT_T(block_verification_context);
     block  b = AUTO_VAL_INIT(b);
     if (!parse_block(block_blob, b, bvc))
     {
