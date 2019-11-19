@@ -80,7 +80,8 @@ namespace nodetool
                                                         m_ip_address{},
                                                         m_last_stat_request_time{},
                                                         m_use_only_priority_peers(false),
-                                                        m_peer_livetime{}
+                                                        m_peer_livetime{},
+                                                        m_debug_requests_enabled(false)
 
     {}
 
