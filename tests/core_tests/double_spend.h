@@ -42,7 +42,7 @@ struct gen_double_spend_in_the_same_block : public gen_double_spend_base< gen_do
 {
   static const uint64_t send_amount = MK_TEST_COINS(17);
   static const bool has_invalid_tx = !txs_kept_by_block;
-  static const size_t expected_pool_txs_count = has_invalid_tx ? 1 : 2;
+  static const size_t expected_pool_txs_count = 1;
   static const uint64_t expected_bob_balance = send_amount;
   static const uint64_t expected_alice_balance = 0;
 

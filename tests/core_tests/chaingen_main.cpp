@@ -250,7 +250,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if(!postponed_tests.count(#genclass) && (run_single_test.empty() || run_single_test == #genclass))       \
+  if(!postponed_tests.count(#genclass) && (run_single_test.empty() || std::string::npos != std::string(#genclass).find(run_single_test)))       \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
