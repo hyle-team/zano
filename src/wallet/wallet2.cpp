@@ -3044,6 +3044,7 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose) const
   }
   else
   {
+    boost::io::ios_flags_saver ifs(ss);
     ss << "index                 amount  spent_h  g_index   block  block_ts     flg tx                                                                   out#  key image" << ENDL;
     for (size_t i = 0; i != m_transfers.size(); i++)
     {
