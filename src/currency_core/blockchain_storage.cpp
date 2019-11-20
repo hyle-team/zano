@@ -4774,7 +4774,7 @@ wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise
   return 0;
 }
 //------------------------------------------------------------------
-bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, transaction& tx, size_t& blob_size, uint64_t fee)
+bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, transaction& tx, size_t& blob_size, uint64_t& fee)
 {
   auto it = tx_cache.find(tx_id);
   if (it == tx_cache.end())
