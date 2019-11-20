@@ -87,7 +87,7 @@ namespace currency
     bool pos,
     const pos_entry& pe)
   {
-    uint64_t block_reward;
+    uint64_t block_reward = 0;
     if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward, height))
     {
       LOG_ERROR("Block is too big");
