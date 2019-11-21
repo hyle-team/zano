@@ -55,7 +55,7 @@ struct gen_double_spend_in_different_blocks : public gen_double_spend_base< gen_
 {
   static const uint64_t send_amount = MK_TEST_COINS(17);
   static const bool has_invalid_tx = !txs_kept_by_block;
-  static const size_t expected_pool_txs_count = has_invalid_tx ? 0 : 1;
+  static const size_t expected_pool_txs_count = 0;
   static const uint64_t expected_bob_balance = 0;
   static const uint64_t expected_alice_balance = send_amount - TESTS_DEFAULT_FEE;
 
@@ -68,7 +68,7 @@ struct gen_double_spend_in_alt_chain_in_the_same_block : public gen_double_spend
 {
   static const uint64_t send_amount = MK_TEST_COINS(17);
   static const bool has_invalid_tx = !txs_kept_by_block;
-  static const size_t expected_pool_txs_count = has_invalid_tx ? 1 : 2;
+  static const size_t expected_pool_txs_count = txs_kept_by_block ?  0 :1;
   static const uint64_t expected_bob_balance = send_amount;
   static const uint64_t expected_alice_balance = 0;
 
@@ -81,13 +81,11 @@ struct gen_double_spend_in_alt_chain_in_different_blocks : public gen_double_spe
 {
   static const uint64_t send_amount = MK_TEST_COINS(17);
   static const bool has_invalid_tx = !txs_kept_by_block;
-  static const size_t expected_pool_txs_count = has_invalid_tx ? 1 : 2;
+  static const size_t expected_pool_txs_count = txs_kept_by_block ? 0:1;
   static const uint64_t expected_bob_balance = send_amount;
-  static const uint64_t expected_alice_balance = 0;
-
+  static const uint64_t expected_alice_balance = 0; 
   bool generate(std::vector<test_event_entry>& events) const;
 };
-
 
 class gen_double_spend_in_different_chains : public test_chain_unit_base
 {
