@@ -62,7 +62,9 @@ namespace currency
   //-----------------------------------------------------------------------------------------------------
   miner::~miner()
   {
+    TRY_ENTRY();
     stop();
+    CATCH_ENTRY_NO_RETURN();
   }
   //-----------------------------------------------------------------------------------------------------
   bool miner::set_block_template(const block& bl, const wide_difficulty_type& di, uint64_t height)
