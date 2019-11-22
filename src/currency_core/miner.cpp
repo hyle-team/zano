@@ -56,7 +56,8 @@ namespace currency
     m_current_hash_rate(0),
     m_last_hr_merge_time(0),
     m_hashes(0),
-    m_config(AUTO_VAL_INIT(m_config))
+    m_config(AUTO_VAL_INIT(m_config)),
+    m_mine_address{}
   {
   }
   //-----------------------------------------------------------------------------------------------------
