@@ -1525,14 +1525,16 @@ namespace currency
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+      return false;
     return pk == out_key.key;
   }
   //---------------------------------------------------------------
   bool is_out_to_acc(const account_keys& acc, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+      return false;
     auto it = std::find(out_multisig.keys.begin(), out_multisig.keys.end(), pk);
     if (out_multisig.keys.end() == it)
       return false;
