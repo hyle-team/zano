@@ -3089,39 +3089,6 @@ bool wallet2::get_contracts(escrow_contracts_container& contracts)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_fake_offers(std::list<bc_services::offer_details_ex>& offers, uint64_t amount)
-{
-
-  for (uint64_t i = 0; i != amount; i++)
-  {
-    bc_services::offer_details od;
-    od.offer_type = rand() % 4;
-    od.amount_primary = rand();
-    od.amount_target = rand();
-    od.bonus = get_random_rext(10);
-    od.target = get_random_rext(10);
-    od.location_country = get_random_rext(6);
-    od.location_city = get_random_rext(10);
-    od.contacts = get_random_rext(20);
-    od.comment = get_random_rext(30);
-    od.payment_types = get_random_rext(10);
-    od.deal_option = get_random_rext(10);
-    od.category = get_random_rext(4);
-    od.expiration_time = 3;
-
-    crypto::hash tx_id = crypto::rand<crypto::hash>();
-    offers.push_back(bc_services::offer_details_ex());
-    bc_services::offer_details_ex& odl = offers.back();
-    static_cast<bc_services::offer_details&>(odl) = od;
-    odl.timestamp = m_core_runtime_config.get_core_time();
-    odl.index_in_tx = 0;
-    odl.tx_hash = tx_id;
-    odl.stopped = false;
-    odl.fee = 10000;
-  }
-  return true;
-}
-//----------------------------------------------------------------------------------------------------
 void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   uint64_t fee,
   currency::transaction& tx_release_template,

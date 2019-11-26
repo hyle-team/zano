@@ -698,7 +698,6 @@ namespace tools
     bool reset_password(const std::string& pass);
     bool is_password_valid(const std::string& pass);
     bool get_actual_offers(std::list<bc_services::offer_details_ex>& offers);
-    bool get_fake_offers(std::list<bc_services::offer_details_ex>& offers, uint64_t amount);
     bool process_contract_info(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_attach);
     bool handle_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::proposal_body& prop);
     void accept_proposal(const crypto::hash& contract_id, uint64_t b_acceptance_fee, currency::transaction* p_acceptance_tx = nullptr);
