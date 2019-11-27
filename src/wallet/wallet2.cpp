@@ -2291,6 +2291,17 @@ void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) con
   incoming_transfers = m_transfers;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::generate_packing_transaction_if_needed(transaction& tx)
+{
+  prepare_free_transfers_cache(0);
+  auto it = m_found_free_amounts.find(CURRENCY_BLOCK_REWARD);
+  if (it == m_found_free_amounts.end() || it->second.size() < WALLET_POS_MINT_PACKING_SIZE)
+    return false;
+  
+
+
+}
+//----------------------------------------------------------------------------------------------------
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const
 {
   static const char* header = "index                 amount  g_index  flags       block  tx                                                                  out#  key image";
@@ -3424,11 +3435,41 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   print_tx_sent_message(tx, "(from multisig)", fee);
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
+{
+  prepare_free_transfers_cache(fake_outputs_count);
+  auto it = m_found_free_amounts.find(CURRENCY_BLOCK_REWARD);
+  if (it == m_found_free_amounts.end() || it->second.size() < WALLET_POS_MINT_PACKING_SIZE)
+    return false;
+
+  uint64_t found_money = 0;
+  for (auto set_it = it->second.begin(); set_it != it->second.end(); it++)
+  {
+    if (is_transfer_ready_to_go(m_transfers[*set_it], fake_outputs_count))
+    {
+      found_money += it->first;
+      selected_indicies.push_back(*set_it);
+      WLT_LOG_L2("Selected index: " << *set_it << ", transfer_details: " << ENDL << epee::serialization::store_t_to_json(m_transfers[*set_it]));
+    }
+    it->second.erase(it->second.begin());
+    if (!it->second.size())
+      found_free_amounts.erase(it);
+  }
+
+
+  return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
+
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {
   found_money = select_transfers(needed_money, fake_outputs_count, dust_threshold, selected_indicies);
   THROW_IF_FALSE_WALLET_EX_MES(found_money >= needed_money, error::not_enough_money, "wallet_dump: " << ENDL << dump_trunsfers(false), found_money, needed_money, 0);
-
+  return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
+{
   typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
   typedef currency::tx_source_entry::output_entry tx_output_entry;
 

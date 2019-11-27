@@ -42,6 +42,8 @@
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 
+#define WALLET_POS_MINT_PACKING_SIZE                                  100
+
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet");
@@ -256,6 +258,7 @@ namespace tools
     currency::account_public_address crypt_address;
     uint8_t tx_outs_attr;
     bool shuffle;
+    bool perform_packing;
   };
 
   struct finalize_tx_param
@@ -784,7 +787,9 @@ private:
     void process_genesis_if_needed(const currency::block& genesis);
     bool build_escrow_proposal(bc_services::contract_private_details& ecrow_details, uint64_t fee, uint64_t unlock_time, currency::tx_service_attachment& att, std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
+    bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
+    bool prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     uint64_t get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
     void prepare_tx_destinations(uint64_t needed_money,
       uint64_t found_money,
@@ -842,7 +847,7 @@ private:
     void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
     void check_for_free_space_and_throw_if_it_lacks(const std::wstring& path, uint64_t exact_size_needed_if_known = UINT64_MAX);
-
+    bool generate_packing_transaction_if_needed(transaction& tx);
 
 
     currency::account_base m_account;
