@@ -333,6 +333,11 @@ namespace currency
     return m_blockchain_storage.create_block_template(b, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
   }
   //-----------------------------------------------------------------------------------------------
+  bool core::get_block_template(const create_block_template_params& params, create_block_template_response& resp)
+  {
+    return m_blockchain_storage.create_block_template(params, resp);
+  }
+  //-----------------------------------------------------------------------------------------------
   bool core::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp) const 
   {
     return m_blockchain_storage.find_blockchain_supplement(qblock_ids, resp);

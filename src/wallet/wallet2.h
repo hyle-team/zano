@@ -541,6 +541,11 @@ namespace tools
                   const std::vector<currency::attachment_v>& attachments, 
                   currency::transaction& tx);
 
+    void transfer(const construct_tx_param& ctp,
+                  currency::transaction &tx,
+                  bool send_to_network,
+                  std::string* p_signed_tx_blob_str);
+
     template<typename destination_split_strategy_t>
     void transfer_from_contract(
       const std::list<currency::account_keys>& owner_keys,
@@ -805,7 +810,9 @@ private:
 
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_public::wallet_transfer_info& wti) const;
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
-
+    
+    construct_tx_param get_default_construct_tx_param_inital();
+    const construct_tx_param& get_default_construct_tx_param();
 
     uint64_t get_tx_expiration_median() const;
 
@@ -847,7 +854,7 @@ private:
     void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
     void check_for_free_space_and_throw_if_it_lacks(const std::wstring& path, uint64_t exact_size_needed_if_known = UINT64_MAX);
-    bool generate_packing_transaction_if_needed(transaction& tx);
+    bool generate_packing_transaction_if_needed(transaction& tx, uint64_t fake_outputs_number);
 
 
     currency::account_base m_account;

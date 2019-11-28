@@ -793,28 +793,45 @@ namespace currency
       return false;
     }
 
-    block b = AUTO_VAL_INIT(b);
-    wide_difficulty_type dt = 0;
-    currency::pos_entry pe = AUTO_VAL_INIT(pe);
-    pe.amount = req.pos_amount;
-    pe.index = req.pos_index;
-    pe.stake_unlock_time = req.stake_unlock_time;
-    //pe.keyimage key image will be set in the wallet
-    //pe.wallet_index is not included in serialization map, TODO: refactoring here
 
-    if (!m_core.get_block_template(b, miner_address, stakeholder_address, dt, res.height, req.extra_text, req.pos_block, pe))
+    create_block_template_params params = AUTO_VAL_INIT(params);
+    params.miner_address = miner_address;
+    params.stakeholder_address = stakeholder_address;
+    params.ex_nonce = req.extra_text;
+    params.pos = req.pos_block;
+    params.pe.amount = req.pos_amount;
+    params.pe.index = req.pos_index;
+    params.pe.stake_unlock_time = req.stake_unlock_time;
+    //params.pe.keyimage key image will be set in the wallet
+    //params.pe.wallet_index is not included in serialization map, TODO: refactoring here
+    params.pcustom_fill_block_template_func = nullptr;
+    if (req.explicit_transaction.size())
+    {
+      transaction tx = AUTO_VAL_INIT(tx);
+      if (!parse_and_validate_tx_from_blob(req.explicit_transaction, tx))
+      {
+        error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+        error_resp.message = "Wrong parameters: explicit_transaction is invalid";
+        LOG_ERROR("Failed to parse explicit_transaction blob");
+        return false;
+      }
+      params.explicit_txs.push_back(tx);
+    }
+
+    create_block_template_response resp = AUTO_VAL_INIT(resp);
+    if (!m_core.get_block_template(params, resp))
     {
       error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR;
       error_resp.message = "Internal error: failed to create block template";
       LOG_ERROR("Failed to create block template");
       return false;
     }
-    res.difficulty = dt.convert_to<std::string>();
-    blobdata block_blob = t_serializable_object_to_blob(b);
 
+    res.difficulty = resp.diffic.convert_to<std::string>();
+    blobdata block_blob = t_serializable_object_to_blob(resp.b);
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
-    res.prev_hash = string_tools::pod_to_hex(b.prev_id);
-
+    res.prev_hash = string_tools::pod_to_hex(resp.b.prev_id);
+    res.height = resp.height;
     //calculate epoch seed
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
 

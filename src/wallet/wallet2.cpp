@@ -2291,15 +2291,32 @@ void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) con
   incoming_transfers = m_transfers;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::generate_packing_transaction_if_needed(transaction& tx)
+bool wallet2::generate_packing_transaction_if_needed(transaction& tx, uint64_t fake_outputs_number)
 {
   prepare_free_transfers_cache(0);
   auto it = m_found_free_amounts.find(CURRENCY_BLOCK_REWARD);
   if (it == m_found_free_amounts.end() || it->second.size() < WALLET_POS_MINT_PACKING_SIZE)
     return false;
   
+  //let's check if we have at least WALLET_POS_MINT_PACKING_SIZE transactions which is ready to go
+  size_t count = 0;
+  for (auto it_ind = it->second.begin(); it_ind != it->second.end() && count < WALLET_POS_MINT_PACKING_SIZE; it_ind++)
+  {
+    if (is_transfer_ready_to_go(m_transfers[*it_ind], fake_outputs_number))
+      ++count;
+  }
+  if (count < WALLET_POS_MINT_PACKING_SIZE)
+    return false;
+  construct_tx_param ctp = get_default_construct_tx_param();
+  currency::tx_destination_entry de = AUTO_VAL_INIT(de);
+  de.addr.push_back(m_account.get_public_address());
+  de.amount = WALLET_POS_MINT_PACKING_SIZE;
+  ctp.dsts.push_back(de);
+  ctp.perform_packing = true;
+  
+  transfer(ctp, tx, false, nullptr);
 
-
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const
@@ -2769,6 +2786,12 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     tmpl_req.pos_index = req.pos_entries[rsp.index].index;
     tmpl_req.extra_text = m_miner_text_info;
     tmpl_req.stake_unlock_time = req.pos_entries[rsp.index].stake_unlock_time;
+    //generate packing tx
+    transaction pack_tx = AUTO_VAL_INIT(pack_tx);
+    if (generate_packing_transaction_if_needed(pack_tx, 0))
+    {      
+      tx_to_blob(pack_tx, tmpl_req.explicit_transaction);
+    }
     m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
     WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == CORE_RPC_STATUS_OK, false, "Failed to create block template after kernel hash found!");
 
@@ -3453,12 +3476,10 @@ bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake
     }
     it->second.erase(it->second.begin());
     if (!it->second.size())
-      found_free_amounts.erase(it);
+      m_found_free_amounts.erase(it);
   }
 
-
   return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
-
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
@@ -4110,6 +4131,8 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
   if (ctp.multisig_id == currency::null_hash)
     prepare_tx_sources(needed_money, ctp.fake_outputs_count, ctp.dust_policy.dust_threshold, ftp.sources, ftp.selected_transfers, found_money);
+  else if (ctp.perform_packing)
+    prepare_tx_sources_for_packing(WALLET_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, found_money);
   else
     prepare_tx_sources(ctp.multisig_id, ftp.sources, found_money);
   TIME_MEASURE_FINISH_MS(prepare_tx_sources_time);
@@ -4239,7 +4262,32 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   ctp.tx_outs_attr = tx_outs_attr;
   ctp.unlock_time = unlock_time;
   TIME_MEASURE_FINISH(precalculation_time);
+  transfer(ctp, tx, send_to_network, p_signed_tx_blob_str);
+}
+//----------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------
+construct_tx_param wallet2::get_default_construct_tx_param_inital()
+{
+  construct_tx_param ctp = AUTO_VAL_INIT(ctp);
 
+  ctp.fee = m_core_runtime_config.tx_default_fee;
+  ctp.dust_policy = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  ctp.split_strategy_id = tools::detail::ssi_digit;
+  ctp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+  ctp.shuffle = 0;
+  return ctp;
+}
+const construct_tx_param& wallet2::get_default_construct_tx_param()
+{
+  static construct_tx_param ctp = get_default_construct_tx_param_inital();
+  return ctp;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::transfer(const construct_tx_param& ctp,
+  currency::transaction &tx,
+  bool send_to_network,
+  std::string* p_signed_tx_blob_str)
+{
   TIME_MEASURE_START(prepare_transaction_time);
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(ctp, ftp);

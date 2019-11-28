@@ -770,7 +770,7 @@ namespace currency
   {
     struct request
     {
-      //uint64_t reserve_size;       //max 255 bytes
+      blobdata explicit_transaction;
       std::string extra_text;
       std::string wallet_address;
       std::string stakeholder_address;
@@ -780,6 +780,7 @@ namespace currency
       uint64_t stake_unlock_time;
 
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(explicit_transaction)
         KV_SERIALIZE(extra_text)
         KV_SERIALIZE(wallet_address)   
         KV_SERIALIZE(stakeholder_address);

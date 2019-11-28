@@ -53,7 +53,8 @@ namespace currency
 
      //-------------------- i_miner_handler -----------------------
      virtual bool handle_block_found(const block& b, block_verification_context* p_verification_result = nullptr);
-     virtual bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
+     virtual bool get_block_template(const create_block_template_params& params, create_block_template_response& resp);
+     bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
 
      miner& get_miner(){ return m_miner; }
      static void init_options(boost::program_options::options_description& desc);
