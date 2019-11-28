@@ -854,7 +854,7 @@ private:
     void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
     void check_for_free_space_and_throw_if_it_lacks(const std::wstring& path, uint64_t exact_size_needed_if_known = UINT64_MAX);
-    bool generate_packing_transaction_if_needed(transaction& tx, uint64_t fake_outputs_number);
+    bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
 
 
     currency::account_base m_account;

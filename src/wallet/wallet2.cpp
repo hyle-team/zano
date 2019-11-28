@@ -2291,7 +2291,7 @@ void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) con
   incoming_transfers = m_transfers;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::generate_packing_transaction_if_needed(transaction& tx, uint64_t fake_outputs_number)
+bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number)
 {
   prepare_free_transfers_cache(0);
   auto it = m_found_free_amounts.find(CURRENCY_BLOCK_REWARD);
@@ -3465,7 +3465,6 @@ bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake
   if (it == m_found_free_amounts.end() || it->second.size() < WALLET_POS_MINT_PACKING_SIZE)
     return false;
 
-  uint64_t found_money = 0;
   for (auto set_it = it->second.begin(); set_it != it->second.end(); it++)
   {
     if (is_transfer_ready_to_go(m_transfers[*set_it], fake_outputs_count))
@@ -4312,7 +4311,7 @@ void wallet2::transfer(const construct_tx_param& ctp,
     TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
 
     WLT_LOG_GREEN("[wallet::transfer]"
-      << "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
+      //<< "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
       << ", prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
       << ", store_unsigned_tx_time: " << print_fixed_decimal_point(store_unsigned_tx_time, 3)
       << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
@@ -4340,13 +4339,13 @@ void wallet2::transfer(const construct_tx_param& ctp,
 
 
   WLT_LOG_GREEN("[wallet::transfer]"
-    << "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
+    //<< "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
     << ", prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
     << ", finalize_transaction_time: " << print_fixed_decimal_point(finalize_transaction_time, 3)
     << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
     , LOG_LEVEL_0);
 
-  print_tx_sent_message(tx, std::string() + "(transfer)", fee);
+  print_tx_sent_message(tx, std::string() + "(transfer)", ctp.fee);
 }
 
 
