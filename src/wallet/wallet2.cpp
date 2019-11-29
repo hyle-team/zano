@@ -147,6 +147,11 @@ bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::set_pos_mint_packing_size(uint64_t new_size)
+{
+  m_pos_mint_packing_size = new_size;
+}
+//----------------------------------------------------------------------------------------------------
 std::shared_ptr<i_core_proxy> wallet2::get_core_proxy()
 {
   return m_core_proxy;
@@ -2295,22 +2300,22 @@ bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, 
 {
   prepare_free_transfers_cache(0);
   auto it = m_found_free_amounts.find(CURRENCY_BLOCK_REWARD);
-  if (it == m_found_free_amounts.end() || it->second.size() < WALLET_POS_MINT_PACKING_SIZE)
+  if (it == m_found_free_amounts.end() || it->second.size() < m_pos_mint_packing_size)
     return false;
   
   //let's check if we have at least WALLET_POS_MINT_PACKING_SIZE transactions which is ready to go
   size_t count = 0;
-  for (auto it_ind = it->second.begin(); it_ind != it->second.end() && count < WALLET_POS_MINT_PACKING_SIZE; it_ind++)
+  for (auto it_ind = it->second.begin(); it_ind != it->second.end() && count < m_pos_mint_packing_size; it_ind++)
   {
     if (is_transfer_ready_to_go(m_transfers[*it_ind], fake_outputs_number))
       ++count;
   }
-  if (count < WALLET_POS_MINT_PACKING_SIZE)
+  if (count < m_pos_mint_packing_size)
     return false;
   construct_tx_param ctp = get_default_construct_tx_param();
   currency::tx_destination_entry de = AUTO_VAL_INIT(de);
   de.addr.push_back(m_account.get_public_address());
-  de.amount = WALLET_POS_MINT_PACKING_SIZE;
+  de.amount = m_pos_mint_packing_size*CURRENCY_BLOCK_REWARD;
   ctp.dsts.push_back(de);
   ctp.perform_packing = true;
   
@@ -2835,10 +2840,13 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     
     WLT_LOG_GREEN("Block constructed <" << get_block_hash(b) << ">, sending to core...", LOG_LEVEL_0);
 
-    currency::COMMAND_RPC_SUBMITBLOCK::request subm_req = AUTO_VAL_INIT(subm_req);
-    currency::COMMAND_RPC_SUBMITBLOCK::response subm_rsp = AUTO_VAL_INIT(subm_rsp);
-    subm_req.push_back(epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(b)));
-    m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK(subm_req, subm_rsp);
+    currency::COMMAND_RPC_SUBMITBLOCK2::request subm_req = AUTO_VAL_INIT(subm_req);
+    currency::COMMAND_RPC_SUBMITBLOCK2::response subm_rsp = AUTO_VAL_INIT(subm_rsp);
+    subm_req.b = t_serializable_object_to_blob(b);
+    if (tmpl_req.explicit_transaction.size())
+      subm_req.explicit_txs.push_back(hexemizer{ tmpl_req.explicit_transaction });
+    
+    m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
     if (subm_rsp.status != CORE_RPC_STATUS_OK)
     {
       WLT_LOG_ERROR("Constructed block is not accepted by core, status: " << subm_rsp.status);
@@ -3462,21 +3470,24 @@ bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake
 {
   prepare_free_transfers_cache(fake_outputs_count);
   auto it = m_found_free_amounts.find(CURRENCY_BLOCK_REWARD);
-  if (it == m_found_free_amounts.end() || it->second.size() < WALLET_POS_MINT_PACKING_SIZE)
+  if (it == m_found_free_amounts.end() || it->second.size() < m_pos_mint_packing_size)
     return false;
 
-  for (auto set_it = it->second.begin(); set_it != it->second.end(); it++)
+  for (auto set_it = it->second.begin(); set_it != it->second.end() && selected_indicies.size() <= m_pos_mint_packing_size; )
   {
     if (is_transfer_ready_to_go(m_transfers[*set_it], fake_outputs_count))
     {
       found_money += it->first;
       selected_indicies.push_back(*set_it);
       WLT_LOG_L2("Selected index: " << *set_it << ", transfer_details: " << ENDL << epee::serialization::store_t_to_json(m_transfers[*set_it]));
+      
+      it->second.erase(set_it++);
     }
-    it->second.erase(it->second.begin());
-    if (!it->second.size())
-      m_found_free_amounts.erase(it);
+    else
+      set_it++;
   }
+  if (!it->second.size())
+    m_found_free_amounts.erase(it);
 
   return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
 }
@@ -4128,10 +4139,10 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
   uint64_t found_money = 0;
 
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
-  if (ctp.multisig_id == currency::null_hash)
+  if (ctp.perform_packing)
+    prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, found_money);
+  else if (ctp.multisig_id == currency::null_hash)
     prepare_tx_sources(needed_money, ctp.fake_outputs_count, ctp.dust_policy.dust_threshold, ftp.sources, ftp.selected_transfers, found_money);
-  else if (ctp.perform_packing)
-    prepare_tx_sources_for_packing(WALLET_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, found_money);
   else
     prepare_tx_sources(ctp.multisig_id, ftp.sources, found_money);
   TIME_MEASURE_FINISH_MS(prepare_tx_sources_time);

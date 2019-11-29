@@ -1358,8 +1358,8 @@ bool blockchain_storage::create_block_template(const create_block_template_param
 
   CRITICAL_REGION_END();
 
-  size_t txs_size;
-  uint64_t fee;
+  size_t txs_size = 0;
+  uint64_t fee = 0;
   bool block_filled = false;
   if (pcustom_fill_block_template_func == nullptr)
     block_filled = m_tx_pool.fill_block_template(b, pos, median_size, already_generated_coins, txs_size, fee, height, params.explicit_txs);

@@ -1138,6 +1138,7 @@ namespace currency
     // add explicit transactions 
     for (const auto& tx : explicit_txs)
     {
+      fee += get_tx_fee(tx);
       bl.tx_hashes.push_back(get_transaction_hash(tx));
     }
     return true;

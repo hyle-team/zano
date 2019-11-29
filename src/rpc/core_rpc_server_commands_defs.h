@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#include "serialization/keyvalue_hexemizer.h"
 #include "currency_protocol/currency_protocol_defs.h"
 #include "currency_core/currency_basic.h"
 #include "currency_core/difficulty.h"
@@ -825,6 +826,29 @@ namespace currency
     };
   };
   
+  struct COMMAND_RPC_SUBMITBLOCK2
+  {
+    struct request
+    {
+      std::string b;                              //hex encoded block blob
+      std::list<epee::hexemizer> explicit_txs;    //hex encoded tx blobs
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(b)
+        KV_SERIALIZE(explicit_txs)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct block_header_response
   {
       uint8_t major_version;

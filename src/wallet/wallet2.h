@@ -42,7 +42,7 @@
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 
-#define WALLET_POS_MINT_PACKING_SIZE                                  100
+#define WALLET_DEFAULT_POS_MINT_PACKING_SIZE                          100
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -316,7 +316,8 @@ namespace tools
                               m_last_sync_percent(0), 
                               m_do_rise_transfer(false),
                               m_watch_only(false), 
-                              m_last_pow_block_h(0)
+                              m_last_pow_block_h(0), 
+                              m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {};
   public:
     wallet2() : m_stop(false), 
@@ -329,7 +330,8 @@ namespace tools
                 m_do_rise_transfer(false),
                 m_log_prefix("???"),
                 m_watch_only(false), 
-                m_last_pow_block_h(0)
+                m_last_pow_block_h(0), 
+                m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {
       m_core_runtime_config = currency::get_default_core_runtime_config();
     };
@@ -494,6 +496,7 @@ namespace tools
     
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
+    void set_pos_mint_packing_size(uint64_t new_size);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
     uint64_t balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const;
@@ -867,6 +870,7 @@ private:
     std::atomic<uint64_t> m_local_bc_height; //temporary workaround 
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
+    uint64_t m_pos_mint_packing_size;
 
     transfer_container m_transfers;
     multisig_transfer_container m_multisig_transfers;

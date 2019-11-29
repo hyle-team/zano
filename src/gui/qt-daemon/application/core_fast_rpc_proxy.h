@@ -109,6 +109,11 @@ namespace tools
       return m_rpc.on_submitblock(req, rsp, m_err_stub, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
+    bool call_COMMAND_RPC_SUBMITBLOCK2(const currency::COMMAND_RPC_SUBMITBLOCK2::request& req, currency::COMMAND_RPC_SUBMITBLOCK2::response& rsp) override
+    {
+      return m_rpc.on_submitblock2(req, rsp, m_err_stub, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_POS_MINING_DETAILS(const currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, currency::COMMAND_RPC_GET_POS_MINING_DETAILS::response& rsp) override
     {
       return m_rpc.on_get_pos_mining_details(req, rsp, m_cntxt_stub);

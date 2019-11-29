@@ -892,6 +892,63 @@ namespace currency
 
     res.status = "OK";
     return true;
+  }  
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_submitblock2(const COMMAND_RPC_SUBMITBLOCK2::request& req, COMMAND_RPC_SUBMITBLOCK2::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+    CHECK_CORE_READY();
+
+
+    block b = AUTO_VAL_INIT(b);
+    if (!parse_and_validate_block_from_blob(req.b, b))
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_WRONG_BLOCKBLOB;
+      error_resp.message = "Wrong block blob";
+      return false;
+    }
+
+    block_verification_context bvc = AUTO_VAL_INIT(bvc);
+    for (const auto& txblob : req.explicit_txs)
+    {
+
+      crypto::hash tx_hash = AUTO_VAL_INIT(tx_hash);
+      transaction tx = AUTO_VAL_INIT(tx);
+      if (!parse_and_validate_tx_from_blob(txblob.blob, tx, tx_hash))
+      {
+        error_resp.code = CORE_RPC_ERROR_CODE_WRONG_BLOCKBLOB;
+        error_resp.message = "Wrong explicit tx blob";
+        return false;
+      }
+      bvc.m_onboard_transactions[tx_hash] = tx;
+    }
+
+
+    if (!m_core.handle_block_found(b, &bvc))
+    {
+      if (bvc.m_added_to_altchain)
+      {
+        error_resp.code = CORE_RPC_ERROR_CODE_BLOCK_ADDED_AS_ALTERNATIVE;
+        error_resp.message = "Block added as alternative";
+        return false;
+      }
+      error_resp.code = CORE_RPC_ERROR_CODE_BLOCK_NOT_ACCEPTED;
+      error_resp.message = "Block not accepted";
+      return false;
+    }
+    //@#@
+    //temporary double check timestamp
+    if (time(NULL) - get_actual_timestamp(b) > 5)
+    {
+      LOG_PRINT_RED_L0("Found block (" << get_block_hash(b) << ") timestamp (" << get_actual_timestamp(b)
+        << ") is suspiciously less (" << time(NULL) - get_actual_timestamp(b) << ") then curren time( " << time(NULL) << ")");
+      //mark node to make it easier to find it via scanner      
+      m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend = true;
+    }
+    //
+
+
+    res.status = "OK";
+    return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   uint64_t core_rpc_server::get_block_reward(const block& blk)
