@@ -715,7 +715,8 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
 {
   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
   std::vector<tools::wallet_public::wallet_transfer_info> recent;
-  m_wallet->get_recent_transfers_history(recent, 0, 0);
+  uint64_t total = 0;
+  m_wallet->get_recent_transfers_history(recent, 0, 0, total);
   m_wallet->get_unconfirmed_transfers(unconfirmed);
   //workaround for missed fee
   
@@ -740,7 +741,8 @@ bool simple_wallet::list_recent_transfers_ex(const std::vector<std::string>& arg
 {
   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
   std::vector<tools::wallet_public::wallet_transfer_info> recent;
-  m_wallet->get_recent_transfers_history(recent, 0, 0);
+  uint64_t total = 0;
+  m_wallet->get_recent_transfers_history(recent, 0, 0, total);
   m_wallet->get_unconfirmed_transfers(unconfirmed);
   //workaround for missed fee
   stringstream ss;
