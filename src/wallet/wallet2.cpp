@@ -2515,7 +2515,7 @@ uint64_t wallet2::get_recent_transfers_total_count()
   return m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count)
+void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total)
 {
   if (offset >= m_transfer_history.size())
     return;
@@ -2526,6 +2526,7 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
     stop = m_transfer_history.rend();
 
   trs.insert(trs.end(), start, stop);
+  total = m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)

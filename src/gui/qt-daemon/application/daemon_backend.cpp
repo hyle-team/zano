@@ -716,7 +716,7 @@ std::string daemon_backend::get_recent_transfers(size_t wallet_id, uint64_t offs
     return API_RETURN_CODE_CORE_BUSY;
   }
 
-  w->get()->get_recent_transfers_history(tr_hist.history, offset, count);
+  w->get()->get_recent_transfers_history(tr_hist.history, offset, count, tr_hist.total_history_items);
   //workaround for missed fee
   for (auto & he : tr_hist.history)
   {
