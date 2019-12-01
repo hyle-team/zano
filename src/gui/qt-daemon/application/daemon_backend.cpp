@@ -677,8 +677,7 @@ std::string daemon_backend::open_wallet(const std::wstring& path, const std::str
     try
     {
       w->load(path, password);  
-      w->get_recent_transfers_history(owr.recent_history.history, 0, 0);
-      owr.recent_history.total_history_items = w->get_recent_transfers_total_count();
+      w->get_recent_transfers_history(owr.recent_history.history, 0, 100, owr.recent_history.total_history_items);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history);
       //workaround for missed fee
