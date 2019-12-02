@@ -2114,7 +2114,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!data_file.fail(), "failed to open binary wallet file for saving: " << tmp_file_path.string());
   data_file << header_buff << keys_buff;
 
-  WLT_LOG_L0("Storing to " << tmp_file_path.string() << " ...");
+  WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
 
   r = tools::portble_serialize_obj_to_stream(*this, data_file);
   if (!r)
@@ -2127,15 +2127,39 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   data_file.flush();
   data_file.close();
 
+  WLT_LOG_L1("Stored successfully to temporary file " << tmp_file_path.string());
+
   // for the sake of safety perform a double-renaming: wallet file -> old tmp, new tmp -> wallet file, remove old tmp
   
   boost::filesystem::path tmp_old_file_path = boost::filesystem::path(path_to_save);
   tmp_old_file_path += L".oldtmp_" + std::to_wstring(ts);
 
   if (boost::filesystem::is_regular_file(path_to_save))
+  {
     boost::filesystem::rename(path_to_save, tmp_old_file_path);
+    WLT_LOG_L1("Renamed: " << ascii_path_to_save << " -> " << tmp_old_file_path.string());
+  }
+  
   boost::filesystem::rename(tmp_file_path, path_to_save);
-  boost::filesystem::remove(tmp_old_file_path);
+  WLT_LOG_L1("Renamed: " << tmp_file_path.string() << " -> " << ascii_path_to_save);
+
+  if (boost::filesystem::remove(tmp_old_file_path))
+  {
+    WLT_LOG_L1("Removed temporary file: " << tmp_old_file_path.string());
+  }
+
+  bool path_to_save_exists       = boost::filesystem::is_regular_file(path_to_save);
+  bool tmp_file_path_exists      = boost::filesystem::is_regular_file(tmp_file_path);
+  bool tmp_old_file_path_exists  = boost::filesystem::is_regular_file(tmp_old_file_path);
+  if (path_to_save_exists && !tmp_file_path_exists && !tmp_old_file_path_exists)
+  {
+    WLT_LOG_L0("Wallet was successfully stored to " << ascii_path_to_save);
+  }
+  else
+  {
+    WLT_LOG_ERROR("Wallet stroing to " << ascii_path_to_save << " might not be successfull: path_to_save_exists=" << path_to_save_exists << ", tmp_file_path_exists=" << tmp_file_path_exists << ", tmp_old_file_path_exists=" << tmp_old_file_path_exists);
+    throw tools::error::wallet_common_error(LOCATION_STR, "Wallet file storing might not be successfull. Please make sure you have backed up your seed phrase and check log for details.");
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
