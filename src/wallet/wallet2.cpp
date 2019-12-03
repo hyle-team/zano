@@ -4266,7 +4266,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   bool send_to_network,
   std::string* p_signed_tx_blob_str)
 {
-  TIME_MEASURE_START(precalculation_time);
+  //TIME_MEASURE_START(precalculation_time);
   construct_tx_param ctp = AUTO_VAL_INIT(ctp);
   ctp.attachments = attachments;
   ctp.crypt_address = currency::get_crypt_address_from_destinations(m_account.get_keys(), dsts);
@@ -4282,7 +4282,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   ctp.split_strategy_id = destination_split_strategy_id;
   ctp.tx_outs_attr = tx_outs_attr;
   ctp.unlock_time = unlock_time;
-  TIME_MEASURE_FINISH(precalculation_time);
+  //TIME_MEASURE_FINISH(precalculation_time);
   transfer(ctp, tx, send_to_network, p_signed_tx_blob_str);
 }
 //----------------------------------------------------------------------------------------------------
