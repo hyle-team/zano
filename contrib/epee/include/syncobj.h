@@ -699,7 +699,7 @@ namespace epee
 #define  CRITICAL_REGION_END()                  }
 
 
-#define  CIRITCAL_OPERATION(obj,op) {obj##_lock.lock();obj## . ##op;obj##_lock.unlock();}
+#define  CIRITCAL_OPERATION(obj,op) {obj##_lock.lock();obj . op;obj##_lock.unlock();}
 
 #define  SHARED_CRITICAL_REGION_LOCAL(x) boost::shared_lock< boost::shared_mutex > critical_region_var(x)
 #define  EXCLUSIVE_CRITICAL_REGION_LOCAL(x) boost::unique_lock< boost::shared_mutex > critical_region_var(x)
