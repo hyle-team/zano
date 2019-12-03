@@ -529,27 +529,36 @@ namespace currency
       {
         CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Blocks processing interrupted, connection dropped");
 
+        block_verification_context bvc = boost::value_initialized<block_verification_context>();
         //process transactions
         TIME_MEASURE_START(transactions_process_time);
         for (const auto& tx_blob : block_entry.txs)
         {
           CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Block txs processing interrupted, connection dropped");
-
-          tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-          m_core.handle_incoming_tx(tx_blob, tvc, true);
-          if(tvc.m_verification_failed)
+          crypto::hash tx_id = null_hash;
+          transaction tx = AUTO_VAL_INIT(tx);
+          if (!parse_and_validate_tx_from_blob(tx_blob, tx, tx_id))
           {
-            LOG_ERROR_CCONTEXT("transaction verification failed on NOTIFY_RESPONSE_GET_OBJECTS, \r\ntx_id = " 
+            LOG_ERROR_CCONTEXT("failed to parse tx: " 
               << string_tools::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
             m_p2p->drop_connection(context);
             return 1;
           }
+          bvc.m_onboard_transactions[tx_id] = tx;
+//           tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+//           m_core.handle_incoming_tx(tx_blob, tvc, true);
+//           if(tvc.m_verification_failed)
+//           {
+//             LOG_ERROR_CCONTEXT("transaction verification failed on NOTIFY_RESPONSE_GET_OBJECTS, \r\ntx_id = " 
+//               << string_tools::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
+//             m_p2p->drop_connection(context);
+//             return 1;
+//           }
         }
         TIME_MEASURE_FINISH(transactions_process_time);
 
         //process block
         TIME_MEASURE_START(block_process_time);
-        block_verification_context bvc = boost::value_initialized<block_verification_context>();
 
         m_core.handle_incoming_block(block_entry.block, bvc, false);
         if (count > 2 && bvc.m_already_exists)
