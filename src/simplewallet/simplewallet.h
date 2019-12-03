@@ -67,6 +67,7 @@ namespace currency
     bool fix_collisions(const std::vector<std::string> &args  );
     bool scan_transfers_for_id(const std::vector<std::string> &args);
     bool scan_transfers_for_ki(const std::vector<std::string> &args);
+    bool print_utxo_distribution(const std::vector<std::string> &args);    
     bool show_blockchain_height(const std::vector<std::string> &args);
     bool show_wallet_bcheight(const std::vector<std::string> &args);    
     bool transfer(const std::vector<std::string> &args);

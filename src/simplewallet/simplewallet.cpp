@@ -207,6 +207,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("fix_collisions", boost::bind(&simple_wallet::fix_collisions, this, _1), "Rescan transfers for key image collisions");
   m_cmd_binder.set_handler("scan_transfers_for_id", boost::bind(&simple_wallet::scan_transfers_for_id, this, _1), "Rescan transfers for tx_id");
   m_cmd_binder.set_handler("scan_transfers_for_ki", boost::bind(&simple_wallet::scan_transfers_for_ki, this, _1), "Rescan transfers for key image");
+  m_cmd_binder.set_handler("print_utxo_distribution", boost::bind(&simple_wallet::print_utxo_distribution, this, _1), "Prints utxo distribution");
   
   m_cmd_binder.set_handler("address", boost::bind(&simple_wallet::print_address, this, _1), "Show current wallet public address");
   m_cmd_binder.set_handler("integrated_address", boost::bind(&simple_wallet::integrated_address, this, _1), "integrated_address [<payment_id>|<integrated_address] - encodes given payment_id along with wallet's address into an integrated address (random payment_id will be used if none is provided). Decodes given integrated_address into standard address");
@@ -949,6 +950,18 @@ bool simple_wallet::scan_transfers_for_ki(const std::vector<std::string> &args)
   print_td_list(td);
   return true;
 }
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::print_utxo_distribution(const std::vector<std::string> &args)
+{
+  std::map<uint64_t, uint64_t> distribution;
+  m_wallet->get_utxo_distribution(distribution);
+  for (auto& e : distribution)
+  {    
+    message_writer() << std::left << setw(25) << print_money(e.first) << "|" << e.second;
+  }
+  return true;
+}
+
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::get_transfer_info(const std::vector<std::string> &args)
 {

@@ -2442,6 +2442,16 @@ void wallet2::sign_transfer_files(const std::string& tx_sources_file, const std:
   THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store signed tx to file " << signed_tx_file);
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution)
+{
+  prepare_free_transfers_cache(0);
+  for (auto ent : m_found_free_amounts)
+  {
+    distribution[ent.first] = ent.second.size();
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx)
 {
   // decrypt sources
