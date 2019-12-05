@@ -1,12 +1,13 @@
-import {Component, OnInit, OnDestroy, NgZone, ViewChild, ElementRef} from '@angular/core';
-import {ActivatedRoute, Router, RoutesRecognized} from '@angular/router';
-import {VariablesService} from '../_helpers/services/variables.service';
-import {BackendService} from '../_helpers/services/backend.service';
-import {TranslateService} from '@ngx-translate/core';
-import {IntToMoneyPipe} from '../_helpers/pipes/int-to-money.pipe';
-import {Subscription} from 'rxjs';
+import { Component, OnInit, OnDestroy, NgZone, ViewChild, ElementRef } from '@angular/core';
+import { ActivatedRoute, Router, RoutesRecognized } from '@angular/router';
+import { VariablesService } from '../_helpers/services/variables.service';
+import { BackendService } from '../_helpers/services/backend.service';
+import { TranslateService } from '@ngx-translate/core';
+import { IntToMoneyPipe } from '../_helpers/pipes/int-to-money.pipe';
+import { Subscription } from 'rxjs';
 
 import icons from '../../assets/icons/icons.json';
+import { PaginationService } from '../_helpers/services/pagination.service';
 
 @Component({
   selector: 'app-wallet',
@@ -22,6 +23,9 @@ export class WalletComponent implements OnInit, OnDestroy {
   copyAnimationTimeout;
   balanceTooltip;
   isModalDialogVisible = false;
+  activeTab = 'history';
+
+  public currentPage = 1;
 
   @ViewChild('scrolledContent') private scrolledContent: ElementRef;
 
@@ -90,8 +94,9 @@ export class WalletComponent implements OnInit, OnDestroy {
     public variablesService: VariablesService,
     private ngZone: NgZone,
     private translate: TranslateService,
-    private intToMoneyPipe: IntToMoneyPipe
-  ) {}
+    private intToMoneyPipe: IntToMoneyPipe,
+    private pagination: PaginationService
+  ) { }
 
   ngOnInit() {
     this.subRouting1 = this.route.params.subscribe(params => {
@@ -103,7 +108,8 @@ export class WalletComponent implements OnInit, OnDestroy {
     });
     this.subRouting2 = this.router.events.subscribe(val => {
       if (val instanceof RoutesRecognized) {
-        if ( val.state.root.firstChild && val.state.root.firstChild.firstChild ) {
+        this.activeTab = val.urlAfterRedirects.split('/').pop();
+        if (val.state.root.firstChild && val.state.root.firstChild.firstChild) {
           for (let i = 0; i < this.tabs.length; i++) {
             this.tabs[i].active = (this.tabs[i].link === '/' + val.state.root.firstChild.firstChild.url[0].path);
           }
@@ -137,7 +143,7 @@ export class WalletComponent implements OnInit, OnDestroy {
       tab.active = false;
     });
     this.tabs[index].active = true;
-    this.ngZone.run( () => {
+    this.ngZone.run(() => {
       this.scrolledContent.nativeElement.scrollTop = 0;
       this.router.navigate(['wallet/' + this.walletID + this.tabs[index].link]);
     });
@@ -159,11 +165,11 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.balanceTooltip = document.createElement('div');
     const available = document.createElement('span');
     available.setAttribute('class', 'available');
-    available.innerHTML = this.translate.instant('WALLET.AVAILABLE_BALANCE', {available: this.intToMoneyPipe.transform(this.variablesService.currentWallet.unlocked_balance), currency: this.variablesService.defaultCurrency});
+    available.innerHTML = this.translate.instant('WALLET.AVAILABLE_BALANCE', { available: this.intToMoneyPipe.transform(this.variablesService.currentWallet.unlocked_balance), currency: this.variablesService.defaultCurrency });
     this.balanceTooltip.appendChild(available);
     const locked = document.createElement('span');
     locked.setAttribute('class', 'locked');
-    locked.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE', {locked: this.intToMoneyPipe.transform(this.variablesService.currentWallet.balance.minus(this.variablesService.currentWallet.unlocked_balance)), currency: this.variablesService.defaultCurrency});
+    locked.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE', { locked: this.intToMoneyPipe.transform(this.variablesService.currentWallet.balance.minus(this.variablesService.currentWallet.unlocked_balance)), currency: this.variablesService.defaultCurrency });
     this.balanceTooltip.appendChild(locked);
     const link = document.createElement('span');
     link.setAttribute('class', 'link');
@@ -213,6 +219,29 @@ export class WalletComponent implements OnInit, OnDestroy {
         this.backend.storeSecureAppData();
       }
     });
+  }
+
+  public setPage(pageNumber: number) {
+    if (pageNumber === this.variablesService.currentWallet.currentPage) {
+      return;
+    }
+    this.variablesService.currentWallet.currentPage = pageNumber;
+    this.backend.getRecentTransfers(
+      this.walletID,
+      (this.variablesService.currentWallet.currentPage - 1) * this.variablesService.count,
+      this.variablesService.count, (status, data) => {
+        if (status && data.total_history_items) {
+          this.variablesService.currentWallet.history.splice(0, this.variablesService.currentWallet.history.length);
+          this.ngZone.run(() => {
+            this.pagination.paginate(this.variablesService.currentWallet.currentPage);
+            if (data.history.length !== 0) {
+              this.variablesService.currentWallet.restore = false;
+              this.variablesService.currentWallet.total_history_item = data.total_history_items;
+              this.variablesService.currentWallet.prepareHistory(data.history);
+            }
+          });
+        }
+      });
   }
 
   ngOnDestroy() {
