@@ -2119,7 +2119,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!data_file.fail(), "failed to open binary wallet file for saving: " << tmp_file_path.string());
   data_file << header_buff << keys_buff;
 
-  WLT_LOG_L0("Storing to " << tmp_file_path.string() << " ...");
+  WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
 
   r = tools::portble_serialize_obj_to_stream(*this, data_file);
   if (!r)
@@ -2132,15 +2132,39 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   data_file.flush();
   data_file.close();
 
+  WLT_LOG_L1("Stored successfully to temporary file " << tmp_file_path.string());
+
   // for the sake of safety perform a double-renaming: wallet file -> old tmp, new tmp -> wallet file, remove old tmp
   
   boost::filesystem::path tmp_old_file_path = boost::filesystem::path(path_to_save);
   tmp_old_file_path += L".oldtmp_" + std::to_wstring(ts);
 
   if (boost::filesystem::is_regular_file(path_to_save))
+  {
     boost::filesystem::rename(path_to_save, tmp_old_file_path);
+    WLT_LOG_L1("Renamed: " << ascii_path_to_save << " -> " << tmp_old_file_path.string());
+  }
+  
   boost::filesystem::rename(tmp_file_path, path_to_save);
-  boost::filesystem::remove(tmp_old_file_path);
+  WLT_LOG_L1("Renamed: " << tmp_file_path.string() << " -> " << ascii_path_to_save);
+
+  if (boost::filesystem::remove(tmp_old_file_path))
+  {
+    WLT_LOG_L1("Removed temporary file: " << tmp_old_file_path.string());
+  }
+
+  bool path_to_save_exists       = boost::filesystem::is_regular_file(path_to_save);
+  bool tmp_file_path_exists      = boost::filesystem::is_regular_file(tmp_file_path);
+  bool tmp_old_file_path_exists  = boost::filesystem::is_regular_file(tmp_old_file_path);
+  if (path_to_save_exists && !tmp_file_path_exists && !tmp_old_file_path_exists)
+  {
+    WLT_LOG_L0("Wallet was successfully stored to " << ascii_path_to_save);
+  }
+  else
+  {
+    WLT_LOG_ERROR("Wallet stroing to " << ascii_path_to_save << " might not be successfull: path_to_save_exists=" << path_to_save_exists << ", tmp_file_path_exists=" << tmp_file_path_exists << ", tmp_old_file_path_exists=" << tmp_old_file_path_exists);
+    throw tools::error::wallet_common_error(LOCATION_STR, "Wallet file storing might not be successfull. Please make sure you have backed up your seed phrase and check log for details.");
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
@@ -2558,7 +2582,7 @@ uint64_t wallet2::get_recent_transfers_total_count()
   return m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count)
+void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total)
 {
   if (offset >= m_transfer_history.size())
     return;
@@ -2569,6 +2593,7 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
     stop = m_transfer_history.rend();
 
   trs.insert(trs.end(), start, stop);
+  total = m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
@@ -3097,6 +3122,7 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose) const
   }
   else
   {
+    boost::io::ios_flags_saver ifs(ss);
     ss << "index                 amount  spent_h  g_index   block  block_ts     flg tx                                                                   out#  key image" << ENDL;
     for (size_t i = 0; i != m_transfers.size(); i++)
     {
@@ -3138,39 +3164,6 @@ void wallet2::get_multisig_transfers(multisig_transfer_container& ms_transfers)
 bool wallet2::get_contracts(escrow_contracts_container& contracts)
 {
   contracts = m_contracts;
-  return true;
-}
-//----------------------------------------------------------------------------------------------------
-bool wallet2::get_fake_offers(std::list<bc_services::offer_details_ex>& offers, uint64_t amount)
-{
-
-  for (uint64_t i = 0; i != amount; i++)
-  {
-    bc_services::offer_details od;
-    od.offer_type = rand() % 4;
-    od.amount_primary = rand();
-    od.amount_target = rand();
-    od.bonus = get_random_rext(10);
-    od.target = get_random_rext(10);
-    od.location_country = get_random_rext(6);
-    od.location_city = get_random_rext(10);
-    od.contacts = get_random_rext(20);
-    od.comment = get_random_rext(30);
-    od.payment_types = get_random_rext(10);
-    od.deal_option = get_random_rext(10);
-    od.category = get_random_rext(4);
-    od.expiration_time = 3;
-
-    crypto::hash tx_id = crypto::rand<crypto::hash>();
-    offers.push_back(bc_services::offer_details_ex());
-    bc_services::offer_details_ex& odl = offers.back();
-    static_cast<bc_services::offer_details&>(odl) = od;
-    odl.timestamp = m_core_runtime_config.get_core_time();
-    odl.index_in_tx = 0;
-    odl.tx_hash = tx_id;
-    odl.stopped = false;
-    odl.fee = 10000;
-  }
   return true;
 }
 //----------------------------------------------------------------------------------------------------

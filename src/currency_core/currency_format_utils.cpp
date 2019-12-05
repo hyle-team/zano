@@ -87,7 +87,7 @@ namespace currency
     bool pos,
     const pos_entry& pe)
   {
-    uint64_t block_reward;
+    uint64_t block_reward = 0;
     if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward, height))
     {
       LOG_ERROR("Block is too big");
@@ -1525,14 +1525,16 @@ namespace currency
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+      return false;
     return pk == out_key.key;
   }
   //---------------------------------------------------------------
   bool is_out_to_acc(const account_keys& acc, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+      return false;
     auto it = std::find(out_multisig.keys.begin(), out_multisig.keys.end(), pk);
     if (out_multisig.keys.end() == it)
       return false;
@@ -1593,7 +1595,8 @@ namespace currency
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     money_transfered = 0;
-    generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
+    bool r = generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "unable to generate derivation from tx_pub = " << tx_pub_key << " * view_sec, invalid tx_pub?");
 
     if (is_coinbase(tx) && get_block_height(tx) == 0 &&  tx_pub_key == ggenesis_tx_pub_key)
     {

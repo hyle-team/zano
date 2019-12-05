@@ -100,9 +100,9 @@ namespace nodetool
     if (m_offline_mode)
       return false;
 
-    //@#@ workaround 
+    //@#@ temporary workaround
     return true;
-
+#if 0
     CRITICAL_REGION_LOCAL(m_blocked_ips_lock);
     auto it = m_blocked_ips.find(addr);
     if(it == m_blocked_ips.end())
@@ -114,6 +114,7 @@ namespace nodetool
       return true;
     }
     return false;
+#endif
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>

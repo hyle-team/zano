@@ -31,8 +31,10 @@ namespace bc_services
   //------------------------------------------------------------------
   bc_offers_service::~bc_offers_service()
   {
+    TRY_ENTRY();
     if (!m_deinitialized)
       deinit();
+    CATCH_ENTRY_NO_RETURN();
   }
   //------------------------------------------------------------------
   bool bc_offers_service::init(const std::string& config_folder, const boost::program_options::variables_map& vm)

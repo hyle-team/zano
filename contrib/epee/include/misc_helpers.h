@@ -77,7 +77,7 @@
 /// @details Useful within a dtor - but only if nested within another try block
 ///    (since we can still potentially throw here). See NESTED_*ENTRY()
 /// @todo Exception dispatcher class
-#define CATCH_ENTRY_NO_RETURN(location, custom_code) } \
+#define CATCH_ENTRY_NO_RETURN_CUSTOM(location, custom_code) } \
   catch(const std::exception& ex) \
 { \
   (void)(ex); \
@@ -90,6 +90,7 @@
   custom_code; \
 }
 
+#define CATCH_ENTRY_NO_RETURN() CATCH_ENTRY_NO_RETURN_CUSTOM(LOCATION_SS, (void)0)
 
 #define CATCH_ENTRY_WITH_FORWARDING_EXCEPTION() } \
   catch(const std::exception& ex) \
@@ -108,7 +109,7 @@
 #define NESTED_TRY_ENTRY() try { TRY_ENTRY();
 
 #define NESTED_CATCH_ENTRY(location) \
-  CATCH_ENTRY_NO_RETURN(location, {}); \
+  CATCH_ENTRY_NO_RETURN_CUSTOM(location, {}); \
   } catch (...) {}
 
 
