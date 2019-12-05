@@ -27,6 +27,9 @@ int main(int argc, char** argv)
   epee::string_tools::set_module_name_and_folder(argv[0]);
   epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
   epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+  epee::log_space::log_singletone::add_logger(LOGGER_FILE,
+    epee::log_space::log_singletone::get_default_log_file().c_str(),
+    epee::log_space::log_singletone::get_default_log_folder().c_str());
 
   //run_serialization_performance_test();
   //return 1;
