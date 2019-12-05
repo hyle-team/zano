@@ -116,6 +116,11 @@ namespace tools
     return invoke_http_json_rpc_update_is_disconnect("submitblock", req, rsp);
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool default_http_core_proxy::call_COMMAND_RPC_SUBMITBLOCK2(const currency::COMMAND_RPC_SUBMITBLOCK2::request& req, currency::COMMAND_RPC_SUBMITBLOCK2::response& rsp)
+  {
+    return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::check_connection()
   {
     CRITICAL_REGION_LOCAL(m_lock);

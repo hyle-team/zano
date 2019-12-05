@@ -53,7 +53,8 @@ namespace currency
 
      //-------------------- i_miner_handler -----------------------
      virtual bool handle_block_found(const block& b, block_verification_context* p_verification_result = nullptr);
-     virtual bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
+     virtual bool get_block_template(const create_block_template_params& params, create_block_template_response& resp);
+     bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
 
      miner& get_miner(){ return m_miner; }
      static void init_options(boost::program_options::options_description& desc);
@@ -118,12 +119,6 @@ namespace currency
      bool add_new_block(const block& b, block_verification_context& bvc);
      bool load_state_data();
      bool parse_tx_from_blob(transaction& tx, crypto::hash& tx_hash, const blobdata& blob);
-     bool check_tx_extra(const transaction& tx);
-
-     bool check_tx_syntax(const transaction& tx);
-     //check correct values, amounts and all lightweight checks not related with database
-     bool check_tx_semantic(const transaction& tx, bool kept_by_block);
-     //check if tx already in memory pool or in main blockchain
 
      bool is_key_image_spent(const crypto::key_image& key_im);
 
@@ -132,7 +127,6 @@ namespace currency
      bool update_miner_block_template();
      bool handle_command_line(const boost::program_options::variables_map& vm);
      bool on_update_blocktemplate_interval();
-     bool check_tx_inputs_keyimages_diff(const transaction& tx);
 
      void notify_blockchain_update_listeners();
 

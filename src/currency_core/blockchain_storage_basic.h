@@ -6,6 +6,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#include <unordered_map>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 
@@ -145,6 +146,12 @@ namespace currency
     uint64_t height;
   };
 
-  
+  typedef std::unordered_map<crypto::hash, transaction> transactions_map;
+
+  struct block_ws_txs
+  {
+    block b;
+    transactions_map onboard_transactions;
+  };
 
 }

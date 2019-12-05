@@ -251,3 +251,11 @@ struct wallet_unconfimed_tx_balance : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct packing_outputs_on_pos_minting_wallet : public wallet_test
+{
+  packing_outputs_on_pos_minting_wallet();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool set_core_config(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

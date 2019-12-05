@@ -383,12 +383,12 @@ public:
   struct get_recent_transfers_request
   {
     uint64_t wallet_id;
-    uint64_t offest;
+    uint64_t offset;
     uint64_t count;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
-      KV_SERIALIZE(offest)
+      KV_SERIALIZE(offset)
       KV_SERIALIZE(count)
     END_KV_SERIALIZE_MAP()
   };
