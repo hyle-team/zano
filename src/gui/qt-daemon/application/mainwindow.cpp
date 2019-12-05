@@ -1746,7 +1746,7 @@ QString MainWindow::get_recent_transfers(const QString& param)
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::get_recent_transfers_request, a);
   PREPARE_RESPONSE(view::transfers_array, ar);
-  ar.error_code = m_backend.get_recent_transfers(a.wallet_id, a.offest, a.count, ar.response_data);
+  ar.error_code = m_backend.get_recent_transfers(a.wallet_id, a.offset, a.count, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
