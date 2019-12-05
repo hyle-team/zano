@@ -373,10 +373,12 @@ public:
   {
     std::string pass;
     std::string path;
+    uint64_t txs_to_return;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
+      KV_SERIALIZE(txs_to_return)
     END_KV_SERIALIZE_MAP()
   };
 

@@ -655,7 +655,7 @@ std::string daemon_backend::get_my_offers(const bc_services::core_offers_filter&
   return API_RETURN_CODE_OK;
 }
 
-std::string daemon_backend::open_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr)
+std::string daemon_backend::open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   owr.wallet_id = m_wallet_id_counter++;
@@ -677,7 +677,7 @@ std::string daemon_backend::open_wallet(const std::wstring& path, const std::str
     try
     {
       w->load(path, password);  
-      w->get_recent_transfers_history(owr.recent_history.history, 0, 100, owr.recent_history.total_history_items);
+      w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history);
       //workaround for missed fee
