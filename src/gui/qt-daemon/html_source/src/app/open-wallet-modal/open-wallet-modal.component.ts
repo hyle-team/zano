@@ -36,7 +36,7 @@ export class OpenWalletModalComponent implements OnInit {
       this.wallet = this.wallets[0];
       this.wallet.pass = '';
 
-      this.backend.openWallet(this.wallet.path, '', true, (status, data, error) => {
+      this.backend.openWallet(this.wallet.path, '', this.variablesService.count, true, (status, data, error) => {
         if (error === 'FILE_NOT_FOUND') {
           this.wallet.notFound = true;
         }
@@ -54,7 +54,7 @@ export class OpenWalletModalComponent implements OnInit {
     if (this.wallets.length === 0) {
       return;
     }
-    this.backend.openWallet(this.wallet.path, this.wallet.pass, false, (open_status, open_data, open_error) => {
+    this.backend.openWallet(this.wallet.path, this.wallet.pass, this.variablesService.count, false, (open_status, open_data, open_error) => {
       if (open_error && open_error === 'FILE_NOT_FOUND') {
         let error_translate = this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
         error_translate += ':<br>' + this.wallet.path;

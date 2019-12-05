@@ -2089,10 +2089,11 @@ var BackendService = /** @class */ (function () {
         };
         this.runCommand('generate_wallet', params, callback);
     };
-    BackendService.prototype.openWallet = function (path, pass, testEmpty, callback) {
+    BackendService.prototype.openWallet = function (path, pass, txs_to_return, testEmpty, callback) {
         var params = {
             path: path,
-            pass: pass
+            pass: pass,
+            txs_to_return: txs_to_return
         };
         params['testEmpty'] = !!(testEmpty);
         this.runCommand('open_wallet', params, callback);
@@ -5460,7 +5461,7 @@ var LoginComponent = /** @class */ (function () {
         var openWallets = 0;
         var runWallets = 0;
         walletData.forEach(function (wallet, wallet_index) {
-            _this.backend.openWallet(wallet.path, wallet.pass, true, function (open_status, open_data, open_error) {
+            _this.backend.openWallet(wallet.path, wallet.pass, _this.variablesService.count, true, function (open_status, open_data, open_error) {
                 if (open_status || open_error === 'FILE_RESTORED') {
                     openWallets++;
                     _this.ngZone.run(function () {
@@ -5801,7 +5802,7 @@ var OpenWalletModalComponent = /** @class */ (function () {
         if (this.wallets.length) {
             this.wallet = this.wallets[0];
             this.wallet.pass = '';
-            this.backend.openWallet(this.wallet.path, '', true, function (status, data, error) {
+            this.backend.openWallet(this.wallet.path, '', this.variablesService.count, true, function (status, data, error) {
                 if (error === 'FILE_NOT_FOUND') {
                     _this.wallet.notFound = true;
                 }
@@ -5819,7 +5820,7 @@ var OpenWalletModalComponent = /** @class */ (function () {
         if (this.wallets.length === 0) {
             return;
         }
-        this.backend.openWallet(this.wallet.path, this.wallet.pass, false, function (open_status, open_data, open_error) {
+        this.backend.openWallet(this.wallet.path, this.wallet.pass, this.variablesService.count, false, function (open_status, open_data, open_error) {
             if (open_error && open_error === 'FILE_NOT_FOUND') {
                 var error_translate = _this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
                 error_translate += ':<br>' + _this.wallet.path;
@@ -6000,7 +6001,7 @@ var OpenWalletComponent = /** @class */ (function () {
     OpenWalletComponent.prototype.openWallet = function () {
         var _this = this;
         if (this.openForm.valid && this.openForm.get('name').value.length <= this.variablesService.maxWalletNameLength) {
-            this.backend.openWallet(this.filePath, this.openForm.get('password').value, false, function (open_status, open_data, open_error) {
+            this.backend.openWallet(this.filePath, this.openForm.get('password').value, this.variablesService.count, false, function (open_status, open_data, open_error) {
                 if (open_error && open_error === 'FILE_NOT_FOUND') {
                     var error_translate = _this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
                     error_translate += ':<br>' + _this.filePath;
