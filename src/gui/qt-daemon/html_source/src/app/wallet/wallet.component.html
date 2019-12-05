@@ -46,6 +46,16 @@
   <div #scrolledContent class="tabs-content scrolled-content">
     <router-outlet></router-outlet>
   </div>
+  <div *ngIf="activeTab === 'history'" class="pagination-wrapper">
+    <div class="pagination">
+        <button [disabled]="variablesService.currentWallet.currentPage === 1" (click)="setPage(variablesService.currentWallet.currentPage - 1)"><</button>
+        <ng-container *ngFor="let page of variablesService.currentWallet.pages">
+          <button [ngClass]="{ 'active': variablesService.currentWallet.currentPage === page }" 
+          (click)="setPage(page)">{{page}}</button>
+        </ng-container>
+        <button [disabled]="variablesService.currentWallet.currentPage === variablesService.currentWallet.totalPages" (click)="setPage(variablesService.currentWallet.currentPage + 1)">></button>
+    </div>
+  </div>
 </div>
 
 <app-confirm-modal *ngIf="isModalDialogVisible" [title]=" 'WALLET.CONFIRM.TITLE' | translate " [message]=" 'WALLET.CONFIRM.MESSAGE' | translate " (confirmed)="confirmed($event)"></app-confirm-modal>

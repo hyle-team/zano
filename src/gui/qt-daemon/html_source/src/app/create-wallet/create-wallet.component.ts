@@ -78,6 +78,10 @@ export class CreateWalletComponent implements OnInit {
                 generate_data['wi'].tracking_hey
               );
               this.variablesService.opening_wallet.alias = this.backend.getWalletAlias(generate_data['wi'].address);
+              this.variablesService.opening_wallet.total_history_item = 0;
+              this.variablesService.opening_wallet.pages = new Array(1).fill(1);
+              this.variablesService.opening_wallet.totalPages = 1;
+              this.variablesService.opening_wallet.currentPage = 1;
               this.ngZone.run(() => {
                 this.walletSaved = true;
                 this.progressWidth = '50%';

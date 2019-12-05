@@ -631,6 +631,15 @@ export class BackendService {
     }
   }
 
+  getRecentTransfers( id, offset, count, callback) {
+    const params = {
+      wallet_id: id,
+      offset: offset,
+      count: count
+    };
+    this.runCommand('get_recent_transfers', params, callback);
+  }
+
   getPoolInfo(callback) {
     this.runCommand('get_tx_pool_info', {}, callback);
   }

@@ -53,7 +53,8 @@ $themes: (
     tooltipCriticalBackgroundColor: #5f1d1d,
     tooltipShadow: 0 0 1rem rgba(0, 0, 0, 0.5),
     modalBackground: url(~src/assets/images/background-dark.png),
-    closeButtonColor: #556576
+    closeButtonColor: #556576,
+    hoverPage: #3a485a
   ),
   gray: (
     bodyBackgroundColor: #101417,
@@ -109,7 +110,8 @@ $themes: (
     tooltipCriticalBackgroundColor: #4c1919,
     tooltipShadow: 0 0 1rem rgba(0, 0, 0, 0.5),
     modalBackground: url(~src/assets/images/background-gray.png),
-    closeButtonColor: #515960
+    closeButtonColor: #515960,
+    hoverPage: #383e43
   ),
   white: (
     bodyBackgroundColor: #eeeeee,
@@ -165,7 +167,8 @@ $themes: (
     tooltipCriticalBackgroundColor: #e53935,
     tooltipShadow: 0 0 1rem rgba(120, 120, 120, 0.5),
     modalBackground: url(~src/assets/images/background-white.png),
-    closeButtonColor: #43454b
+    closeButtonColor: #43454b,
+    hoverPage: #ffffff
   )
 );
 
