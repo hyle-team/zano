@@ -51,6 +51,7 @@ namespace epee
     }
   };
 
+
 	//basic helpers for pod-to-hex serialization 
 	template<class t_pod_type>
 	std::string transform_t_pod_to_str(const t_pod_type & a)

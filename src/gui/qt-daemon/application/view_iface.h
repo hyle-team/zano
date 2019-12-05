@@ -373,22 +373,24 @@ public:
   {
     std::string pass;
     std::string path;
+    uint64_t txs_to_return;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
+      KV_SERIALIZE(txs_to_return)
     END_KV_SERIALIZE_MAP()
   };
 
   struct get_recent_transfers_request
   {
     uint64_t wallet_id;
-    uint64_t offest;
+    uint64_t offset;
     uint64_t count;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
-      KV_SERIALIZE(offest)
+      KV_SERIALIZE(offset)
       KV_SERIALIZE(count)
     END_KV_SERIALIZE_MAP()
   };

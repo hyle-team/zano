@@ -393,7 +393,21 @@ namespace misc_utils
     
     auto res = container.insert(typename t_container_type::value_type(key, AUTO_VAL_INIT(typename t_container_type::mapped_type())));
     return res.first->second;
-  } 
+  }
+
+  template<class t_container_type>
+  typename t_container_type::iterator it_get_or_insert_value_initialized(t_container_type& container, const typename t_container_type::key_type& key)
+  {
+    auto it = container.find(key);
+    if (it != container.end())
+    {
+      return it;
+    }
+
+    auto res = container.insert(typename t_container_type::value_type(key, AUTO_VAL_INIT(typename t_container_type::mapped_type())));
+    return res.first;
+  }
+
 } // namespace misc_utils
 } // namespace epee
 

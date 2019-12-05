@@ -207,6 +207,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("fix_collisions", boost::bind(&simple_wallet::fix_collisions, this, _1), "Rescan transfers for key image collisions");
   m_cmd_binder.set_handler("scan_transfers_for_id", boost::bind(&simple_wallet::scan_transfers_for_id, this, _1), "Rescan transfers for tx_id");
   m_cmd_binder.set_handler("scan_transfers_for_ki", boost::bind(&simple_wallet::scan_transfers_for_ki, this, _1), "Rescan transfers for key image");
+  m_cmd_binder.set_handler("print_utxo_distribution", boost::bind(&simple_wallet::print_utxo_distribution, this, _1), "Prints utxo distribution");
   
   m_cmd_binder.set_handler("address", boost::bind(&simple_wallet::print_address, this, _1), "Show current wallet public address");
   m_cmd_binder.set_handler("integrated_address", boost::bind(&simple_wallet::integrated_address, this, _1), "integrated_address [<payment_id>|<integrated_address] - encodes given payment_id along with wallet's address into an integrated address (random payment_id will be used if none is provided). Decodes given integrated_address into standard address");
@@ -715,7 +716,8 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
 {
   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
   std::vector<tools::wallet_public::wallet_transfer_info> recent;
-  m_wallet->get_recent_transfers_history(recent, 0, 0);
+  uint64_t total = 0;
+  m_wallet->get_recent_transfers_history(recent, 0, 0, total);
   m_wallet->get_unconfirmed_transfers(unconfirmed);
   //workaround for missed fee
   
@@ -740,7 +742,8 @@ bool simple_wallet::list_recent_transfers_ex(const std::vector<std::string>& arg
 {
   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
   std::vector<tools::wallet_public::wallet_transfer_info> recent;
-  m_wallet->get_recent_transfers_history(recent, 0, 0);
+  uint64_t total = 0;
+  m_wallet->get_recent_transfers_history(recent, 0, 0, total);
   m_wallet->get_unconfirmed_transfers(unconfirmed);
   //workaround for missed fee
   stringstream ss;
@@ -949,6 +952,18 @@ bool simple_wallet::scan_transfers_for_ki(const std::vector<std::string> &args)
   print_td_list(td);
   return true;
 }
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::print_utxo_distribution(const std::vector<std::string> &args)
+{
+  std::map<uint64_t, uint64_t> distribution;
+  m_wallet->get_utxo_distribution(distribution);
+  for (auto& e : distribution)
+  {    
+    message_writer() << std::left << setw(25) << print_money(e.first) << "|" << e.second;
+  }
+  return true;
+}
+
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::get_transfer_info(const std::vector<std::string> &args)
 {
@@ -1261,7 +1276,7 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 bool simple_wallet::show_seed(const std::vector<std::string> &args)
 {
   success_msg_writer() << "Here's your wallet's seed phrase. Write it down and keep in a safe place.";
-  success_msg_writer(true) << "Anyone who knows the following 25 words can access you wallet:";
+  success_msg_writer(true) << "Anyone who knows the following 25 words can access your wallet:";
   std::cout << m_wallet->get_account().get_restore_braindata() << std::endl << std::flush;
   return true;
 }
@@ -1269,7 +1284,7 @@ bool simple_wallet::show_seed(const std::vector<std::string> &args)
 bool simple_wallet::spendkey(const std::vector<std::string> &args)
 {
   message_writer(epee::log_space::console_color_red, true, std::string())
-   << "WARNING! Anyone who knows the following secret key can access you wallet and spend your coins.";
+   << "WARNING! Anyone who knows the following secret key can access your wallet and spend your coins.";
 
   const account_keys& keys = m_wallet->get_account().get_keys();
   std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_spend_secret_key) << std::endl;
@@ -1281,7 +1296,7 @@ bool simple_wallet::spendkey(const std::vector<std::string> &args)
 bool simple_wallet::viewkey(const std::vector<std::string> &args)
 {
   message_writer(epee::log_space::console_color_yellow, false, std::string())
-    << "WARNING! Anyone who knows the following secret key can view you wallet (but can not spend your coins).";
+    << "WARNING! Anyone who knows the following secret key can view your wallet (but can not spend your coins).";
 
   const account_keys& keys = m_wallet->get_account().get_keys();
   std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_view_secret_key) << std::endl;

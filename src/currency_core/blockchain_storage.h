@@ -156,6 +156,9 @@ namespace currency
       
       //date added to alt chain storage
       uint64_t timestamp; 
+      
+      //transactions associated with the block
+      transactions_map onboard_transactions;
     };
     typedef std::unordered_map<crypto::hash, alt_block_extended_info> alt_chain_container;
     //typedef std::list<alt_chain_container::iterator> alt_chain_type;
@@ -543,10 +546,10 @@ namespace currency
     bool switch_to_alternative_blockchain(alt_chain_type& alt_chain);
     void purge_alt_block_txs_hashs(const block& b);
     void add_alt_block_txs_hashs(const block& b);   
-    bool pop_block_from_blockchain();
+    bool pop_block_from_blockchain(transactions_map& onboard_transactions);
     bool purge_block_data_from_blockchain(const block& b, size_t processed_tx_count);
-    bool purge_block_data_from_blockchain(const block& b, size_t processed_tx_count, uint64_t& fee);
-    bool purge_transaction_from_blockchain(const crypto::hash& tx_id, uint64_t& fee);
+    bool purge_block_data_from_blockchain(const block& b, size_t processed_tx_count, uint64_t& fee, transactions_map& onboard_transactions);
+    bool purge_transaction_from_blockchain(const crypto::hash& tx_id, uint64_t& fee, transaction& tx);
     bool purge_transaction_keyimages_from_blockchain(const transaction& tx, bool strict_check);
     wide_difficulty_type get_next_difficulty_for_alternative_chain(const alt_chain_type& alt_chain, block_extended_info& bei, bool pos) const;
     bool handle_block_to_main_chain(const block& bl, block_verification_context& bvc);
@@ -565,7 +568,7 @@ namespace currency
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
     void get_last_n_x_blocks(uint64_t n, bool pos_blocks, std::list<std::shared_ptr<const block_extended_info>>& blocks) const;
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
-    bool rollback_blockchain_switching(std::list<block>& original_chain, size_t rollback_height);
+    bool rollback_blockchain_switching(std::list<block_ws_txs>& original_chain, size_t rollback_height);
     bool add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp);
     bool push_transaction_to_global_outs_index(const transaction& tx, const crypto::hash& tx_id, std::vector<uint64_t>& global_indexes);
     bool pop_transaction_from_global_index(const transaction& tx, const crypto::hash& tx_id);
@@ -578,7 +581,7 @@ namespace currency
     bool check_block_timestamp(std::vector<uint64_t> timestamps, const block& b)const;
     std::vector<uint64_t> get_last_n_blocks_timestamps(size_t n)const;
     const std::vector<txin_etc_details_v>& get_txin_etc_options(const txin_v& in)const;
-    void on_block_added(const block_extended_info& bei, const crypto::hash& id);
+    void on_block_added(const block_extended_info& bei, const crypto::hash& id, const std::list<crypto::key_image>& bsk);
     void on_block_removed(const block_extended_info& bei);
     void update_targetdata_cache_on_block_added(const block_extended_info& bei);
     void update_targetdata_cache_on_block_removed(const block_extended_info& bei);

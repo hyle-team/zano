@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#include "serialization/keyvalue_hexemizer.h"
 #include "currency_protocol/currency_protocol_defs.h"
 #include "currency_core/currency_basic.h"
 #include "currency_core/difficulty.h"
@@ -770,7 +771,7 @@ namespace currency
   {
     struct request
     {
-      //uint64_t reserve_size;       //max 255 bytes
+      blobdata explicit_transaction;
       std::string extra_text;
       std::string wallet_address;
       std::string stakeholder_address;
@@ -780,6 +781,7 @@ namespace currency
       uint64_t stake_unlock_time;
 
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(explicit_transaction)
         KV_SERIALIZE(extra_text)
         KV_SERIALIZE(wallet_address)   
         KV_SERIALIZE(stakeholder_address);
@@ -824,6 +826,29 @@ namespace currency
     };
   };
   
+  struct COMMAND_RPC_SUBMITBLOCK2
+  {
+    struct request
+    {
+      std::string b;                              //hex encoded block blob
+      std::list<epee::hexemizer> explicit_txs;    //hex encoded tx blobs
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(b)
+        KV_SERIALIZE(explicit_txs)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct block_header_response
   {
       uint8_t major_version;
