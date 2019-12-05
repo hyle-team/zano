@@ -634,7 +634,7 @@ export class BackendService {
   getRecentTransfers( id, offset, count, callback) {
     const params = {
       wallet_id: id,
-      offest: offset,
+      offset: offset,
       count: count
     };
     this.runCommand('get_recent_transfers', params, callback);
