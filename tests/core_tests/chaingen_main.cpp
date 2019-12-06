@@ -739,6 +739,7 @@ int main(int argc, char* argv[])
 
 #undef MARK_TEST_AS_POSTPONED
 
+    GENERATE_AND_PLAY(pos_minting_tx_packing);
 
     GENERATE_AND_PLAY(multisig_wallet_test);
     GENERATE_AND_PLAY(multisig_wallet_test_many_dst);
