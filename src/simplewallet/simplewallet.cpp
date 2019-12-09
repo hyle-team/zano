@@ -49,6 +49,7 @@ namespace
   const command_line::arg_descriptor<int> arg_daemon_port = {"daemon-port", "Use daemon instance at port <arg> instead of default", 0};
   const command_line::arg_descriptor<uint32_t> arg_log_level = {"set-log", "", 0, true};
   const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
+  const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address = { "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" };
   const command_line::arg_descriptor<std::string> arg_restore_wallet = { "restore-wallet", "Restore wallet from the seed phrase and save it to <arg>", "" };
   const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
 
@@ -1578,6 +1579,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_dont_set_date);
   command_line::add_arg(desc_params, arg_print_brain_wallet);
   command_line::add_arg(desc_params, arg_do_pos_mining);
+  command_line::add_arg(desc_params, arg_pos_mining_reward_address);
   command_line::add_arg(desc_params, arg_restore_wallet);
   command_line::add_arg(desc_params, arg_offline_mode);
   command_line::add_arg(desc_params, command_line::arg_log_file);
@@ -1728,6 +1730,17 @@ int main(int argc, char* argv[])
       break;
     }
 
+    currency::account_public_address miner_address = wal.get_account().get_public_address();
+    if (command_line::has_arg(vm, arg_pos_mining_reward_address))
+    {
+      std::string arg_pos_mining_reward_address_str = command_line::get_arg(vm, arg_pos_mining_reward_address);
+      if (!arg_pos_mining_reward_address_str.empty())
+      {
+        r = get_account_address_from_str(miner_address, arg_pos_mining_reward_address_str);
+        CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to parse miner address from string: " << arg_pos_mining_reward_address_str);
+        LOG_PRINT_YELLOW("PoS reward will be sent to another address: " << arg_pos_mining_reward_address_str, LOG_LEVEL_0);
+      }
+    }
 
     tools::wallet_rpc_server wrpc(wal);
     bool r = wrpc.init(vm);
@@ -1737,7 +1750,7 @@ int main(int argc, char* argv[])
       wrpc.send_stop_signal();
     });
     LOG_PRINT_L0("Starting wallet rpc server");
-    wrpc.run(command_line::get_arg(vm, arg_do_pos_mining), offline_mode);
+    wrpc.run(command_line::get_arg(vm, arg_do_pos_mining), offline_mode, miner_address);
     LOG_PRINT_L0("Stopped wallet rpc server");
     try
     {

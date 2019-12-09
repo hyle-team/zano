@@ -681,6 +681,7 @@ namespace tools
     //PoS
     //synchronous version of function 
     bool try_mint_pos();
+    bool try_mint_pos(const currency::account_public_address& miner_address); // block reward will be sent to miner_address, stake will be returned back to the wallet
     //for unit tests
     friend class ::test_generator;
     

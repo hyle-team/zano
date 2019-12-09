@@ -51,7 +51,7 @@ namespace tools
   wallet_rpc_server::wallet_rpc_server(wallet2& w):m_wallet(w), m_do_mint(false), m_deaf(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::run(bool do_mint, bool offline_mode)
+  bool wallet_rpc_server::run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address)
   {
     static const uint64_t wallet_rpt_idle_work_period_ms = 2000;
 
@@ -59,7 +59,7 @@ namespace tools
 
     if (!offline_mode)
     {
-      m_net_server.add_idle_handler([this]() -> bool
+      m_net_server.add_idle_handler([this, &miner_address]() -> bool
       {
         try
         {
@@ -80,7 +80,7 @@ namespace tools
             LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
             m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
             LOG_PRINT_L2("wallet RPC idle: trying to do PoS iteration...");
-            m_wallet.try_mint_pos();
+            m_wallet.try_mint_pos(miner_address);
           }
         }
         catch (error::no_connection_to_daemon&)
