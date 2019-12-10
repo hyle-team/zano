@@ -390,7 +390,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         if (coin_base_tx)
         {
           //last out in coinbase tx supposed to be change from coinstake
-          if (!(i_in_outs == outs.size() - 1 && !is_derived_from_coinbase))
+          if (!(o == tx.vout.size() - 1 && !is_derived_from_coinbase))
           {
             td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER;
           }
