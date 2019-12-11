@@ -2324,7 +2324,7 @@ bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, 
 {
   prepare_free_transfers_cache(0);
   auto it = m_found_free_amounts.find(CURRENCY_BLOCK_REWARD);
-  if (it == m_found_free_amounts.end() || it->second.size() < m_pos_mint_packing_size)
+  if (it == m_found_free_amounts.end() || it->second.size() <= m_pos_mint_packing_size)
     return false;
   
   //let's check if we have at least WALLET_POS_MINT_PACKING_SIZE transactions which is ready to go
@@ -2343,7 +2343,9 @@ bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, 
   ctp.dsts.push_back(de);
   ctp.perform_packing = true;
   
+  TRY_ENTRY();
   transfer(ctp, tx, false, nullptr);
+  CATCH_ENTRY2(false);
 
   return true;
 }
