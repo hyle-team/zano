@@ -1076,13 +1076,47 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size, true, UINT64_MAX, m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size, // total
+    true,
+    UINT64_MAX,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size // unlocked
+  ), false, "");
 
-  alice_wlt->set_pos_mint_packing_size(5);
+  alice_wlt->set_pos_mint_packing_size(m_pos_mint_packing_size);
 
+  // no coinbase tx outputs should packed
   r = alice_wlt->try_mint_pos();
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
   
+  // make sure the wallet has only received new locked incoming reward
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1), // total
+    true,
+    UINT64_MAX,
+    m_alice_start_amount // unlocked (one output with amount == CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size was spent as stake)
+  ), false, "");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+  
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1), // total
+    true,
+    UINT64_MAX,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1) // unlocked
+  ), false, "");
+
+  // coinbase tx outputs should be packed now, there's enough coinbase outputs (> m_pos_mint_packing_size)
+  r = alice_wlt->try_mint_pos();
+  CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 2), // total
+    true,
+    UINT64_MAX,
+    m_alice_start_amount - CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size // unlocked ( - CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size for stake and - CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size for packing)
+  ), false, "");
 
 
   return true;
