@@ -2334,7 +2334,7 @@ bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, 
     if (is_transfer_ready_to_go(m_transfers[*it_ind], fake_outputs_number))
       ++count;
   }
-  if (count < m_pos_mint_packing_size)
+  if (count <= m_pos_mint_packing_size)
     return false;
   construct_tx_param ctp = get_default_construct_tx_param();
   currency::tx_destination_entry de = AUTO_VAL_INIT(de);
