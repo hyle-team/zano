@@ -736,7 +736,7 @@ namespace tools
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
     void prepare_transaction(const construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
-    void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx);
+    void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
 
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);

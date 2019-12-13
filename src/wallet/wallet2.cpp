@@ -4190,11 +4190,14 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
     LOG_LEVEL_0);*/
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx)
+void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key /* = true */)
 {
   // NOTE: if broadcast_tx == true callback rise_on_transfer2() may be called at the end of this function.
   // That callback may call balance(), so it's important to have all used/spending transfers
   // to be correctly marked with corresponding flags PRIOR to calling finalize_transaction()
+
+  // broadcasting tx without secret key storing is forbidden to avoid lost key issues
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!broadcast_tx || store_tx_secret_key, "finalize_tx is requested to broadcast a tx without storing the key");
 
   //TIME_MEASURE_START_MS(construct_tx_time);
   bool r = currency::construct_tx(m_account.get_keys(),
@@ -4227,9 +4230,10 @@ void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::trans
   }
   //TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
-  m_tx_keys.insert(std::make_pair(get_transaction_hash(tx), tx_key));
-
   THROW_IF_FALSE_WALLET_EX(get_object_blobsize(tx) < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, tx, m_upper_transaction_size_limit);
+
+  if (store_tx_secret_key)
+    m_tx_keys.insert(std::make_pair(get_transaction_hash(tx), tx_key));
 
   //TIME_MEASURE_START(send_transaction_to_network_time);
   if (broadcast_tx)
