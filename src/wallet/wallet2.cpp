@@ -3692,16 +3692,22 @@ void wallet2::mark_transfers_with_flag(const std::vector<uint64_t>& selected_tra
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::clear_transfers_from_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason /* = empty_string */)
+void wallet2::clear_transfers_from_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason /* = empty_string */) noexcept
 {
+  TRY_ENTRY();
   for (uint64_t i : selected_transfers)
   {
-    THROW_IF_TRUE_WALLET_EX(i >= m_transfers.size(), error::wallet_internal_error, "i >= m_transfers.size()");
+    if (i >= m_transfers.size())
+    {
+      WLT_LOG_ERROR("INTERNAL ERROR: i: " << i << " >= m_transfers.size() : " << m_transfers.size());
+      continue;
+    }
     uint32_t flags_before = m_transfers[i].m_flags;
     m_transfers[i].m_flags &= ~flag;
     WLT_LOG_L1("clearing transfer #" << std::setfill('0') << std::right << std::setw(3) << i << " from flag " << flag << " : " << flags_before << " -> " << m_transfers[i].m_flags <<
       (reason.empty() ? "" : ", reason: ") << reason);
   }
+  CATCH_ENTRY_NO_RETURN();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::exception_handler()
