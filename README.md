@@ -43,6 +43,7 @@ For GUI version:\
    &nbsp;&nbsp;`$ cd zano && mkdir build && cd build `\
    &nbsp;&nbsp;`$ cmake -D BUILD_GUI=ON .. `\
    &nbsp;&nbsp;`$ make -j Zano` \
+   &nbsp;&nbsp;`$ rsync -haP ~/zano/src/gui/qt-daemon/html ~/zano/build/src` \
 NOTICE: If you are building on machine with relatively small anount of RAM(small VPS for example, less then 16GB) and without proper setting of virtual memory, then be careful with setting `-j` option, this may cause compiller crashes. 
 3. Look for the binaries, including the `Zano` GUI, in the build directory
 
