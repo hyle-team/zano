@@ -84,6 +84,7 @@ namespace currency
     bool save_watch_only(const std::vector<std::string> &args);
     bool sign_transfer(const std::vector<std::string> &args);
     bool submit_transfer(const std::vector<std::string> &args);
+    bool sweep_below(const std::vector<std::string> &args);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr);
