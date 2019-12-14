@@ -1115,7 +1115,7 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
     m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 2), // total
     true,
     UINT64_MAX,
-    m_alice_start_amount - CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size // unlocked ( - CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size for stake and - CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size for packing)
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD
   ), false, "");
 
 
