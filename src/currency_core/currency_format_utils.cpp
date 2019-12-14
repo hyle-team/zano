@@ -857,14 +857,6 @@ namespace currency
         tx.extra.push_back(chs);
       else
         tx.attachment.push_back(chs);
-
-      LOG_PRINT_GREEN("ENCRYPTING ATTACHMENTS ON KEY: " << epee::string_tools::pod_to_hex(derivation) 
-        << " destination addr: " << currency::get_account_address_as_str(destination_addr) 
-        << " tx_random_key.sec" << tx_random_key.sec 
-        << " tx_random_key.pub" << tx_random_key.pub
-        << " sender address: " << currency::get_account_address_as_str(sender_keys.m_account_address)
-        , LOG_LEVEL_0);
-
     }
   }
   //---------------------------------------------------------------

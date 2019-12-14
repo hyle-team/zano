@@ -3674,17 +3674,18 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx,
 //----------------------------------------------------------------------------------------------------
 void wallet2::mark_transfers_with_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason /* = empty_string */, bool throw_if_flag_already_set /* = false */)
 {
-  if (throw_if_flag_already_set)
-  {
-    for (uint64_t i : selected_transfers)
-    {
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(i < m_transfers.size(), "invalid transfer index given: " << i << ", m_transfers.size() == " << m_transfers.size());
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX((m_transfers[i].m_flags & flag) == 0, "transfer #" << i << " already has flag " << flag << ": " << m_transfers[i].m_flags << ", transfer info:" << ENDL << epee::serialization::store_t_to_json(m_transfers[i]));
-    }
-  }
+  // check all selected transfers prior to flag change
   for (uint64_t i : selected_transfers)
   {
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(i < m_transfers.size(), "invalid transfer index given: " << i << ", m_transfers.size() == " << m_transfers.size());
+    if (throw_if_flag_already_set)
+    {
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX((m_transfers[i].m_flags & flag) == 0, "transfer #" << i << " already has flag " << flag << ": " << m_transfers[i].m_flags << ", transfer info:" << ENDL << epee::serialization::store_t_to_json(m_transfers[i]));
+    }
+  }
+
+  for (uint64_t i : selected_transfers)
+  {
     uint32_t flags_before = m_transfers[i].m_flags;
     m_transfers[i].m_flags |= flag;
     WLT_LOG_L1("marking transfer  #" << std::setfill('0') << std::right << std::setw(3) << i << " with flag " << flag << " : " << flags_before << " -> " << m_transfers[i].m_flags <<
@@ -4180,6 +4181,7 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
   ftp.shuffle = ctp.shuffle;
   ftp.flags = ctp.flags;
   ftp.multisig_id = ctp.multisig_id;
+  ftp.spend_pub_key = m_account.get_public_address().m_spend_public_key;
 
   /* TODO
   WLT_LOG_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"
@@ -4314,6 +4316,31 @@ const construct_tx_param& wallet2::get_default_construct_tx_param()
   return ctp;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_signed_tx_blob_str /* = nullptr */)
+{
+  TIME_MEASURE_START(store_unsigned_tx_time);
+  blobdata bl = t_serializable_object_to_blob(ftp);
+  crypto::chacha_crypt(bl, m_account.get_keys().m_view_secret_key);
+  bool r = epee::file_io_utils::save_string_to_file(filename, bl);
+  CHECK_AND_ASSERT_MES(r, false, "failed to store unsigned tx to " << filename);
+  LOG_PRINT_L0("Transaction stored to " << filename << ". You need to sign this tx using a full-access wallet.");
+
+  if (p_signed_tx_blob_str != nullptr)
+    *p_signed_tx_blob_str = bl;
+  TIME_MEASURE_FINISH(store_unsigned_tx_time);
+
+  // reserve transfers at the very end
+  TIME_MEASURE_START(mark_transfers_as_spent_time);
+  mark_transfers_with_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION, std::string("cold sig reservation for money transfer"), true);
+  TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
+
+  WLT_LOG_GREEN("[wallet::store_unsigned_tx_to_file_and_reserve_transfers]"
+    << " store_unsigned_tx_time: " << print_fixed_decimal_point(store_unsigned_tx_time, 3)
+    << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
+    , LOG_LEVEL_1);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::transfer(const construct_tx_param& ctp,
   currency::transaction &tx,
   bool send_to_network,
@@ -4326,29 +4353,9 @@ void wallet2::transfer(const construct_tx_param& ctp,
 
   if (m_watch_only)
   {
-    TIME_MEASURE_START(store_unsigned_tx_time);
-    ftp.spend_pub_key = m_account.get_public_address().m_spend_public_key;
-    blobdata bl = t_serializable_object_to_blob(ftp);
-    crypto::chacha_crypt(bl, m_account.get_keys().m_view_secret_key);
-    epee::file_io_utils::save_string_to_file("zano_tx_unsigned", bl);
-    LOG_PRINT_L0("Transaction stored to unsigned_zano_tx. You need to sign this tx using a full-access wallet.");
-
-    if (p_signed_tx_blob_str != nullptr)
-      *p_signed_tx_blob_str = bl;
-    TIME_MEASURE_FINISH(store_unsigned_tx_time);
-
-    // unlock transfers at the very end
-    TIME_MEASURE_START(mark_transfers_as_spent_time);
-    mark_transfers_with_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION, std::string("cold sig reservation for money transfer"), true);
-    TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
-
-    WLT_LOG_GREEN("[wallet::transfer]"
-      //<< "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
-      << ", prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
-      << ", store_unsigned_tx_time: " << print_fixed_decimal_point(store_unsigned_tx_time, 3)
-      << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
-      , LOG_LEVEL_0);
-
+    bool r = store_unsigned_tx_to_file_and_reserve_transfers(ftp, "zano_tx_unsigned", p_signed_tx_blob_str);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store unsigned tx");
+    WLT_LOG_GREEN("[wallet::transfer]" << " prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3), LOG_LEVEL_0);
     return;
   }
 
