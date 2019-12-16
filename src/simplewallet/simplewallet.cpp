@@ -691,7 +691,7 @@ bool print_wti(const tools::wallet_public::wallet_transfer_info& wti)
 
   std::string payment_id_placeholder;
   if (wti.payment_id.size())
-    payment_id_placeholder = std::string("(payment_id:") + wti.payment_id + ")";
+    payment_id_placeholder = std::string("(payment_id:") + epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) + ")";
 
   static const std::string separator = ", ";
   std::string remote_side;
