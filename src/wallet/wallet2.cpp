@@ -4390,6 +4390,10 @@ void wallet2::transfer(const construct_tx_param& ctp,
 void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
   uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx /* = nullptr */)
 {
+  static const size_t estimated_bytes_per_input = 78;
+  const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit
+  const size_t tx_sources_for_querying_random_outs_max = estimated_max_inputs * 2;
+
   bool r = false;
   outs_total = 0;
   amount_total = 0;
@@ -4410,10 +4414,14 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     }
   }
 
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!selected_transfers.empty(), "No spendable outputs meet the criterion");
+
   // sort by amount descending in order to spend bigger outputs first
   std::sort(selected_transfers.begin(), selected_transfers.end(), [this](size_t a, size_t b) { return m_transfers[b].amount() < m_transfers[a].amount(); });
 
-  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!selected_transfers.empty(), "No spendable outputs meet the criterion");
+  // limit RPC request with reasonable number of sources
+  if (selected_transfers.size() > tx_sources_for_querying_random_outs_max)
+    selected_transfers.erase(selected_transfers.begin() + tx_sources_for_querying_random_outs_max, selected_transfers.end());
 
   typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
   typedef currency::tx_source_entry::output_entry tx_output_entry;
@@ -4463,6 +4471,9 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   ftp.unlock_time = 0;
   
   enum try_construct_result_t {rc_ok = 0, rc_too_few_outputs = 1, rc_too_many_outputs = 2, rc_create_tx_failed = 3 };
+  auto get_result_t_str = [](try_construct_result_t t) -> const char*
+  { return t == rc_ok ? "rc_ok" : t == rc_too_few_outputs ? "rc_too_few_outputs" : t == rc_too_many_outputs ? "rc_too_many_outputs" : t == rc_create_tx_failed ? "rc_create_tx_failed" : "unknown"; };
+
   auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_count, &fee, &destination_addr]
     (size_t st_index_upper_boundary, finalize_tx_param& ftp, uint64_t& amount_swept) -> try_construct_result_t
   {
@@ -4540,10 +4551,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     return rc_ok;
   };
 
-  static const size_t estimated_bytes_per_input = 78;
-  const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (fake_outs_count + 1.5)));
-
-  size_t st_index_upper_boundary = std::min(selected_transfers.size(), estimated_max_inputs); // selected_transfers.size();
+  size_t st_index_upper_boundary = std::min(selected_transfers.size(), estimated_max_inputs);
   uint64_t amount_swept = 0;
   try_construct_result_t res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
   
@@ -4552,7 +4560,6 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   
   if (res == rc_too_many_outputs)
   {
-    // TODO: add logs
     size_t low_bound = 0;
     size_t high_bound = st_index_upper_boundary;
     finalize_tx_param ftp_ok = ftp;
@@ -4567,6 +4574,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
       }
       st_index_upper_boundary = (low_bound + high_bound) / 2;
       try_construct_result_t res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
+      WLT_LOG_L1("sweep_below: try_construct_tx(" << st_index_upper_boundary << ") returned " << get_result_t_str(res));
       if (res == rc_ok)
       {
         low_bound = st_index_upper_boundary;
