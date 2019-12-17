@@ -402,6 +402,93 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_sweep_below(const wallet_public::COMMAND_SWEEP_BELOW::request& req, wallet_public::COMMAND_SWEEP_BELOW::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    currency::payment_id_t payment_id;
+    if (!req.payment_id_hex.empty() && !currency::parse_payment_id_from_hex_str(req.payment_id_hex, payment_id))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+      er.message = std::string("Invalid payment id: ") + req.payment_id_hex;
+      return false;
+    }
+
+    currency::account_public_address addr;
+    currency::payment_id_t integrated_payment_id;
+    if (!m_wallet.get_transfer_address(req.address, addr, integrated_payment_id))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      er.message = std::string("Invalid address: ") + req.address;
+      return false;
+    }
+
+    if (!integrated_payment_id.empty())
+    {
+      if (!payment_id.empty())
+      {
+        er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+        er.message = std::string("address ") + req.address + " has integrated payment id " + epee::string_tools::buff_to_hex_nodelimer(integrated_payment_id) +
+          " which is incompatible with payment id " + epee::string_tools::buff_to_hex_nodelimer(payment_id) + " that was already assigned to this transfer";
+        return false;
+      }
+      payment_id = integrated_payment_id;
+    }
+
+    if (req.fee < m_wallet.get_core_runtime_config().tx_pool_min_fee)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = std::string("Given fee is too low: ") + epee::string_tools::num_to_string_fast(req.fee) + ", minimum is: " + epee::string_tools::num_to_string_fast(m_wallet.get_core_runtime_config().tx_pool_min_fee);
+      return false;
+    }
+
+    try
+    {
+      currency::transaction tx = AUTO_VAL_INIT(tx);
+      size_t outs_total = 0, outs_swept = 0;
+      uint64_t amount_total = 0, amount_swept = 0;
+
+      std::string unsigned_tx_blob_str;
+      m_wallet.sweep_below(req.mixin, addr, req.amount, payment_id, req.fee, outs_total, amount_total, outs_swept, &tx, &unsigned_tx_blob_str);
+
+      get_inputs_money_amount(tx, amount_swept);
+      res.amount_swept = amount_swept;
+      res.amount_total = amount_total;
+      res.outs_swept = outs_swept;
+      res.outs_total = outs_total;
+
+      if (m_wallet.is_watch_only())
+      {
+        res.tx_unsigned_hex = epee::string_tools::buff_to_hex_nodelimer(unsigned_tx_blob_str); // watch-only wallets can't sign and relay transactions
+        // leave res.tx_hash empty, because tx has will change after signing
+      }
+      else
+      {
+        res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(tx));
+      }
+      
+      
+    }
+    catch (const tools::error::daemon_busy& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_DAEMON_IS_BUSY;
+      er.message = e.what();
+      return false;
+    }
+    catch (const std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR;
+      er.message = e.what();
+      return false;
+    }
+    catch (...)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_sign_transfer(const wallet_public::COMMAND_SIGN_TRANSFER::request& req, wallet_public::COMMAND_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();

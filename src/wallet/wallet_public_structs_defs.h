@@ -375,6 +375,45 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_SWEEP_BELOW
+  {
+    struct request
+    {
+      uint64_t    mixin;
+      std::string address;
+      uint64_t    amount;
+      std::string payment_id_hex;
+      uint64_t    fee;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(mixin)
+        KV_SERIALIZE(address)
+        KV_SERIALIZE(amount)
+        KV_SERIALIZE(payment_id_hex)
+        KV_SERIALIZE(fee)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string   tx_hash;
+      std::string   tx_unsigned_hex;
+      uint64_t      outs_total;
+      uint64_t      amount_total;
+      uint64_t      outs_swept;
+      uint64_t      amount_swept;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_hash)
+        KV_SERIALIZE(tx_unsigned_hex)
+        KV_SERIALIZE(outs_total)
+        KV_SERIALIZE(amount_total)
+        KV_SERIALIZE(outs_swept)
+        KV_SERIALIZE(amount_swept)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct COMMAND_SIGN_TRANSFER
   {
     struct request
