@@ -1932,7 +1932,7 @@ void wallet2::load_keys2ki(bool create_if_not_exist, bool& need_to_resync)
   {
     WLT_LOG_RED("m_pending_key_images size: " << m_pending_key_images.size() << " is GREATER than m_pending_key_images_file_container size: " << m_pending_key_images_file_container.size(), LOG_LEVEL_0);
     WLT_LOG_RED("UNRECOVERABLE ERROR, wallet stops", LOG_LEVEL_0);
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "UNRECOVERABLE ERROR, wallet stops: m_pending_key_images > m_pending_key_images_file_container");
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "UNRECOVERABLE ERROR, wallet stops: m_pending_key_images > m_pending_key_images_file_container" << ENDL << "Missing/wrong " << string_encoding::convert_to_ansii(m_pending_ki_file) << " file?");
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -4316,17 +4316,24 @@ const construct_tx_param& wallet2::get_default_construct_tx_param()
   return ctp;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_signed_tx_blob_str /* = nullptr */)
+bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str /* = nullptr */)
 {
   TIME_MEASURE_START(store_unsigned_tx_time);
   blobdata bl = t_serializable_object_to_blob(ftp);
   crypto::chacha_crypt(bl, m_account.get_keys().m_view_secret_key);
-  bool r = epee::file_io_utils::save_string_to_file(filename, bl);
-  CHECK_AND_ASSERT_MES(r, false, "failed to store unsigned tx to " << filename);
-  LOG_PRINT_L0("Transaction stored to " << filename << ". You need to sign this tx using a full-access wallet.");
 
-  if (p_signed_tx_blob_str != nullptr)
-    *p_signed_tx_blob_str = bl;
+  if (!filename.empty())
+  {
+    bool r = epee::file_io_utils::save_string_to_file(filename, bl);
+    CHECK_AND_ASSERT_MES(r, false, "failed to store unsigned tx to " << filename);
+    LOG_PRINT_L0("Transaction stored to " << filename << ". You need to sign this tx using a full-access wallet.");
+  }
+  else
+  {
+    CHECK_AND_ASSERT_MES(p_unsigned_tx_blob_str != nullptr, false, "empty filename and p_unsigned_tx_blob_str == null");
+    *p_unsigned_tx_blob_str = bl;
+  }
+
   TIME_MEASURE_FINISH(store_unsigned_tx_time);
 
   // reserve transfers at the very end
