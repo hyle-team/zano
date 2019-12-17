@@ -4395,7 +4395,7 @@ void wallet2::transfer(const construct_tx_param& ctp,
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
-  uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx /* = nullptr */)
+  uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
 {
   static const size_t estimated_bytes_per_input = 78;
   const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit
@@ -4624,7 +4624,8 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 
   if (m_watch_only)
   {
-    bool r = store_unsigned_tx_to_file_and_reserve_transfers(ftp, "zano_tx_unsigned");
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(p_filename_or_unsigned_tx_blob_str != nullptr, "p_filename_or_unsigned_tx_blob_str is null");
+    bool r = store_unsigned_tx_to_file_and_reserve_transfers(ftp, *p_filename_or_unsigned_tx_blob_str, p_filename_or_unsigned_tx_blob_str);
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store unsigned tx");
     return;
   }

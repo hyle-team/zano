@@ -1594,13 +1594,18 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
     size_t outs_total = 0, outs_swept = 0;
     uint64_t amount_total = 0, amount_swept = 0;
     currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
-    m_wallet->sweep_below(fake_outs_count, addr, amount, payment_id, fee, outs_total, amount_total, outs_swept, &result_tx);
+    std::string filename = "zano_tx_unsigned";
+    m_wallet->sweep_below(fake_outs_count, addr, amount, payment_id, fee, outs_total, amount_total, outs_swept, &result_tx, &filename);
     if (!get_inputs_money_amount(result_tx, amount_swept))
       LOG_ERROR("get_inputs_money_amount failed, tx: " << obj_to_json_str(result_tx));
 
     success_msg_writer(false) << outs_swept << " outputs (" << print_money_brief(amount_swept) << " coins) of " << outs_total << " total (" << print_money_brief(amount_total)
       << ") below the specified limit of " << print_money_brief(amount) << " were successfully swept";
-    success_msg_writer(true) << "tx: " << get_transaction_hash(result_tx) << " size: " << get_object_blobsize(result_tx) << " bytes";
+
+    if (m_wallet->is_watch_only())
+      success_msg_writer(true) << "Transaction prepared for signing and saved into \"" << filename << "\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
+    else
+      success_msg_writer(true) << "tx: " << get_transaction_hash(result_tx) << " size: " << get_object_blobsize(result_tx) << " bytes";
   }
   catch (const std::exception& e)
   {
