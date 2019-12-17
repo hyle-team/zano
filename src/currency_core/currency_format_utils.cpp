@@ -973,6 +973,8 @@ namespace currency
   {
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "Too many outs (" << destinations.size() << ")! Tx can't be constructed.");
 
+    bool watch_only_mode = sender_account_keys.m_spend_secret_key == null_skey;
+
     bool append_mode = false;
     if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
       append_mode = true;
@@ -1188,10 +1190,12 @@ namespace currency
         }
         sigs.resize(src_entr.outputs.size());
 
-        crypto::generate_ring_signature(tx_hash_for_signature, boost::get<txin_to_key>(tx.vin[input_index]).k_image, keys_ptrs, in_contexts[in_context_index].in_ephemeral.sec, src_entr.real_output, sigs.data());
+        if (!watch_only_mode)
+          crypto::generate_ring_signature(tx_hash_for_signature, boost::get<txin_to_key>(tx.vin[input_index]).k_image, keys_ptrs, in_contexts[in_context_index].in_ephemeral.sec, src_entr.real_output, sigs.data());
+
         ss_ring_s << "signatures:" << ENDL;
-        std::for_each(sigs.begin(), sigs.end(), [&](const crypto::signature& s){ss_ring_s << s << ENDL; });
-        ss_ring_s << "prefix_hash:" << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_contexts[in_context_index].in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output << ENDL;
+        std::for_each(sigs.begin(), sigs.end(), [&ss_ring_s](const crypto::signature& s) { ss_ring_s << s << ENDL; });
+        ss_ring_s << "prefix_hash: " << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_contexts[in_context_index].in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output << ENDL;
       }
       else
       {
