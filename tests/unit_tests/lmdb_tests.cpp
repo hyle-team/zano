@@ -5,6 +5,8 @@
 #include <memory>
 #include <thread>
 #include <atomic>
+#include <boost/format.hpp>
+#include <bitset>
 
 #include "epee/include/include_base_utils.h"
 
@@ -963,7 +965,55 @@ namespace lmdb_test
       ASSERT_TRUE(r);
       ASSERT_EQ(buffer_size, out_buffer.size());
 
-      ASSERT_TRUE(0 == memcmp(buffer.data(), out_buffer.c_str(), buffer_size));
+      if (memcmp(buffer.data(), out_buffer.c_str(), buffer_size) != 0)
+      {
+        // read data doesn't match with written one
+        std::cout << "ERROR: data missmatch at key " << key << ", total_data = " << total_data << std::endl;
+
+        size_t wrong_bytes = 0;
+        size_t wrong_bytes_min_idx = SIZE_MAX;
+        size_t wrong_bytes_max_idx = 0;
+        for (size_t i = 0; i < buffer_size; ++i)
+        {
+          if (buffer[i] != static_cast<unsigned char>(out_buffer[i]))
+          {
+            ++wrong_bytes;
+            if (wrong_bytes_min_idx == SIZE_MAX)
+              wrong_bytes_min_idx = i;
+            if (wrong_bytes_max_idx < i)
+              wrong_bytes_max_idx = i;
+            if (wrong_bytes < 10)
+            {
+              std::cout << "wrong byte at buffer offset " << boost::format("0x%04x") % i << ", file offset " << boost::format("0x%08x") % (total_data + i) << ": " <<
+                 boost::format("%02x") % static_cast<unsigned int>(static_cast<unsigned char>(out_buffer[i])) << " = " << std::bitset<8>(out_buffer[i]) << " instead of " <<
+                 boost::format("%02x") % static_cast<unsigned int>(buffer[i]) << " = " << std::bitset<8>(buffer[i]) << std::endl;
+            }
+          }
+        }
+
+        std::cout << "wrong bytes: " << wrong_bytes << " of " << buffer_size << " (" << std::fixed << std::setprecision(2) << 100.0 * wrong_bytes / buffer_size << "%)" << std::endl;
+
+        size_t line_len = 32;
+        size_t wrong_bytes_min_line = wrong_bytes_min_idx / line_len;
+        size_t wrong_bytes_max_line = wrong_bytes_max_idx / line_len + 1;
+
+        for (size_t l = wrong_bytes_min_line; l < wrong_bytes_max_line; ++l)
+        {
+          std::cout << boost::format("\n0x%04x  ") % ( l * line_len );
+          
+          for(size_t i = l * line_len; i < (l + 1) * line_len; ++i)
+            std::cout << boost::format("%02x") % static_cast<unsigned int>(buffer[i]) << (i % 4 == 3 ? " " : "");
+
+          std::cout << "  ";
+
+          for(size_t i = l * line_len; i < (l + 1) * line_len; ++i)
+            std::cout << boost::format("%02x") % static_cast<unsigned int>(static_cast<unsigned char>(out_buffer[i])) << (i % 4 == 3 ? " " : "");
+        }
+        std::cout << std::endl;
+
+
+        ASSERT_TRUE(false);
+      }
 
       total_data += buffer_size;
       if (key % 1024 == 0)
