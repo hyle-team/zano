@@ -16,6 +16,7 @@
 #include "common/db_abstract_accessor.h"
 #include "common/db_backend_lmdb.h"
 #include "serialization/serialization.h"
+#include "common/db_backend_mdbx.h"
 
 using namespace tools;
 
@@ -892,7 +893,8 @@ namespace lmdb_test
   //////////////////////////////////////////////////////////////////////////////
   // 2gb_test
   //////////////////////////////////////////////////////////////////////////////
-  TEST(lmdb, 2gb_test)
+  template<typename db_backend_t>
+  void db_2gb_test()
   {
     bool r = false;
     epee::shared_recursive_mutex rw_lock;
@@ -901,9 +903,9 @@ namespace lmdb_test
 
     static const uint64_t buffer_size = 64 * 1024;                                         // 64 KB
     static const uint64_t db_total_size = static_cast<uint64_t>(2.1 * 1024 * 1024 * 1024); // 2.1 GB -- a bit more than 2GB to test 2GB boundary
-    static const std::string db_file_path = "2gb_lmdb_test";
+    static const std::string db_file_path = std::string("2gb_") + typeid(db_backend_t).name() + "_test"; 
 
-    std::shared_ptr<db::lmdb_db_backend> lmdb_ptr = std::make_shared<db::lmdb_db_backend>();
+    std::shared_ptr<db_backend_t> lmdb_ptr = std::make_shared<db_backend_t>();
     db::basic_db_accessor bdba(lmdb_ptr, rw_lock);
 
     //
@@ -923,6 +925,27 @@ namespace lmdb_test
     std::vector<uint8_t> buffer;
     buffer.resize(buffer_size);
     crypto::generate_random_bytes(buffer_size, buffer.data());
+
+    std::vector<std::vector<uint8_t>> buffer_paranoidal_copies;
+    buffer_paranoidal_copies.resize(3);
+    for (size_t i = 0; i < buffer_paranoidal_copies.size(); ++i)
+      buffer_paranoidal_copies[i].assign(buffer.begin(), buffer.end());
+
+    auto check_buffer_paranoidal_copies = [&]() {
+      for (size_t buffer_index = 0; buffer_index < buffer_paranoidal_copies.size(); ++buffer_index)
+      {
+        for(size_t i = 0; i < buffer_size; ++i)
+        {
+          if (buffer[i] != buffer_paranoidal_copies[buffer_index][i])
+          {
+            std::cout << "!!! buffer differs from paranoidal copy #" << buffer_index << " at byte " << i << ": " << static_cast<uint32_t>(buffer[i]) << " != " << static_cast<uint32_t>(buffer_paranoidal_copies[buffer_index][i]) << std::endl;
+            break;
+          }
+        }
+      }
+    };
+
+    check_buffer_paranoidal_copies();
 
     uint64_t total_data = 0;
     for (uint64_t key = 0; key < db_total_size / buffer_size; ++key)
@@ -969,6 +992,9 @@ namespace lmdb_test
       {
         // read data doesn't match with written one
         std::cout << "ERROR: data missmatch at key " << key << ", total_data = " << total_data << std::endl;
+
+        // paranoid checks
+        check_buffer_paranoidal_copies();
 
         size_t wrong_bytes = 0;
         size_t wrong_bytes_min_idx = SIZE_MAX;
@@ -1027,6 +1053,16 @@ namespace lmdb_test
 
     boost::filesystem::remove_all(db_file_path);
 
+  }
+
+  TEST(lmdb, 2gb_test)
+  {
+    db_2gb_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, 2gb_test)
+  {
+    db_2gb_test<db::mdbx_db_backend>();
   }
 
 } // namespace lmdb_test
