@@ -4467,9 +4467,9 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   currency::tx_payer txp = AUTO_VAL_INIT(txp);
   txp.acc_addr = m_account.get_public_address();
   ftp.extra.push_back(txp);
-  //ftp.flags;
-  //ftp.multisig_id;
-  ftp.prepared_destinations;
+  ftp.flags = 0;
+  // ftp.multisig_id -- not required
+  // ftp.prepared_destinations -- will be filled by prepare_tx_destinations
   // ftp.selected_transfers -- needed only at stage of broadcasting or storing unsigned tx
   ftp.shuffle = false;
   // ftp.sources -- will be filled in try_construct_tx
@@ -4501,7 +4501,6 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
       // populate src.outputs with mix-ins
       if (rpc_get_random_outs_resp.outs.size())
       {
-        // TODO: is the folllowing line neccesary?
         rpc_get_random_outs_resp.outs[st_index].outs.sort([](const out_entry& a, const out_entry& b) { return a.global_amount_index < b.global_amount_index; });
         for (out_entry& daemon_oe : rpc_get_random_outs_resp.outs[st_index].outs)
         {
@@ -4567,6 +4566,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   
   if (res == rc_too_many_outputs)
   {
+    WLT_LOG_L1("sweep_below: first try of try_construct_tx(" << st_index_upper_boundary << ") returned " << get_result_t_str(res));
     size_t low_bound = 0;
     size_t high_bound = st_index_upper_boundary;
     finalize_tx_param ftp_ok = ftp;
@@ -4606,7 +4606,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
       amount_max = std::max(amount_max, amount);
       amount_sum += amount;
     }
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "try_construct_tx failed with result: " << res <<
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "try_construct_tx failed with result: " << get_result_t_str(res) << " (" << res << ")" <<
       ", selected_transfers stats:\n" <<
       "  outs:       " << selected_transfers.size() << ENDL <<
       "  amount min: " << print_money(amount_min) << ENDL <<
