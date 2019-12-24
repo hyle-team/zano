@@ -191,7 +191,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("incoming_transfers", boost::bind(&simple_wallet::show_incoming_transfers, this, _1), "incoming_transfers [available|unavailable] - Show incoming transfers - all of them or filter them by availability");
   m_cmd_binder.set_handler("incoming_counts", boost::bind(&simple_wallet::show_incoming_transfers_counts, this, _1), "incoming_transfers counts");
   m_cmd_binder.set_handler("list_recent_transfers", boost::bind(&simple_wallet::list_recent_transfers, this, _1), "list_recent_transfers - Show recent maximum 1000 transfers");
-  m_cmd_binder.set_handler("list_recent_transfers_ex", boost::bind(&simple_wallet::list_recent_transfers_ex, this, _1), "list_recent_transfers_tx - Write recent transfer in json to wallet_recent_transfers.txt");
+  m_cmd_binder.set_handler("export_recent_transfers", boost::bind(&simple_wallet::export_recent_transfers, this, _1), "list_recent_transfers_tx - Write recent transfer in json to wallet_recent_transfers.txt");
   m_cmd_binder.set_handler("list_outputs", boost::bind(&simple_wallet::list_outputs, this, _1), "list_outputs [spent|unspent] - Lists all the outputs that have ever been sent to this wallet if called without arguments, otherwise it lists only the spent or unspent outputs");
   m_cmd_binder.set_handler("dump_transfers", boost::bind(&simple_wallet::dump_trunsfers, this, _1), "dump_transfers - Write  transfers in json to dump_transfers.txt");
   m_cmd_binder.set_handler("dump_keyimages", boost::bind(&simple_wallet::dump_key_images, this, _1), "dump_keyimages - Write  key_images in json to dump_key_images.txt");
@@ -740,8 +740,35 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::list_recent_transfers_ex(const std::vector<std::string>& args)
+std::string wti_to_text_line(const tools::wallet_public::wallet_transfer_info& wti)
 {
+  stringstream ss;
+  ss << (wti.is_income ? "[INC]" : "[OUT]") << "\t"
+    << epee::misc_utils::get_time_str(wti.timestamp) << "\t"
+    << print_money(wti.amount) << "\t"
+    << print_money(wti.fee) << "\t"
+    << wti.remote_addresses << "\t"
+    << wti.comment << "\t";
+  return ss.str();
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::export_recent_transfers(const std::vector<std::string>& args)
+{
+  bool export_to_json = true;
+  bool ignore_pos = false;
+  if (args.size())
+  {
+    if (args[0] == "json")
+      export_to_json = true;
+    else if (args[0] == "txt")
+      export_to_json = false;
+  }
+  if (args.size() > 1)
+  {
+    if (args[1] == "ignore-pos")
+      ignore_pos = true;
+  }
+
   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
   std::vector<tools::wallet_public::wallet_transfer_info> recent;
   uint64_t total = 0;
@@ -753,17 +780,28 @@ bool simple_wallet::list_recent_transfers_ex(const std::vector<std::string>& arg
   ss << "Unconfirmed transfers: " << ENDL;
   for (auto & wti : unconfirmed)
   {
+    if(ignore_pos && wti.is_mining)
+      continue;
     if (!wti.fee)
       wti.fee = currency::get_tx_fee(wti.tx);
-    ss << epee::serialization::store_t_to_json(wti) << ENDL;
+    if(export_to_json)
+      ss << epee::serialization::store_t_to_json(wti) << ENDL;
+    else
+      ss << wti_to_text_line(wti) << ENDL;
+
   }
   ss << "Recent transfers: " << ENDL;
   for (auto & wti : recent)
   {
+    if (ignore_pos && wti.is_mining)
+      continue;
     if (!wti.fee)
       wti.fee = currency::get_tx_fee(wti.tx);
     
-    ss << epee::serialization::store_t_to_json(wti) << ENDL;
+    if (export_to_json)
+      ss << epee::serialization::store_t_to_json(wti) << ENDL;
+    else
+      ss << wti_to_text_line(wti) << ENDL;
   }
   LOG_PRINT_GREEN("Storing text to wallet_recent_transfers.txt....", LOG_LEVEL_0);
   file_io_utils::save_string_to_file(log_space::log_singletone::get_default_log_folder() + "/wallet_recent_transfers.txt", ss.str());

@@ -55,7 +55,7 @@ namespace currency
     bool refresh(const std::vector<std::string> &args);
     bool show_balance(const std::vector<std::string> &args = std::vector<std::string>());
     bool list_recent_transfers(const std::vector<std::string>& args);
-    bool list_recent_transfers_ex(const std::vector<std::string>& args);
+    bool export_recent_transfers(const std::vector<std::string>& args);
     bool dump_trunsfers(const std::vector<std::string>& args);
     bool dump_key_images(const std::vector<std::string>& args);
     bool show_incoming_transfers(const std::vector<std::string> &args);
