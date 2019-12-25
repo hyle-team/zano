@@ -3095,23 +3095,23 @@ bool escrow_zero_amounts::c1(currency::core& c, size_t ev_index, const std::vect
 
   return true;
 }
+
 //------------------------------------------------------------------------------
 
-escrow_acceptance_and_balance::escrow_acceptance_and_balance()
+escrow_balance::escrow_balance()
   : m_alice_bob_start_amount(0)
   , m_alice_bob_start_chunk_amount(0)
-  , m_alice_fee_proposal(0)
-  , m_bob_fee_accept(0)
-  , m_bob_fee_release(0)
 {
-  REGISTER_CALLBACK_METHOD(escrow_acceptance_and_balance, check_balance_after_proposal_not_confirmed);
-  REGISTER_CALLBACK_METHOD(escrow_acceptance_and_balance, check_balance_after_proposal_confirmed);
-  REGISTER_CALLBACK_METHOD(escrow_acceptance_and_balance, check_balance_after_acceptance_not_confirmed);
-  REGISTER_CALLBACK_METHOD(escrow_acceptance_and_balance, check_balance_after_acceptance_confirmed);
+  REGISTER_CALLBACK_METHOD(escrow_balance, c1);
 }
 
-bool escrow_acceptance_and_balance::generate(std::vector<test_event_entry>& events) const
+bool escrow_balance::generate(std::vector<test_event_entry>& events) const
 {
+  // Test idea: carefull check balances on each stage of escrow contract (including cancellation req and acc):
+  // 1) within wallet callback in the middle of contract function call
+  // 2) after tx was sent to network but not yet confirmed
+  // 3) after tx was confirmed
+
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
@@ -3138,157 +3138,447 @@ bool escrow_acceptance_and_balance::generate(std::vector<test_event_entry>& even
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
-  // prepare contract details
-  m_cpd = AUTO_VAL_INIT(m_cpd);
-  m_cpd.amount_a_pledge = MK_TEST_COINS(7);
-  m_cpd.amount_b_pledge = MK_TEST_COINS(5);
-  m_cpd.amount_to_pay = MK_TEST_COINS(3);
-  m_cpd.a_addr = alice_acc.get_public_address();
-  m_cpd.b_addr = bob_acc.get_public_address();
-  m_alice_fee_proposal = MK_TEST_COINS(4);
-  m_bob_fee_accept = MK_TEST_COINS(2);
-  m_bob_fee_release = MK_TEST_COINS(9); // Alice states that Bob should pay this much money for upcoming contract release (which will be sent by Alice)
+  DO_CALLBACK(events, "c1");
 
-  std::vector<tx_source_entry> used_sources;
+  return true;
+}
 
+bool escrow_balance::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false, stub_bool = false;
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+  auto alice_bc = std::make_shared<wallet_callback_balance_checker>("Alice");
+  alice_wlt->callback(alice_bc);
+
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
+  auto bob_bc = std::make_shared<wallet_callback_balance_checker>("Bob");
+  bob_wlt->callback(bob_bc);
+
+  alice_bc->expect_balance(m_alice_bob_start_amount, 0);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_bob_start_amount, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awainted out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
+
+  bob_bc->expect_balance(m_alice_bob_start_amount, 0);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
+    m_alice_bob_start_amount, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+  //
   // escrow proposal
-  bc_services::proposal_body prop = AUTO_VAL_INIT(prop);
-  transaction escrow_proposal_tx = AUTO_VAL_INIT(escrow_proposal_tx);
-  r = build_custom_escrow_proposal(events, blk_1r, alice_acc.get_keys(), m_cpd, 0, 0, 0, blk_1r.timestamp + 36000, 0, m_alice_fee_proposal, m_bob_fee_release, eccf_normal, escrow_proposal_tx, used_sources, &prop);
-  CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
-  events.push_back(escrow_proposal_tx);
+  //
+  bc_services::contract_private_details cpd = AUTO_VAL_INIT(cpd);
+  cpd.amount_a_pledge = MK_TEST_COINS(7);
+  cpd.amount_b_pledge = MK_TEST_COINS(5);
+  cpd.amount_to_pay   = MK_TEST_COINS(3);
+  cpd.a_addr          = m_accounts[ALICE_ACC_IDX].get_public_address();
+  cpd.b_addr          = m_accounts[BOB_ACC_IDX].get_public_address();
+  uint64_t alice_proposal_fee = MK_TEST_COINS(4);
+  uint64_t bob_acceptace_fee = MK_TEST_COINS(2);
+  uint64_t bob_release_fee = MK_TEST_COINS(9); // Alice states that Bob should pay this much money for upcoming contract release (which will be sent by Alice)
+  uint64_t alice_cancellation_request_fee = MK_TEST_COINS(1);
 
-  DO_CALLBACK(events, "check_balance_after_proposal_not_confirmed");
+  alice_bc->expect_balance(m_alice_bob_start_amount - alice_proposal_fee, m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount); // balace after sending the proposal 
+  
+  transaction proposal_tx = AUTO_VAL_INIT(proposal_tx);
+  transaction escrow_template_tx = AUTO_VAL_INIT(escrow_template_tx);
+  uint64_t expiration_time = test_core_time::get_time() + 60;
+  LOG_PRINT_GREEN("\n" "alice_wlt->send_escrow_proposal()", LOG_LEVEL_0);
+  alice_wlt->send_escrow_proposal(cpd, 0, 0, expiration_time, alice_proposal_fee, bob_release_fee, "", proposal_tx, escrow_template_tx);
 
-  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, escrow_proposal_tx);
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
 
-  DO_CALLBACK(events, "check_balance_after_proposal_confirmed");
+  tools::wallet2::escrow_contracts_container contracts;
+  r = alice_wlt->get_contracts(contracts);
+  CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Alice failed");
+  crypto::hash contract_id = contracts.begin()->first;
 
-  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
-  DO_CALLBACK(events, "check_balance_after_proposal_confirmed");
-
-  // escrow proposal acceptance
-  transaction escrow_normal_acceptance_tx = prop.tx_template;
-  uint64_t normal_acceptance_mask = eccf_normal;
-  r = build_custom_escrow_accept_proposal(events, blk_2, 0, bob_acc.get_keys(), m_cpd, 0, 0, 0, 0, m_bob_fee_accept, m_bob_fee_release, normal_acceptance_mask, prop.tx_onetime_secret_key, escrow_normal_acceptance_tx, used_sources);
-  CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_accept_proposal failed");
-
-  events.push_back(escrow_normal_acceptance_tx);
-
-  DO_CALLBACK(events, "check_balance_after_acceptance_not_confirmed");
-
-  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, escrow_normal_acceptance_tx);
-
-  DO_CALLBACK(events, "check_balance_after_acceptance_confirmed");
-
-  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
-
-  DO_CALLBACK(events, "check_balance_after_acceptance_confirmed");
-
-  return true;
-}
-
-bool escrow_acceptance_and_balance::check_balance_after_proposal_not_confirmed(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
-  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
-
+  // proposal tx is not confirmed yet
+  alice_bc->expect_balance();
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
-    m_alice_bob_start_amount - m_alice_fee_proposal, // total
+    m_alice_bob_start_amount - alice_proposal_fee, // total
     true, UINT64_MAX,
     m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount, // unlocked
     0, // mined
-    MK_TEST_COINS(0), // awaited in
-    MK_TEST_COINS(0) // awainted out
+    0, // awaited in
+    0  // awainted out
     ), false, "");
+  CHECK_AND_ASSERT_MES(!alice_bc->called(), false, "balance callback check failed");
 
+  // Bob's balance should not change
+  bob_bc->expect_balance(m_alice_bob_start_amount, m_alice_bob_start_amount);
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
     m_alice_bob_start_amount, // total
     true, UINT64_MAX,
     m_alice_bob_start_amount, // unlocked
     0, // mined
-    MK_TEST_COINS(0), // awaited in
-    MK_TEST_COINS(0)  // awaited out
+    0, // awaited in
+    0  // awaited out
     ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
 
-  return true;
-}
+  // mine a block to confirm escrow proposal tx
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
-bool escrow_acceptance_and_balance::check_balance_after_proposal_confirmed(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
-  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
-
+  // proposal tx is confirmed (balances should stay the same)
+  alice_bc->expect_balance(m_alice_bob_start_amount - alice_proposal_fee, m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount);
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
-    m_alice_bob_start_amount - m_alice_fee_proposal, // total
+    m_alice_bob_start_amount - alice_proposal_fee, // total
     true, UINT64_MAX,
     m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount, // unlocked
     0, // mined
-    MK_TEST_COINS(0), // awaited in
-    MK_TEST_COINS(0) // awaited out
+    0, // awaited in
+    0  // awainted out
     ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
 
+  bob_bc->expect_balance(m_alice_bob_start_amount, m_alice_bob_start_amount);
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
     m_alice_bob_start_amount, // total
     true, UINT64_MAX,
     m_alice_bob_start_amount, // unlocked
     0, // mined
-    MK_TEST_COINS(0), // awaited in
-    MK_TEST_COINS(0)  // awaited out
+    0, // awaited in
+    0  // awaited out
     ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
 
-  return true;
-}
+  //
+  // proposal acceptance
+  //
+  bob_bc->expect_balance(m_alice_bob_start_amount - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, m_alice_bob_start_amount - m_alice_bob_start_chunk_amount);
 
-bool escrow_acceptance_and_balance::check_balance_after_acceptance_not_confirmed(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
-  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  LOG_PRINT_GREEN("\n" "bob_wlt->accept_proposal()", LOG_LEVEL_0);
+  bob_wlt->accept_proposal(contract_id, bob_acceptace_fee);
 
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // acceptance tx is not confirmed yet
+  alice_bc->expect_balance(m_alice_bob_start_amount - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay, m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount);
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
-    m_alice_bob_start_amount - m_alice_fee_proposal - m_cpd.amount_a_pledge - m_cpd.amount_to_pay, // total
+    m_alice_bob_start_amount - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay, // total
     true, UINT64_MAX,
-    m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount,           // unlocked
-    0,                                                                       // mined
-    MK_TEST_COINS(0),                                                        // awaited in
-    m_cpd.amount_a_pledge + m_cpd.amount_to_pay),                            // awaited out
-    false, "");
+    m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    cpd.amount_a_pledge + cpd.amount_to_pay // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
 
+  bob_bc->expect_balance();
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
-    m_alice_bob_start_amount - m_cpd.amount_b_pledge - m_bob_fee_release - m_bob_fee_accept, // total
+    m_alice_bob_start_amount - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, // total
     true, UINT64_MAX,
-    m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount,           // unlocked
-    0,                                                                       // mined
-    MK_TEST_COINS(0),                                                        // awaited in
-    m_cpd.amount_b_pledge + m_bob_fee_release),                              // awaited out
-    false, "");
+    m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    cpd.amount_b_pledge + bob_release_fee // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(!bob_bc->called(), false, "balance callback check failed");
 
-  return true;
-}
+  // mine a block containing contract acceptance
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
-bool escrow_acceptance_and_balance::check_balance_after_acceptance_confirmed(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
-  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
-
+  // acceptance tx is confirmed
+  alice_bc->expect_balance(m_alice_bob_start_amount - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay, m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount);
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
-    m_alice_bob_start_amount - m_alice_fee_proposal - m_cpd.amount_a_pledge - m_cpd.amount_to_pay, // total
+    m_alice_bob_start_amount - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay, // total
     true, UINT64_MAX,
-    m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount,           // unlocked
-    0,                                                                       // mined
-    MK_TEST_COINS(0),                                                        // awaited in
-    MK_TEST_COINS(0)                                                         // awaited out
+    m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
     ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
 
+  bob_bc->expect_balance(m_alice_bob_start_amount - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount);
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
-    m_alice_bob_start_amount - m_cpd.amount_b_pledge - m_bob_fee_release - m_bob_fee_accept, // total
+    m_alice_bob_start_amount - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, // total
     true, UINT64_MAX,
-    m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount,           // unlocked
-    0,                                                                       // mined
-    MK_TEST_COINS(0),                                                        // awaited in
-    MK_TEST_COINS(0)                                                         // awaited out
+    m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
     ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+  //
+  // cancellation request
+  //
+  alice_bc->expect_balance(m_alice_bob_start_amount - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay - alice_cancellation_request_fee, m_alice_bob_start_amount - 3 * m_alice_bob_start_chunk_amount);
+
+  LOG_PRINT_GREEN("\n" "alice_wlt->request_cancel_contract()", LOG_LEVEL_0);
+  alice_wlt->request_cancel_contract(contract_id, alice_cancellation_request_fee, 60 * 60);
+
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // cancellation request is not confirmed yet
+  alice_bc->expect_balance();
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_bob_start_amount - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay - alice_cancellation_request_fee, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 3 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(!alice_bc->called(), false, "balance callback check failed");
+
+  bob_bc->expect_balance(m_alice_bob_start_amount - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
+    m_alice_bob_start_amount - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+  // mine a block containing cancellation request
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // cancellation request is confirmed
+  alice_bc->expect_balance(m_alice_bob_start_amount - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay - alice_cancellation_request_fee, m_alice_bob_start_amount - 3 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_bob_start_amount - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay - alice_cancellation_request_fee, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 3 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
+
+  bob_bc->expect_balance(m_alice_bob_start_amount - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
+    m_alice_bob_start_amount - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+  //
+  // cancellation acceptance
+  //
+  bob_bc->expect_balance();
+  
+  LOG_PRINT_GREEN("\n" "bob_wlt->accept_cancel_contract()", LOG_LEVEL_0);
+  bob_wlt->accept_cancel_contract(contract_id);
+
+  CHECK_AND_ASSERT_MES(!bob_bc->called(), false, "balance callback check failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // cancellation acceptance is not confirmed yet
+  alice_bc->expect_balance(m_alice_bob_start_amount - alice_proposal_fee - alice_cancellation_request_fee, m_alice_bob_start_amount - 3 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_bob_start_amount - alice_proposal_fee - alice_cancellation_request_fee, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 3 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    cpd.amount_a_pledge + cpd.amount_to_pay, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
+
+  bob_bc->expect_balance(m_alice_bob_start_amount - bob_release_fee - bob_acceptace_fee, m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
+    m_alice_bob_start_amount - bob_release_fee - bob_acceptace_fee, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    cpd.amount_b_pledge, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+  // mine a block containing cancellation acceptance
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // cancellation acceptance is confirmed
+  alice_bc->expect_balance(m_alice_bob_start_amount - alice_proposal_fee - alice_cancellation_request_fee, m_alice_bob_start_amount - 3 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_bob_start_amount - alice_proposal_fee - alice_cancellation_request_fee, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 3 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
+
+  bob_bc->expect_balance(m_alice_bob_start_amount - bob_release_fee - bob_acceptace_fee, m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
+    m_alice_bob_start_amount - bob_release_fee - bob_acceptace_fee, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 1 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+
+  //
+  // Stage 2 : check normal contract workflow
+  // don't check balances on request and accept as it was checked above
+  //
+  
+  uint64_t alice_balance_before_stage_2 = m_alice_bob_start_amount - alice_proposal_fee - alice_cancellation_request_fee;
+  uint64_t bob_balance_before_stage_2 = m_alice_bob_start_amount - bob_release_fee - bob_acceptace_fee;
+
+  alice_bc->expect_balance(alice_balance_before_stage_2 - alice_proposal_fee, m_alice_bob_start_amount - 5 * m_alice_bob_start_chunk_amount);
+
+  LOG_PRINT_GREEN("\n" "stage2: alice_wlt->send_escrow_proposal()", LOG_LEVEL_0);
+  proposal_tx = AUTO_VAL_INIT(proposal_tx);
+  escrow_template_tx = AUTO_VAL_INIT(escrow_template_tx);
+  alice_wlt->send_escrow_proposal(cpd, 0, 0, expiration_time, alice_proposal_fee, bob_release_fee, "", proposal_tx, escrow_template_tx);
+
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
+
+  contracts.clear();
+  r = alice_wlt->get_contracts(contracts);
+  CHECK_AND_ASSERT_MES(r && contracts.size() == 2, false, "get_contracts() for Alice failed");
+  // get new contract id
+  if (contract_id != contracts.begin()->first)
+    contract_id = contracts.begin()->first;
+  else
+    contract_id = (++contracts.begin())->first;
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  bob_wlt->refresh();
+
+  bob_bc->expect_balance(bob_balance_before_stage_2 - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount);
+
+  LOG_PRINT_GREEN("\n" "stage2: bob_wlt->accept_proposal()", LOG_LEVEL_0);
+  bob_wlt->accept_proposal(contract_id, bob_acceptace_fee);
+
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  alice_bc->expect_balance(alice_balance_before_stage_2 - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay, m_alice_bob_start_amount - 5 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    alice_balance_before_stage_2 - alice_proposal_fee - cpd.amount_a_pledge - cpd.amount_to_pay, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 5 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed");
+
+  bob_bc->expect_balance(bob_balance_before_stage_2 - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
+    bob_balance_before_stage_2 - cpd.amount_b_pledge - bob_release_fee - bob_acceptace_fee, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+  //
+  // contract release
+  //
+
+  alice_bc->expect_balance();
+
+  alice_wlt->finish_contract(contract_id, BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_NORMAL);
+
+  CHECK_AND_ASSERT_MES(!alice_bc->called(), false, "balance callback check failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // contract release tx is unconfirmed
+  alice_bc->expect_balance(alice_balance_before_stage_2 - alice_proposal_fee - cpd.amount_to_pay, m_alice_bob_start_amount - 5 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    alice_balance_before_stage_2 - alice_proposal_fee - cpd.amount_to_pay, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 5 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    cpd.amount_a_pledge, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
+
+  bob_bc->expect_balance(bob_balance_before_stage_2 - bob_release_fee - bob_acceptace_fee + cpd.amount_to_pay, m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
+    bob_balance_before_stage_2 - bob_release_fee - bob_acceptace_fee + cpd.amount_to_pay, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    cpd.amount_b_pledge + cpd.amount_to_pay, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // contract release tx is confirmed
+  alice_bc->expect_balance(alice_balance_before_stage_2 - alice_proposal_fee - cpd.amount_to_pay, m_alice_bob_start_amount - 5 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    alice_balance_before_stage_2 - alice_proposal_fee - cpd.amount_to_pay, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 5 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
+
+  bob_bc->expect_balance(bob_balance_before_stage_2 - bob_release_fee - bob_acceptace_fee + cpd.amount_to_pay, m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,
+    bob_balance_before_stage_2 - bob_release_fee - bob_acceptace_fee + cpd.amount_to_pay, // total
+    true, UINT64_MAX,
+    m_alice_bob_start_amount - 2 * m_alice_bob_start_chunk_amount, // unlocked
+    0, // mined
+    0, // awaited in
+    0  // awaited out
+    ), false, "");
+  CHECK_AND_ASSERT_MES(bob_bc->check(), false, "balance callback check failed, see above");
 
   return true;
 }

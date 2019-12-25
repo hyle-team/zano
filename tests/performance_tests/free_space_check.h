@@ -13,14 +13,14 @@
 
 namespace fs = boost::filesystem;
 
-std::string exec(const char* cmd)
+std::string exec(const std::string& str)
 {
     std::array<char, 1024> buffer;
 
 #if defined(WIN32)
-    std::unique_ptr<FILE, decltype(&_pclose)> pipe(_popen(cmd, "r"), _pclose);
+    std::unique_ptr<FILE, decltype(&_pclose)> pipe(_popen(str.c_str(), "r"), _pclose);
 #else
-    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(str.c_str(), "r"), pclose);
 #endif
 
     if (!pipe)
@@ -89,12 +89,13 @@ void free_space_check()
   bool r = false;
   
 #ifdef WIN32
-  output = exec("dir");
+  std::string command = "dir";
 #else
-  output = exec("df -h");
+  std::string command = "df -h && df -i";
 #endif
+  output = exec(command);
 
-  LOG_PRINT_L0("test command output:" << std::endl << output);
+  LOG_PRINT_L0("test command " << command << ", output:" << std::endl << output);
 
   r = try_write_test_file(test_file_size);
   LOG_PRINT_L0("test file write: " << (r ? "OK" : "fail"));
@@ -122,12 +123,9 @@ void free_space_check()
       }
       // free space is not ok!
       LOG_PRINT_YELLOW("1) fs::space() : available: " << si.available << ", free: " << si.free << ", capacity: " << si.capacity, LOG_LEVEL_0);
-#ifdef WIN32
-      output = exec("dir");
-#else
-      output = exec("df -h");
-#endif
-      LOG_PRINT_YELLOW(output, LOG_LEVEL_0);
+
+      output = exec(command);
+      LOG_PRINT_YELLOW("executed command: " << command << ", output: " << std::endl << output, LOG_LEVEL_0);
 
       // try one again asap
       si = fs::space(current_path);

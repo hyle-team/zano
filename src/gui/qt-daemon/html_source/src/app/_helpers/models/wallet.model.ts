@@ -21,12 +21,17 @@ export class Wallet {
   new_contracts?: number;
 
   history: Array<Transaction> = [];
+  total_history_item?: number;
+  pages = [];
+  totalPages: number;
+  currentPage: number;
   excluded_history: Array<Transaction> = [];
 
   contracts: Array<Contract> = [];
 
   progress?: number;
   loaded?: boolean;
+  restore?: boolean;
 
   send_data?: any = {
     address: null,

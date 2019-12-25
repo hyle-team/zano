@@ -63,7 +63,7 @@ bool clean_data_directory()
 
   for(auto& entry : boost::make_iterator_range(boost::filesystem::directory_iterator(config_folder), {}))
   {
-    const std::string& fn_str = entry.path().filename().string();
+    std::string fn_str = entry.path().filename().string();
     if (files.count(fn_str) != 0)
     {
       entries_to_remove.push_back(entry.path());
@@ -222,7 +222,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     auto after_init_cb = [crc, &alt_chains, &cps, core_time](currency::core& c)
     {
       c.get_blockchain_storage().set_core_runtime_config(crc);           // restore runtime config
-      c.get_blockchain_storage().set_alternative_chains(alt_chains);  // restore alt chains
+      c.get_blockchain_storage().set_alternative_chains(alt_chains);     // restore alt chains
       c.get_blockchain_storage().get_checkpoints() = cps;                // restore checkpoints
       test_core_time::adjust(core_time);                                 // restore core time
     };
@@ -231,7 +231,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     {
       core_time = test_core_time::get_time();                            // save core time
       crc = c.get_blockchain_storage().get_core_runtime_config();        // save runtime config
-      c.get_blockchain_storage().get_alternative_chains(alt_chains);  // save altchains
+      c.get_blockchain_storage().get_alternative_chains(alt_chains);     // save altchains
       cps = c.get_blockchain_storage().get_checkpoints();                // save checkpoints
       if (last_iter)
         core_state_after.fill(c);
@@ -250,7 +250,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if(!postponed_tests.count(#genclass) && (run_single_test.empty() || run_single_test == #genclass))                                              \
+  if(!postponed_tests.count(#genclass) && (run_single_test.empty() || std::string::npos != std::string(#genclass).find(run_single_test)))       \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -359,6 +359,7 @@ private:
   size_t m_ev_index;
   test_core_listener* m_core_listener;
 
+  mutable std::unordered_map<crypto::hash, currency::transaction> m_onboard_txs;
   bool m_txs_kept_by_block;
   bool m_skip_txs_blobsize_check;
 
@@ -389,11 +390,19 @@ public:
 
     size_t pool_size = m_c.get_pool_transactions_count();
     currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-    m_c.handle_incoming_tx(tx_blob, tvc, m_txs_kept_by_block);
-    bool tx_added = pool_size + 1 == m_c.get_pool_transactions_count();
-    bool r = check_tx_verification_context(tvc, tx_added, m_ev_index, tx, m_validator);
-    LOCAL_ASSERT(r);
-    CHECK_AND_NO_ASSERT_MES(r, false, "tx verification context check failed");
+    if (m_txs_kept_by_block)
+    {
+      m_onboard_txs[get_transaction_hash(tx)] = tx;
+    }
+    else
+    {
+      m_c.handle_incoming_tx(tx_blob, tvc, m_txs_kept_by_block);
+      bool tx_added = pool_size + 1 == m_c.get_pool_transactions_count();
+      bool r = check_tx_verification_context(tvc, tx_added, m_ev_index, tx, m_validator);
+      LOCAL_ASSERT(r);
+      CHECK_AND_NO_ASSERT_MES(r, false, "tx verification context check failed");
+    }
+
     return true;
   }
 
@@ -403,6 +412,7 @@ public:
       m_core_listener->before_block_pushed_to_core(b, blob_blk, m_c);
 
     currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+    bvc.m_onboard_transactions.swap(m_onboard_txs);
     m_c.handle_incoming_block(blob_blk, bvc);
     bool r = check_block_verification_context(bvc, m_ev_index, b, m_validator);
     CHECK_AND_NO_ASSERT_MES(r, false, "block verification context check failed");
@@ -655,7 +665,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_run_single_test);  
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
-  command_line::add_arg(desc_options, command_line::arg_db_engine);  
+  currency::core::init_options(desc_options);
 
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {
@@ -729,6 +739,7 @@ int main(int argc, char* argv[])
 
 #undef MARK_TEST_AS_POSTPONED
 
+    GENERATE_AND_PLAY(pos_minting_tx_packing);
 
     GENERATE_AND_PLAY(multisig_wallet_test);
     GENERATE_AND_PLAY(multisig_wallet_test_many_dst);
@@ -764,7 +775,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(escrow_cancellation_acceptance_expiration);
     // GENERATE_AND_PLAY(escrow_proposal_acceptance_in_alt_chain); -- work in progress
     GENERATE_AND_PLAY(escrow_zero_amounts);
-    GENERATE_AND_PLAY(escrow_acceptance_and_balance);
+    GENERATE_AND_PLAY(escrow_balance);
 
     GENERATE_AND_PLAY(escrow_altchain_meta_test<0>);
     GENERATE_AND_PLAY(escrow_altchain_meta_test<1>);
@@ -846,6 +857,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_outputs_with_same_key_image);
     GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
     GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
+    GENERATE_AND_PLAY(packing_outputs_on_pos_minting_wallet);
 
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
     GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);

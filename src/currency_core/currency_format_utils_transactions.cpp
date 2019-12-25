@@ -193,6 +193,16 @@ namespace currency
     return get_object_blobsize(t, tx_blob_size);
   }
   //---------------------------------------------------------------
+  size_t get_objects_blobsize(const std::list<transaction>& ls)
+  {
+    size_t total = 0;
+    for (const auto& tx : ls)
+    {
+      total += get_object_blobsize(tx);
+    }
+    return total;
+  }
+  //---------------------------------------------------------------
   size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size)
   {
     size_t tx_blob_size = prefix_blob_size;
@@ -245,6 +255,21 @@ namespace currency
   bool tx_to_blob(const transaction& tx, blobdata& b_blob)
   {
     return t_serializable_object_to_blob(tx, b_blob);
+  }
+  //---------------------------------------------------------------
+  bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil)
+  {
+    std::unordered_set<crypto::key_image> ki;
+    BOOST_FOREACH(const auto& in, tx.vin)
+    {
+      if (in.type() == typeid(txin_to_key))
+      {
+        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, false);
+        if (!ki.insert(tokey_in.k_image).second)
+          return false;
+      }
+    }
+    return true;
   }
 
 }

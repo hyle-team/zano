@@ -38,9 +38,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-make -j connectivity_tool;
+make -j connectivity_tool daemon simplewallet
 if [ $? -ne 0 ]; then
-    echo "Failed to make!"
+    echo "Failed to make binaries!"
     exit 1
 fi
 
@@ -66,11 +66,17 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-
+cp zanod simplewallet Zano.app/Contents/MacOS/
+if [ $? -ne 0 ]; then
+    echo "Failed to copy binaries to Zano.app folder"
+    exit 1
+fi
 
 # fix boost libs paths in main executable and libs to workaround El Capitan's SIP restrictions
 source ../../../utils/macosx_fix_boost_libs_path.sh
 fix_boost_libs_in_binary @executable_path/../Frameworks/boost_libs Zano.app/Contents/MacOS/Zano
+fix_boost_libs_in_binary @executable_path/../Frameworks/boost_libs Zano.app/Contents/MacOS/simplewallet
+fix_boost_libs_in_binary @executable_path/../Frameworks/boost_libs Zano.app/Contents/MacOS/zanod
 fix_boost_libs_in_libs @executable_path/../Frameworks/boost_libs Zano.app/Contents/Frameworks/boost_libs
 
 

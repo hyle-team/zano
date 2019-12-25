@@ -92,7 +92,7 @@ namespace currency
   inline void set_tx_flags(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_flags>(tx, v); }
   inline void set_tx_expiration_time(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_expiration_time>(tx, v); }
   account_public_address get_crypt_address_from_destinations(const account_keys& sender_account_keys, const std::vector<tx_destination_entry>& destinations);
-
+  //-----------------------------------------------------------------------------------------------
 
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median);
   uint64_t get_burned_amount(const transaction& tx);
@@ -104,7 +104,11 @@ namespace currency
   bool get_transaction_hash(const transaction& t, crypto::hash& res);
   bool get_transaction_hash(const transaction& t, crypto::hash& res, uint64_t& blob_size);
   size_t get_object_blobsize(const transaction& t);
+  size_t get_objects_blobsize(const std::list<transaction>& ls);
   size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
   blobdata tx_to_blob(const transaction& b);
   bool tx_to_blob(const transaction& b, blobdata& b_blob);
+  bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil);
+
+
 }

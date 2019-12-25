@@ -43,3 +43,47 @@ protected:
   mutable test_generator generator;
   std::shared_ptr<tools::i_core_proxy> m_core_proxy;
 };
+
+// wallet callback helper to check balance in wallet callbacks
+// see escrow_balance test for usage example 
+struct wallet_callback_balance_checker : public tools::i_wallet2_callback
+{
+  wallet_callback_balance_checker(const std::string& label) : m_label(label), m_result(true), m_called(false), m_balance(UINT64_MAX), m_unlocked_balance(UINT64_MAX), m_total_mined(UINT64_MAX) {}
+
+  void expect_balance(uint64_t balance = UINT64_MAX, uint64_t unlocked_balance = UINT64_MAX, uint64_t total_mined = UINT64_MAX)
+  {
+    m_balance = balance;
+    m_unlocked_balance = unlocked_balance;
+    m_total_mined = total_mined;
+    m_called = false;
+  }
+
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override
+  {
+    m_called = true;
+    m_result = false;
+    CHECK_AND_ASSERT_MES(m_balance == UINT64_MAX          || balance          == m_balance,          (void)(0), m_label << " balance is incorrect: "          << currency::print_money_brief(balance)          << ", expected: " << currency::print_money_brief(m_balance));
+    CHECK_AND_ASSERT_MES(m_unlocked_balance == UINT64_MAX || unlocked_balance == m_unlocked_balance, (void)(0), m_label << " unlocked balance is incorrect: " << currency::print_money_brief(unlocked_balance) << ", expected: " << currency::print_money_brief(m_unlocked_balance));
+    CHECK_AND_ASSERT_MES(m_total_mined == UINT64_MAX      || total_mined      == m_total_mined,      (void)(0), m_label << " total mined is incorrect: "      << currency::print_money_brief(total_mined)      << ", expected: " << currency::print_money_brief(m_total_mined));
+    m_result = true;
+  }
+
+  bool check()
+  {
+    bool result = m_result;
+    m_result = false; // clear result to avoid errorneous successive calls to check() without calling except_balance()
+    return result;
+  }
+
+  bool called()
+  {
+    return m_called;
+  }
+
+  bool m_result;
+  bool m_called;
+  std::string m_label;
+  uint64_t m_balance;
+  uint64_t m_unlocked_balance;
+  uint64_t m_total_mined;
+};

@@ -238,4 +238,18 @@
     overflow-x: hidden;
     overflow-y: overlay;
   }
+
+  
+  .pagination-wrapper {
+    .pagination {
+      padding: 1rem;
+      button {
+        margin-right: 0.5rem;
+        padding: 0;
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 1.2rem;
+      }
+    }
+  }
 }

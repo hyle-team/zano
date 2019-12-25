@@ -61,7 +61,7 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
 
   openWallet() {
     if (this.openForm.valid && this.openForm.get('name').value.length <= this.variablesService.maxWalletNameLength) {
-      this.backend.openWallet(this.filePath, this.openForm.get('password').value, false, (open_status, open_data, open_error) => {
+      this.backend.openWallet(this.filePath, this.openForm.get('password').value, this.variablesService.count, false, (open_status, open_data, open_error) => {
         if (open_error && open_error === 'FILE_NOT_FOUND') {
           let error_translate = this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
           error_translate += ':<br>' + this.filePath;
@@ -97,8 +97,18 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
                 open_data['wi'].tracking_hey
               );
               new_wallet.alias = this.backend.getWalletAlias(new_wallet.address);
+              new_wallet.currentPage = 1;
               if (open_data.recent_history && open_data.recent_history.history) {
+                new_wallet.total_history_item = open_data.recent_history.total_history_items;
+                new_wallet.totalPages = Math.ceil( open_data.recent_history.total_history_items / this.variablesService.count);
+                new_wallet.totalPages > this.variablesService.maxPages
+                ? new_wallet.pages = new Array(5).fill(1).map((value, index) => value + index)
+                  : new_wallet.pages = new Array(new_wallet.totalPages).fill(1).map((value, index) => value + index);
                 new_wallet.prepareHistory(open_data.recent_history.history);
+              } else {
+                new_wallet.total_history_item = 0;
+                new_wallet.pages = new Array(1).fill(1);
+                new_wallet.totalPages = 1;
               }
               this.backend.getContracts(open_data.wallet_id, (contracts_status, contracts_data) => {
                 if (contracts_status && contracts_data.hasOwnProperty('contracts')) {

@@ -2361,7 +2361,7 @@ bool multisig_out_make_and_spent_in_altchain::generate(std::vector<test_event_en
   MAKE_NEXT_BLOCK(events, blk_5b, blk_4b, miner_acc);
 
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_5b), get_block_hash(blk_5b)));
-  size_t tx_count = 1;
+  size_t tx_count = 0;
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", tx_count);
   DO_CALLBACK(events, "clear_tx_pool");
 

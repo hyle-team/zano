@@ -120,7 +120,6 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
   command_line::add_arg(desc_cmd_sett, command_line::arg_show_details);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_db_engine);
   command_line::add_arg(desc_cmd_sett, arg_alloc_win_console);
   command_line::add_arg(desc_cmd_sett, arg_html_folder);
   command_line::add_arg(desc_cmd_sett, arg_xcode_stub);
@@ -656,7 +655,7 @@ std::string daemon_backend::get_my_offers(const bc_services::core_offers_filter&
   return API_RETURN_CODE_OK;
 }
 
-std::string daemon_backend::open_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr)
+std::string daemon_backend::open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   owr.wallet_id = m_wallet_id_counter++;
@@ -678,8 +677,7 @@ std::string daemon_backend::open_wallet(const std::wstring& path, const std::str
     try
     {
       w->load(path, password);  
-      w->get_recent_transfers_history(owr.recent_history.history, 0, 0);
-      owr.recent_history.total_history_items = w->get_recent_transfers_total_count();
+      w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history);
       //workaround for missed fee
@@ -717,7 +715,7 @@ std::string daemon_backend::get_recent_transfers(size_t wallet_id, uint64_t offs
     return API_RETURN_CODE_CORE_BUSY;
   }
 
-  w->get()->get_recent_transfers_history(tr_hist.history, offset, count);
+  w->get()->get_recent_transfers_history(tr_hist.history, offset, count, tr_hist.total_history_items);
   //workaround for missed fee
   for (auto & he : tr_hist.history)
   {

@@ -45,6 +45,9 @@ export class VariablesService {
     wallets: []
   };
 
+  public count = 40;
+  public maxPages = 5;
+
   public wallets: Array<Wallet> = [];
   public currentWallet: Wallet;
   public selectWallet: number;

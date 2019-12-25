@@ -87,7 +87,7 @@ namespace currency
     bool pos,
     const pos_entry& pe)
   {
-    uint64_t block_reward;
+    uint64_t block_reward = 0;
     if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward, height))
     {
       LOG_ERROR("Block is too big");
@@ -857,14 +857,6 @@ namespace currency
         tx.extra.push_back(chs);
       else
         tx.attachment.push_back(chs);
-
-      LOG_PRINT_GREEN("ENCRYPTING ATTACHMENTS ON KEY: " << epee::string_tools::pod_to_hex(derivation) 
-        << " destination addr: " << currency::get_account_address_as_str(destination_addr) 
-        << " tx_random_key.sec" << tx_random_key.sec 
-        << " tx_random_key.pub" << tx_random_key.pub
-        << " sender address: " << currency::get_account_address_as_str(sender_keys.m_account_address)
-        , LOG_LEVEL_0);
-
     }
   }
   //---------------------------------------------------------------
@@ -980,6 +972,8 @@ namespace currency
     uint64_t flags)
   {
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "Too many outs (" << destinations.size() << ")! Tx can't be constructed.");
+
+    bool watch_only_mode = sender_account_keys.m_spend_secret_key == null_skey;
 
     bool append_mode = false;
     if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
@@ -1196,10 +1190,12 @@ namespace currency
         }
         sigs.resize(src_entr.outputs.size());
 
-        crypto::generate_ring_signature(tx_hash_for_signature, boost::get<txin_to_key>(tx.vin[input_index]).k_image, keys_ptrs, in_contexts[in_context_index].in_ephemeral.sec, src_entr.real_output, sigs.data());
+        if (!watch_only_mode)
+          crypto::generate_ring_signature(tx_hash_for_signature, boost::get<txin_to_key>(tx.vin[input_index]).k_image, keys_ptrs, in_contexts[in_context_index].in_ephemeral.sec, src_entr.real_output, sigs.data());
+
         ss_ring_s << "signatures:" << ENDL;
-        std::for_each(sigs.begin(), sigs.end(), [&](const crypto::signature& s){ss_ring_s << s << ENDL; });
-        ss_ring_s << "prefix_hash:" << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_contexts[in_context_index].in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output << ENDL;
+        std::for_each(sigs.begin(), sigs.end(), [&ss_ring_s](const crypto::signature& s) { ss_ring_s << s << ENDL; });
+        ss_ring_s << "prefix_hash: " << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_contexts[in_context_index].in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output << ENDL;
       }
       else
       {
@@ -1525,14 +1521,16 @@ namespace currency
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+      return false;
     return pk == out_key.key;
   }
   //---------------------------------------------------------------
   bool is_out_to_acc(const account_keys& acc, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk);
+    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+      return false;
     auto it = std::find(out_multisig.keys.begin(), out_multisig.keys.end(), pk);
     if (out_multisig.keys.end() == it)
       return false;
@@ -1593,7 +1591,8 @@ namespace currency
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     money_transfered = 0;
-    generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
+    bool r = generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "unable to generate derivation from tx_pub = " << tx_pub_key << " * view_sec, invalid tx_pub?");
 
     if (is_coinbase(tx) && get_block_height(tx) == 0 &&  tx_pub_key == ggenesis_tx_pub_key)
     {
@@ -2431,11 +2430,6 @@ namespace currency
     return CURRENCY_MAX_BLOCK_SIZE;
   }
   //-----------------------------------------------------------------------------------------------
-  size_t get_max_tx_size()
-  {
-    return CURRENCY_MAX_TRANSACTION_BLOB_SIZE;
-  }
-  //-----------------------------------------------------------------------------------------------
   uint64_t get_base_block_reward(bool is_pos, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t height)
   {
     if (!height)
@@ -2480,7 +2474,7 @@ namespace currency
     div128_32(product_hi, product_lo, static_cast<uint32_t>(median_size), &reward_hi, &reward_lo);
     div128_32(reward_hi, reward_lo, static_cast<uint32_t>(median_size), &reward_hi, &reward_lo);
     CHECK_AND_ASSERT_MES(0 == reward_hi, false, "0 == reward_hi");
-    CHECK_AND_ASSERT_MES(reward_lo < base_reward, false, "reward_lo < base_reward, reward: " << reward << ", base_reward: " << base_reward << ", current_block_size: " << current_block_size << ", median_size: " << median_size);
+    CHECK_AND_ASSERT_MES(reward_lo < base_reward, false, "reward_lo < base_reward, reward_lo: " << reward_lo << ", base_reward: " << base_reward << ", current_block_size: " << current_block_size << ", median_size: " << median_size);
 
     reward = reward_lo;
     return true;

@@ -1,4 +1,5 @@
-﻿// Copyright (c) 2019, anonimal, <anonimal@zano.org>
+﻿// Copyright (c) 2019, Zano Project
+// Copyright (c) 2019, anonimal, <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -24,12 +25,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
-
-
-
-
-#ifndef __WINH_OBJ_H__
-#define __WINH_OBJ_H__
+#pragma once
 #include <thread>
 #include <condition_variable>
 #include <atomic>
@@ -40,7 +36,7 @@
 
 #include "singleton.h"
 #include "static_initializer.h"
-
+#include "misc_helpers.h"
 
 //#define DISABLE_DEADLOCK_GUARD
 
@@ -55,9 +51,6 @@
   { \
     LOG_ERROR("MUTEX IS NOT FREE ON DESTRUCTOR: " << #mutex_mame); \
   }
-
-
-
 
 
 namespace epee
@@ -526,9 +519,11 @@ namespace epee
               << prev_it->second.func_name << " @ " << prev_it->second.block_location << std::endl << "    |" << std::endl << "    V" << std::endl;
             prev_it = current_it;
           }
-
-          ss << prev_it->second.thread_name << "(tid:" << prev_it->first << ")  blocked by locker \"" << lock_name << "(owned by " << (*threads_chain.begin())->second.thread_name << " tid:" << (*threads_chain.begin())->first << ")] at "
-            << func_name << " @ " << location << std::endl;
+          if (prev_it != m_thread_owned_locks.end())
+          {
+            ss << prev_it->second.thread_name << "(tid:" << prev_it->first << ")  blocked by locker \"" << lock_name << "(owned by " << (*threads_chain.begin())->second.thread_name << " tid:" << (*threads_chain.begin())->first << ")] at "
+              << func_name << " @ " << location << std::endl;
+          }
           m_deadlock_journal.push_back(ss.str());
           throw std::runtime_error(ss.str());
         }
@@ -605,14 +600,9 @@ namespace epee
 
     ~guarded_critical_region_t()
     {
-      // TODO(unassigned): because one cannot forward-declare macros,
-      //   the circular dependency created by misc_log_ex will not
-      //   allow us to actually use these substitutions.
-      //NESTED_TRY_ENTRY();
-
+      TRY_ENTRY();
       unlock();
-
-      //NESTED_CATCH_ENTRY(__func__);
+      CATCH_ALL_DO_NOTHING();
     }
 
     void unlock()
@@ -708,6 +698,9 @@ namespace epee
 #define  CRITICAL_REGION_BEGIN1(x)              CRITICAL_REGION_BEGIN_VAR(x, critical_region_var1)
 #define  CRITICAL_REGION_END()                  }
 
+
+#define  CIRITCAL_OPERATION(obj,op) {obj##_lock.lock();obj . op;obj##_lock.unlock();}
+
 #define  SHARED_CRITICAL_REGION_LOCAL(x) boost::shared_lock< boost::shared_mutex > critical_region_var(x)
 #define  EXCLUSIVE_CRITICAL_REGION_LOCAL(x) boost::unique_lock< boost::shared_mutex > critical_region_var(x)
 
@@ -716,6 +709,3 @@ namespace epee
 
 
 }
-
-#endif
-

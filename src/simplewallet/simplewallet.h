@@ -55,7 +55,7 @@ namespace currency
     bool refresh(const std::vector<std::string> &args);
     bool show_balance(const std::vector<std::string> &args = std::vector<std::string>());
     bool list_recent_transfers(const std::vector<std::string>& args);
-    bool list_recent_transfers_ex(const std::vector<std::string>& args);
+    bool export_recent_transfers(const std::vector<std::string>& args);
     bool dump_trunsfers(const std::vector<std::string>& args);
     bool dump_key_images(const std::vector<std::string>& args);
     bool show_incoming_transfers(const std::vector<std::string> &args);
@@ -67,6 +67,7 @@ namespace currency
     bool fix_collisions(const std::vector<std::string> &args  );
     bool scan_transfers_for_id(const std::vector<std::string> &args);
     bool scan_transfers_for_ki(const std::vector<std::string> &args);
+    bool print_utxo_distribution(const std::vector<std::string> &args);    
     bool show_blockchain_height(const std::vector<std::string> &args);
     bool show_wallet_bcheight(const std::vector<std::string> &args);    
     bool transfer(const std::vector<std::string> &args);
@@ -83,6 +84,7 @@ namespace currency
     bool save_watch_only(const std::vector<std::string> &args);
     bool sign_transfer(const std::vector<std::string> &args);
     bool submit_transfer(const std::vector<std::string> &args);
+    bool sweep_below(const std::vector<std::string> &args);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr);

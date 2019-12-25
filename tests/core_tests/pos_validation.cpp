@@ -1008,3 +1008,117 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
 
   return true;
 }
+
+//------------------------------------------------------------------
+
+pos_minting_tx_packing::pos_minting_tx_packing()
+  : m_pos_mint_packing_size(5)
+{
+  REGISTER_CALLBACK_METHOD(pos_minting_tx_packing, configure_core);
+  REGISTER_CALLBACK_METHOD(pos_minting_tx_packing, c1);
+}
+
+bool pos_minting_tx_packing::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = 1;
+  pc.pos_minimum_heigh = 1;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}
+
+bool pos_minting_tx_packing::pos_minting_tx_packing::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+
+  std::list<account_base> miner_acc_lst(1, miner_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+
+  m_alice_start_amount = 10 * CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size;// +TESTS_DEFAULT_FEE;
+  
+  transaction tx_1 = AUTO_VAL_INIT(tx_1);
+  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
+
+  events.push_back(tx_1);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, m_alice_start_amount, true, UINT64_MAX, m_alice_start_amount), false, "");
+
+  size_t pos_entries_count = 0;
+
+  for (size_t i = 0; i < m_pos_mint_packing_size; ++i)
+  {
+    r = mine_next_pos_block_in_playtime_with_wallet(*alice_wlt, m_accounts[ALICE_ACC_IDX].get_public_address(), pos_entries_count);
+    CHECK_AND_ASSERT_MES(r, false, "mine_next_pos_block_in_playtime_with_wallet failed");
+    alice_wlt->refresh();
+  }
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size, true, UINT64_MAX), false, "");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size, // total
+    true,
+    UINT64_MAX,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size // unlocked
+  ), false, "");
+
+  alice_wlt->set_pos_mint_packing_size(m_pos_mint_packing_size);
+
+  // no coinbase tx outputs should packed
+  r = alice_wlt->try_mint_pos();
+  CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  
+  // make sure the wallet has only received new locked incoming reward
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1), // total
+    true,
+    UINT64_MAX,
+    m_alice_start_amount // unlocked (one output with amount == CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size was spent as stake)
+  ), false, "");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+  
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1), // total
+    true,
+    UINT64_MAX,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1) // unlocked
+  ), false, "");
+
+  // coinbase tx outputs should be packed now, there's enough coinbase outputs (> m_pos_mint_packing_size)
+  r = alice_wlt->try_mint_pos();
+  CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 2), // total
+    true,
+    UINT64_MAX,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD
+  ), false, "");
+
+
+  return true;
+}
+
