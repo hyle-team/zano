@@ -2097,7 +2097,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   //prepare data
   std::string keys_buff;
-  bool r = store_keys(keys_buff, password);
+  bool r = store_keys(keys_buff, password, m_watch_only);
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store_keys for wallet " << ascii_path_to_save);
 
   //store data
