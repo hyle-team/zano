@@ -20,6 +20,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
   settings = icons.settings;
   exit = icons.exit;
 
+  isModalDialogVisible = false;
+  closeWalletId: number;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -66,6 +69,39 @@ export class SidebarComponent implements OnInit, OnDestroy {
         'CONTACTS.FORM_ERRORS.SET_MASTER_PASSWORD'
       );
     }
+  }
+
+  showDialog(wallet_id) {
+    this.isModalDialogVisible = true;
+    this.closeWalletId = wallet_id;
+  }
+
+  confirmed(confirmed: boolean) {
+    if (confirmed) {
+      this.closeWallet(this.closeWalletId);
+    }
+    this.isModalDialogVisible = false;
+  }
+
+  closeWallet(wallet_id) {
+    this.backend.closeWallet(wallet_id, () => {
+      for (let i = this.variablesService.wallets.length - 1; i >= 0; i--) {
+        if (this.variablesService.wallets[i].wallet_id === this.variablesService.currentWallet.wallet_id) {
+          this.variablesService.wallets.splice(i, 1);
+        }
+      }
+      this.ngZone.run(() => {
+        if (this.variablesService.wallets.length) {
+          this.variablesService.currentWallet = this.variablesService.wallets[0];
+          this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
+        } else {
+          this.router.navigate(['/']);
+        }
+      });
+      if (this.variablesService.appPass) {
+        this.backend.storeSecureAppData();
+      }
+    });
   }
 
   getUpdate() {
