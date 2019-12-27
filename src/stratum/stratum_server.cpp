@@ -532,7 +532,7 @@ namespace
       r = m_p_core->handle_block_found(m_block_template, &bvc, false);
       if (r)
       {
-        if (!bvc.m_verification_failed && !bvc.added_to_altchain && bvc.m_added_to_main_chain && !bvc.m_already_exists && !bvc.m_marked_as_orphaned)
+        if (!bvc.m_verification_failed && !bvc.m_added_to_altchain && bvc.m_added_to_main_chain && !bvc.m_already_exists && !bvc.m_marked_as_orphaned)
         {
           LP_CC_WORKER_GREEN(p_ph->get_context(), "found block " << block_hash << " at height " << height << " was successfully added to the blockchain, difficulty " << m_network_difficulty, LOG_LEVEL_0);
           r = update_block_template();
@@ -544,7 +544,7 @@ namespace
         {
           LP_CC_WORKER_RED(p_ph->get_context(), "block " << block_hash << " at height " << height << " was NOT added to the blockchain:" << ENDL <<
             "    verification_failed: " << bvc.m_verification_failed  << ENDL <<
-            "    added_to_altchain:   " << bvc.added_to_altchain      << ENDL <<
+            "    added_to_altchain:   " << bvc.m_added_to_altchain      << ENDL <<
             "    added_to_main_chain: " << bvc.m_added_to_main_chain  << ENDL <<
             "    already_exists:      " << bvc.m_already_exists       << ENDL <<
             "    marked_as_orphaned:  " << bvc.m_marked_as_orphaned, LOG_LEVEL_0);

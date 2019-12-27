@@ -92,6 +92,41 @@ app-wallet {
         background-color: themed(contentBackgroundColor);
       }
     }
+
+    .pagination-wrapper {
+
+      @include themify($themes) {
+        background-color: themed(contentBackgroundColor);
+      }
+
+      .pagination {
+
+        @include themify($themes) {
+          border-top: 0.2rem solid themed(transparentButtonBorderColor);
+        }
+  
+        button {
+          @include themify($themes) {
+            background-color: themed(transparentButtonBorderColor);
+            color: themed(mainTextColor);
+          }
+  
+          &.active {
+            @include themify($themes) {
+              background-color: themed(tableBackgroundColor);
+              color: themed(mainTextColor);
+            }
+          }
+  
+          &:hover {
+            @include themify($themes) {
+              background-color: themed(hoverPage);
+              color: themed(mainTextColor);
+            } 
+          }
+        }
+      }
+    }
   }
 }
 

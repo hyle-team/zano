@@ -42,6 +42,8 @@
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 
+#define WALLET_DEFAULT_POS_MINT_PACKING_SIZE                          100
+
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet");
@@ -256,6 +258,7 @@ namespace tools
     currency::account_public_address crypt_address;
     uint8_t tx_outs_attr;
     bool shuffle;
+    bool perform_packing;
   };
 
   struct finalize_tx_param
@@ -313,7 +316,8 @@ namespace tools
                               m_last_sync_percent(0), 
                               m_do_rise_transfer(false),
                               m_watch_only(false), 
-                              m_last_pow_block_h(0)
+                              m_last_pow_block_h(0), 
+                              m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {};
   public:
     wallet2() : m_stop(false), 
@@ -326,7 +330,8 @@ namespace tools
                 m_do_rise_transfer(false),
                 m_log_prefix("???"),
                 m_watch_only(false), 
-                m_last_pow_block_h(0)
+                m_last_pow_block_h(0), 
+                m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {
       m_core_runtime_config = currency::get_default_core_runtime_config();
     };
@@ -459,7 +464,7 @@ namespace tools
     currency::account_base& get_account() { return m_account; }
     const currency::account_base& get_account() const { return m_account; }
 
-    void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count);
+    void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total);
     uint64_t get_recent_transfers_total_count();
     void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs);
     void init(const std::string& daemon_address = "http://localhost:8080");
@@ -491,6 +496,7 @@ namespace tools
     
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
+    void set_pos_mint_packing_size(uint64_t new_size);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
     uint64_t balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const;
@@ -537,6 +543,11 @@ namespace tools
                   const std::vector<currency::extra_v>& extra, 
                   const std::vector<currency::attachment_v>& attachments, 
                   currency::transaction& tx);
+
+    void transfer(const construct_tx_param& ctp,
+                  currency::transaction &tx,
+                  bool send_to_network,
+                  std::string* p_signed_tx_blob_str);
 
     template<typename destination_split_strategy_t>
     void transfer_from_contract(
@@ -611,6 +622,9 @@ namespace tools
     void submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx);
     void submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx);
 
+    void sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
+      uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
+
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
     uint64_t get_blockchain_current_height() const { return m_blockchain.size(); }
 
@@ -670,6 +684,7 @@ namespace tools
     //PoS
     //synchronous version of function 
     bool try_mint_pos();
+    bool try_mint_pos(const currency::account_public_address& miner_address); // block reward will be sent to miner_address, stake will be returned back to the wallet
     //for unit tests
     friend class ::test_generator;
     
@@ -698,7 +713,6 @@ namespace tools
     bool reset_password(const std::string& pass);
     bool is_password_valid(const std::string& pass);
     bool get_actual_offers(std::list<bc_services::offer_details_ex>& offers);
-    bool get_fake_offers(std::list<bc_services::offer_details_ex>& offers, uint64_t amount);
     bool process_contract_info(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_attach);
     bool handle_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::proposal_body& prop);
     void accept_proposal(const crypto::hash& contract_id, uint64_t b_acceptance_fee, currency::transaction* p_acceptance_tx = nullptr);
@@ -725,10 +739,11 @@ namespace tools
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
     void prepare_transaction(const construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
-    void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx);
+    void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
 
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
+    bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
 
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
@@ -784,7 +799,9 @@ private:
     void process_genesis_if_needed(const currency::block& genesis);
     bool build_escrow_proposal(bc_services::contract_private_details& ecrow_details, uint64_t fee, uint64_t unlock_time, currency::tx_service_attachment& att, std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
+    bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
+    bool prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     uint64_t get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
     void prepare_tx_destinations(uint64_t needed_money,
       uint64_t found_money,
@@ -800,7 +817,9 @@ private:
 
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_public::wallet_transfer_info& wti) const;
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
-
+    
+    construct_tx_param get_default_construct_tx_param_inital();
+    const construct_tx_param& get_default_construct_tx_param();
 
     uint64_t get_tx_expiration_median() const;
 
@@ -837,12 +856,13 @@ private:
       const std::vector<uint64_t>& selected_indicies);
     void mark_transfers_as_spent(const std::vector<uint64_t>& selected_transfers, const std::string& reason = std::string());
     void mark_transfers_with_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason = std::string(), bool throw_if_flag_already_set = false);
-    void clear_transfers_from_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason = std::string());
+    void clear_transfers_from_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason = std::string()) noexcept;
     void exception_handler();
     void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
     void check_for_free_space_and_throw_if_it_lacks(const std::wstring& path, uint64_t exact_size_needed_if_known = UINT64_MAX);
-
+    bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
+    bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
 
 
     currency::account_base m_account;
@@ -855,6 +875,7 @@ private:
     std::atomic<uint64_t> m_local_bc_height; //temporary workaround 
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
+    uint64_t m_pos_mint_packing_size;
 
     transfer_container m_transfers;
     multisig_transfer_container m_multisig_transfers;

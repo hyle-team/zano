@@ -581,6 +581,7 @@
     "TRANSACTION_ERROR": "Error. Transaction not completed.",
     "BAD_ARG": "Invalid argument",
     "WALLET_WRONG_ID": "Invalid wallet ID",
+    "WALLET_WATCH_ONLY_NOT_SUPPORTED": "Watch-only wallets can only be opened by simplewallet",
     "WRONG_PASSWORD": "Invalid password",
     "FILE_RESTORED": "The wallet file was corrupted. We have recovered the keys and the wallet from the blockchain",
     "FILE_NOT_FOUND": "File not found",

@@ -56,13 +56,16 @@ namespace currency
     m_current_hash_rate(0),
     m_last_hr_merge_time(0),
     m_hashes(0),
-    m_config(AUTO_VAL_INIT(m_config))
+    m_config(AUTO_VAL_INIT(m_config)),
+    m_mine_address{}
   {
   }
   //-----------------------------------------------------------------------------------------------------
   miner::~miner()
   {
+    TRY_ENTRY();
     stop();
+    CATCH_ENTRY_NO_RETURN();
   }
   //-----------------------------------------------------------------------------------------------------
   bool miner::set_block_template(const block& bl, const wide_difficulty_type& di, uint64_t height)

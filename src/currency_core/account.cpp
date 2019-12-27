@@ -28,16 +28,21 @@ namespace currency
 
   //-----------------------------------------------------------------
   account_base::account_base()
-    :m_keys{}
-    ,m_creation_timestamp{}
-    ,m_seed{}
   {
     set_null();
   }
   //-----------------------------------------------------------------
   void account_base::set_null()
   {
+    // fill sensitive data with random bytes
+    crypto::generate_random_bytes(sizeof m_keys.m_spend_secret_key, &m_keys.m_spend_secret_key);
+    crypto::generate_random_bytes(sizeof m_keys.m_view_secret_key, &m_keys.m_view_secret_key);
+    crypto::generate_random_bytes(m_seed.size(), &m_seed[0]);
+    
+    // clear
     m_keys = account_keys();
+    m_creation_timestamp = 0;
+    m_seed.clear();
   }
   //-----------------------------------------------------------------
   void account_base::generate()
@@ -65,6 +70,8 @@ namespace currency
   std::string account_base::get_restore_braindata() const 
   {
     std::string restore_buff = get_restore_data();
+    if (restore_buff.empty())
+      return "";
     std::vector<unsigned char> v;
     v.assign((unsigned char*)restore_buff.data(), (unsigned char*)restore_buff.data() + restore_buff.size());
     std::string seed_brain_data = tools::mnemonic_encoding::binary2text(v);
@@ -124,7 +131,23 @@ namespace currency
   //-----------------------------------------------------------------
   void account_base::make_account_watch_only()
   {
-    m_keys.m_spend_secret_key = currency::null_skey;
+    // keep only:
+    // timestamp
+    // view pub & spend pub (public address)
+    // view sec
+    
+    // store to local tmp
+    uint64_t local_ts = m_creation_timestamp;
+    account_public_address local_addr = m_keys.m_account_address;
+    crypto::secret_key local_view_sec = m_keys.m_view_secret_key;
+
+    // clear
+    set_null();
+
+    // restore
+    m_creation_timestamp = local_ts;
+    m_keys.m_account_address = local_addr;
+    m_keys.m_view_secret_key = local_view_sec;
   }
   //-----------------------------------------------------------------
   std::string transform_addr_to_str(const account_public_address& addr)

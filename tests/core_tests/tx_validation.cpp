@@ -1514,12 +1514,12 @@ bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events)
   events.push_back(tx_2);
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(3));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
   // make a block with tx_0 and put tx_0 to the blockchain
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, m_miner_acc, tx_0);
 
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
   // tx_1 and tx_2 is still in the pool
   // it can never be added to any block as long as blk_1 is in the blockchain due to key image conflict
@@ -1531,7 +1531,7 @@ bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events)
   MAKE_NEXT_BLOCK_TX1(events, blk_1a, blk_0r, m_miner_acc, tx_1);
 
   // however, it does not remove tx from the pool
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
   //
   // make sure stuck tx will be removed from the pool when it's too old
@@ -1541,7 +1541,7 @@ bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events)
 
   // remove_stuck_txs should not remove anything, tx_1 and tx_2 should be in the pool
   DO_CALLBACK(events, "remove_stuck_txs");
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
   // shift time by CURRENCY_MEMPOOL_TX_LIVETIME
   events.push_back(event_core_time(CURRENCY_MEMPOOL_TX_LIVETIME + 1, true));
@@ -1562,11 +1562,11 @@ bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events)
   events.push_back(tx_2);
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
   // remove_stuck_txs should not remove anything, tx_1 and tx_2 should be in the pool
   DO_CALLBACK(events, "remove_stuck_txs");
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
   // rewind 50 blocks so tx_0 spending its key image will be deep enough
   REWIND_BLOCKS_N_WITH_TIME(events, blk_3r, blk_3, m_miner_acc, 50);

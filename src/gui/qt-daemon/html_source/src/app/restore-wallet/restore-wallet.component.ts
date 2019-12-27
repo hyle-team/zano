@@ -83,7 +83,16 @@ export class RestoreWalletComponent implements OnInit {
                     restore_data['wi'].tracking_hey
                   );
                   this.variablesService.opening_wallet.alias = this.backend.getWalletAlias(this.variablesService.opening_wallet.address);
+                  this.variablesService.opening_wallet.pages = new Array(1).fill(1);
+                  this.variablesService.opening_wallet.totalPages = 1;
+                  this.variablesService.opening_wallet.currentPage = 1;
+                  this.variablesService.opening_wallet.total_history_item = 0;
+                  this.variablesService.opening_wallet.restore = true;
                   if (restore_data.recent_history && restore_data.recent_history.history) {
+                    this.variablesService.opening_wallet.totalPages = Math.ceil( restore_data.recent_history.total_history_items / this.variablesService.count);
+                    this.variablesService.opening_wallet.totalPages > this.variablesService.maxPages
+                      ? this.variablesService.opening_wallet.pages = new Array(5).fill(1).map((value, index) => value + index)
+                        : this.variablesService.opening_wallet.pages = new Array(this.variablesService.opening_wallet.totalPages).fill(1).map((value, index) => value + index);
                     this.variablesService.opening_wallet.prepareHistory(restore_data.recent_history.history);
                   }
                   this.backend.getContracts(this.variablesService.opening_wallet.wallet_id, (contracts_status, contracts_data) => {

@@ -6,6 +6,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#include <unordered_map>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 
@@ -17,7 +18,7 @@
 
 #include "currency_basic.h"
 #include "difficulty.h"
-
+#include "currency_protocol/blobdatatype.h"
 namespace currency
 {
 
@@ -125,6 +126,32 @@ namespace currency
     }
   };
 
+  typedef bool fill_block_template_func_t(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height);
 
+  struct create_block_template_params
+  {
+    account_public_address miner_address;
+    account_public_address stakeholder_address;
+    blobdata ex_nonce;
+    bool pos = false;
+    pos_entry pe;
+    std::list<transaction> explicit_txs;
+    fill_block_template_func_t *pcustom_fill_block_template_func;
+  };
+
+  struct create_block_template_response
+  {
+    block b;
+    wide_difficulty_type diffic;
+    uint64_t height;
+  };
+
+  typedef std::unordered_map<crypto::hash, transaction> transactions_map;
+
+  struct block_ws_txs
+  {
+    block b;
+    transactions_map onboard_transactions;
+  };
 
 }

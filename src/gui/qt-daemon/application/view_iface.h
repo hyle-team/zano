@@ -373,22 +373,24 @@ public:
   {
     std::string pass;
     std::string path;
+    uint64_t txs_to_return;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
+      KV_SERIALIZE(txs_to_return)
     END_KV_SERIALIZE_MAP()
   };
 
   struct get_recent_transfers_request
   {
     uint64_t wallet_id;
-    uint64_t offest;
+    uint64_t offset;
     uint64_t count;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
-      KV_SERIALIZE(offest)
+      KV_SERIALIZE(offset)
       KV_SERIALIZE(count)
     END_KV_SERIALIZE_MAP()
   };
@@ -734,6 +736,7 @@ public:
 #define API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID                "BAD_ARG_WRONG_PAYMENT_ID"
 #define API_RETURN_CODE_WRONG_PASSWORD                          "WRONG_PASSWORD"
 #define API_RETURN_CODE_WALLET_WRONG_ID                         "WALLET_WRONG_ID"
+#define API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED         "WALLET_WATCH_ONLY_NOT_SUPPORTED"
 #define API_RETURN_CODE_FILE_NOT_FOUND                          "FILE_NOT_FOUND"
 #define API_RETURN_CODE_ALREADY_EXISTS                          "ALREADY_EXISTS"
 #define API_RETURN_CODE_CANCELED                                "CANCELED"

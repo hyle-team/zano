@@ -5,6 +5,8 @@
 #include <memory>
 #include <thread>
 #include <atomic>
+#include <boost/format.hpp>
+#include <bitset>
 
 #include "epee/include/include_base_utils.h"
 
@@ -14,6 +16,7 @@
 #include "common/db_abstract_accessor.h"
 #include "common/db_backend_lmdb.h"
 #include "serialization/serialization.h"
+#include "common/db_backend_mdbx.h"
 
 using namespace tools;
 
@@ -890,7 +893,8 @@ namespace lmdb_test
   //////////////////////////////////////////////////////////////////////////////
   // 2gb_test
   //////////////////////////////////////////////////////////////////////////////
-  TEST(lmdb, 2gb_test)
+  template<typename db_backend_t>
+  void db_2gb_test()
   {
     bool r = false;
     epee::shared_recursive_mutex rw_lock;
@@ -899,9 +903,9 @@ namespace lmdb_test
 
     static const uint64_t buffer_size = 64 * 1024;                                         // 64 KB
     static const uint64_t db_total_size = static_cast<uint64_t>(2.1 * 1024 * 1024 * 1024); // 2.1 GB -- a bit more than 2GB to test 2GB boundary
-    static const std::string db_file_path = "2gb_lmdb_test";
+    static const std::string db_file_path = std::string("2gb_") + typeid(db_backend_t).name() + "_test"; 
 
-    std::shared_ptr<db::lmdb_db_backend> lmdb_ptr = std::make_shared<db::lmdb_db_backend>();
+    std::shared_ptr<db_backend_t> lmdb_ptr = std::make_shared<db_backend_t>();
     db::basic_db_accessor bdba(lmdb_ptr, rw_lock);
 
     //
@@ -921,6 +925,27 @@ namespace lmdb_test
     std::vector<uint8_t> buffer;
     buffer.resize(buffer_size);
     crypto::generate_random_bytes(buffer_size, buffer.data());
+
+    std::vector<std::vector<uint8_t>> buffer_paranoidal_copies;
+    buffer_paranoidal_copies.resize(3);
+    for (size_t i = 0; i < buffer_paranoidal_copies.size(); ++i)
+      buffer_paranoidal_copies[i].assign(buffer.begin(), buffer.end());
+
+    auto check_buffer_paranoidal_copies = [&]() {
+      for (size_t buffer_index = 0; buffer_index < buffer_paranoidal_copies.size(); ++buffer_index)
+      {
+        for(size_t i = 0; i < buffer_size; ++i)
+        {
+          if (buffer[i] != buffer_paranoidal_copies[buffer_index][i])
+          {
+            std::cout << "!!! buffer differs from paranoidal copy #" << buffer_index << " at byte " << i << ": " << static_cast<uint32_t>(buffer[i]) << " != " << static_cast<uint32_t>(buffer_paranoidal_copies[buffer_index][i]) << std::endl;
+            break;
+          }
+        }
+      }
+    };
+
+    check_buffer_paranoidal_copies();
 
     uint64_t total_data = 0;
     for (uint64_t key = 0; key < db_total_size / buffer_size; ++key)
@@ -963,7 +988,58 @@ namespace lmdb_test
       ASSERT_TRUE(r);
       ASSERT_EQ(buffer_size, out_buffer.size());
 
-      ASSERT_TRUE(0 == memcmp(buffer.data(), out_buffer.c_str(), buffer_size));
+      if (memcmp(buffer.data(), out_buffer.c_str(), buffer_size) != 0)
+      {
+        // read data doesn't match with written one
+        std::cout << "ERROR: data missmatch at key " << key << ", total_data = " << total_data << std::endl;
+
+        // paranoid checks
+        check_buffer_paranoidal_copies();
+
+        size_t wrong_bytes = 0;
+        size_t wrong_bytes_min_idx = SIZE_MAX;
+        size_t wrong_bytes_max_idx = 0;
+        for (size_t i = 0; i < buffer_size; ++i)
+        {
+          if (buffer[i] != static_cast<unsigned char>(out_buffer[i]))
+          {
+            ++wrong_bytes;
+            if (wrong_bytes_min_idx == SIZE_MAX)
+              wrong_bytes_min_idx = i;
+            if (wrong_bytes_max_idx < i)
+              wrong_bytes_max_idx = i;
+            if (wrong_bytes < 10)
+            {
+              std::cout << "wrong byte at buffer offset " << boost::format("0x%04x") % i << ", file offset " << boost::format("0x%08x") % (total_data + i) << ": " <<
+                 boost::format("%02x") % static_cast<unsigned int>(static_cast<unsigned char>(out_buffer[i])) << " = " << std::bitset<8>(out_buffer[i]) << " instead of " <<
+                 boost::format("%02x") % static_cast<unsigned int>(buffer[i]) << " = " << std::bitset<8>(buffer[i]) << std::endl;
+            }
+          }
+        }
+
+        std::cout << "wrong bytes: " << wrong_bytes << " of " << buffer_size << " (" << std::fixed << std::setprecision(2) << 100.0 * wrong_bytes / buffer_size << "%)" << std::endl;
+
+        size_t line_len = 32;
+        size_t wrong_bytes_min_line = wrong_bytes_min_idx / line_len;
+        size_t wrong_bytes_max_line = wrong_bytes_max_idx / line_len + 1;
+
+        for (size_t l = wrong_bytes_min_line; l < wrong_bytes_max_line; ++l)
+        {
+          std::cout << boost::format("\n0x%04x  ") % ( l * line_len );
+          
+          for(size_t i = l * line_len; i < (l + 1) * line_len; ++i)
+            std::cout << boost::format("%02x") % static_cast<unsigned int>(buffer[i]) << (i % 4 == 3 ? " " : "");
+
+          std::cout << "  ";
+
+          for(size_t i = l * line_len; i < (l + 1) * line_len; ++i)
+            std::cout << boost::format("%02x") % static_cast<unsigned int>(static_cast<unsigned char>(out_buffer[i])) << (i % 4 == 3 ? " " : "");
+        }
+        std::cout << std::endl;
+
+
+        ASSERT_TRUE(false);
+      }
 
       total_data += buffer_size;
       if (key % 1024 == 0)
@@ -977,6 +1053,16 @@ namespace lmdb_test
 
     boost::filesystem::remove_all(db_file_path);
 
+  }
+
+  TEST(lmdb, 2gb_test)
+  {
+    db_2gb_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, 2gb_test)
+  {
+    db_2gb_test<db::mdbx_db_backend>();
   }
 
 } // namespace lmdb_test

@@ -305,14 +305,22 @@ namespace currency
     //now actually process block
     for(auto tx_blob_it = arg.b.txs.begin(); tx_blob_it!=arg.b.txs.end();tx_blob_it++)
     {
-      currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-      m_core.handle_incoming_tx(*tx_blob_it, tvc, true);
-      if(tvc.m_verification_failed)
+      if (tx_blob_it->size() > CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
       {
-        LOG_PRINT_L0("Block verification failed: transaction verification failed, dropping connection");
+        LOG_ERROR("WRONG TRANSACTION BLOB, too big size " << tx_blob_it->size() << ", rejected");
         m_p2p->drop_connection(context);
         return 1;
       }
+
+      crypto::hash tx_hash = null_hash;
+      transaction tx;
+      if (!parse_and_validate_tx_from_blob(*tx_blob_it, tx, tx_hash))
+      {
+        LOG_ERROR("WRONG TRANSACTION BLOB, Failed to parse, rejected");
+        m_p2p->drop_connection(context);
+        return 1;
+      }
+      bvc.m_onboard_transactions[tx_hash] = tx;
     }
     
     m_core.pause_mine();
@@ -327,10 +335,10 @@ namespace currency
     LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK EXTRA " << block_id 
       << " bvc.m_added_to_main_chain=" << bvc.m_added_to_main_chain
       //<< ", prevalidate_result=" << prevalidate_relayed
-      << ", bvc.added_to_altchain=" << bvc.added_to_altchain
+      << ", bvc.added_to_altchain=" << bvc.m_added_to_altchain
       << ", bvc.m_marked_as_orphaned=" << bvc.m_marked_as_orphaned, LOG_LEVEL_2);
 
-    if (bvc.m_added_to_main_chain || (bvc.added_to_altchain && bvc.height_difference < 2))
+    if (bvc.m_added_to_main_chain || (bvc.m_added_to_altchain && bvc.m_height_difference < 2))
     { 
       if (true/*!prevalidate_relayed*/)
       {
@@ -521,27 +529,36 @@ namespace currency
       {
         CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Blocks processing interrupted, connection dropped");
 
+        block_verification_context bvc = boost::value_initialized<block_verification_context>();
         //process transactions
         TIME_MEASURE_START(transactions_process_time);
         for (const auto& tx_blob : block_entry.txs)
         {
           CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Block txs processing interrupted, connection dropped");
-
-          tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-          m_core.handle_incoming_tx(tx_blob, tvc, true);
-          if(tvc.m_verification_failed)
+          crypto::hash tx_id = null_hash;
+          transaction tx = AUTO_VAL_INIT(tx);
+          if (!parse_and_validate_tx_from_blob(tx_blob, tx, tx_id))
           {
-            LOG_ERROR_CCONTEXT("transaction verification failed on NOTIFY_RESPONSE_GET_OBJECTS, \r\ntx_id = " 
+            LOG_ERROR_CCONTEXT("failed to parse tx: " 
               << string_tools::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
             m_p2p->drop_connection(context);
             return 1;
           }
+          bvc.m_onboard_transactions[tx_id] = tx;
+//           tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+//           m_core.handle_incoming_tx(tx_blob, tvc, true);
+//           if(tvc.m_verification_failed)
+//           {
+//             LOG_ERROR_CCONTEXT("transaction verification failed on NOTIFY_RESPONSE_GET_OBJECTS, \r\ntx_id = " 
+//               << string_tools::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
+//             m_p2p->drop_connection(context);
+//             return 1;
+//           }
         }
         TIME_MEASURE_FINISH(transactions_process_time);
 
         //process block
         TIME_MEASURE_START(block_process_time);
-        block_verification_context bvc = boost::value_initialized<block_verification_context>();
 
         m_core.handle_incoming_block(block_entry.block, bvc, false);
         if (count > 2 && bvc.m_already_exists)

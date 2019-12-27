@@ -36,7 +36,7 @@ export class OpenWalletModalComponent implements OnInit {
       this.wallet = this.wallets[0];
       this.wallet.pass = '';
 
-      this.backend.openWallet(this.wallet.path, '', true, (status, data, error) => {
+      this.backend.openWallet(this.wallet.path, '', this.variablesService.count, true, (status, data, error) => {
         if (error === 'FILE_NOT_FOUND') {
           this.wallet.notFound = true;
         }
@@ -54,7 +54,7 @@ export class OpenWalletModalComponent implements OnInit {
     if (this.wallets.length === 0) {
       return;
     }
-    this.backend.openWallet(this.wallet.path, this.wallet.pass, false, (open_status, open_data, open_error) => {
+    this.backend.openWallet(this.wallet.path, this.wallet.pass, this.variablesService.count, false, (open_status, open_data, open_error) => {
       if (open_error && open_error === 'FILE_NOT_FOUND') {
         let error_translate = this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
         error_translate += ':<br>' + this.wallet.path;
@@ -87,7 +87,16 @@ export class OpenWalletModalComponent implements OnInit {
             );
             new_wallet.alias = this.backend.getWalletAlias(new_wallet.address);
             if (open_data.recent_history && open_data.recent_history.history) {
+              new_wallet.total_history_item = open_data.recent_history.total_history_items;
+              new_wallet.totalPages = Math.ceil( open_data.recent_history.total_history_items / this.variablesService.count);
+              new_wallet.totalPages > this.variablesService.maxPages
+              ? new_wallet.pages = new Array(5).fill(1).map((value, index) => value + index)
+                : new_wallet.pages = new Array(new_wallet.totalPages).fill(1).map((value, index) => value + index);
               new_wallet.prepareHistory(open_data.recent_history.history);
+            } else {
+              new_wallet.total_history_item = 0;
+              new_wallet.pages = new Array(1).fill(1);
+              new_wallet.totalPages = 1;
             }
             this.backend.getContracts(open_data.wallet_id, (contracts_status, contracts_data) => {
               if (contracts_status && contracts_data.hasOwnProperty('contracts')) {

@@ -109,6 +109,9 @@ export class BackendService {
       case 'WALLET_WRONG_ID':
         error_translate = 'ERRORS.WALLET_WRONG_ID';
         break;
+      case 'WALLET_WATCH_ONLY_NOT_SUPPORTED':
+        error_translate = 'ERRORS.WALLET_WATCH_ONLY_NOT_SUPPORTED';
+        break;
       case 'WRONG_PASSWORD':
       case 'WRONG_PASSWORD:invalid password':
         params = JSON.parse(params);
@@ -374,10 +377,11 @@ export class BackendService {
     this.runCommand('generate_wallet', params, callback);
   }
 
-  openWallet(path, pass, testEmpty, callback) {
+  openWallet(path, pass, txs_to_return, testEmpty, callback) {
     const params = {
       path: path,
-      pass: pass
+      pass: pass,
+      txs_to_return: txs_to_return
     };
     params['testEmpty'] = !!(testEmpty);
     this.runCommand('open_wallet', params, callback);
@@ -629,6 +633,15 @@ export class BackendService {
         });
       });
     }
+  }
+
+  getRecentTransfers( id, offset, count, callback) {
+    const params = {
+      wallet_id: id,
+      offset: offset,
+      count: count
+    };
+    this.runCommand('get_recent_transfers', params, callback);
   }
 
   getPoolInfo(callback) {

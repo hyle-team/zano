@@ -147,6 +147,11 @@ bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::set_pos_mint_packing_size(uint64_t new_size)
+{
+  m_pos_mint_packing_size = new_size;
+}
+//----------------------------------------------------------------------------------------------------
 std::shared_ptr<i_core_proxy> wallet2::get_core_proxy()
 {
   return m_core_proxy;
@@ -385,7 +390,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         if (coin_base_tx)
         {
           //last out in coinbase tx supposed to be change from coinstake
-          if (!(i_in_outs == outs.size() - 1 && !is_derived_from_coinbase))
+          if (!(o == tx.vout.size() - 1 && !is_derived_from_coinbase))
           {
             td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER;
           }
@@ -574,7 +579,17 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(construct_param, ftp, tx);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
-  finalize_transaction(ftp, tx, one_time_key, true);
+
+  try
+  {
+    finalize_transaction(ftp, tx, one_time_key, true);
+  }
+  catch (...)
+  {
+    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception in finalize_transaction, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
+    throw;
+  }
+
   print_tx_sent_message(tx, "(contract <" + epee::string_tools::pod_to_hex(contract_id) + ">)", construct_param.fee);
 
   if (p_acceptance_tx != nullptr)
@@ -696,7 +711,16 @@ void wallet2::request_cancel_contract(const crypto::hash& contract_id, uint64_t 
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::secret_key sk = AUTO_VAL_INIT(sk);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been requested for cancellaton with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
-  finalize_transaction(ftp, tx, sk, true);
+
+  try
+  {
+    finalize_transaction(ftp, tx, sk, true);
+  }
+  catch (...)
+  {
+    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception in finalize_transaction, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
+    throw;
+  }
 
   print_tx_sent_message(tx, "(transport for cancel proposal)", fee);
 
@@ -1111,7 +1135,9 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response res = AUTO_VAL_INIT(res);
   get_short_chain_history(req.block_ids);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
-  THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getblocks.bin");
+  if (!r)
+    throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
+
   if (res.status == CORE_RPC_STATUS_GENESIS_MISMATCH)
   {
     WLT_LOG_MAGENTA("Reseting genesis block...", LOG_LEVEL_0);
@@ -1293,11 +1319,10 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
   currency::COMMAND_RPC_GET_TX_POOL::response res = AUTO_VAL_INIT(res);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_TX_POOL(req, res);
   if (res.status == CORE_RPC_STATUS_BUSY)
-    throw error::daemon_busy("", "get_tx_pool");
-  THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_tx_pool");
-  THROW_IF_TRUE_WALLET_EX(res.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "get_tx_pool");
+    throw error::daemon_busy(LOCATION_STR, "get_tx_pool");
+  if (!r)
+    throw error::no_connection_to_daemon(LOCATION_STR, "get_tx_pool");
   THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
-  
   
 
   //- @#@ ----- debug 
@@ -1591,22 +1616,22 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
       if(!added_blocks)
         break;
     }
+    catch (error::no_connection_to_daemon&)
+    {
+      blocks_fetched += added_blocks;
+      if (++try_count > 3)
+        return;
+      WLT_LOG_L2("no connection to the daemon, wait and try pull_blocks again (try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ")");
+      std::this_thread::sleep_for(std::chrono::seconds(3));
+    }
     catch (const std::exception& e)
     {
       blocks_fetched += added_blocks;
-      if(try_count < 3)
-      {
-        WLT_LOG_L1("Another try pull_blocks (try_count=" << try_count << "), exception: " << e.what());
-        ++try_count;
-      }
-      else
-      {
-        WLT_LOG_ERROR("pull_blocks failed, try_count=" << try_count << ", exception: " << e.what());
-        return;
-        //throw;
-      }
+      WLT_LOG_ERROR("refresh->pull_blocks failed, try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ", exception: " << e.what());
+      return;
     }
   }
+
   if(last_tx_hash_id != (m_transfers.size() ? get_transaction_hash(m_transfers.back().m_ptx_wallet_info->m_tx) : null_hash))
     received_money = true;
 
@@ -1907,7 +1932,7 @@ void wallet2::load_keys2ki(bool create_if_not_exist, bool& need_to_resync)
   {
     WLT_LOG_RED("m_pending_key_images size: " << m_pending_key_images.size() << " is GREATER than m_pending_key_images_file_container size: " << m_pending_key_images_file_container.size(), LOG_LEVEL_0);
     WLT_LOG_RED("UNRECOVERABLE ERROR, wallet stops", LOG_LEVEL_0);
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "UNRECOVERABLE ERROR, wallet stops: m_pending_key_images > m_pending_key_images_file_container");
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "UNRECOVERABLE ERROR, wallet stops: m_pending_key_images > m_pending_key_images_file_container" << ENDL << "Missing/wrong " << string_encoding::convert_to_ansii(m_pending_ki_file) << " file?");
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -2072,7 +2097,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   //prepare data
   std::string keys_buff;
-  bool r = store_keys(keys_buff, password);
+  bool r = store_keys(keys_buff, password, m_watch_only);
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store_keys for wallet " << ascii_path_to_save);
 
   //store data
@@ -2094,7 +2119,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!data_file.fail(), "failed to open binary wallet file for saving: " << tmp_file_path.string());
   data_file << header_buff << keys_buff;
 
-  WLT_LOG_L0("Storing to " << tmp_file_path.string() << " ...");
+  WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
 
   r = tools::portble_serialize_obj_to_stream(*this, data_file);
   if (!r)
@@ -2107,15 +2132,39 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   data_file.flush();
   data_file.close();
 
+  WLT_LOG_L1("Stored successfully to temporary file " << tmp_file_path.string());
+
   // for the sake of safety perform a double-renaming: wallet file -> old tmp, new tmp -> wallet file, remove old tmp
   
   boost::filesystem::path tmp_old_file_path = boost::filesystem::path(path_to_save);
   tmp_old_file_path += L".oldtmp_" + std::to_wstring(ts);
 
   if (boost::filesystem::is_regular_file(path_to_save))
+  {
     boost::filesystem::rename(path_to_save, tmp_old_file_path);
+    WLT_LOG_L1("Renamed: " << ascii_path_to_save << " -> " << tmp_old_file_path.string());
+  }
+  
   boost::filesystem::rename(tmp_file_path, path_to_save);
-  boost::filesystem::remove(tmp_old_file_path);
+  WLT_LOG_L1("Renamed: " << tmp_file_path.string() << " -> " << ascii_path_to_save);
+
+  if (boost::filesystem::remove(tmp_old_file_path))
+  {
+    WLT_LOG_L1("Removed temporary file: " << tmp_old_file_path.string());
+  }
+
+  bool path_to_save_exists       = boost::filesystem::is_regular_file(path_to_save);
+  bool tmp_file_path_exists      = boost::filesystem::is_regular_file(tmp_file_path);
+  bool tmp_old_file_path_exists  = boost::filesystem::is_regular_file(tmp_old_file_path);
+  if (path_to_save_exists && !tmp_file_path_exists && !tmp_old_file_path_exists)
+  {
+    WLT_LOG_L0("Wallet was successfully stored to " << ascii_path_to_save);
+  }
+  else
+  {
+    WLT_LOG_ERROR("Wallet stroing to " << ascii_path_to_save << " might not be successfull: path_to_save_exists=" << path_to_save_exists << ", tmp_file_path_exists=" << tmp_file_path_exists << ", tmp_old_file_path_exists=" << tmp_old_file_path_exists);
+    throw tools::error::wallet_common_error(LOCATION_STR, "Wallet file storing might not be successfull. Please make sure you have backed up your seed phrase and check log for details.");
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
@@ -2271,6 +2320,36 @@ void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) con
   incoming_transfers = m_transfers;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number)
+{
+  prepare_free_transfers_cache(0);
+  auto it = m_found_free_amounts.find(CURRENCY_BLOCK_REWARD);
+  if (it == m_found_free_amounts.end() || it->second.size() <= m_pos_mint_packing_size)
+    return false;
+  
+  //let's check if we have at least WALLET_POS_MINT_PACKING_SIZE transactions which is ready to go
+  size_t count = 0;
+  for (auto it_ind = it->second.begin(); it_ind != it->second.end() && count < m_pos_mint_packing_size; it_ind++)
+  {
+    if (is_transfer_ready_to_go(m_transfers[*it_ind], fake_outputs_number))
+      ++count;
+  }
+  if (count <= m_pos_mint_packing_size)
+    return false;
+  construct_tx_param ctp = get_default_construct_tx_param();
+  currency::tx_destination_entry de = AUTO_VAL_INIT(de);
+  de.addr.push_back(m_account.get_public_address());
+  de.amount = m_pos_mint_packing_size*CURRENCY_BLOCK_REWARD;
+  ctp.dsts.push_back(de);
+  ctp.perform_packing = true;
+  
+  TRY_ENTRY();
+  transfer(ctp, tx, false, nullptr);
+  CATCH_ENTRY2(false);
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const
 {
   static const char* header = "index                 amount  g_index  flags       block  tx                                                                  out#  key image";
@@ -2389,6 +2468,16 @@ void wallet2::sign_transfer_files(const std::string& tx_sources_file, const std:
   THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store signed tx to file " << signed_tx_file);
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution)
+{
+  prepare_free_transfers_cache(0);
+  for (auto ent : m_found_free_amounts)
+  {
+    distribution[ent.first] = ent.second.size();
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx)
 {
   // decrypt sources
@@ -2495,7 +2584,7 @@ uint64_t wallet2::get_recent_transfers_total_count()
   return m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count)
+void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total)
 {
   if (offset >= m_transfer_history.size())
     return;
@@ -2506,6 +2595,7 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
     stop = m_transfer_history.rend();
 
   trs.insert(trs.end(), start, stop);
+  total = m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
@@ -2663,6 +2753,11 @@ bool wallet2::fill_mining_context(mining_context& ctx)
 //------------------------------------------------------------------
 bool wallet2::try_mint_pos()
 {
+  return try_mint_pos(m_account.get_public_address());
+}
+//------------------------------------------------------------------
+bool wallet2::try_mint_pos(const currency::account_public_address& miner_address)
+{
   mining_context ctx = AUTO_VAL_INIT(ctx);
   WLT_LOG_L1("Starting PoS mining iteration");
   fill_mining_context(ctx);
@@ -2690,7 +2785,7 @@ bool wallet2::try_mint_pos()
   
   if (ctx.rsp.status == CORE_RPC_STATUS_OK)
   {
-    build_minted_block(ctx.sp, ctx.rsp);
+    build_minted_block(ctx.sp, ctx.rsp, miner_address);
   }
 
   WLT_LOG_L0("PoS mining iteration finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
@@ -2738,6 +2833,13 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     tmpl_req.pos_index = req.pos_entries[rsp.index].index;
     tmpl_req.extra_text = m_miner_text_info;
     tmpl_req.stake_unlock_time = req.pos_entries[rsp.index].stake_unlock_time;
+    //generate packing tx
+    transaction pack_tx = AUTO_VAL_INIT(pack_tx);
+    if (generate_packing_transaction_if_needed(pack_tx, 0))
+    {
+      tx_to_blob(pack_tx, tmpl_req.explicit_transaction);
+      WLT_LOG_GREEN("Pacling inputs: " << pack_tx.vin.size() << " inputs consolidated", LOG_LEVEL_0);
+    }
     m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
     WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == CORE_RPC_STATUS_OK, false, "Failed to create block template after kernel hash found!");
 
@@ -2781,10 +2883,13 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     
     WLT_LOG_GREEN("Block constructed <" << get_block_hash(b) << ">, sending to core...", LOG_LEVEL_0);
 
-    currency::COMMAND_RPC_SUBMITBLOCK::request subm_req = AUTO_VAL_INIT(subm_req);
-    currency::COMMAND_RPC_SUBMITBLOCK::response subm_rsp = AUTO_VAL_INIT(subm_rsp);
-    subm_req.push_back(epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(b)));
-    m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK(subm_req, subm_rsp);
+    currency::COMMAND_RPC_SUBMITBLOCK2::request subm_req = AUTO_VAL_INIT(subm_req);
+    currency::COMMAND_RPC_SUBMITBLOCK2::response subm_rsp = AUTO_VAL_INIT(subm_rsp);
+    subm_req.b = t_serializable_object_to_blob(b);
+    if (tmpl_req.explicit_transaction.size())
+      subm_req.explicit_txs.push_back(hexemizer{ tmpl_req.explicit_transaction });
+    
+    m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
     if (subm_rsp.status != CORE_RPC_STATUS_OK)
     {
       WLT_LOG_ERROR("Constructed block is not accepted by core, status: " << subm_rsp.status);
@@ -3024,6 +3129,7 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose) const
   }
   else
   {
+    boost::io::ios_flags_saver ifs(ss);
     ss << "index                 amount  spent_h  g_index   block  block_ts     flg tx                                                                   out#  key image" << ENDL;
     for (size_t i = 0; i != m_transfers.size(); i++)
     {
@@ -3065,39 +3171,6 @@ void wallet2::get_multisig_transfers(multisig_transfer_container& ms_transfers)
 bool wallet2::get_contracts(escrow_contracts_container& contracts)
 {
   contracts = m_contracts;
-  return true;
-}
-//----------------------------------------------------------------------------------------------------
-bool wallet2::get_fake_offers(std::list<bc_services::offer_details_ex>& offers, uint64_t amount)
-{
-
-  for (uint64_t i = 0; i != amount; i++)
-  {
-    bc_services::offer_details od;
-    od.offer_type = rand() % 4;
-    od.amount_primary = rand();
-    od.amount_target = rand();
-    od.bonus = get_random_rext(10);
-    od.target = get_random_rext(10);
-    od.location_country = get_random_rext(6);
-    od.location_city = get_random_rext(10);
-    od.contacts = get_random_rext(20);
-    od.comment = get_random_rext(30);
-    od.payment_types = get_random_rext(10);
-    od.deal_option = get_random_rext(10);
-    od.category = get_random_rext(4);
-    od.expiration_time = 3;
-
-    crypto::hash tx_id = crypto::rand<crypto::hash>();
-    offers.push_back(bc_services::offer_details_ex());
-    bc_services::offer_details_ex& odl = offers.back();
-    static_cast<bc_services::offer_details&>(odl) = od;
-    odl.timestamp = m_core_runtime_config.get_core_time();
-    odl.index_in_tx = 0;
-    odl.tx_hash = tx_id;
-    odl.stopped = false;
-    odl.fee = 10000;
-  }
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3404,11 +3477,41 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   print_tx_sent_message(tx, "(from multisig)", fee);
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
+{
+  prepare_free_transfers_cache(fake_outputs_count);
+  auto it = m_found_free_amounts.find(CURRENCY_BLOCK_REWARD);
+  if (it == m_found_free_amounts.end() || it->second.size() < m_pos_mint_packing_size)
+    return false;
+
+  for (auto set_it = it->second.begin(); set_it != it->second.end() && selected_indicies.size() <= m_pos_mint_packing_size; )
+  {
+    if (is_transfer_ready_to_go(m_transfers[*set_it], fake_outputs_count))
+    {
+      found_money += it->first;
+      selected_indicies.push_back(*set_it);
+      WLT_LOG_L2("Selected index: " << *set_it << ", transfer_details: " << ENDL << epee::serialization::store_t_to_json(m_transfers[*set_it]));
+      
+      it->second.erase(set_it++);
+    }
+    else
+      set_it++;
+  }
+  if (!it->second.size())
+    m_found_free_amounts.erase(it);
+
+  return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {
   found_money = select_transfers(needed_money, fake_outputs_count, dust_threshold, selected_indicies);
   THROW_IF_FALSE_WALLET_EX_MES(found_money >= needed_money, error::not_enough_money, "wallet_dump: " << ENDL << dump_trunsfers(false), found_money, needed_money, 0);
-
+  return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
+{
   typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
   typedef currency::tx_source_entry::output_entry tx_output_entry;
 
@@ -3571,17 +3674,18 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx,
 //----------------------------------------------------------------------------------------------------
 void wallet2::mark_transfers_with_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason /* = empty_string */, bool throw_if_flag_already_set /* = false */)
 {
-  if (throw_if_flag_already_set)
-  {
-    for (uint64_t i : selected_transfers)
-    {
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(i < m_transfers.size(), "invalid transfer index given: " << i << ", m_transfers.size() == " << m_transfers.size());
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX((m_transfers[i].m_flags & flag) == 0, "transfer #" << i << " already has flag " << flag << ": " << m_transfers[i].m_flags << ", transfer info:" << ENDL << epee::serialization::store_t_to_json(m_transfers[i]));
-    }
-  }
+  // check all selected transfers prior to flag change
   for (uint64_t i : selected_transfers)
   {
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(i < m_transfers.size(), "invalid transfer index given: " << i << ", m_transfers.size() == " << m_transfers.size());
+    if (throw_if_flag_already_set)
+    {
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX((m_transfers[i].m_flags & flag) == 0, "transfer #" << i << " already has flag " << flag << ": " << m_transfers[i].m_flags << ", transfer info:" << ENDL << epee::serialization::store_t_to_json(m_transfers[i]));
+    }
+  }
+
+  for (uint64_t i : selected_transfers)
+  {
     uint32_t flags_before = m_transfers[i].m_flags;
     m_transfers[i].m_flags |= flag;
     WLT_LOG_L1("marking transfer  #" << std::setfill('0') << std::right << std::setw(3) << i << " with flag " << flag << " : " << flags_before << " -> " << m_transfers[i].m_flags <<
@@ -3589,16 +3693,22 @@ void wallet2::mark_transfers_with_flag(const std::vector<uint64_t>& selected_tra
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::clear_transfers_from_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason /* = empty_string */)
+void wallet2::clear_transfers_from_flag(const std::vector<uint64_t>& selected_transfers, uint32_t flag, const std::string& reason /* = empty_string */) noexcept
 {
+  TRY_ENTRY();
   for (uint64_t i : selected_transfers)
   {
-    THROW_IF_TRUE_WALLET_EX(i >= m_transfers.size(), error::wallet_internal_error, "i >= m_transfers.size()");
+    if (i >= m_transfers.size())
+    {
+      WLT_LOG_ERROR("INTERNAL ERROR: i: " << i << " >= m_transfers.size() : " << m_transfers.size());
+      continue;
+    }
     uint32_t flags_before = m_transfers[i].m_flags;
     m_transfers[i].m_flags &= ~flag;
     WLT_LOG_L1("clearing transfer #" << std::setfill('0') << std::right << std::setw(3) << i << " from flag " << flag << " : " << flags_before << " -> " << m_transfers[i].m_flags <<
       (reason.empty() ? "" : ", reason: ") << reason);
   }
+  CATCH_ENTRY_NO_RETURN();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::exception_handler()
@@ -4047,7 +4157,9 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
   uint64_t found_money = 0;
 
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
-  if (ctp.multisig_id == currency::null_hash)
+  if (ctp.perform_packing)
+    prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, found_money);
+  else if (ctp.multisig_id == currency::null_hash)
     prepare_tx_sources(needed_money, ctp.fake_outputs_count, ctp.dust_policy.dust_threshold, ftp.sources, ftp.selected_transfers, found_money);
   else
     prepare_tx_sources(ctp.multisig_id, ftp.sources, found_money);
@@ -4069,6 +4181,7 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
   ftp.shuffle = ctp.shuffle;
   ftp.flags = ctp.flags;
   ftp.multisig_id = ctp.multisig_id;
+  ftp.spend_pub_key = m_account.get_public_address().m_spend_public_key;
 
   /* TODO
   WLT_LOG_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"
@@ -4079,11 +4192,14 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
     LOG_LEVEL_0);*/
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx)
+void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key /* = true */)
 {
   // NOTE: if broadcast_tx == true callback rise_on_transfer2() may be called at the end of this function.
   // That callback may call balance(), so it's important to have all used/spending transfers
   // to be correctly marked with corresponding flags PRIOR to calling finalize_transaction()
+
+  // broadcasting tx without secret key storing is forbidden to avoid lost key issues
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!broadcast_tx || store_tx_secret_key, "finalize_tx is requested to broadcast a tx without storing the key");
 
   //TIME_MEASURE_START_MS(construct_tx_time);
   bool r = currency::construct_tx(m_account.get_keys(),
@@ -4116,9 +4232,10 @@ void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::trans
   }
   //TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
-  m_tx_keys.insert(std::make_pair(get_transaction_hash(tx), tx_key));
-
   THROW_IF_FALSE_WALLET_EX(get_object_blobsize(tx) < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, tx, m_upper_transaction_size_limit);
+
+  if (store_tx_secret_key)
+    m_tx_keys.insert(std::make_pair(get_transaction_hash(tx), tx_key));
 
   //TIME_MEASURE_START(send_transaction_to_network_time);
   if (broadcast_tx)
@@ -4161,7 +4278,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   bool send_to_network,
   std::string* p_signed_tx_blob_str)
 {
-  TIME_MEASURE_START(precalculation_time);
+  //TIME_MEASURE_START(precalculation_time);
   construct_tx_param ctp = AUTO_VAL_INIT(ctp);
   ctp.attachments = attachments;
   ctp.crypt_address = currency::get_crypt_address_from_destinations(m_account.get_keys(), dsts);
@@ -4177,8 +4294,65 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   ctp.split_strategy_id = destination_split_strategy_id;
   ctp.tx_outs_attr = tx_outs_attr;
   ctp.unlock_time = unlock_time;
-  TIME_MEASURE_FINISH(precalculation_time);
+  //TIME_MEASURE_FINISH(precalculation_time);
+  transfer(ctp, tx, send_to_network, p_signed_tx_blob_str);
+}
+//----------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------
+construct_tx_param wallet2::get_default_construct_tx_param_inital()
+{
+  construct_tx_param ctp = AUTO_VAL_INIT(ctp);
 
+  ctp.fee = m_core_runtime_config.tx_default_fee;
+  ctp.dust_policy = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  ctp.split_strategy_id = tools::detail::ssi_digit;
+  ctp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+  ctp.shuffle = 0;
+  return ctp;
+}
+const construct_tx_param& wallet2::get_default_construct_tx_param()
+{
+  static construct_tx_param ctp = get_default_construct_tx_param_inital();
+  return ctp;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str /* = nullptr */)
+{
+  TIME_MEASURE_START(store_unsigned_tx_time);
+  blobdata bl = t_serializable_object_to_blob(ftp);
+  crypto::chacha_crypt(bl, m_account.get_keys().m_view_secret_key);
+
+  if (!filename.empty())
+  {
+    bool r = epee::file_io_utils::save_string_to_file(filename, bl);
+    CHECK_AND_ASSERT_MES(r, false, "failed to store unsigned tx to " << filename);
+    LOG_PRINT_L0("Transaction stored to " << filename << ". You need to sign this tx using a full-access wallet.");
+  }
+  else
+  {
+    CHECK_AND_ASSERT_MES(p_unsigned_tx_blob_str != nullptr, false, "empty filename and p_unsigned_tx_blob_str == null");
+    *p_unsigned_tx_blob_str = bl;
+  }
+
+  TIME_MEASURE_FINISH(store_unsigned_tx_time);
+
+  // reserve transfers at the very end
+  TIME_MEASURE_START(mark_transfers_as_spent_time);
+  mark_transfers_with_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION, std::string("cold sig reservation for money transfer"), true);
+  TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
+
+  WLT_LOG_GREEN("[wallet::store_unsigned_tx_to_file_and_reserve_transfers]"
+    << " store_unsigned_tx_time: " << print_fixed_decimal_point(store_unsigned_tx_time, 3)
+    << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
+    , LOG_LEVEL_1);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::transfer(const construct_tx_param& ctp,
+  currency::transaction &tx,
+  bool send_to_network,
+  std::string* p_signed_tx_blob_str)
+{
   TIME_MEASURE_START(prepare_transaction_time);
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(ctp, ftp);
@@ -4186,29 +4360,9 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
 
   if (m_watch_only)
   {
-    TIME_MEASURE_START(store_unsigned_tx_time);
-    ftp.spend_pub_key = m_account.get_public_address().m_spend_public_key;
-    blobdata bl = t_serializable_object_to_blob(ftp);
-    crypto::chacha_crypt(bl, m_account.get_keys().m_view_secret_key);
-    epee::file_io_utils::save_string_to_file("zano_tx_unsigned", bl);
-    LOG_PRINT_L0("Transaction stored to unsigned_zano_tx. You need to sign this tx using a full-access wallet.");
-
-    if (p_signed_tx_blob_str != nullptr)
-      *p_signed_tx_blob_str = bl;
-    TIME_MEASURE_FINISH(store_unsigned_tx_time);
-
-    // unlock transfers at the very end
-    TIME_MEASURE_START(mark_transfers_as_spent_time);
-    mark_transfers_with_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION, std::string("cold sig reservation for money transfer"), true);
-    TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
-
-    WLT_LOG_GREEN("[wallet::transfer]"
-      << "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
-      << ", prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
-      << ", store_unsigned_tx_time: " << print_fixed_decimal_point(store_unsigned_tx_time, 3)
-      << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
-      , LOG_LEVEL_0);
-
+    bool r = store_unsigned_tx_to_file_and_reserve_transfers(ftp, "zano_tx_unsigned", p_signed_tx_blob_str);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store unsigned tx");
+    WLT_LOG_GREEN("[wallet::transfer]" << " prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3), LOG_LEVEL_0);
     return;
   }
 
@@ -4231,14 +4385,268 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
 
 
   WLT_LOG_GREEN("[wallet::transfer]"
-    << "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
+    //<< "  precalculation_time: " << print_fixed_decimal_point(precalculation_time, 3)
     << ", prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3)
     << ", finalize_transaction_time: " << print_fixed_decimal_point(finalize_transaction_time, 3)
     << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
     , LOG_LEVEL_0);
 
-  print_tx_sent_message(tx, std::string() + "(transfer)", fee);
+  print_tx_sent_message(tx, std::string() + "(transfer)", ctp.fee);
 }
+//----------------------------------------------------------------------------------------------------
+void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
+  uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
+{
+  static const size_t estimated_bytes_per_input = 78;
+  const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit
+  const size_t tx_sources_for_querying_random_outs_max = estimated_max_inputs * 2;
 
+  bool r = false;
+  outs_total = 0;
+  amount_total = 0;
+  outs_swept = 0;
+
+  std::vector<size_t> selected_transfers;
+  selected_transfers.reserve(m_transfers.size());
+  for (size_t i = 0; i < m_transfers.size(); ++i)
+  {
+    const transfer_details& td = m_transfers[i];
+    uint64_t amount = td.amount();
+    if (amount < threshold_amount &&
+      is_transfer_ready_to_go(td, fake_outs_count))
+    {
+      selected_transfers.push_back(i);
+      outs_total += 1;
+      amount_total += amount;
+    }
+  }
+
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!selected_transfers.empty(), "No spendable outputs meet the criterion");
+
+  // sort by amount descending in order to spend bigger outputs first
+  std::sort(selected_transfers.begin(), selected_transfers.end(), [this](size_t a, size_t b) { return m_transfers[b].amount() < m_transfers[a].amount(); });
+
+  // limit RPC request with reasonable number of sources
+  if (selected_transfers.size() > tx_sources_for_querying_random_outs_max)
+    selected_transfers.erase(selected_transfers.begin() + tx_sources_for_querying_random_outs_max, selected_transfers.end());
+
+  typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
+  typedef currency::tx_source_entry::output_entry tx_output_entry;
+
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response rpc_get_random_outs_resp = AUTO_VAL_INIT(rpc_get_random_outs_resp);
+  if (fake_outs_count > 0)
+  {
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
+    req.use_forced_mix_outs = false;
+    req.outs_count = fake_outs_count + 1;
+    for (size_t i : selected_transfers)
+      req.amounts.push_back(m_transfers[i].amount());
+
+    r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, rpc_get_random_outs_resp);
+    
+    THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs.bin");
+    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status != CORE_RPC_STATUS_BUSY, error::daemon_busy, "getrandom_outs.bin");
+    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status == CORE_RPC_STATUS_OK, error::get_random_outs_error, rpc_get_random_outs_resp.status);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(rpc_get_random_outs_resp.outs.size() == selected_transfers.size(),
+      "daemon returned wrong number of amounts for getrandom_outs.bin: " << rpc_get_random_outs_resp.outs.size() << ", requested: " << selected_transfers.size());
+
+    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
+    for (COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_outs : rpc_get_random_outs_resp.outs)
+    {
+      if (amount_outs.outs.size() < fake_outs_count)
+        scanty_outs.push_back(amount_outs);
+    }
+    THROW_IF_FALSE_WALLET_EX(scanty_outs.empty(), error::not_enough_outs_to_mix, scanty_outs, fake_outs_count);
+  }
+
+  finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  if (!payment_id.empty())
+    set_payment_id_to_tx(ftp.attachments, payment_id);
+  // put encrypted payer info into the extra
+  ftp.crypt_address = destination_addr;
+  currency::tx_payer txp = AUTO_VAL_INIT(txp);
+  txp.acc_addr = m_account.get_public_address();
+  ftp.extra.push_back(txp);
+  ftp.flags = 0;
+  // ftp.multisig_id -- not required
+  // ftp.prepared_destinations -- will be filled by prepare_tx_destinations
+  // ftp.selected_transfers -- needed only at stage of broadcasting or storing unsigned tx
+  ftp.shuffle = false;
+  // ftp.sources -- will be filled in try_construct_tx
+  ftp.spend_pub_key = m_account.get_public_address().m_spend_public_key; // needed for offline signing
+  ftp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+  ftp.unlock_time = 0;
+  
+  enum try_construct_result_t {rc_ok = 0, rc_too_few_outputs = 1, rc_too_many_outputs = 2, rc_create_tx_failed = 3 };
+  auto get_result_t_str = [](try_construct_result_t t) -> const char*
+  { return t == rc_ok ? "rc_ok" : t == rc_too_few_outputs ? "rc_too_few_outputs" : t == rc_too_many_outputs ? "rc_too_many_outputs" : t == rc_create_tx_failed ? "rc_create_tx_failed" : "unknown"; };
+
+  auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_count, &fee, &destination_addr]
+    (size_t st_index_upper_boundary, finalize_tx_param& ftp, uint64_t& amount_swept) -> try_construct_result_t
+  {
+    // prepare inputs
+    amount_swept = 0;
+    ftp.sources.clear();
+    ftp.sources.resize(st_index_upper_boundary);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(st_index_upper_boundary <= selected_transfers.size(), "index_upper_boundary = " << st_index_upper_boundary << ", selected_transfers.size() = " << selected_transfers.size());
+    for (size_t st_index = 0; st_index < st_index_upper_boundary; ++st_index)
+    {
+      currency::tx_source_entry& src = ftp.sources[st_index];
+      size_t tr_index = selected_transfers[st_index];
+      transfer_details& td = m_transfers[tr_index];
+      src.transfer_index = tr_index;
+      src.amount = td.amount();
+      amount_swept += src.amount;
+      
+      // populate src.outputs with mix-ins
+      if (rpc_get_random_outs_resp.outs.size())
+      {
+        rpc_get_random_outs_resp.outs[st_index].outs.sort([](const out_entry& a, const out_entry& b) { return a.global_amount_index < b.global_amount_index; });
+        for (out_entry& daemon_oe : rpc_get_random_outs_resp.outs[st_index].outs)
+        {
+          if (td.m_global_output_index == daemon_oe.global_amount_index)
+            continue;
+          tx_output_entry oe;
+          oe.first = daemon_oe.global_amount_index;
+          oe.second = daemon_oe.out_key;
+          src.outputs.push_back(oe);
+          if (src.outputs.size() >= fake_outs_count)
+            break;
+        }
+      }
+
+      // insert real output into src.outputs
+      auto it_to_insert = std::find_if(src.outputs.begin(), src.outputs.end(), [&](const tx_output_entry& a)
+      {
+        if (a.first.type().hash_code() == typeid(uint64_t).hash_code())
+          return boost::get<uint64_t>(a.first) >= td.m_global_output_index;
+        return false; // TODO: implement deterministics real output placement in case there're ref_by_id outs
+      });
+      tx_output_entry real_oe;
+      real_oe.first = td.m_global_output_index;
+      real_oe.second = boost::get<txout_to_key>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target).key;
+      auto inserted_it = src.outputs.insert(it_to_insert, real_oe);
+      src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
+      src.real_output = inserted_it - src.outputs.begin();
+      src.real_output_in_tx_index = td.m_internal_output_index;
+      //detail::print_source_entry(src);
+    }
+
+    if (amount_swept <= fee)
+      return rc_too_few_outputs;
+
+    // try to construct a transaction
+    std::vector<currency::tx_destination_entry> dsts({ tx_destination_entry(amount_swept - fee, destination_addr) });
+    prepare_tx_destinations(0, 0, detail::ssi_digit, tools::tx_dust_policy(), dsts, ftp.prepared_destinations);
+
+    currency::transaction tx = AUTO_VAL_INIT(tx);
+    crypto::secret_key tx_key = AUTO_VAL_INIT(tx_key);
+    try
+    {
+      finalize_transaction(ftp, tx, tx_key, false, false);
+    }
+    catch (error::tx_too_big)
+    {
+      return rc_too_many_outputs;
+    }
+    catch (...)
+    {
+      return rc_create_tx_failed;
+    }
+
+    return rc_ok;
+  };
+
+  size_t st_index_upper_boundary = std::min(selected_transfers.size(), estimated_max_inputs);
+  uint64_t amount_swept = 0;
+  try_construct_result_t res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
+  
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(res != rc_too_few_outputs, st_index_upper_boundary << " biggest unspent outputs have total amount of " << print_money_brief(amount_swept)
+    << " which is less than required fee: " << print_money_brief(fee) << ", transaction cannot be constructed");
+  
+  if (res == rc_too_many_outputs)
+  {
+    WLT_LOG_L1("sweep_below: first try of try_construct_tx(" << st_index_upper_boundary << ") returned " << get_result_t_str(res));
+    size_t low_bound = 0;
+    size_t high_bound = st_index_upper_boundary;
+    finalize_tx_param ftp_ok = ftp;
+    for (;;)
+    {
+      if (low_bound + 1 >= high_bound)
+      {
+        st_index_upper_boundary = low_bound;
+        res = rc_ok;
+        ftp = ftp_ok;
+        break;
+      }
+      st_index_upper_boundary = (low_bound + high_bound) / 2;
+      try_construct_result_t res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
+      WLT_LOG_L1("sweep_below: try_construct_tx(" << st_index_upper_boundary << ") returned " << get_result_t_str(res));
+      if (res == rc_ok)
+      {
+        low_bound = st_index_upper_boundary;
+        ftp_ok = ftp;
+      }
+      else if (res == rc_too_many_outputs)
+      {
+        high_bound = st_index_upper_boundary;
+      }
+      else
+        break;
+    }
+  }
+
+  if (res != rc_ok)
+  {
+    uint64_t amount_min = UINT64_MAX, amount_max = 0, amount_sum = 0;
+    for (auto& i : selected_transfers)
+    {
+      uint64_t amount = m_transfers[i].amount();
+      amount_min = std::min(amount_min, amount);
+      amount_max = std::max(amount_max, amount);
+      amount_sum += amount;
+    }
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "try_construct_tx failed with result: " << get_result_t_str(res) << " (" << res << ")" <<
+      ", selected_transfers stats:\n" <<
+      "  outs:       " << selected_transfers.size() << ENDL <<
+      "  amount min: " << print_money(amount_min) << ENDL <<
+      "  amount max: " << print_money(amount_max) << ENDL <<
+      "  amount avg: " << (selected_transfers.empty() ? std::string("n/a") : print_money(amount_sum / selected_transfers.size())));
+  }
+
+  // populate ftp.selected_transfers from ftp.sources
+  ftp.selected_transfers.clear();
+  for (size_t i = 0; i < ftp.sources.size(); ++i)
+    ftp.selected_transfers.push_back(ftp.sources[i].transfer_index);
+
+  outs_swept = ftp.sources.size();
+  
+
+  if (m_watch_only)
+  {
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(p_filename_or_unsigned_tx_blob_str != nullptr, "p_filename_or_unsigned_tx_blob_str is null");
+    bool r = store_unsigned_tx_to_file_and_reserve_transfers(ftp, *p_filename_or_unsigned_tx_blob_str, p_filename_or_unsigned_tx_blob_str);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store unsigned tx");
+    return;
+  }
+
+  mark_transfers_as_spent(ftp.selected_transfers, "sweep_below");
+
+  transaction local_tx;
+  transaction* p_tx = p_result_tx != nullptr ? p_result_tx : &local_tx;
+  *p_tx = AUTO_VAL_INIT_T(transaction);
+  try
+  {
+    crypto::secret_key sk = AUTO_VAL_INIT(sk);
+    finalize_transaction(ftp, *p_tx, sk, true);
+  }
+  catch (...)
+  {
+    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception on sweep_below, tx id (might be wrong): ") + epee::string_tools::pod_to_hex(get_transaction_hash(*p_tx)));
+    throw;
+  }
+  
+
+}
 
 } // namespace tools

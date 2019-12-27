@@ -213,8 +213,8 @@ class boosted_tcp_server
       return true;
     }
 
-    idle_callback_conext_base(boost::asio::io_service& io_serice)
-        : m_timer(io_serice)
+    idle_callback_conext_base(boost::asio::io_service& io_serice): m_timer(io_serice), 
+                                                                   m_period(0)
     {
     }
     boost::asio::deadline_timer m_timer;
@@ -254,7 +254,14 @@ class boosted_tcp_server
       if(!ptr->call_handler())
         return true;
     }
-    catch(...) {
+    catch(std::exception& e)
+    {
+      LOG_ERROR("exeption caught in boosted_tcp_server::global_timer_handler: " << e.what() << ENDL << "won't be called anymore");
+      return true;
+    }
+    catch(...)
+    {
+      LOG_ERROR("unknown exeption caught in boosted_tcp_server::global_timer_handler, it won't be called anymore");
       return true;
     }
 

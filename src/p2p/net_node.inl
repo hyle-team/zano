@@ -100,9 +100,9 @@ namespace nodetool
     if (m_offline_mode)
       return false;
 
-    //@#@ workaround 
+    //@#@ temporary workaround
     return true;
-
+#if 0
     CRITICAL_REGION_LOCAL(m_blocked_ips_lock);
     auto it = m_blocked_ips.find(addr);
     if(it == m_blocked_ips.end())
@@ -114,6 +114,7 @@ namespace nodetool
       return true;
     }
     return false;
+#endif
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -280,10 +281,10 @@ namespace nodetool
     ADD_HARDCODED_SEED_NODE("94.130.137.230", P2P_DEFAULT_PORT);
     ADD_HARDCODED_SEED_NODE("95.217.42.247", P2P_DEFAULT_PORT);
     ADD_HARDCODED_SEED_NODE("94.130.160.115", P2P_DEFAULT_PORT);
-    ADD_HARDCODED_SEED_NODE("207.154.237.82", P2P_DEFAULT_PORT);
-    ADD_HARDCODED_SEED_NODE("207.154.240.198", P2P_DEFAULT_PORT);
-    ADD_HARDCODED_SEED_NODE("207.154.255.10", P2P_DEFAULT_PORT);
-    ADD_HARDCODED_SEED_NODE("207.154.228.141", P2P_DEFAULT_PORT);
+    ADD_HARDCODED_SEED_NODE("195.201.107.230", P2P_DEFAULT_PORT);
+    ADD_HARDCODED_SEED_NODE("95.217.46.49", P2P_DEFAULT_PORT);
+    ADD_HARDCODED_SEED_NODE("159.69.76.144", P2P_DEFAULT_PORT);
+    ADD_HARDCODED_SEED_NODE("144.76.183.143", P2P_DEFAULT_PORT);
 #else
     //TODO:
     ADD_HARDCODED_SEED_NODE("95.217.43.225", P2P_DEFAULT_PORT);
@@ -696,7 +697,7 @@ namespace nodetool
     if(just_take_peerlist)
     {
       m_net_server.get_config_object().close(con.m_connection_id);
-      LOG_PRINT_CC_GREEN(con, "CONNECTION HANDSHAKED OK AND CLOSED.", LOG_LEVEL_2);
+      LOG_PRINT_CC_GREEN(con, "CONNECTION HANDSHAKED OK AND CLOSED with peer " << string_tools::get_ip_string_from_int32(na.ip) << ":" << string_tools::num_to_string_fast(na.port), LOG_LEVEL_2);
       return true;
     }
 
@@ -707,7 +708,7 @@ namespace nodetool
     m_peerlist.append_with_peer_white(pe_local);
     //update last seen and push it to peerlist manager
 
-    LOG_PRINT_CC_GREEN(con, "CONNECTION HANDSHAKED OK.", LOG_LEVEL_2);
+    LOG_PRINT_CC_GREEN(con, "CONNECTION HANDSHAKED OK with peer " << string_tools::get_ip_string_from_int32(na.ip) << ":" << string_tools::num_to_string_fast(na.port), LOG_LEVEL_2);
     return true;
   }
   //-----------------------------------------------------------------------------------  

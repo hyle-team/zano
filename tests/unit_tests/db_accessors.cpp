@@ -428,3 +428,23 @@ TEST(db_accessor_tests, median_db_cache_test)
 
   m_naive_median.print_to_file(folder_name + "/naive_median_2.txt");
 }
+
+
+TEST(db_accessor_tests, dtor_without_init)
+{
+  epee::shared_recursive_mutex m_rw_lock;
+
+  {
+    tools::db::basic_db_accessor m_db(nullptr, m_rw_lock);
+    ASSERT_FALSE(m_db.is_open());
+  }
+
+  // make sure dtor called successfully with no exceptions
+
+  {
+    tools::db::basic_db_accessor m_db(nullptr, m_rw_lock);
+    m_db.close();
+    ASSERT_FALSE(m_db.is_open());
+  }
+
+}

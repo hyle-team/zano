@@ -122,3 +122,14 @@ struct pos_altblocks_validation : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct pos_minting_tx_packing : public wallet_test
+{
+  pos_minting_tx_packing();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable size_t m_pos_mint_packing_size;
+  mutable size_t m_alice_start_amount;
+};
