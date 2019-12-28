@@ -109,6 +109,9 @@ export class BackendService {
       case 'WALLET_WRONG_ID':
         error_translate = 'ERRORS.WALLET_WRONG_ID';
         break;
+      case 'WALLET_WATCH_ONLY_NOT_SUPPORTED':
+        error_translate = 'ERRORS.WALLET_WATCH_ONLY_NOT_SUPPORTED';
+        break;
       case 'WRONG_PASSWORD':
       case 'WRONG_PASSWORD:invalid password':
         params = JSON.parse(params);
