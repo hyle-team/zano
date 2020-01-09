@@ -1,10 +1,16 @@
 set(UPNPC_BUILD_STATIC ON CACHE BOOL "Build static library")
 set(UPNPC_BUILD_SHARED OFF CACHE BOOL "Build shared library")
 set(UPNPC_BUILD_TESTS OFF CACHE BOOL "Build test executables")
-add_subdirectory(miniupnp/miniupnpc)
 add_subdirectory(zlib)
 add_subdirectory(db)
 add_subdirectory(ethereum)
+
+
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  message("excluded db support for IOS build")
+  return()
+endif()
+add_subdirectory(miniupnp/miniupnpc)
 
 
 set_property(TARGET libminiupnpc-static PROPERTY FOLDER "contrib")

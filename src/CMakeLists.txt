@@ -1,7 +1,4 @@
-if(CMAKE_SYSTEM_NAME STREQL iOS)
-{
-  return()
-}
+
 if(POLICY CMP0043)
   cmake_policy(SET CMP0043 OLD)
 endif()
@@ -107,7 +104,7 @@ add_dependencies(wallet version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(WALLET)
 
 add_library(currency_core ${CURRENCY_CORE})
-add_dependencies(currency_core version rpc ${PCH_LIB_NAME})
+add_dependencies(currency_core version  ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(CURRENCY_CORE)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
