@@ -736,6 +736,7 @@ public:
 #define API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID                "BAD_ARG_WRONG_PAYMENT_ID"
 #define API_RETURN_CODE_WRONG_PASSWORD                          "WRONG_PASSWORD"
 #define API_RETURN_CODE_WALLET_WRONG_ID                         "WALLET_WRONG_ID"
+#define API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED         "WALLET_WATCH_ONLY_NOT_SUPPORTED"
 #define API_RETURN_CODE_FILE_NOT_FOUND                          "FILE_NOT_FOUND"
 #define API_RETURN_CODE_ALREADY_EXISTS                          "ALREADY_EXISTS"
 #define API_RETURN_CODE_CANCELED                                "CANCELED"

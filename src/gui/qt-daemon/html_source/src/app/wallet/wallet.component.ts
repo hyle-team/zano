@@ -22,7 +22,6 @@ export class WalletComponent implements OnInit, OnDestroy {
   copyAnimation = false;
   copyAnimationTimeout;
   balanceTooltip;
-  isModalDialogVisible = false;
   activeTab = 'history';
 
   public currentPage = 1;
@@ -187,38 +186,6 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   openInBrowser(link) {
     this.backend.openUrlInBrowser(link);
-  }
-
-  showDialog() {
-    this.isModalDialogVisible = true;
-  }
-
-  confirmed(confirmed: boolean) {
-    if (confirmed) {
-      this.closeWallet();
-    }
-    this.isModalDialogVisible = false;
-  }
-
-  closeWallet() {
-    this.backend.closeWallet(this.variablesService.currentWallet.wallet_id, () => {
-      for (let i = this.variablesService.wallets.length - 1; i >= 0; i--) {
-        if (this.variablesService.wallets[i].wallet_id === this.variablesService.currentWallet.wallet_id) {
-          this.variablesService.wallets.splice(i, 1);
-        }
-      }
-      this.ngZone.run(() => {
-        if (this.variablesService.wallets.length) {
-          this.variablesService.currentWallet = this.variablesService.wallets[0];
-          this.router.navigate(['/wallet/' + this.variablesService.currentWallet.wallet_id]);
-        } else {
-          this.router.navigate(['/']);
-        }
-      });
-      if (this.variablesService.appPass) {
-        this.backend.storeSecureAppData();
-      }
-    });
   }
 
   public setPage(pageNumber: number) {

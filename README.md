@@ -30,7 +30,21 @@ Recommended OS version: Ubuntu 17.04 LTS.
 For GUI version:\
 `$ sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git libboost-all-dev screen mesa-common-dev libglu1-mesa-dev qt5-default qtwebengine5-dev`
 
-2. `$ cd zano/ && make -j$(nproc) gui`
+2. Building binaries \
+  2.1. Building daemon and simplewallet: \
+   &nbsp;&nbsp;`$ cd zano/ && make -j` \
+   &nbsp;&nbsp;or  \
+   &nbsp;&nbsp;`$ cd zano && mkdir build && cd build `\
+   &nbsp;&nbsp;`$ cmake .. `\
+   &nbsp;&nbsp;`$ make -j daemon simplewallet` \ 
+  2.2. Building GUI: \
+   &nbsp;&nbsp;`$ cd zano/ && make -j gui ` \
+   &nbsp;&nbsp;or \
+   &nbsp;&nbsp;`$ cd zano && mkdir build && cd build `\
+   &nbsp;&nbsp;`$ cmake -D BUILD_GUI=ON .. `\
+   &nbsp;&nbsp;`$ make -j Zano` \
+   &nbsp;&nbsp;`$ rsync -haP ~/zano/src/gui/qt-daemon/html ~/zano/build/src` \
+NOTICE: If you are building on machine with relatively small anount of RAM(small VPS for example, less then 16GB) and without proper setting of virtual memory, then be careful with setting `-j` option, this may cause compiller crashes. 
 3. Look for the binaries, including the `Zano` GUI, in the build directory
 
 ### Windows
@@ -54,14 +68,14 @@ Recommended OS version: macOS Sierra 10.12.6 x64.
 
 To build GUI application:
 
-1. Create self-signing certificate via Keychain Access:
-    a. Run Keychain Access.
-    b. Choose Keychain Access > Certificate Assistant > Create a Certificate.
-    c. Use “Zano” (without quotes) as certificate name.
-    d. Choose “Code Signing” in “Certificate Type” field.
-    e. Press “Create”, then “Done”.
-    f. Make sure the certificate was added to keychain "System". If not—move it to "System".
-    g. Double click the certificate you've just added, enter the trust section and under "When using this certificate" select "Always trust".
+1. Create self-signing certificate via Keychain Access:\
+    a. Run Keychain Access.\
+    b. Choose Keychain Access > Certificate Assistant > Create a Certificate.\
+    c. Use “Zano” (without quotes) as certificate name.\
+    d. Choose “Code Signing” in “Certificate Type” field.\
+    e. Press “Create”, then “Done”.\
+    f. Make sure the certificate was added to keychain "System". If not—move it to "System".\
+    g. Double click the certificate you've just added, enter the trust section and under "When using this certificate" select "Always trust".\
     h. Unfold the certificate in Keychain Access window and double click underlying private key "Zano". Select "Access Control" tab, then select "Allow all applications to access this item". Click "Save Changes".
 2. Revise building script, comment out unwanted steps and run it:  `utils/build_script_mac_osx.sh`
 3. The application should be here: `/buid_mac_osx_64/release/src`

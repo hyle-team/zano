@@ -179,6 +179,31 @@
             }
           }
         }
+
+        button {
+          display: flex;
+          align-items: center;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          font-weight: 400;
+          outline: none;
+          padding: 0;
+          padding-bottom: 5rem;
+          position: absolute;
+          left: 105%;
+      
+          .icon {
+            margin-right: 1.2rem;
+            width: 1.3rem;
+            height: 1.3rem;
+
+            &.close-wallet {
+              mask: url(../../assets/icons/close-wallet.svg) no-repeat center;
+              margin-right: 0;
+            }
+          }
+        }
       }
 
       &:focus {
