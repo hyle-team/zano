@@ -1,4 +1,7 @@
-
+if(CMAKE_SYSTEM_NAME STREQL iOS)
+{
+  return()
+}
 if(POLICY CMP0043)
   cmake_policy(SET CMP0043 OLD)
 endif()
@@ -99,9 +102,18 @@ endif()
 
 add_library(crypto ${CRYPTO})
 
+add_library(wallet ${WALLET})
+add_dependencies(wallet version ${PCH_LIB_NAME})
+ENABLE_SHARED_PCH(WALLET)
+
 add_library(currency_core ${CURRENCY_CORE})
 add_dependencies(currency_core version rpc ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(CURRENCY_CORE)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  message("Generating for iOS: finished")
+  return()
+endif()
 
 add_library(rpc ${RPC})
 add_dependencies(rpc version ${PCH_LIB_NAME})
@@ -111,9 +123,6 @@ add_library(stratum ${STRATUM})
 add_dependencies(stratum version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(STRATUM)
 
-add_library(wallet ${WALLET})
-add_dependencies(wallet version ${PCH_LIB_NAME})
-ENABLE_SHARED_PCH(WALLET)
 
 target_link_libraries(currency_core lmdb mdbx)
 
