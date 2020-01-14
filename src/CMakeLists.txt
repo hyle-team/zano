@@ -1,4 +1,7 @@
-
+if(CMAKE_SYSTEM_NAME STREQL iOS)
+{
+  return()
+}
 if(POLICY CMP0043)
   cmake_policy(SET CMP0043 OLD)
 endif()

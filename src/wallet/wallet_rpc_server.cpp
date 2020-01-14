@@ -53,7 +53,7 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address)
   {
-    static const uint64_t wallet_rpt_idle_work_period_ms = 2000;
+    static const uint64_t wallet_rpc_idle_work_period_ms = 2000;
 
     m_do_mint = do_mint;
 
@@ -97,7 +97,7 @@ namespace tools
         }
 
         return true;
-      }, wallet_rpt_idle_work_period_ms);
+      }, wallet_rpc_idle_work_period_ms);
     }
 
     //DO NOT START THIS SERVER IN MORE THEN 1 THREADS WITHOUT REFACTORING

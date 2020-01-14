@@ -25,8 +25,8 @@ namespace currency {
   using std::vector;
 
 #if defined(_MSC_VER)
-#include <windows.h>
-#include <winnt.h>
+//#include <windows.h>
+//#include <winnt.h>
 
   static inline void mul(uint64_t a, uint64_t b, uint64_t &low, uint64_t &high) {
     boost::multiprecision::uint128_t res = boost::multiprecision::uint128_t(a) * b;

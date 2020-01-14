@@ -171,7 +171,6 @@ namespace currency
 
     transactions_container m_db_transactions;
     hash_container  m_db_black_tx_list;
-    //key_images_container m_db_key_images_set;
     aliases_container m_db_alias_names;
     address_to_aliases_container m_db_alias_addresses;
     solo_options_container m_db_solo_options;
