@@ -7,14 +7,18 @@
 
 #include <string>
 
-namespace wallet
+namespace plain_wallet
 {
   typedef void* hwallet;
   hwallet create_instance(const std::string port, const std::string ip);
-  void destroy_instance(hwallet);
-  std::string open(const std::string& path, const std::string password);
-  void start_sync_thread(hwallet);
-  std::string get_sync_status(hwallet);
-  std::string sync(hwallet);
+  void destroy_instance(hwallet h);
+
+  std::string open(hwallet h, const std::string& path, const std::string password);
+  std::string restore(hwallet h, const std::string& seed, const std::string& path, const std::string password);
+  std::string generate(hwallet h, const std::string& path, const std::string password);
+
+  void start_sync_thread(hwallet h);
+  std::string get_sync_status(hwallet h);
+  std::string sync(hwallet h);
   std::string invoke(hwallet h, const std::string& params);
 }

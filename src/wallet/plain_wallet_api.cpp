@@ -6,34 +6,49 @@
 #include "plain_wallet_api.h"
 #include "plain_wallet_api_impl.h"
 
-namespace wallet
+namespace plain_wallet
 {
   hwallet create_instance(const std::string port, const std::string ip)
   {
-
+    return new plain_wallet_api_impl(port, ip);
   }
-  void destroy_instance(hwallet)
+  void destroy_instance(hwallet h)
   {
-
+    delete ((plain_wallet_api_impl*)h);
   }
-  std::string open(const std::string& path, const std::string password)
+  std::string open(hwallet h, const std::string& path, const std::string password)
   {
-
+    plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
+    return pimpl->open(path, password);
   }
-  void start_sync_thread(hwallet)
+  std::string restore(hwallet h, const std::string& seed, const std::string& path, const std::string password)
   {
-
+    plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
+    return pimpl->restore(seed, path, password);
   }
-  std::string get_sync_status(hwallet)
+  std::string generate(hwallet h, const std::string& path, const std::string password)
   {
-
+    plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
+    return pimpl->generate(path, password);
   }
-  std::string sync(hwallet)
+  void start_sync_thread(hwallet h)
   {
-
+    plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
+    pimpl->start_sync_thread();
+  }
+  std::string get_sync_status(hwallet h)
+  {
+    plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
+    pimpl->get_sync_status();
+  }
+  std::string sync(hwallet h)
+  {
+    plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
+    pimpl->sync();
   }
   std::string invoke(hwallet h, const std::string& params)
   {
-
+    plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
+    pimpl->invoke(params);
   }
 }
