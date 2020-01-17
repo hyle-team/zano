@@ -99,21 +99,27 @@ namespace plain_wallet
   {
     m_sync_thread = std::thread([&]() 
     {
-    
+      m_wallet->refresh(m_stop);
     });
   }
+
+  bool plain_wallet_api_impl::cancel_sync_thread()
+  {
+    m_stop = true;
+  }
+
   std::string plain_wallet_api_impl::get_sync_status()
   {
-
+    m_wallet->get_sync_progress();
   }
 
   std::string plain_wallet_api_impl::sync()
   {
-
+    m_wallet->refresh(m_stop);
   }
   std::string plain_wallet_api_impl::invoke(const std::string& params)
   {
-
+    m_rpc_wrapper->handle_http_request_map()
   }
 
 

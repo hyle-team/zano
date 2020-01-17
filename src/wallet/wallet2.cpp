@@ -1236,6 +1236,11 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
   WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << m_blockchain.size());
 }
 //----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_sync_progress()
+{
+  return m_last_sync_percent;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::refresh()
 {
   size_t blocks_fetched = 0;

@@ -21,6 +21,7 @@ namespace plain_wallet
     std::string generate(const std::string& path, const std::string password);
 
     bool start_sync_thread();
+    bool cancel_sync_thread();
     std::string get_sync_status();
 
     std::string sync();

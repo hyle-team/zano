@@ -744,7 +744,7 @@ namespace tools
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
     bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
-
+    uint64_t get_sync_progress();
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
@@ -895,7 +895,7 @@ private:
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
     uint64_t m_height_of_start_sync;
-    uint64_t m_last_sync_percent;
+    std::atomic<uint64_t> m_last_sync_percent;
     uint64_t m_last_pow_block_h;
     currency::core_runtime_config m_core_runtime_config;
     escrow_contracts_container m_contracts;
