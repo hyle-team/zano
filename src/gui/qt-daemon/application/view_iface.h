@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <QObject>
-#ifndef Q_MOC_RUN
+// #include <stdint.h>
+// #include <QObject>
+// #ifndef Q_MOC_RUN
 #include "warnings.h"
 
 PUSH_VS_WARNINGS
@@ -22,7 +22,7 @@ DISABLE_VS_WARNINGS(4503)
 #include "currency_core/basic_api_response_codes.h"
 POP_VS_WARNINGS
 
-#endif
+//#endif
 
 namespace view
 {

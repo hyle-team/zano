@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "plain_wallet_api_impl.h"
+#include "wallet/wallet_helpers.h"
 
 namespace plain_wallet
 {
@@ -95,32 +96,71 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(ok_response);
   }
 
-  bool plain_wallet_api_impl::start_sync_thread()
+  std::string plain_wallet_api_impl::start_sync_thread()
   {
     m_sync_thread = std::thread([&]() 
     {
-      m_wallet->refresh(m_stop);
+      
+      try
+      {
+        m_wallet->refresh(m_stop);
+      }
+      catch (const std::exception& e)
+      {
+        LOG_ERROR("Wallet refresh failed: " << e.what());
+        return;
+      }
+      m_sync_finished = true;
     });
+    basic_status_response bsr = AUTO_VAL_INIT(bsr);
+    bsr.status = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(bsr);
   }
 
-  bool plain_wallet_api_impl::cancel_sync_thread()
+  std::string plain_wallet_api_impl::cancel_sync_thread()
   {
     m_stop = true;
+    if (m_sync_thread.joinable())
+      m_sync_thread.join();
+    basic_status_response bsr = AUTO_VAL_INIT(bsr);
+    bsr.status = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(bsr);
+
   }
 
   std::string plain_wallet_api_impl::get_sync_status()
   {
-    m_wallet->get_sync_progress();
+    sync_status_response ssr = AUTO_VAL_INIT(ssr);
+    ssr.finished = m_sync_finished;
+    ssr.progress = m_wallet->get_sync_progress();
+    return epee::serialization::store_t_to_json(ssr);
   }
 
   std::string plain_wallet_api_impl::sync()
   {
-    m_wallet->refresh(m_stop);
+    basic_status_response bsr = AUTO_VAL_INIT(bsr);
+    try
+    {
+      m_wallet->refresh(m_stop);
+    }
+    catch (const std::exception& e)
+    {
+      LOG_ERROR("Wallet refresh failed: " << e.what());
+      bsr.status = API_RETURN_CODE_FAIL;
+      return epee::serialization::store_t_to_json(bsr);
+    }
+    bsr.status = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(bsr);
   }
   std::string plain_wallet_api_impl::invoke(const std::string& params)
   {
-    m_rpc_wrapper->handle_http_request_map()
+    epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
+    epee::net_utils::http::http_response_info response_info = AUTO_VAL_INIT(response_info);
+    epee::net_utils::connection_context_base stub_conn_context = AUTO_VAL_INIT(stub_conn_context);
+    std::string reference_stub;
+    bool call_found = false;
+    query_info.m_body = params;
+    m_rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found, reference_stub);
+    return response_info.m_body;
   }
-
-
 }

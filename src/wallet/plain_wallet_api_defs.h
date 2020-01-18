@@ -24,9 +24,27 @@ namespace plain_wallet
     view::transfers_array recent_history;
     view::wallet_info wi;
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(recent_history)
       KV_SERIALIZE(wi)
     END_KV_SERIALIZE_MAP()
-  }
+  };
+
+  struct sync_status_response
+  {
+    bool finished;
+    uint64_t progress;
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(finished)
+      KV_SERIALIZE(progress)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct basic_status_response
+  {
+    std::string status;
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(status)
+    END_KV_SERIALIZE_MAP()
+  };
+
 } // namespace tools
