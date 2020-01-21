@@ -39,16 +39,16 @@ namespace plain_wallet
   std::string get_sync_status(hwallet h)
   {
     plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
-    pimpl->get_sync_status();
+    return pimpl->get_sync_status();
   }
   std::string sync(hwallet h)
   {
     plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
-    pimpl->sync();
+    return pimpl->sync();
   }
   std::string invoke(hwallet h, const std::string& params)
   {
     plain_wallet_api_impl* pimpl = (plain_wallet_api_impl*)h;
-    pimpl->invoke(params);
+    return pimpl->invoke(params);
   }
 }

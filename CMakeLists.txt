@@ -163,11 +163,15 @@ if(STATIC)
 endif()
 
 
-#find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options ) #locale
-set(Boost_INCLUDE_DIRS "/Users/roky/projects/Zano/mobile_repo/ofxiOSBoost/libs/boost/include")
-set(Boost_LIBRARY_DIRS "/Users/roky/projects/Zano/mobile_repo/ofxiOSBoost/libs/boost/ios/")
-set(Boost_LIBRARIES "libboost.a")
-set(Boost_VERSION "ofxiOSBoost  1.60.0")
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  set(Boost_INCLUDE_DIRS "/Users/roky/projects/Zano/mobile_repo/ofxiOSBoost/libs/boost/include")
+  set(Boost_LIBRARY_DIRS "/Users/roky/projects/Zano/mobile_repo/ofxiOSBoost/libs/boost/ios/")
+  set(Boost_LIBRARIES "libboost.a")
+  set(Boost_VERSION "ofxiOSBoost  1.60.0")
+else()
+  find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options ) #locale
+endif()
+
 
 
 message(STATUS "Boost: ${Boost_VERSION} from ${Boost_LIBRARY_DIRS}")
