@@ -13,7 +13,6 @@ set(VERSION "1.0")
     cmake_policy(SET CMP0020 OLD)
   endif()
 
-set(CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "Andrey Sabelnikov")
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # build types
@@ -24,7 +23,11 @@ if (UNIX AND NOT APPLE)
   endif()
 else()
   # multi configurations for MSVC and XCode
-  set(CMAKE_CONFIGURATION_TYPES "Release")
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS") 
+    set(CMAKE_CONFIGURATION_TYPES "Release")
+  else()
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
+  endif()
 endif()
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}, and built type: ${CMAKE_BUILD_TYPE}")
  
@@ -169,7 +172,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(Boost_LIBRARIES "libboost.a")
   set(Boost_VERSION "ofxiOSBoost  1.60.0")
 else()
-  find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options ) #locale
+  find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem locale thread timer date_time chrono regex serialization atomic program_options ) #locale
 endif()
 
 

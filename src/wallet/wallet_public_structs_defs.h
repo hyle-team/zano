@@ -206,6 +206,37 @@ namespace wallet_public
     };
   };
 
+  
+
+  struct COMMAND_RPC_GET_WALLET_INFO
+  {
+    struct request
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string               address;
+      std::string               path;
+      uint64_t                  transfers_count;
+      uint64_t                  transfer_entries_count;
+      bool                      is_whatch_only;
+      std::vector<std::string>  utxo_distribution;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(address)
+        KV_SERIALIZE(path)
+        KV_SERIALIZE(transfers_count)
+        KV_SERIALIZE(transfer_entries_count)
+        KV_SERIALIZE(is_whatch_only)
+        KV_SERIALIZE(utxo_distribution)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  
   struct trnsfer_destination
   {
     uint64_t amount;

@@ -32,7 +32,6 @@ DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated 
 #define TRANSACTION_POOL_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION 92 // DON'T CHANGE THIS, if you need to resync db! Change TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION instead!
 #define TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION      BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 1
 
-#define CURRENCY_POOLDATA_FOLDERNAME_SUFFIX               "_v1"
 
 #define CONFLICT_KEY_IMAGE_SPENT_DEPTH_TO_REMOVE_TX_FROM_POOL 50 // if there's a conflict in key images between tx in the pool and in the blockchain this much depth in required to remove correspongin tx from pool
 

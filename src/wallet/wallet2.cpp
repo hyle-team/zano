@@ -2589,6 +2589,11 @@ uint64_t wallet2::get_recent_transfers_total_count()
   return m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_transfer_entries_count()
+{
+  return m_transfers.size();
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total)
 {
   if (offset >= m_transfer_history.size())
