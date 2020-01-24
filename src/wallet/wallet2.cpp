@@ -4572,7 +4572,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     {
       finalize_transaction(ftp, tx, tx_key, false, false);
     }
-    catch (error::tx_too_big)
+    catch (error::tx_too_big&)
     {
       return rc_too_many_outputs;
     }
