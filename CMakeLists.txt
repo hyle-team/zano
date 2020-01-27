@@ -5,13 +5,13 @@ PROJECT(Zano)
 
 set(VERSION "1.0")
 
-  if(POLICY CMP0043)
-    cmake_policy(SET CMP0043 OLD)
-  endif()
+#  if(POLICY CMP0043)
+#    cmake_policy(SET CMP0043 OLD)
+#  endif()
 
-  if(POLICY CMP0020)
-    cmake_policy(SET CMP0020 OLD)
-  endif()
+#  if(POLICY CMP0020)
+#    cmake_policy(SET CMP0020 OLD)
+#  endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
