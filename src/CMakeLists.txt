@@ -110,6 +110,7 @@ add_dependencies(currency_core version  ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(CURRENCY_CORE)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  install(TARGETS wallet currency_core crypto common DESTINATION lib)
   message("Generating for iOS: finished")
   return()
 endif()
