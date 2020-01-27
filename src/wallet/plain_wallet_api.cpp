@@ -9,7 +9,7 @@
 //TODO: global objects, need refactoring. Just temporary solution
 std::map<int64_t, plain_wallet::plain_wallet_api_impl*> ginstances;
 epee::critical_section ginstances_lock;
-std::atomic<int64_t> gcounter = 1;
+std::atomic<int64_t> gcounter(1);
 
 #define GENERAL_INTERNAL_ERRROR_INSTANCE "GENERAL_INTERNAL_ERROR: WALLET INSTNACE NOT FOUND"
 
