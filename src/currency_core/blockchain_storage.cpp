@@ -3909,7 +3909,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   const std::vector<crypto::signature>* psig = &sig_stub;
 
   TIME_MEASURE_START_PD(tx_check_inputs_loop);
-  BOOST_FOREACH(const auto& txin,  tx.vin)
+  for(const auto& txin : tx.vin)
   {
     if (!m_is_in_checkpoint_zone)
     {
