@@ -8,9 +8,9 @@
 
 namespace plain_wallet
 {
-  hwallet create_instance(const std::string port, const std::string ip)
+  hwallet create_instance(const std::string ip, const std::string port)
   {
-    return new plain_wallet_api_impl(port, ip);
+    return new plain_wallet_api_impl(ip, port);
   }
   void destroy_instance(hwallet h)
   {

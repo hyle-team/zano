@@ -9,7 +9,9 @@ namespace plain_wallet
 {
   typedef epee::json_rpc::response<epee::json_rpc::dummy_result, error> error_response;
 
-  plain_wallet_api_impl::plain_wallet_api_impl(const std::string ip, const std::string port):m_stop(false)
+  plain_wallet_api_impl::plain_wallet_api_impl(const std::string ip, const std::string port):
+    m_stop(false), 
+    m_sync_finished(false)
   {
     m_wallet.reset(new tools::wallet2());
     m_wallet->init(ip + ":" + port);
@@ -159,6 +161,7 @@ namespace plain_wallet
     epee::net_utils::connection_context_base stub_conn_context = AUTO_VAL_INIT(stub_conn_context);
     std::string reference_stub;
     bool call_found = false;
+    query_info.m_URI = "/json_rpc";    
     query_info.m_body = params;
     m_rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found, reference_stub);
     return response_info.m_body;

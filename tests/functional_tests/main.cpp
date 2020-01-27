@@ -191,7 +191,7 @@ int main(int argc, char* argv[])
     do_deadlock_test_main();
     return 1;
   }
-  else if (command_line::has_arg(vm, arg_deadlock_guard))
+  else if (command_line::has_arg(vm, arg_test_plain_wallet))
   {
     run_plain_wallet_api_test();
     return 1;
