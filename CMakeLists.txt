@@ -13,6 +13,11 @@ set(VERSION "1.0")
 #    cmake_policy(SET CMP0020 OLD)
 #  endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  add_definitions(-DIOS_BUILD)
+endif()
+
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # build types
