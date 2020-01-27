@@ -47,7 +47,7 @@ namespace plain_wallet
       LOG_ERROR("Internall error: attempt to delete wallet with wrong instance id: " << h);
     }
     instance_ptr = it->second;
-    ginstances.erase(instance_ptr);
+    ginstances.erase(it);
     CRITICAL_REGION_END();
     delete instance_ptr; 
   }
