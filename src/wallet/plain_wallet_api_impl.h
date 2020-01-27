@@ -15,11 +15,11 @@ namespace plain_wallet
   class plain_wallet_api_impl
   {
   public: 
-    plain_wallet_api_impl(const std::string ip, const std::string port);
+    plain_wallet_api_impl(const std::string& ip, const std::string& port);
     ~plain_wallet_api_impl();
-    std::string open(const std::string& path, const std::string password);
-    std::string restore(const std::string& seed, const std::string& path, const std::string password);
-    std::string generate(const std::string& path, const std::string password);
+    std::string open(const std::string& path, const std::string& password);
+    std::string restore(const std::string& seed, const std::string& path, const std::string& password);
+    std::string generate(const std::string& path, const std::string& password);
 
     std::string start_sync_thread();
     std::string cancel_sync_thread();

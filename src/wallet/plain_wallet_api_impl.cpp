@@ -9,7 +9,7 @@ namespace plain_wallet
 {
   typedef epee::json_rpc::response<epee::json_rpc::dummy_result, error> error_response;
 
-  plain_wallet_api_impl::plain_wallet_api_impl(const std::string ip, const std::string port):
+  plain_wallet_api_impl::plain_wallet_api_impl(const std::string& ip, const std::string& port):
     m_stop(false), 
     m_sync_finished(false)
   {
@@ -24,7 +24,7 @@ namespace plain_wallet
       m_sync_thread.join();
   }
 
-  std::string plain_wallet_api_impl::open(const std::string& path, const std::string password)
+  std::string plain_wallet_api_impl::open(const std::string& path, const std::string& password)
   {
     error_response err_result = AUTO_VAL_INIT(err_result);
     try
@@ -50,7 +50,7 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(ok_response);
   }
 
-  std::string plain_wallet_api_impl::restore(const std::string& seed, const std::string& path, const std::string password)
+  std::string plain_wallet_api_impl::restore(const std::string& seed, const std::string& path, const std::string& password)
   {
     error_response err_result = AUTO_VAL_INIT(err_result);
     try
@@ -74,7 +74,7 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(ok_response);
   }
 
-  std::string plain_wallet_api_impl::generate(const std::string& path, const std::string password)
+  std::string plain_wallet_api_impl::generate(const std::string& path, const std::string& password)
   {
     error_response err_result = AUTO_VAL_INIT(err_result);
     try
