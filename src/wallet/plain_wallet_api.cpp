@@ -46,6 +46,11 @@ namespace plain_wallet
     glogs_initialized = true;
   }
 
+  std::string get_version()
+  {
+    return PROJECT_VERSION_LONG;
+  }
+
   hwallet create_instance(const std::string& ip, const std::string& port)
   {
     if (!glogs_initialized)
