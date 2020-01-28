@@ -32,16 +32,21 @@ std::atomic<bool> glogs_initialized(false);
 
 namespace plain_wallet
 {
+  std::string get_bundle_root_dir()
+  {
+    char buffer[1000] = {0};
+    strcpy(buffer, getenv("HOME"));
+    return buffer;
+  }
+
   void initialize_logs()
   {
-    char buffer[1000] = {};
-    strcpy(buffer, getenv("HOME"));
-    std::string log_dir = buffer;
+    std::string log_dir = get_bundle_root_dir();
     log_dir += "/Documents";
     epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
     epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
     epee::log_space::log_singletone::add_logger(LOGGER_FILE, "plain_wallet.log", log_dir.c_str());
-    LOG_PRINT_L0("Plain wallet initialized: " <<  CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
+    LOG_PRINT_L0("Plain wallet initialized: " <<  CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ", log location: " << log_dir + "/plain_wallet.log");
 
     glogs_initialized = true;
   }
@@ -49,6 +54,24 @@ namespace plain_wallet
   std::string get_version()
   {
     return PROJECT_VERSION_LONG;
+  }
+
+  struct strings_list
+  {
+    std::list<std::string> items;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(items)
+    END_KV_SERIALIZE_MAP()
+
+  };
+
+  std::string get_wallet_files()
+  {
+    std::string wallet_files_path = get_bundle_root_dir() + "/Documents";
+    strings_list sl = AUTO_VAL_INIT(sl);
+    epee::file_io_utils::get_folder_content(wallet_files_path, sl.items, true);
+    return epee::serialization::store_t_to_json(sl);
   }
 
   hwallet create_instance(const std::string& ip, const std::string& port)

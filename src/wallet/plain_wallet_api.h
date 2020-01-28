@@ -13,6 +13,7 @@ namespace plain_wallet
   hwallet create_instance(const std::string& ip, const std::string& port);
   void destroy_instance(hwallet h);
   std::string get_version();
+  std::string get_wallet_files();
 
   std::string open(hwallet h, const std::string& path, const std::string& password);
   std::string restore(hwallet h, const std::string& seed, const std::string& path, const std::string& password);
