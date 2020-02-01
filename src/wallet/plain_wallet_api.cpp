@@ -38,6 +38,11 @@ namespace plain_wallet
     strcpy(buffer, getenv("HOME"));
     return buffer;
   }
+  
+  std::string get_wallets_folder()
+  {
+    return get_bundle_root_dir() + "/Documents";
+  }
 
   void initialize_logs()
   {
@@ -68,7 +73,7 @@ namespace plain_wallet
 
   std::string get_wallet_files()
   {
-    std::string wallet_files_path = get_bundle_root_dir() + "/Documents";
+    std::string wallet_files_path = get_wallets_folder();
     strings_list sl = AUTO_VAL_INIT(sl);
     epee::file_io_utils::get_folder_content(wallet_files_path, sl.items, true);
     return epee::serialization::store_t_to_json(sl);
@@ -104,17 +109,20 @@ namespace plain_wallet
   std::string open(hwallet h, const std::string& path, const std::string& password)
   {
     GET_INSTANCE(pimpl, h);
-    return pimpl->open(path, password);
+    std::string full_path = get_wallets_folder() + "/" + path;
+    return pimpl->open(full_path, password);
   }
   std::string restore(hwallet h, const std::string& seed, const std::string& path, const std::string& password)
   {
     GET_INSTANCE(pimpl, h);
-    return pimpl->restore(seed, path, password);
+    std::string full_path = get_wallets_folder() + "/" + path;
+    return pimpl->restore(seed, full_path, password);
   }
   std::string generate(hwallet h, const std::string& path, const std::string& password)
   {
     GET_INSTANCE(pimpl, h);
-    return pimpl->generate(path, password);
+    std::string full_path = get_wallets_folder() + "/" + path;
+    return pimpl->generate(full_path, password);
   }
   std::string start_sync_thread(hwallet h)
   {
