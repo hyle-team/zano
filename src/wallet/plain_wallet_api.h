@@ -21,6 +21,7 @@ namespace plain_wallet
 
   std::string start_sync_thread(hwallet h);
   std::string get_sync_status(hwallet h);
+  std::string cancel_sync_thread(hwallet h);
   std::string sync(hwallet h);
   std::string invoke(hwallet h, const std::string& params);
 }

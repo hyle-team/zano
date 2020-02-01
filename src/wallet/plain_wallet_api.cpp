@@ -141,6 +141,7 @@ namespace plain_wallet
     GET_INSTANCE(pimpl, h);
     return pimpl->cancel_sync_thread();
   }
+
   std::string sync(hwallet h)
   {
     GET_INSTANCE(pimpl, h);
