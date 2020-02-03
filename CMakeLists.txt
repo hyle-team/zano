@@ -177,7 +177,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(Boost_LIBRARIES "libboost.a")
   set(Boost_VERSION "ofxiOSBoost  1.60.0")
 else()
-  find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem locale thread timer date_time chrono regex serialization atomic program_options ) #locale
+  find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale)
 endif()
 
 
