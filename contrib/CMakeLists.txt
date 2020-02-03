@@ -17,7 +17,7 @@ set_property(TARGET libminiupnpc-static PROPERTY FOLDER "contrib")
 set_property(TARGET zlibstatic PROPERTY FOLDER "contrib")
 set_property(TARGET mdbx PROPERTY FOLDER "contrib")
 set_property(TARGET lmdb PROPERTY FOLDER "contrib")
-set_property(TARGET upnpc-static mdbx_chk mdbx_copy mdbx_dump mdbx_load mdbx_stat minigzip zlib example PROPERTY FOLDER "unused")
+set_property(TARGET upnpc-static mdbx_chk mdbx_copy mdbx_dump mdbx_load mdbx_stat PROPERTY FOLDER "unused")
 
 if(MSVC)
   set_property(TARGET ntdll_extra_target PROPERTY FOLDER "unused")
