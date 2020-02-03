@@ -2909,10 +2909,10 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     m_wcallback->on_pos_block_found(b);
     //@#@
     //double check timestamp
-    if (time(NULL) - get_actual_timestamp(b) > 5)
+    if (time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) > 5)
     {
       WLT_LOG_RED("Found block (" << get_block_hash(b) << ") timestamp ("  << get_actual_timestamp(b)
-        << ") is suspiciously less (" << time(NULL) - get_actual_timestamp(b) << ") then curren time( " << time(NULL) << ")", LOG_LEVEL_0);
+        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) << ") than current time ( " << time(NULL) << ")", LOG_LEVEL_0);
     }
     //
     return true;
@@ -4358,11 +4358,38 @@ bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp)
+{
+  // If someone sends coins to his own address, all tx outputs will be detected as own outputs.
+  // It's totally okay unless payment id is used, because it would be impossible to distinguish
+  // between change outs and transfer outs. Thus, such tx with a payment id can't be correctly
+  // obtained via RPC by the given payment id. It could be a problem for an exchange or other
+  // service when a user, identifyied by payment id sends coins to another user on the same
+  // exchange/service. Coins will be received but RPCs like get_payments won't give the transfer.
+  // To avoid such issues we prohibit such txs with a soft rule on sender side.
+
+  for (auto& d : ctp.dsts)
+  {
+    for (auto& addr : d.addr)
+    {
+      if (addr != m_account.get_public_address())
+        return; // at least one destination address is not our address -- it's not self-directed tx
+    }
+  }
+
+  // it's self-directed tx
+  payment_id_t pid;
+  bool has_payment_id = get_payment_id_from_tx(ctp.attachments, pid) && !pid.empty();
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_payment_id, "sending funds to yourself with payment id is not allowed");
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::transfer(const construct_tx_param& ctp,
   currency::transaction &tx,
   bool send_to_network,
   std::string* p_signed_tx_blob_str)
 {
+  check_and_throw_if_self_directed_tx_with_payment_id_requested(ctp);
+
   TIME_MEASURE_START(prepare_transaction_time);
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(ctp, ftp);
@@ -4555,7 +4582,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     {
       finalize_transaction(ftp, tx, tx_key, false, false);
     }
-    catch (error::tx_too_big)
+    catch (error::tx_too_big&)
     {
       return rc_too_many_outputs;
     }
