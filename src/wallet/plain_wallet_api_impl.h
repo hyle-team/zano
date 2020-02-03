@@ -30,6 +30,7 @@ namespace plain_wallet
   private: 
     bool get_wallet_info(view::wallet_info& wi);
     std::thread m_sync_thread;
+    epee::critical_section m_wallet_lock;
     std::atomic<bool> m_stop;
     std::atomic<bool> m_sync_finished;
     std::shared_ptr<tools::wallet2> m_wallet;

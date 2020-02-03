@@ -21,7 +21,7 @@ std::atomic<bool> glogs_initialized(false);
   auto it = ginstances.find(instance_handle);\
   if (it == ginstances.end())\
   {\
-    LOG_ERROR("Internall error: attempt to delete wallet with wrong instance id: " << instance_handle);\
+    LOG_ERROR("Internall error: attempt to get instance wallet with wrong id: " << instance_handle);\
     return GENERAL_INTERNAL_ERRROR_INSTANCE;\
   }\
   var_name = it->second;\

@@ -29,7 +29,13 @@ namespace plain_wallet
     error_response err_result = AUTO_VAL_INIT(err_result);
     try
     {
+      CRITICAL_REGION_LOCAL(m_wallet_lock);
       m_wallet->load(epee::string_encoding::utf8_to_wstring(path), password);
+      epee::json_rpc::response<open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+      m_wallet->get_recent_transfers_history(ok_response.result.recent_history.history, 0, 20, ok_response.result.recent_history.total_history_items);
+      m_wallet->get_unconfirmed_transfers(ok_response.result.recent_history.history);
+      tools::get_wallet_info(*m_wallet, ok_response.result.wi);
+      return epee::serialization::store_t_to_json(ok_response);
     }
     catch (const tools::error::wallet_load_notice_wallet_restored& e)
     {
@@ -43,11 +49,6 @@ namespace plain_wallet
       err_result.error.code = API_RETURN_CODE_FAIL;
       return epee::serialization::store_t_to_json(err_result);
     }
-    epee::json_rpc::response<open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    m_wallet->get_recent_transfers_history(ok_response.result.recent_history.history, 0, 20, ok_response.result.recent_history.total_history_items);
-    m_wallet->get_unconfirmed_transfers(ok_response.result.recent_history.history);
-    tools::get_wallet_info(*m_wallet, ok_response.result.wi);
-    return epee::serialization::store_t_to_json(ok_response);
   }
 
   std::string plain_wallet_api_impl::restore(const std::string& seed, const std::string& path, const std::string& password)
@@ -55,7 +56,12 @@ namespace plain_wallet
     error_response err_result = AUTO_VAL_INIT(err_result);
     try
     {
+      CRITICAL_REGION_LOCAL(m_wallet_lock);
       m_wallet->restore(epee::string_encoding::utf8_to_wstring(path), password, seed);
+      epee::json_rpc::response<open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+      tools::get_wallet_info(*m_wallet, ok_response.result.wi);
+      return epee::serialization::store_t_to_json(ok_response);
+
     }
     catch (const tools::error::wallet_load_notice_wallet_restored& e)
     {
@@ -69,9 +75,6 @@ namespace plain_wallet
       err_result.error.code = API_RETURN_CODE_FAIL;
       return epee::serialization::store_t_to_json(err_result);
     }
-    epee::json_rpc::response<open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    tools::get_wallet_info(*m_wallet, ok_response.result.wi);
-    return epee::serialization::store_t_to_json(ok_response);
   }
 
   std::string plain_wallet_api_impl::generate(const std::string& path, const std::string& password)
@@ -79,7 +82,11 @@ namespace plain_wallet
     error_response err_result = AUTO_VAL_INIT(err_result);
     try
     {
+      CRITICAL_REGION_LOCAL(m_wallet_lock);
       m_wallet->generate(epee::string_encoding::utf8_to_wstring(path), password);
+      epee::json_rpc::response<open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+      tools::get_wallet_info(*m_wallet, ok_response.result.wi);
+      return epee::serialization::store_t_to_json(ok_response);
     }
     catch (const tools::error::wallet_load_notice_wallet_restored& e)
     {
@@ -93,9 +100,6 @@ namespace plain_wallet
       err_result.error.code = API_RETURN_CODE_FAIL;
       return epee::serialization::store_t_to_json(err_result);
     }
-    epee::json_rpc::response<open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    tools::get_wallet_info(*m_wallet, ok_response.result.wi);
-    return epee::serialization::store_t_to_json(ok_response);
   }
 
   std::string plain_wallet_api_impl::start_sync_thread()
@@ -105,6 +109,7 @@ namespace plain_wallet
       
       try
       {
+        CRITICAL_REGION_LOCAL(m_wallet_lock);
         m_wallet->refresh(m_stop);
       }
       catch (const std::exception& e)
@@ -143,7 +148,10 @@ namespace plain_wallet
     basic_status_response bsr = AUTO_VAL_INIT(bsr);
     try
     {
+      CRITICAL_REGION_LOCAL(m_wallet_lock);
       m_wallet->refresh(m_stop);
+      bsr.status = API_RETURN_CODE_OK;
+      return epee::serialization::store_t_to_json(bsr);
     }
     catch (const std::exception& e)
     {
@@ -151,11 +159,10 @@ namespace plain_wallet
       bsr.status = API_RETURN_CODE_FAIL;
       return epee::serialization::store_t_to_json(bsr);
     }
-    bsr.status = API_RETURN_CODE_OK;
-    return epee::serialization::store_t_to_json(bsr);
   }
   std::string plain_wallet_api_impl::invoke(const std::string& params)
   {
+    CRITICAL_REGION_LOCAL(m_wallet_lock);
     epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
     epee::net_utils::http::http_response_info response_info = AUTO_VAL_INIT(response_info);
     epee::net_utils::connection_context_base stub_conn_context = AUTO_VAL_INIT(stub_conn_context);
