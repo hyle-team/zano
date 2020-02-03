@@ -209,6 +209,31 @@ namespace tools
       return false;
     }
   }
+  bool wallet_rpc_server::on_get_recent_txs_and_info(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      if (req.update_provision_info)
+      {
+        res.pi.balance = m_wallet.balance(res.pi.unlocked_balance);
+        res.pi.transfer_entries_count = m_wallet.get_transfer_entries_count();
+        res.pi.transfers_count = m_wallet.get_recent_transfers_total_count();
+      }
+
+      if (req.offset == 0)
+        m_wallet.get_unconfirmed_transfers(res.transfers);
+      
+      m_wallet.get_recent_transfers_history(res.transfers, req.offset, req.count, res.total_transfers);
+
+      return true;
+    }
+    catch (std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = e.what();
+      return false;
+    }
+  }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {

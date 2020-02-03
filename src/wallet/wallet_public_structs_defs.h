@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#include <vector>
 #include "currency_protocol/currency_protocol_defs.h"
 #include "currency_core/currency_basic.h"
 #include "crypto/hash.h"
@@ -235,6 +236,66 @@ namespace wallet_public
       END_KV_SERIALIZE_MAP()
     };
   };
+
+
+  struct wallet_provision_info
+  {
+    uint64_t                  transfers_count;
+    uint64_t                  transfer_entries_count;
+    uint64_t                  balance;
+    uint64_t                  unlocked_balance;
+
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(transfers_count)
+      KV_SERIALIZE(transfer_entries_count)
+      KV_SERIALIZE(balance)
+      KV_SERIALIZE(unlocked_balance)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
+  {
+    struct request
+    {
+
+      /*
+      if offset is 0, then GET_RECENT_TXS_AND_INFO return 
+      unconfirmed transactions as the first first items of "transfers", 
+      this unconfirmed transactions is not counted regarding "count" parameter
+      */
+      uint64_t offset;
+      uint64_t count;
+
+      /* 
+      need_to_get_info - should backend re-calculate balance(could be relatively heavy, 
+      and not needed when getting long tx history with multiple calls 
+      of GET_RECENT_TXS_AND_INFO with offsets)
+      */
+      bool update_provision_info;  
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(offset)
+        KV_SERIALIZE(count)
+        KV_SERIALIZE(update_provision_info)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      wallet_provision_info pi;
+      std::vector<wallet_transfer_info> transfers;
+      uint64_t total_transfers;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(pi)
+        KV_SERIALIZE(transfers)
+        KV_SERIALIZE(total_transfers)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
 
   
   struct trnsfer_destination
