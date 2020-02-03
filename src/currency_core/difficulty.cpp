@@ -24,9 +24,9 @@ namespace currency {
   using std::uint64_t;
   using std::vector;
 
-#if defined(_MSC_VER)
-#include <windows.h>
-#include <winnt.h>
+//#if defined(_MSC_VER)
+//#include <windows.h>
+//#include <winnt.h>
 
   static inline void mul(uint64_t a, uint64_t b, uint64_t &low, uint64_t &high) {
     boost::multiprecision::uint128_t res = boost::multiprecision::uint128_t(a) * b;
@@ -36,7 +36,7 @@ namespace currency {
     //low = UnsignedMultiply128(a, b, &high);
   }
 
-#else
+/* #else
 
   static inline void mul(uint64_t a, uint64_t b, uint64_t &low, uint64_t &high) {
     typedef unsigned __int128 uint128_t;
@@ -45,7 +45,7 @@ namespace currency {
     high = (uint64_t)(res >> 64);
   }
 
-#endif
+#endif */
 
   static inline bool cadd(uint64_t a, uint64_t b) {
     return a + b < a;

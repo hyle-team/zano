@@ -10,6 +10,7 @@
 #include "string_coding.h"
 #include "currency_core/core_tools.h"
 #include "common/callstack_helper.h"
+#include "wallet/wallet_helpers.h"
 
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   CRITICAL_REGION_LOCAL(m_wallets_lock);    \
@@ -1342,14 +1343,12 @@ std::string daemon_backend::run_wallet(uint64_t wallet_id)
   wo.miner_thread = std::thread(boost::bind(&daemon_backend::wallet_vs_options::worker_func, &wo));
   return API_RETURN_CODE_OK;
 }
+
 std::string daemon_backend::get_wallet_info(wallet_vs_options& wo, view::wallet_info& wi)
 {
-  wi = view::wallet_info();
-  wi.address = wo.w->get()->get_account().get_public_address_str();
-  wi.tracking_hey = string_tools::pod_to_hex(wo.w->get()->get_account().get_keys().m_view_secret_key);
-	uint64_t fake = 0;
-	wi.balance = wo.w->get()->balance(wi.unlocked_balance, fake, fake, wi.mined_total);
-  wi.path = epee::string_encoding::wstring_to_utf8(wo.w->get()->get_wallet_path());
+  auto locker_object = wo.w.lock();
+  tools::wallet2& rw = *(*(*locker_object)); //this looks a bit crazy, i know
+  tools::get_wallet_info(rw, wi);
   return API_RETURN_CODE_OK;
 }
 

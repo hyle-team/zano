@@ -70,7 +70,6 @@ using namespace currency;
 #endif
 #define BLOCK_POS_STRICT_SEQUENCE_LIMIT                               20
 
-#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX                     "_v1"
 
 DISABLE_VS_WARNINGS(4267)
 

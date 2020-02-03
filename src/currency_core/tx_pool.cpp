@@ -32,7 +32,6 @@ DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated 
 #define TRANSACTION_POOL_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION 92 // DON'T CHANGE THIS, if you need to resync db! Change TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION instead!
 #define TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION      BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 1
 
-#define CURRENCY_POOLDATA_FOLDERNAME_SUFFIX               "_v1"
 
 #define CONFLICT_KEY_IMAGE_SPENT_DEPTH_TO_REMOVE_TX_FROM_POOL 50 // if there's a conflict in key images between tx in the pool and in the blockchain this much depth in required to remove correspongin tx from pool
 
@@ -1165,7 +1164,7 @@ namespace currency
     uint64_t cache_size_l1 = CACHE_SIZE;
     LOG_PRINT_GREEN("Using pool db file cache size(L1): " << cache_size_l1, LOG_LEVEL_0);
 
-    // remove old incompartible DB
+    // remove old incompatible DB
     const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME_OLD;
     if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
     {
@@ -1192,8 +1191,6 @@ namespace currency
 
       res = m_db_transactions.init(TRANSACTION_POOL_CONTAINER_TRANSACTIONS);
       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-//       res = m_db_key_images_set.init(TRANSACTION_POOL_CONTAINER_KEY_IMAGES);
-//       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
       res = m_db_black_tx_list.init(TRANSACTION_POOL_CONTAINER_BLACK_TX_LIST);
       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
       res = m_db_alias_names.init(TRANSACTION_POOL_CONTAINER_ALIAS_NAMES);

@@ -5,13 +5,17 @@ PROJECT(Zano)
 
 set(VERSION "1.0")
 
-  if(POLICY CMP0043)
-    cmake_policy(SET CMP0043 OLD)
-  endif()
+#  if(POLICY CMP0043)
+#    cmake_policy(SET CMP0043 OLD)
+#  endif()
 
-  if(POLICY CMP0020)
-    cmake_policy(SET CMP0020 OLD)
-  endif()
+#  if(POLICY CMP0020)
+#    cmake_policy(SET CMP0020 OLD)
+#  endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  add_definitions(-DIOS_BUILD)
+endif()
 
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -24,7 +28,11 @@ if (UNIX AND NOT APPLE)
   endif()
 else()
   # multi configurations for MSVC and XCode
-  set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS") 
+    set(CMAKE_CONFIGURATION_TYPES "Release")
+  else()
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
+  endif()
 endif()
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}, and built type: ${CMAKE_BUILD_TYPE}")
  
@@ -78,7 +86,7 @@ else()
   else()
     set(ARCH_FLAG "-march=${ARCH}")
   endif()
-  set(WARNINGS "-Wall -Wextra -Wpointer-arith -Wvla -Wwrite-strings -Wno-error=extra -Wno-error=deprecated-declarations -Wno-error=sign-compare -Wno-error=strict-aliasing -Wno-error=type-limits -Wno-unused-parameter -Wno-error=unused-variable -Wno-aggregate-return")
+  set(WARNINGS "-Wno-implicit-function-declaration  -Wall -Wextra -Wpointer-arith -Wvla -Wwrite-strings -Wno-error=extra -Wno-error=deprecated-declarations -Wno-error=sign-compare -Wno-error=strict-aliasing -Wno-error=type-limits -Wno-unused-parameter -Wno-error=unused-variable -Wno-aggregate-return")
 #  if(NOT APPLE)
 #    set(WARNINGS "${WARNINGS} -Werror")
 #  endif()
@@ -161,10 +169,18 @@ if(STATIC)
   set(Boost_USE_STATIC_LIBS ON)  
   set(Boost_USE_STATIC_RUNTIME ON)
 endif()
-find_package(Boost 1.53 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale)
-if(MSVC AND (${Boost_MAJOR_VERSION} EQUAL 1) AND (${Boost_MINOR_VERSION} EQUAL 54))
-  message(SEND_ERROR "Boost version 1.54 is unsupported, more details are available here http://goo.gl/RrCFmA")
+
+
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  set(Boost_INCLUDE_DIRS "/Users/roky/projects/Zano/mobile_repo/ofxiOSBoost/libs/boost/include")
+  set(Boost_LIBRARY_DIRS "/Users/roky/projects/Zano/mobile_repo/ofxiOSBoost/libs/boost/ios/")
+  set(Boost_LIBRARIES "libboost.a")
+  set(Boost_VERSION "ofxiOSBoost  1.60.0")
+else()
+  find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale)
 endif()
+
+
 
 message(STATUS "Boost: ${Boost_VERSION} from ${Boost_LIBRARY_DIRS}")
 

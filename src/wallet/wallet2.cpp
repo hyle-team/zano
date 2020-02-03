@@ -1236,6 +1236,11 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
   WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << m_blockchain.size());
 }
 //----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_sync_progress()
+{
+  return m_last_sync_percent;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::refresh()
 {
   size_t blocks_fetched = 0;
@@ -2582,6 +2587,11 @@ void wallet2::submit_transfer_files(const std::string& signed_tx_file, currency:
 uint64_t wallet2::get_recent_transfers_total_count()
 {
   return m_transfer_history.size();
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_transfer_entries_count()
+{
+  return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total)
