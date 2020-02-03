@@ -343,7 +343,7 @@ struct json_command_type_t
   epee::json_rpc::error_response rsp; \
   rsp.id = id_; \
   rsp.jsonrpc = "2.0"; \
-  rsp.method = req.method; \
+  rsp.method = callback_name; \
   rsp.error.code = -32601; \
   rsp.error.message = "Method not found"; \
   epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
