@@ -198,10 +198,12 @@ namespace epee
     struct response<dummy_result, t_error>
     {
       std::string jsonrpc;
+      std::string method;
       t_error     error;
       epee::serialization::storage_entry id;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(jsonrpc)
+        KV_SERIALIZE(method)
         KV_SERIALIZE(id)
         KV_SERIALIZE(error)
       END_KV_SERIALIZE_MAP()
@@ -288,6 +290,7 @@ struct json_command_type_t
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
   fail_resp.jsonrpc = "2.0"; \
+  fail_resp.method = req.method; \
   fail_resp.id = req.id; \
   if(!callback_f(req.params, resp.result, fail_resp.error, m_conn_context)) \
   { \
@@ -304,6 +307,7 @@ struct json_command_type_t
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
   fail_resp.jsonrpc = "2.0"; \
+  fail_resp.method = req.method; \
   fail_resp.id = req.id; \
   if(!callback_f(req.params, resp.result, fail_resp.error, m_conn_context, response_info)) \
   { \
@@ -322,6 +326,7 @@ struct json_command_type_t
   { \
     epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
     fail_resp.jsonrpc = "2.0"; \
+    fail_resp.method = req.method; \ 
     fail_resp.id = req.id; \
     fail_resp.error.code = -32603; \
     fail_resp.error.message = "Internal error"; \
@@ -338,6 +343,7 @@ struct json_command_type_t
   epee::json_rpc::error_response rsp; \
   rsp.id = id_; \
   rsp.jsonrpc = "2.0"; \
+  rsp.method = req.method; \
   rsp.error.code = -32601; \
   rsp.error.message = "Method not found"; \
   epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
