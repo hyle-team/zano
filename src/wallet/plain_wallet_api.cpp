@@ -7,6 +7,7 @@
 #include "plain_wallet_api_impl.h"
 #include "currency_core/currency_config.h"
 #include "version.h"
+#include "currency_core/currency_format_utils.h"
 
 //TODO: global objects, need refactoring. Just temporary solution
 std::map<int64_t, plain_wallet::plain_wallet_api_impl*> ginstances;
@@ -42,6 +43,11 @@ namespace plain_wallet
   std::string get_wallets_folder()
   {
     return get_bundle_root_dir() + "/Documents";
+  }
+
+  std::string print_money(int64_t amount)
+  {
+    return currency::print_money(amount);
   }
 
   void initialize_logs()

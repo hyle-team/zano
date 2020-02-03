@@ -14,6 +14,7 @@ namespace plain_wallet
   void destroy_instance(hwallet h);
   std::string get_version();
   std::string get_wallet_files();
+  std::string print_money(int64_t);
 
   std::string open(hwallet h, const std::string& path, const std::string& password);
   std::string restore(hwallet h, const std::string& seed, const std::string& path, const std::string& password);
