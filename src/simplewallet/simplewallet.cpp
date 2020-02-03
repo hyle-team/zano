@@ -1195,7 +1195,7 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
 
 
   std::vector<currency::attachment_v> attachments;
-  if (!set_payment_id_to_tx(attachments, payment_id))
+  if (!payment_id.empty() && !set_payment_id_to_tx(attachments, payment_id))
   {
     fail_msg_writer() << "provided (or embedded) payment id can't be set: \"" << payment_id << "\"";
     return true;

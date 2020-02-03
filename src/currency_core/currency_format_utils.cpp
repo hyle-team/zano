@@ -1605,7 +1605,7 @@ namespace currency
       return true;
 
     size_t i = 0;
-    BOOST_FOREACH(const tx_out& o, tx.vout)
+    for(const tx_out& o : tx.vout)
     {
       if (o.target.type() == typeid(txout_to_key))
       {

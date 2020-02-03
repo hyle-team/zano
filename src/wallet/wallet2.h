@@ -863,7 +863,7 @@ private:
     void check_for_free_space_and_throw_if_it_lacks(const std::wstring& path, uint64_t exact_size_needed_if_known = UINT64_MAX);
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
-
+    void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
 
     currency::account_base m_account;
     bool m_watch_only;
