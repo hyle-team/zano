@@ -1086,10 +1086,10 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
       process_new_transaction(tx_entry->tx, height, b);
     }
     TIME_MEASURE_FINISH(txs_handle_time);
-    WLT_LOG_L2("Processed block: " << bl_id << ", height " << height << ", " <<  miner_tx_handle_time + txs_handle_time << "(" << miner_tx_handle_time << "/" << txs_handle_time <<")ms");
+    WLT_LOG_L3("Processed block: " << bl_id << ", height " << height << ", " <<  miner_tx_handle_time + txs_handle_time << "(" << miner_tx_handle_time << "/" << txs_handle_time <<")ms");
   }else
   {
-    WLT_LOG_L2( "Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime());
+    WLT_LOG_L3( "Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime());
   }
   m_blockchain.push_back(bl_id);
   ++m_local_bc_height;
