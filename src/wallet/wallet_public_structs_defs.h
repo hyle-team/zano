@@ -221,6 +221,7 @@ namespace wallet_public
     {
       std::string               address;
       std::string               path;
+      std::string               seed;
       uint64_t                  transfers_count;
       uint64_t                  transfer_entries_count;
       bool                      is_whatch_only;
@@ -229,6 +230,7 @@ namespace wallet_public
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(address)
         KV_SERIALIZE(path)
+        KV_SERIALIZE(seed)
         KV_SERIALIZE(transfers_count)
         KV_SERIALIZE(transfer_entries_count)
         KV_SERIALIZE(is_whatch_only)
