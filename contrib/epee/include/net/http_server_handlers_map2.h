@@ -326,7 +326,7 @@ struct json_command_type_t
   { \
     epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
     fail_resp.jsonrpc = "2.0"; \
-    fail_resp.method = req.method; \ 
+    fail_resp.method = req.method; \
     fail_resp.id = req.id; \
     fail_resp.error.code = -32603; \
     fail_resp.error.message = "Internal error"; \
