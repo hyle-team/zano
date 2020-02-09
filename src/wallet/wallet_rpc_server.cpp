@@ -199,7 +199,7 @@ namespace tools
       std::map<uint64_t, uint64_t> distribution;
       m_wallet.get_utxo_distribution(distribution);
       for (const auto& ent : distribution)
-        res.utxo_distribution.push_back(currency::print_money(ent.first) + ":" + std::to_string(ent.second));
+        res.utxo_distribution.push_back(currency::print_money_brief(ent.first) + ":" + std::to_string(ent.second));
       
       return true;
     }
