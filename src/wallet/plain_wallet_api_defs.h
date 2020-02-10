@@ -4,7 +4,7 @@
 
 #pragma once
 #include "net/http_server_handlers_map2.h"
-#include "gui/qt-daemon/application/view_iface.h"
+#include "view_iface.h"
 
 namespace plain_wallet
 {

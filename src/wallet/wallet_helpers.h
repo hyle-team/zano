@@ -6,7 +6,7 @@
 
 
 #include "wallet2.h"
-#include "gui/qt-daemon/application/view_iface.h"
+#include "view_iface.h"
 
 
 namespace tools
