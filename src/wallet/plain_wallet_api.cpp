@@ -8,12 +8,16 @@
 #include "currency_core/currency_config.h"
 #include "version.h"
 #include "currency_core/currency_format_utils.h"
+//#include "wallets_manager.h"
 
 //TODO: global objects, need refactoring. Just temporary solution
 std::map<int64_t, plain_wallet::plain_wallet_api_impl*> ginstances;
 epee::critical_section ginstances_lock;
 std::atomic<int64_t> gcounter(1);
-std::atomic<bool> glogs_initialized(false);
+ std::atomic<bool> glogs_initialized(false);
+
+#define HOME_FOLDER             "Documents"
+#define WALLETS_FOLDER_NAME     "wallets"
 
 #define GENERAL_INTERNAL_ERRROR_INSTANCE "GENERAL_INTERNAL_ERROR: WALLET INSTNACE NOT FOUND"
 
@@ -29,7 +33,8 @@ std::atomic<bool> glogs_initialized(false);
   CRITICAL_REGION_END();
 
 
-
+//TODO: global object, subject to refactoring
+//wallets_manager gwm;
 
 namespace plain_wallet
 {
@@ -42,7 +47,10 @@ namespace plain_wallet
   
   std::string get_wallets_folder()
   {
-    return get_bundle_root_dir() + "/Documents";
+    std::string path = get_bundle_root_dir() + "/" + HOME_FOLDER + "/" + WALLETS_FOLDER_NAME;
+    boost::system::error_code ec;
+    boost::filesystem::create_directories(path, ec);
+    return path;
   }
 
   std::string print_money(int64_t amount)
@@ -53,7 +61,7 @@ namespace plain_wallet
   void initialize_logs()
   {
     std::string log_dir = get_bundle_root_dir();
-    log_dir += "/Documents";
+    log_dir += "/" HOME_FOLDER;
     epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
     epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
     epee::log_space::log_singletone::add_logger(LOGGER_FILE, "plain_wallet.log", log_dir.c_str());
