@@ -1,6 +1,6 @@
 
 [![Coverity Scan](https://scan.coverity.com/projects/18767/badge.svg)](https://scan.coverity.com/projects/zanoproject)
-![Discord](https://img.shields.io/discord/538361472691077130?label=discord&logo=discord)
+[![Discord](https://img.shields.io/discord/538361472691077130?label=discord&logo=discord)](https://discord.gg/wE3rmYY)
 
 Building
 --------
