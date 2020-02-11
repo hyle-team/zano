@@ -21,18 +21,6 @@
 
 #define GENERAL_INTERNAL_ERRROR_INSTANCE "GENERAL_INTERNAL_ERROR: WALLET INSTNACE NOT FOUND"
 #define GENERAL_INTERNAL_ERRROR_INIT "Failed to intialize library"
-// 
-// #define GET_INSTANCE(var_name, instance_handle) plain_wallet_api_impl* var_name = nullptr;\
-//   CRITICAL_REGION_BEGIN(ginstances_lock);\
-//   auto it = ginstances.find(instance_handle);\
-//   if (it == ginstances.end())\
-//   {\
-//     LOG_ERROR("Internall error: attempt to get instance wallet with wrong id: " << instance_handle);\
-//     return GENERAL_INTERNAL_ERRROR_INSTANCE;\
-//   }\
-//   var_name = it->second;\
-//   CRITICAL_REGION_END();
-
 
 //TODO: global object, subject to refactoring
 wallets_manager gwm;
@@ -165,29 +153,12 @@ namespace plain_wallet
     err_result.error.code = rsp;
     return epee::serialization::store_t_to_json(err_result);
   }
-//   std::string start_sync_thread(hwallet h)
-//   {
-//     GET_INSTANCE(pimpl, h);
-//     pimpl->start_sync_thread();
-//     return "";
-//   }
-//   std::string get_sync_status(hwallet h)
-//   {
-//     GET_INSTANCE(pimpl, h);
-//     return pimpl->get_sync_status();
-//   }
-// 
-//   std::string cancel_sync_thread(hwallet h)
-//   {
-//     GET_INSTANCE(pimpl, h);
-//     return pimpl->cancel_sync_thread();
-//   }
-// 
-//   std::string sync(hwallet h)
-//   {
-//     GET_INSTANCE(pimpl, h);
-//     return pimpl->sync();
-//   }
+
+  std::string close_wallet(hwallet h)
+  {
+    return gwm.close_wallet(h);
+  }
+
   std::string get_wallet_status(hwallet h)
   {
     return gwm.get_wallet_status(h);

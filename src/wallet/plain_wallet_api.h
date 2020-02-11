@@ -10,8 +10,6 @@
 namespace plain_wallet
 {
   typedef int64_t hwallet;
-  hwallet create_instance(const std::string& ip, const std::string& port);
-  void destroy_instance(hwallet h);
   std::string init(const std::string& ip, const std::string& port);
   std::string get_version();
   std::string get_wallet_files();
@@ -21,5 +19,6 @@ namespace plain_wallet
   std::string generate(const std::string& path, const std::string& password);
 
   std::string get_wallet_status(hwallet h);
+  std::string close_wallet(hwallet h);
   std::string invoke(hwallet h, const std::string& params);
 }
