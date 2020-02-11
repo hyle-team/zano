@@ -36,18 +36,23 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_cprotocol(m_ccore, &m_p2psrv),
                                  m_p2psrv(m_cprotocol),
                                  m_rpc_server(m_ccore, m_p2psrv, m_offers_service),
-#endif
                                  m_rpc_proxy(new tools::core_fast_rpc_proxy(m_rpc_server)),
+                                 m_offers_service(nullptr),
+#else 
+                                 m_rpc_proxy(new tools::default_http_core_proxy()),
+#endif                            
+                       
                                  m_last_daemon_height(0),
                                  m_last_daemon_is_disconnected(false),
                                  m_wallet_id_counter(0),
-                                 m_offers_service(nullptr), 
                                  m_ui_opt(AUTO_VAL_INIT(m_ui_opt)), 
                                  m_remote_node_mode(false),
                                  m_is_pos_allowed(false),
                                  m_qt_logs_enbaled(false)
 {
+#ifndef IOS_BUILD
   m_offers_service.set_disabled(true);
+#endif
 	//m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
 }
 
@@ -688,7 +693,11 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
   }
   else
   {
+#ifndef IOS_BUILD
     w->set_core_proxy(std::shared_ptr<tools::i_core_proxy>(new tools::core_fast_rpc_proxy(m_rpc_server)));
+#else 
+    LOG_ERROR("Unexpected location reached");
+#endif
   }
   
   std::string return_code = API_RETURN_CODE_OK;
@@ -763,7 +772,12 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   }
   else
   {
+#ifndef IOS_BUILD
     w->set_core_proxy(std::shared_ptr<tools::i_core_proxy>(new tools::core_fast_rpc_proxy(m_rpc_server)));
+#else 
+    LOG_ERROR("Unexpected location reached");
+#endif
+
   }
 
 
@@ -842,7 +856,12 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   }
   else
   {
+#ifndef IOS_BUILD
     w->set_core_proxy(std::shared_ptr<tools::i_core_proxy>(new tools::core_fast_rpc_proxy(m_rpc_server)));
+#else 
+    LOG_ERROR("Unexpected location reached");
+#endif
+
   }
 
   currency::account_base acc;
