@@ -184,12 +184,14 @@ private:
   std::string m_data_dir;
   view::gui_options m_ui_opt;
   
+#ifndef IOS_BUILD
   //daemon stuff
 	bc_services::bc_offers_service m_offers_service;
   currency::core m_ccore;
   currency::t_currency_protocol_handler<currency::core> m_cprotocol;
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > m_p2psrv;
   currency::core_rpc_server m_rpc_server;
+#endif
 
   bool m_remote_node_mode;
   bool m_qt_logs_enbaled;
