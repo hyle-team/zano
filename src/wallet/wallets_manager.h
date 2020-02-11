@@ -26,7 +26,7 @@ using namespace epee;
   #include "currency_protocol/currency_protocol_handler.h"
   #include "core_fast_rpc_proxy.h"
 #endif
-#include "daemon/daemon_commands_handler.h"
+//#include "daemon/daemon_commands_handler.h"
 //#include "common/miniupnp_helper.h"
 #include "view_iface.h"
 #include "wallet2.h"
