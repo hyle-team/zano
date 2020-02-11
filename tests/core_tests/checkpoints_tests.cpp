@@ -813,3 +813,69 @@ bool gen_no_attchments_in_coinbase_gentime::generate(std::vector<test_event_entr
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+gen_checkpoints_and_invalid_tx_to_pool::gen_checkpoints_and_invalid_tx_to_pool()
+{
+  REGISTER_CALLBACK_METHOD(gen_checkpoints_and_invalid_tx_to_pool, c1);
+}
+
+bool gen_checkpoints_and_invalid_tx_to_pool::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure txs with invalid signatures rejected by the pool when the core is in CP zone
+  // Mine a block aftewards to make sure everything is okay.
+
+  //  0 ... N     N+1   N+2     <- height (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+  //     +------->CP1           <- checkpoint
+  //     |                      <- when CP is set up
+  // (0 )- (0r)- (1 )- (2 )-    <- main chain
+  //          tx_0         CB
+
+  bool r = false;
+  GENERATE_ACCOUNT(miner_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1));
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, miner_acc, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");  
+  
+  transaction tx_0 = AUTO_VAL_INIT(tx_0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+
+  // invalidate tx_0 signature
+  tx_0.signatures.clear();
+
+  events.push_back(tx_0);
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc); // <-- CHECKPOINT
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+
+  DO_CALLBACK(events, "check_not_being_in_cp_zone");
+
+  //DO_CALLBACK(events, "check_tx_pool_empty");
+
+  // try to mine a block using default blocktemplate (all txs from the pool)
+  DO_CALLBACK(events, "c1");
+
+  DO_CALLBACK(events, "check_tx_pool_empty");
+
+  return true;
+}
+
+bool gen_checkpoints_and_invalid_tx_to_pool::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  account_base acc;
+  acc.generate();
+
+  bool r = mine_next_pow_block_in_playtime(acc.get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+
+  return true;
+}
+
