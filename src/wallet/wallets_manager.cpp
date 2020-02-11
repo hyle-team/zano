@@ -6,10 +6,12 @@
 
 #include "wallets_manager.h"
 #include "currency_core/alias_helper.h"
-#include "core_fast_rpc_proxy.h"
-#include "string_coding.h"
-#include "currency_core/core_tools.h"
+#ifndef IOS_BUILD
+  #include "core_fast_rpc_proxy.h"
+  #include "currency_core/core_tools.h"
+#endif
 #include "common/callstack_helper.h"
+#include "string_coding.h"
 #include "wallet_helpers.h"
 #include "core_default_rpc_proxy.h"
 
