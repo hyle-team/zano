@@ -140,7 +140,7 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(err_result);
   }
 
-  std::string generate(hwallet h, const std::string& path, const std::string& password)
+  std::string generate(const std::string& path, const std::string& password)
   {
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     std::string rsp = gwm.generate_wallet(epee::string_encoding::convert_to_unicode(path), password, ok_response.result);
