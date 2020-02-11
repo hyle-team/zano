@@ -142,8 +142,10 @@ public:
   std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
   std::string is_valid_brain_restore_data(const std::string& brain_text);
+#ifndef IOS_BUILD
   void subscribe_to_core_events(currency::i_core_event_handler* pevents_handler);
-  void unsubscribe_to_core_events();
+  //void unsubscribe_to_core_events();
+#endif
   void get_gui_options(view::gui_options& opt);
   std::string get_wallet_log_prefix(size_t wallet_id) const;
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
