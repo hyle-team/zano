@@ -1133,13 +1133,19 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
 
 std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
 {
-
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
+  wsi.is_in_long_refresh = wo.long_refresh_in_progress;
+  wsi.progress = wo.w.unlocked_get().get()->get_sync_progress();
+  wsi.wallet_state = wo.wallet_state;
+  return epee::serialization::store_t_to_json(wsi);
 }
+
 std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
-  CRITICAL_REGION_LOCAL(wo.long_refresh_in_progress_lock);
+  CRITICAL_REGION_LOCAL1(wo.long_refresh_in_progress_lock);
   if (wo.long_refresh_in_progress)
   {
     epee::json_rpc::response<epee::json_rpc::dummy_result, epee::json_rpc::error> error_response = AUTO_VAL_INIT(error_response);

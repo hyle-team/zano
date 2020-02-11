@@ -54,9 +54,16 @@ namespace plain_wallet
     return path;
   }
 
-  std::string print_money(int64_t amount)
+  void initialize_logs()
   {
-    return currency::print_money(amount);
+    std::string log_dir = get_bundle_root_dir();
+    log_dir += "/" HOME_FOLDER;
+    epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
+    epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
+    epee::log_space::log_singletone::add_logger(LOGGER_FILE, "plain_wallet.log", log_dir.c_str());
+    LOG_PRINT_L0("Plain wallet initialized: " << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ", log location: " << log_dir + "/plain_wallet.log");
+
+    //glogs_initialized = true;
   }
 
   std::string init(const std::string& ip, const std::string& port)
@@ -84,17 +91,7 @@ namespace plain_wallet
     return API_RETURN_CODE_OK;
   }
 
-  void initialize_logs()
-  {
-    std::string log_dir = get_bundle_root_dir();
-    log_dir += "/" HOME_FOLDER;
-    epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
-    epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
-    epee::log_space::log_singletone::add_logger(LOGGER_FILE, "plain_wallet.log", log_dir.c_str());
-    LOG_PRINT_L0("Plain wallet initialized: " <<  CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ", log location: " << log_dir + "/plain_wallet.log");
 
-    //glogs_initialized = true;
-  }
 
   std::string get_version()
   {
@@ -119,31 +116,6 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(sl);
   }
 
-  hwallet create_instance(const std::string& ip, const std::string& port)
-  {
-
-//     plain_wallet_api_impl* ptr = new plain_wallet_api_impl(ip, port);
-//     hwallet new_h = gcounter++;
-//     CRITICAL_REGION_BEGIN(ginstances_lock);     
-//     ginstances[new_h] = ptr;
-//     CRITICAL_REGION_END();
-//     return new_h;      
-  }
-
-  void destroy_instance(hwallet h)
-  {
-//     plain_wallet_api_impl* instance_ptr = nullptr;
-//     CRITICAL_REGION_BEGIN(ginstances_lock);
-//     auto it = ginstances.find(h);
-//     if (it == ginstances.end())
-//     {
-//       LOG_ERROR("Internal error: attempt to delete wallet with wrong instance id: " << h);
-//     }
-//     instance_ptr = it->second;
-//     ginstances.erase(it);
-//     CRITICAL_REGION_END();
-//     delete instance_ptr; 
-  }
   std::string open(const std::string& path, const std::string& password)
   {
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
@@ -218,7 +190,7 @@ namespace plain_wallet
 //   }
   std::string get_wallet_status(hwallet h)
   {
-
+    return gwm.get_wallet_status(h);
   }
   std::string invoke(hwallet h, const std::string& params)
   {

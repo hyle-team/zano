@@ -520,6 +520,19 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct wallet_sync_status_info
+  {
+    uint64_t wallet_state;
+    bool is_in_long_refresh;
+    uint64_t progress;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_state)
+      KV_SERIALIZE(is_in_long_refresh)
+      KV_SERIALIZE(progress)
+    END_KV_SERIALIZE_MAP()
+  };
+
   struct get_restore_info_response
   {
     std::string restore_key;
