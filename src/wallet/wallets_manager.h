@@ -86,7 +86,7 @@ public:
 
   wallets_manager();
   ~wallets_manager();
-  bool init(int argc, const char* argv[], view::i_view* pview_handler);
+  bool init(int argc, char* argv[], view::i_view* pview_handler);
   bool start();
   bool stop();
   bool send_stop_signal();

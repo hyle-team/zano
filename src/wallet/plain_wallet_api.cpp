@@ -70,8 +70,8 @@ namespace plain_wallet
   {
     initialize_logs();
     std::string argss_1 = std::string("--remote-nodes=") + ip + ":" + port;    
-    const char * args[] = {"", 0};
-    args[1] = argss_1.c_str();
+    char * args[] = {"", 0};
+    args[1] = const_cast<char*>(argss_1.c_str());
     if (!gwm.init(2, args, nullptr))
     {
       LOG_ERROR("Failed to init wallets_manager");

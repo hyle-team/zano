@@ -77,7 +77,7 @@ void terminate_handler_func()
   std::abort(); // default terminate handler's behavior
 }
 
-bool wallets_manager::init(int argc, const char* argv[], view::i_view* pview_handler)
+bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
 {
   m_stop_singal_sent = false;
   if (pview_handler)
