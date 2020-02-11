@@ -139,12 +139,13 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
   command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
 
-
+#ifndef IOS_BUILD
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
   currency::miner::init_options(desc_cmd_sett);
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
+#endif
 
   po::options_description desc_options("Allowed options");
   desc_options.add(desc_cmd_only).add(desc_cmd_sett);
@@ -836,13 +837,15 @@ std::string wallets_manager::is_valid_brain_restore_data(const std::string& brai
   else
     return API_RETURN_CODE_FALSE;
 }
+#ifndef IOS_BUILD
 void wallets_manager::subscribe_to_core_events(currency::i_core_event_handler* pevents_handler)
 {
-#ifndef IOS_BUILD
+
   if(!m_remote_node_mode)
     m_ccore.get_blockchain_storage().set_event_handler(pevents_handler);
-#endif
+
 }
+#endif
 void wallets_manager::get_gui_options(view::gui_options& opt)
 {
   opt = m_ui_opt;
