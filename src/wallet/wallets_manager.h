@@ -70,6 +70,10 @@ public:
     std::atomic<bool>* plast_daemon_is_disconnected;
     std::atomic<bool> has_related_alias_in_unconfirmed;
     std::atomic<bool> need_to_update_wallet_info;
+
+    std::atomic<bool> long_refresh_in_progress;
+    epee::critical_section long_refresh_in_progress_lock; //secure wallet state and prevent from long wait while long refresh is in work
+
     view::i_view* pview;
     uint64_t wallet_id;
     epee::locked_object<std::list<bc_services::offer_details_ex>> offers;

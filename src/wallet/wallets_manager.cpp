@@ -1131,9 +1131,24 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
   return API_RETURN_CODE_OK;
 }
 
+std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
+{
+
+}
 std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
+
+  CRITICAL_REGION_LOCAL(wo.long_refresh_in_progress_lock);
+  if (wo.long_refresh_in_progress)
+  {
+    epee::json_rpc::response<epee::json_rpc::dummy_result, epee::json_rpc::error> error_response = AUTO_VAL_INIT(error_response);
+    error_response.error.code = -1;
+    error_response.error.message = API_RETURN_CODE_BUSY;
+    return epee::serialization::store_t_to_json(error_response);
+  }
+
+
   auto locker_object = wo.w.lock();
 
   epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
@@ -1542,6 +1557,13 @@ void wallets_manager::wallet_vs_options::worker_func()
           if (last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height < 3)
             show_progress = false;
 
+          if(last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height > 10)
+          {
+            CRITICAL_REGION_LOCAL(long_refresh_in_progress_lock);
+            long_refresh_in_progress = true;
+          }
+
+
           if (show_progress)
           {
             wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_synchronizing;
@@ -1549,6 +1571,7 @@ void wallets_manager::wallet_vs_options::worker_func()
             pview->update_wallet_status(wsi);
           }
           w->get()->refresh(stop_for_refresh);
+          long_refresh_in_progress = false;
           w->get()->resend_unconfirmed();
           {
             auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')

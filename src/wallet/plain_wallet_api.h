@@ -15,15 +15,16 @@ namespace plain_wallet
   std::string init(const std::string& ip, const std::string& port);
   std::string get_version();
   std::string get_wallet_files();
-  std::string print_money(int64_t);
+  //std::string print_money(int64_t);
 
   std::string open(hwallet h, const std::string& path, const std::string& password);
   std::string restore(hwallet h, const std::string& seed, const std::string& path, const std::string& password);
   std::string generate(hwallet h, const std::string& path, const std::string& password);
 
-  std::string start_sync_thread(hwallet h);
-  std::string get_sync_status(hwallet h);
-  std::string cancel_sync_thread(hwallet h);
-  std::string sync(hwallet h);
+//   std::string start_sync_thread(hwallet h);
+//   std::string get_sync_status(hwallet h);
+//   std::string cancel_sync_thread(hwallet h);
+//   std::string sync(hwallet h);
+  std::string get_wallet_status(hwallet h);
   std::string invoke(hwallet h, const std::string& params);
 }

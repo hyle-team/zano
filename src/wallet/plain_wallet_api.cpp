@@ -216,9 +216,12 @@ namespace plain_wallet
 //     GET_INSTANCE(pimpl, h);
 //     return pimpl->sync();
 //   }
+  std::string get_wallet_status(hwallet h)
+  {
+
+  }
   std::string invoke(hwallet h, const std::string& params)
   {
-    GET_INSTANCE(pimpl, h);
-    return pimpl->invoke(params);
+    return gwm.invoke(h, params);
   }
 }
