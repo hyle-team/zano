@@ -10,11 +10,7 @@
 #include "currency_core/currency_format_utils.h"
 #include "wallets_manager.h"
 
-//TODO: global objects, need refactoring. Just temporary solution
-// std::map<int64_t, plain_wallet::plain_wallet_api_impl*> ginstances;
-// epee::critical_section ginstances_lock;
-// std::atomic<int64_t> gcounter(1);
-//  std::atomic<bool> glogs_initialized(false);
+std::atomic<bool> initialized(false);
 
 #define HOME_FOLDER             "Documents"
 #define WALLETS_FOLDER_NAME     "wallets"
@@ -56,6 +52,13 @@ namespace plain_wallet
 
   std::string init(const std::string& ip, const std::string& port)
   {
+    if (initialized)
+    {
+      LOG_ERROR("Double-initialization in plain_wallet detected.");
+      throw std::runtime_error("Double-initialization in plain_wallet detected.");
+    }
+      
+
     initialize_logs();
     std::string argss_1 = std::string("--remote-nodes=") + ip + ":" + port;    
     char * args[] = {"", 0};
