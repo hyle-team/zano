@@ -12,6 +12,7 @@ namespace plain_wallet
   typedef int64_t hwallet;
   hwallet create_instance(const std::string& ip, const std::string& port);
   void destroy_instance(hwallet h);
+  std::string init(const std::string& ip, const std::string& port);
   std::string get_version();
   std::string get_wallet_files();
   std::string print_money(int64_t);

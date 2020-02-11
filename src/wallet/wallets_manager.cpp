@@ -10,7 +10,8 @@
 #include "string_coding.h"
 #include "currency_core/core_tools.h"
 #include "common/callstack_helper.h"
-#include "wallet/wallet_helpers.h"
+#include "wallet_helpers.h"
+#include "core_default_rpc_proxy.h"
 
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   CRITICAL_REGION_LOCAL(m_wallets_lock);    \
@@ -76,7 +77,7 @@ void terminate_handler_func()
   std::abort(); // default terminate handler's behavior
 }
 
-bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
+bool wallets_manager::init(int argc, const char* argv[], view::i_view* pview_handler)
 {
   m_stop_singal_sent = false;
   if (pview_handler)
@@ -218,7 +219,8 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
 
   if (command_line::has_arg(m_vm, arg_remote_node))
   {
-    // configure for remote node
+    m_rpc_proxy.reset(new tools::default_http_core_proxy());
+    m_rpc_proxy->set_connection_addr(command_line::get_arg(m_vm, arg_remote_node));
   }
 
   m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
@@ -565,6 +567,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.plast_daemon_is_disconnected = &m_last_daemon_is_disconnected;
   wo.pview = m_pview;  
   wo.has_related_alias_in_unconfirmed = false;
+  wo.rpc_wrapper.reset(new tools::wallet_rpc_server(*wo.w.unlocked_get().get()));
   if (m_remote_node_mode)
     wo.core_conf = currency::get_default_core_runtime_config();
   else 
@@ -1126,6 +1129,22 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
   }
 
   return API_RETURN_CODE_OK;
+}
+
+std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  auto locker_object = wo.w.lock();
+
+  epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
+  epee::net_utils::http::http_response_info response_info = AUTO_VAL_INIT(response_info);
+  epee::net_utils::connection_context_base stub_conn_context = AUTO_VAL_INIT(stub_conn_context);
+  std::string reference_stub;
+  bool call_found = false;
+  query_info.m_URI = "/json_rpc";
+  query_info.m_body = params;
+  wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found, reference_stub);
+  return response_info.m_body;
 }
 
 std::string wallets_manager::get_wallet_info(size_t wallet_id, view::wallet_info& wi)

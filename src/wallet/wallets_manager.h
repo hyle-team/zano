@@ -27,8 +27,9 @@ using namespace epee;
 //#include "common/miniupnp_helper.h"
 #include "view_iface.h"
 #include "core_fast_rpc_proxy.h"
-#include "wallet/wallet2.h"
+#include "wallet2.h"
 #include "wallet_id_adapter.h"
+#include "wallet_rpc_server.h"
 
 POP_VS_WARNINGS
 
@@ -55,6 +56,7 @@ public:
   {
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
+    std::shared_ptr<tools::wallet_rpc_server> rpc_wrapper; //500 bytes of extra data, we can afford it, to have rpc-like invoke map
     std::atomic<bool> do_mining;
     std::atomic<bool> major_stop;
     std::atomic<bool> stop_for_refresh; //use separate var for passing to "refresh" member function, 
@@ -80,13 +82,14 @@ public:
 
   wallets_manager();
   ~wallets_manager();
-  bool init(int argc, char* argv[], view::i_view* pview_handler);
+  bool init(int argc, const char* argv[], view::i_view* pview_handler);
   bool start();
   bool stop();
   bool send_stop_signal();
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr);
+  std::string invoke(uint64_t wallet_id, std::string params);
   std::string run_wallet(uint64_t wallet_id);
   std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist);
   std::string get_wallet_info(size_t wallet_id, view::wallet_info& wi);
