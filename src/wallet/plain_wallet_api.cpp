@@ -27,6 +27,10 @@ namespace plain_wallet
 
   std::string get_bundle_root_dir()
   {
+#ifdef WIN32
+    return "undefined";
+#endif // WIN32
+
     char buffer[1000] = {0};
     strcpy(buffer, getenv("HOME"));
     return buffer;
@@ -60,9 +64,11 @@ namespace plain_wallet
       
 
     initialize_logs();
-    std::string argss_1 = std::string("--remote-nodes=") + ip + ":" + port;    
-    char * args[] = {"", 0};
+    std::string argss_1 = std::string("--remote-node=") + ip + ":" + port;    
+    char * args[3];
+    args[0] = "stub";
     args[1] = const_cast<char*>(argss_1.c_str());
+    args[2] = nullptr;
     if (!gwm.init(2, args, nullptr))
     {
       LOG_ERROR("Failed to init wallets_manager");
