@@ -8,7 +8,7 @@
 #include "chaingen_tests_list.h"
 #include "common/command_line.h"
 #include "transaction_tests.h"
-#include "../../src/gui/qt-daemon/application/core_fast_rpc_proxy.h"
+#include "../../src/wallet/core_fast_rpc_proxy.h"
 #include "test_core_proxy.h"
 #include "currency_core/bc_offers_service.h"
 #include "random_helper.h"
