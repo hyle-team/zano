@@ -340,11 +340,13 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   // tx_0 should be accepted
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_0 goes with blk_1_bad
   events.push_back(tx_0);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   DO_CALLBACK(events, "mark_invalid_block");
   MAKE_NEXT_BLOCK_TX1(events, blk_1_bad, blk_0r, miner_acc, tx_0); // should be rejected because of tx_0
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK(events, "check_tx_pool_empty"); // tx_0 won't be returned to the pool as it came with block blk_1_bad
   DO_CALLBACK(events, "clear_tx_pool");
 
   MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
@@ -360,7 +362,9 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   //
 
   // now tx_0 is okay and can be added to the blockchain
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_0 goes with blk_5
   events.push_back(tx_0);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   MAKE_NEXT_BLOCK_TX1(events, blk_5, blk_4, miner_acc, tx_0);
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_5r, blk_5, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);

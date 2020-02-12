@@ -81,7 +81,9 @@ bool gen_checkpoints_attachments_basic::generate(std::vector<test_event_entry>& 
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   //  0 ... N     N+1   N+2   <- height (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+  //                    CP       checkpoint
   // (0 )- (0r)- (1 )- (2 )
+  //             tx_0            txs
 
   DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2));
 
@@ -94,10 +96,13 @@ bool gen_checkpoints_attachments_basic::generate(std::vector<test_event_entry>& 
   attachments.push_back(cm);
   attachments.push_back(ms);
 
-  MAKE_TX_LIST_START_WITH_ATTACHS(events, txs, miner_acc, miner_acc, MK_TEST_COINS(1), blk_0r, attachments);
-  m_tx_hash = get_transaction_hash(txs.front());
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_0 goes with the block blk_1
+  MAKE_TX_ATTACH(events, tx_0, miner_acc, miner_acc, MK_TEST_COINS(1), blk_0r, attachments);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
+  m_tx_hash = get_transaction_hash(tx_0);
   
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, txs);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
 
@@ -150,7 +155,10 @@ bool gen_checkpoints_invalid_keyimage::generate(std::vector<test_event_entry>& e
   // don't sign at all
   // tb.step5_sign();
 
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tb.m_tx goes with block blk_1
   events.push_back(tb.m_tx);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tb.m_tx);
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
@@ -376,33 +384,40 @@ bool gen_checkpoints_prun_txs_after_blockchain_load::generate(std::vector<test_e
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  //  0 ... N     N+1   N+2   N+3   N+4   N+5   N+6    <- height (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
-  //           +------->CP1      +------->CP2          <- checkpoints
-  //           |                 |                     <- when CP are set up
-  // (0 )- (0r)- (1 )- (2 )- (3 )- (4 )- (5 )- (6 )    <- main chain
-  //             tx_0        tx_1                      <- txs included in blocks
+  //  0 ... N     N+1   N+2   N+3   N+4   N+5   N+6   N+7     <- height (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+  //           +------->CP1             +------->CP2          <- checkpoints
+  //           |                        |                     <- when CP are set up
+  // (0 )- (0r)- (1 )- (2 )- (3 )- (4 )- (5 )- (6 )- (7 )     <- main chain
+  //             tx_0              tx_1                       <- txs included in blocks
   //
   // Expected: tx_0 and tx_1 are both pruned
 
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
   DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2));
 
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_0 goes with blk_1_bad
   MAKE_TX(events, tx_0, miner_acc, alice, MK_TEST_COINS(1), blk_0r);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
   
   DO_CALLBACK(events, "check_being_in_cp_zone");
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
 
-  MAKE_TX(events, tx_1, miner_acc, alice, MK_TEST_COINS(1), blk_2);
-  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_1);
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
 
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
-  DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5));
 
-  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
+  MAKE_TX(events, tx_1, miner_acc, alice, MK_TEST_COINS(1), blk_3);
+  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_1);
+
+  DO_CALLBACK(events, "check_not_being_in_cp_zone");
+
+  DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 6));
+
   MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
   DO_CALLBACK(events, "check_being_in_cp_zone");
   MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
 
   m_tx0_id = get_transaction_hash(tx_0);
