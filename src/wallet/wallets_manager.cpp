@@ -229,6 +229,7 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
 
   if (command_line::has_arg(m_vm, arg_remote_node))
   {
+    m_remote_node_mode = true;
     m_rpc_proxy.reset(new tools::default_http_core_proxy());
     m_rpc_proxy->set_connection_addr(command_line::get_arg(m_vm, arg_remote_node));
   }
