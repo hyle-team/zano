@@ -115,8 +115,9 @@ namespace plain_wallet
 
   std::string open(const std::string& path, const std::string& password)
   {
+    std::string full_path = get_wallets_folder() + "/" + path;
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    std::string rsp = gwm.open_wallet(epee::string_encoding::convert_to_unicode(path), password, 20, ok_response.result);
+    std::string rsp = gwm.open_wallet(epee::string_encoding::convert_to_unicode(full_path), password, 20, ok_response.result);
     if (rsp == API_RETURN_CODE_OK || rsp == API_RETURN_CODE_FILE_RESTORED)
     {
       if (rsp == API_RETURN_CODE_FILE_RESTORED)
@@ -131,8 +132,9 @@ namespace plain_wallet
   }
   std::string restore(const std::string& seed, const std::string& path, const std::string& password)
   {
+    std::string full_path = get_wallets_folder() + "/" + path;
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    std::string rsp = gwm.restore_wallet(epee::string_encoding::convert_to_unicode(path), password, seed, ok_response.result);
+    std::string rsp = gwm.restore_wallet(epee::string_encoding::convert_to_unicode(full_path), password, seed, ok_response.result);
     if (rsp == API_RETURN_CODE_OK || rsp == API_RETURN_CODE_FILE_RESTORED)
     {
       if (rsp == API_RETURN_CODE_FILE_RESTORED)
@@ -148,8 +150,9 @@ namespace plain_wallet
 
   std::string generate(const std::string& path, const std::string& password)
   {
+    std::string full_path = get_wallets_folder() + "/" + path;
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    std::string rsp = gwm.generate_wallet(epee::string_encoding::convert_to_unicode(path), password, ok_response.result);
+    std::string rsp = gwm.generate_wallet(epee::string_encoding::convert_to_unicode(full_path), password, ok_response.result);
     if (rsp == API_RETURN_CODE_OK || rsp == API_RETURN_CODE_FILE_RESTORED)
     {
       if (rsp == API_RETURN_CODE_FILE_RESTORED)
