@@ -107,10 +107,10 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
 
   // setup custom callstack retrieving function
   epee::misc_utils::get_callstack(tools::get_callstack);
-
+#ifndef IOS_BUILD
   // setup custom terminate functions
   std::set_terminate(&terminate_handler_func);
-
+#endif
   //#if !defined(NDEBUG)
   //  log_space::log_singletone::add_logger(LOGGER_DEBUGGER, nullptr, nullptr);
   //#endif
