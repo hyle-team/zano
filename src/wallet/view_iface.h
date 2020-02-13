@@ -424,12 +424,14 @@ public:
     uint64_t wallet_id;
     transfers_array recent_history;
     wallet_info wi;
+    std::string seed;
     bool recovered;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(recent_history)
       KV_SERIALIZE(wi)
+      KV_SERIALIZE(seed)
       KV_SERIALIZE(recovered)
     END_KV_SERIALIZE_MAP()
   };

@@ -717,6 +717,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history);
       //workaround for missed fee
+      owr.seed = w->get_account().get_restore_braindata();
       break;
     }
     catch (const tools::error::file_not_found& /**/)
@@ -790,6 +791,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   try
   {
     w->generate(path, password);
+    owr.seed = w->get_account().get_restore_braindata();
   }
   catch (const tools::error::file_exists/*& e*/)
   {
@@ -877,6 +879,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   try
   {
     w->restore(path, password, restore_key);
+    owr.seed = w->get_account().get_restore_braindata();
   }
   catch (const tools::error::file_exists/*& e*/)
   {
