@@ -146,6 +146,7 @@ namespace plain_wallet
       {
         ok_response.result.recovered = true;
       }
+      gwm.run_wallet(ok_response.result.wallet_id);
       return epee::serialization::store_t_to_json(ok_response);
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
@@ -164,6 +165,7 @@ namespace plain_wallet
       {
         ok_response.result.recovered = true;
       }
+      gwm.run_wallet(ok_response.result.wallet_id);
       return epee::serialization::store_t_to_json(ok_response);
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
