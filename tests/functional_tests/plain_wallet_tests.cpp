@@ -19,7 +19,28 @@ using namespace epee;
 void run_plain_wallet_api_test()
 {
   LOG_PRINT_L0("Creating instance...");
-  std::string s  = plain_wallet::init("127.0.0.1", "11211");
+  std::string s = plain_wallet::init("195.201.107.230", "11211");
+
+  LOG_PRINT_L0("Generating wallet...");
+  std::string rsp = plain_wallet::open(std::string("E:\\tmp\\zano_testwallet_745ss65030.zan"), "");
+  LOG_PRINT_L0("RESPONSE:" << ENDL << rsp);
+  epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+  epee::serialization::load_t_from_json(ok_response, rsp);
+
+
+  while (true)
+  {
+    std::string prog = plain_wallet::get_wallet_status(ok_response.result.wallet_id);
+    LOG_PRINT_L0("Progress: " << ENDL << prog);
+    //     view::sta ssr = AUTO_VAL_INIT(ssr);
+    //     epee::serialization::load_t_from_json(ssr, prog);
+    //     LOG_PRINT_L0("Progress: " << ssr.progress << "Finished: " << ssr.finished);
+    //     if (ssr.finished)
+    //       break;
+    epee::misc_utils::sleep_no_w(1000);
+  }
+}
+
 //   LOG_PRINT_L0("Creating instance..." << std::hex << hw);
 // 
 //   LOG_PRINT_L0("Generating wallet...");
@@ -157,5 +178,4 @@ void run_plain_wallet_api_test()
 //       LOG_PRINT_L0("Balance request returned: code [" << gbres.error.code << "], str_response: "
 //         << ENDL << res);
 //     }
-//  }
-}
+//  }}

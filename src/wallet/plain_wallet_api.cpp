@@ -28,7 +28,7 @@ namespace plain_wallet
   std::string get_bundle_root_dir()
   {
 #ifdef WIN32
-    return "undefined";
+    return "";
 #endif // WIN32
 
     char buffer[1000] = {0};
@@ -38,7 +38,10 @@ namespace plain_wallet
   
   std::string get_wallets_folder()
   {
-    std::string path = get_bundle_root_dir() + "/" + HOME_FOLDER + "/" + WALLETS_FOLDER_NAME;
+#ifdef WIN32
+    return "";
+#endif // WIN32
+    std::string path = get_bundle_root_dir() + "/" + HOME_FOLDER + "/" + WALLETS_FOLDER_NAME + "/";
     return path;
   }
 
@@ -115,7 +118,7 @@ namespace plain_wallet
 
   std::string open(const std::string& path, const std::string& password)
   {
-    std::string full_path = get_wallets_folder() + "/" + path;
+    std::string full_path = get_wallets_folder() + path;
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     std::string rsp = gwm.open_wallet(epee::string_encoding::convert_to_unicode(full_path), password, 20, ok_response.result);
     if (rsp == API_RETURN_CODE_OK || rsp == API_RETURN_CODE_FILE_RESTORED)
@@ -124,6 +127,8 @@ namespace plain_wallet
       {
         ok_response.result.recovered = true;
       }
+      gwm.run_wallet(ok_response.result.wallet_id);
+
       return epee::serialization::store_t_to_json(ok_response);
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
@@ -132,7 +137,7 @@ namespace plain_wallet
   }
   std::string restore(const std::string& seed, const std::string& path, const std::string& password)
   {
-    std::string full_path = get_wallets_folder() + "/" + path;
+    std::string full_path = get_wallets_folder() + path;
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     std::string rsp = gwm.restore_wallet(epee::string_encoding::convert_to_unicode(full_path), password, seed, ok_response.result);
     if (rsp == API_RETURN_CODE_OK || rsp == API_RETURN_CODE_FILE_RESTORED)
@@ -150,7 +155,7 @@ namespace plain_wallet
 
   std::string generate(const std::string& path, const std::string& password)
   {
-    std::string full_path = get_wallets_folder() + "/" + path;
+    std::string full_path = get_wallets_folder() + path;
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     std::string rsp = gwm.generate_wallet(epee::string_encoding::convert_to_unicode(full_path), password, ok_response.result);
     if (rsp == API_RETURN_CODE_OK || rsp == API_RETURN_CODE_FILE_RESTORED)

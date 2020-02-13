@@ -1616,7 +1616,7 @@ void wallets_manager::wallet_vs_options::worker_func()
           if (last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height < 3)
             show_progress = false;
 
-          if(last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height > 10)
+          if(*plast_daemon_height - last_wallet_synch_height > 10)
           {
             CRITICAL_REGION_LOCAL(long_refresh_in_progress_lock);
             long_refresh_in_progress = true;
