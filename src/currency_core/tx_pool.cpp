@@ -91,6 +91,16 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const transaction &tx, const crypto::hash &id, uint64_t blob_size, tx_verification_context& tvc, bool kept_by_block, bool from_core)
   {    
+    if (!kept_by_block && !from_core && m_blockchain.is_in_checkpoint_zone())
+    {
+      // BCS is in CP zone, tx verification is impossible until it gets synchronized
+      tvc.m_added_to_pool = false;
+      tvc.m_should_be_relayed = false;
+      tvc.m_verification_failed = false;
+      tvc.m_verification_impossible = true;
+      return false;
+    }
+
     TIME_MEASURE_START_PD(tx_processing_time);
     TIME_MEASURE_START_PD(check_inputs_types_supported_time);
     if(!check_inputs_types_supported(tx))
