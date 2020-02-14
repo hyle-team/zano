@@ -1019,7 +1019,7 @@ namespace currency
       if (!txs_v[i].second)
       {
         LOG_ERROR("Internal tx pool db error: key " << k << " was enumerated as key but couldn't get value");
-        continue;
+        return false;
       }
       txs[i] = &txs_v[i];
     }
