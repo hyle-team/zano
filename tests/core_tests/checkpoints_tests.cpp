@@ -866,6 +866,7 @@ bool gen_checkpoints_and_invalid_tx_to_pool::generate(std::vector<test_event_ent
   // invalidate tx_0 signature
   tx_0.signatures.clear();
 
+  DO_CALLBACK(events, "mark_unverifiable_tx");
   events.push_back(tx_0);
 
   MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc); // <-- CHECKPOINT
@@ -873,7 +874,7 @@ bool gen_checkpoints_and_invalid_tx_to_pool::generate(std::vector<test_event_ent
 
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
 
-  //DO_CALLBACK(events, "check_tx_pool_empty");
+  DO_CALLBACK(events, "check_tx_pool_empty");
 
   // try to mine a block using default blocktemplate (all txs from the pool)
   DO_CALLBACK(events, "c1");
