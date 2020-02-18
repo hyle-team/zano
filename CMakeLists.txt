@@ -188,7 +188,7 @@ elseif(MAKE_SYSTEM_NAME STREQUAL "Android")
   set(Boost_VERSION "PurpleI2PBoost  1.68.0")
 else()
   find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale)
-#endif()
+endif()
 
 
 
