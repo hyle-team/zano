@@ -40,7 +40,7 @@ namespace plain_wallet
     strcpy(buffer, getenv("HOME"));
     return buffer;
 #elif ANDROID_BUILD
-    return "/data/data/ "ANDROID_PACKAGE_NAME
+    return "/data/data/" ANDROID_PACKAGE_NAME
 #endif
   }
   
