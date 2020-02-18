@@ -12,7 +12,12 @@
 
 std::atomic<bool> initialized(false);
 
+#define ANDROID_PACKAGE_NAME    "zano_mobile"
+#ifdef IOS_BUILD
 #define HOME_FOLDER             "Documents"
+#elif ANDROID_BUILD
+#define HOME_FOLDER             "files"
+#endif
 #define WALLETS_FOLDER_NAME     "wallets"
 
 #define GENERAL_INTERNAL_ERRROR_INSTANCE "GENERAL_INTERNAL_ERROR: WALLET INSTNACE NOT FOUND"
@@ -30,10 +35,13 @@ namespace plain_wallet
 #ifdef WIN32
     return "";
 #endif // WIN32
-
+#ifdef IOS_BUILD
     char buffer[1000] = {0};
     strcpy(buffer, getenv("HOME"));
     return buffer;
+#elif ANDROID_BUILD
+    return "/data/data/ "ANDROID_PACKAGE_NAME
+#endif
   }
   
   std::string get_wallets_folder()

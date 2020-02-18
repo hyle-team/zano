@@ -14,7 +14,7 @@ set(VERSION "1.0")
 #  endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
-  add_definitions(-DIOS_BUILD)
+  add_definitions(-DMOBILE_WALLET_BUILD)
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     message("Android sdk prefix: ${CMAKE_CXX_ANDROID_TOOLCHAIN_PREFIX}")    
     message("Android CMAKE_CXX_COMPILER prefix: ${CMAKE_CXX_COMPILER}")    

@@ -19,7 +19,7 @@ using namespace epee;
 #include "console_handler.h"
 #include "p2p/net_node.h"
 #include "currency_core/checkpoints_create.h"
-#ifndef IOS_BUILD
+#ifndef MOBILE_WALLET_BUILD
   #include "currency_core/currency_core.h"
   #include "currency_core/bc_offers_service.h"
   #include "rpc/core_rpc_server.h"
@@ -142,7 +142,7 @@ public:
   std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
   std::string is_valid_brain_restore_data(const std::string& brain_text);
-#ifndef IOS_BUILD
+#ifndef MOBILE_WALLET_BUILD
   void subscribe_to_core_events(currency::i_core_event_handler* pevents_handler);
   //void unsubscribe_to_core_events();
 #endif
@@ -186,7 +186,7 @@ private:
   std::string m_data_dir;
   view::gui_options m_ui_opt;
   
-#ifndef IOS_BUILD
+#ifndef MOBILE_WALLET_BUILD
   //daemon stuff
 	bc_services::bc_offers_service m_offers_service;
   currency::core m_ccore;
