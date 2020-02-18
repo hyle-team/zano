@@ -15,13 +15,16 @@ set(VERSION "1.0")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
   add_definitions(-DMOBILE_WALLET_BUILD)
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" )   
+    add_definitions(-DIOS_BUILD)
+  endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    add_definitions(-DANDROID_BUILD)
     message("Android sdk prefix: ${CMAKE_CXX_ANDROID_TOOLCHAIN_PREFIX}")    
     message("Android CMAKE_CXX_COMPILER prefix: ${CMAKE_CXX_COMPILER}")    
     message("Android ANDROID_LD: ${ANDROID_LD}")
   endif()
 endif()
-
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
