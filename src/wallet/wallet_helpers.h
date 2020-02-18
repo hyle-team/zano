@@ -19,6 +19,6 @@ namespace tools
     uint64_t fake = 0;
     wi.balance = w.balance(wi.unlocked_balance, fake, fake, wi.mined_total);
     wi.path = epee::string_encoding::wstring_to_utf8(w.get_wallet_path());
-    return API_RETURN_CODE_OK;
+    return true;
   }
 }
