@@ -66,7 +66,9 @@ void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 
 wallets_manager::~wallets_manager()
 {
+  TRY_ENTRY();
   stop();
+  CATCH_ENTRY_NO_RETURN();
 }
 
 void terminate_handler_func()
