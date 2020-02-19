@@ -1,6 +1,6 @@
 [![Coverity Scan](https://scan.coverity.com/projects/18767/badge.svg)](https://scan.coverity.com/projects/zanoproject) [![Discord](https://img.shields.io/discord/538361472691077130?label=discord&logo=discord)](https://discord.gg/wE3rmYY)
 
-Building
+Building Zano
 --------
 
 ### Cloning
@@ -25,45 +25,52 @@ Be sure to properly clone the repository:
 Recommended OS version: Ubuntu 18.04 LTS.
 
 1. Prerequisites
-  a. Prerequisites for server version: 
-          &nbsp;&nbsp;&nbsp;&nbsp;`$ sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen`
-  b. Prerequisites for GUI version:
-&nbsp;&nbsp;&nbsp;&nbsp;`$ sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen mesa-common-dev libglu1-mesa-dev`
+   1. Prerequisites for server version:
+       
+          sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen
+          
+   1. Prerequisites for GUI version:
 
-2. Install Boost 1.68
+          sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen mesa-common-dev libglu1-mesa-dev`
 
-       $ wget https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.bz2
-       $ tar -xjf boost_1_68_0.tar.bz2
-       $ cd boost_1_68_0
-       $ ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer
-       $ ./b2
+2. Download and build Boost
 
-3. Install Qt 5.11.2
+       wget https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.bz2
+       tar -xjf boost_1_68_0.tar.bz2
+       cd boost_1_68_0
+       ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer
+       ./b2
 
-       $ wget https://download.qt.io/archive/qt/5.11/5.11.2/qt-opensource-linux-x64-5.11.2.run
-       $ chmod +x qt-opensource-linux-x64-5.11.2.run
-       $ ./qt-opensource-linux-x64-5.11.2.run
+3. Install Qt
+
+       wget https://download.qt.io/archive/qt/5.11/5.11.2/qt-opensource-linux-x64-5.11.2.run
+       chmod +x qt-opensource-linux-x64-5.11.2.run
+       ./qt-opensource-linux-x64-5.11.2.run
     Then follow the instructions in Wizard. Don't forget to tick WebEngine module!
 
-4. Set `BOOST_ROOT` and `QT_PREFIX_PATH` envinorment variables:
-   For instance, by adding these line to `~/.bashrc`:
+4. Set `BOOST_ROOT` and `QT_PREFIX_PATH` envinorment variables\
+  For instance, by adding these lines to `~/.bashrc`:
   
        export BOOST_ROOT=/home/user/boost_1_68_0  
        export QT_PREFIX_PATH=/home/user/Qt5.11.2/5.11.2/gcc_64
 
 
 5. Building binaries
-  5.1. Building daemon and simplewallet:
-   &nbsp;&nbsp;`$ cd zano/ && make -j1`
-   &nbsp;&nbsp;or 
-   &nbsp;&nbsp;`$ cd zano && mkdir build && cd build `
-   &nbsp;&nbsp;`$ cmake .. `
-   &nbsp;&nbsp;`$ make -j1 daemon simplewallet`
-**NOTICE**: If you are building on machine with relatively high anount of RAM or with proper setting of virtual memory, then you can use `-j2` or `-j` option to speed up the building process. Use with caution.
+   1. Building daemon and simplewallet:
+
+          cd zano/ && make -j1
+      or 
    
-   5.2. Building GUI:
-   &nbsp;&nbsp;`$ cd zano`
-   &nbsp;&nbsp;`$ utils/build_sript_linux.sh`
+          cd zano && mkdir build && cd build
+          cmake ..
+          make -j1 daemon simplewallet
+
+      **NOTICE**: If you are building on machine with relatively high anount of RAM or with proper setting of virtual memory, then you can use `-j2` or `-j` option to speed up the building process. Use with caution.
+   
+   1. Building GUI:
+
+          cd zano
+          utils/build_sript_linux.sh
 
 7. Look for the binaries in `build` folder
 
