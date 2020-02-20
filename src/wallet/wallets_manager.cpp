@@ -755,7 +755,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   {
     w->generate(path, password);
   }
-  catch (const tools::error::file_exists/*& e*/)
+  catch (const tools::error::file_exists&)
   {
     return API_RETURN_CODE_ALREADY_EXISTS;
   }
@@ -830,7 +830,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     w->restore(path, password, restore_key);
   }
-  catch (const tools::error::file_exists/*& e*/)
+  catch (const tools::error::file_exists&)
   {
     return API_RETURN_CODE_ALREADY_EXISTS;
   }
