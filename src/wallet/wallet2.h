@@ -46,7 +46,6 @@
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
-ENABLE_CHANNEL_BY_DEFAULT("wallet");
 
 // wallet-specific logging functions
 #define WLT_LOG_L0(msg) LOG_PRINT_L0("[W:" << m_log_prefix << "] " << msg)

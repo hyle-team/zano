@@ -113,14 +113,12 @@ DISABLE_VS_WARNINGS(4100)
 #endif
 
 #define LOG_DEFAULT_CHANNEL    NULL
-#ifndef ANDROID_BUILD
+
 #define ENABLE_CHANNEL_BY_DEFAULT(ch_name)   \
   static bool COMBINE(init_channel, __LINE__) UNUSED_ATTRIBUTE = epee::misc_utils::static_initializer([](){  \
   epee::log_space::log_singletone::enable_channel(ch_name);  return true; \
 });
-#else
-  #define ENABLE_CHANNEL_BY_DEFAULT(ch_name)
-#endif
+
 
 
 #if defined(ENABLE_LOGGING_INTERNAL)
@@ -1158,7 +1156,9 @@ namespace log_space
       std::set<std::string> enabled_channels_local = genabled_channels;
       enabled_channels_local.insert(ch_name);
       genabled_channels.swap(enabled_channels_local);
+#ifndef ANDROID_BUILD
       std::cout << "log channel '" << ch_name << "' enabled" << std::endl;
+#endif
     }
 
     static void disable_channels(const std::string& channels_set)
