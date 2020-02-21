@@ -150,14 +150,14 @@ namespace bc_services
     //check category
     if (!of.category.empty() && o.category.find(of.category) == std::string::npos)
       return false;
-
+#ifndef ANDROID_BUILD
     //check target condition
     if (of.target.size() && !currency::utf8_substring_test_case_insensitive(of.target, o.target))
       return false;
 
     if (of.primary.size() && !currency::utf8_substring_test_case_insensitive(of.primary, o.primary))
       return false;
-
+#endif
 
     //check payment_types condition (TODO: add more complicated algo here)
     if (of.payment_types.size())
@@ -173,11 +173,11 @@ namespace bc_services
     //check target condition
     if (of.location_country.size() && (of.location_country != o.location_country))
       return false;
-
+#ifndef ANDROID_BUILD
     //check target condition
     if (of.location_city.size() && !currency::utf8_substring_test_case_insensitive(of.location_city, o.location_city))
       return false;
-
+#endif
     //check amount
     if (of.amount_low_limit && (of.amount_low_limit > o.amount_primary))
       return false;
@@ -221,12 +221,12 @@ namespace bc_services
   //--------------------------------------------------------------------------------
   bool filter_offers_list(std::list<bc_services::offer_details_ex>& offers, const bc_services::core_offers_filter& filter, uint64_t current_core_time)
   {
-
+#ifndef ANDROID_BUILD
     //filter    
     offers.remove_if([&](bc_services::offer_details_ex& o) -> bool {
       return !is_offer_matched_by_filter(o, filter, current_core_time);
     });
-
+#endif
     //sort 
     CHECK_AND_ASSERT_MES(filter.order_by < gsort_offers_predicates.size(), false, "Wrong cof.order_by value");
     auto cb = *gsort_offers_predicates[static_cast<size_t>(filter.order_by)];
