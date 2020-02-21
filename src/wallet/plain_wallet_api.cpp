@@ -12,7 +12,7 @@
 
 std::atomic<bool> initialized(false);
 
-#define ANDROID_PACKAGE_NAME    "zano_mobile"
+#define ANDROID_PACKAGE_NAME    "com.zano_mobile"
 #ifdef IOS_BUILD
 #define HOME_FOLDER             "Documents"
 #elif ANDROID_BUILD
@@ -40,6 +40,7 @@ namespace plain_wallet
     strcpy(buffer, getenv("HOME"));
     return buffer;
 #elif ANDROID_BUILD
+    ///      data/data/com.zano_mobile/files
     return "/data/data/" ANDROID_PACKAGE_NAME;
 #endif
   }
