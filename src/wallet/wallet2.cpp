@@ -2334,7 +2334,7 @@ bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, 
   
   //let's check if we have at least WALLET_POS_MINT_PACKING_SIZE transactions which is ready to go
   size_t count = 0;
-  for (auto it_ind = it->second.begin(); it_ind != it->second.end() && count < m_pos_mint_packing_size; it_ind++)
+  for (auto it_ind = it->second.begin(); it_ind != it->second.end() && count <= m_pos_mint_packing_size; it_ind++)
   {
     if (is_transfer_ready_to_go(m_transfers[*it_ind], fake_outputs_number))
       ++count;
