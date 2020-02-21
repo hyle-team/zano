@@ -56,7 +56,11 @@ namespace bc_services
   //------------------------------------------------------------------
   bool order_offers_by_name(const offer_details_ex* a, const offer_details_ex* b)
   {
+#ifndef ANDROID_BUILD
     return currency::utf8_to_lower(a->target) < currency::utf8_to_lower(b->target);
+#else
+    return false;
+#endif
   }
   //------------------------------------------------------------------
   std::vector<sort_offers_func_type> gsort_offers_predicates;
