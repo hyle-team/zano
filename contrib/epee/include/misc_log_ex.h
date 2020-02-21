@@ -113,10 +113,14 @@ DISABLE_VS_WARNINGS(4100)
 #endif
 
 #define LOG_DEFAULT_CHANNEL    NULL
+#ifndef ANDROID_BUILD
 #define ENABLE_CHANNEL_BY_DEFAULT(ch_name)   \
   static bool COMBINE(init_channel, __LINE__) UNUSED_ATTRIBUTE = epee::misc_utils::static_initializer([](){  \
   epee::log_space::log_singletone::enable_channel(ch_name);  return true; \
 });
+#else
+  #define ENABLE_CHANNEL_BY_DEFAULT(ch_name)
+#endif
 
 
 #if defined(ENABLE_LOGGING_INTERNAL)
