@@ -365,6 +365,7 @@ namespace log_space
 
   inline bool is_stdout_a_tty()
   {
+#ifndef ANDROID_BUILD
     static std::atomic<bool> initialized(false);
     static std::atomic<bool> is_a_tty(false);
 
@@ -379,6 +380,9 @@ namespace log_space
     }
 
     return is_a_tty.load(std::memory_order_relaxed);
+#else
+    return false;
+#endif
   }
 
   inline void set_console_color(int color, bool bright)
