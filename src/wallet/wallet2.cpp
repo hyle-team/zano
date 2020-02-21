@@ -2848,7 +2848,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     if (generate_packing_transaction_if_needed(pack_tx, 0))
     {
       tx_to_blob(pack_tx, tmpl_req.explicit_transaction);
-      WLT_LOG_GREEN("Pacling inputs: " << pack_tx.vin.size() << " inputs consolidated", LOG_LEVEL_0);
+      WLT_LOG_GREEN("Packing inputs: " << pack_tx.vin.size() << " inputs consolidated in tx " << get_transaction_hash(pack_tx), LOG_LEVEL_0);
     }
     m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
     WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == CORE_RPC_STATUS_OK, false, "Failed to create block template after kernel hash found!");
