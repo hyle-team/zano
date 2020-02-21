@@ -198,7 +198,7 @@ static inline void memcpy_swap64(void *dst, const void *src, size_t n) {
 static_assert(false, "BYTE_ORDER is undefined. Perhaps, GNU extensions are not enabled");
 #endif
 
-#if __BYTE_ORDER == __ORDER_LITTLE_ENDIAN__
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #define SWAP32LE IDENT32
 #define SWAP32BE SWAP32
 #define swap32le ident32
@@ -217,7 +217,7 @@ static_assert(false, "BYTE_ORDER is undefined. Perhaps, GNU extensions are not e
 #define memcpy_swap64be memcpy_swap64
 #endif
 
-#if __BYTE_ORDER == __ORDER_BIG_ENDIAN__
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define SWAP32BE IDENT32
 #define SWAP32LE SWAP32
 #define swap32be ident32
