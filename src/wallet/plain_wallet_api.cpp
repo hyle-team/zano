@@ -113,6 +113,7 @@ namespace plain_wallet
     if (it == ginstances.end())
     {
       LOG_ERROR("Internall error: attempt to delete wallet with wrong instance id: " << h);
+      return;
     }
     instance_ptr = it->second;
     ginstances.erase(it);
