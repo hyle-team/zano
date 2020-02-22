@@ -86,7 +86,8 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
 
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   dsi.pos_difficulty = dsi.pow_difficulty = "---";
-  pview_handler->update_daemon_status(dsi);
+  if (pview_handler)
+    pview_handler->update_daemon_status(dsi);
 
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   log_space::get_set_need_thread_id(true, true);
