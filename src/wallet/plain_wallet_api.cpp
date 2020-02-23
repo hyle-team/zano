@@ -99,7 +99,7 @@ namespace plain_wallet
     std::string wallet_folder = get_wallets_folder();
     boost::system::error_code ec;
     boost::filesystem::create_directories(wallet_folder, ec);
-
+    initialized = true;
     return API_RETURN_CODE_OK;
   }
 
