@@ -40,9 +40,8 @@ namespace plain_wallet
 {
   std::string get_bundle_root_dir()
   {
-    char buffer[1000] = {0};
-    strcpy(buffer, getenv("HOME"));
-    return buffer;
+    char* env = getenv("HOME");
+    return env ? env : "";
   }
   
   std::string get_wallets_folder()
@@ -114,6 +113,7 @@ namespace plain_wallet
     if (it == ginstances.end())
     {
       LOG_ERROR("Internall error: attempt to delete wallet with wrong instance id: " << h);
+      return;
     }
     instance_ptr = it->second;
     ginstances.erase(it);

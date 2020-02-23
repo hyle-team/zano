@@ -258,6 +258,9 @@ public:
   {
     if (m_invalid_tx_index == event_idx)
       return tvc.m_verification_failed;
+    
+    if (m_unverifiable_tx_index == event_idx)
+      return tvc.m_verification_impossible;
 
     return !tvc.m_verification_failed && tx_added;
   }
@@ -291,6 +294,12 @@ public:
     return true;
   }
 
+  bool mark_unverifiable_tx(currency::core& /*c*/, size_t ev_index, const std::vector<test_event_entry>& /*events*/)
+  {
+    m_unverifiable_tx_index = ev_index + 1;
+    return true;
+  }
+
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_top_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool clear_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
@@ -310,6 +319,7 @@ protected:
   };
   size_t m_invalid_block_index;
   size_t m_invalid_tx_index;
+  size_t m_unverifiable_tx_index;
   size_t m_orphan_block_index;
 };
 

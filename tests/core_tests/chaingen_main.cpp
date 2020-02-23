@@ -8,7 +8,7 @@
 #include "chaingen_tests_list.h"
 #include "common/command_line.h"
 #include "transaction_tests.h"
-#include "../../src/gui/qt-daemon/application/core_fast_rpc_proxy.h"
+#include "../../src/wallet/core_fast_rpc_proxy.h"
 #include "test_core_proxy.h"
 #include "currency_core/bc_offers_service.h"
 #include "random_helper.h"
@@ -809,6 +809,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_checkpoints_prun_txs_after_blockchain_load);
     GENERATE_AND_PLAY(gen_checkpoints_reorganize);
     GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
+    GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase);
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 

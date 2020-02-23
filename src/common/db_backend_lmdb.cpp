@@ -315,13 +315,13 @@ namespace tools
       PROFILE_FUNC("lmdb_db_backend::set");
       int res = 0;
       MDB_val key = AUTO_VAL_INIT(key);
-      MDB_val data = AUTO_VAL_INIT(data);
+      MDB_val data[2] = {}; // mdb_put may access data[1] if some flags are set, this may trigger static code analizers, so here we allocate two elements to avoid it
       key.mv_data = (void*)k;
       key.mv_size = ks;
-      data.mv_data = (void*)v;
-      data.mv_size = vs;
+      data[0].mv_data = (void*)v;
+      data[0].mv_size = vs;
 
-      res = mdb_put(get_current_tx(), static_cast<MDB_dbi>(h), &key, &data, 0);
+      res = mdb_put(get_current_tx(), static_cast<MDB_dbi>(h), &key, data, 0);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_put");
       return true;
     }

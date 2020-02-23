@@ -2047,9 +2047,11 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   : m_invalid_block_index(std::numeric_limits<size_t>::max())
   , m_orphan_block_index(std::numeric_limits<size_t>::max())
   , m_invalid_tx_index(std::numeric_limits<size_t>::max())
+  , m_unverifiable_tx_index(std::numeric_limits<size_t>::max())
 {
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, configure_core);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, mark_invalid_tx);
+  REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, mark_unverifiable_tx);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, mark_invalid_block);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, mark_orphan_block);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_top_block);

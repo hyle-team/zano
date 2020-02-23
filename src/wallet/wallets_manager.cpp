@@ -66,7 +66,9 @@ void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 
 wallets_manager::~wallets_manager()
 {
+  TRY_ENTRY();
   stop();
+  CATCH_ENTRY_NO_RETURN();
 }
 
 void terminate_handler_func()
@@ -84,7 +86,8 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
 
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   dsi.pos_difficulty = dsi.pow_difficulty = "---";
-  pview_handler->update_daemon_status(dsi);
+  if (pview_handler)
+    pview_handler->update_daemon_status(dsi);
 
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   log_space::get_set_need_thread_id(true, true);
@@ -753,7 +756,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   {
     w->generate(path, password);
   }
-  catch (const tools::error::file_exists/*& e*/)
+  catch (const tools::error::file_exists&)
   {
     return API_RETURN_CODE_ALREADY_EXISTS;
   }
@@ -828,7 +831,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     w->restore(path, password, restore_key);
   }
-  catch (const tools::error::file_exists/*& e*/)
+  catch (const tools::error::file_exists&)
   {
     return API_RETURN_CODE_ALREADY_EXISTS;
   }
