@@ -113,10 +113,12 @@ DISABLE_VS_WARNINGS(4100)
 #endif
 
 #define LOG_DEFAULT_CHANNEL    NULL
+
 #define ENABLE_CHANNEL_BY_DEFAULT(ch_name)   \
   static bool COMBINE(init_channel, __LINE__) UNUSED_ATTRIBUTE = epee::misc_utils::static_initializer([](){  \
   epee::log_space::log_singletone::enable_channel(ch_name);  return true; \
 });
+
 
 
 #if defined(ENABLE_LOGGING_INTERNAL)
@@ -365,6 +367,7 @@ namespace log_space
 
   inline bool is_stdout_a_tty()
   {
+#ifndef ANDROID_BUILD
     static std::atomic<bool> initialized(false);
     static std::atomic<bool> is_a_tty(false);
 
@@ -379,6 +382,9 @@ namespace log_space
     }
 
     return is_a_tty.load(std::memory_order_relaxed);
+#else
+    return false;
+#endif
   }
 
   inline void set_console_color(int color, bool bright)
@@ -1150,7 +1156,9 @@ namespace log_space
       std::set<std::string> enabled_channels_local = genabled_channels;
       enabled_channels_local.insert(ch_name);
       genabled_channels.swap(enabled_channels_local);
+#ifndef ANDROID_BUILD
       std::cout << "log channel '" << ch_name << "' enabled" << std::endl;
+#endif
     }
 
     static void disable_channels(const std::string& channels_set)

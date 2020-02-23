@@ -19,16 +19,19 @@ using namespace epee;
 #include "console_handler.h"
 #include "p2p/net_node.h"
 #include "currency_core/checkpoints_create.h"
-#include "currency_core/currency_core.h"
-#include "currency_core/bc_offers_service.h"
-#include "rpc/core_rpc_server.h"
-#include "currency_protocol/currency_protocol_handler.h"
-#include "daemon/daemon_commands_handler.h"
+#ifndef MOBILE_WALLET_BUILD
+  #include "currency_core/currency_core.h"
+  #include "currency_core/bc_offers_service.h"
+  #include "rpc/core_rpc_server.h"
+  #include "currency_protocol/currency_protocol_handler.h"
+  #include "core_fast_rpc_proxy.h"
+#endif
+//#include "daemon/daemon_commands_handler.h"
 //#include "common/miniupnp_helper.h"
 #include "view_iface.h"
-#include "core_fast_rpc_proxy.h"
-#include "wallet/wallet2.h"
+#include "wallet2.h"
 #include "wallet_id_adapter.h"
+#include "wallet_rpc_server.h"
 
 POP_VS_WARNINGS
 
@@ -38,8 +41,6 @@ namespace po = boost::program_options;
 #include <crtdbg.h>
 #endif
 
-//TODO: need refactoring here. (template classes can't be used in BOOST_CLASS_VERSION)
-BOOST_CLASS_VERSION(nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >, CURRENT_P2P_STORAGE_ARCHIVE_VER);
 
 struct wallet_lock_time_watching_policy
 {
@@ -55,6 +56,7 @@ public:
   {
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
+    std::shared_ptr<tools::wallet_rpc_server> rpc_wrapper; //500 bytes of extra data, we can afford it, to have rpc-like invoke map
     std::atomic<bool> do_mining;
     std::atomic<bool> major_stop;
     std::atomic<bool> stop_for_refresh; //use separate var for passing to "refresh" member function, 
@@ -68,6 +70,10 @@ public:
     std::atomic<bool>* plast_daemon_is_disconnected;
     std::atomic<bool> has_related_alias_in_unconfirmed;
     std::atomic<bool> need_to_update_wallet_info;
+
+    std::atomic<bool> long_refresh_in_progress;
+    epee::critical_section long_refresh_in_progress_lock; //secure wallet state and prevent from long wait while long refresh is in work
+
     view::i_view* pview;
     uint64_t wallet_id;
     epee::locked_object<std::list<bc_services::offer_details_ex>> offers;
@@ -87,6 +93,8 @@ public:
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr);
+  std::string invoke(uint64_t wallet_id, std::string params);
+  std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);
   std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist);
   std::string get_wallet_info(size_t wallet_id, view::wallet_info& wi);
@@ -134,8 +142,10 @@ public:
   std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
   std::string is_valid_brain_restore_data(const std::string& brain_text);
+#ifndef MOBILE_WALLET_BUILD
   void subscribe_to_core_events(currency::i_core_event_handler* pevents_handler);
-  void unsubscribe_to_core_events();
+  //void unsubscribe_to_core_events();
+#endif
   void get_gui_options(view::gui_options& opt);
   std::string get_wallet_log_prefix(size_t wallet_id) const;
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
@@ -176,12 +186,14 @@ private:
   std::string m_data_dir;
   view::gui_options m_ui_opt;
   
+#ifndef MOBILE_WALLET_BUILD
   //daemon stuff
 	bc_services::bc_offers_service m_offers_service;
   currency::core m_ccore;
   currency::t_currency_protocol_handler<currency::core> m_cprotocol;
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > m_p2psrv;
   currency::core_rpc_server m_rpc_server;
+#endif
 
   bool m_remote_node_mode;
   bool m_qt_logs_enbaled;

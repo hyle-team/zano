@@ -10,19 +10,15 @@
 namespace plain_wallet
 {
   typedef int64_t hwallet;
-  hwallet create_instance(const std::string& ip, const std::string& port);
-  void destroy_instance(hwallet h);
+  std::string init(const std::string& ip, const std::string& port);
   std::string get_version();
   std::string get_wallet_files();
-  std::string print_money(int64_t);
 
-  std::string open(hwallet h, const std::string& path, const std::string& password);
-  std::string restore(hwallet h, const std::string& seed, const std::string& path, const std::string& password);
-  std::string generate(hwallet h, const std::string& path, const std::string& password);
+  std::string open(const std::string& path, const std::string& password);
+  std::string restore(const std::string& seed, const std::string& path, const std::string& password);
+  std::string generate(const std::string& path, const std::string& password);
 
-  std::string start_sync_thread(hwallet h);
-  std::string get_sync_status(hwallet h);
-  std::string cancel_sync_thread(hwallet h);
-  std::string sync(hwallet h);
+  std::string get_wallet_status(hwallet h);
+  std::string close_wallet(hwallet h);
   std::string invoke(hwallet h, const std::string& params);
 }

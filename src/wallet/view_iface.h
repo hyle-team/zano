@@ -424,11 +424,15 @@ public:
     uint64_t wallet_id;
     transfers_array recent_history;
     wallet_info wi;
+    std::string seed;
+    bool recovered;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(recent_history)
       KV_SERIALIZE(wi)
+      KV_SERIALIZE(seed)
+      KV_SERIALIZE(recovered)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -514,6 +518,19 @@ public:
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(progress)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct wallet_sync_status_info
+  {
+    uint64_t wallet_state;
+    bool is_in_long_refresh;
+    uint64_t progress;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_state)
+      KV_SERIALIZE(is_in_long_refresh)
       KV_SERIALIZE(progress)
     END_KV_SERIALIZE_MAP()
   };
@@ -745,6 +762,7 @@ public:
 #define API_RETURN_CODE_FALSE                                   "FALSE"
 #define API_RETURN_CODE_CORE_BUSY                               "CORE_BUSY"
 #define API_RETURN_CODE_OVERFLOW                                "OVERFLOW"
+#define API_RETURN_CODE_BUSY                                    "BUSY"
 
 #define API_MAX_ALIASES_COUNT                                   10000
 

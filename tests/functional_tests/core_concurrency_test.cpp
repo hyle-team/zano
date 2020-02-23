@@ -13,7 +13,7 @@
 using namespace epee;
 #include "currency_core/currency_core.h"
 #include "rpc/core_rpc_server.h"
-#include "gui/qt-daemon/application/core_fast_rpc_proxy.h"
+#include "wallet/core_fast_rpc_proxy.h"
 #include "version.h"
 #include "common/command_line.h"
 #include "common/boost_serialization_helper.h"
