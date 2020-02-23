@@ -71,7 +71,8 @@ namespace plain_wallet
     if (initialized)
     {
       LOG_ERROR("Double-initialization in plain_wallet detected.");
-      throw std::runtime_error("Double-initialization in plain_wallet detected.");
+      //throw std::runtime_error("Double-initialization in plain_wallet detected.");
+      return "Already initialized!";
     }
       
 
