@@ -14,9 +14,11 @@ std::atomic<bool> initialized(false);
 
 #define ANDROID_PACKAGE_NAME    "com.zano_mobile"
 #ifdef IOS_BUILD
-#define HOME_FOLDER             "Documents"
+  #define HOME_FOLDER             "Documents"
 #elif ANDROID_BUILD
-#define HOME_FOLDER             "files"
+  #define HOME_FOLDER             "files"
+#else 
+  #define HOME_FOLDER             ""
 #endif
 #define WALLETS_FOLDER_NAME     "wallets"
 
@@ -48,9 +50,10 @@ namespace plain_wallet
   {
 #ifdef WIN32
     return "";
-#endif // WIN32
+#else
     std::string path = get_bundle_root_dir() + "/" + HOME_FOLDER + "/" + WALLETS_FOLDER_NAME + "/";
     return path;
+#endif // WIN32
   }
 
   void initialize_logs()
@@ -157,7 +160,6 @@ namespace plain_wallet
       }
       gwm.run_wallet(ok_response.result.wallet_id);
       return epee::serialization::store_t_to_json(ok_response);
-      return;
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
     err_result.error.code = rsp;
