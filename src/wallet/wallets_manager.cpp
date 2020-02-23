@@ -76,7 +76,9 @@ void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 
 wallets_manager::~wallets_manager()
 {
+  TRY_ENTRY();
   stop();
+  CATCH_ENTRY_NO_RETURN();
 }
 
 void terminate_handler_func()
@@ -793,7 +795,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
     w->generate(path, password);
     owr.seed = w->get_account().get_restore_braindata();
   }
-  catch (const tools::error::file_exists/*& e*/)
+  catch (const tools::error::file_exists&)
   {
     return API_RETURN_CODE_ALREADY_EXISTS;
   }
@@ -881,7 +883,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
     w->restore(path, password, restore_key);
     owr.seed = w->get_account().get_restore_braindata();
   }
-  catch (const tools::error::file_exists/*& e*/)
+  catch (const tools::error::file_exists&)
   {
     return API_RETURN_CODE_ALREADY_EXISTS;
   }

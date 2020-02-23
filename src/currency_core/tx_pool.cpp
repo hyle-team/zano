@@ -91,6 +91,16 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const transaction &tx, const crypto::hash &id, uint64_t blob_size, tx_verification_context& tvc, bool kept_by_block, bool from_core)
   {    
+    if (!kept_by_block && !from_core && m_blockchain.is_in_checkpoint_zone())
+    {
+      // BCS is in CP zone, tx verification is impossible until it gets synchronized
+      tvc.m_added_to_pool = false;
+      tvc.m_should_be_relayed = false;
+      tvc.m_verification_failed = false;
+      tvc.m_verification_impossible = true;
+      return false;
+    }
+
     TIME_MEASURE_START_PD(tx_processing_time);
     TIME_MEASURE_START_PD(check_inputs_types_supported_time);
     if(!check_inputs_types_supported(tx))
@@ -995,12 +1005,12 @@ namespace currency
 
     std::vector<txv> txs_v;
     txs_v.reserve(m_db_transactions.size());
-    std::vector<txv*> txs;
+    std::vector<size_t> txs; // selected transactions, vector of indices of txs_v
 
     
     //keep getting it as a values cz db items cache will keep it as unserialised object stored by shared ptrs 
     m_db_transactions.enumerate_keys([&](uint64_t i, crypto::hash& k){txs_v.resize(i + 1); txs_v[i].first = k; return true;});
-    txs.resize(txs_v.size(), nullptr);
+    txs.resize(txs_v.size(), SIZE_MAX);
     
     for (uint64_t i = 0; i != txs_v.size(); i++)
     {      
@@ -1009,17 +1019,17 @@ namespace currency
       if (!txs_v[i].second)
       {
         LOG_ERROR("Internal tx pool db error: key " << k << " was enumerated as key but couldn't get value");
-        continue;
+        return false;
       }
-      txs[i] = &txs_v[i];
+      txs[i] = i;
     }
 
     
     
-    std::sort(txs.begin(), txs.end(), [](txv *a, txv *b) -> bool {
+    std::sort(txs.begin(), txs.end(), [&txs_v](size_t a, size_t b) -> bool {
       boost::multiprecision::uint128_t a_, b_;
-      a_ = boost::multiprecision::uint128_t(a->second->fee) * b->second->blob_size;
-      b_ = boost::multiprecision::uint128_t(b->second->fee) * a->second->blob_size;
+      a_ = boost::multiprecision::uint128_t(txs_v[a].second->fee) * txs_v[b].second->blob_size;
+      b_ = boost::multiprecision::uint128_t(txs_v[b].second->fee) * txs_v[a].second->blob_size;
       return a_ > b_;
     });
 
@@ -1039,10 +1049,10 @@ namespace currency
 
     // scan txs for alias reg requests - if there are such requests, don't process alias updates
     bool alias_regs_exist = false;
-    for (auto txp : txs) 
+    for (auto txi : txs) 
     {
       tx_extra_info ei = AUTO_VAL_INIT(ei);
-      bool r = parse_and_validate_tx_extra(txp->second->tx, ei);
+      bool r = parse_and_validate_tx_extra(txs_v[txi].second->tx, ei);
       CHECK_AND_ASSERT_MES(r, false, "parse_and_validate_tx_extra failed while looking up the tx pool");
       if (!ei.m_alias.m_alias.empty() && !ei.m_alias.m_sign.size()) {
         alias_regs_exist = true;
@@ -1056,12 +1066,12 @@ namespace currency
 
     for (size_t i = 0; i < txs.size(); i++)
     {
-      txv &tx(*txs[i]);
+      txv &tx(txs_v[txs[i]]);
 
       // expiration time check -- skip expired transactions
       if (is_tx_expired(tx.second->tx, tx_expiration_ts_median))
       {
-          txs[i] = nullptr;
+          txs[i] = SIZE_MAX;
           continue;
       } 
       
@@ -1075,7 +1085,7 @@ namespace currency
         if ((alias_count >= MAX_ALIAS_PER_BLOCK) ||                   // IF this tx registers/updates an alias AND alias per block threshold exceeded
           (update_an_alias && alias_regs_exist))                      // OR this tx updates an alias AND there are alias reg requests...
         {
-          txs[i] = NULL;                                              // ...skip this tx
+          txs[i] = SIZE_MAX;                                          // ...skip this tx
           continue;
         }
       }
@@ -1093,7 +1103,7 @@ namespace currency
       }
 
       if (!is_tx_ready_to_go_result || have_key_images(k_images, tx.second->tx)) {
-        txs[i] = NULL;
+        txs[i] = SIZE_MAX;
         continue;
       }
       append_key_images(k_images, tx.second->tx);
@@ -1120,17 +1130,18 @@ namespace currency
 
     for (size_t i = 0; i != txs.size(); i++)
     {
-      if (txs[i])
+      if (txs[i] != SIZE_MAX)
       {
+        txv &tx(txs_v[txs[i]]);
         if (i < best_position)
         {
-          bl.tx_hashes.push_back(txs[i]->first);
+          bl.tx_hashes.push_back(tx.first);
         }
-        else if (have_attachment_service_in_container(txs[i]->second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
+        else if (have_attachment_service_in_container(tx.second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
         {
           // BC_OFFERS_SERVICE_INSTRUCTION_DEL transactions has zero fee, so include them here regardless of reward effectiveness
-          bl.tx_hashes.push_back(txs[i]->first);
-          total_size += txs[i]->second->blob_size;
+          bl.tx_hashes.push_back(tx.first);
+          total_size += tx.second->blob_size;
         }
       }
     }

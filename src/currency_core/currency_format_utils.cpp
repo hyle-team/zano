@@ -627,7 +627,8 @@ namespace currency
     //put hash into extra
     std::stringstream ss;
     binary_archive<true> oar(ss);
-    ::do_serialize(oar, const_cast<std::vector<attachment_v>&>(attachment));
+    if (!::do_serialize(oar, const_cast<std::vector<attachment_v>&>(attachment)))
+      return;
     std::string buff = ss.str();
     eai.sz = buff.size();
     eai.hsh = get_blob_hash(buff);

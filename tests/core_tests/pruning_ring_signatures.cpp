@@ -56,6 +56,7 @@ bool generate_blockchain_with_pruned_rs(std::vector<test_event_entry>& events)
   REWIND_BLOCKS_N(events, blk_5, blk_4, miner_account, 30);
   REWIND_BLOCKS(events, blk_5r, blk_5, miner_account);
 
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   MAKE_TX_LIST_START(events, txs_blk_6, miner_account, some_account_1, MK_TEST_COINS(1), blk_5r);
   MAKE_TX_LIST(events, txs_blk_6, miner_account, some_account_1, MK_TEST_COINS(1), blk_5r);
   MAKE_TX_LIST(events, txs_blk_6, miner_account, some_account_1, MK_TEST_COINS(1), blk_5r);
@@ -69,13 +70,16 @@ bool generate_blockchain_with_pruned_rs(std::vector<test_event_entry>& events)
   MAKE_TX_LIST(events, txs_blk_6, miner_account, some_account_1, MK_TEST_COINS(1), blk_5r);
   MAKE_TX_LIST(events, txs_blk_6, miner_account, some_account_1, MK_TEST_COINS(1), blk_5r);
   MAKE_TX_LIST(events, txs_blk_6, miner_account, some_account_1, MK_TEST_COINS(1), blk_5r);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_6, blk_5r, miner_account, txs_blk_6);
   REWIND_BLOCKS_N(events, blk_6r, blk_6, miner_account, 20);
 
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   MAKE_TX_LIST_START(events, txs_blk_7, some_account_1, some_account_1, MK_TEST_COINS(1) + TESTS_DEFAULT_FEE, blk_6r);
   MAKE_TX_MIX_LIST(events, txs_blk_7, some_account_1, some_account_1, MK_TEST_COINS(1) + TESTS_DEFAULT_FEE, 3, blk_6r, std::vector<currency::attachment_v>());
   MAKE_TX_MIX_LIST(events, txs_blk_7, some_account_1, some_account_1, MK_TEST_COINS(1) + TESTS_DEFAULT_FEE, 3, blk_6r, std::vector<currency::attachment_v>());
   MAKE_TX_MIX_LIST(events, txs_blk_7, some_account_1, some_account_1, MK_TEST_COINS(1) + TESTS_DEFAULT_FEE, 3, blk_6r, std::vector<currency::attachment_v>());
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_7, blk_6r, miner_account, txs_blk_7);
   REWIND_BLOCKS(events, blk_7r, blk_7, miner_account);
 

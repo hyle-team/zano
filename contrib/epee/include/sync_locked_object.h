@@ -54,8 +54,10 @@ namespace epee
     {}
     ~locked_object_proxy()
     {
+      TRY_ENTRY();
       uint64_t lock_time = epee::misc_utils::get_tick_count() - start_lock_time;
       lock_time_watching_policy::watch_lock_time(lock_time);
+      CATCH_ALL_DO_NOTHING();
     }
 
     /*

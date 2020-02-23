@@ -36,9 +36,8 @@ namespace plain_wallet
     return "";
 #endif // WIN32
 #ifdef IOS_BUILD
-    char buffer[1000] = {0};
-    strcpy(buffer, getenv("HOME"));
-    return buffer;
+    char* env = getenv("HOME");
+    return env ? env : "";
 #elif ANDROID_BUILD
     ///      data/data/com.zano_mobile/files
     return "/data/data/" ANDROID_PACKAGE_NAME;
@@ -158,6 +157,7 @@ namespace plain_wallet
       }
       gwm.run_wallet(ok_response.result.wallet_id);
       return epee::serialization::store_t_to_json(ok_response);
+      return;
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
     err_result.error.code = rsp;
