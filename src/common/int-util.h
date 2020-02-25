@@ -16,6 +16,17 @@
 #include <intrin.h>
 #include <stdlib.h>
 
+#if !defined(__ORDER_LITTLE_ENDIAN__)
+#define __ORDER_LITTLE_ENDIAN__ 1011012001
+#endif
+
+#if !defined(__BYTE_ORDER__)
+#define __BYTE_ORDER__ __ORDER_LITTLE_ENDIAN__
+#endif
+
+#if !defined(__ORDER_BIG_ENDIAN__)
+#define __ORDER_BIG_ENDIAN__ 0
+#endif
 
 static inline uint32_t rol32(uint32_t x, int r) {
   static_assert(sizeof(uint32_t) == sizeof(unsigned int), "this code assumes 32-bit integers");
