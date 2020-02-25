@@ -587,17 +587,12 @@ namespace log_space
       CONSOLE_DEFAULT_STREAM << ptarget_buf;
       if(pallocated_buf) delete [] pallocated_buf;
 #else
-      PUSH_GCC_WARNINGS
-      DISABLE_GCC_AND_CLANG_WARNING(autological-constant-out-of-range-compare)
-
-
       std::string buf(buffer, buffer_len);
       for(size_t i = 0; i!= buf.size(); i++)
       {
-        if(buf[i] == 0x7 || buf[i] == 0x95)
+        if(static_cast<unsigned char>(buf[i]) == 0x7 || static_cast<unsigned char>(buf[i]) == 0x95)
           buf[i] = '^';
       }
-      POP_GCC_WARNINGS
 
       CONSOLE_DEFAULT_STREAM << buf;
 #endif
