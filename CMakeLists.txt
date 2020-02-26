@@ -107,13 +107,13 @@ else()
   endif()
 
   # Since gcc 4.9 the LTO format is non-standard (slim), so we need the gcc-specific ar and ranlib binaries
-  ##if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9.0) AND NOT (MAKE_SYSTEM_NAME STREQUAL "Android"))
-  ##  set(CMAKE_AR "gcc-ar")
-  ##  set(CMAKE_RANLIB "gcc-ranlib")
-  ##elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE AND NOT (MAKE_SYSTEM_NAME STREQUAL "Android"))
-  ##  set(CMAKE_AR "llvm-ar")
-  ##  set(CMAKE_RANLIB "llvm-ranlib")
-  ##endif()
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9.0) AND NOT (CMAKE_SYSTEM_NAME STREQUAL "Android"))
+    set(CMAKE_AR "gcc-ar")
+    set(CMAKE_RANLIB "gcc-ranlib")
+  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE AND NOT (CMAKE_SYSTEM_NAME STREQUAL "Android"))
+    set(CMAKE_AR "llvm-ar")
+    set(CMAKE_RANLIB "llvm-ranlib")
+  endif()
 
 
   if(MINGW)
