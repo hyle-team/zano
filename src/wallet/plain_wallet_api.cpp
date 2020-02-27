@@ -10,8 +10,6 @@
 #include "currency_core/currency_format_utils.h"
 #include "wallets_manager.h"
 
-std::atomic<bool> initialized(false);
-
 #define ANDROID_PACKAGE_NAME    "com.zano_mobile"
 #ifdef IOS_BUILD
   #define HOME_FOLDER             "Documents"
@@ -27,6 +25,11 @@ std::atomic<bool> initialized(false);
 
 //TODO: global object, subject to refactoring
 wallets_manager gwm;
+std::atomic<bool> initialized(false);
+
+std::atomic<uint64_t> gjobs_counter(1);
+std::map<uint64_t, std::string> gjobs;
+epee::critical_section gjobs_lock;
 
 namespace plain_wallet
 {
@@ -198,4 +201,43 @@ namespace plain_wallet
   {
     return gwm.invoke(h, params);
   }
+
+  void put_result(uint64_t job_is, const std::string& res)
+  {
+
+  }
+
+  uint64_t async_call(const std::string& method_name, const std::string& params)
+  {
+    std::function<void()> async_callback;
+
+    uint64_t job_id = gjobs_counter++;
+    std::string local_copy_params = params;
+    if (method_name == "close_wallet")
+    {
+      uint64_t wal_id = 0;
+      epee::string_tools:get_xnum_from_hex_string<uint64_t>(params, wal_id);
+      if()
+      async_callback = []() 
+      {return
+
+
+      };
+    }
+    else if (method_name == "open")
+    {
+      view::open_wallet_request
+
+    }
+
+    std::thread([job_id, local_copy_params]() {
+      //some heavy call here  
+    });
+    return job_id;
+  }
+  std::string try_pull_result(uint64_t)
+  {
+    return "";
+  }
+
 }

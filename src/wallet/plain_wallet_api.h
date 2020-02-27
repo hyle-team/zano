@@ -21,4 +21,8 @@ namespace plain_wallet
   std::string get_wallet_status(hwallet h);
   std::string close_wallet(hwallet h);
   std::string invoke(hwallet h, const std::string& params);
+  
+  //async api
+  uint64_t async_call(const std::string& method_name, const std::string& params);
+  std::string try_pull_result(uint64_t);
 }
