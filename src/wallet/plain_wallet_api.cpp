@@ -7,6 +7,7 @@
 #include "plain_wallet_api_impl.h"
 #include "currency_core/currency_config.h"
 #include "version.h"
+#include "string_tools.h"
 #include "currency_core/currency_format_utils.h"
 #include "wallets_manager.h"
 
@@ -202,43 +203,84 @@ namespace plain_wallet
     return gwm.invoke(h, params);
   }
 
-  void put_result(uint64_t job_is, const std::string& res)
+  void put_result(uint64_t job_id, const std::string& res)
   {
-
+    CRITICAL_REGION_LOCAL(gjobs_lock);
+    gjobs[job_id] = res;
   }
 
-  uint64_t async_call(const std::string& method_name, const std::string& params)
+
+  uint64_t async_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
   {
     std::function<void()> async_callback;
 
     uint64_t job_id = gjobs_counter++;
-    std::string local_copy_params = params;
     if (method_name == "close_wallet")
     {
-      uint64_t wal_id = 0;
-      //epee::string_tools:get_xnum_from_hex_string<uint64_t>(params, wal_id);
-      //if()
-      async_callback = []() 
+      async_callback = [job_id, instance_id]()
       {
-        //return
-
-
+        close_wallet(instance_id);
+        view::api_responce_return_code rc = AUTO_VAL_INIT(rc);
+        rc.return_code = API_RETURN_CODE_OK;
+        put_result(job_id, epee::serialization::store_t_to_json(rc));        
       };
     }
     else if (method_name == "open")
     {
-      //view::open_wallet_request
-
+      view::open_wallet_request owr = AUTO_VAL_INIT(owr);
+      if (!epee::serialization::load_t_from_json(owr, params))
+      {
+        view::api_response ar = AUTO_VAL_INIT(ar);
+        ar.error_code = "Wrong parameter";
+        put_result(job_id, epee::serialization::store_t_to_json(ar));
+      }
+      async_callback = [job_id, owr]()
+      {
+        std::string res = open(owr.path, owr.pass);
+        put_result(job_id, res);
+      };
     }
-
-    std::thread([job_id, local_copy_params]() {
-      //some heavy call here  
-    });
+    else if (method_name == "restore")
+    {
+      view::restore_wallet_request rwr = AUTO_VAL_INIT(rwr);
+      if (!epee::serialization::load_t_from_json(rwr, params))
+      {
+        view::api_response ar = AUTO_VAL_INIT(ar);
+        ar.error_code = "Wrong parameter";
+        put_result(job_id, epee::serialization::store_t_to_json(ar));
+      }
+      async_callback = [job_id, rwr]()
+      {
+        std::string res = restore(rwr.restore_key, rwr.path, rwr.pass);
+        put_result(job_id, res);
+      };
+    }
+    else if (method_name == "invoke")
+    {
+    std::string local_params = params;
+      async_callback = [job_id, local_params, instance_id]()
+      {
+        std::string res = invoke(instance_id, local_params);
+        put_result(job_id, res);
+      };
+    }
+    std::thread([async_callback]() {async_callback(); });
     return job_id;
   }
-  std::string try_pull_result(uint64_t)
+  std::string try_pull_result(uint64_t job_id)
   {
-    return "";
+    //TODO: need refactoring
+    CRITICAL_REGION_LOCAL(gjobs_lock);
+    auto it = gjobs.find(job_id);
+    if (it == gjobs.end())
+    {
+      return "{delivered: false}";
+    }
+    std::string res = "{delivered: true, result: ";
+    res += it->second;
+    res += "  }";
+    gjobs.erase(it);
+    return res;
   }
 
 }

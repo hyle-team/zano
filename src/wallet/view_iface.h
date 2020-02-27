@@ -717,6 +717,14 @@ public:
   };
 
 
+  struct api_responce_return_code
+  {
+    std::string return_code;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(return_code)
+    END_KV_SERIALIZE_MAP()
+  };
 
 
   struct api_void
