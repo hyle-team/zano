@@ -216,17 +216,18 @@ namespace plain_wallet
     if (method_name == "close_wallet")
     {
       uint64_t wal_id = 0;
-      epee::string_tools:get_xnum_from_hex_string<uint64_t>(params, wal_id);
-      if()
+      //epee::string_tools:get_xnum_from_hex_string<uint64_t>(params, wal_id);
+      //if()
       async_callback = []() 
-      {return
+      {
+        //return
 
 
       };
     }
     else if (method_name == "open")
     {
-      view::open_wallet_request
+      //view::open_wallet_request
 
     }
 
