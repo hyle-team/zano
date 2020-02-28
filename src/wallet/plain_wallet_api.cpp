@@ -277,7 +277,7 @@ namespace plain_wallet
     auto it = gjobs.find(job_id);
     if (it == gjobs.end())
     {
-      return "{delivered: false}";
+      return "{\"delivered\": false}";
     }
     std::string res = "{\"delivered\": true, \"result\": ";
     res += it->second;
