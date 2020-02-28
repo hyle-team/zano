@@ -211,7 +211,7 @@ namespace plain_wallet
   }
 
 
-  uint64_t async_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
+  std::string async_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
   {
     std::function<void()> async_callback;
 
@@ -268,7 +268,7 @@ namespace plain_wallet
     std::thread t([async_callback]() {async_callback(); });
     t.detach();
     LOG_PRINT_L0("[ASYNC_CALL]: started " << method_name << ", job id: " << job_id);
-    return job_id;
+    return std::string("{ \"job_id\": ") + std::to_string(job_id) + "}";
   }
   std::string try_pull_result(uint64_t job_id)
   {
@@ -279,7 +279,7 @@ namespace plain_wallet
     {
       return "{delivered: false}";
     }
-    std::string res = "{delivered: true, result: ";
+    std::string res = "{\"delivered\": true, \"result\": ";
     res += it->second;
     res += "  }";
     gjobs.erase(it);
