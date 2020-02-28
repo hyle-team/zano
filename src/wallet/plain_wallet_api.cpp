@@ -265,7 +265,8 @@ namespace plain_wallet
         put_result(job_id, res);
       };
     }
-    std::thread([async_callback]() {async_callback(); });
+    std::thread t([async_callback]() {async_callback(); });
+    t.detach();
     LOG_PRINT_L0("[ASYNC_CALL]: started " << method_name << ", job id: " << job_id);
     return job_id;
   }

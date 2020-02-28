@@ -22,6 +22,17 @@ void run_plain_wallet_api_test()
   std::string s = plain_wallet::init("195.201.107.230", "11211");
 
   LOG_PRINT_L0("Generating wallet...");
+  view::open_wallet_request owr = AUTO_VAL_INIT(owr);
+  owr.path = "E:\\tmp\\zano_testwallet_745ss65030.zan";
+  owr.pass = "";
+  uint64_t job_id = plain_wallet::async_call("open", 0, epee::serialization::store_t_to_json(owr));
+  while (true)
+  {
+    std::string res = plain_wallet::try_pull_result(job_id);
+    LOG_PRINT_L0("[try_pull_result] RESPONSE:" << ENDL << res);
+    epee::misc_utils::sleep_no_w(1000);
+  }
+
   std::string rsp = plain_wallet::open(std::string("E:\\tmp\\zano_testwallet_745ss65030.zan"), "");
   LOG_PRINT_L0("RESPONSE:" << ENDL << rsp);
   epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
