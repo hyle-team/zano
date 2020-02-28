@@ -16,6 +16,17 @@ using namespace epee;
 #include "wallet/plain_wallet_api_defs.h"
 
 
+struct try_pull_result_open_response
+{
+  bool delivered;
+  epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> result;
+  BEGIN_KV_SERIALIZE_MAP()
+    KV_SERIALIZE(delivered)
+    KV_SERIALIZE(result)
+  END_KV_SERIALIZE_MAP()
+};
+
+
 void run_plain_wallet_api_test()
 {
   LOG_PRINT_L0("Creating instance...");
@@ -25,31 +36,72 @@ void run_plain_wallet_api_test()
   view::open_wallet_request owr = AUTO_VAL_INIT(owr);
   owr.path = "E:\\tmp\\zano_testwallet_745ss65030.zan";
   owr.pass = "";
-  uint64_t job_id = plain_wallet::async_call("open", 0, epee::serialization::store_t_to_json(owr));
+  std::string job_id_str = plain_wallet::async_call("open", 0, epee::serialization::store_t_to_json(owr));
+
+
+  try_pull_result_open_response rsp = AUTO_VAL_INIT(rsp);
+
   while (true)
   {
-    std::string res = plain_wallet::try_pull_result(job_id);
+    std::string res = plain_wallet::try_pull_result(1);
     LOG_PRINT_L0("[try_pull_result] RESPONSE:" << ENDL << res);
+
+    if (!epee::serialization::load_t_from_json(rsp, res))
+    {
+      LOG_ERROR("Failed to parse try_pull_result response: " << res);
+      return;
+    }
+    epee::misc_utils::sleep_no_w(1000);
+    if(!rsp.delivered)
+      continue;
+    break;
+  }
+
+
+
+  //std::string rsp = plain_wallet::open(std::string("E:\\tmp\\zano_testwallet_745ss65030.zan"), "");
+  //LOG_PRINT_L0("RESPONSE:" << ENDL << rsp);
+  //epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+  //epee::serialization::load_t_from_json(ok_response, rsp);
+
+  size_t count = 0;
+  while (count < 10)
+  {
+    std::string prog = plain_wallet::get_wallet_status(rsp.result.result.wallet_id);
+    LOG_PRINT_L0("Progress: " << ENDL << prog);
+    view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
+    if (!epee::serialization::load_t_from_json(wsi, prog))
+    {
+      LOG_ERROR("Failed to get_wallet_status()");
+      return;
+    }
+    if (!wsi.is_in_long_refresh)
+      break;
     epee::misc_utils::sleep_no_w(1000);
   }
 
-  std::string rsp = plain_wallet::open(std::string("E:\\tmp\\zano_testwallet_745ss65030.zan"), "");
-  LOG_PRINT_L0("RESPONSE:" << ENDL << rsp);
-  epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-  epee::serialization::load_t_from_json(ok_response, rsp);
-
+  std::string job_id_str2 = plain_wallet::async_call("close", rsp.result.result.wallet_id, "");
+  try_pull_result_open_response rsp2 = AUTO_VAL_INIT(rsp2);
 
   while (true)
   {
-    std::string prog = plain_wallet::get_wallet_status(ok_response.result.wallet_id);
-    LOG_PRINT_L0("Progress: " << ENDL << prog);
-    //     view::sta ssr = AUTO_VAL_INIT(ssr);
-    //     epee::serialization::load_t_from_json(ssr, prog);
-    //     LOG_PRINT_L0("Progress: " << ssr.progress << "Finished: " << ssr.finished);
-    //     if (ssr.finished)
-    //       break;
+    std::string res = plain_wallet::try_pull_result(2);
+    LOG_PRINT_L0("[try_pull_result] RESPONSE:" << ENDL << res);
+
+    if (!epee::serialization::load_t_from_json(rsp2, res))
+    {
+      LOG_ERROR("Failed to parse try_pull_result response: " << res);
+      return;
+    }
     epee::misc_utils::sleep_no_w(1000);
+    if (!rsp2.delivered)
+      continue;
+    break;
   }
+
+
+  LOG_PRINT_L0("OK");
+
 }
 
 //   LOG_PRINT_L0("Creating instance..." << std::hex << hw);

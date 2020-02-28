@@ -68,11 +68,11 @@ int main(int argc, char* argv[])
   currency::get_block_reward(false, 500000, 589313, 10300000000000000, reward, 11030);
 
   //set up logging options
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_1);
-  log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
-  log_space::log_singletone::add_logger(LOGGER_FILE, 
-    log_space::log_singletone::get_default_log_file().c_str(), 
-    log_space::log_singletone::get_default_log_folder().c_str());
+  //log_space::get_set_log_detalisation_level(true, LOG_LEVEL_1);
+  //log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+  //log_space::log_singletone::add_logger(LOGGER_FILE, 
+  //  log_space::log_singletone::get_default_log_file().c_str(), 
+  //  log_space::log_singletone::get_default_log_folder().c_str());
 
 
   po::options_description desc_options("Allowed options");

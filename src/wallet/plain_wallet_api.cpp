@@ -219,7 +219,7 @@ namespace plain_wallet
     std::function<void()> async_callback;
 
     uint64_t job_id = gjobs_counter++;
-    if (method_name == "close_wallet")
+    if (method_name == "close")
     {
       async_callback = [job_id, instance_id]()
       {
@@ -261,18 +261,28 @@ namespace plain_wallet
     }
     else if (method_name == "invoke")
     {
-    std::string local_params = params;
+      std::string local_params = params;
       async_callback = [job_id, local_params, instance_id]()
       {
         std::string res = invoke(instance_id, local_params);
         put_result(job_id, res);
       };
     }
+    else
+    {
+      view::api_response ar = AUTO_VAL_INIT(ar);
+      ar.error_code = "UNKNOWN METHOD";
+      put_result(job_id, epee::serialization::store_t_to_json(ar));
+      return;
+    }
+
+
     std::thread t([async_callback]() {async_callback(); });
     t.detach();
     LOG_PRINT_L0("[ASYNC_CALL]: started " << method_name << ", job id: " << job_id);
     return std::string("{ \"job_id\": ") + std::to_string(job_id) + "}";
   }
+
   std::string try_pull_result(uint64_t job_id)
   {
     //TODO: need refactoring
