@@ -191,7 +191,10 @@ namespace plain_wallet
 
   std::string close_wallet(hwallet h)
   {
-    return gwm.close_wallet(h);
+    std::string r = "{\"response\": \"";
+    r += gwm.close_wallet(h);
+    r += "\"}";
+    return r;
   }
 
   std::string get_wallet_status(hwallet h)
