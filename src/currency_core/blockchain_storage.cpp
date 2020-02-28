@@ -645,7 +645,7 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
     }
   };
 
-  BOOST_FOREACH(const txin_v& in, tx.vin)
+  for(const txin_v& in : tx.vin)
   {
     bool r = boost::apply_visitor(purge_transaction_visitor(*this, m_db_spent_keys, strict_check), in);
     CHECK_AND_ASSERT_MES(!strict_check || r, false, "failed to process purge_transaction_visitor");
