@@ -273,7 +273,7 @@ namespace plain_wallet
       view::api_response ar = AUTO_VAL_INIT(ar);
       ar.error_code = "UNKNOWN METHOD";
       put_result(job_id, epee::serialization::store_t_to_json(ar));
-      return;
+      return std::string("{ \"job_id\": ") + std::to_string(job_id) + "}";;
     }
 
 
