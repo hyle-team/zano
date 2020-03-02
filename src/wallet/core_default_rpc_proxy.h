@@ -66,7 +66,7 @@ namespace tools
       if (ret)
         m_last_success_interract_time = time(nullptr);
       else
-        m_plast_daemon_is_disconnected = true;
+        *m_plast_daemon_is_disconnected = true;
       return ret;
     }
 
