@@ -524,11 +524,13 @@ public:
 
   struct wallet_sync_status_info
   {
+    bool is_daemon_connected;
     uint64_t wallet_state;
     bool is_in_long_refresh;
     uint64_t progress;
 
     BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(is_daemon_connected)
       KV_SERIALIZE(wallet_state)
       KV_SERIALIZE(is_in_long_refresh)
       KV_SERIALIZE(progress)

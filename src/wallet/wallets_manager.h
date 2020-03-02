@@ -162,6 +162,7 @@ private:
   void update_wallets_info();
   void init_wallet_entry(wallet_vs_options& wo, uint64_t id);
   static void prepare_wallet_status_info(wallet_vs_options& wo, view::wallet_status_info& wsi);
+  bool get_is_remote_daemon_connected();
   //----- i_backend_wallet_callback ------
   virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block);
 	virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined);

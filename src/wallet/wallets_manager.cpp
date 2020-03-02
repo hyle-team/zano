@@ -29,7 +29,7 @@ if (it == m_wallets.end())                \
   return API_RETURN_CODE_WALLET_WRONG_ID; \
 auto& name = it->second.w;
 
-
+#define DAEMON_IDLE_UPDATE_TIME_MS        1000
 
 wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_stop_singal_sent(false),
@@ -232,7 +232,9 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   if (command_line::has_arg(m_vm, arg_remote_node))
   {
     m_remote_node_mode = true;
-    m_rpc_proxy.reset(new tools::default_http_core_proxy());
+    auto proxy_ptr = new tools::default_http_core_proxy();
+    proxy_ptr->set_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected);
+    m_rpc_proxy.reset(proxy_ptr);    
     m_rpc_proxy->set_connection_addr(command_line::get_arg(m_vm, arg_remote_node));
   }
 
@@ -567,7 +569,7 @@ void wallets_manager::loop()
   while(!m_stop_singal_sent)
   {
     update_state_info();
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(DAEMON_IDLE_UPDATE_TIME_MS));
   }
 }
 
@@ -1185,11 +1187,23 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
   return API_RETURN_CODE_OK;
 }
 
+bool wallets_manager::get_is_remote_daemon_connected()
+{
+  if (!m_remote_node_mode)
+    return true;
+  if (m_last_daemon_is_disconnected)
+    return false;
+  if (time(nullptr) - m_rpc_proxy->get_last_success_interract_time() > DAEMON_IDLE_UPDATE_TIME_MS * 2)
+    return false;
+  return true;
+}
+
 std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
   wsi.is_in_long_refresh = wo.long_refresh_in_progress;
+  wsi.is_daemon_connected = get_is_remote_daemon_connected();
   wsi.progress = wo.w.unlocked_get().get()->get_sync_progress();
   wsi.wallet_state = wo.wallet_state;
   return epee::serialization::store_t_to_json(wsi);
