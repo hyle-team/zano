@@ -528,12 +528,14 @@ public:
     uint64_t wallet_state;
     bool is_in_long_refresh;
     uint64_t progress;
+    uint64_t current_daemon_height;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(is_daemon_connected)
       KV_SERIALIZE(wallet_state)
       KV_SERIALIZE(is_in_long_refresh)
       KV_SERIALIZE(progress)
+      KV_SERIALIZE(current_daemon_height)
     END_KV_SERIALIZE_MAP()
   };
 

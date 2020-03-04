@@ -1206,6 +1206,7 @@ std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
   wsi.is_daemon_connected = get_is_remote_daemon_connected();
   wsi.progress = wo.w.unlocked_get().get()->get_sync_progress();
   wsi.wallet_state = wo.wallet_state;
+  wsi.current_daemon_height = m_last_daemon_height;
   return epee::serialization::store_t_to_json(wsi);
 }
 
