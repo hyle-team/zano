@@ -21,7 +21,7 @@ namespace currency
     ADD_CHECKPOINT(100000,  "6b8b54356a9d44f6c1ebdacb8593d8f5ab2e2e2ca4493e7ae7baf4b3755c5e16");
 #else
     // MAINNET
-    // no checkpoints
+    ADD_CHECKPOINT(425000,  "46a6c36d5dec2d484d5e4845a8525ca322aafc06915ed9c8da2a241b51b7d1e8");
 #endif
 
     return true;
