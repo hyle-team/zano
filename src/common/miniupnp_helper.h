@@ -30,13 +30,18 @@ namespace tools
     char m_lanaddr[64];
     int m_IGD;
     boost::thread m_mapper_thread;
+    boost::thread m_initializer_thread;
     uint32_t m_external_port;
+    uint32_t m_internal_port;
+    uint32_t m_period_ms;
   public: 
     miniupnp_helper():m_devlist(nullptr),
       m_urls(AUTO_VAL_INIT(m_urls)), 
       m_data(AUTO_VAL_INIT(m_data)),
       m_IGD(0),
-      m_external_port{}
+      m_external_port(0),
+      m_internal_port(0),
+      m_period_ms(0)
     {
       m_lanaddr[0] = 0;
     }
@@ -52,9 +57,10 @@ namespace tools
     bool start_regular_mapping(uint32_t internal_port, uint32_t external_port, uint32_t period_ms)
     {
       m_external_port = external_port;
+      m_internal_port = internal_port;
+      m_period_ms = period_ms;
       if(!init())
         return false;
-      m_mapper_thread = boost::thread([=](){run_port_mapping_loop(internal_port, external_port, period_ms);});
       return true;
     }
 
@@ -77,27 +83,42 @@ namespace tools
 
     bool init()
     {
-      deinit();
+      m_initializer_thread = boost::thread([=]()
+      {
+        deinit();
 
-      int error = 0;
-      m_devlist = upnpDiscover(2000, nullptr, nullptr, 0, 0, 2, &error);
-      if(error)
-      {
-        LOG_PRINT_L0("Failed to call upnpDiscover");
-        return false;
-      }
-      
-      m_IGD = UPNP_GetValidIGD(m_devlist, &m_urls, &m_data, m_lanaddr, sizeof(m_lanaddr));
-      if(m_IGD != 1)
-      {
-        LOG_PRINT_L2("IGD not found");
-        return false;
-      }
+        int error = 0;
+        m_devlist = upnpDiscover(2000, nullptr, nullptr, 0, 0, 2, &error);
+        if (error)
+        {
+          LOG_PRINT_L0("Failed to call upnpDiscover");
+          return false;
+        }
+
+        m_IGD = UPNP_GetValidIGD(m_devlist, &m_urls, &m_data, m_lanaddr, sizeof(m_lanaddr));
+        if (m_IGD != 1)
+        {
+          LOG_PRINT_L2("IGD not found");
+          return false;
+        }
+
+        m_mapper_thread = boost::thread([=]() {run_port_mapping_loop(m_internal_port, m_external_port, m_period_ms); });
+        return true;
+      });
       return true;
     }
 
     bool deinit()
     {
+      if(m_initializer_thread.get_id() != boost::this_thread::get_id())
+      {
+        if (m_initializer_thread.joinable())
+        {
+          m_initializer_thread.interrupt();
+          m_initializer_thread.join();
+        }
+      }
+
       stop_mapping();
 
       if(m_devlist)

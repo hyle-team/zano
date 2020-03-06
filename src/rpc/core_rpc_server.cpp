@@ -880,10 +880,10 @@ namespace currency
     }
     //@#@
     //temporary double check timestamp
-    if (time(NULL) - get_actual_timestamp(b) > 5)
+    if (time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) > 5)
     {
       LOG_PRINT_RED_L0("Found block (" << get_block_hash(b) << ") timestamp (" << get_actual_timestamp(b)
-        << ") is suspiciously less (" << time(NULL) - get_actual_timestamp(b) << ") then curren time( " << time(NULL) << ")");
+        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) << ") than current time ( " << time(NULL) << ")");
       //mark node to make it easier to find it via scanner      
       m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend = true;
     }
@@ -937,10 +937,10 @@ namespace currency
     }
     //@#@
     //temporary double check timestamp
-    if (time(NULL) - get_actual_timestamp(b) > 5)
+    if (time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) > 5)
     {
       LOG_PRINT_RED_L0("Found block (" << get_block_hash(b) << ") timestamp (" << get_actual_timestamp(b)
-        << ") is suspiciously less (" << time(NULL) - get_actual_timestamp(b) << ") then curren time( " << time(NULL) << ")");
+        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) << ") than current time ( " << time(NULL) << ")");
       //mark node to make it easier to find it via scanner      
       m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend = true;
     }

@@ -11,7 +11,7 @@
 #include "core_rpc_proxy.h"
 #include "storages/http_abstract_invoke.h"
 
-#define WALLET_RCP_CONNECTION_TIMEOUT                          200000
+#define WALLET_RCP_CONNECTION_TIMEOUT                          10000
 #define WALLET_RCP_COUNT_ATTEMNTS                              3
 
 namespace tools
@@ -63,7 +63,10 @@ namespace tools
         ret = request();
       }
 
-      m_plast_daemon_is_disconnected->store(!ret);
+      if (ret)
+        m_last_success_interract_time = time(nullptr);
+      else
+        *m_plast_daemon_is_disconnected = true;
       return ret;
     }
 
@@ -90,10 +93,16 @@ namespace tools
         return epee::net_utils::invoke_http_json_remote_command2(m_daemon_address + url, req, res, m_http_client, WALLET_RCP_CONNECTION_TIMEOUT);
       });
     }
+    //------------------------------------------------------------------------------------------------------------------------------
+    virtual time_t get_last_success_interract_time()
+    {
+      return m_last_success_interract_time;
+    }
 
     epee::critical_section m_lock;
     epee::net_utils::http::http_simple_client m_http_client;
     std::string m_daemon_address;
+    std::atomic<time_t> m_last_success_interract_time;
     std::atomic<bool> *m_plast_daemon_is_disconnected;
     std::atomic<bool> m_last_daemon_is_disconnected_stub;
 

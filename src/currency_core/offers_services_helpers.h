@@ -191,8 +191,21 @@ namespace bc_services
   inline double       extract_rate(const odeh& v)           { return calculate_offer_rate(v); }
   inline size_t       extract_payment_types(const odeh& v)  { return v.payment_types.size(); }
   inline std::string  extract_contacts(const odeh& v)       { return v.contacts; }
-  inline std::string  extract_location(const odeh& v)       { return currency::utf8_to_lower(v.location_country + v.location_city); }
-  inline std::string  extract_name(const odeh& v)           { return currency::utf8_to_lower(v.target); }
+  inline std::string  extract_location(const odeh& v) {
+
+#ifndef ANDROID_BUILD
+    return currency::utf8_to_lower(v.location_country + v.location_city);
+#else 
+    return "UNSUPORTED";
+#endif
+  }
+  inline std::string  extract_name(const odeh& v)           { 
+#ifndef ANDROID_BUILD
+    return currency::utf8_to_lower(v.target); 
+#else
+    return "UNSUPORTED";
+#endif
+  }
 
   template<int sort_type>
   struct sort_id_to_type

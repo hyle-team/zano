@@ -873,6 +873,7 @@ using namespace std;
         if (!tr.connect(u_c.host, static_cast<int>(u_c.port), timeout))
         {
           LOG_PRINT_L2("invoke_request: cannot connect to " << u_c.host << ":" << u_c.port);
+          return false;
         }
       }
 

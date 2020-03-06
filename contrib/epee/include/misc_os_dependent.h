@@ -109,14 +109,15 @@ namespace misc_utils
 #endif
 	}
 
-#if defined(__GNUC__)
+
+#if defined(__GNUC__) && !defined(__ANDROID__)
 #include <execinfo.h>
 #include <boost/core/demangle.hpp>
 #endif
   inline std::string print_trace_default()
   {
     std::stringstream ss;
-#if defined(__GNUC__)
+#if defined(__GNUC__) && !defined(__ANDROID__)
     ss << std::endl << "STACK" << std::endl;
     const size_t max_depth = 100;
     size_t stack_depth;

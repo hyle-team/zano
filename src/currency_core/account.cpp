@@ -158,7 +158,10 @@ namespace currency
   account_public_address transform_str_to_addr(const std::string& str)
   {
     account_public_address ad = AUTO_VAL_INIT(ad);
-    get_account_address_from_str(ad, str);
+    if (!get_account_address_from_str(ad, str))
+    {
+      LOG_ERROR("cannot parse address from string: " << str);
+    }
     return ad;
   }
 }

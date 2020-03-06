@@ -117,6 +117,9 @@ fi
 
 echo "Build success"
 
+if [ -z "$upload_build" ]; then
+    exit 0
+fi
 
 echo "Uploading..."
 

@@ -1,4 +1,11 @@
 
+
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
+  message("excluded db support for IOS build")
+  return()
+endif()
+
+
   message("DB ENGINE: lmdb")  
   add_subdirectory(liblmdb)
   if(MSVC)

@@ -16,6 +16,17 @@
 #include <intrin.h>
 #include <stdlib.h>
 
+#if !defined(__ORDER_LITTLE_ENDIAN__)
+#define __ORDER_LITTLE_ENDIAN__ 1011012001
+#endif
+
+#if !defined(__BYTE_ORDER__)
+#define __BYTE_ORDER__ __ORDER_LITTLE_ENDIAN__
+#endif
+
+#if !defined(__ORDER_BIG_ENDIAN__)
+#define __ORDER_BIG_ENDIAN__ 0
+#endif
 
 static inline uint32_t rol32(uint32_t x, int r) {
   static_assert(sizeof(uint32_t) == sizeof(unsigned int), "this code assumes 32-bit integers");
@@ -194,11 +205,11 @@ static inline void memcpy_swap64(void *dst, const void *src, size_t n) {
   }
 }
 
-#if !defined(BYTE_ORDER) || !defined(LITTLE_ENDIAN) || !defined(BIG_ENDIAN)
+#if !defined(__BYTE_ORDER__) || !defined(__ORDER_LITTLE_ENDIAN__) || !defined(__ORDER_BIG_ENDIAN__)
 static_assert(false, "BYTE_ORDER is undefined. Perhaps, GNU extensions are not enabled");
 #endif
 
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #define SWAP32LE IDENT32
 #define SWAP32BE SWAP32
 #define swap32le ident32
@@ -217,7 +228,7 @@ static_assert(false, "BYTE_ORDER is undefined. Perhaps, GNU extensions are not e
 #define memcpy_swap64be memcpy_swap64
 #endif
 
-#if BYTE_ORDER == BIG_ENDIAN
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define SWAP32BE IDENT32
 #define SWAP32LE SWAP32
 #define swap32be ident32

@@ -70,7 +70,6 @@ using namespace currency;
 #endif
 #define BLOCK_POS_STRICT_SEQUENCE_LIMIT                               20
 
-#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX                     "_v1"
 
 DISABLE_VS_WARNINGS(4267)
 
@@ -293,14 +292,21 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     bool need_reinit = false;
     if (m_db_blocks.size() != 0)
     {
-      if (m_db_storage_major_compatibility_version != BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION)
+      if (m_db_storage_major_compatibility_version == 93 && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 94)
+      {
+        // do not reinit db if moving from version 93 to version 94
+        LOG_PRINT_MAGENTA("DB storage does not need reinit because moving from v93 to v94", LOG_LEVEL_0);
+      }
+      else if (m_db_storage_major_compatibility_version != BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION)
       {
         need_reinit = true;
         LOG_PRINT_MAGENTA("DB storage needs reinit because it has major compatibility ver " << m_db_storage_major_compatibility_version << ", expected : " << BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION, LOG_LEVEL_0); 
       }
-      else if (m_db_storage_minor_compatibility_version != BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION)
+      else if (m_db_storage_minor_compatibility_version > BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION)
       {
-        // nothing
+        // reinit db only if minor version in the DB is greather (i.e. newer) than minor version in the code 
+        need_reinit = true;
+        LOG_PRINT_MAGENTA("DB storage needs reinit because it has minor compatibility ver " << m_db_storage_minor_compatibility_version << " that is greater than BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION: " << BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION, LOG_LEVEL_0);
       }
     }
 
@@ -528,17 +534,22 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  if(m_db_blocks.size() && m_checkpoints.get_top_checkpoint_height() && m_checkpoints.get_top_checkpoint_height() > m_db_current_pruned_rs_height)
+  if (m_db_blocks.size() > 1 && m_checkpoints.get_top_checkpoint_height() && m_checkpoints.get_top_checkpoint_height() > m_db_current_pruned_rs_height)
   {    
-    LOG_PRINT_CYAN("Starting pruning ring signatues and attachments...", LOG_LEVEL_0);
-    uint64_t tx_count = 0, sig_count = 0, attach_count = 0;
-    for(uint64_t height = m_db_current_pruned_rs_height; height < m_db_blocks.size() && height <= m_checkpoints.get_top_checkpoint_height(); height++)
+    uint64_t pruning_last_height = std::min(m_db_blocks.size() - 1, m_checkpoints.get_top_checkpoint_height());
+    if (pruning_last_height > m_db_current_pruned_rs_height)
     {
-      bool res = prune_ring_signatures_and_attachments(height, tx_count, sig_count, attach_count);
-      CHECK_AND_ASSERT_MES(res, false, "failed to prune_ring_signatures_and_attachments for height = " << height);
+      LOG_PRINT_CYAN("Starting pruning ring signatues and attachments from height " << m_db_current_pruned_rs_height + 1 << " to height " << pruning_last_height
+        << " (" << pruning_last_height - m_db_current_pruned_rs_height << " blocks)", LOG_LEVEL_0);
+      uint64_t tx_count = 0, sig_count = 0, attach_count = 0;
+      for(uint64_t height = m_db_current_pruned_rs_height + 1; height <= pruning_last_height; height++)
+      {
+        bool res = prune_ring_signatures_and_attachments(height, tx_count, sig_count, attach_count);
+        CHECK_AND_ASSERT_MES(res, false, "failed to prune_ring_signatures_and_attachments for height = " << height);
+      }
+      m_db_current_pruned_rs_height = pruning_last_height;
+      LOG_PRINT_CYAN("Transaction pruning finished: " << sig_count << " signatures and " << attach_count << " attachments released in " << tx_count << " transactions.", LOG_LEVEL_0);
     }
-    m_db_current_pruned_rs_height = m_checkpoints.get_top_checkpoint_height();
-    LOG_PRINT_CYAN("Transaction pruning finished: " << sig_count << " signatures and " << attach_count << " attachments released in " << tx_count << " transactions.", LOG_LEVEL_0);
   }
   return true;
 }
@@ -641,7 +652,7 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
     }
   };
 
-  BOOST_FOREACH(const txin_v& in, tx.vin)
+  for(const txin_v& in : tx.vin)
   {
     bool r = boost::apply_visitor(purge_transaction_visitor(*this, m_db_spent_keys, strict_check), in);
     CHECK_AND_ASSERT_MES(!strict_check || r, false, "failed to process purge_transaction_visitor");
@@ -3909,7 +3920,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   const std::vector<crypto::signature>* psig = &sig_stub;
 
   TIME_MEASURE_START_PD(tx_check_inputs_loop);
-  BOOST_FOREACH(const auto& txin,  tx.vin)
+  for(const auto& txin : tx.vin)
   {
     if (!m_is_in_checkpoint_zone)
     {

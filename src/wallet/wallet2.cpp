@@ -1086,10 +1086,10 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
       process_new_transaction(tx_entry->tx, height, b);
     }
     TIME_MEASURE_FINISH(txs_handle_time);
-    WLT_LOG_L2("Processed block: " << bl_id << ", height " << height << ", " <<  miner_tx_handle_time + txs_handle_time << "(" << miner_tx_handle_time << "/" << txs_handle_time <<")ms");
+    WLT_LOG_L3("Processed block: " << bl_id << ", height " << height << ", " <<  miner_tx_handle_time + txs_handle_time << "(" << miner_tx_handle_time << "/" << txs_handle_time <<")ms");
   }else
   {
-    WLT_LOG_L2( "Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime());
+    WLT_LOG_L3( "Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime());
   }
   m_blockchain.push_back(bl_id);
   ++m_local_bc_height;
@@ -1234,6 +1234,11 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
   }
 
   WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << m_blockchain.size());
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_sync_progress()
+{
+  return m_last_sync_percent;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::refresh()
@@ -2329,7 +2334,7 @@ bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, 
   
   //let's check if we have at least WALLET_POS_MINT_PACKING_SIZE transactions which is ready to go
   size_t count = 0;
-  for (auto it_ind = it->second.begin(); it_ind != it->second.end() && count < m_pos_mint_packing_size; it_ind++)
+  for (auto it_ind = it->second.begin(); it_ind != it->second.end() && count <= m_pos_mint_packing_size; it_ind++)
   {
     if (is_transfer_ready_to_go(m_transfers[*it_ind], fake_outputs_number))
       ++count;
@@ -2582,6 +2587,11 @@ void wallet2::submit_transfer_files(const std::string& signed_tx_file, currency:
 uint64_t wallet2::get_recent_transfers_total_count()
 {
   return m_transfer_history.size();
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_transfer_entries_count()
+{
+  return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total)
@@ -2838,7 +2848,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     if (generate_packing_transaction_if_needed(pack_tx, 0))
     {
       tx_to_blob(pack_tx, tmpl_req.explicit_transaction);
-      WLT_LOG_GREEN("Pacling inputs: " << pack_tx.vin.size() << " inputs consolidated", LOG_LEVEL_0);
+      WLT_LOG_GREEN("Packing inputs: " << pack_tx.vin.size() << " inputs consolidated in tx " << get_transaction_hash(pack_tx), LOG_LEVEL_0);
     }
     m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
     WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == CORE_RPC_STATUS_OK, false, "Failed to create block template after kernel hash found!");
@@ -2899,10 +2909,10 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     m_wcallback->on_pos_block_found(b);
     //@#@
     //double check timestamp
-    if (time(NULL) - get_actual_timestamp(b) > 5)
+    if (time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) > 5)
     {
       WLT_LOG_RED("Found block (" << get_block_hash(b) << ") timestamp ("  << get_actual_timestamp(b)
-        << ") is suspiciously less (" << time(NULL) - get_actual_timestamp(b) << ") then curren time( " << time(NULL) << ")", LOG_LEVEL_0);
+        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) << ") than current time ( " << time(NULL) << ")", LOG_LEVEL_0);
     }
     //
     return true;
@@ -4348,11 +4358,38 @@ bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp)
+{
+  // If someone sends coins to his own address, all tx outputs will be detected as own outputs.
+  // It's totally okay unless payment id is used, because it would be impossible to distinguish
+  // between change outs and transfer outs. Thus, such tx with a payment id can't be correctly
+  // obtained via RPC by the given payment id. It could be a problem for an exchange or other
+  // service when a user, identifyied by payment id sends coins to another user on the same
+  // exchange/service. Coins will be received but RPCs like get_payments won't give the transfer.
+  // To avoid such issues we prohibit such txs with a soft rule on sender side.
+
+  for (auto& d : ctp.dsts)
+  {
+    for (auto& addr : d.addr)
+    {
+      if (addr != m_account.get_public_address())
+        return; // at least one destination address is not our address -- it's not self-directed tx
+    }
+  }
+
+  // it's self-directed tx
+  payment_id_t pid;
+  bool has_payment_id = get_payment_id_from_tx(ctp.attachments, pid) && !pid.empty();
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_payment_id, "sending funds to yourself with payment id is not allowed");
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::transfer(const construct_tx_param& ctp,
   currency::transaction &tx,
   bool send_to_network,
   std::string* p_signed_tx_blob_str)
 {
+  check_and_throw_if_self_directed_tx_with_payment_id_requested(ctp);
+
   TIME_MEASURE_START(prepare_transaction_time);
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(ctp, ftp);
@@ -4545,7 +4582,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     {
       finalize_transaction(ftp, tx, tx_key, false, false);
     }
-    catch (error::tx_too_big)
+    catch (error::tx_too_big&)
     {
       return rc_too_many_outputs;
     }

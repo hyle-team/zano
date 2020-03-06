@@ -7,9 +7,9 @@
 #include <QtWidgets>
 #include <QWebChannel>
 
-#include "view_iface.h"
+#include "wallet/view_iface.h"
 #ifndef Q_MOC_RUN
-#include "daemon_backend.h"
+#include "wallet/wallets_manager.h"
 #include "currency_core/offers_services_helpers.h"
 #endif
 
@@ -227,7 +227,7 @@ private:
   QWebChannel* m_channel;
 
   // DATA
-  daemon_backend m_backend;
+  wallets_manager m_backend;
   //std::atomic<bool> m_quit_requested;
   std::atomic<bool> m_gui_deinitialize_done_1;
   std::atomic<bool> m_backend_stopped_2;

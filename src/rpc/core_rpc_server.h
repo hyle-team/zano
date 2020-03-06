@@ -155,7 +155,6 @@ namespace currency
         MAP_JON_RPC   ("get_current_core_tx_expiration_median", on_get_current_core_tx_expiration_median, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN)
         //
         MAP_JON_RPC_WE("marketplace_global_get_offers_ex",               on_get_offers_ex,               COMMAND_RPC_GET_OFFERS_EX)
-
         //remote miner rpc
         MAP_JON_RPC_N(on_login,            mining::COMMAND_RPC_LOGIN)
         MAP_JON_RPC_N(on_getjob,           mining::COMMAND_RPC_GETJOB)

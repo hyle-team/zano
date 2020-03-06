@@ -7,6 +7,9 @@
       <div class="sidebar-account-row account-title-balance">
         <span class="title" tooltip="{{ wallet.name }}" placement="top-left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{wallet.name}}</span>
         <span class="balance">{{wallet.balance | intToMoney : '3' }} {{variablesService.defaultCurrency}}</span>
+        <button type="button" (click)="showDialog(wallet.wallet_id)" tooltip="{{ 'WALLET.TOOLTIPS.CLOSE' | translate }}" placement="top-left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
+          <i class="icon close-wallet"></i>
+        </button>
       </div>
       <div class="sidebar-account-row account-alias">
         <div class="name">
@@ -155,3 +158,4 @@
   </div>
 </div>
 
+<app-confirm-modal *ngIf="isModalDialogVisible" [title]=" 'WALLET.CONFIRM.TITLE' | translate " [message]=" 'WALLET.CONFIRM.MESSAGE' | translate " (confirmed)="confirmed($event)"></app-confirm-modal>

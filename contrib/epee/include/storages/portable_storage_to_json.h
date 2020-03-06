@@ -157,6 +157,7 @@ namespace epee
     template<class t_stream>
     void dump_as_json(t_stream& strm, const double& v, size_t indent, end_of_line_t eol)
     {
+      boost::io::ios_flags_saver ifs(strm);
       strm.precision(8);
       strm << std::fixed << v;
     }

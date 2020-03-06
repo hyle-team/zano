@@ -1,7 +1,6 @@
-
-if(POLICY CMP0043)
-  cmake_policy(SET CMP0043 OLD)
-endif()
+# if(POLICY CMP0043)
+#   cmake_policy(SET CMP0043 OLD)
+# endif()
 
 ###########
 # using shared PCH -- this is unusual case for MSVC... so mystery, such hack, many wow. See also: https://stackoverflow.com/questions/645747/sharing-precompiled-headers-between-projects-in-visual-studio/4170902#4170902
@@ -100,8 +99,33 @@ endif()
 add_library(crypto ${CRYPTO})
 
 add_library(currency_core ${CURRENCY_CORE})
-add_dependencies(currency_core version rpc ${PCH_LIB_NAME})
+add_dependencies(currency_core version  ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(CURRENCY_CORE)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Android" )
+  add_library(wallet  ${WALLET})
+  add_dependencies(wallet version ${PCH_LIB_NAME})
+  target_link_libraries(wallet currency_core crypto common zlibstatic ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+else()
+  add_library(wallet ${WALLET})
+  add_dependencies(wallet version ${PCH_LIB_NAME})
+  ENABLE_SHARED_PCH(WALLET)
+endif()
+
+
+
+
+
+
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  install(TARGETS wallet currency_core crypto common DESTINATION lib)
+  message("Generating install for iOS")
+  return()
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+  install(TARGETS wallet currency_core crypto common zlibstatic DESTINATION "${CMAKE_ANDROID_ARCH_ABI}/lib")
+  message("Generating install for Android")
+  return()
+endif()
 
 add_library(rpc ${RPC})
 add_dependencies(rpc version ${PCH_LIB_NAME})
@@ -111,15 +135,12 @@ add_library(stratum ${STRATUM})
 add_dependencies(stratum version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(STRATUM)
 
-add_library(wallet ${WALLET})
-add_dependencies(wallet version ${PCH_LIB_NAME})
-ENABLE_SHARED_PCH(WALLET)
 
 target_link_libraries(currency_core lmdb mdbx)
 
 add_executable(daemon ${DAEMON} ${P2P} ${CURRENCY_PROTOCOL})
 add_dependencies(daemon version)
-target_link_libraries(daemon rpc stratum currency_core crypto common libminiupnpc-static zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+  target_link_libraries(daemon rpc stratum currency_core crypto common libminiupnpc-static zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 ENABLE_SHARED_PCH(DAEMON)
 ENABLE_SHARED_PCH_EXECUTABLE(daemon)
                      

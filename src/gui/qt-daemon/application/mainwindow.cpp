@@ -304,7 +304,9 @@ bool MainWindow::store_app_config()
 {
   TRY_ENTRY();
   std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG;
-  return tools::serialize_obj_to_file(m_config, conf_path);
+  LOG_PRINT_L0("storing gui internal config from " << conf_path);
+  CHECK_AND_ASSERT_MES(tools::serialize_obj_to_file(m_config, conf_path), false, "failed to store gui internal config");
+  return true;
   CATCH_ENTRY2(false);
 }
 
@@ -312,7 +314,10 @@ bool MainWindow::load_app_config()
 {
   TRY_ENTRY();
   std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG;
-  return tools::unserialize_obj_from_file(m_config, conf_path);
+  LOG_PRINT_L0("loading gui internal config from " << conf_path);
+  bool r = tools::unserialize_obj_from_file(m_config, conf_path);
+  LOG_PRINT_L0("gui internal config " << (r ? "loaded ok" : "was not loaded"));
+  return r;
   CATCH_ENTRY2(false);
 }
 
@@ -1060,13 +1065,13 @@ QString MainWindow::get_secure_app_data(const QString& param)
   bool r = file_io_utils::load_file_to_string(filename, app_data_buff);
   if (!r)
   {
-    LOG_PRINT_L1("config file was not loaded: " << m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME);
+    LOG_PRINT_L1("gui secure config was not loaded from " << filename);
     return "";
   }
 
   if (app_data_buff.size() < sizeof(app_data_file_binary_header))
   {
-    LOG_ERROR("app_data_buff.size() < sizeof(app_data_file_binary_header) check failed");
+    LOG_ERROR("app_data_buff.size() < sizeof(app_data_file_binary_header) check failed while loading from " << filename);
     view::api_response ar;
     ar.error_code = API_RETURN_CODE_FAIL;
     return MAKE_RESPONSE(ar);
@@ -1077,7 +1082,7 @@ QString MainWindow::get_secure_app_data(const QString& param)
   const app_data_file_binary_header* phdr = reinterpret_cast<const app_data_file_binary_header*>(app_data_buff.data());
   if (phdr->m_signature != APP_DATA_FILE_BINARY_SIGNATURE)
   {
-    LOG_ERROR("password missmatch");
+    LOG_ERROR("gui secure config: password missmatch while loading from " << filename);
     view::api_response ar;
     ar.error_code = API_RETURN_CODE_WRONG_PASSWORD;
     return MAKE_RESPONSE(ar);
@@ -1087,7 +1092,7 @@ QString MainWindow::get_secure_app_data(const QString& param)
 
   crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
   crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  LOG_PRINT_L0("get_secure_app_data, pass hash: " << master_password_hash);
+  LOG_PRINT_L0("gui secure config loaded ok from " << filename << ", pass hash: " << master_password_hash);
 
   return app_data_buff.substr(sizeof(app_data_file_binary_header)).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
@@ -1160,10 +1165,6 @@ QString MainWindow::store_app_data(const QString& param)
     LOG_PRINT_L0("Failed to create data directory: " << m_backend.get_config_folder());
     return MAKE_RESPONSE(ar);
   }
-
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  LOG_PRINT_L0("store_app_data, pass hash: " << master_password_hash);
 
   std::string filename = m_backend.get_config_folder() + "/" + GUI_CONFIG_FILENAME;
   bool r = file_io_utils::save_string_to_file(filename, param.toStdString());
@@ -1313,6 +1314,8 @@ QString MainWindow::have_secure_app_data()
   else
     ar.error_code = API_RETURN_CODE_FALSE;
 
+  LOG_PRINT_L0("have_secure_app_data, r = " << ar.error_code);
+
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1328,6 +1331,9 @@ QString MainWindow::drop_secure_app_data()
     ar.error_code = API_RETURN_CODE_TRUE;
   else
     ar.error_code = API_RETURN_CODE_FALSE;
+
+  LOG_PRINT_L0("drop_secure_app_data, r = " << ar.error_code);
+
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }

@@ -18,6 +18,7 @@ using namespace epee;
 #include "generate_test_genesis.h"
 #include "deadlock_guard_test.h"
 #include "difficulty_analysis.h"
+#include "plain_wallet_tests.h"
 
 namespace po = boost::program_options;
 
@@ -53,6 +54,7 @@ namespace
   const command_line::arg_descriptor<size_t> arg_generate_test_genesis_json = { "generate-test-genesis-json",            "generates test genesis json, specify amount of accounts", 0, true };
   const command_line::arg_descriptor<bool>   arg_deadlock_guard    = { "test-deadlock-guard",            "Do deadlock guard test", false, true };
   const command_line::arg_descriptor<std::string>   arg_difficulty_analysis = { "difficulty-analysis", "Do difficulty analysis", "", true };
+  const command_line::arg_descriptor<bool>   arg_test_plain_wallet = { "test-plainwallet", "Do testing of plain wallet interface", false, true };
 
 }
 
@@ -66,11 +68,11 @@ int main(int argc, char* argv[])
   currency::get_block_reward(false, 500000, 589313, 10300000000000000, reward, 11030);
 
   //set up logging options
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_1);
-  log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
-  log_space::log_singletone::add_logger(LOGGER_FILE, 
-    log_space::log_singletone::get_default_log_file().c_str(), 
-    log_space::log_singletone::get_default_log_folder().c_str());
+  //log_space::get_set_log_detalisation_level(true, LOG_LEVEL_1);
+  //log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+  //log_space::log_singletone::add_logger(LOGGER_FILE, 
+  //  log_space::log_singletone::get_default_log_file().c_str(), 
+  //  log_space::log_singletone::get_default_log_folder().c_str());
 
 
   po::options_description desc_options("Allowed options");
@@ -104,8 +106,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_max_tx_in_pool);
   command_line::add_arg(desc_options, arg_deadlock_guard);
   command_line::add_arg(desc_options, arg_difficulty_analysis);
-  
-  
+  command_line::add_arg(desc_options, arg_test_plain_wallet);  
   
   
   test_serialization();
@@ -188,6 +189,11 @@ int main(int argc, char* argv[])
   else if (command_line::get_arg(vm, arg_deadlock_guard) )
   {
     do_deadlock_test_main();
+    return 1;
+  }
+  else if (command_line::has_arg(vm, arg_test_plain_wallet))
+  {
+    run_plain_wallet_api_test();
     return 1;
   }
   else if (command_line::get_arg(vm, arg_test_core_concurrency))

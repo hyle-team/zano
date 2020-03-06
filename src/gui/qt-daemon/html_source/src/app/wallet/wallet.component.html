@@ -17,9 +17,6 @@
     <button [routerLink]="['/details']" routerLinkActive="active" tooltip="{{ 'WALLET.TOOLTIPS.SETTINGS' | translate }}" placement="left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
       <i class="icon details"></i>
     </button>
-    <button type="button" (click)="showDialog()" tooltip="{{ 'WALLET.TOOLTIPS.CLOSE' | translate }}" placement="bottom-right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
-      <i class="icon close-wallet"></i>
-    </button>
   </div>
 </div>
 <div class="address">
@@ -57,5 +54,3 @@
     </div>
   </div>
 </div>
-
-<app-confirm-modal *ngIf="isModalDialogVisible" [title]=" 'WALLET.CONFIRM.TITLE' | translate " [message]=" 'WALLET.CONFIRM.MESSAGE' | translate " (confirmed)="confirmed($event)"></app-confirm-modal>

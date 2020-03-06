@@ -13,7 +13,7 @@
 using namespace epee;
 #include "currency_core/currency_core.h"
 #include "rpc/core_rpc_server.h"
-#include "gui/qt-daemon/application/core_fast_rpc_proxy.h"
+#include "wallet/core_fast_rpc_proxy.h"
 #include "version.h"
 #include "common/command_line.h"
 #include "common/boost_serialization_helper.h"
@@ -284,8 +284,10 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
 bool clean_data_directory(boost::program_options::variables_map& vm)
 {
   std::string config_folder = command_line::get_arg(vm, command_line::arg_data_dir);
+  const std::string bch_db_folder_path = config_folder + ("/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX) + "lmdb" + CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX;
+  const std::string pool_db_folder_path = config_folder + ("/" CURRENCY_POOLDATA_FOLDERNAME_PREFIX) + "lmdb" + CURRENCY_POOLDATA_FOLDERNAME_SUFFIX;
 
-  static const char* const files[] = { CURRENCY_BLOCKCHAINDATA_FOLDERNAME, CURRENCY_POOLDATA_FOLDERNAME, MINER_CONFIG_FILENAME };
+  static const char* const files[] = { bch_db_folder_path.c_str(), pool_db_folder_path.c_str(), MINER_CONFIG_FILENAME };
   for (size_t i = 0; i < sizeof files / sizeof files[0]; ++i)
   {
     boost::filesystem::path filename(config_folder + "/" + files[i]);

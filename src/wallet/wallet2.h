@@ -46,7 +46,6 @@
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
-ENABLE_CHANNEL_BY_DEFAULT("wallet");
 
 // wallet-specific logging functions
 #define WLT_LOG_L0(msg) LOG_PRINT_L0("[W:" << m_log_prefix << "] " << msg)
@@ -452,9 +451,9 @@ namespace tools
       END_SERIALIZE()
     };
     void assign_account(const currency::account_base& acc);
-    void generate(const std::wstring& wallet, const std::string& password);
+    void generate(const std::wstring& path, const std::string& password);
     void restore(const std::wstring& path, const std::string& pass, const std::string& restore_key);
-    void load(const std::wstring& wallet, const std::string& password);    
+    void load(const std::wstring& path, const std::string& password);
     void store();
     void store(const std::wstring& path);
     void store(const std::wstring& path, const std::string& password);
@@ -466,6 +465,7 @@ namespace tools
 
     void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total);
     uint64_t get_recent_transfers_total_count();
+    uint64_t get_transfer_entries_count();
     void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs);
     void init(const std::string& daemon_address = "http://localhost:8080");
     bool deinit();
@@ -744,7 +744,7 @@ namespace tools
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
     bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
-
+    uint64_t get_sync_progress();
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
@@ -863,7 +863,7 @@ private:
     void check_for_free_space_and_throw_if_it_lacks(const std::wstring& path, uint64_t exact_size_needed_if_known = UINT64_MAX);
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
-
+    void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
 
     currency::account_base m_account;
     bool m_watch_only;
@@ -895,7 +895,7 @@ private:
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
     uint64_t m_height_of_start_sync;
-    uint64_t m_last_sync_percent;
+    std::atomic<uint64_t> m_last_sync_percent;
     uint64_t m_last_pow_block_h;
     currency::core_runtime_config m_core_runtime_config;
     escrow_contracts_container m_contracts;
