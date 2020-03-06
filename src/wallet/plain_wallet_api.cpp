@@ -40,13 +40,14 @@ namespace plain_wallet
   {
 #ifdef WIN32
     return "";
-#endif // WIN32
-#ifdef IOS_BUILD
+#elif IOS_BUILD
     char* env = getenv("HOME");
     return env ? env : "";
 #elif ANDROID_BUILD
     ///      data/data/com.zano_mobile/files
     return "/data/data/" ANDROID_PACKAGE_NAME;
+#else
+    return "";
 #endif
   }
   
