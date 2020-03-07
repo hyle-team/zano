@@ -62,6 +62,31 @@
       flex-shrink: 0;
       cursor: pointer;
       padding: 2rem 3rem;
+      
+      .close-wallet-wrapper {
+        display: flex;
+        justify-content: flex-end;
+        position: relative;
+        button {
+          display: flex;
+          position: absolute;
+          padding: 0;
+          height: auto;
+          background: transparent;
+          border: none;
+          margin: -1.3rem 1.6rem;
+    
+          .icon {
+            width: 1.3rem;
+            height: 1.3rem;
+
+            &.close-wallet {
+              mask: url(../../assets/icons/close-wallet.svg) no-repeat center;
+            }
+          }
+        }
+      }
+      
 
       .sidebar-account-row {
         display: flex;
@@ -180,30 +205,7 @@
           }
         }
 
-        button {
-          display: flex;
-          align-items: center;
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          font-weight: 400;
-          outline: none;
-          padding: 0;
-          padding-bottom: 5rem;
-          position: absolute;
-          left: 105%;
-      
-          .icon {
-            margin-right: 1.2rem;
-            width: 1.3rem;
-            height: 1.3rem;
-
-            &.close-wallet {
-              mask: url(../../assets/icons/close-wallet.svg) no-repeat center;
-              margin-right: 0;
-            }
-          }
-        }
+        
       }
 
       &:focus {
