@@ -230,7 +230,10 @@ using namespace std;
 			blocked_mode_client m_net_client;
 			std::string m_host_buff;
 			std::string m_port;
-			unsigned int m_timeout;
+			//unsigned int m_timeout;
+      unsigned int m_connection_timeout;
+      unsigned int m_invoke_timeout;
+      unsigned int m_recv_timeout;
 			std::string m_header_cache;
 			http_response_info m_response_info;
 			size_t m_len_in_summary;
@@ -259,14 +262,25 @@ using namespace std;
       {
         return connect(host, std::to_string(port), timeout);
       }
-      bool connect(const std::string& host, const std::string& port, unsigned int timeout)
+
+      bool set_timeouts(unsigned int connection_timeout, unsigned int invoke_timeout, unsigned int recv_timeout)
+      {
+
+      }
+
+      bool connect(const std::string& host, std::string port)
       {
         CRITICAL_REGION_LOCAL(m_lock);
         m_host_buff = host;
         m_port = port;
-        m_timeout = timeout;
 
-        return m_net_client.connect(host,  port, timeout, timeout);
+        return m_net_client.connect(host, port, m_connection_timeout, m_recv_timeout);
+      }
+
+      bool connect(const std::string& host, const std::string& port, unsigned int timeout)
+      {
+        m_connection_timeout = m_invoke_timeout = m_recv_timeout = timeout;
+        return connect(host, port);
       }
 			//---------------------------------------------------------------------------
 			bool disconnect()
@@ -303,7 +317,7 @@ using namespace std;
 				if(!is_connected())
 				{
 					LOG_PRINT("Reconnecting...", LOG_LEVEL_3);
-					if(!connect(m_host_buff, m_port, m_timeout))
+					if(!connect(m_host_buff, m_port))
 					{
 						LOG_PRINT("Failed to connect to " << m_host_buff << ":" << m_port, LOG_LEVEL_3);
 						return false;

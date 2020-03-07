@@ -29,7 +29,9 @@ if (it == m_wallets.end())                \
   return API_RETURN_CODE_WALLET_WRONG_ID; \
 auto& name = it->second.w;
 
-#define DAEMON_IDLE_UPDATE_TIME_MS        1000
+#define DAEMON_IDLE_UPDATE_TIME_MS        2000
+#define HTTP_PROXY_TIMEOUT                2000
+#define HTTP_PROXY_ATTEMPTS_COUNT         1
 
 wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_stop_singal_sent(false),
@@ -234,6 +236,7 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
     m_remote_node_mode = true;
     auto proxy_ptr = new tools::default_http_core_proxy();
     proxy_ptr->set_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected);
+    proxy_ptr->set_connectivity(HTTP_PROXY_TIMEOUT,  HTTP_PROXY_ATTEMPTS_COUNT);
     m_rpc_proxy.reset(proxy_ptr);    
     m_rpc_proxy->set_connection_addr(command_line::get_arg(m_vm, arg_remote_node));
   }
@@ -505,10 +508,9 @@ bool wallets_manager::update_state_info()
     dsi.is_disconnected = true;
     m_last_daemon_network_state = dsi.daemon_network_state;
     m_pview->update_daemon_status(dsi);
-    LOG_ERROR("Failed to call get_info");
+    LOG_PRINT_RED_L0("Failed to call get_info");
     return false;
   }
-
   m_is_pos_allowed = inf.pos_allowed;
   dsi.alias_count = inf.alias_count;
   dsi.pow_difficulty = std::to_string(inf.pow_difficulty);
