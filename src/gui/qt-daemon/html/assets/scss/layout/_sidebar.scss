@@ -32,6 +32,13 @@ app-sidebar {
           color: themed(mainTextColor);
         }
 
+        .icon {
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+        }
+
         .sidebar-account-row {
 
           .text {
