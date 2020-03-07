@@ -67,7 +67,10 @@ namespace tools
       }
 
       if (ret)
+      {
         m_last_success_interract_time = time(nullptr);
+        m_plast_daemon_is_disconnected = false;
+      }
       else
         *m_plast_daemon_is_disconnected = true;
       return ret;
