@@ -139,7 +139,7 @@ namespace tools
     bool r = m_http_client.connect(u.host, std::to_string(u.port), m_connection_timeout);
     if (r)
     {
-      m_plast_daemon_is_disconnected = false;
+      *m_plast_daemon_is_disconnected = false;
       m_last_success_interract_time = time(nullptr);
     }
     return r;
