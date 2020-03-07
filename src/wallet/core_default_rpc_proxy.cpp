@@ -136,7 +136,13 @@ namespace tools
     epee::net_utils::parse_url(m_daemon_address, u);
     if (!u.port)
       u.port = 8081;
-    return m_http_client.connect(u.host, std::to_string(u.port), m_connection_timeout);
+    bool r = m_http_client.connect(u.host, std::to_string(u.port), m_connection_timeout);
+    if (r)
+    {
+      m_plast_daemon_is_disconnected = false;
+      m_last_success_interract_time = time(nullptr);
+    }
+    return r;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_GET_ALL_ALIASES(currency::COMMAND_RPC_GET_ALL_ALIASES::response& res)
