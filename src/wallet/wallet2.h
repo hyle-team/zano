@@ -123,8 +123,6 @@ namespace tools
 #pragma pack(push, 1)
   struct out_key_to_ki
   {
-    out_key_to_ki() {}
-    out_key_to_ki(const crypto::public_key& out_key, const crypto::key_image& key_image) : out_key(out_key), key_image(key_image) {}
     crypto::public_key out_key;
     crypto::key_image  key_image;
   };
