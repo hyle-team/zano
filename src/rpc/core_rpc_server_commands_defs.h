@@ -181,10 +181,12 @@ namespace currency
     struct response
     {
       std::list<blobdata> txs;  //transactions blobs
+      uint64_t tx_expiration_ts_median;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs)
+        KV_SERIALIZE(tx_expiration_ts_median)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };

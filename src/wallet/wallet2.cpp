@@ -1356,7 +1356,7 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
   std::unordered_map<crypto::hash, std::pair<currency::transaction, money_transfer2_details>> unconfirmed_multisig_transfers_from_tx_pool;
 
   has_related_alias_in_unconfirmed = false;
-  uint64_t tx_expiration_ts_median = get_tx_expiration_median();
+  uint64_t tx_expiration_ts_median = res.tx_expiration_ts_median; //get_tx_expiration_median();
   for (const auto &tx_blob : res.txs)
   {
     currency::transaction tx;
