@@ -232,7 +232,6 @@ using namespace std;
 			std::string m_port;
 			//unsigned int m_timeout;
       unsigned int m_connection_timeout;
-      unsigned int m_invoke_timeout;
       unsigned int m_recv_timeout;
 			std::string m_header_cache;
 			http_response_info m_response_info;
@@ -263,9 +262,11 @@ using namespace std;
         return connect(host, std::to_string(port), timeout);
       }
 
-      bool set_timeouts(unsigned int connection_timeout, unsigned int invoke_timeout, unsigned int recv_timeout)
+      bool set_timeouts(unsigned int connection_timeout, unsigned int recv_timeout)
       {
-
+        m_connection_timeout = connection_timeout;
+        m_recv_timeout = recv_timeout;
+        return true;
       }
 
       bool connect(const std::string& host, std::string port)
@@ -279,7 +280,7 @@ using namespace std;
 
       bool connect(const std::string& host, const std::string& port, unsigned int timeout)
       {
-        m_connection_timeout = m_invoke_timeout = m_recv_timeout = timeout;
+        m_connection_timeout = m_recv_timeout = timeout;
         return connect(host, port);
       }
 			//---------------------------------------------------------------------------
