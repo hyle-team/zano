@@ -48,7 +48,7 @@ namespace net_utils
     *
     */
     inline 
-    content_encoding_gzip(i_target_handler* powner_filter, bool is_deflate_mode = false):m_powner_filter(powner_filter), 
+      content_encoding_gzip(i_target_handler* powner_filter, bool is_deflate_mode = false, int compression_level = Z_DEFAULT_COMPRESSION) :m_powner_filter(powner_filter),
       m_is_stream_ended(false), 
       m_is_deflate_mode(is_deflate_mode),
       m_is_first_update_in(true)
@@ -56,14 +56,15 @@ namespace net_utils
       memset(&m_zstream_in, 0, sizeof(m_zstream_in));
       memset(&m_zstream_out, 0, sizeof(m_zstream_out));
       int ret = 0;
+			boost::ignore_unused(ret);
       if(is_deflate_mode)
       {
         ret = inflateInit(&m_zstream_in);  
-        ret = deflateInit(&m_zstream_out, Z_DEFAULT_COMPRESSION);
+        ret = deflateInit(&m_zstream_out, compression_level);
       }else
       {
         ret = inflateInit2(&m_zstream_in, 0x1F);
-        ret = deflateInit2(&m_zstream_out, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 0x1F, 8, Z_DEFAULT_STRATEGY);
+        ret = deflateInit2(&m_zstream_out, compression_level, Z_DEFLATED, 0x1F, 8, Z_DEFAULT_STRATEGY);
       }  
     }
     /*! \brief
