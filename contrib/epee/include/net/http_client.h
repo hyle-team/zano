@@ -38,9 +38,9 @@
 #include "net_helper.h"
 #include "http_client_base.h"
 
-#ifdef HTTP_ENABLE_GZIP
+//#ifdef HTTP_ENABLE_GZIP
 #include "gzip_encoding.h"
-#endif 
+//#endif 
 
 #include "string_tools.h"
 #include "reg_exp_definer.h"
@@ -500,7 +500,7 @@ using namespace std;
 			}
 			//---------------------------------------------------------------------------
 			inline
-				bool get_len_from_chunk_head(const std::string &chunk_head, size_t& result_size)
+				bool get_len_from_chunk_head(const std::string &chunk_head, uint64_t& result_size)
 			{
 				std::stringstream str_stream;
 				str_stream << std::hex;
@@ -511,7 +511,7 @@ using namespace std;
 			}
 			//---------------------------------------------------------------------------
 			inline
-				bool get_chunk_head(std::string& buff, size_t& chunk_size, bool& is_matched)
+				bool get_chunk_head(std::string& buff, uint64_t& chunk_size, bool& is_matched)
 			{
 				is_matched = false;
 				size_t offset = 0;
