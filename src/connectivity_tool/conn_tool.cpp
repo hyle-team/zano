@@ -8,6 +8,7 @@
 
 #include "include_base_utils.h"
 #include "version.h"
+#include "epee/include/gzip_encoding.h"
 
 using namespace epee;
 #include <boost/program_options.hpp>
@@ -23,7 +24,6 @@ using namespace epee;
 #include "storages/http_abstract_invoke.h"
 #include "net/http_client.h"
 #include "currency_core/genesis_acc.h"
-
 #include <cstdlib>
 
 namespace po = boost::program_options;
@@ -59,6 +59,9 @@ namespace
   const command_line::arg_descriptor<std::string> arg_download_peer_log =  { "download-peer-log", "Download log from remote peer <starting_offset>[,<count>]", "", true };
   const command_line::arg_descriptor<bool>        arg_do_consloe_log    = { "do-console-log", "Tool generates debug console output(debug purposes)", "", true };
   const command_line::arg_descriptor<std::string> arg_generate_integrated_address = { "generate-integrated-address", "Tool create integrated address from simple address and payment_id", "", true };
+  const command_line::arg_descriptor<std::string> arg_pack_file          = {"pack-file", "perform gzip-packing and calculate hash for a given file", "", true };
+  const command_line::arg_descriptor<std::string> arg_unpack_file        = {"unpack-file", "Perform gzip-unpacking and calculate hash for a given file", "", true };
+  const command_line::arg_descriptor<std::string> arg_target_file        = {"target-file", "Specify target file for pack-file and unpack-file commands", "", true };
 }
 
 typedef COMMAND_REQUEST_STAT_INFO_T<t_currency_protocol_handler<core>::stat_info> COMMAND_REQUEST_STAT_INFO;
@@ -910,7 +913,6 @@ bool invoke_debug_command(po::variables_map& vm, const crypto::secret_key& sk, l
 
   return net_utils::invoke_remote_command2(command_t::ID, req, rsp, transport);
 }
-
 //---------------------------------------------------------------------------------------------------------------
 bool handle_set_peer_log_level(po::variables_map& vm)
 {
@@ -1101,6 +1103,119 @@ bool handle_generate_integrated_address(po::variables_map& vm)
   return true;
 }
 //---------------------------------------------------------------------------------------------------------------
+template<class archive_processor_t>
+bool process_archive(archive_processor_t& arch_processor, bool is_packing, std::ifstream& source, std::ofstream& target)
+{
+  source.seekg(0, std::ios::end);
+  uint64_t sz = source.tellg();
+  uint64_t remaining = sz;
+  uint64_t written_bytes = 0;
+
+  crypto::stream_cn_hash hash_stream;
+  
+  source.seekg(0, std::ios::beg);
+
+#define PACK_READ_BLOCKS_SIZE  1048576 // 1MB blocks
+
+  std::string buff;
+
+  auto writer_cb = [&](const std::string& piece_of_transfer)
+  {
+    target.write(piece_of_transfer.data(), piece_of_transfer.size());
+    written_bytes += piece_of_transfer.size();
+    if (!is_packing)
+      hash_stream.update(piece_of_transfer.data(), piece_of_transfer.size());
+    return true;
+  };
+
+  while (remaining)
+  {
+    uint64_t read_sz = remaining >= PACK_READ_BLOCKS_SIZE ? PACK_READ_BLOCKS_SIZE : remaining;
+    buff.resize(read_sz);
+    source.read(const_cast<char*>(buff.data()), buff.size());
+    if (!source)
+    {
+      std::cout << "Error on read from source" << ENDL;
+      return true;
+    }
+
+    if (is_packing)
+      hash_stream.update(buff.data(), buff.size());
+
+    arch_processor.update_in(buff, writer_cb);
+
+    remaining -= read_sz;
+    std::cout << "Progress: " << ((sz - remaining) * 100) / sz << "%\r";
+  }
+
+  //flush gzip decoder
+  arch_processor.stop(writer_cb);
+
+  source.close();
+  target.close();
+
+  crypto::hash data_hash = hash_stream.calculate_hash();
+
+  std::cout << "\r\nFile " << (is_packing ? "packed" : "unpacked") << " from size " << sz << " to " << written_bytes <<
+                "\r\nhash of the data is " << epee::string_tools::pod_to_hex(data_hash) << "\r\n";
+
+  return true;
+}
+
+bool handle_pack_file(po::variables_map& vm)
+{
+  bool do_pack = false;
+  std::string path_source;
+  std::string path_target;
+  if (command_line::has_arg(vm, arg_pack_file))
+  {
+    path_source = command_line::get_arg(vm, arg_pack_file);
+    do_pack = true;
+  }
+  else if (command_line::has_arg(vm, arg_unpack_file))
+  {
+    path_source = command_line::get_arg(vm, arg_unpack_file);
+    do_pack = false;
+  }
+  else
+  {
+    return false;
+  }
+
+  if (!command_line::has_arg(vm, arg_target_file))
+    std::cout << "Error: Parameter target_file is not set." << ENDL;
+  path_target = command_line::get_arg(vm, arg_target_file);
+
+  std::ifstream source;
+  source.open(path_source, std::ios::binary | std::ios::in );
+  if (!source.is_open())
+  {
+    std::cout << "Error: Unable to open " << path_source << ENDL;
+    return false;
+  }
+  
+  std::ofstream target;
+  target.open(path_target, std::ios::binary | std::ios::out | std::ios::trunc);
+  if (!target.is_open())
+  {
+    std::cout << "Error: Unable to open " << path_target << ENDL;
+    return false;
+  }
+
+  if (do_pack)
+  {
+    epee::net_utils::gzip_encoder_lyambda gzip_encoder(Z_BEST_COMPRESSION);
+    return process_archive(gzip_encoder, true, source, target);
+  }
+  else
+  {
+    epee::net_utils::gzip_decoder_lambda gzip_decoder;
+    return process_archive(gzip_decoder, false, source, target);
+  }
+}
+
+//---------------------------------------------------------------------------------------------------------------
+
 int main(int argc, char* argv[])
 {
   try
@@ -1142,8 +1257,9 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_download_peer_log);
   command_line::add_arg(desc_params, arg_do_consloe_log);
   command_line::add_arg(desc_params, arg_generate_integrated_address);
-  
-
+  command_line::add_arg(desc_params, arg_pack_file);
+  command_line::add_arg(desc_params, arg_unpack_file);
+  command_line::add_arg(desc_params, arg_target_file);
 
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
@@ -1215,6 +1331,10 @@ int main(int argc, char* argv[])
   else if (command_line::has_arg(vm, arg_generate_integrated_address))
   {
     return handle_generate_integrated_address(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
+  }
+  else if (command_line::has_arg(vm, arg_pack_file) || command_line::has_arg(vm, arg_unpack_file))
+  {
+    return handle_pack_file(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else
   {
