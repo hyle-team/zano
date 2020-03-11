@@ -61,11 +61,11 @@ namespace plain_wallet
 #endif // WIN32
   }
 
-  void initialize_logs()
+  void initialize_logs(int log_level)
   {
     std::string log_dir = get_bundle_root_dir();
     log_dir += "/" HOME_FOLDER;
-    epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
+    epee::log_space::get_set_log_detalisation_level(true, log_level);
     epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
     epee::log_space::log_singletone::add_logger(LOGGER_FILE, "plain_wallet.log", log_dir.c_str());
     LOG_PRINT_L0("Plain wallet initialized: " << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ", log location: " << log_dir + "/plain_wallet.log");
@@ -73,7 +73,13 @@ namespace plain_wallet
     //glogs_initialized = true;
   }
 
-  std::string init(const std::string& ip, const std::string& port)
+  std::string set_log_level(int log_level)
+  {
+    epee::log_space::get_set_log_detalisation_level(true, log_level);
+    return "{}";
+  }
+
+  std::string init(const std::string& ip, const std::string& port, int64_t log_level)
   {
     if (initialized)
     {
@@ -83,7 +89,7 @@ namespace plain_wallet
     }
       
 
-    initialize_logs();
+    initialize_logs(log_level);
     std::string argss_1 = std::string("--remote-node=") + ip + ":" + port;    
     char * args[3];
     args[0] = "stub";

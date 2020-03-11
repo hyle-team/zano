@@ -10,7 +10,8 @@
 namespace plain_wallet
 {
   typedef int64_t hwallet;
-  std::string init(const std::string& ip, const std::string& port);
+  std::string init(const std::string& ip, const std::string& port, int log_level);
+  std::string set_log_level(int log_level);
   std::string get_version();
   std::string get_wallet_files();
 
