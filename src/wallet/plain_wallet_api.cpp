@@ -121,9 +121,9 @@ namespace plain_wallet
       return GENERAL_INTERNAL_ERRROR_INIT;
     }
 
-    std::string app_config_folder = get_wallets_folder();
+    std::string wallets_folder = get_wallets_folder();
     boost::system::error_code ec;
-    boost::filesystem::create_directories(app_config_folder, ec);
+    boost::filesystem::create_directories(wallets_folder, ec);
 
     std::string app_config_folder = get_app_config_folder();
     boost::system::error_code ec;
