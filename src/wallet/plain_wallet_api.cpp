@@ -146,13 +146,13 @@ namespace plain_wallet
     if (!epee::file_io_utils::save_string_to_file(app_config_config_path, conf_str))
     {
       error_response err_result = AUTO_VAL_INIT(err_result);
-      err_result.error.code = ;
+      err_result.error.code = API_RETURN_CODE_NOT_FOUND;
       return epee::serialization::store_t_to_json(err_result);
     }
     else
     {
       epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-      ok_response.result.return_code = API_RETURN_CODE_NOT_FOUND;
+      ok_response.result.return_code = API_RETURN_CODE_OK;
       return epee::serialization::store_t_to_json(ok_response);
     }
 
