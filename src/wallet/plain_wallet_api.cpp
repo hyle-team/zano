@@ -79,7 +79,7 @@ namespace plain_wallet
     return "{}";
   }
 
-  std::string init(const std::string& ip, const std::string& port, int64_t log_level)
+  std::string init(const std::string& ip, const std::string& port, int log_level)
   {
     if (initialized)
     {
