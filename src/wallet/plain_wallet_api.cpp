@@ -126,7 +126,6 @@ namespace plain_wallet
     boost::filesystem::create_directories(wallets_folder, ec);
 
     std::string app_config_folder = get_app_config_folder();
-    boost::system::error_code ec;
     boost::filesystem::create_directories(app_config_folder, ec);
 
     initialized = true;

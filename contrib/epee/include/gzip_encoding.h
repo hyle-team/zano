@@ -29,6 +29,7 @@
 
 #ifndef _GZIP_ENCODING_H_
 #define _GZIP_ENCODING_H_
+#include "boost/core/ignore_unused.hpp"
 #include "net/http_client_base.h"
 #include "zlib/zlib.h"
 
