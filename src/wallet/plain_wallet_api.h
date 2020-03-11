@@ -15,6 +15,9 @@ namespace plain_wallet
   std::string get_version();
   std::string get_wallet_files();
 
+  std::string get_appconfig();
+  std::string set_appconfig(const std::string& conf_str);
+
   std::string open(const std::string& path, const std::string& password);
   std::string restore(const std::string& seed, const std::string& path, const std::string& password);
   std::string generate(const std::string& path, const std::string& password);

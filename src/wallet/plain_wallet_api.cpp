@@ -20,6 +20,8 @@
   #define HOME_FOLDER             ""
 #endif
 #define WALLETS_FOLDER_NAME     "wallets"
+#define APP_CONFIG_FOLDER       "app_config"
+#define APP_CONFIG_FILENAME     "app_cfg.json"
 
 #define GENERAL_INTERNAL_ERRROR_INSTANCE "GENERAL_INTERNAL_ERROR: WALLET INSTNACE NOT FOUND"
 #define GENERAL_INTERNAL_ERRROR_INIT "Failed to intialize library"
@@ -60,6 +62,18 @@ namespace plain_wallet
     return path;
 #endif // WIN32
   }
+
+  std::string get_app_config_folder()
+  {
+#ifdef WIN32
+    return "";
+#else
+    std::string path = get_bundle_root_dir() + "/" + HOME_FOLDER + "/" + APP_CONFIG_FOLDER + "/";
+    return path;
+#endif // WIN32
+  }
+
+  
 
   void initialize_logs(int log_level)
   {
@@ -107,13 +121,42 @@ namespace plain_wallet
       return GENERAL_INTERNAL_ERRROR_INIT;
     }
 
-    std::string wallet_folder = get_wallets_folder();
+    std::string app_config_folder = get_wallets_folder();
     boost::system::error_code ec;
-    boost::filesystem::create_directories(wallet_folder, ec);
+    boost::filesystem::create_directories(app_config_folder, ec);
+
+    std::string app_config_folder = get_app_config_folder();
+    boost::system::error_code ec;
+    boost::filesystem::create_directories(app_config_folder, ec);
+
     initialized = true;
     return API_RETURN_CODE_OK;
   }
 
+  std::string get_appconfig()
+  {
+    std::string res_str = "{}";
+    std::string app_config_config_path = get_app_config_folder() + APP_CONFIG_FILENAME;
+    epee::file_io_utils::load_file_to_string(app_config_config_path, res_str);
+    return res_str;
+  }
+  std::string set_appconfig(const std::string& conf_str)
+  {
+    std::string app_config_config_path = get_app_config_folder() + APP_CONFIG_FILENAME;
+    if (!epee::file_io_utils::save_string_to_file(app_config_config_path, conf_str))
+    {
+      error_response err_result = AUTO_VAL_INIT(err_result);
+      err_result.error.code = ;
+      return epee::serialization::store_t_to_json(err_result);
+    }
+    else
+    {
+      epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+      ok_response.result.return_code = API_RETURN_CODE_NOT_FOUND;
+      return epee::serialization::store_t_to_json(ok_response);
+    }
+
+  }
 
 
   std::string get_version()
