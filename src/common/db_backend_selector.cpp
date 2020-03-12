@@ -8,9 +8,8 @@
 #include "db_backend_lmdb.h"
 #include "db_backend_mdbx.h"
 
-
-#define LMDB_MAIN_FILE_NAME       "data.mdb"
-#define MDBX_MAIN_FILE_NAME       "mdbx.dat"
+#define LMDB_MAIN_FILE_NAME  "data.mdb"
+#define MDBX_MAIN_FILE_NAME  "mdbx.dat"
 
 namespace tools
 {
@@ -65,8 +64,18 @@ namespace db
   std::string db_backend_selector::get_db_folder_path() const
   {
     //CHECK_AND_ASSERT_THROW_MES(m_engine_type != db_none, "db_backend_selector was no inited");
-
     return m_config_folder + ("/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX) + get_engine_name() + CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX;
+  }
+
+  std::string db_backend_selector::get_temp_db_folder_path() const
+  {
+    //CHECK_AND_ASSERT_THROW_MES(m_engine_type != db_none, "db_backend_selector was no inited");
+    return get_temp_config_folder() + ("/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX) + get_engine_name() + CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX;
+  }
+
+  std::string db_backend_selector::get_pool_db_folder_path() const
+  {
+    return m_config_folder + ("/" CURRENCY_POOLDATA_FOLDERNAME_PREFIX) + get_engine_name() + CURRENCY_POOLDATA_FOLDERNAME_SUFFIX;
   }
 
   std::string db_backend_selector::get_db_main_file_name() const
@@ -110,6 +119,12 @@ namespace db
       return nullptr;
     }
   }
+
+  std::string db_backend_selector::get_temp_config_folder() const
+  {
+    return m_config_folder + "_TEMP";                                                                  
+  }
+
 
 
 

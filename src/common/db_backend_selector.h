@@ -26,7 +26,11 @@ namespace tools
       db_engine_type get_engine_type() const { return m_engine_type; }
       std::string get_engine_name() const;
       std::string get_config_folder() const { return m_config_folder; }
-      
+      std::string get_temp_config_folder() const;
+      std::string get_temp_db_folder_path() const;
+ 
+      std::string get_pool_db_folder_path() const;
+
       std::shared_ptr<tools::db::i_db_backend> create_backend();
 
     private:

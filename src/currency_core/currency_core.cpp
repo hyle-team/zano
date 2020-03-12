@@ -184,6 +184,34 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
+  bool core::handle_incoming_tx(const transaction& tx, tx_verification_context& tvc, bool kept_by_block, const crypto::hash& tx_hash_ /* = null_hash */)
+  {
+    TIME_MEASURE_START_MS(wait_lock_time);
+    CRITICAL_REGION_LOCAL(m_incoming_tx_lock);
+    TIME_MEASURE_FINISH_MS(wait_lock_time);
+
+    crypto::hash tx_hash = tx_hash_;
+    if (tx_hash == null_hash)
+      tx_hash = get_transaction_hash(tx);
+
+    TIME_MEASURE_START_MS(add_new_tx_time);
+    bool r = add_new_tx(tx, tx_hash, get_object_blobsize(tx), tvc, kept_by_block);
+    TIME_MEASURE_FINISH_MS(add_new_tx_time);
+
+    if(tvc.m_verification_failed)
+    {LOG_PRINT_RED_L0("Transaction verification failed: " << tx_hash);}
+    else if(tvc.m_verification_impossible)
+    {LOG_PRINT_RED_L0("Transaction verification impossible: " << tx_hash);}
+
+    if (tvc.m_added_to_pool)
+    {
+      LOG_PRINT_L2("incoming tx " << tx_hash << " was added to the pool");
+    }
+    LOG_PRINT_L2("[CORE HANDLE_INCOMING_TX1]: timing " << wait_lock_time
+      << "/" << add_new_tx_time);
+    return r;
+  }
+  //-----------------------------------------------------------------------------------------------
   bool core::handle_incoming_tx(const blobdata& tx_blob, tx_verification_context& tvc, bool kept_by_block)
   {
     CHECK_AND_ASSERT_MES(!kept_by_block, false, "Transaction associated with block came throw handle_incoming_tx!(not allowed anymore)");
@@ -212,7 +240,6 @@ namespace currency
     }
     TIME_MEASURE_FINISH_MS(parse_tx_time);
     
-
     TIME_MEASURE_START_MS(check_tx_semantic_time);
     if(!validate_tx_semantic(tx, tx_blob.size()))
     {
@@ -222,23 +249,10 @@ namespace currency
     }
     TIME_MEASURE_FINISH_MS(check_tx_semantic_time);
 
-    TIME_MEASURE_START_MS(add_new_tx_time);
-    bool r = add_new_tx(tx, tx_hash, get_object_blobsize(tx), tvc, kept_by_block);
-    TIME_MEASURE_FINISH_MS(add_new_tx_time);
-
-    if(tvc.m_verification_failed)
-    {LOG_PRINT_RED_L0("Transaction verification failed: " << tx_hash);}
-    else if(tvc.m_verification_impossible)
-    {LOG_PRINT_RED_L0("Transaction verification impossible: " << tx_hash);}
-
-    if (tvc.m_added_to_pool)
-    {
-      LOG_PRINT_L2("incoming tx " << tx_hash << " was added to the pool");
-    }
-    LOG_PRINT_L2("[CORE HANDLE_INCOMING_TX]: timing " << wait_lock_time
+    bool r = handle_incoming_tx(tx, tvc, kept_by_block, tx_hash);
+    LOG_PRINT_L2("[CORE HANDLE_INCOMING_TX2]: timing " << wait_lock_time
       << "/" << parse_tx_time
-      << "/" << check_tx_semantic_time
-      << "/" << add_new_tx_time);
+      << "/" << check_tx_semantic_time);
     return r;
   }
   //-----------------------------------------------------------------------------------------------

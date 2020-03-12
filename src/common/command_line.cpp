@@ -31,4 +31,10 @@ namespace command_line
   const arg_descriptor<bool>        arg_disable_stop_on_low_free_space   = { "disable-stop-on-low-free-space", "Do not stop the daemon if free space at data dir is critically low", false, true };
   const arg_descriptor<bool>        arg_enable_offers_service = { "enable-offers-service", "Enables marketplace feature", false, false};
   const arg_descriptor<std::string> arg_db_engine =             { "db-engine", "Specify database engine for storage. May be \"lmdb\"(default) or \"mdbx\"", ARG_DB_ENGINE_LMDB, false };
+
+  const arg_descriptor<bool>        arg_no_predownload       = { "no-predownload", "Do not pre-download blockchain database", };
+  const arg_descriptor<bool>        arg_explicit_predownload = { "explicit-predownload", "Pre-download blockchain database regardless of it's status", };
+  const arg_descriptor<bool>        arg_validate_predownload = { "validate-predownload", "Paranoid mode, re-validate each block from pre-downloaded database and rebuild own database", };
+  const arg_descriptor<std::string> arg_predownload_link     = { "predownload-link", "Override url for blockchain database pre-downloading", "", true };
+
 }

@@ -236,7 +236,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
     boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
   }
-  ;
+
   const std::string db_folder_path = dbbs.get_db_folder_path();
   LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
 

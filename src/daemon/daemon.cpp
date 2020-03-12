@@ -27,6 +27,7 @@ using namespace epee;
 #include "version.h"
 #include "currency_core/core_tools.h"
 #include "common/callstack_helper.h"
+#include "common/pre_download.h"
 
 #include <cstdlib>
 
@@ -147,6 +148,11 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_if_time_out_of_sync);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_on_low_free_space);
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_offers_service);
+
+  command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_explicit_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
 
 
   arg_market_disable.default_value = true;
@@ -275,6 +281,17 @@ int main(int argc, char* argv[])
   bool res = false;
   res = dbbs.init(vm);
   CHECK_AND_ASSERT_MES(res, EXIT_FAILURE, "db_backend_selector failed to initialize");
+
+  //do pre_download if needed
+  if (!command_line::has_arg(vm, command_line::arg_no_predownload) || command_line::has_arg(vm, command_line::arg_explicit_predownload))
+  {
+    tools::process_predownload(vm, [&](uint64_t total_bytes, uint64_t received_bytes){
+      return static_cast<nodetool::i_p2p_endpoint<currency::t_currency_protocol_handler<currency::core>::connection_context> *>(&p2psrv)->is_stop_signal_sent();
+    }, dbbs);
+    if (static_cast<nodetool::i_p2p_endpoint<currency::t_currency_protocol_handler<currency::core>::connection_context>*>(&p2psrv)->is_stop_signal_sent())
+      return 1;
+  }
+
 
   //initialize objects
   LOG_PRINT_L0("Initializing p2p server...");
