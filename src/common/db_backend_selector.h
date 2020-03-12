@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include "db_backend_base.h"
 
 namespace tools
