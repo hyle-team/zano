@@ -152,7 +152,6 @@ void blockchain_storage::init_options(boost::program_options::options_descriptio
 {
   command_line::add_arg(desc, arg_db_cache_l1);
   command_line::add_arg(desc, arg_db_cache_l2);
-  command_line::add_arg(desc, command_line::arg_db_engine);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_block_h_older_then(uint64_t timestamp) const 
@@ -203,14 +202,16 @@ bool blockchain_storage::validate_instance(const std::string& path)
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
+bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm, tools::db::db_backend_selector& dbbs)
 {
 //  CRITICAL_REGION_LOCAL(m_read_lock);
-  if (!select_db_engine_from_arg(vm, m_db))
+  auto p_backend = dbbs.create_backend();
+  if (!p_backend)
   {
-    LOG_PRINT_RED_L0("Failed to select db engine");
+    LOG_PRINT_RED_L0("Failed to create db engine");
     return false;
   }
+  m_db.reset_backend(p_backend);
   LOG_PRINT_L0("DB ENGINE USED BY CORE: " << m_db.get_backend()->name());
   
   if (!validate_instance(config_folder))
@@ -236,7 +237,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
   }
   ;
-  const std::string db_folder_path = m_config_folder + ("/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX) + m_db.get_backend()->name() + CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX;
+  const std::string db_folder_path = dbbs.get_db_folder_path();
   LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
 
   bool db_opened_okay = false;

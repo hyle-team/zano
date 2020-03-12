@@ -27,6 +27,7 @@ using namespace epee;
 #include "crypto/hash.h"
 #include "common/boost_serialization_helper.h"
 #include "currency_protocol/currency_protocol_handler_common.h"
+#include "common/db_backend_selector.h"
 
 namespace currency
 {
@@ -116,7 +117,7 @@ namespace currency
     void clear();
 
     // load/store operations
-    bool init(const std::string& config_folder, const boost::program_options::variables_map& vm);
+    bool init(const std::string& config_folder, const boost::program_options::variables_map& vm, tools::db::db_backend_selector& dbbs);
     bool deinit();
     bool fill_block_template(block &bl, bool pos, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, size_t &total_size, uint64_t &fee, uint64_t height, const std::list<transaction>& explicit_txs);
     bool get_transactions(std::list<transaction>& txs) const;

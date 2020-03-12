@@ -1161,13 +1161,15 @@ namespace currency
     m_db.commit_transaction();
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
+  bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm, tools::db::db_backend_selector& dbbs)
   {
-    if (!select_db_engine_from_arg(vm, m_db))
+    auto p_backend = dbbs.create_backend();
+    if (!p_backend)
     {
-      LOG_PRINT_RED_L0("Failed to select db engine");
+      LOG_PRINT_RED_L0("Failed to create db engine");
       return false;
     }
+    m_db.reset_backend(p_backend);
     LOG_PRINT_L0("DB ENGINE USED BY POOL: " << m_db.get_backend()->name());
 
     m_config_folder = config_folder;

@@ -177,8 +177,8 @@ namespace currency
     ~blockchain_storage();
 
 
-    bool init(const boost::program_options::variables_map& vm) { return init(tools::get_default_data_dir(), vm); }
-    bool init(const std::string& config_folder, const boost::program_options::variables_map& vm);
+    bool init(const boost::program_options::variables_map& vm, tools::db::db_backend_selector& dbbs) { return init(tools::get_default_data_dir(), vm, dbbs); }
+    bool init(const std::string& config_folder, const boost::program_options::variables_map& vm, tools::db::db_backend_selector& dbbs);
     bool deinit();
     static void init_options(boost::program_options::options_description& desc);
 

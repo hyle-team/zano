@@ -149,6 +149,7 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
   currency::miner::init_options(desc_cmd_sett);
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
+  tools::db::db_backend_selector::init_options(desc_cmd_sett);
 #endif
 
   po::options_description desc_options("Allowed options");
@@ -312,12 +313,15 @@ bool wallets_manager::init_local_daemon()
   dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_loading_core;
   m_pview->update_daemon_status(dsi);
 
+  tools::db::db_backend_selector dbbs;
+  bool res = dbbs.init(m_vm);
+  CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize db_backend_selector");
 
   //initialize core here
   LOG_PRINT_L0("Initializing core...");
   //dsi.text_state = "Initializing core";
   m_pview->update_daemon_status(dsi);
-  bool res = m_ccore.init(m_vm);
+  res = m_ccore.init(m_vm, dbbs);
   CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize core");
   LOG_PRINT_L0("Core initialized OK");
 

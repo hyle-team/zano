@@ -159,7 +159,7 @@ int main(int argc, char* argv[])
   currency::miner::init_options(desc_cmd_sett);
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
   currency::stratum_server::init_options(desc_cmd_sett);
-
+  tools::db::db_backend_selector::init_options(desc_cmd_sett);
 
   po::options_description desc_options("Allowed options");
   desc_options.add(desc_cmd_only).add(desc_cmd_sett);
@@ -240,6 +240,8 @@ int main(int argc, char* argv[])
     command_line::get_arg(vm, command_line::arg_disable_stop_on_low_free_space));
   ccore.set_critical_error_handler(&cceh);
 
+  tools::db::db_backend_selector dbbs;
+
 
   if (command_line::get_arg(vm, command_line::arg_enable_offers_service))
   {
@@ -270,8 +272,10 @@ int main(int argc, char* argv[])
     LOG_PRINT_L0(generate_reference << ENDL << "----------------------------------------" << ENDL << json_rpc_reference);
   }
 
-
   bool res = false;
+  res = dbbs.init(vm);
+  CHECK_AND_ASSERT_MES(res, EXIT_FAILURE, "db_backend_selector failed to initialize");
+
   //initialize objects
   LOG_PRINT_L0("Initializing p2p server...");
   res = p2psrv.init(vm);
@@ -298,7 +302,7 @@ int main(int argc, char* argv[])
 
   //initialize core here
   LOG_PRINT_L0("Initializing core...");
-  res = ccore.init(vm);
+  res = ccore.init(vm, dbbs);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
   LOG_PRINT_L0("Core initialized OK");
 

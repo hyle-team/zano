@@ -136,17 +136,17 @@ namespace currency
     return m_blockchain_storage.get_alternative_blocks_count();
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::init(const boost::program_options::variables_map& vm)
+  bool core::init(const boost::program_options::variables_map& vm, tools::db::db_backend_selector& dbbs)
   {
     bool r = handle_command_line(vm);
 
     uint64_t available_space = 0;
     CHECK_AND_ASSERT_MES(!check_if_free_space_critically_low(&available_space), false, "free space in data folder is critically low: " << std::fixed << available_space / (1024 * 1024) << " MB");
 
-    r = m_mempool.init(m_config_folder, vm);
+    r = m_mempool.init(m_config_folder, vm, dbbs);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize memory pool");
 
-    r = m_blockchain_storage.init(m_config_folder, vm);
+    r = m_blockchain_storage.init(m_config_folder, vm, dbbs);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize blockchain storage");
 
     r = m_miner.init(vm);
