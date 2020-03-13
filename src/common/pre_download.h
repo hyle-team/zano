@@ -80,7 +80,7 @@ namespace tools
     };
 
     tools::create_directories_if_necessary(working_folder);
-    bool r = cl.download_and_unzip(cb, downloading_file_path, url, 1000 /* timout */);
+    bool r = cl.download_and_unzip(cb, downloading_file_path, url, 1000 /* timout */, "GET", std::string(), 3 /* fails count */);
     if (!r)
     {
       LOG_PRINT_RED("Download failed", LOG_LEVEL_0);
@@ -211,6 +211,12 @@ namespace tools
     LOG_PRINT_GREEN("Processing finished, " << total_blocks << " successfully added.", LOG_LEVEL_0);
     target_core.deinit();
     source_core.deinit();
+
+    boost::filesystem::remove_all(path_to_temp_datafolder, ec);
+    if (ec)
+    {
+      LOG_ERROR("Failed to remove all from " << path_to_temp_datafolder);
+    }
 
     return true;
   }
