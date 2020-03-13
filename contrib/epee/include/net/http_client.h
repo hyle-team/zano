@@ -930,7 +930,14 @@ using namespace std;
       bool invoke_cb(callback_t cb, const std::string& url, uint64_t timeout, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
       {
         m_pcb.reset(new idle_handler<callback_t>(cb));
-        return invoke_request(url, *this, timeout, nullptr, method, body, additional_params);
+        const http_response_info* p_hri = nullptr;
+        bool r = invoke_request(url, *this, timeout, &p_hri, method, body, additional_params);
+        if (p_hri && p_hri->m_response_code != 200)
+        {
+          LOG_PRINT_L0("HTTP request to " << url << " failed with code: " << p_hri->m_response_code);
+          return false;
+        }
+        return r;
       }
 
       template<typename callback_t>
@@ -988,7 +995,7 @@ using namespace std;
         uint64_t current_err_count = 0;
         bool r = false;
 
-        while (!r || current_err_count > fails_count)
+        while (!r && current_err_count < fails_count)
         {
           LOG_PRINT_L0("Attempt to invoke http: " << url << " (offset:" << state_received_bytes_base << ")");
           fields_list additional_params_local = additional_params;
