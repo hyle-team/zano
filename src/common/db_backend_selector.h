@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <boost/program_options.hpp>
 #include "misc_language.h"
 #include "db_backend_base.h"
 
