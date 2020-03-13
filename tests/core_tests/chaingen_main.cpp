@@ -574,11 +574,13 @@ inline bool do_replay_events(const std::vector<test_event_entry>& events, t_test
   }
 
   bool r = false;
+  tools::db::db_backend_selector dbbs;
+  dbbs.init(g_vm);
   currency::core c(nullptr);
   test_protocol_handler protocol_handler(c, core_listener.get());
   protocol_handler.init(g_vm);
   c.set_currency_protocol(&protocol_handler);
-  if (!c.init(g_vm))
+  if (!c.init(g_vm, dbbs))
   {
     std::cout << concolor::magenta << "Failed to init core" << concolor::normal << std::endl;
     return false;
@@ -666,6 +668,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   currency::core::init_options(desc_options);
+  tools::db::db_backend_selector::init_options(desc_options);
 
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {
