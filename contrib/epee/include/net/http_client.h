@@ -932,7 +932,7 @@ using namespace std;
         m_pcb.reset(new idle_handler<callback_t>(cb));
         const http_response_info* p_hri = nullptr;
         bool r = invoke_request(url, *this, timeout, &p_hri, method, body, additional_params);
-        if (p_hri && p_hri->m_response_code != 200)
+        if (p_hri && !(p_hri->m_response_code >= 200 && p_hri->m_response_code < 300))
         {
           LOG_PRINT_L0("HTTP request to " << url << " failed with code: " << p_hri->m_response_code);
           return false;
