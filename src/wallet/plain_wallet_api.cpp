@@ -99,7 +99,10 @@ namespace plain_wallet
     {
       LOG_ERROR("Double-initialization in plain_wallet detected.");
       //throw std::runtime_error("Double-initialization in plain_wallet detected.");
-      return "Already initialized!";
+      error_response err_result = AUTO_VAL_INIT(err_result);
+      err_result.error.code = API_RETURN_CODE_INTERNAL_ERROR;
+      err_result.error.message = LOCATION_STR + "\nmessage: Already initialized";
+      return epee::serialization::store_t_to_json(err_result);
     }
       
 
@@ -124,12 +127,28 @@ namespace plain_wallet
     std::string wallets_folder = get_wallets_folder();
     boost::system::error_code ec;
     boost::filesystem::create_directories(wallets_folder, ec);
+    if (ec)
+    {
+      error_response err_result = AUTO_VAL_INIT(err_result);
+      err_result.error.code = API_RETURN_CODE_INTERNAL_ERROR;
+      err_result.error.message = LOCATION_STR + " \nmessage:" + ec.message();
+      return epee::serialization::store_t_to_json(err_result);
+    }
 
     std::string app_config_folder = get_app_config_folder();
     boost::filesystem::create_directories(app_config_folder, ec);
+    if (ec)
+    {
+      error_response err_result = AUTO_VAL_INIT(err_result);
+      err_result.error.code = API_RETURN_CODE_INTERNAL_ERROR;
+      err_result.error.message = LOCATION_STR + " \nmessage:" + ec.message();
+      return epee::serialization::store_t_to_json(err_result);
+    }
 
     initialized = true;
-    return API_RETURN_CODE_OK;
+    epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+    ok_response.result.return_code = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(ok_response);
   }
 
   std::string get_appconfig()
