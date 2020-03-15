@@ -1338,7 +1338,7 @@ namespace log_space
     static std::string copy_logs_to_buffer()
     {
       logger* plogger = get_or_create_instance();
-      if (!plogger) return false;
+      if (!plogger) return "";
       return plogger->copy_logs_to_buffer();
     }
 
