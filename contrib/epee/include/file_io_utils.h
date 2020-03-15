@@ -48,7 +48,6 @@
 #endif
 
 #ifndef  WIN32
-#include <psapi.h>
 #include <sys/file.h>
 #endif
 
