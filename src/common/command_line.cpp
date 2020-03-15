@@ -12,7 +12,7 @@ namespace command_line
 {
   const arg_descriptor<bool>		arg_help = {"help", "Produce help message"};
   const arg_descriptor<bool>		arg_version = {"version", "Output version information"};
-  const arg_descriptor<std::string> arg_data_dir = {"data-dir", "Specify data directory"};
+  const arg_descriptor<std::string> arg_data_dir = {"data-dir", "Specify data directory", ""};
 
   const arg_descriptor<std::string> arg_config_file =  { "config-file", "Specify configuration file", std::string(CURRENCY_NAME_SHORT ".conf") };
   const arg_descriptor<bool>        arg_os_version =   { "os-version", "" };

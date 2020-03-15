@@ -67,6 +67,9 @@ const command_line::arg_descriptor<bool> arg_enable_gui_debug_mode = { "gui-debu
 const command_line::arg_descriptor<uint32_t> arg_qt_remote_debugging_port = { "remote-debugging-port", "Specify port for Qt remote debugging", 30333, true };
 const command_line::arg_descriptor<std::string> arg_remote_node = { "remote-node", "Switch GUI to work with remote node instead of local daemon", "",  true };
 const command_line::arg_descriptor<bool> arg_enable_qt_logs = { "enable-qt-logs", "Forward Qt log messages into main log", false,  true };
+const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
+//const command_line::arg_descriptor<bool> arg_disable_logs_init = { "disable-logs-init", "Disable log initialization in GUI" };
+
 
 void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 {
@@ -99,10 +102,6 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   dsi.pos_difficulty = dsi.pow_difficulty = "---";
   m_pview->update_daemon_status(dsi);
-
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
-  log_space::get_set_need_thread_id(true, true);
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
@@ -142,6 +141,8 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, arg_qt_remote_debugging_port);
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
   command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
+  command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
+  
 
 #ifndef MOBILE_WALLET_BUILD
   currency::core::init_options(desc_cmd_sett);
@@ -228,10 +229,6 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
     path_to_html = command_line::get_arg(m_vm, arg_html_folder);
   }
 
-  log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
-  LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
-  LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
-
   if (command_line::has_arg(m_vm, arg_remote_node))
   {
     m_remote_node_mode = true;
@@ -240,6 +237,13 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
     proxy_ptr->set_connectivity(HTTP_PROXY_TIMEOUT,  HTTP_PROXY_ATTEMPTS_COUNT);
     m_rpc_proxy.reset(proxy_ptr);    
     m_rpc_proxy->set_connection_addr(command_line::get_arg(m_vm, arg_remote_node));
+  }
+
+  if(!command_line::has_arg(m_vm, arg_disable_logs_init))
+  {
+    log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
+    LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
+    LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
   }
 
   m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);

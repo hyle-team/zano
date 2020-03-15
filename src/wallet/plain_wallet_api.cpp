@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 
+#include <boost/dll.hpp>
 #include "plain_wallet_api.h"
 #include "plain_wallet_api_impl.h"
 #include "currency_core/currency_config.h"
@@ -17,7 +18,7 @@
 #elif ANDROID_BUILD
   #define HOME_FOLDER             "files"
 #else 
-  #define HOME_FOLDER             ""
+  #define HOME_FOLDER             "logs"
 #endif
 #define WALLETS_FOLDER_NAME     "wallets"
 #define APP_CONFIG_FOLDER       "app_config"
@@ -41,7 +42,7 @@ namespace plain_wallet
   std::string get_bundle_root_dir()
   {
 #ifdef WIN32
-    return "";
+    return boost::dll::program_location().parent_path().string();
 #elif IOS_BUILD
     char* env = getenv("HOME");
     return env ? env : "";
@@ -79,6 +80,9 @@ namespace plain_wallet
   {
     std::string log_dir = get_bundle_root_dir();
     log_dir += "/" HOME_FOLDER;
+
+    log_space::get_set_need_thread_id(true, true);
+    log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
     epee::log_space::get_set_log_detalisation_level(true, log_level);
     epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
     epee::log_space::log_singletone::add_logger(LOGGER_FILE, "plain_wallet.log", log_dir.c_str());
@@ -108,11 +112,13 @@ namespace plain_wallet
 
     initialize_logs(log_level);
     std::string argss_1 = std::string("--remote-node=") + ip + ":" + port;    
-    char * args[3];
+    std::string argss_2 = std::string("--disable-logs-init");
+    char * args[4];
     args[0] = "stub";
     args[1] = const_cast<char*>(argss_1.c_str());
-    args[2] = nullptr;
-    if (!gwm.init(2, args, nullptr))
+    args[2] = const_cast<char*>(argss_2.c_str());
+    args[3] = nullptr;
+    if (!gwm.init(3, args, nullptr))
     {
       LOG_ERROR("Failed to init wallets_manager");
       return GENERAL_INTERNAL_ERRROR_INIT;
@@ -174,6 +180,19 @@ namespace plain_wallet
       return epee::serialization::store_t_to_json(ok_response);
     }
 
+  }
+
+  std::string get_logs_buffer()
+  {
+    return epee::log_space::log_singletone::copy_logs_to_buffer();
+  }
+
+  std::string truncate_log()
+  {
+    epee::log_space::log_singletone::truncate_log_files();
+    epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+    ok_response.result.return_code = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(ok_response);
   }
 
 
