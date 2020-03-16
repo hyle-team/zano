@@ -126,6 +126,7 @@ namespace tools
     // paranoid mode
     // move downloaded blockchain into a temporary folder
     //
+    LOG_PRINT_MAGENTA(ENDL << "Downloaded blockchain database is about to be validated and added to the local database block-by-block" << ENDL, LOG_LEVEL_0);
     std::string path_to_temp_datafolder = dbbs.get_temp_config_folder();
     std::string path_to_temp_blockchain = dbbs.get_temp_db_folder_path();
     std::string path_to_temp_blockchain_file = path_to_temp_blockchain + "/" + dbbs.get_db_main_file_name();

@@ -502,7 +502,7 @@ void wallets_manager::main_worker(const po::variables_map& m_vm)
   }
 
   m_pview->on_backend_stopped();
-  CATCH_ENTRY_L0("daemon_backend::main_worker", void());
+  CATCH_ENTRY_L0("wallets_manager::main_worker", void());
 }
 
 bool wallets_manager::update_state_info()
