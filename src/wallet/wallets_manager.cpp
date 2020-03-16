@@ -15,6 +15,7 @@
 #include "wallet_helpers.h"
 #include "core_default_rpc_proxy.h"
 #include "common/db_backend_selector.h"
+#include "common/pre_download.h"
 
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   CRITICAL_REGION_LOCAL(m_wallets_lock);    \
@@ -143,6 +144,10 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
   command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
   command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_explicit_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   
 
 #ifndef MOBILE_WALLET_BUILD
@@ -318,15 +323,44 @@ bool wallets_manager::init_local_daemon()
   dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_loading_core;
   m_pview->update_daemon_status(dsi);
 
-  //tools::db::db_backend_selector dbbs;
-  //bool res = dbbs.init(m_vm);
-  //CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize db_backend_selector");
+  // pre-downloading handling
+  tools::db::db_backend_selector dbbs;
+  bool res = dbbs.init(m_vm);
+  CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize db_backend_selector");
+  if (!command_line::has_arg(m_vm, command_line::arg_no_predownload) || command_line::has_arg(m_vm, command_line::arg_explicit_predownload))
+  {
+    auto last_update = std::chrono::system_clock::now();
+    bool r = tools::process_predownload(m_vm, [&](uint64_t total_bytes, uint64_t received_bytes){
+      auto dif = std::chrono::system_clock::now() - last_update;
+      if (dif >  std::chrono::milliseconds(300))
+      {
+        dsi.synchronization_start_height = 0;
+        dsi.max_net_seen_height = total_bytes;
+        dsi.height = received_bytes;
+        dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
+        //dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_downloading_database;
+        m_pview->update_daemon_status(dsi);
+        last_update = std::chrono::system_clock::now();
+      }
+
+      return static_cast<bool>(m_stop_singal_sent);
+    });
+    /*if (m_stop_singal_sent)
+    {
+      dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_deintializing;
+      m_pview->update_daemon_status(dsi);
+    }*/
+  }
+
+
+
 
   //initialize core here
   LOG_PRINT_L0("Initializing core...");
+  dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_loading_core;
   //dsi.text_state = "Initializing core";
   m_pview->update_daemon_status(dsi);
-  bool res = m_ccore.init(m_vm);
+  res = m_ccore.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize core");
   LOG_PRINT_L0("Core initialized OK");
 

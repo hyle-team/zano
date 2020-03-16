@@ -616,7 +616,8 @@ namespace currency
       daemon_network_state_online = 2,
       daemon_network_state_loading_core = 3,
       daemon_network_state_internal_error = 4,
-      daemon_network_state_unloading_core = 5
+      daemon_network_state_unloading_core = 5,
+      daemon_network_state_downloading_database = 6
     };
 
     struct response
