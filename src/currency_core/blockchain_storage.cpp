@@ -202,9 +202,12 @@ bool blockchain_storage::validate_instance(const std::string& path)
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm, tools::db::db_backend_selector& dbbs)
+bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
 {
 //  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  tools::db::db_backend_selector dbbs;
+  dbbs.init(vm);
   auto p_backend = dbbs.create_backend();
   if (!p_backend)
   {

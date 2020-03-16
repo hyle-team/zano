@@ -20,7 +20,6 @@
 #include "currency_core/currency_stat_info.h"
 #include "warnings.h"
 #include "crypto/hash.h"
-#include "common/db_backend_selector.h"
 
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4355)
@@ -60,7 +59,7 @@ namespace currency
 
      miner& get_miner(){ return m_miner; }
      static void init_options(boost::program_options::options_description& desc);
-     bool init(const boost::program_options::variables_map& vm, tools::db::db_backend_selector& dbbs);
+     bool init(const boost::program_options::variables_map& vm);
      bool set_genesis_block(const block& b);
      bool deinit();
      uint64_t get_current_blockchain_size() const;

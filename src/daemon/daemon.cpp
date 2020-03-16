@@ -246,8 +246,6 @@ int main(int argc, char* argv[])
     command_line::get_arg(vm, command_line::arg_disable_stop_on_low_free_space));
   ccore.set_critical_error_handler(&cceh);
 
-  tools::db::db_backend_selector dbbs;
-
 
   if (command_line::get_arg(vm, command_line::arg_enable_offers_service))
   {
@@ -279,16 +277,20 @@ int main(int argc, char* argv[])
   }
 
   bool res = false;
-  res = dbbs.init(vm);
-  CHECK_AND_ASSERT_MES(res, EXIT_FAILURE, "db_backend_selector failed to initialize");
 
   //do pre_download if needed
   if (!command_line::has_arg(vm, command_line::arg_no_predownload) || command_line::has_arg(vm, command_line::arg_explicit_predownload))
   {
-    tools::process_predownload(vm, [&](uint64_t total_bytes, uint64_t received_bytes){
-      return static_cast<nodetool::i_p2p_endpoint<currency::t_currency_protocol_handler<currency::core>::connection_context> *>(&p2psrv)->is_stop_signal_sent();
-    }, dbbs);
-    if (static_cast<nodetool::i_p2p_endpoint<currency::t_currency_protocol_handler<currency::core>::connection_context>*>(&p2psrv)->is_stop_signal_sent())
+    auto is_stop_signal_sent = [&p2psrv]() -> bool {
+      return static_cast<nodetool::i_p2p_endpoint<currency::t_currency_protocol_handler<currency::core>::connection_context>*>(&p2psrv)->is_stop_signal_sent();
+    };
+
+    if (!tools::process_predownload(vm, [&](uint64_t total_bytes, uint64_t received_bytes) { return is_stop_signal_sent(); }))
+    {
+      return EXIT_FAILURE;
+    }
+    
+    if (is_stop_signal_sent())
       return 1;
   }
 
@@ -319,7 +321,7 @@ int main(int argc, char* argv[])
 
   //initialize core here
   LOG_PRINT_L0("Initializing core...");
-  res = ccore.init(vm, dbbs);
+  res = ccore.init(vm);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
   LOG_PRINT_L0("Core initialized OK");
 

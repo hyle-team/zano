@@ -20,6 +20,7 @@
 #include "warnings.h"
 #include "crypto/hash.h"
 #include "profile_tools.h"
+#include "common/db_backend_selector.h"
 
 DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated name length exceeded, name was truncated
 
@@ -1161,8 +1162,10 @@ namespace currency
     m_db.commit_transaction();
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm, tools::db::db_backend_selector& dbbs)
+  bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
   {
+    tools::db::db_backend_selector dbbs;
+    dbbs.init(vm);
     auto p_backend = dbbs.create_backend();
     if (!p_backend)
     {
@@ -1185,7 +1188,7 @@ namespace currency
       boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
     }
 
-    const std::string db_folder_path = m_config_folder + ("/" CURRENCY_POOLDATA_FOLDERNAME_PREFIX) + m_db.get_backend()->name() + CURRENCY_POOLDATA_FOLDERNAME_SUFFIX;
+    const std::string db_folder_path = dbbs.get_pool_db_folder_path();
     
     LOG_PRINT_L0("Loading blockchain from " << db_folder_path << "...");
 

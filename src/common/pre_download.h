@@ -28,8 +28,12 @@ namespace tools
 #endif
 
   template<class callback_t>
-  bool process_predownload(const boost::program_options::variables_map& vm, callback_t cb_should_stop, db::db_backend_selector& dbbs)
+  bool process_predownload(const boost::program_options::variables_map& vm, callback_t cb_should_stop)
   {
+    tools::db::db_backend_selector dbbs;
+    bool r = dbbs.init(vm);
+    CHECK_AND_ASSERT_MES(r, false, "db_backend_selector failed to initialize");
+
     std::string config_folder = dbbs.get_config_folder();
     std::string working_folder = dbbs.get_db_folder_path();
     std::string db_main_file_path = working_folder + "/" + dbbs.get_db_main_file_name();
@@ -80,7 +84,7 @@ namespace tools
     };
 
     tools::create_directories_if_necessary(working_folder);
-    bool r = cl.download_and_unzip(cb, downloading_file_path, url, 1000 /* timout */, "GET", std::string(), 3 /* fails count */);
+    r = cl.download_and_unzip(cb, downloading_file_path, url, 1000 /* timout */, "GET", std::string(), 3 /* fails count */);
     if (!r)
     {
       LOG_PRINT_RED("Download failed", LOG_LEVEL_0);
@@ -157,11 +161,7 @@ namespace tools
     source_core_vm.insert(std::make_pair("db-engine", boost::program_options::variable_value(dbbs.get_engine_name(), false)));
     //source_core_vm.insert(std::make_pair("db-sync-mode", boost::program_options::variable_value(std::string("fast"), false)));
 
-    db::db_backend_selector source_core_dbbs;
-    r = source_core_dbbs.init(source_core_vm);
-    CHECK_AND_ASSERT_MES(r, false, "failed to init source_core_dbbs");
-
-    r = source_core.init(source_core_vm, source_core_dbbs);
+    r = source_core.init(source_core_vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to init source core");
 
     // target core
@@ -170,11 +170,7 @@ namespace tools
     target_core_vm.insert(std::make_pair("db-engine", boost::program_options::variable_value(dbbs.get_engine_name(), false)));
     //vm_with_fast_sync.insert(std::make_pair("db-sync-mode", boost::program_options::variable_value(std::string("fast"), false)));
 
-    db::db_backend_selector target_core_dbbs;
-    r = target_core_dbbs.init(target_core_vm);
-    CHECK_AND_ASSERT_MES(r, false, "failed to init target_core_dbbs");
-
-    r = target_core.init(target_core_vm, target_core_dbbs);
+    r = target_core.init(target_core_vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to init target core");
 
     CHECK_AND_ASSERT_MES(target_core.get_top_block_height() == 0, false, "Target blockchain initialized not empty");

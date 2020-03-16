@@ -14,6 +14,7 @@
 #include "string_coding.h"
 #include "wallet_helpers.h"
 #include "core_default_rpc_proxy.h"
+#include "common/db_backend_selector.h"
 
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   CRITICAL_REGION_LOCAL(m_wallets_lock);    \
@@ -317,15 +318,15 @@ bool wallets_manager::init_local_daemon()
   dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_loading_core;
   m_pview->update_daemon_status(dsi);
 
-  tools::db::db_backend_selector dbbs;
-  bool res = dbbs.init(m_vm);
-  CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize db_backend_selector");
+  //tools::db::db_backend_selector dbbs;
+  //bool res = dbbs.init(m_vm);
+  //CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize db_backend_selector");
 
   //initialize core here
   LOG_PRINT_L0("Initializing core...");
   //dsi.text_state = "Initializing core";
   m_pview->update_daemon_status(dsi);
-  res = m_ccore.init(m_vm, dbbs);
+  bool res = m_ccore.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize core");
   LOG_PRINT_L0("Core initialized OK");
 
