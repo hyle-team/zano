@@ -13,6 +13,7 @@
 #include "currency_core/bc_offers_service.h"
 #include "random_helper.h"
 #include "core_state_helper.h"
+#include "common/db_backend_selector.h"
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
@@ -574,13 +575,11 @@ inline bool do_replay_events(const std::vector<test_event_entry>& events, t_test
   }
 
   bool r = false;
-  tools::db::db_backend_selector dbbs;
-  dbbs.init(g_vm);
   currency::core c(nullptr);
   test_protocol_handler protocol_handler(c, core_listener.get());
   protocol_handler.init(g_vm);
   c.set_currency_protocol(&protocol_handler);
-  if (!c.init(g_vm, dbbs))
+  if (!c.init(g_vm))
   {
     std::cout << concolor::magenta << "Failed to init core" << concolor::normal << std::endl;
     return false;
