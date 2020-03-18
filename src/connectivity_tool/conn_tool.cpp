@@ -1142,7 +1142,9 @@ bool process_archive(archive_processor_t& arch_processor, bool is_packing, std::
     if (is_packing)
       hash_stream.update(buff.data(), buff.size());
 
-    arch_processor.update_in(buff, writer_cb);
+    bool r = arch_processor.update_in(buff, writer_cb);
+    CHECK_AND_ASSERT_MES(r, false, "arch_processor.update_in failed");
+
 
     remaining -= read_sz;
     std::cout << "Progress: " << ((sz - remaining) * 100) / sz << "%\r";
