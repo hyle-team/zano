@@ -113,9 +113,9 @@ namespace net_utils
         m_zstream_in.next_out = (Bytef*)current_decode_buff.data();
         m_zstream_in.avail_out = (uInt)ungzip_size;
 
-        int flag = Z_SYNC_FLUSH;
+        int flag = Z_NO_FLUSH;
         int ret = inflate(&m_zstream_in, flag);
-        CHECK_AND_ASSERT_MES(ret>=0 || m_zstream_in.avail_out ||m_is_deflate_mode, false, "content_encoding_gzip::update_in() Failed to inflate. err = " << ret);
+        CHECK_AND_ASSERT_MES(ret>=0 || m_zstream_in.avail_out ||m_is_deflate_mode, false, "content_encoding_gzip::update_in() Failed to inflate. ret = " << ret << ", msg: " << (m_zstream_in.msg ? m_zstream_in.msg : ""));
 
         if(Z_STREAM_END == ret)
           m_is_stream_ended = true;
