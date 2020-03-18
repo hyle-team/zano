@@ -145,7 +145,7 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
   command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
   command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_explicit_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   
@@ -327,7 +327,7 @@ bool wallets_manager::init_local_daemon()
   tools::db::db_backend_selector dbbs;
   bool res = dbbs.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize db_backend_selector");
-  if (!command_line::has_arg(m_vm, command_line::arg_no_predownload) || command_line::has_arg(m_vm, command_line::arg_explicit_predownload))
+  if (!command_line::has_arg(m_vm, command_line::arg_no_predownload) || command_line::has_arg(m_vm, command_line::arg_force_predownload))
   {
     auto last_update = std::chrono::system_clock::now();
     bool r = tools::process_predownload(m_vm, [&](uint64_t total_bytes, uint64_t received_bytes){

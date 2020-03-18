@@ -27,6 +27,8 @@ namespace tools
   static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.43.225/pre-download/zano_testnet_mdbx_94_99000.pak", "017598ebbbedd45c65870b290387ab1ca5bdd813f0384739422ed4bf16f21ef8", 166013858, 268431360 };
 #endif
 
+  static constexpr uint64_t pre_download_min_size_difference = 512 * 1024 * 1024; // minimum difference in size between local DB and the downloadable one to start downloading
+
   template<class callback_t>
   bool process_predownload(const boost::program_options::variables_map& vm, callback_t cb_should_stop)
   {
@@ -47,7 +49,7 @@ namespace tools
 
     boost::system::error_code ec;
     uint64_t sz = boost::filesystem::file_size(db_main_file_path, ec);
-    if (!(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > 500000000) || command_line::has_arg(vm, command_line::arg_explicit_predownload)) )
+    if (!(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > pre_download_min_size_difference) || command_line::has_arg(vm, command_line::arg_force_predownload)) )
     {
       LOG_PRINT_MAGENTA("Pre-downloading not needed (db file size = " << sz << ")", LOG_LEVEL_0);
       return true;
@@ -57,7 +59,7 @@ namespace tools
 
     std::string downloading_file_path = db_main_file_path + ".download";
 
-    LOG_PRINT_MAGENTA("Trying to download blockchain database file from " << url << " ...", LOG_LEVEL_0);
+    LOG_PRINT_MAGENTA("Trying to download blockchain database from " << url << " ...", LOG_LEVEL_0);
     epee::net_utils::http::interruptible_http_client cl;
 
     crypto::stream_cn_hash hash_stream;

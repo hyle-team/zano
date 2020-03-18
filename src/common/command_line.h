@@ -212,7 +212,7 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_enable_offers_service;
   extern const arg_descriptor<std::string> arg_db_engine;
   extern const arg_descriptor<bool>        arg_no_predownload;
-  extern const arg_descriptor<bool>        arg_explicit_predownload;
+  extern const arg_descriptor<bool>        arg_force_predownload;
   extern const arg_descriptor<bool>        arg_validate_predownload;
   extern const arg_descriptor<std::string> arg_predownload_link;
 }
