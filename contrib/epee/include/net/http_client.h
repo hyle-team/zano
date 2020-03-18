@@ -464,7 +464,14 @@ using namespace std;
 				}
 				CHECK_AND_ASSERT_MES(m_len_in_remain >= recv_buff.size(), false, "m_len_in_remain >= recv_buff.size()");
 				m_len_in_remain -= recv_buff.size();
-				m_pcontent_encoding_handler->update_in(recv_buff);
+				bool r = m_pcontent_encoding_handler->update_in(recv_buff);
+				//CHECK_AND_ASSERT_MES(m_len_in_remain >= recv_buff.size(), false, "m_pcontent_encoding_handler->update_in returned false");
+        if (!r)
+        {
+					m_state = reciev_machine_state_error;
+          disconnect();
+          return false;
+        }
 
 				if(m_len_in_remain == 0)
 					m_state = reciev_machine_state_done;

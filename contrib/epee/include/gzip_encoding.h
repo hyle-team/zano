@@ -150,6 +150,10 @@ namespace net_utils
             return false;
           }
         }
+        else
+        {
+          CHECK_AND_ASSERT_MES(Z_DATA_ERROR != ret, false, "content_encoding_gzip::update_in() Failed to inflate. err = Z_DATA_ERROR");
+        }
 
 
         //leave only unpacked part in the output buffer to start with it the next time
