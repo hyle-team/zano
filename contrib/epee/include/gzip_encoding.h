@@ -345,8 +345,10 @@ namespace net_utils
           result_packed_buff.resize(result_packed_buff.size() * 2);
           continue;
         }
-        if (result_packed_buff.size() != m_zstream.avail_out)
-          result_packed_buff.resize(result_packed_buff.size() - m_zstream.avail_out);
+
+        CHECK_AND_ASSERT_MES(result_packed_buff.size() >= m_zstream.avail_out, false, "result_packed_buff.size()=" << result_packed_buff.size() << " >= m_zstream.avail_out=" << m_zstream.avail_out);
+        result_packed_buff.resize(result_packed_buff.size() - m_zstream.avail_out);
+
         m_initialized = false;
         break;
       }
