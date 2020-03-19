@@ -332,13 +332,11 @@ bool wallets_manager::init_local_daemon()
     auto last_update = std::chrono::system_clock::now();
     bool r = tools::process_predownload(m_vm, [&](uint64_t total_bytes, uint64_t received_bytes){
       auto dif = std::chrono::system_clock::now() - last_update;
-      if (dif >  std::chrono::milliseconds(300))
+      if (dif > std::chrono::milliseconds(300))
       {
-        dsi.synchronization_start_height = 0;
-        dsi.max_net_seen_height = total_bytes;
-        dsi.height = received_bytes;
-        dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
-        //dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_downloading_database;
+        dsi.download_total_data_size = total_bytes;
+        dsi.downloaded_bytes = received_bytes;
+        dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_downloading_database;
         m_pview->update_daemon_status(dsi);
         last_update = std::chrono::system_clock::now();
       }

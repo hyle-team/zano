@@ -139,6 +139,8 @@ public:
     uint64_t last_build_displaymode;
     uint64_t alias_count;
     std::string last_build_available;
+    uint64_t downloaded_bytes;
+    uint64_t download_total_data_size;
     //std::list<block_info> last_blocks;
     bool is_pos_allowed;
     uint64_t expiration_median_timestamp;
@@ -160,6 +162,8 @@ public:
       KV_SERIALIZE(last_build_available)
       //KV_SERIALIZE(last_blocks)
       KV_SERIALIZE(alias_count)
+      KV_SERIALIZE(downloaded_bytes)
+      KV_SERIALIZE(download_total_data_size)
       KV_SERIALIZE(is_pos_allowed)
       KV_SERIALIZE(expiration_median_timestamp)
       KV_SERIALIZE(is_disconnected)
