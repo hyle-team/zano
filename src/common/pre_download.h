@@ -79,6 +79,7 @@ namespace tools
       auto dif = std::chrono::system_clock::now() - last_update;
       if (dif >= std::chrono::milliseconds(300))
       {
+        boost::io::ios_flags_saver ifs(std::cout);
         std::cout << "Received " << received_bytes / 1048576 << " of " << total_bytes / 1048576 << " MiB ( " << std::fixed << std::setprecision(1) << 100.0 * received_bytes / total_bytes << " %)\r";
         last_update = std::chrono::system_clock::now();
       }
