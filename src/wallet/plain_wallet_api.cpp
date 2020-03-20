@@ -102,11 +102,9 @@ namespace plain_wallet
     if (initialized)
     {
       LOG_ERROR("Double-initialization in plain_wallet detected.");
-      //throw std::runtime_error("Double-initialization in plain_wallet detected.");
-      error_response err_result = AUTO_VAL_INIT(err_result);
-      err_result.error.code = API_RETURN_CODE_INTERNAL_ERROR;
-      err_result.error.message = LOCATION_STR + "\nmessage: Already initialized";
-      return epee::serialization::store_t_to_json(err_result);
+      epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+      ok_response.result.return_code = API_RETURN_CODE_ALREADY_EXISTS;
+      return epee::serialization::store_t_to_json(ok_response);
     }
       
 
