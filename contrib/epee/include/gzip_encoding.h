@@ -99,6 +99,7 @@ namespace net_utils
 
       size_t  ungzip_size = m_pre_decode.size() * 0x30;
       std::string current_decode_buff(ungzip_size, 'X');
+      auto slh = misc_utils::create_scope_leave_handler([&]() { m_zstream_in.next_out = nullptr; } ); // make sure local pointer to current_decode_buff.data() won't be used out of this scope
 
       //Here the cycle is introduced where we unpack the buffer, the cycle is required
       //because of the case where if after unpacking the data will exceed the awaited size, we will not halt with error
@@ -294,6 +295,8 @@ namespace net_utils
       }
 
       std::string result_packed_buff;
+      auto slh = misc_utils::create_scope_leave_handler([&]() { m_zstream.next_out = nullptr; } ); // make sure local pointer to result_packed_buff.data() won't be used out of this scope
+
       //theoretically it supposed to be smaller
       result_packed_buff.resize(target.size(), 'X');
       while (true)
