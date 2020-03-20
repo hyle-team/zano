@@ -322,13 +322,13 @@ namespace tools
       PROFILE_FUNC("mdbx_db_backend::set");
       int res = 0;
       MDBX_val key = AUTO_VAL_INIT(key);
-      MDBX_val data = AUTO_VAL_INIT(data);
+      MDBX_val data[2] = {}; // mdbx_put may access data[1] if some flags are set, this may trigger static code analizers, so here we allocate two elements to avoid it
       key.iov_base = (void*)k;
       key.iov_len = ks;
-      data.iov_base = (void*)v;
-      data.iov_len = vs;
+      data[0].iov_base = (void*)v;
+      data[0].iov_len = vs;
 
-      res = mdbx_put(get_current_tx(), static_cast<MDBX_dbi>(h), &key, &data, 0);
+      res = mdbx_put(get_current_tx(), static_cast<MDBX_dbi>(h), &key, data, 0);
       CHECK_AND_ASSERT_MESS_MDBX_DB(res, false, "Unable to mdbx_put");
       return true;
     }
