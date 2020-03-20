@@ -779,6 +779,7 @@ public:
 #define API_RETURN_CODE_CORE_BUSY                               "CORE_BUSY"
 #define API_RETURN_CODE_OVERFLOW                                "OVERFLOW"
 #define API_RETURN_CODE_BUSY                                    "BUSY"
+#define API_RETURN_CODE_INVALID_FILE                            "INVALID_FILE"
 
 #define API_MAX_ALIASES_COUNT                                   10000
 

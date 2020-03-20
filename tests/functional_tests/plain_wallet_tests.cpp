@@ -32,9 +32,18 @@ void run_plain_wallet_api_test()
   LOG_PRINT_L0("Creating instance...");
   std::string s = plain_wallet::init("195.201.107.230", "11211", 1);
 
-  std::string fres = plain_wallet::get_logs_buffer();
-  std::string fres2 = plain_wallet::truncate_log();
-  std::string fres3 = plain_wallet::get_logs_buffer();
+  std::string key = plain_wallet::generate_random_key(10);
+  std::string test_data = "1234567890 test test ";
+  std::string res = plain_wallet::set_appconfig(test_data, key);
+  std::string test_data2 =  plain_wallet::get_appconfig(key);
+  if (test_data2 != test_data)
+  {
+    LOG_ERROR("Error");
+  }
+  return;
+  //std::string fres = plain_wallet::get_logs_buffer();
+  //std::string fres2 = plain_wallet::truncate_log();
+  //std::string fres3 = plain_wallet::get_logs_buffer();
 
 
 

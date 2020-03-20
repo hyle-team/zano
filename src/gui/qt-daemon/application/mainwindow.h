@@ -8,6 +8,7 @@
 #include <QWebChannel>
 
 #include "wallet/view_iface.h"
+
 #ifndef Q_MOC_RUN
 #include "wallet/wallets_manager.h"
 #include "currency_core/offers_services_helpers.h"
@@ -18,13 +19,7 @@ class QWebEngineView;
 class QLineEdit;
 QT_END_NAMESPACE
 
-#pragma pack(push, 1)
-struct app_data_file_binary_header
-{
-  uint64_t m_signature;
-  uint64_t m_cb_body;
-};
-#pragma pack (pop)
+
 #define  APP_DATA_FILE_BINARY_SIGNATURE   0x1000111101101021LL
 
 

@@ -11,6 +11,8 @@
 #include "string_tools.h"
 #include "currency_core/currency_format_utils.h"
 #include "wallets_manager.h"
+#include "common/base58.h"
+#include "common/config_encrypt_helper.h"
 
 #define ANDROID_PACKAGE_NAME    "com.zano_mobile"
 #ifdef IOS_BUILD
@@ -22,7 +24,9 @@
 #endif
 #define WALLETS_FOLDER_NAME     "wallets"
 #define APP_CONFIG_FOLDER       "app_config"
-#define APP_CONFIG_FILENAME     "app_cfg.json"
+#define APP_CONFIG_FILENAME     "app_cfg.bin"
+
+#define  MOBILE_APP_DATA_FILE_BINARY_SIGNATURE   0x1000111201101011LL //Bender's nightmare
 
 #define GENERAL_INTERNAL_ERRROR_INSTANCE "GENERAL_INTERNAL_ERROR: WALLET INSTNACE NOT FOUND"
 #define GENERAL_INTERNAL_ERRROR_INIT "Failed to intialize library"
@@ -155,20 +159,27 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(ok_response);
   }
 
-  std::string get_appconfig()
+  std::string get_appconfig(const std::string& encryption_key)
   {
-    std::string res_str = "{}";
+    std::string res_str;
     std::string app_config_config_path = get_app_config_folder() + APP_CONFIG_FILENAME;
-    epee::file_io_utils::load_file_to_string(app_config_config_path, res_str);
-    return res_str;
-  }
-  std::string set_appconfig(const std::string& conf_str)
-  {
-    std::string app_config_config_path = get_app_config_folder() + APP_CONFIG_FILENAME;
-    if (!epee::file_io_utils::save_string_to_file(app_config_config_path, conf_str))
+    std::string ret_code = tools::load_encrypted_file(app_config_config_path, encryption_key, res_str, MOBILE_APP_DATA_FILE_BINARY_SIGNATURE);
+    if (ret_code != API_RETURN_CODE_OK)
     {
       error_response err_result = AUTO_VAL_INIT(err_result);
-      err_result.error.code = API_RETURN_CODE_NOT_FOUND;
+      err_result.error.code = ret_code;
+      return epee::serialization::store_t_to_json(err_result);
+    }
+    return res_str;
+  }
+  std::string set_appconfig(const std::string& conf_str, const std::string& encryption_key)
+  {
+    std::string app_config_config_path = get_app_config_folder() + APP_CONFIG_FILENAME;
+    std::string ret_code = tools::store_encrypted_file(app_config_config_path, encryption_key, conf_str, MOBILE_APP_DATA_FILE_BINARY_SIGNATURE);
+    if (ret_code != API_RETURN_CODE_OK)
+    {
+      error_response err_result = AUTO_VAL_INIT(err_result);
+      err_result.error.code = ret_code;
       return epee::serialization::store_t_to_json(err_result);
     }
     else
@@ -177,7 +188,14 @@ namespace plain_wallet
       ok_response.result.return_code = API_RETURN_CODE_OK;
       return epee::serialization::store_t_to_json(ok_response);
     }
+  }
 
+  std::string generate_random_key(uint64_t lenght)
+  {
+    std::string buff; 
+    buff.resize(lenght);
+    crypto::generate_random_bytes(lenght, const_cast<char*>(buff.data()));
+    return tools::base58::encode(buff);
   }
 
   std::string get_logs_buffer()

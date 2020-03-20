@@ -461,8 +461,7 @@ bool core_concurrency_test(boost::program_options::variables_map& vm, size_t wth
 
     test_protocol_handler protocol_handler(c, core_listener.get());
     c.set_currency_protocol(&protocol_handler);
-    tools::db::db_backend_selector dbbs;
-    if (!c.init(vm, dbbs))
+    if (!c.init(vm))
     {
       LOG_ERROR("Failed to init core");
       return false;
@@ -528,8 +527,7 @@ bool core_concurrency_test(boost::program_options::variables_map& vm, size_t wth
 
     test_protocol_handler protocol_handler(c, core_listener.get());
     c.set_currency_protocol(&protocol_handler);
-    tools::db::db_backend_selector dbbs;
-    if (!c.init(vm, dbbs))
+    if (!c.init(vm))
     {
       LOG_ERROR("Failed to init core");
       return false;
