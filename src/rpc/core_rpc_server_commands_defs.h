@@ -181,10 +181,12 @@ namespace currency
     struct response
     {
       std::list<blobdata> txs;  //transactions blobs
+      uint64_t tx_expiration_ts_median;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs)
+        KV_SERIALIZE(tx_expiration_ts_median)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };
@@ -614,7 +616,8 @@ namespace currency
       daemon_network_state_online = 2,
       daemon_network_state_loading_core = 3,
       daemon_network_state_internal_error = 4,
-      daemon_network_state_unloading_core = 5
+      daemon_network_state_unloading_core = 5,
+      daemon_network_state_downloading_database = 6
     };
 
     struct response

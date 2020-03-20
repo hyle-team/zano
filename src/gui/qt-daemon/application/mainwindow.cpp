@@ -12,6 +12,7 @@
 #include "string_coding.h"
 #include "gui_utils.h"
 #include "notification_helper.h"
+#include "common/config_encrypt_helper.h"
 
 #define PREPARE_ARG_FROM_JSON(arg_type, var_name)   \
   arg_type var_name = AUTO_VAL_INIT(var_name); \
@@ -1047,6 +1048,35 @@ void MainWindow::on_clear_events()
   CATCH_ENTRY2(void());
 }
 
+
+QString MainWindow::store_secure_app_data(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  if (!tools::create_directories_if_necessary(m_backend.get_config_folder()))
+  {
+    view::api_response ar;
+    LOG_PRINT_L0("Failed to create data directory: " << m_backend.get_config_folder());
+    ar.error_code = API_RETURN_CODE_FAIL;
+    return MAKE_RESPONSE(ar);
+  }
+
+  view::api_response ar = AUTO_VAL_INIT(ar);
+  ar.error_code = tools::store_encrypted_file(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME,
+    m_master_password, param.toStdString(), APP_DATA_FILE_BINARY_SIGNATURE);
+  if (ar.error_code != API_RETURN_CODE_OK)
+  {
+    return MAKE_RESPONSE(ar);
+  }
+
+  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
+  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
+  LOG_PRINT_L0("store_secure_app_data, r = " << ar.error_code << ", pass hash: " << master_password_hash);
+
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
 QString MainWindow::get_secure_app_data(const QString& param)
 {
   TRY_ENTRY();
@@ -1060,41 +1090,21 @@ QString MainWindow::get_secure_app_data(const QString& param)
     return MAKE_RESPONSE(ar);
   }
 
-  std::string app_data_buff;
   std::string filename = m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME;
-  bool r = file_io_utils::load_file_to_string(filename, app_data_buff);
-  if (!r)
+  std::string res_body;
+  std::string rsp_code = tools::load_encrypted_file(filename, pwd.pass, res_body, APP_DATA_FILE_BINARY_SIGNATURE);    
+  if (rsp_code != API_RETURN_CODE_OK)
   {
-    LOG_PRINT_L1("gui secure config was not loaded from " << filename);
-    return "";
-  }
-
-  if (app_data_buff.size() < sizeof(app_data_file_binary_header))
-  {
-    LOG_ERROR("app_data_buff.size() < sizeof(app_data_file_binary_header) check failed while loading from " << filename);
     view::api_response ar;
-    ar.error_code = API_RETURN_CODE_FAIL;
+    ar.error_code = rsp_code;
     return MAKE_RESPONSE(ar);
   }
-
-  crypto::chacha_crypt(app_data_buff, pwd.pass);
-
-  const app_data_file_binary_header* phdr = reinterpret_cast<const app_data_file_binary_header*>(app_data_buff.data());
-  if (phdr->m_signature != APP_DATA_FILE_BINARY_SIGNATURE)
-  {
-    LOG_ERROR("gui secure config: password missmatch while loading from " << filename);
-    view::api_response ar;
-    ar.error_code = API_RETURN_CODE_WRONG_PASSWORD;
-    return MAKE_RESPONSE(ar);
-  }
-
   m_master_password = pwd.pass;
-
   crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
   crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
   LOG_PRINT_L0("gui secure config loaded ok from " << filename << ", pass hash: " << master_password_hash);
 
-  return app_data_buff.substr(sizeof(app_data_file_binary_header)).c_str();
+  return res_body.c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
@@ -1267,40 +1277,6 @@ QString MainWindow::get_app_data()
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::store_secure_app_data(const QString& param)
-{
-  TRY_ENTRY();
-  LOG_API_TIMING();
-  if (!tools::create_directories_if_necessary(m_backend.get_config_folder()))
-  {
-    view::api_response ar;
-    LOG_PRINT_L0("Failed to create data directory: " << m_backend.get_config_folder());
-    return MAKE_RESPONSE(ar);
-  }
-
-
-  std::string buff(sizeof(app_data_file_binary_header), 0);
-  app_data_file_binary_header* phdr = (app_data_file_binary_header*)buff.data();
-  phdr->m_signature = APP_DATA_FILE_BINARY_SIGNATURE;
-  phdr->m_cb_body = 0; // for future use
-
-  buff.append(param.toStdString());
-  crypto::chacha_crypt(buff, m_master_password);
-
-  bool r = file_io_utils::save_string_to_file(m_backend.get_config_folder() + "/" + GUI_SECURE_CONFIG_FILENAME, buff);
-  view::api_response ar;
-  if (r)
-    ar.error_code = API_RETURN_CODE_OK;
-  else
-    ar.error_code = API_RETURN_CODE_FAIL;
-
-  crypto::hash master_password_pre_hash = crypto::cn_fast_hash(m_master_password.c_str(), m_master_password.length());
-  crypto::hash master_password_hash = crypto::cn_fast_hash(&master_password_pre_hash, sizeof master_password_pre_hash);
-  LOG_PRINT_L0("store_secure_app_data, r = " << r << ", pass hash: " << master_password_hash);
-
-  return MAKE_RESPONSE(ar);
-  CATCH_ENTRY_FAIL_API_RESPONCE();
-}
 
 QString MainWindow::have_secure_app_data()
 {

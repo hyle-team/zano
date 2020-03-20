@@ -1356,7 +1356,7 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
   std::unordered_map<crypto::hash, std::pair<currency::transaction, money_transfer2_details>> unconfirmed_multisig_transfers_from_tx_pool;
 
   has_related_alias_in_unconfirmed = false;
-  uint64_t tx_expiration_ts_median = get_tx_expiration_median();
+  uint64_t tx_expiration_ts_median = res.tx_expiration_ts_median; //get_tx_expiration_median();
   for (const auto &tx_blob : res.txs)
   {
     currency::transaction tx;
@@ -2208,7 +2208,7 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
       continue;
     const crypto::public_key& out_key = boost::get<txout_to_key>(out_t).key;
     wo.m_pending_key_images.insert(std::make_pair(out_key, td.m_key_image));
-    wo.m_pending_key_images_file_container.push_back(tools::out_key_to_ki(out_key, td.m_key_image));
+    wo.m_pending_key_images_file_container.push_back(tools::out_key_to_ki{ out_key, td.m_key_image });
     WLT_LOG_L1("preparing watch-only wallet: added pending ki (" << out_key << ", " << td.m_key_image << ")");
   }
 
@@ -2552,7 +2552,7 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
       else
       {
         m_pending_key_images[p.first] = p.second;
-        m_pending_key_images_file_container.push_back(tools::out_key_to_ki(p.first, p.second));
+        m_pending_key_images_file_container.push_back(tools::out_key_to_ki{ p.first, p.second });
         LOG_PRINT_L2("for tx " << tx_hash << " pending key image added (" << p.first << ", " << p.second << ")");
       }
     }

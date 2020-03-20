@@ -14,6 +14,8 @@
 #include "string_coding.h"
 #include "wallet_helpers.h"
 #include "core_default_rpc_proxy.h"
+#include "common/db_backend_selector.h"
+#include "common/pre_download.h"
 
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   CRITICAL_REGION_LOCAL(m_wallets_lock);    \
@@ -29,7 +31,9 @@ if (it == m_wallets.end())                \
   return API_RETURN_CODE_WALLET_WRONG_ID; \
 auto& name = it->second.w;
 
-#define DAEMON_IDLE_UPDATE_TIME_MS        1000
+#define DAEMON_IDLE_UPDATE_TIME_MS        2000
+#define HTTP_PROXY_TIMEOUT                2000
+#define HTTP_PROXY_ATTEMPTS_COUNT         1
 
 wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_stop_singal_sent(false),
@@ -65,6 +69,9 @@ const command_line::arg_descriptor<bool> arg_enable_gui_debug_mode = { "gui-debu
 const command_line::arg_descriptor<uint32_t> arg_qt_remote_debugging_port = { "remote-debugging-port", "Specify port for Qt remote debugging", 30333, true };
 const command_line::arg_descriptor<std::string> arg_remote_node = { "remote-node", "Switch GUI to work with remote node instead of local daemon", "",  true };
 const command_line::arg_descriptor<bool> arg_enable_qt_logs = { "enable-qt-logs", "Forward Qt log messages into main log", false,  true };
+const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
+//const command_line::arg_descriptor<bool> arg_disable_logs_init = { "disable-logs-init", "Disable log initialization in GUI" };
+
 
 void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 {
@@ -97,10 +104,6 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   dsi.pos_difficulty = dsi.pow_difficulty = "---";
   m_pview->update_daemon_status(dsi);
-
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
-  log_space::get_set_need_thread_id(true, true);
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
@@ -140,6 +143,12 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, arg_qt_remote_debugging_port);
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
   command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
+  command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
+  
 
 #ifndef MOBILE_WALLET_BUILD
   currency::core::init_options(desc_cmd_sett);
@@ -147,6 +156,7 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
   currency::miner::init_options(desc_cmd_sett);
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
+  tools::db::db_backend_selector::init_options(desc_cmd_sett);
 #endif
 
   po::options_description desc_options("Allowed options");
@@ -225,17 +235,21 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
     path_to_html = command_line::get_arg(m_vm, arg_html_folder);
   }
 
-  log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
-  LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
-  LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
-
   if (command_line::has_arg(m_vm, arg_remote_node))
   {
     m_remote_node_mode = true;
     auto proxy_ptr = new tools::default_http_core_proxy();
     proxy_ptr->set_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected);
+    proxy_ptr->set_connectivity(HTTP_PROXY_TIMEOUT,  HTTP_PROXY_ATTEMPTS_COUNT);
     m_rpc_proxy.reset(proxy_ptr);    
     m_rpc_proxy->set_connection_addr(command_line::get_arg(m_vm, arg_remote_node));
+  }
+
+  if(!command_line::has_arg(m_vm, arg_disable_logs_init))
+  {
+    log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
+    LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
+    LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
   }
 
   m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
@@ -309,12 +323,42 @@ bool wallets_manager::init_local_daemon()
   dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_loading_core;
   m_pview->update_daemon_status(dsi);
 
+  // pre-downloading handling
+  tools::db::db_backend_selector dbbs;
+  bool res = dbbs.init(m_vm);
+  CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize db_backend_selector");
+  if (!command_line::has_arg(m_vm, command_line::arg_no_predownload) || command_line::has_arg(m_vm, command_line::arg_force_predownload))
+  {
+    auto last_update = std::chrono::system_clock::now();
+    bool r = tools::process_predownload(m_vm, [&](uint64_t total_bytes, uint64_t received_bytes){
+      auto dif = std::chrono::system_clock::now() - last_update;
+      if (dif > std::chrono::milliseconds(300))
+      {
+        dsi.download_total_data_size = total_bytes;
+        dsi.downloaded_bytes = received_bytes;
+        dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_downloading_database;
+        m_pview->update_daemon_status(dsi);
+        last_update = std::chrono::system_clock::now();
+      }
+
+      return static_cast<bool>(m_stop_singal_sent);
+    });
+    /*if (m_stop_singal_sent)
+    {
+      dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_deintializing;
+      m_pview->update_daemon_status(dsi);
+    }*/
+  }
+
+
+
 
   //initialize core here
   LOG_PRINT_L0("Initializing core...");
+  dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_loading_core;
   //dsi.text_state = "Initializing core";
   m_pview->update_daemon_status(dsi);
-  bool res = m_ccore.init(m_vm);
+  res = m_ccore.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize core");
   LOG_PRINT_L0("Core initialized OK");
 
@@ -490,7 +534,7 @@ void wallets_manager::main_worker(const po::variables_map& m_vm)
   }
 
   m_pview->on_backend_stopped();
-  CATCH_ENTRY_L0("daemon_backend::main_worker", void());
+  CATCH_ENTRY_L0("wallets_manager::main_worker", void());
 }
 
 bool wallets_manager::update_state_info()
@@ -505,10 +549,9 @@ bool wallets_manager::update_state_info()
     dsi.is_disconnected = true;
     m_last_daemon_network_state = dsi.daemon_network_state;
     m_pview->update_daemon_status(dsi);
-    LOG_ERROR("Failed to call get_info");
+    LOG_PRINT_RED_L0("Failed to call get_info");
     return false;
   }
-
   m_is_pos_allowed = inf.pos_allowed;
   dsi.alias_count = inf.alias_count;
   dsi.pow_difficulty = std::to_string(inf.pow_difficulty);

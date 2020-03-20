@@ -20,6 +20,7 @@
 #include "warnings.h"
 #include "crypto/hash.h"
 #include "profile_tools.h"
+#include "common/db_backend_selector.h"
 
 DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated name length exceeded, name was truncated
 
@@ -1163,11 +1164,15 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
   {
-    if (!select_db_engine_from_arg(vm, m_db))
+    tools::db::db_backend_selector dbbs;
+    dbbs.init(vm);
+    auto p_backend = dbbs.create_backend();
+    if (!p_backend)
     {
-      LOG_PRINT_RED_L0("Failed to select db engine");
+      LOG_PRINT_RED_L0("Failed to create db engine");
       return false;
     }
+    m_db.reset_backend(p_backend);
     LOG_PRINT_L0("DB ENGINE USED BY POOL: " << m_db.get_backend()->name());
 
     m_config_folder = config_folder;
@@ -1183,7 +1188,7 @@ namespace currency
       boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
     }
 
-    const std::string db_folder_path = m_config_folder + ("/" CURRENCY_POOLDATA_FOLDERNAME_PREFIX) + m_db.get_backend()->name() + CURRENCY_POOLDATA_FOLDERNAME_SUFFIX;
+    const std::string db_folder_path = dbbs.get_pool_db_folder_path();
     
     LOG_PRINT_L0("Loading blockchain from " << db_folder_path << "...");
 

@@ -60,6 +60,11 @@ int main(int argc, char *argv[])
 #endif
 #endif
 
+  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
+  log_space::get_set_need_thread_id(true, true);
+  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
+
+
   QApplication app(argc, argv);
   MainWindow viewer;
   if (!viewer.init_backend(argc, argv))

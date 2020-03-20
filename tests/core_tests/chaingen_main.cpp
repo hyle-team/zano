@@ -13,6 +13,7 @@
 #include "currency_core/bc_offers_service.h"
 #include "random_helper.h"
 #include "core_state_helper.h"
+#include "common/db_backend_selector.h"
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
@@ -666,6 +667,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   currency::core::init_options(desc_options);
+  tools::db::db_backend_selector::init_options(desc_options);
 
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {

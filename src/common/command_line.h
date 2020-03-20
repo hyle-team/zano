@@ -23,6 +23,25 @@ namespace command_line
   struct arg_descriptor<T, false>
   {
     typedef T value_type;
+    arg_descriptor(const char* _name, const char* _description):
+      name(_name),
+      description(_description),
+      not_use_default(true),
+      default_value(T())
+    {}
+    arg_descriptor(const char* _name, const char* _description, const T& default_val) :
+      name(_name),
+      description(_description),
+      not_use_default(false),
+      default_value(default_val)
+    {}
+    arg_descriptor(const char* _name, const char* _description, const T& default_val, bool not_use_default) :
+      name(_name),
+      description(_description),
+      default_value(default_val),
+      not_use_default(not_use_default)
+    {}
+
 
     const char* name;
     const char* description;
@@ -192,4 +211,8 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_disable_stop_on_low_free_space;
   extern const arg_descriptor<bool>        arg_enable_offers_service;
   extern const arg_descriptor<std::string> arg_db_engine;
+  extern const arg_descriptor<bool>        arg_no_predownload;
+  extern const arg_descriptor<bool>        arg_force_predownload;
+  extern const arg_descriptor<bool>        arg_validate_predownload;
+  extern const arg_descriptor<std::string> arg_predownload_link;
 }

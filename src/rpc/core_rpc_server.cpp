@@ -386,6 +386,9 @@ namespace currency
       return true;
     }
 
+    res.tx_expiration_ts_median = m_core.get_blockchain_storage().get_tx_expiration_median();
+
+
     for(auto& tx: txs)
     {
       res.txs.push_back(t_serializable_object_to_blob(tx));
@@ -393,6 +396,7 @@ namespace currency
     res.status = CORE_RPC_STATUS_OK;
     return true;
   }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_scan_pos(const COMMAND_RPC_SCAN_POS::request& req, COMMAND_RPC_SCAN_POS::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();

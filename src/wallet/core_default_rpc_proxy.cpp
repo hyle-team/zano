@@ -11,6 +11,11 @@ using namespace epee;
 #include "currency_core/currency_format_utils.h"
 #include "currency_core/alias_helper.h"
 
+#undef LOG_DEFAULT_CHANNEL
+#define LOG_DEFAULT_CHANNEL "rpc_proxy"
+ENABLE_CHANNEL_BY_DEFAULT("rpc_proxy")
+
+
 namespace tools
 {
   bool default_http_core_proxy::set_connection_addr(const std::string& url)
@@ -131,7 +136,13 @@ namespace tools
     epee::net_utils::parse_url(m_daemon_address, u);
     if (!u.port)
       u.port = 8081;
-    return m_http_client.connect(u.host, std::to_string(u.port), WALLET_RCP_CONNECTION_TIMEOUT);
+    bool r = m_http_client.connect(u.host, std::to_string(u.port), m_connection_timeout);
+    if (r)
+    {
+      *m_plast_daemon_is_disconnected = false;
+      m_last_success_interract_time = time(nullptr);
+    }
+    return r;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_GET_ALL_ALIASES(currency::COMMAND_RPC_GET_ALL_ALIASES::response& res)
@@ -166,7 +177,17 @@ namespace tools
     m_plast_daemon_is_disconnected = plast_daemon_is_disconnected ? plast_daemon_is_disconnected : &m_last_daemon_is_disconnected_stub;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  default_http_core_proxy::default_http_core_proxy():m_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected_stub)
+  bool default_http_core_proxy::set_connectivity(unsigned int connection_timeout, size_t repeats_count)
+  {
+    m_connection_timeout = connection_timeout;
+    m_attempts_count = repeats_count;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  default_http_core_proxy::default_http_core_proxy() :m_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected_stub),
+    m_last_success_interract_time(0),
+    m_connection_timeout(WALLET_RCP_CONNECTION_TIMEOUT),
+    m_attempts_count(WALLET_RCP_COUNT_ATTEMNTS)
   {
 
   }

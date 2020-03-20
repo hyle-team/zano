@@ -11,8 +11,10 @@
 #include "core_rpc_proxy.h"
 #include "storages/http_abstract_invoke.h"
 
-#define WALLET_RCP_CONNECTION_TIMEOUT                          10000
+#define WALLET_RCP_CONNECTION_TIMEOUT                          3000
 #define WALLET_RCP_COUNT_ATTEMNTS                              3
+
+
 
 namespace tools
 {
@@ -22,6 +24,7 @@ namespace tools
 
 
     bool set_connection_addr(const std::string& url) override;
+    bool set_connectivity(unsigned int connection_timeout, size_t repeats_count);
     bool call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(const currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& rqt, currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& rsp) override;
     bool call_COMMAND_RPC_GET_BLOCKS_FAST(const currency::COMMAND_RPC_GET_BLOCKS_FAST::request& rqt, currency::COMMAND_RPC_GET_BLOCKS_FAST::response& rsp) override;
     bool call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request& rqt, currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& rsp) override;
@@ -58,13 +61,16 @@ namespace tools
       CRITICAL_REGION_LOCAL(m_lock);
 
       bool ret = false;
-      for(size_t i = WALLET_RCP_COUNT_ATTEMNTS; i && !ret; --i)
+      for(size_t i = m_attempts_count; i && !ret; --i)
       {
         ret = request();
       }
 
       if (ret)
+      {
         m_last_success_interract_time = time(nullptr);
+        *m_plast_daemon_is_disconnected = false;
+      }
       else
         *m_plast_daemon_is_disconnected = true;
       return ret;
@@ -74,7 +80,14 @@ namespace tools
     inline bool invoke_http_json_rpc_update_is_disconnect(const std::string& method_name, const t_request& req, t_response& res)
     {
       return call_request([&](){
-        return epee::net_utils::invoke_http_json_rpc("/json_rpc", method_name, req, res, m_http_client);
+#ifdef MOBILE_WALLET_BUILD
+        LOG_PRINT_L0("[INVOKE_JSON_METHOD] ---> " << method_name)
+#endif
+        bool r = epee::net_utils::invoke_http_json_rpc("/json_rpc", method_name, req, res, m_http_client);
+#ifdef MOBILE_WALLET_BUILD
+        LOG_PRINT_L0("[INVOKE_JSON_METHOD] <---" << method_name)
+#endif
+        return r;
       });
     }
 
@@ -82,7 +95,14 @@ namespace tools
     inline bool invoke_http_bin_remote_command2_update_is_disconnect(const std::string& url, const t_request& req, t_response& res)
     {
       return call_request([&](){
-        return epee::net_utils::invoke_http_bin_remote_command2(m_daemon_address + url, req, res, m_http_client, WALLET_RCP_CONNECTION_TIMEOUT);
+#ifdef MOBILE_WALLET_BUILD
+        LOG_PRINT_L0("[INVOKE_BIN] --->" << typeid(t_request).name())
+#endif
+        bool r = epee::net_utils::invoke_http_bin_remote_command2(m_daemon_address + url, req, res, m_http_client, m_connection_timeout);
+#ifdef MOBILE_WALLET_BUILD
+        LOG_PRINT_L0("[INVOKE_BIN] <---" << typeid(t_request).name())
+#endif
+        return r;
       });
     }
 
@@ -90,7 +110,14 @@ namespace tools
     inline bool invoke_http_json_remote_command2_update_is_disconnect(const std::string& url, const t_request& req, t_response& res)
     {
       return call_request([&](){
-        return epee::net_utils::invoke_http_json_remote_command2(m_daemon_address + url, req, res, m_http_client, WALLET_RCP_CONNECTION_TIMEOUT);
+#ifdef MOBILE_WALLET_BUILD
+        LOG_PRINT_L0("[INVOKE_JSON_URL] --->" << typeid(t_request).name() )
+#endif
+        bool r = epee::net_utils::invoke_http_json_remote_command2(m_daemon_address + url, req, res, m_http_client, m_connection_timeout);
+#ifdef MOBILE_WALLET_BUILD
+        LOG_PRINT_L0("[INVOKE_JSON_URL] <---" << typeid(t_request).name())
+#endif
+        return r;
       });
     }
     //------------------------------------------------------------------------------------------------------------------------------
@@ -105,6 +132,8 @@ namespace tools
     std::atomic<time_t> m_last_success_interract_time;
     std::atomic<bool> *m_plast_daemon_is_disconnected;
     std::atomic<bool> m_last_daemon_is_disconnected_stub;
+    unsigned int m_connection_timeout;
+    size_t m_attempts_count;
 
   };
 }
