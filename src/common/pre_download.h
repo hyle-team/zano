@@ -8,6 +8,7 @@
 #include "net/http_client.h"
 #include "db_backend_selector.h"
 #include "crypto/crypto.h"
+#include "currency_core/currency_core.h"
 
 namespace tools
 {
