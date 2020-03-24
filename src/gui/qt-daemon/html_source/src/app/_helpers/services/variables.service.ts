@@ -23,10 +23,16 @@ export class VariablesService {
   public net_time_delta_median = 0;
   public height_app = 0;
   public height_max = 0;
+  public downloaded = 0;
+  public total = 0;
   public last_build_available = '';
   public last_build_displaymode = 0;
   public daemon_state = 3;
   public sync = {
+    progress_value: 0,
+    progress_value_text: '0'
+  };
+  public download = {
     progress_value: 0,
     progress_value_text: '0'
   };
@@ -66,6 +72,8 @@ export class VariablesService {
   getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);
   getHeightMaxEvent = new BehaviorSubject(null);
+  getDownloadedAppEvent = new BehaviorSubject(null);
+  getTotalEvent = new BehaviorSubject(null);
   getRefreshStackingEvent = new BehaviorSubject(null);
   getAliasChangedEvent = new BehaviorSubject(null);
 
@@ -112,6 +120,20 @@ export class VariablesService {
     }
   }
 
+  setDownloadedBytes(bytes: number) {
+    if (bytes !== this.downloaded) {
+      this.downloaded = this.bytesToMb(bytes);
+      this.getDownloadedAppEvent.next(bytes);
+    }
+  }
+
+  setTotalBytes(bytes: number) {
+    if (bytes !== this.total) {
+      this.total = this.bytesToMb(bytes);
+      this.getTotalEvent.next(bytes);
+    }
+  }
+
   setRefreshStacking(wallet_id: number) {
     this.getHeightAppEvent.next(wallet_id);
   }
@@ -147,6 +169,10 @@ export class VariablesService {
 
   restartCountdown() {
     this.idle.within(this.settings.appLockTime).restart();
+  }
+
+  bytesToMb(bytes) {
+    return Number((bytes / Math.pow(1024, 2)).toFixed(1));
   }
 
   public onContextMenu($event: MouseEvent): void {
