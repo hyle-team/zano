@@ -98,7 +98,7 @@
     </div>
   </ng-template>
 </div>
-<div class="sidebar-synchronization-status" [ngStyle]="{'align-items': variablesService.daemon_state === 1 ? 'flex-start' : 'center'}">
+<div class="sidebar-synchronization-status" [ngStyle]="{'align-items': variablesService.daemon_state === 1 || variablesService.daemon_state === 6 ? 'flex-start' : 'center'}">
   <div class="status-container">
     <span class="offline" *ngIf="variablesService.daemon_state === 0">
       {{ 'SIDEBAR.SYNCHRONIZATION.OFFLINE' | translate }}
@@ -118,6 +118,9 @@
     <span class="online" *ngIf="variablesService.daemon_state === 5">
       {{ 'SIDEBAR.SYNCHRONIZATION.COMPLETE' | translate }}
     </span>
+    <span class="syncing" *ngIf="variablesService.daemon_state === 6">
+      {{ 'SIDEBAR.SYNCHRONIZATION.DOWNLOADING' | translate }} {{ variablesService.downloaded }}{{ 'SIDEBAR.SYNCHRONIZATION.SLASH' | translate }}{{ variablesService.total }}{{ 'SIDEBAR.SYNCHRONIZATION.MB' | translate }}
+    </span>
     <div class="progress-bar-container" *ngIf="variablesService.daemon_state === 1 || variablesService.daemon_state === 3">
       <div class="syncing" *ngIf="variablesService.daemon_state === 1">
         <div class="progress-bar">
@@ -126,6 +129,15 @@
         <div class="progress-percent">{{ variablesService.sync.progress_value_text }}%</div>
       </div>
       <div class="loading" *ngIf="variablesService.daemon_state === 3"></div>
+    </div>
+
+    <div class="progress-bar-container" *ngIf="variablesService.daemon_state === 6">
+      <div class="syncing downloading" *ngIf="variablesService.daemon_state === 6">
+        <div class="progress-bar">
+          <div class="fill" [style.width]="variablesService.download.progress_value + '%'"></div>
+        </div>
+        <div class="progress-percent">{{ variablesService.download.progress_value_text }}%</div>
+      </div>
     </div>
   </div>
   <div class="update-container" *ngIf="(variablesService.daemon_state === 0 || variablesService.daemon_state === 2) && [2, 3, 4].indexOf(variablesService.last_build_displaymode) !== -1">

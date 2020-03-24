@@ -227,6 +227,23 @@ app-sidebar {
               }
             }
           }
+
+          &.downloading {
+
+            .progress-bar {
+
+              @include themify($themes) {
+                background-color: themed(progressBarBackgroundColor);
+              }
+
+              .fill {
+
+                @include themify($themes) {
+                  background-color: themed(blueTextColor);
+                }
+              }
+            }
+          }
         }
 
         .loading {

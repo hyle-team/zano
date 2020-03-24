@@ -185,6 +185,10 @@ export class AppComponent implements OnInit, OnDestroy {
         this.variablesService.last_build_displaymode = data.last_build_displaymode;
         this.variablesService.setHeightApp(data.height);
         this.variablesService.setHeightMax(data.max_net_seen_height);
+
+        this.variablesService.setDownloadedBytes(data.downloaded_bytes);
+        this.variablesService.setTotalBytes(data.download_total_data_size);
+
         this.backend.getContactAlias();
         this.ngZone.run(() => {
           this.variablesService.daemon_state = data['daemon_network_state'];
@@ -201,6 +205,22 @@ export class AppComponent implements OnInit, OnDestroy {
             } else {
               this.variablesService.sync.progress_value = return_val;
               this.variablesService.sync.progress_value_text = return_val.toFixed(2);
+            }
+          }
+
+          if (data['daemon_network_state'] === 6) {
+            const max = data['download_total_data_size'];
+            const current = data['downloaded_bytes'];
+            const return_val = Math.floor((current / max) * 100);
+            if (max === 0 || return_val < 0) {
+              this.variablesService.download.progress_value = 0;
+              this.variablesService.download.progress_value_text = '0.00';
+            } else if (return_val >= 100) {
+              this.variablesService.download.progress_value = 100;
+              this.variablesService.download.progress_value_text = '99.99';
+            } else {
+              this.variablesService.download.progress_value = return_val;
+              this.variablesService.download.progress_value_text = return_val.toFixed(2);
             }
           }
         });
