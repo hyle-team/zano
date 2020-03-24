@@ -50,7 +50,9 @@
       "COMPLETE": "Completion",
       "SYNCING": "Syncing block",
       "LOADING": "Loading blockchain data",
-      "SLASH": "/"
+      "DOWNLOADING": "Downloading",
+      "SLASH": "/",
+      "MB": "MB"
     },
     "UPDATE": {
       "STANDARD": "Update available",

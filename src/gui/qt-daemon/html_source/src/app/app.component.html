@@ -1,7 +1,7 @@
 <app-sidebar *ngIf="variablesService.appLogin"></app-sidebar>
 
 <div class="app-content scrolled-content">
-  <router-outlet *ngIf="[0, 1, 2].indexOf(variablesService.daemon_state) !== -1"></router-outlet>
+  <router-outlet *ngIf="[0, 1, 2, 6].indexOf(variablesService.daemon_state) !== -1"></router-outlet>
   <div class="preloader" *ngIf="[3, 4, 5].indexOf(variablesService.daemon_state) !== -1">
     <span *ngIf="variablesService.daemon_state === 3">{{ 'SIDEBAR.SYNCHRONIZATION.LOADING' | translate }}</span>
     <span *ngIf="variablesService.daemon_state === 4">{{ 'SIDEBAR.SYNCHRONIZATION.ERROR' | translate }}</span>
