@@ -117,7 +117,8 @@ namespace plain_wallet
     std::string argss_1 = std::string("--remote-node=") + ip + ":" + port;    
     std::string argss_2 = std::string("--disable-logs-init");
     char * args[4];
-    args[0] = "stub";
+    static const char* arg0_stub = "stub";
+    args[0] = const_cast<char*>(arg0_stub);
     args[1] = const_cast<char*>(argss_1.c_str());
     args[2] = const_cast<char*>(argss_2.c_str());
     args[3] = nullptr;
