@@ -233,12 +233,12 @@ namespace crypto {
     static constexpr size_t DATA_BLOCK_SIZE = 1024 * 1024;
 
     stream_cn_hash()
-      : m_p_hash(reinterpret_cast<hash*>(&m_buffer))
-      , m_p_data(m_buffer + HASH_SIZE)
+      : m_buffer(HASH_SIZE + DATA_BLOCK_SIZE, '\0')
+      , m_p_hash(const_cast<hash*>(reinterpret_cast<const hash*>(m_buffer.data())))
+      , m_p_data(const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(m_buffer.data())) + HASH_SIZE)
       , m_ready(false)
       , m_data_used(0)
     {
-      memset(m_buffer, 0, HASH_SIZE + DATA_BLOCK_SIZE);
       m_ready = true;
     }
 
@@ -261,7 +261,7 @@ namespace crypto {
         if (m_data_used == DATA_BLOCK_SIZE)
         {
           // calc imtermediate hash of the whole buffer and put the result into the beginning of the buffer
-          *m_p_hash = cn_fast_hash(m_buffer, HASH_SIZE + m_data_used);
+          *m_p_hash = cn_fast_hash(m_buffer.data(), HASH_SIZE + m_data_used);
           // clear data buffer for new bytes
           memset(m_p_data, 0, DATA_BLOCK_SIZE);
           m_data_used = 0;
@@ -279,11 +279,11 @@ namespace crypto {
         return *m_p_hash;
 
       m_ready = false;
-      return cn_fast_hash(m_buffer, HASH_SIZE + m_data_used);
+      return cn_fast_hash(m_buffer.data(), HASH_SIZE + m_data_used);
     }
   
   private:
-    uint8_t         m_buffer[HASH_SIZE + DATA_BLOCK_SIZE];
+    const std::string m_buffer;
     hash* const     m_p_hash;
     uint8_t* const  m_p_data;
     size_t          m_data_used;
