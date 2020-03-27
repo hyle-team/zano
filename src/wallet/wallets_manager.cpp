@@ -330,7 +330,7 @@ bool wallets_manager::init_local_daemon()
   if (!command_line::has_arg(m_vm, command_line::arg_no_predownload) || command_line::has_arg(m_vm, command_line::arg_force_predownload))
   {
     auto last_update = std::chrono::system_clock::now();
-    bool r = tools::process_predownload(m_vm, [&](uint64_t total_bytes, uint64_t received_bytes){
+    res = tools::process_predownload(m_vm, [&](uint64_t total_bytes, uint64_t received_bytes){
       auto dif = std::chrono::system_clock::now() - last_update;
       if (dif > std::chrono::milliseconds(300))
       {
@@ -343,11 +343,7 @@ bool wallets_manager::init_local_daemon()
 
       return static_cast<bool>(m_stop_singal_sent);
     });
-    /*if (m_stop_singal_sent)
-    {
-      dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_deintializing;
-      m_pview->update_daemon_status(dsi);
-    }*/
+    CHECK_AND_ASSERT_AND_SET_GUI(res,  "pre-downloading failed");
   }
 
 
