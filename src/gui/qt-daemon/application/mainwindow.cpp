@@ -24,6 +24,13 @@ if (!epee::serialization::load_t_from_json(var_name, param.toStdString())) \
 }
 
 template<typename T>
+QString make_response(const T& r)
+{
+  std::string str = epee::serialization::store_t_to_json(r);
+  return str.c_str();
+}
+
+template<typename T>
 QString make_response_dbg(const T& r, const std::string& location)
 {
   std::string str = epee::serialization::store_t_to_json(r);
@@ -31,10 +38,8 @@ QString make_response_dbg(const T& r, const std::string& location)
   return str.c_str();
 }
 
-#define PREPARE_RESPONSE(rsp_type, var_name)   view::api_response_t<rsp_type> var_name = AUTO_VAL_INIT(var_name); 
-#define MAKE_RESPONSE(r)   epee::serialization::store_t_to_json(r).c_str()
-// use the following version of MAKE_RESPONSE to debug all responses
-// #define MAKE_RESPONSE(r)   make_response_dbg(r, LOCATION_STR)
+#define PREPARE_RESPONSE(rsp_type, var_name)   view::api_response_t<rsp_type> var_name = AUTO_VAL_INIT(var_name) 
+#define MAKE_RESPONSE(r) (r.error_code == API_RETURN_CODE_OK || r.error_code == API_RETURN_CODE_TRUE) ? make_response(r) : make_response_dbg(r, LOCATION_STR)
 
 #define LOG_API_TIMING() const char* pfunc_call_name = LOCAL_FUNCTION_DEF__; LOG_PRINT_BLUE("[API:" << pfunc_call_name << "]-->>", LOG_LEVEL_0); uint64_t ticks_before_start = epee::misc_utils::get_tick_count(); \
   auto cb_leave = epee::misc_utils::create_scope_leave_handler([&ticks_before_start, &pfunc_call_name](){ \
