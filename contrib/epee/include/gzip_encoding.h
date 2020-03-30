@@ -224,6 +224,7 @@ namespace net_utils
   struct abstract_callback_base
   {
     virtual bool do_call(const std::string& piece_of_transfer) = 0;
+    virtual ~abstract_callback_base() {}
   };
 
   template <typename callback_t>
