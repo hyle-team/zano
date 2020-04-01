@@ -200,7 +200,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("wallet_bc_height", boost::bind(&simple_wallet::show_wallet_bcheight, this, _1), "Show blockchain height");
   m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this, _1), "transfer <mixin_count> <addr_1> <amount_1> [<addr_2> <amount_2> ... <addr_N> <amount_N>] [payment_id] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available)");
   m_cmd_binder.set_handler("set_log", boost::bind(&simple_wallet::set_log, this, _1), "set_log <level> - Change current log detalisation level, <level> is a number 0-4");
-  m_cmd_binder.set_handler("enable_concole_logger", boost::bind(&simple_wallet::enable_concole_logger, this, _1), "Enables console logging");
+  m_cmd_binder.set_handler("enable_console_logger", boost::bind(&simple_wallet::enable_console_logger, this, _1), "Enables console logging");
   m_cmd_binder.set_handler("resync", boost::bind(&simple_wallet::resync_wallet, this, _1), "Causes wallet to reset all transfers and re-synchronize wallet");
   m_cmd_binder.set_handler("help", boost::bind(&simple_wallet::help, this, _1), "Show this help");
   m_cmd_binder.set_handler("get_transfer_info", boost::bind(&simple_wallet::get_transfer_info, this, _1), "displays transfer info by key_image or index");
@@ -226,16 +226,17 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this, _1), "submit_transfer <signed_tx_file> - broadcast signed tx");
 }
 //----------------------------------------------------------------------------------------------------
-
 simple_wallet::~simple_wallet()
 {
 }
-bool simple_wallet::enable_concole_logger(const std::vector<std::string> &args)
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::enable_console_logger(const std::vector<std::string> &args)
 {
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_0);
   LOG_PRINT_L0("Console logger enabled");
   return true;
 }
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::set_log(const std::vector<std::string> &args)
 {
   if(args.size() != 1) 
