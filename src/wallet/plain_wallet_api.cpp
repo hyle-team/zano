@@ -373,7 +373,15 @@ namespace plain_wallet
         put_result(job_id, res);
       };
     }
-    else
+    else if (method_name == "get_wallet_status")
+    {
+      std::string local_params = params;
+      async_callback = [job_id, local_params, instance_id]()
+      {
+        std::string res = get_wallet_status(instance_id);
+        put_result(job_id, res);
+      };
+    }else
     {
       view::api_response ar = AUTO_VAL_INIT(ar);
       ar.error_code = "UNKNOWN METHOD";
