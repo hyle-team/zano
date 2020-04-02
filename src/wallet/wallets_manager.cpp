@@ -4,6 +4,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+
 #include "wallets_manager.h"
 #include "currency_core/alias_helper.h"
 #ifndef MOBILE_WALLET_BUILD
@@ -17,19 +18,20 @@
 #include "common/db_backend_selector.h"
 #include "common/pre_download.h"
 
+
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
-  CRITICAL_REGION_LOCAL(m_wallets_lock);    \
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    \
   auto it = m_wallets.find(wallet_id);      \
   if (it == m_wallets.end())                \
     return API_RETURN_CODE_WALLET_WRONG_ID; \
   auto& name = it->second;
 
 #define GET_WALLET_BY_ID(wallet_id, name)       \
-CRITICAL_REGION_LOCAL(m_wallets_lock);    \
-auto it = m_wallets.find(wallet_id);      \
-if (it == m_wallets.end())                \
-  return API_RETURN_CODE_WALLET_WRONG_ID; \
-auto& name = it->second.w;
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    \
+  auto it = m_wallets.find(wallet_id);      \
+  if (it == m_wallets.end())                \
+    return API_RETURN_CODE_WALLET_WRONG_ID; \
+  auto& name = it->second.w;
 
 #define DAEMON_IDLE_UPDATE_TIME_MS        2000
 #define HTTP_PROXY_TIMEOUT                2000
@@ -494,7 +496,7 @@ void wallets_manager::main_worker(const po::variables_map& m_vm)
   loop();
   
 
-  CRITICAL_REGION_BEGIN(m_wallets_lock);
+  SHARED_CRITICAL_REGION_BEGIN(m_wallets_lock);
   for (auto& wo : m_wallets)
   {
     LOG_PRINT_L0("Storing wallet data...");
@@ -682,7 +684,7 @@ std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter
   if (m_remote_node_mode)
     return API_RETURN_CODE_FAIL;
 #ifndef MOBILE_WALLET_BUILD
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   while (true)
   {
     try
@@ -748,7 +750,6 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
   }
   
   std::string return_code = API_RETURN_CODE_OK;
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
   while (true)
   {
     try
@@ -777,7 +778,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       return std::string(API_RETURN_CODE_WRONG_PASSWORD) + ":" + e.what();
     }
   }
-
+  EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   get_wallet_info(wo, owr.wi);
@@ -828,9 +829,6 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
 
   }
 
-
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
-
   try
   {
     w->generate(path, password);
@@ -845,6 +843,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   {
     return std::string(API_RETURN_CODE_FAIL) + ":" + e.what();
   }
+  EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   init_wallet_entry(wo, owr.wallet_id);
@@ -916,9 +915,6 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   }
 
   currency::account_base acc;
-
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
-
   try
   {
     w->restore(path, password, restore_key);
@@ -933,6 +929,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     return std::string(API_RETURN_CODE_FAIL) + ":" + e.what();
   }
+  EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   init_wallet_entry(wo, owr.wallet_id);
@@ -941,7 +938,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
 }
 std::string wallets_manager::close_wallet(size_t wallet_id)
 {
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
+  EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   
   auto it = m_wallets.find(wallet_id);
   if (it == m_wallets.end())
@@ -956,7 +953,6 @@ std::string wallets_manager::close_wallet(size_t wallet_id)
 
     it->second.w->get()->store();
     m_wallets.erase(it);
-
     {
       CRITICAL_REGION_LOCAL(m_wallet_log_prefixes_lock);
       m_wallet_log_prefixes[wallet_id] = std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":CLOSED] ";
@@ -1632,7 +1628,7 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
 
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   auto& w = m_wallets[wallet_id].w;
   if (w->get() != nullptr)
   {
