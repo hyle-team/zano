@@ -335,10 +335,12 @@ namespace wallet_public
     {
       std::string tx_hash;
       std::string tx_unsigned_hex; // for cold-signing process
+      uint64_t tx_size;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_hash)
         KV_SERIALIZE(tx_unsigned_hex)
+        KV_SERIALIZE(tx_size)
       END_KV_SERIALIZE_MAP()
     };
   };

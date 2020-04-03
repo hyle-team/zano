@@ -300,6 +300,7 @@ namespace tools
       else
       {
         res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
+        res.tx_size = get_object_blobsize(tx);
       }
       return true;
     }
