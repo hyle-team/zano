@@ -1244,7 +1244,7 @@ std::string wallets_manager::get_connectivity_status()
   gci.is_online = get_is_remote_daemon_connected();
   gci.last_daemon_is_disconnected = m_last_daemon_is_disconnected;
   gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
-  return epee::serialization::store_t_to_json(wsi);
+  return epee::serialization::store_t_to_json(gci);
 }
 
 std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
