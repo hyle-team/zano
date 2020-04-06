@@ -198,7 +198,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("payments", boost::bind(&simple_wallet::show_payments, this, _1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
   m_cmd_binder.set_handler("bc_height", boost::bind(&simple_wallet::show_blockchain_height, this, _1), "Show blockchain height");
   m_cmd_binder.set_handler("wallet_bc_height", boost::bind(&simple_wallet::show_wallet_bcheight, this, _1), "Show blockchain height");
-  m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this, _1), "transfer <mixin_count> <addr_1> <amount_1> [<addr_2> <amount_2> ... <addr_N> <amount_N>] [payment_id] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available)");
+  m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this, _1), "transfer <mixin_count> <addr_1> <amount_1> [<addr_2> <amount_2> ... <addr_N> <amount_N>] [payment_id] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available), <payment_id> is an optional HEX-encoded string");
   m_cmd_binder.set_handler("set_log", boost::bind(&simple_wallet::set_log, this, _1), "set_log <level> - Change current log detalisation level, <level> is a number 0-4");
   m_cmd_binder.set_handler("enable_console_logger", boost::bind(&simple_wallet::enable_console_logger, this, _1), "Enables console logging");
   m_cmd_binder.set_handler("resync", boost::bind(&simple_wallet::resync_wallet, this, _1), "Causes wallet to reset all transfers and re-synchronize wallet");
@@ -1142,26 +1142,31 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   local_args.erase(local_args.begin());
 
   
-  std::string payment_id;
+  currency::payment_id_t payment_id;
   if (1 == local_args.size() % 2)
   {
-    payment_id = local_args.back();
+    std::string payment_id_hex = local_args.back();
     local_args.pop_back();
+    if (!payment_id_hex.empty() && !currency::parse_payment_id_from_hex_str(payment_id_hex, payment_id))
+    {
+      fail_msg_writer() << "unable to parse payment id: " << payment_id_hex << ", HEX-encoded string is expected";
+      return true;
+    }
   }
-
+  
   if (!currency::is_payment_id_size_ok(payment_id))
   {
-    fail_msg_writer() << "payment id is too long: " << payment_id.size() << " bytes, max allowed: " << BC_PAYMENT_ID_SERVICE_SIZE_MAX;
+    fail_msg_writer() << "decoded payment id is too long: " << payment_id.size() << " bytes, max allowed: " << BC_PAYMENT_ID_SERVICE_SIZE_MAX;
     return true;
   }
 
   vector<currency::tx_destination_entry> dsts;
   for (size_t i = 0; i < local_args.size(); i += 2) 
   {
-    std::string embedded_payment_id;
+    std::string integrated_payment_id;
     currency::tx_destination_entry de;
     de.addr.resize(1);
-    if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(local_args[i], de.addr.front(), embedded_payment_id)))
+    if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(local_args[i], de.addr.front(), integrated_payment_id)))
     {
       fail_msg_writer() << "wrong address: " << local_args[i];
       return true;
@@ -1181,14 +1186,14 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
       return true;
     }
 
-    if (embedded_payment_id.size() != 0)
+    if (integrated_payment_id.size() != 0)
     {
       if (payment_id.size() != 0)
       {
-        fail_msg_writer() << "address " + local_args[i] + " has embedded payment id \"" + embedded_payment_id + "\" which conflicts with previously set payment id: \"" << payment_id << "\"";
+        fail_msg_writer() << "address " + local_args[i] + " has integrated payment id " + epee::string_tools::buff_to_hex_nodelimer(integrated_payment_id) + " which conflicts with previously set payment id: " << epee::string_tools::buff_to_hex_nodelimer(payment_id) << "";
         return true;
       }
-      payment_id = embedded_payment_id;
+      payment_id = integrated_payment_id;
     }
 
     dsts.push_back(de);
