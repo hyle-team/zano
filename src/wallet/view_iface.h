@@ -448,6 +448,19 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct general_connectivity_info
+  {
+    bool is_online;
+    bool last_daemon_is_disconnected;
+    uint64_t last_proxy_communicate_timestamp;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(is_online)
+      KV_SERIALIZE(last_daemon_is_disconnected)
+      KV_SERIALIZE(last_proxy_communicate_timestamp)
+    END_KV_SERIALIZE_MAP()
+  };
+
 
   struct header_entry
   {

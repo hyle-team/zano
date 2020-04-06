@@ -106,6 +106,7 @@ public:
   std::string request_cancel_contract(size_t wallet_id, const crypto::hash& contract_id, uint64_t fee, uint64_t expiration_period);
   std::string accept_cancel_contract(size_t wallet_id, const crypto::hash& contract_id);
   
+  std::string get_connectivity_status();
   std::string get_wallet_info(wallet_vs_options& w, view::wallet_info& wi);
   std::string close_wallet(size_t wallet_id);
   std::string push_offer(size_t wallet_id, const bc_services::offer_details_ex& od, currency::transaction& res_tx);
