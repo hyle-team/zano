@@ -74,11 +74,12 @@ namespace tools
             return true;
           }
 
+          bool has_related_alias_in_unconfirmed = false;
+          LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
+          m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
+
           if (m_do_mint)
           {
-            bool has_related_alias_in_unconfirmed = false;
-            LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
-            m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
             LOG_PRINT_L2("wallet RPC idle: trying to do PoS iteration...");
             m_wallet.try_mint_pos(miner_address);
           }
@@ -582,7 +583,7 @@ namespace tools
   {
     bool tx_id_specified = req.tx_id != currency::null_hash;
 
-    // 
+    // process confirmed txs
     m_wallet.enumerate_transfers_history([&](const wallet_public::wallet_transfer_info& wti) -> bool {
 
       if (tx_id_specified)
@@ -616,7 +617,7 @@ namespace tools
       return true; // continue
     }, false /* enumerate_forward */);
 
-
+    // process unconfirmed txs
     if (req.pool)
     {
       m_wallet.enumerate_unconfirmed_transfers([&](const wallet_public::wallet_transfer_info& wti) -> bool {
