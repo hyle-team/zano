@@ -51,7 +51,7 @@ namespace tools
         MAP_JON_RPC_WE("sign_transfer",             on_sign_transfer,             wallet_public::COMMAND_SIGN_TRANSFER)
         MAP_JON_RPC_WE("submit_transfer",           on_submit_transfer,           wallet_public::COMMAND_SUBMIT_TRANSFER)
         MAP_JON_RPC_WE("search_for_transactions",   on_search_for_transactions,   wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS)
-        //contracts API Skipped block by timestamp, height: 94766, block time 1563035089
+        //contracts API
         MAP_JON_RPC_WE("contracts_send_proposal",             on_contracts_send_proposal,      wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL)
         MAP_JON_RPC_WE("contracts_accept_proposal",           on_contracts_accept_proposal,    wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL)
         MAP_JON_RPC_WE("contracts_get_all",                   on_contracts_get_all,            wallet_public::COMMAND_CONTRACTS_GET_ALL)
