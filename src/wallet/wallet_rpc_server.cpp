@@ -578,6 +578,57 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_search_for_transactions(const wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request& req, wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    bool tx_id_specified = req.tx_id != currency::null_hash;
+
+    // 
+    m_wallet.enumerate_transfers_history([&](const wallet_public::wallet_transfer_info& wti) -> bool {
+
+      if (tx_id_specified)
+      {
+        if (wti.tx_hash != req.tx_id)
+          return true; // continue
+      }
+
+      if (req.filter_by_height)
+      {
+        if (!wti.height) // unconfirmed
+          return true; // continue
+
+        if (wti.height < req.min_height)
+        {
+          // no need to scan more
+          return false; // stop
+        }
+        if (wti.height > req.max_height)
+        {
+          return true; // continue
+        }
+      }
+    
+      if (wti.is_income && req.in)
+        res.in.push_back(wti);
+
+      if (!wti.is_income && req.out)
+        res.out.push_back(wti);   
+
+      return true; // continue
+    }, false /* enumerate_forward */);
+
+
+    if (req.pool)
+    {
+      m_wallet.enumerate_unconfirmed_transfers([&](const wallet_public::wallet_transfer_info& wti) -> bool {
+        if ((wti.is_income && req.in) || (!wti.is_income && req.out))
+          res.pool.push_back(wti);
+        return true; // continue
+      });
+    }
+
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_contracts_send_proposal(const wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::request& req, wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();       
