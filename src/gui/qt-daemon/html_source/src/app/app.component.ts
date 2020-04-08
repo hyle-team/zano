@@ -265,13 +265,15 @@ export class AppComponent implements OnInit, OnDestroy {
             let tr_exists = wallet.excluded_history.some(elem => elem.tx_hash === tr_info.tx_hash);
             tr_exists = (!tr_exists) ? wallet.history.some(elem => elem.tx_hash === tr_info.tx_hash) : tr_exists;
 
-            wallet.prepareHistory([tr_info]);
-            if (wallet.restore) {
-              wallet.total_history_item = wallet.history.length;
-              wallet.totalPages = Math.ceil( wallet.total_history_item / this.variablesService.count);
-              wallet.totalPages > this.variablesService.maxPages
-                  ? wallet.pages = new Array(5).fill(1).map((value, index) => value + index)
-                    : wallet.pages = new Array(wallet.totalPages).fill(1).map((value, index) => value + index);
+            if (wallet.currentPage === 1) {
+              wallet.prepareHistory([tr_info]);
+              if (wallet.restore) {
+                wallet.total_history_item = wallet.history.length;
+                wallet.totalPages = Math.ceil( wallet.total_history_item / this.variablesService.count);
+                wallet.totalPages > this.variablesService.maxPages
+                    ? wallet.pages = new Array(5).fill(1).map((value, index) => value + index)
+                      : wallet.pages = new Array(wallet.totalPages).fill(1).map((value, index) => value + index);
+              }
             }
 
             if (tr_info.hasOwnProperty('contract')) {

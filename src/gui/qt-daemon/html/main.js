@@ -3556,13 +3556,15 @@ var AppComponent = /** @class */ (function () {
                         }
                         var tr_exists = wallet.excluded_history.some(function (elem) { return elem.tx_hash === tr_info.tx_hash; });
                         tr_exists = (!tr_exists) ? wallet.history.some(function (elem) { return elem.tx_hash === tr_info.tx_hash; }) : tr_exists;
-                        wallet.prepareHistory([tr_info]);
-                        if (wallet.restore) {
-                            wallet.total_history_item = wallet.history.length;
-                            wallet.totalPages = Math.ceil(wallet.total_history_item / _this.variablesService.count);
-                            wallet.totalPages > _this.variablesService.maxPages
-                                ? wallet.pages = new Array(5).fill(1).map(function (value, index) { return value + index; })
-                                : wallet.pages = new Array(wallet.totalPages).fill(1).map(function (value, index) { return value + index; });
+                        if (wallet.currentPage === 1) {
+                            wallet.prepareHistory([tr_info]);
+                            if (wallet.restore) {
+                                wallet.total_history_item = wallet.history.length;
+                                wallet.totalPages = Math.ceil(wallet.total_history_item / _this.variablesService.count);
+                                wallet.totalPages > _this.variablesService.maxPages
+                                    ? wallet.pages = new Array(5).fill(1).map(function (value, index) { return value + index; })
+                                    : wallet.pages = new Array(wallet.totalPages).fill(1).map(function (value, index) { return value + index; });
+                            }
                         }
                         if (tr_info.hasOwnProperty('contract')) {
                             var exp_med_ts = _this.variablesService.exp_med_ts;
@@ -8821,6 +8823,9 @@ var WalletComponent = /** @class */ (function () {
                         _this.variablesService.currentWallet.restore = false;
                         _this.variablesService.currentWallet.total_history_item = data.total_history_items;
                         _this.variablesService.currentWallet.prepareHistory(data.history);
+                        if (_this.variablesService.currentWallet.currentPage === 1 && data.unconfirmed) {
+                            _this.variablesService.currentWallet.prepareHistory(data.unconfirmed);
+                        }
                     }
                 });
             }
