@@ -796,16 +796,21 @@ std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t off
     return API_RETURN_CODE_CORE_BUSY;
   }
 
+  w->get()->get_unconfirmed_transfers(tr_hist.unconfirmed);
   w->get()->get_recent_transfers_history(tr_hist.history, offset, count, tr_hist.total_history_items);
+
+  auto fix_tx = [](tools::wallet_public::wallet_transfer_info& wti) -> void {
+    wti.show_sender = currency::is_showing_sender_addres(wti.tx);
+    if (!wti.fee && !currency::is_coinbase(wti.tx))
+      wti.fee = currency::get_tx_fee(wti.tx);
+  };
+
   //workaround for missed fee
+  for (auto & he : tr_hist.unconfirmed)
+    fix_tx(he);
+
   for (auto & he : tr_hist.history)
-  {
-    he.show_sender = currency::is_showing_sender_addres(he.tx);
-    if (!he.fee && !currency::is_coinbase(he.tx))
-    {
-      he.fee = currency::get_tx_fee(he.tx);
-    }
-  }
+    fix_tx(he);
 
   return API_RETURN_CODE_OK;
 }
@@ -1231,6 +1236,15 @@ bool wallets_manager::get_is_remote_daemon_connected()
   if (time(nullptr) - m_rpc_proxy->get_last_success_interract_time() > DAEMON_IDLE_UPDATE_TIME_MS * 2)
     return false;
   return true;
+}
+
+std::string wallets_manager::get_connectivity_status()
+{
+  view::general_connectivity_info gci = AUTO_VAL_INIT(gci);
+  gci.is_online = get_is_remote_daemon_connected();
+  gci.last_daemon_is_disconnected = m_last_daemon_is_disconnected;
+  gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
+  return epee::serialization::store_t_to_json(gci);
 }
 
 std::string wallets_manager::get_wallet_status(uint64_t wallet_id)

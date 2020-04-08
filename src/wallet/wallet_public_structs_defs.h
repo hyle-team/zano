@@ -871,6 +871,52 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_RPC_SEARCH_FOR_TRANSACTIONS
+  {
+    struct request
+    {
+      crypto::hash tx_id;
+      bool in;
+      bool out;
+      //bool pending;
+      //bool failed;
+      bool pool;
+      bool filter_by_height;
+      uint64_t min_height;
+      uint64_t max_height;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+        KV_SERIALIZE(in)
+        KV_SERIALIZE(out)
+        //KV_SERIALIZE(pending)
+        //KV_SERIALIZE(failed)
+        KV_SERIALIZE(pool)
+        KV_SERIALIZE(filter_by_height)
+        KV_SERIALIZE(min_height)
+        KV_SERIALIZE(max_height)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::list<wallet_transfer_info> in;
+      std::list<wallet_transfer_info> out;
+      //std::list<wallet_transfer_info> pending;
+      //std::list<wallet_transfer_info> failed;
+      std::list<wallet_transfer_info> pool;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(in)
+        KV_SERIALIZE(out)
+        //KV_SERIALIZE(pending)
+        //KV_SERIALIZE(failed)
+        KV_SERIALIZE(pool)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
 
   inline std::string get_escrow_contract_state_name(uint32_t state)
   {

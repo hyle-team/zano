@@ -20,6 +20,7 @@ namespace plain_wallet
   std::string generate_random_key(uint64_t lenght);
   std::string get_logs_buffer();
   std::string truncate_log();
+  std::string get_connectivity_status();
 
   std::string open(const std::string& path, const std::string& password);
   std::string restore(const std::string& seed, const std::string& path, const std::string& password);

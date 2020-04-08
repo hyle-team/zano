@@ -614,6 +614,14 @@ namespace tools
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;
 
+    // callback: (const wallet_public::wallet_transfer_info& wti) -> bool, true -- continue, false -- stop
+    template<typename callback_t>
+    void enumerate_transfers_history(callback_t cb, bool enumerate_forward) const;
+
+    // callback: (const wallet_public::wallet_transfer_info& wti) -> bool, true -- continue, false -- stop
+    template<typename callback_t>
+    void enumerate_unconfirmed_transfers(callback_t cb) const;
+
     bool is_watch_only() const { return m_watch_only; }
     void sign_transfer(const std::string& tx_sources_blob, std::string& signed_tx_blob, currency::transaction& tx);
     void sign_transfer_files(const std::string& tx_sources_file, const std::string& signed_tx_file, currency::transaction& tx);
@@ -1141,6 +1149,31 @@ namespace tools
     }
     cxt.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
     return false;
+  }
+
+  template<typename callback_t>
+  void wallet2::enumerate_transfers_history(callback_t cb, bool enumerate_forward) const
+  {
+    if (enumerate_forward)
+    {
+      for(auto it = m_transfer_history.begin(); it != m_transfer_history.end(); ++it)
+        if (!cb(*it))
+          break;
+    }
+    else
+    {
+      for(auto it = m_transfer_history.rbegin(); it != m_transfer_history.rend(); ++it)
+        if (!cb(*it))
+          break;
+    }
+  }
+
+  template<typename callback_t>
+  void wallet2::enumerate_unconfirmed_transfers(callback_t cb) const
+  {
+    for (auto& el : m_unconfirmed_txs)
+      if (!cb(el.second))
+        break;
   }
 
 } // namespace tools

@@ -4,7 +4,7 @@
 
 
 #include "plain_wallet_api.h"
-#include "plain_wallet_api_impl.h"
+#include "plain_wallet_api_defs.h"
 #include "currency_core/currency_config.h"
 #include "version.h"
 #include "string_tools.h"
@@ -213,6 +213,10 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(ok_response);
   }
 
+  std::string get_connectivity_status()
+  {
+    return gwm.get_connectivity_status();
+  }
 
   std::string get_version()
   {
