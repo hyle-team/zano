@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <boost/thread/shared_mutex.hpp>
 #include <boost/program_options.hpp>
 #include "warnings.h"
 PUSH_VS_WARNINGS
@@ -105,6 +106,7 @@ public:
   std::string request_cancel_contract(size_t wallet_id, const crypto::hash& contract_id, uint64_t fee, uint64_t expiration_period);
   std::string accept_cancel_contract(size_t wallet_id, const crypto::hash& contract_id);
   
+  std::string get_connectivity_status();
   std::string get_wallet_info(wallet_vs_options& w, view::wallet_info& wi);
   std::string close_wallet(size_t wallet_id);
   std::string push_offer(size_t wallet_id, const bc_services::offer_details_ex& od, currency::transaction& res_tx);
@@ -175,7 +177,6 @@ private:
   view::i_view m_view_stub;
   view::i_view* m_pview;
   std::shared_ptr<tools::i_core_proxy> m_rpc_proxy;
-  mutable critical_section m_wallets_lock;
   po::variables_map m_vm;
 
   std::atomic<uint64_t> m_last_daemon_height;
@@ -202,6 +203,9 @@ private:
 
 
   std::map<size_t, wallet_vs_options> m_wallets;
+  //mutable critical_section m_wallets_lock;
+  mutable boost::shared_mutex m_wallets_lock;
+
   std::vector<std::string> m_wallet_log_prefixes;
   mutable critical_section m_wallet_log_prefixes_lock;
 };

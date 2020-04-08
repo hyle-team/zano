@@ -15,7 +15,6 @@ namespace currency
   t_currency_protocol_handler<t_core>::t_currency_protocol_handler(t_core& rcore, nodetool::i_p2p_endpoint<connection_context>* p_net_layout)
     : m_core(rcore)
     , m_p2p(p_net_layout)
-    , m_syncronized_connections_count(0)
     , m_synchronized(false)
     , m_have_been_synchronized(false)
     , m_max_height_seen(0)
@@ -606,25 +605,19 @@ namespace currency
   template<class t_core> 
   bool t_currency_protocol_handler<t_core>::on_idle()
   {
-    bool have_synced_conn = false;
-    m_p2p->for_each_connection([&](currency_connection_context& context, nodetool::peerid_type peer_id)->bool{
-      if (context.m_state == currency_connection_context::state_normal)
-      {
-        have_synced_conn = true;
-        return false;
-      }
-      return true;
-    });
+    size_t synchronized_connections_count = get_synchronized_connections_count();
+    size_t total_connections_count = m_p2p->get_connections_count();
+    bool have_enough_synchronized_connections = synchronized_connections_count > total_connections_count / 2;
 
-    if (have_synced_conn && !m_synchronized)
+    if (have_enough_synchronized_connections && !m_synchronized)
     {
       on_connection_synchronized();
       m_synchronized = true;
-      LOG_PRINT_MAGENTA("Synchronized set to TRUE (idle)", LOG_LEVEL_0);
+      LOG_PRINT_MAGENTA("Synchronized set to TRUE (" << synchronized_connections_count << " of " << total_connections_count << " conn. synced)", LOG_LEVEL_0);
     }
-    else if (!have_synced_conn && m_synchronized)
+    else if (!have_enough_synchronized_connections && m_synchronized)
     {
-      LOG_PRINT_MAGENTA("Synchronized set to FALSE (idle)", LOG_LEVEL_0);
+      LOG_PRINT_MAGENTA("Synchronized set to FALSE (" << synchronized_connections_count << " of " << total_connections_count << " conn. synced)", LOG_LEVEL_0);
       m_synchronized = false;
     }
 

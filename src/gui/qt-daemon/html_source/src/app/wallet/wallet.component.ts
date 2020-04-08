@@ -205,6 +205,9 @@ export class WalletComponent implements OnInit, OnDestroy {
               this.variablesService.currentWallet.restore = false;
               this.variablesService.currentWallet.total_history_item = data.total_history_items;
               this.variablesService.currentWallet.prepareHistory(data.history);
+              if (this.variablesService.currentWallet.currentPage === 1 && data.unconfirmed) {
+                this.variablesService.currentWallet.prepareHistory(data.unconfirmed);
+              }
             }
           });
         }

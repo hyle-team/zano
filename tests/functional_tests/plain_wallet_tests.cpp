@@ -2,6 +2,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <boost/dll.hpp>
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -30,7 +31,7 @@ struct try_pull_result_open_response
 void run_plain_wallet_api_test()
 {
   LOG_PRINT_L0("Creating instance...");
-  std::string s = plain_wallet::init("195.201.107.230", "11211", 1);
+  std::string s = plain_wallet::init("195.201.107.230", "11211", boost::dll::program_location().parent_path().string(), 1);
 
   std::string key = plain_wallet::generate_random_key(10);
   std::string test_data = "1234567890 test test ";

@@ -74,11 +74,12 @@ namespace tools
             return true;
           }
 
+          bool has_related_alias_in_unconfirmed = false;
+          LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
+          m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
+
           if (m_do_mint)
           {
-            bool has_related_alias_in_unconfirmed = false;
-            LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
-            m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
             LOG_PRINT_L2("wallet RPC idle: trying to do PoS iteration...");
             m_wallet.try_mint_pos(miner_address);
           }
@@ -300,6 +301,7 @@ namespace tools
       else
       {
         res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
+        res.tx_size = get_object_blobsize(tx);
       }
       return true;
     }
@@ -573,6 +575,57 @@ namespace tools
     m_wallet.submit_transfer(tx_signed_blob, tx);
     res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
     WALLET_RPC_CATCH_TRY_ENTRY();
+
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_search_for_transactions(const wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request& req, wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    bool tx_id_specified = req.tx_id != currency::null_hash;
+
+    // process confirmed txs
+    m_wallet.enumerate_transfers_history([&](const wallet_public::wallet_transfer_info& wti) -> bool {
+
+      if (tx_id_specified)
+      {
+        if (wti.tx_hash != req.tx_id)
+          return true; // continue
+      }
+
+      if (req.filter_by_height)
+      {
+        if (!wti.height) // unconfirmed
+          return true; // continue
+
+        if (wti.height < req.min_height)
+        {
+          // no need to scan more
+          return false; // stop
+        }
+        if (wti.height > req.max_height)
+        {
+          return true; // continue
+        }
+      }
+    
+      if (wti.is_income && req.in)
+        res.in.push_back(wti);
+
+      if (!wti.is_income && req.out)
+        res.out.push_back(wti);   
+
+      return true; // continue
+    }, false /* enumerate_forward */);
+
+    // process unconfirmed txs
+    if (req.pool)
+    {
+      m_wallet.enumerate_unconfirmed_transfers([&](const wallet_public::wallet_transfer_info& wti) -> bool {
+        if ((wti.is_income && req.in) || (!wti.is_income && req.out))
+          res.pool.push_back(wti);
+        return true; // continue
+      });
+    }
 
     return true;
   }

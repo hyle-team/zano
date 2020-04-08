@@ -10,7 +10,7 @@
 namespace plain_wallet
 {
   typedef int64_t hwallet;
-  std::string init(const std::string& ip, const std::string& port, int log_level);
+  std::string init(const std::string& ip, const std::string& port, const std::string& working_dir, int log_level);
   std::string set_log_level(int log_level);
   std::string get_version();
   std::string get_wallet_files();
@@ -20,6 +20,7 @@ namespace plain_wallet
   std::string generate_random_key(uint64_t lenght);
   std::string get_logs_buffer();
   std::string truncate_log();
+  std::string get_connectivity_status();
 
   std::string open(const std::string& path, const std::string& password);
   std::string restore(const std::string& seed, const std::string& path, const std::string& password);

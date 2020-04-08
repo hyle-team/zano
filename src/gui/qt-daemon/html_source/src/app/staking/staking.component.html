@@ -16,7 +16,7 @@
     </div>
   </div>
   <div class="selected" *ngIf="selectedDate && selectedDate.date">
-    <span>{{selectedDate.date | date : 'MMM. EEEE, dd, yyyy'}}</span>
+    <span>{{selectedDate.date | date : 'EEEE, MMMM d, y'}}</span>
     <span>{{selectedDate.amount}} {{variablesService.defaultCurrency}}</span>
   </div>
 </div>

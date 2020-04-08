@@ -907,6 +907,7 @@ using namespace std;
     struct idle_handler_base
     {
       virtual bool do_call(const std::string& piece_of_data, uint64_t total_bytes, uint64_t received_bytes) = 0;
+      virtual ~idle_handler_base() {}
     };
 
     template <typename callback_t>

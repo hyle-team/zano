@@ -100,7 +100,7 @@ namespace currency
     res.current_max_allowed_block_size = m_core.get_blockchain_storage().get_current_comulative_blocksize_limit();
     if (!res.outgoing_connections_count)
       res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_connecting;
-    else if (res.synchronized_connections_count > total_conn/2 ) /* m_p2p.get_payload_object().is_synchronized()*/
+    else if (m_p2p.get_payload_object().is_synchronized())
       res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_online;
     else
       res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;

@@ -3,9 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 
-#include <boost/dll.hpp>
 #include "plain_wallet_api.h"
-#include "plain_wallet_api_impl.h"
+#include "plain_wallet_api_defs.h"
 #include "currency_core/currency_config.h"
 #include "version.h"
 #include "string_tools.h"
@@ -15,13 +14,9 @@
 #include "common/config_encrypt_helper.h"
 
 #define ANDROID_PACKAGE_NAME    "com.zano_mobile"
-#ifdef IOS_BUILD
-  #define HOME_FOLDER             "Documents"
-#elif ANDROID_BUILD
-  #define HOME_FOLDER             "files"
-#else 
-  #define HOME_FOLDER             "logs"
-#endif
+
+#define LOGS_FOLDER             "logs"
+
 #define WALLETS_FOLDER_NAME     "wallets"
 #define APP_CONFIG_FOLDER       "app_config"
 #define APP_CONFIG_FILENAME     "app_cfg.bin"
@@ -31,31 +26,37 @@
 #define GENERAL_INTERNAL_ERRROR_INSTANCE "GENERAL_INTERNAL_ERROR: WALLET INSTNACE NOT FOUND"
 #define GENERAL_INTERNAL_ERRROR_INIT "Failed to intialize library"
 
-//TODO: global object, subject to refactoring
+//TODO: global objects, subject to refactoring
 wallets_manager gwm;
 std::atomic<bool> initialized(false);
 
 std::atomic<uint64_t> gjobs_counter(1);
 std::map<uint64_t, std::string> gjobs;
 epee::critical_section gjobs_lock;
+std::string gconfig_folder;
 
 namespace plain_wallet
 {
   typedef epee::json_rpc::response<epee::json_rpc::dummy_result, error> error_response;
 
-  std::string get_bundle_root_dir()
+  std::string get_bundle_working_dir()
   {
-#ifdef WIN32
-    return boost::dll::program_location().parent_path().string();
-#elif IOS_BUILD
-    char* env = getenv("HOME");
-    return env ? env : "";
-#elif ANDROID_BUILD
-    ///      data/data/com.zano_mobile/files
-    return "/data/data/" ANDROID_PACKAGE_NAME;
-#else
-    return "";
-#endif
+    return gconfig_folder;
+// #ifdef WIN32
+//     return boost::dll::program_location().parent_path().string();
+// #elif IOS_BUILD
+//     char* env = getenv("HOME");
+//     return env ? env : "";
+// #elif ANDROID_BUILD
+//     ///      data/data/com.zano_mobile/files
+//     return "/data/data/" ANDROID_PACKAGE_NAME;
+// #else
+//     return "";
+// #endif
+  }
+  void set_bundle_working_dir(const std::string& dir)
+  {
+    gconfig_folder = dir;
   }
   
   std::string get_wallets_folder()
@@ -63,7 +64,7 @@ namespace plain_wallet
 #ifdef WIN32
     return "";
 #else
-    std::string path = get_bundle_root_dir() + "/" + HOME_FOLDER + "/" + WALLETS_FOLDER_NAME + "/";
+    std::string path = get_bundle_working_dir() + "/" + WALLETS_FOLDER_NAME + "/";
     return path;
 #endif // WIN32
   }
@@ -73,7 +74,7 @@ namespace plain_wallet
 #ifdef WIN32
     return "";
 #else
-    std::string path = get_bundle_root_dir() + "/" + HOME_FOLDER + "/" + APP_CONFIG_FOLDER + "/";
+    std::string path = get_bundle_working_dir() + "/" + APP_CONFIG_FOLDER + "/";
     return path;
 #endif // WIN32
   }
@@ -82,8 +83,8 @@ namespace plain_wallet
 
   void initialize_logs(int log_level)
   {
-    std::string log_dir = get_bundle_root_dir();
-    log_dir += "/" HOME_FOLDER;
+    std::string log_dir = get_bundle_working_dir();
+    log_dir += "/" LOGS_FOLDER;
 
     log_space::get_set_need_thread_id(true, true);
     log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
@@ -101,7 +102,7 @@ namespace plain_wallet
     return "{}";
   }
 
-  std::string init(const std::string& ip, const std::string& port, int log_level)
+  std::string init(const std::string& ip, const std::string& port, const std::string& working_dir, int log_level)
   {
     if (initialized)
     {
@@ -110,13 +111,14 @@ namespace plain_wallet
       ok_response.result.return_code = API_RETURN_CODE_ALREADY_EXISTS;
       return epee::serialization::store_t_to_json(ok_response);
     }
-      
+    set_bundle_working_dir(working_dir);
 
     initialize_logs(log_level);
     std::string argss_1 = std::string("--remote-node=") + ip + ":" + port;    
     std::string argss_2 = std::string("--disable-logs-init");
     char * args[4];
-    args[0] = "stub";
+    static const char* arg0_stub = "stub";
+    args[0] = const_cast<char*>(arg0_stub);
     args[1] = const_cast<char*>(argss_1.c_str());
     args[2] = const_cast<char*>(argss_2.c_str());
     args[3] = nullptr;
@@ -211,6 +213,10 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(ok_response);
   }
 
+  std::string get_connectivity_status()
+  {
+    return gwm.get_connectivity_status();
+  }
 
   std::string get_version()
   {
@@ -371,7 +377,15 @@ namespace plain_wallet
         put_result(job_id, res);
       };
     }
-    else
+    else if (method_name == "get_wallet_status")
+    {
+      std::string local_params = params;
+      async_callback = [job_id, local_params, instance_id]()
+      {
+        std::string res = get_wallet_status(instance_id);
+        put_result(job_id, res);
+      };
+    }else
     {
       view::api_response ar = AUTO_VAL_INIT(ar);
       ar.error_code = "UNKNOWN METHOD";
