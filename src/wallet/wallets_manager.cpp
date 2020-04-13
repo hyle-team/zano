@@ -1183,7 +1183,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
     }
       
     
-    //proces attachments
+    //process attachments
     if (tp.comment.size())
     {
       currency::tx_comment tc = AUTO_VAL_INIT(tc);

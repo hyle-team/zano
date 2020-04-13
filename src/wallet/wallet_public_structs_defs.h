@@ -320,6 +320,8 @@ namespace wallet_public
       //uint64_t unlock_time;
       std::string payment_id; // hex-encoded
       std::string comment; 
+      bool push_payer;
+      bool hide_receiver;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(destinations)
@@ -328,6 +330,8 @@ namespace wallet_public
         //KV_SERIALIZE(unlock_time)
         KV_SERIALIZE(payment_id)
         KV_SERIALIZE(comment)
+        KV_SERIALIZE(push_payer)
+        KV_SERIALIZE(hide_receiver)
       END_KV_SERIALIZE_MAP()
     };
 

@@ -275,6 +275,7 @@ namespace tools
     try
     {
       std::vector<currency::attachment_v> attachments; 
+      std::vector<currency::extra_v> extra;
       if (!payment_id.empty() && !currency::set_payment_id_to_tx(attachments, payment_id))
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
@@ -289,8 +290,27 @@ namespace tools
         attachments.push_back(comment);
       }
 
+      if (req.push_payer)
+      {
+        currency::tx_payer txp = AUTO_VAL_INIT(txp);
+        txp.acc_addr = m_wallet.get_account().get_keys().m_account_address;
+        extra.push_back(txp);
+      }
+      if (!req.hide_receiver)
+      {
+        for (auto& d : dsts)
+        {
+          for (auto& a : d.addr)
+          {
+            currency::tx_receiver txr = AUTO_VAL_INIT(txr);
+            txr.acc_addr = a;
+            extra.push_back(txr);
+          }
+        }
+      }
+
       currency::transaction tx;
-      std::vector<currency::extra_v> extra;
+      
       std::string signed_tx_blob_str;
       m_wallet.transfer(dsts, req.mixin, 0/*req.unlock_time*/, req.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, CURRENCY_TO_KEY_OUT_RELAXED, true, 0, true, &signed_tx_blob_str);
       if (m_wallet.is_watch_only())
