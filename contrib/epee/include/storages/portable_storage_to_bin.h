@@ -37,7 +37,7 @@ namespace epee
   {
 
     template<class pack_value, class t_stream>
-    size_t pack_varint_t(t_stream& strm, uint8_t type_or, size_t& pv)
+    size_t pack_varint_t(t_stream& strm, uint8_t type_or, const uint64_t& pv)
     {
       pack_value v = (*((pack_value*)&pv)) << 2;
       v |= type_or;
@@ -48,7 +48,7 @@ namespace epee
     PUSH_GCC_WARNINGS
     DISABLE_GCC_WARNING(strict-aliasing)
       template<class t_stream>
-    size_t pack_varint(t_stream& strm, size_t val)
+    size_t pack_varint(t_stream& strm, uint64_t val)
     {   //the first two bits always reserved for size information
 
       if(val <= 63)

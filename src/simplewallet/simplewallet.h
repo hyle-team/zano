@@ -78,7 +78,7 @@ namespace currency
     bool viewkey(const std::vector<std::string> &args);
     bool save(const std::vector<std::string> &args);
     bool set_log(const std::vector<std::string> &args);
-    bool enable_concole_logger(const std::vector<std::string> &args);
+    bool enable_console_logger(const std::vector<std::string> &args);
     bool integrated_address(const std::vector<std::string> &args);
     bool get_tx_key(const std::vector<std::string> &args_);
     bool save_watch_only(const std::vector<std::string> &args);

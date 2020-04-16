@@ -53,7 +53,7 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address)
   {
-    static const uint64_t wallet_rpt_idle_work_period_ms = 2000;
+    static const uint64_t wallet_rpc_idle_work_period_ms = 2000;
 
     m_do_mint = do_mint;
 
@@ -74,11 +74,12 @@ namespace tools
             return true;
           }
 
+          bool has_related_alias_in_unconfirmed = false;
+          LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
+          m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
+
           if (m_do_mint)
           {
-            bool has_related_alias_in_unconfirmed = false;
-            LOG_PRINT_L2("wallet RPC idle: scanning tx pool...");
-            m_wallet.scan_tx_pool(has_related_alias_in_unconfirmed);
             LOG_PRINT_L2("wallet RPC idle: trying to do PoS iteration...");
             m_wallet.try_mint_pos(miner_address);
           }
@@ -97,7 +98,7 @@ namespace tools
         }
 
         return true;
-      }, wallet_rpt_idle_work_period_ms);
+      }, wallet_rpc_idle_work_period_ms);
     }
 
     //DO NOT START THIS SERVER IN MORE THEN 1 THREADS WITHOUT REFACTORING
@@ -186,6 +187,55 @@ namespace tools
     }
     return true;
   }
+  bool wallet_rpc_server::on_getwallet_info(const wallet_public::COMMAND_RPC_GET_WALLET_INFO::request& req, wallet_public::COMMAND_RPC_GET_WALLET_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      res.address = m_wallet.get_account().get_public_address_str();
+      res.is_whatch_only = m_wallet.is_watch_only();
+      res.path = epee::string_encoding::convert_to_ansii(m_wallet.get_wallet_path());
+      res.transfers_count = m_wallet.get_recent_transfers_total_count();
+      res.transfer_entries_count = m_wallet.get_transfer_entries_count();
+      res.seed = m_wallet.get_account().get_restore_braindata();
+      std::map<uint64_t, uint64_t> distribution;
+      m_wallet.get_utxo_distribution(distribution);
+      for (const auto& ent : distribution)
+        res.utxo_distribution.push_back(currency::print_money_brief(ent.first) + ":" + std::to_string(ent.second));
+      
+      return true;
+    }
+    catch (std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = e.what();
+      return false;
+    }
+  }
+  bool wallet_rpc_server::on_get_recent_txs_and_info(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      if (req.update_provision_info)
+      {
+        res.pi.balance = m_wallet.balance(res.pi.unlocked_balance);
+        res.pi.transfer_entries_count = m_wallet.get_transfer_entries_count();
+        res.pi.transfers_count = m_wallet.get_recent_transfers_total_count();
+      }
+
+      if (req.offset == 0)
+        m_wallet.get_unconfirmed_transfers(res.transfers);
+      
+      m_wallet.get_recent_transfers_history(res.transfers, req.offset, req.count, res.total_transfers);
+
+      return true;
+    }
+    catch (std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = e.what();
+      return false;
+    }
+  }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
@@ -251,6 +301,7 @@ namespace tools
       else
       {
         res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
+        res.tx_size = get_object_blobsize(tx);
       }
       return true;
     }
@@ -524,6 +575,57 @@ namespace tools
     m_wallet.submit_transfer(tx_signed_blob, tx);
     res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
     WALLET_RPC_CATCH_TRY_ENTRY();
+
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_search_for_transactions(const wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request& req, wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    bool tx_id_specified = req.tx_id != currency::null_hash;
+
+    // process confirmed txs
+    m_wallet.enumerate_transfers_history([&](const wallet_public::wallet_transfer_info& wti) -> bool {
+
+      if (tx_id_specified)
+      {
+        if (wti.tx_hash != req.tx_id)
+          return true; // continue
+      }
+
+      if (req.filter_by_height)
+      {
+        if (!wti.height) // unconfirmed
+          return true; // continue
+
+        if (wti.height < req.min_height)
+        {
+          // no need to scan more
+          return false; // stop
+        }
+        if (wti.height > req.max_height)
+        {
+          return true; // continue
+        }
+      }
+    
+      if (wti.is_income && req.in)
+        res.in.push_back(wti);
+
+      if (!wti.is_income && req.out)
+        res.out.push_back(wti);   
+
+      return true; // continue
+    }, false /* enumerate_forward */);
+
+    // process unconfirmed txs
+    if (req.pool)
+    {
+      m_wallet.enumerate_unconfirmed_transfers([&](const wallet_public::wallet_transfer_info& wti) -> bool {
+        if ((wti.is_income && req.in) || (!wti.is_income && req.out))
+          res.pool.push_back(wti);
+        return true; // continue
+      });
+    }
 
     return true;
   }

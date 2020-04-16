@@ -46,7 +46,6 @@
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
-ENABLE_CHANNEL_BY_DEFAULT("wallet");
 
 // wallet-specific logging functions
 #define WLT_LOG_L0(msg) LOG_PRINT_L0("[W:" << m_log_prefix << "] " << msg)
@@ -124,8 +123,6 @@ namespace tools
 #pragma pack(push, 1)
   struct out_key_to_ki
   {
-    out_key_to_ki() {}
-    out_key_to_ki(const crypto::public_key& out_key, const crypto::key_image& key_image) : out_key(out_key), key_image(key_image) {}
     crypto::public_key out_key;
     crypto::key_image  key_image;
   };
@@ -452,9 +449,9 @@ namespace tools
       END_SERIALIZE()
     };
     void assign_account(const currency::account_base& acc);
-    void generate(const std::wstring& wallet, const std::string& password);
+    void generate(const std::wstring& path, const std::string& password);
     void restore(const std::wstring& path, const std::string& pass, const std::string& restore_key);
-    void load(const std::wstring& wallet, const std::string& password);    
+    void load(const std::wstring& path, const std::string& password);
     void store();
     void store(const std::wstring& path);
     void store(const std::wstring& path, const std::string& password);
@@ -466,6 +463,7 @@ namespace tools
 
     void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total);
     uint64_t get_recent_transfers_total_count();
+    uint64_t get_transfer_entries_count();
     void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs);
     void init(const std::string& daemon_address = "http://localhost:8080");
     bool deinit();
@@ -616,6 +614,14 @@ namespace tools
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;
 
+    // callback: (const wallet_public::wallet_transfer_info& wti) -> bool, true -- continue, false -- stop
+    template<typename callback_t>
+    void enumerate_transfers_history(callback_t cb, bool enumerate_forward) const;
+
+    // callback: (const wallet_public::wallet_transfer_info& wti) -> bool, true -- continue, false -- stop
+    template<typename callback_t>
+    void enumerate_unconfirmed_transfers(callback_t cb) const;
+
     bool is_watch_only() const { return m_watch_only; }
     void sign_transfer(const std::string& tx_sources_blob, std::string& signed_tx_blob, currency::transaction& tx);
     void sign_transfer_files(const std::string& tx_sources_file, const std::string& signed_tx_file, currency::transaction& tx);
@@ -744,7 +750,7 @@ namespace tools
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
     bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
-
+    uint64_t get_sync_progress();
 private:
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
@@ -863,7 +869,7 @@ private:
     void check_for_free_space_and_throw_if_it_lacks(const std::wstring& path, uint64_t exact_size_needed_if_known = UINT64_MAX);
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
-
+    void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
 
     currency::account_base m_account;
     bool m_watch_only;
@@ -895,7 +901,7 @@ private:
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
     uint64_t m_height_of_start_sync;
-    uint64_t m_last_sync_percent;
+    std::atomic<uint64_t> m_last_sync_percent;
     uint64_t m_last_pow_block_h;
     currency::core_runtime_config m_core_runtime_config;
     escrow_contracts_container m_contracts;
@@ -1143,6 +1149,31 @@ namespace tools
     }
     cxt.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
     return false;
+  }
+
+  template<typename callback_t>
+  void wallet2::enumerate_transfers_history(callback_t cb, bool enumerate_forward) const
+  {
+    if (enumerate_forward)
+    {
+      for(auto it = m_transfer_history.begin(); it != m_transfer_history.end(); ++it)
+        if (!cb(*it))
+          break;
+    }
+    else
+    {
+      for(auto it = m_transfer_history.rbegin(); it != m_transfer_history.rend(); ++it)
+        if (!cb(*it))
+          break;
+    }
+  }
+
+  template<typename callback_t>
+  void wallet2::enumerate_unconfirmed_transfers(callback_t cb) const
+  {
+    for (auto& el : m_unconfirmed_txs)
+      if (!cb(el.second))
+        break;
   }
 
 } // namespace tools

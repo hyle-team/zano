@@ -10,6 +10,7 @@
 #include <mutex>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 #include "common/pod-class.h"
 #include "generic-ops.h"
@@ -225,6 +226,69 @@ namespace crypto {
     const signature *sig) {
     return check_ring_signature(prefix_hash, image, pubs.data(), pubs.size(), sig);
   }
+
+  class stream_cn_hash
+  {
+  public:
+    static constexpr size_t DATA_BLOCK_SIZE = 1024 * 1024;
+
+    stream_cn_hash()
+      : m_buffer(HASH_SIZE + DATA_BLOCK_SIZE, '\0')
+      , m_p_hash(const_cast<hash*>(reinterpret_cast<const hash*>(m_buffer.data())))
+      , m_p_data(const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(m_buffer.data())) + HASH_SIZE)
+      , m_ready(false)
+      , m_data_used(0)
+    {
+      m_ready = true;
+    }
+
+    bool update(const void* data, size_t size)
+    {
+      if (!m_ready)
+        return false;
+
+      const uint8_t* p_source_data = reinterpret_cast<const uint8_t*>(data);
+
+      while(size > 0)
+      {
+        // fill the buffer up
+        size_t bytes_to_copy = std::min(size, DATA_BLOCK_SIZE - m_data_used);
+        memcpy(m_p_data + m_data_used, p_source_data, bytes_to_copy);
+        m_data_used += bytes_to_copy;
+        p_source_data += bytes_to_copy;
+        size -= bytes_to_copy;
+
+        if (m_data_used == DATA_BLOCK_SIZE)
+        {
+          // calc imtermediate hash of the whole buffer and put the result into the beginning of the buffer
+          *m_p_hash = cn_fast_hash(m_buffer.data(), HASH_SIZE + m_data_used);
+          // clear data buffer for new bytes
+          memset(m_p_data, 0, DATA_BLOCK_SIZE);
+          m_data_used = 0;
+        }
+
+        // repeat if there are source bytes left
+      }
+
+      return true;
+    }
+
+    hash calculate_hash()
+    {
+      if (m_data_used == 0)
+        return *m_p_hash;
+
+      m_ready = false;
+      return cn_fast_hash(m_buffer.data(), HASH_SIZE + m_data_used);
+    }
+  
+  private:
+    const std::string m_buffer;
+    hash* const     m_p_hash;
+    uint8_t* const  m_p_data;
+    size_t          m_data_used;
+    bool            m_ready;
+  };
 
 }
 

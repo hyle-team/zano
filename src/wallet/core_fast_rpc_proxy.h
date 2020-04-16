@@ -138,6 +138,11 @@ namespace tools
     {
       return tools::get_transfer_address(adr_str, addr, payment_id, this);
     }
+    //------------------------------------------------------------------------------------------------------------------------------
+    virtual time_t get_last_success_interract_time() override
+    { 
+      return time(nullptr); 
+    }
 
   private:
     currency::core_rpc_server& m_rpc;

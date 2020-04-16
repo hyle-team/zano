@@ -8,11 +8,12 @@
 #include "chaingen_tests_list.h"
 #include "common/command_line.h"
 #include "transaction_tests.h"
-#include "../../src/gui/qt-daemon/application/core_fast_rpc_proxy.h"
+#include "../../src/wallet/core_fast_rpc_proxy.h"
 #include "test_core_proxy.h"
 #include "currency_core/bc_offers_service.h"
 #include "random_helper.h"
 #include "core_state_helper.h"
+#include "common/db_backend_selector.h"
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
@@ -666,6 +667,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   currency::core::init_options(desc_options);
+  tools::db::db_backend_selector::init_options(desc_options);
 
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {
@@ -809,6 +811,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_checkpoints_prun_txs_after_blockchain_load);
     GENERATE_AND_PLAY(gen_checkpoints_reorganize);
     GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
+    GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase);
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 

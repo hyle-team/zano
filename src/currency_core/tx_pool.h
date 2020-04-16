@@ -159,7 +159,6 @@ namespace currency
     
     typedef tools::db::cached_key_value_accessor<crypto::hash, tx_details, true, false> transactions_container;
     typedef tools::db::cached_key_value_accessor<crypto::hash, bool, false, false> hash_container; 
-    //typedef tools::db::cached_key_value_accessor<crypto::key_image, uint64_t, false, false> key_images_container;
     typedef tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> solo_options_container;
     typedef tools::db::cached_key_value_accessor<std::string, bool, false, false> aliases_container; 
     typedef tools::db::cached_key_value_accessor<account_public_address, bool, false, false> address_to_aliases_container;
@@ -172,7 +171,6 @@ namespace currency
 
     transactions_container m_db_transactions;
     hash_container  m_db_black_tx_list;
-    //key_images_container m_db_key_images_set;
     aliases_container m_db_alias_names;
     address_to_aliases_container m_db_alias_addresses;
     solo_options_container m_db_solo_options;

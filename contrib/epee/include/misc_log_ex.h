@@ -69,7 +69,7 @@ DISABLE_VS_WARNINGS(4100)
 #include "syncobj.h"
 #include "sync_locked_object.h"
 #include "string_coding.h"
-
+#include "file_io_utils.h"
 
 #define LOG_LEVEL_SILENT     -1
 #define LOG_LEVEL_0     0
@@ -113,10 +113,12 @@ DISABLE_VS_WARNINGS(4100)
 #endif
 
 #define LOG_DEFAULT_CHANNEL    NULL
+
 #define ENABLE_CHANNEL_BY_DEFAULT(ch_name)   \
   static bool COMBINE(init_channel, __LINE__) UNUSED_ATTRIBUTE = epee::misc_utils::static_initializer([](){  \
   epee::log_space::log_singletone::enable_channel(ch_name);  return true; \
 });
+
 
 
 #if defined(ENABLE_LOGGING_INTERNAL)
@@ -288,6 +290,8 @@ namespace log_space
 
     virtual bool set_max_logfile_size(uint64_t max_size){return true;};
     virtual bool set_log_rotate_cmd(const std::string& cmd){return true;};
+    virtual bool truncate_log_files() { return true; }
+    virtual std::string copy_logs_to_buffer() { return ""; }
   };
 
   /************************************************************************/
@@ -365,6 +369,7 @@ namespace log_space
 
   inline bool is_stdout_a_tty()
   {
+#ifndef ANDROID_BUILD
     static std::atomic<bool> initialized(false);
     static std::atomic<bool> is_a_tty(false);
 
@@ -379,6 +384,9 @@ namespace log_space
     }
 
     return is_a_tty.load(std::memory_order_relaxed);
+#else
+    return false;
+#endif
   }
 
   inline void set_console_color(int color, bool bright)
@@ -584,7 +592,7 @@ namespace log_space
       std::string buf(buffer, buffer_len);
       for(size_t i = 0; i!= buf.size(); i++)
       {
-        if(buf[i] == 7 || buf[i] == -107)
+        if(static_cast<unsigned char>(buf[i]) == 0x7 || static_cast<unsigned char>(buf[i]) == 0x95)
           buf[i] = '^';
       }
 
@@ -623,7 +631,7 @@ namespace log_space
   class file_output_stream : public ibase_log_stream
   {
   public:
-    typedef std::map<std::string, boost::filesystem::ofstream*> named_log_streams;
+    typedef std::map<std::string, std::pair< boost::filesystem::ofstream*, std::wstring> > named_log_streams;
 
     file_output_stream( const std::string& default_log_file_name, const std::string& log_path )
     {
@@ -637,12 +645,12 @@ namespace log_space
     {
       for(named_log_streams::iterator it = m_log_file_names.begin(); it!=m_log_file_names.end(); it++)
       {
-        if ( it->second->is_open() )
+        if ( it->second.first->is_open() )
         {
-          it->second->flush();
-          it->second->close();
+          it->second.first->flush();
+          it->second.first->close();
         }
-        delete it->second;
+        delete it->second.first;
       }
     }
   private:
@@ -660,12 +668,14 @@ namespace log_space
       //log_space::rotate_log_file((m_default_log_path + "\\" + pstream_name).c_str());
       boost::system::error_code ec;
       boost::filesystem::create_directories(m_default_log_path_w, ec);
-      boost::filesystem::ofstream* pstream = (m_log_file_names[pstream_name] = new boost::filesystem::ofstream);
+      boost::filesystem::ofstream* pstream = new boost::filesystem::ofstream;
+      
       std::wstring target_path = m_default_log_path_w + L"/" + epee::string_encoding::utf8_to_wstring(pstream_name);
       
       pstream->open( target_path.c_str(), std::ios_base::out | std::ios::app /*ios_base::trunc */);
       if(pstream->fail())
         return NULL;
+      m_log_file_names[pstream_name] = std::pair<boost::filesystem::ofstream*, std::wstring>(pstream, target_path);
       return pstream;
     }
 
@@ -681,6 +691,51 @@ namespace log_space
       return true;
     }
 
+    bool truncate_log_files()
+    {
+      for (named_log_streams::iterator it = m_log_file_names.begin(); it != m_log_file_names.end(); it++)
+      {
+        std::wstring target_path = it->second.second;
+        //close and delete current stream
+        if (it->second.first->is_open())
+        {
+          it->second.first->flush();
+          it->second.first->close();
+        }
+        delete it->second.first;
+        it->second.first = nullptr;
+        //reopen it with truncate        
+        boost::filesystem::ofstream* pstream = new boost::filesystem::ofstream;
+        pstream->open(target_path.c_str(), std::ios_base::out | std::ios::trunc );
+        if (pstream->fail())
+        {
+          throw std::runtime_error("Unexpected error: failed to re-open log stream on truncate");
+        }
+        it->second.first = pstream;
+      }
+      return true;
+    }
+
+    std::string copy_logs_to_buffer()
+    {
+      std::stringstream res;
+      
+      for (named_log_streams::iterator it = m_log_file_names.begin(); it != m_log_file_names.end(); it++)
+      {
+        std::wstring target_path = it->second.second;
+        res << "[" << epee::string_encoding::convert_to_ansii(target_path) << "]" << ENDL;
+        std::string res_buf;
+        if (!epee::file_io_utils::load_file_to_string(target_path, res_buf))
+        {
+          res << "ERROR";
+        }
+        else
+        {
+          res << res_buf;
+        }
+      }
+      return res.str();
+    }
 
 
     virtual bool out_buffer( const char* buffer, int buffer_len, int log_level, int color, const char* plog_name = NULL )
@@ -692,7 +747,7 @@ namespace log_space
         if(it == m_log_file_names.end())
           m_target_file_stream = add_new_stream_and_open(plog_name);
         else
-          m_target_file_stream = it->second;
+          m_target_file_stream = it->second.first;
       }
       if(!m_target_file_stream || !m_target_file_stream->is_open())
         return false;//TODO: add assert here
@@ -789,6 +844,22 @@ namespace log_space
         it->first->set_log_rotate_cmd(cmd);
       return true;
     }
+
+    bool truncate_log_files()
+    {
+      for (streams_container::iterator it = m_log_streams.begin(); it != m_log_streams.end(); it++)
+        it->first->truncate_log_files();
+      return true;
+    }
+
+    std::string copy_logs_to_buffer()
+    {
+      std::string res;
+      for (streams_container::iterator it = m_log_streams.begin(); it != m_log_streams.end(); it++)
+        res += it->first->copy_logs_to_buffer();
+      return res;
+    }
+
 
     bool do_log_message(const std::string& rlog_mes, int log_level, int color, const char* plog_name = NULL)
     {
@@ -959,6 +1030,21 @@ namespace log_space
       m_log_target.set_log_rotate_cmd(cmd);
       FAST_CRITICAL_REGION_END();
       return true;
+    }
+
+    std::string copy_logs_to_buffer()
+    {
+      FAST_CRITICAL_REGION_BEGIN(m_critical_sec);
+      return m_log_target.copy_logs_to_buffer();
+      FAST_CRITICAL_REGION_END();
+    }
+    
+
+    bool truncate_log_files()
+    {
+      FAST_CRITICAL_REGION_BEGIN(m_critical_sec);
+      return m_log_target.truncate_log_files();
+      FAST_CRITICAL_REGION_END();
     }
 
     bool take_away_journal(std::list<std::string>& journal)
@@ -1150,7 +1236,9 @@ namespace log_space
       std::set<std::string> enabled_channels_local = genabled_channels;
       enabled_channels_local.insert(ch_name);
       genabled_channels.swap(enabled_channels_local);
+#ifndef ANDROID_BUILD
       std::cout << "log channel '" << ch_name << "' enabled" << std::endl;
+#endif
     }
 
     static void disable_channels(const std::string& channels_set)
@@ -1245,6 +1333,23 @@ namespace log_space
       if(!plogger) return false;
       return plogger->set_log_rotate_cmd(cmd);
     }
+
+    
+    static std::string copy_logs_to_buffer()
+    {
+      logger* plogger = get_or_create_instance();
+      if (!plogger) return "";
+      return plogger->copy_logs_to_buffer();
+    }
+
+
+    static bool truncate_log_files()
+    {
+      logger* plogger = get_or_create_instance();
+      if (!plogger) return false;
+      return plogger->truncate_log_files();
+    }
+
 
 
     static bool add_logger( int type, const char* pdefault_file_name, const char* pdefault_log_folder, int log_level_limit = LOG_LEVEL_4)

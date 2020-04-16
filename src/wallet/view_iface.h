@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <QObject>
-#ifndef Q_MOC_RUN
+// #include <stdint.h>
+// #include <QObject>
+// #ifndef Q_MOC_RUN
 #include "warnings.h"
 
 PUSH_VS_WARNINGS
@@ -22,7 +22,7 @@ DISABLE_VS_WARNINGS(4503)
 #include "currency_core/basic_api_response_codes.h"
 POP_VS_WARNINGS
 
-#endif
+//#endif
 
 namespace view
 {
@@ -139,6 +139,8 @@ public:
     uint64_t last_build_displaymode;
     uint64_t alias_count;
     std::string last_build_available;
+    uint64_t downloaded_bytes;
+    uint64_t download_total_data_size;
     //std::list<block_info> last_blocks;
     bool is_pos_allowed;
     uint64_t expiration_median_timestamp;
@@ -160,6 +162,8 @@ public:
       KV_SERIALIZE(last_build_available)
       //KV_SERIALIZE(last_blocks)
       KV_SERIALIZE(alias_count)
+      KV_SERIALIZE(downloaded_bytes)
+      KV_SERIALIZE(download_total_data_size)
       KV_SERIALIZE(is_pos_allowed)
       KV_SERIALIZE(expiration_median_timestamp)
       KV_SERIALIZE(is_disconnected)
@@ -424,11 +428,15 @@ public:
     uint64_t wallet_id;
     transfers_array recent_history;
     wallet_info wi;
+    std::string seed;
+    bool recovered;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(recent_history)
       KV_SERIALIZE(wi)
+      KV_SERIALIZE(seed)
+      KV_SERIALIZE(recovered)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -437,6 +445,19 @@ public:
     std::list<wallet_entry_info> wallets;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallets)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct general_connectivity_info
+  {
+    bool is_online;
+    bool last_daemon_is_disconnected;
+    uint64_t last_proxy_communicate_timestamp;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(is_online)
+      KV_SERIALIZE(last_daemon_is_disconnected)
+      KV_SERIALIZE(last_proxy_communicate_timestamp)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -515,6 +536,23 @@ public:
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(progress)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct wallet_sync_status_info
+  {
+    bool is_daemon_connected;
+    uint64_t wallet_state;
+    bool is_in_long_refresh;
+    uint64_t progress;
+    uint64_t current_daemon_height;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(is_daemon_connected)
+      KV_SERIALIZE(wallet_state)
+      KV_SERIALIZE(is_in_long_refresh)
+      KV_SERIALIZE(progress)
+      KV_SERIALIZE(current_daemon_height)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -700,6 +738,14 @@ public:
   };
 
 
+  struct api_responce_return_code
+  {
+    std::string return_code;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(return_code)
+    END_KV_SERIALIZE_MAP()
+  };
 
 
   struct api_void
@@ -745,6 +791,8 @@ public:
 #define API_RETURN_CODE_FALSE                                   "FALSE"
 #define API_RETURN_CODE_CORE_BUSY                               "CORE_BUSY"
 #define API_RETURN_CODE_OVERFLOW                                "OVERFLOW"
+#define API_RETURN_CODE_BUSY                                    "BUSY"
+#define API_RETURN_CODE_INVALID_FILE                            "INVALID_FILE"
 
 #define API_MAX_ALIASES_COUNT                                   10000
 

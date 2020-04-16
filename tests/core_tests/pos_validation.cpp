@@ -1040,6 +1040,8 @@ bool pos_minting_tx_packing::pos_minting_tx_packing::generate(std::vector<test_e
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
 
   m_alice_start_amount = 10 * CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size;// +TESTS_DEFAULT_FEE;
+
+  // 10 outputs each of (CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size) coins
   
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
@@ -1085,7 +1087,7 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
 
   alice_wlt->set_pos_mint_packing_size(m_pos_mint_packing_size);
 
-  // no coinbase tx outputs should packed
+  // no coinbase tx outputs should be packed
   r = alice_wlt->try_mint_pos();
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
   
@@ -1112,12 +1114,24 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
   
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
-    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 2), // total
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 2), // total (+1 one block reward)
     true,
     UINT64_MAX,
-    m_alice_start_amount + CURRENCY_BLOCK_REWARD
+    // CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size locked for stake
+    // CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1) locked for packing tx
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD - CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1) // unlocked
   ), false, "");
 
+  r = alice_wlt->try_mint_pos();
+  CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt,
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 3), // total (+1 one block reward)
+    true,
+    UINT64_MAX,
+    // CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size locked for stake
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD - CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1) - CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size // unlocked
+  ), false, "");
 
   return true;
 }

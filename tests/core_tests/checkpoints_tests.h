@@ -102,3 +102,10 @@ struct gen_no_attchments_in_coinbase_gentime : public checkpoints_test
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
+
+struct gen_checkpoints_and_invalid_tx_to_pool : public checkpoints_test
+{
+  gen_checkpoints_and_invalid_tx_to_pool();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#include <vector>
 #include "currency_protocol/currency_protocol_defs.h"
 #include "currency_core/currency_basic.h"
 #include "crypto/hash.h"
@@ -206,6 +207,99 @@ namespace wallet_public
     };
   };
 
+  
+
+  struct COMMAND_RPC_GET_WALLET_INFO
+  {
+    struct request
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string               address;
+      std::string               path;
+      std::string               seed;
+      uint64_t                  transfers_count;
+      uint64_t                  transfer_entries_count;
+      bool                      is_whatch_only;
+      std::vector<std::string>  utxo_distribution;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(address)
+        KV_SERIALIZE(path)
+        KV_SERIALIZE(seed)
+        KV_SERIALIZE(transfers_count)
+        KV_SERIALIZE(transfer_entries_count)
+        KV_SERIALIZE(is_whatch_only)
+        KV_SERIALIZE(utxo_distribution)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
+  struct wallet_provision_info
+  {
+    uint64_t                  transfers_count;
+    uint64_t                  transfer_entries_count;
+    uint64_t                  balance;
+    uint64_t                  unlocked_balance;
+
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(transfers_count)
+      KV_SERIALIZE(transfer_entries_count)
+      KV_SERIALIZE(balance)
+      KV_SERIALIZE(unlocked_balance)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
+  {
+    struct request
+    {
+
+      /*
+      if offset is 0, then GET_RECENT_TXS_AND_INFO return 
+      unconfirmed transactions as the first first items of "transfers", 
+      this unconfirmed transactions is not counted regarding "count" parameter
+      */
+      uint64_t offset;
+      uint64_t count;
+
+      /* 
+      need_to_get_info - should backend re-calculate balance(could be relatively heavy, 
+      and not needed when getting long tx history with multiple calls 
+      of GET_RECENT_TXS_AND_INFO with offsets)
+      */
+      bool update_provision_info;  
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(offset)
+        KV_SERIALIZE(count)
+        KV_SERIALIZE(update_provision_info)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      wallet_provision_info pi;
+      std::vector<wallet_transfer_info> transfers;
+      uint64_t total_transfers;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(pi)
+        KV_SERIALIZE(transfers)
+        KV_SERIALIZE(total_transfers)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
+
+  
   struct trnsfer_destination
   {
     uint64_t amount;
@@ -241,10 +335,12 @@ namespace wallet_public
     {
       std::string tx_hash;
       std::string tx_unsigned_hex; // for cold-signing process
+      uint64_t tx_size;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_hash)
         KV_SERIALIZE(tx_unsigned_hex)
+        KV_SERIALIZE(tx_size)
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -774,6 +870,52 @@ namespace wallet_public
       END_KV_SERIALIZE_MAP()
     };
   };
+
+  struct COMMAND_RPC_SEARCH_FOR_TRANSACTIONS
+  {
+    struct request
+    {
+      crypto::hash tx_id;
+      bool in;
+      bool out;
+      //bool pending;
+      //bool failed;
+      bool pool;
+      bool filter_by_height;
+      uint64_t min_height;
+      uint64_t max_height;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+        KV_SERIALIZE(in)
+        KV_SERIALIZE(out)
+        //KV_SERIALIZE(pending)
+        //KV_SERIALIZE(failed)
+        KV_SERIALIZE(pool)
+        KV_SERIALIZE(filter_by_height)
+        KV_SERIALIZE(min_height)
+        KV_SERIALIZE(max_height)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::list<wallet_transfer_info> in;
+      std::list<wallet_transfer_info> out;
+      //std::list<wallet_transfer_info> pending;
+      //std::list<wallet_transfer_info> failed;
+      std::list<wallet_transfer_info> pool;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(in)
+        KV_SERIALIZE(out)
+        //KV_SERIALIZE(pending)
+        //KV_SERIALIZE(failed)
+        KV_SERIALIZE(pool)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 
 
   inline std::string get_escrow_contract_state_name(uint32_t state)

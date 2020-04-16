@@ -27,6 +27,7 @@ using namespace epee;
 #include "version.h"
 #include "currency_core/core_tools.h"
 #include "common/callstack_helper.h"
+#include "common/pre_download.h"
 
 #include <cstdlib>
 
@@ -148,6 +149,11 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_on_low_free_space);
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_offers_service);
 
+  command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
+
 
   arg_market_disable.default_value = true;
   arg_market_disable.not_use_default = false;
@@ -159,7 +165,7 @@ int main(int argc, char* argv[])
   currency::miner::init_options(desc_cmd_sett);
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
   currency::stratum_server::init_options(desc_cmd_sett);
-
+  tools::db::db_backend_selector::init_options(desc_cmd_sett);
 
   po::options_description desc_options("Allowed options");
   desc_options.add(desc_cmd_only).add(desc_cmd_sett);
@@ -270,8 +276,25 @@ int main(int argc, char* argv[])
     LOG_PRINT_L0(generate_reference << ENDL << "----------------------------------------" << ENDL << json_rpc_reference);
   }
 
-
   bool res = false;
+
+  //do pre_download if needed
+  if (!command_line::has_arg(vm, command_line::arg_no_predownload) || command_line::has_arg(vm, command_line::arg_force_predownload))
+  {
+    auto is_stop_signal_sent = [&p2psrv]() -> bool {
+      return static_cast<nodetool::i_p2p_endpoint<currency::t_currency_protocol_handler<currency::core>::connection_context>*>(&p2psrv)->is_stop_signal_sent();
+    };
+
+    if (!tools::process_predownload(vm, [&](uint64_t total_bytes, uint64_t received_bytes) { return is_stop_signal_sent(); }))
+    {
+      return EXIT_FAILURE;
+    }
+    
+    if (is_stop_signal_sent())
+      return 1;
+  }
+
+
   //initialize objects
   LOG_PRINT_L0("Initializing p2p server...");
   res = p2psrv.init(vm);

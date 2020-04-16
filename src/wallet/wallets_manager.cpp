@@ -4,46 +4,63 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "daemon_backend.h"
+
+#include "wallets_manager.h"
 #include "currency_core/alias_helper.h"
-#include "core_fast_rpc_proxy.h"
-#include "string_coding.h"
-#include "currency_core/core_tools.h"
+#ifndef MOBILE_WALLET_BUILD
+  #include "core_fast_rpc_proxy.h"
+  #include "currency_core/core_tools.h"
+#endif
 #include "common/callstack_helper.h"
+#include "string_coding.h"
+#include "wallet_helpers.h"
+#include "core_default_rpc_proxy.h"
+#include "common/db_backend_selector.h"
+#include "common/pre_download.h"
+
 
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
-  CRITICAL_REGION_LOCAL(m_wallets_lock);    \
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    \
   auto it = m_wallets.find(wallet_id);      \
   if (it == m_wallets.end())                \
     return API_RETURN_CODE_WALLET_WRONG_ID; \
   auto& name = it->second;
 
 #define GET_WALLET_BY_ID(wallet_id, name)       \
-CRITICAL_REGION_LOCAL(m_wallets_lock);    \
-auto it = m_wallets.find(wallet_id);      \
-if (it == m_wallets.end())                \
-  return API_RETURN_CODE_WALLET_WRONG_ID; \
-auto& name = it->second.w;
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    \
+  auto it = m_wallets.find(wallet_id);      \
+  if (it == m_wallets.end())                \
+    return API_RETURN_CODE_WALLET_WRONG_ID; \
+  auto& name = it->second.w;
 
+#define DAEMON_IDLE_UPDATE_TIME_MS        2000
+#define HTTP_PROXY_TIMEOUT                2000
+#define HTTP_PROXY_ATTEMPTS_COUNT         1
 
-
-daemon_backend::daemon_backend():m_pview(&m_view_stub),
+wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_stop_singal_sent(false),
+#ifndef MOBILE_WALLET_BUILD
                                  m_ccore(&m_cprotocol),
                                  m_cprotocol(m_ccore, &m_p2psrv),
                                  m_p2psrv(m_cprotocol),
                                  m_rpc_server(m_ccore, m_p2psrv, m_offers_service),
                                  m_rpc_proxy(new tools::core_fast_rpc_proxy(m_rpc_server)),
+                                 m_offers_service(nullptr),
+#else 
+                                 m_rpc_proxy(new tools::default_http_core_proxy()),
+#endif                            
+                       
                                  m_last_daemon_height(0),
                                  m_last_daemon_is_disconnected(false),
                                  m_wallet_id_counter(0),
-                                 m_offers_service(nullptr), 
                                  m_ui_opt(AUTO_VAL_INIT(m_ui_opt)), 
                                  m_remote_node_mode(false),
                                  m_is_pos_allowed(false),
                                  m_qt_logs_enbaled(false)
 {
+#ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
+#endif
 	//m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
 }
 
@@ -54,6 +71,9 @@ const command_line::arg_descriptor<bool> arg_enable_gui_debug_mode = { "gui-debu
 const command_line::arg_descriptor<uint32_t> arg_qt_remote_debugging_port = { "remote-debugging-port", "Specify port for Qt remote debugging", 30333, true };
 const command_line::arg_descriptor<std::string> arg_remote_node = { "remote-node", "Switch GUI to work with remote node instead of local daemon", "",  true };
 const command_line::arg_descriptor<bool> arg_enable_qt_logs = { "enable-qt-logs", "Forward Qt log messages into main log", false,  true };
+const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
+//const command_line::arg_descriptor<bool> arg_disable_logs_init = { "disable-logs-init", "Disable log initialization in GUI" };
+
 
 void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 {
@@ -63,9 +83,11 @@ void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
   }
 }
 
-daemon_backend::~daemon_backend()
+wallets_manager::~wallets_manager()
 {
+  TRY_ENTRY();
   stop();
+  CATCH_ENTRY_NO_RETURN();
 }
 
 void terminate_handler_func()
@@ -75,7 +97,7 @@ void terminate_handler_func()
   std::abort(); // default terminate handler's behavior
 }
 
-bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
+bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
 {
   m_stop_singal_sent = false;
   if (pview_handler)
@@ -83,11 +105,7 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
 
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   dsi.pos_difficulty = dsi.pow_difficulty = "---";
-  pview_handler->update_daemon_status(dsi);
-
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
-  log_space::get_set_need_thread_id(true, true);
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
+  m_pview->update_daemon_status(dsi);
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
@@ -96,10 +114,10 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
 
   // setup custom callstack retrieving function
   epee::misc_utils::get_callstack(tools::get_callstack);
-
+//#ifndef MOBILE_WALLET_BUILD
   // setup custom terminate functions
   std::set_terminate(&terminate_handler_func);
-
+//#endif
   //#if !defined(NDEBUG)
   //  log_space::log_singletone::add_logger(LOGGER_DEBUGGER, nullptr, nullptr);
   //#endif
@@ -127,13 +145,21 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, arg_qt_remote_debugging_port);
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
   command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
+  command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
+  
 
-
+#ifndef MOBILE_WALLET_BUILD
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
   currency::miner::init_options(desc_cmd_sett);
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
+  tools::db::db_backend_selector::init_options(desc_cmd_sett);
+#endif
 
   po::options_description desc_options("Allowed options");
   desc_options.add(desc_cmd_only).add(desc_cmd_sett);
@@ -211,13 +237,21 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
     path_to_html = command_line::get_arg(m_vm, arg_html_folder);
   }
 
-  log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
-  LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
-  LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
-
   if (command_line::has_arg(m_vm, arg_remote_node))
   {
-    // configure for remote node
+    m_remote_node_mode = true;
+    auto proxy_ptr = new tools::default_http_core_proxy();
+    proxy_ptr->set_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected);
+    proxy_ptr->set_connectivity(HTTP_PROXY_TIMEOUT,  HTTP_PROXY_ATTEMPTS_COUNT);
+    m_rpc_proxy.reset(proxy_ptr);    
+    m_rpc_proxy->set_connection_addr(command_line::get_arg(m_vm, arg_remote_node));
+  }
+
+  if(!command_line::has_arg(m_vm, arg_disable_logs_init))
+  {
+    log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
+    LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
+    LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
   }
 
   m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
@@ -236,7 +270,7 @@ bool daemon_backend::init(int argc, char* argv[], view::i_view* pview_handler)
   CATCH_ENTRY_L0("init", false);
 }
 
-bool daemon_backend::start()
+bool wallets_manager::start()
 {
   TRY_ENTRY();
 
@@ -248,14 +282,14 @@ bool daemon_backend::start()
 
  
 
-bool daemon_backend::send_stop_signal()
+bool wallets_manager::send_stop_signal()
 {
   m_stop_singal_sent = true;
   return true;
 }
 
 
-bool daemon_backend::stop()
+bool wallets_manager::stop()
 {
   send_stop_signal();
   if (m_main_worker_thread.joinable())
@@ -269,7 +303,7 @@ bool daemon_backend::stop()
   return true;
 }
 
-std::string daemon_backend::get_config_folder()
+std::string wallets_manager::get_config_folder()
 {
   return m_data_dir;
 }
@@ -283,19 +317,46 @@ std::string daemon_backend::get_config_folder()
     return false; \
   }
 
-bool daemon_backend::init_local_daemon()
+bool wallets_manager::init_local_daemon()
 {
+#ifndef MOBILE_WALLET_BUILD
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   dsi.pos_difficulty = dsi.pos_difficulty = "---";
   dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_loading_core;
   m_pview->update_daemon_status(dsi);
 
+  // pre-downloading handling
+  tools::db::db_backend_selector dbbs;
+  bool res = dbbs.init(m_vm);
+  CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize db_backend_selector");
+  if (!command_line::has_arg(m_vm, command_line::arg_no_predownload) || command_line::has_arg(m_vm, command_line::arg_force_predownload))
+  {
+    auto last_update = std::chrono::system_clock::now();
+    res = tools::process_predownload(m_vm, [&](uint64_t total_bytes, uint64_t received_bytes){
+      auto dif = std::chrono::system_clock::now() - last_update;
+      if (dif > std::chrono::milliseconds(300))
+      {
+        dsi.download_total_data_size = total_bytes;
+        dsi.downloaded_bytes = received_bytes;
+        dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_downloading_database;
+        m_pview->update_daemon_status(dsi);
+        last_update = std::chrono::system_clock::now();
+      }
+
+      return static_cast<bool>(m_stop_singal_sent);
+    });
+    CHECK_AND_ASSERT_AND_SET_GUI(res,  "pre-downloading failed");
+  }
+
+
+
 
   //initialize core here
   LOG_PRINT_L0("Initializing core...");
+  dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_loading_core;
   //dsi.text_state = "Initializing core";
   m_pview->update_daemon_status(dsi);
-  bool res = m_ccore.init(m_vm);
+  res = m_ccore.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize core");
   LOG_PRINT_L0("Core initialized OK");
 
@@ -353,12 +414,13 @@ bool daemon_backend::init_local_daemon()
   res = m_p2psrv.run(false);
   CHECK_AND_ASSERT_AND_SET_GUI(res, "Failed to run p2p loop.");
   LOG_PRINT_L0("p2p net loop stopped");
-
+#endif
   return true;
 }
 
-bool daemon_backend::deinit_local_daemon()
+bool wallets_manager::deinit_local_daemon()
 {
+#ifndef MOBILE_WALLET_BUILD
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   dsi.daemon_network_state = currency::COMMAND_RPC_GET_INFO::daemon_network_state_unloading_core;
   m_pview->update_daemon_status(dsi);
@@ -414,11 +476,11 @@ bool daemon_backend::deinit_local_daemon()
   //dsi.text_state = "Deinitializing core";
   m_pview->update_daemon_status(dsi);
   m_ccore.deinit();
-
+#endif
   return true;
 }
 
-void daemon_backend::main_worker(const po::variables_map& m_vm)
+void wallets_manager::main_worker(const po::variables_map& m_vm)
 {
 	log_space::log_singletone::set_thread_log_prefix("[BACKEND_M]");
   TRY_ENTRY();
@@ -434,7 +496,7 @@ void daemon_backend::main_worker(const po::variables_map& m_vm)
   loop();
   
 
-  CRITICAL_REGION_BEGIN(m_wallets_lock);
+  SHARED_CRITICAL_REGION_BEGIN(m_wallets_lock);
   for (auto& wo : m_wallets)
   {
     LOG_PRINT_L0("Storing wallet data...");
@@ -470,10 +532,10 @@ void daemon_backend::main_worker(const po::variables_map& m_vm)
   }
 
   m_pview->on_backend_stopped();
-  CATCH_ENTRY_L0("daemon_backend::main_worker", void());
+  CATCH_ENTRY_L0("wallets_manager::main_worker", void());
 }
 
-bool daemon_backend::update_state_info()
+bool wallets_manager::update_state_info()
 {
   view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
   currency::COMMAND_RPC_GET_INFO::request req = AUTO_VAL_INIT(req);
@@ -485,10 +547,9 @@ bool daemon_backend::update_state_info()
     dsi.is_disconnected = true;
     m_last_daemon_network_state = dsi.daemon_network_state;
     m_pview->update_daemon_status(dsi);
-    LOG_ERROR("Failed to call get_info");
+    LOG_PRINT_RED_L0("Failed to call get_info");
     return false;
   }
-
   m_is_pos_allowed = inf.pos_allowed;
   dsi.alias_count = inf.alias_count;
   dsi.pow_difficulty = std::to_string(inf.pow_difficulty);
@@ -530,7 +591,7 @@ bool daemon_backend::update_state_info()
   return true;
 }
 
-bool daemon_backend::get_last_blocks(view::daemon_status_info& dsi)
+bool wallets_manager::get_last_blocks(view::daemon_status_info& dsi)
 {
 
   return true;
@@ -538,22 +599,22 @@ bool daemon_backend::get_last_blocks(view::daemon_status_info& dsi)
 
 
 
-void daemon_backend::toggle_pos_mining()
+void wallets_manager::toggle_pos_mining()
 {
   //m_do_mint = !m_do_mint;
   //update_wallets_info();
 }
 
-void daemon_backend::loop()
+void wallets_manager::loop()
 {
   while(!m_stop_singal_sent)
   {
     update_state_info();
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(DAEMON_IDLE_UPDATE_TIME_MS));
   }
 }
 
-void daemon_backend::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
+void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
 {
   wo.wallet_id = id;
   wo.do_mining = false;
@@ -564,10 +625,18 @@ void daemon_backend::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.plast_daemon_is_disconnected = &m_last_daemon_is_disconnected;
   wo.pview = m_pview;  
   wo.has_related_alias_in_unconfirmed = false;
+  wo.rpc_wrapper.reset(new tools::wallet_rpc_server(*wo.w.unlocked_get().get()));
   if (m_remote_node_mode)
     wo.core_conf = currency::get_default_core_runtime_config();
-  else 
+  else
+  {
+#ifndef MOBILE_WALLET_BUILD
     wo.core_conf = m_ccore.get_blockchain_storage().get_core_runtime_config();
+#else 
+    LOG_ERROR("Unexpected location reached");
+#endif
+  }
+    
 
   // update wallet log prefix for further usage
   {
@@ -579,7 +648,7 @@ void daemon_backend::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
 }
 
 
-std::string daemon_backend::get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res)
+std::string wallets_manager::get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res)
 {
   currency::COMMAND_RPC_GET_POOL_INFO::request req = AUTO_VAL_INIT(req);
   res = AUTO_VAL_INIT_T(currency::COMMAND_RPC_GET_POOL_INFO::response);
@@ -591,28 +660,31 @@ std::string daemon_backend::get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO
 }
 
 
-uint64_t daemon_backend::get_default_fee()
+uint64_t wallets_manager::get_default_fee()
 {
   return TX_DEFAULT_FEE;
 }
-std::string daemon_backend::get_fav_offers(const std::list<bc_services::offer_id>& hashes, const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers)
+std::string wallets_manager::get_fav_offers(const std::list<bc_services::offer_id>& hashes, const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers)
 {
   if (m_remote_node_mode)
     return API_RETURN_CODE_FAIL;
-
+#ifndef MOBILE_WALLET_BUILD
   currency::blockchain_storage& bcs = m_ccore.get_blockchain_storage();
 
   m_offers_service.get_offers_by_id(hashes, offers);
   filter_offers_list(offers, filter, bcs.get_core_runtime_config().get_core_time());
   return API_RETURN_CODE_OK;
+#else
+  return API_RETURN_CODE_FAIL;
+#endif
 }
 
-std::string daemon_backend::get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers)
+std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers)
 {
   if (m_remote_node_mode)
     return API_RETURN_CODE_FAIL;
-
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
+#ifndef MOBILE_WALLET_BUILD
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   while (true)
   {
     try
@@ -653,9 +725,12 @@ std::string daemon_backend::get_my_offers(const bc_services::core_offers_filter&
   LOG_PRINT("get_my_offers(): " << offers.size() << " offers returned (" << offers_count_before_filtering << " was before filter)", LOG_LEVEL_1);
 
   return API_RETURN_CODE_OK;
+#else 
+  return API_RETURN_CODE_FAIL;
+#endif
 }
 
-std::string daemon_backend::open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr)
+std::string wallets_manager::open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   owr.wallet_id = m_wallet_id_counter++;
@@ -667,11 +742,14 @@ std::string daemon_backend::open_wallet(const std::wstring& path, const std::str
   }
   else
   {
+#ifndef MOBILE_WALLET_BUILD
     w->set_core_proxy(std::shared_ptr<tools::i_core_proxy>(new tools::core_fast_rpc_proxy(m_rpc_server)));
+#else 
+    LOG_ERROR("Unexpected location reached");
+#endif
   }
   
   std::string return_code = API_RETURN_CODE_OK;
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
   while (true)
   {
     try
@@ -683,6 +761,7 @@ std::string daemon_backend::open_wallet(const std::wstring& path, const std::str
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history);
       //workaround for missed fee
+      owr.seed = w->get_account().get_restore_braindata();
       break;
     }
     catch (const tools::error::file_not_found& /**/)
@@ -699,7 +778,7 @@ std::string daemon_backend::open_wallet(const std::wstring& path, const std::str
       return std::string(API_RETURN_CODE_WRONG_PASSWORD) + ":" + e.what();
     }
   }
-
+  EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   get_wallet_info(wo, owr.wi);
@@ -708,7 +787,7 @@ std::string daemon_backend::open_wallet(const std::wstring& path, const std::str
   return return_code;
 }
 
-std::string daemon_backend::get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist)
+std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist)
 {
   GET_WALLET_BY_ID(wallet_id, w);
   auto wallet_locked = w.try_lock();
@@ -717,21 +796,26 @@ std::string daemon_backend::get_recent_transfers(size_t wallet_id, uint64_t offs
     return API_RETURN_CODE_CORE_BUSY;
   }
 
+  w->get()->get_unconfirmed_transfers(tr_hist.unconfirmed);
   w->get()->get_recent_transfers_history(tr_hist.history, offset, count, tr_hist.total_history_items);
+
+  auto fix_tx = [](tools::wallet_public::wallet_transfer_info& wti) -> void {
+    wti.show_sender = currency::is_showing_sender_addres(wti.tx);
+    if (!wti.fee && !currency::is_coinbase(wti.tx))
+      wti.fee = currency::get_tx_fee(wti.tx);
+  };
+
   //workaround for missed fee
+  for (auto & he : tr_hist.unconfirmed)
+    fix_tx(he);
+
   for (auto & he : tr_hist.history)
-  {
-    he.show_sender = currency::is_showing_sender_addres(he.tx);
-    if (!he.fee && !currency::is_coinbase(he.tx))
-    {
-      he.fee = currency::get_tx_fee(he.tx);
-    }
-  }
+    fix_tx(he);
 
   return API_RETURN_CODE_OK;
 }
 
-std::string daemon_backend::generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr)
+std::string wallets_manager::generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   owr.wallet_id = m_wallet_id_counter++;
@@ -742,17 +826,20 @@ std::string daemon_backend::generate_wallet(const std::wstring& path, const std:
   }
   else
   {
+#ifndef MOBILE_WALLET_BUILD
     w->set_core_proxy(std::shared_ptr<tools::i_core_proxy>(new tools::core_fast_rpc_proxy(m_rpc_server)));
+#else 
+    LOG_ERROR("Unexpected location reached");
+#endif
+
   }
-
-
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
 
   try
   {
     w->generate(path, password);
+    owr.seed = w->get_account().get_restore_braindata();
   }
-  catch (const tools::error::file_exists/*& e*/)
+  catch (const tools::error::file_exists&)
   {
     return API_RETURN_CODE_ALREADY_EXISTS;
   }
@@ -761,6 +848,7 @@ std::string daemon_backend::generate_wallet(const std::wstring& path, const std:
   {
     return std::string(API_RETURN_CODE_FAIL) + ":" + e.what();
   }
+  EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   init_wallet_entry(wo, owr.wallet_id);
@@ -768,7 +856,7 @@ std::string daemon_backend::generate_wallet(const std::wstring& path, const std:
   return API_RETURN_CODE_OK;
 }
 
-std::string daemon_backend::get_mining_estimate(uint64_t amuont_coins, 
+std::string wallets_manager::get_mining_estimate(uint64_t amuont_coins, 
   uint64_t time, 
   uint64_t& estimate_result, 
   uint64_t& pos_coins_and_pos_diff_rate, 
@@ -776,19 +864,22 @@ std::string daemon_backend::get_mining_estimate(uint64_t amuont_coins,
 {
   if (m_remote_node_mode)
     return API_RETURN_CODE_FAIL;
-
+#ifndef MOBILE_WALLET_BUILD
   m_ccore.get_blockchain_storage().get_pos_mining_estimate(amuont_coins, time, estimate_result, pos_coins_and_pos_diff_rate, days);
   return API_RETURN_CODE_OK;
+#else 
+  return API_RETURN_CODE_FAIL;
+#endif 
 }
 
-std::string daemon_backend::is_pos_allowed()
+std::string wallets_manager::is_pos_allowed()
 {
   if (m_is_pos_allowed)
     return API_RETURN_CODE_TRUE;
   else 
     return API_RETURN_CODE_FALSE;
 }
-std::string daemon_backend::is_valid_brain_restore_data(const std::string& brain_text)
+std::string wallets_manager::is_valid_brain_restore_data(const std::string& brain_text)
 {
   currency::account_base acc;
   if (acc.restore_keys_from_braindata(brain_text))
@@ -796,16 +887,20 @@ std::string daemon_backend::is_valid_brain_restore_data(const std::string& brain
   else
     return API_RETURN_CODE_FALSE;
 }
-void daemon_backend::subscribe_to_core_events(currency::i_core_event_handler* pevents_handler)
+#ifndef MOBILE_WALLET_BUILD
+void wallets_manager::subscribe_to_core_events(currency::i_core_event_handler* pevents_handler)
 {
+
   if(!m_remote_node_mode)
     m_ccore.get_blockchain_storage().set_event_handler(pevents_handler);
+
 }
-void daemon_backend::get_gui_options(view::gui_options& opt)
+#endif
+void wallets_manager::get_gui_options(view::gui_options& opt)
 {
   opt = m_ui_opt;
 }
-std::string daemon_backend::restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr)
+std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   owr.wallet_id = m_wallet_id_counter++;
@@ -816,18 +911,21 @@ std::string daemon_backend::restore_wallet(const std::wstring& path, const std::
   }
   else
   {
+#ifndef MOBILE_WALLET_BUILD
     w->set_core_proxy(std::shared_ptr<tools::i_core_proxy>(new tools::core_fast_rpc_proxy(m_rpc_server)));
+#else 
+    LOG_ERROR("Unexpected location reached");
+#endif
+
   }
 
   currency::account_base acc;
-
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
-
   try
   {
     w->restore(path, password, restore_key);
+    owr.seed = w->get_account().get_restore_braindata();
   }
-  catch (const tools::error::file_exists/*& e*/)
+  catch (const tools::error::file_exists&)
   {
     return API_RETURN_CODE_ALREADY_EXISTS;
   }
@@ -836,15 +934,16 @@ std::string daemon_backend::restore_wallet(const std::wstring& path, const std::
   {
     return std::string(API_RETURN_CODE_FAIL) + ":" + e.what();
   }
+  EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   init_wallet_entry(wo, owr.wallet_id);
   get_wallet_info(wo, owr.wi);
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::close_wallet(size_t wallet_id)
+std::string wallets_manager::close_wallet(size_t wallet_id)
 {
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
+  EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   
   auto it = m_wallets.find(wallet_id);
   if (it == m_wallets.end())
@@ -859,7 +958,6 @@ std::string daemon_backend::close_wallet(size_t wallet_id)
 
     it->second.w->get()->store();
     m_wallets.erase(it);
-
     {
       CRITICAL_REGION_LOCAL(m_wallet_log_prefixes_lock);
       m_wallet_log_prefixes[wallet_id] = std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":CLOSED] ";
@@ -874,11 +972,12 @@ std::string daemon_backend::close_wallet(size_t wallet_id)
   return API_RETURN_CODE_OK;
 }
 
-std::string daemon_backend::get_aliases(view::alias_set& al_set)
+std::string wallets_manager::get_aliases(view::alias_set& al_set)
 {
   if (m_remote_node_mode)
     return API_RETURN_CODE_OVERFLOW;
 
+#ifndef MOBILE_WALLET_BUILD
   if (m_ccore.get_blockchain_storage().get_aliases_count() > API_MAX_ALIASES_COUNT)
     return API_RETURN_CODE_OVERFLOW;
 
@@ -889,10 +988,11 @@ std::string daemon_backend::get_aliases(view::alias_set& al_set)
     al_set.aliases = aliases.aliases;
     return API_RETURN_CODE_OK;
   }
-
+#endif
   return API_RETURN_CODE_FAIL;
+  
 }
-std::string daemon_backend::get_alias_info_by_address(const std::string& addr, currency::alias_rpc_details& res_details)
+std::string wallets_manager::get_alias_info_by_address(const std::string& addr, currency::alias_rpc_details& res_details)
 {
   if (addr.empty())
     return API_RETURN_CODE_NOT_FOUND;
@@ -911,7 +1011,7 @@ std::string daemon_backend::get_alias_info_by_address(const std::string& addr, c
   return res.status;
 }
 
-std::string daemon_backend::get_alias_info_by_name(const std::string& name, currency::alias_rpc_details& res_details)
+std::string wallets_manager::get_alias_info_by_name(const std::string& name, currency::alias_rpc_details& res_details)
 {
   if(name.empty())
     return API_RETURN_CODE_FILE_NOT_FOUND;
@@ -931,7 +1031,7 @@ std::string daemon_backend::get_alias_info_by_name(const std::string& name, curr
   return res.status;
 }
 
-std::string daemon_backend::get_alias_coast(const std::string& a, uint64_t& coast)
+std::string wallets_manager::get_alias_coast(const std::string& a, uint64_t& coast)
 {
   currency::COMMAND_RPC_GET_ALIAS_REWARD::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_ALIAS_REWARD::response rsp = AUTO_VAL_INIT(rsp);
@@ -943,7 +1043,7 @@ std::string daemon_backend::get_alias_coast(const std::string& a, uint64_t& coas
   return rsp.status;
 
 }
-std::string daemon_backend::request_alias_registration(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx, uint64_t reward)
+std::string wallets_manager::request_alias_registration(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx, uint64_t reward)
 {
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   if (!currency::alias_rpc_details_to_alias_info(al, ai))
@@ -982,7 +1082,7 @@ std::string daemon_backend::request_alias_registration(const currency::alias_rpc
   return API_RETURN_CODE_ALREADY_EXISTS;
 }
 
-std::string daemon_backend::request_alias_update(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx, uint64_t reward)
+std::string wallets_manager::request_alias_update(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx, uint64_t reward)
 {
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   if (!currency::alias_rpc_details_to_alias_info(al, ai))
@@ -1022,7 +1122,7 @@ std::string daemon_backend::request_alias_update(const currency::alias_rpc_detai
 }
 
 
-std::string daemon_backend::transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
+std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
 {
 
   std::vector<currency::tx_destination_entry> dsts;
@@ -1127,12 +1227,71 @@ std::string daemon_backend::transfer(size_t wallet_id, const view::transfer_para
   return API_RETURN_CODE_OK;
 }
 
-std::string daemon_backend::get_wallet_info(size_t wallet_id, view::wallet_info& wi)
+bool wallets_manager::get_is_remote_daemon_connected()
+{
+  if (!m_remote_node_mode)
+    return true;
+  if (m_last_daemon_is_disconnected)
+    return false;
+  if (time(nullptr) - m_rpc_proxy->get_last_success_interract_time() > DAEMON_IDLE_UPDATE_TIME_MS * 2)
+    return false;
+  return true;
+}
+
+std::string wallets_manager::get_connectivity_status()
+{
+  view::general_connectivity_info gci = AUTO_VAL_INIT(gci);
+  gci.is_online = get_is_remote_daemon_connected();
+  gci.last_daemon_is_disconnected = m_last_daemon_is_disconnected;
+  gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
+  return epee::serialization::store_t_to_json(gci);
+}
+
+std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
+  wsi.is_in_long_refresh = wo.long_refresh_in_progress;
+  wsi.is_daemon_connected = get_is_remote_daemon_connected();
+  wsi.progress = wo.w.unlocked_get().get()->get_sync_progress();
+  wsi.wallet_state = wo.wallet_state;
+  wsi.current_daemon_height = m_last_daemon_height;
+  return epee::serialization::store_t_to_json(wsi);
+}
+
+std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+
+  CRITICAL_REGION_LOCAL1(wo.long_refresh_in_progress_lock);
+  if (wo.long_refresh_in_progress)
+  {
+    epee::json_rpc::response<epee::json_rpc::dummy_result, epee::json_rpc::error> error_response = AUTO_VAL_INIT(error_response);
+    error_response.error.code = -1;
+    error_response.error.message = API_RETURN_CODE_BUSY;
+    return epee::serialization::store_t_to_json(error_response);
+  }
+
+
+  auto locker_object = wo.w.lock();
+
+  epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
+  epee::net_utils::http::http_response_info response_info = AUTO_VAL_INIT(response_info);
+  epee::net_utils::connection_context_base stub_conn_context = AUTO_VAL_INIT(stub_conn_context);
+  std::string reference_stub;
+  bool call_found = false;
+  query_info.m_URI = "/json_rpc";
+  query_info.m_body = params;
+  wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found, reference_stub);
+  return response_info.m_body;
+}
+
+std::string wallets_manager::get_wallet_info(size_t wallet_id, view::wallet_info& wi)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   return get_wallet_info(w, wi);
 }
-std::string daemon_backend::get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts)
+std::string wallets_manager::get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts)
 {
   tools::wallet2::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(wallet_id, w);
@@ -1156,7 +1315,7 @@ std::string daemon_backend::get_contracts(size_t wallet_id, std::vector<tools::w
 
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::create_proposal(const view::create_proposal_param_gui& cpp)
+std::string wallets_manager::create_proposal(const view::create_proposal_param_gui& cpp)
 {
   //tools::wallet2::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(cpp.wallet_id, w);
@@ -1188,7 +1347,7 @@ std::string daemon_backend::create_proposal(const view::create_proposal_param_gu
   }
 }
 
-std::string daemon_backend::accept_proposal(size_t wallet_id, const crypto::hash& contract_id)
+std::string wallets_manager::accept_proposal(size_t wallet_id, const crypto::hash& contract_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   try
@@ -1202,7 +1361,7 @@ std::string daemon_backend::accept_proposal(size_t wallet_id, const crypto::hash
     return API_RETURN_CODE_FAIL;
   }
 }
-std::string daemon_backend::release_contract(size_t wallet_id, const crypto::hash& contract_id, const std::string& contract_over_type)
+std::string wallets_manager::release_contract(size_t wallet_id, const crypto::hash& contract_id, const std::string& contract_over_type)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   try
@@ -1216,7 +1375,7 @@ std::string daemon_backend::release_contract(size_t wallet_id, const crypto::has
     return API_RETURN_CODE_FAIL;
   }
 }
-std::string daemon_backend::request_cancel_contract(size_t wallet_id, const crypto::hash& contract_id, uint64_t fee, uint64_t expiration_period)
+std::string wallets_manager::request_cancel_contract(size_t wallet_id, const crypto::hash& contract_id, uint64_t fee, uint64_t expiration_period)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   try
@@ -1235,7 +1394,7 @@ std::string daemon_backend::request_cancel_contract(size_t wallet_id, const cryp
     return API_RETURN_CODE_FAIL;
   }
 }
-std::string daemon_backend::accept_cancel_contract(size_t wallet_id, const crypto::hash& contract_id)
+std::string wallets_manager::accept_cancel_contract(size_t wallet_id, const crypto::hash& contract_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   try
@@ -1254,7 +1413,7 @@ std::string daemon_backend::accept_cancel_contract(size_t wallet_id, const crypt
     return API_RETURN_CODE_FAIL;
   }
 }
-std::string daemon_backend::backup_wallet(uint64_t wallet_id, const std::wstring& path)
+std::string wallets_manager::backup_wallet(uint64_t wallet_id, const std::wstring& path)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   try
@@ -1267,7 +1426,7 @@ std::string daemon_backend::backup_wallet(uint64_t wallet_id, const std::wstring
   }
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::reset_wallet_password(uint64_t wallet_id, const std::string& pass)
+std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std::string& pass)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   if (w.w->get()->reset_password(pass))
@@ -1275,7 +1434,7 @@ std::string daemon_backend::reset_wallet_password(uint64_t wallet_id, const std:
   else
     return API_RETURN_CODE_FAIL;
 }
-std::string daemon_backend::is_wallet_password_valid(uint64_t wallet_id, const std::string& pass)
+std::string wallets_manager::is_wallet_password_valid(uint64_t wallet_id, const std::string& pass)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   if (w.w->get()->is_password_valid(pass))
@@ -1283,21 +1442,21 @@ std::string daemon_backend::is_wallet_password_valid(uint64_t wallet_id, const s
   else
     return API_RETURN_CODE_FAIL;
 }
-std::string daemon_backend::resync_wallet(uint64_t wallet_id)
+std::string wallets_manager::resync_wallet(uint64_t wallet_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   w.w->get()->reset_history();
   w.last_wallet_synch_height = 0;
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::start_pos_mining(uint64_t wallet_id)
+std::string wallets_manager::start_pos_mining(uint64_t wallet_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   wo.do_mining = true;
   wo.need_to_update_wallet_info = true;
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::get_mining_history(uint64_t wallet_id, tools::wallet_public::mining_history& mh)
+std::string wallets_manager::get_mining_history(uint64_t wallet_id, tools::wallet_public::mining_history& mh)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
@@ -1307,21 +1466,21 @@ std::string daemon_backend::get_mining_history(uint64_t wallet_id, tools::wallet
   wo.w->get()->get_mining_history(mh);
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::get_wallet_restore_info(uint64_t wallet_id, std::string& restore_key)
+std::string wallets_manager::get_wallet_restore_info(uint64_t wallet_id, std::string& restore_key)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   restore_key = wo.w->get()->get_account().get_restore_braindata();
 //  restore_key = tools::base58::encode(rst_data);
   return API_RETURN_CODE_OK;
 }
-void daemon_backend::prepare_wallet_status_info(wallet_vs_options& wo, view::wallet_status_info& wsi)
+void wallets_manager::prepare_wallet_status_info(wallet_vs_options& wo, view::wallet_status_info& wsi)
 {
   wsi.is_mining = wo.do_mining;
   wsi.wallet_id = wo.wallet_id;
   wsi.is_alias_operations_available = !wo.has_related_alias_in_unconfirmed;
   wsi.balance = wo.w->get()->balance(wsi.unlocked_balance, wsi.awaiting_in, wsi.awaiting_out, wsi.minied_total);
 }
-std::string daemon_backend::check_available_sources(uint64_t wallet_id, std::list<uint64_t>& amounts)
+std::string wallets_manager::check_available_sources(uint64_t wallet_id, std::list<uint64_t>& amounts)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   if (wo.w->get()->check_available_sources(amounts))
@@ -1329,31 +1488,29 @@ std::string daemon_backend::check_available_sources(uint64_t wallet_id, std::lis
   else
     return API_RETURN_CODE_FALSE;
 }
-std::string daemon_backend::stop_pos_mining(uint64_t wallet_id)
+std::string wallets_manager::stop_pos_mining(uint64_t wallet_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   wo.do_mining = false;
   wo.need_to_update_wallet_info = true;
   return API_RETURN_CODE_OK;
 }
-std::string daemon_backend::run_wallet(uint64_t wallet_id)
+std::string wallets_manager::run_wallet(uint64_t wallet_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
-  wo.miner_thread = std::thread(boost::bind(&daemon_backend::wallet_vs_options::worker_func, &wo));
-  return API_RETURN_CODE_OK;
-}
-std::string daemon_backend::get_wallet_info(wallet_vs_options& wo, view::wallet_info& wi)
-{
-  wi = view::wallet_info();
-  wi.address = wo.w->get()->get_account().get_public_address_str();
-  wi.tracking_hey = string_tools::pod_to_hex(wo.w->get()->get_account().get_keys().m_view_secret_key);
-	uint64_t fake = 0;
-	wi.balance = wo.w->get()->balance(wi.unlocked_balance, fake, fake, wi.mined_total);
-  wi.path = epee::string_encoding::wstring_to_utf8(wo.w->get()->get_wallet_path());
+  wo.miner_thread = std::thread(boost::bind(&wallets_manager::wallet_vs_options::worker_func, &wo));
   return API_RETURN_CODE_OK;
 }
 
-std::string daemon_backend::push_offer(size_t wallet_id, const bc_services::offer_details_ex& od, currency::transaction& res_tx)
+std::string wallets_manager::get_wallet_info(wallet_vs_options& wo, view::wallet_info& wi)
+{
+  auto locker_object = wo.w.lock();
+  tools::wallet2& rw = *(*(*locker_object)); //this looks a bit crazy, i know
+  tools::get_wallet_info(rw, wi);
+  return API_RETURN_CODE_OK;
+}
+
+std::string wallets_manager::push_offer(size_t wallet_id, const bc_services::offer_details_ex& od, currency::transaction& res_tx)
 {
   GET_WALLET_BY_ID(wallet_id, w);
 
@@ -1375,7 +1532,7 @@ std::string daemon_backend::push_offer(size_t wallet_id, const bc_services::offe
     return API_RETURN_CODE_INTERNAL_ERROR;
   }
 }
-std::string daemon_backend::cancel_offer(const view::cancel_offer_param& co, currency::transaction& res_tx)
+std::string wallets_manager::cancel_offer(const view::cancel_offer_param& co, currency::transaction& res_tx)
 {
   GET_WALLET_BY_ID(co.wallet_id, w);
   try
@@ -1397,7 +1554,7 @@ std::string daemon_backend::cancel_offer(const view::cancel_offer_param& co, cur
   }
 }
 
-std::string daemon_backend::push_update_offer(const bc_services::update_offer_details& uo, currency::transaction& res_tx)
+std::string wallets_manager::push_update_offer(const bc_services::update_offer_details& uo, currency::transaction& res_tx)
 {
   GET_WALLET_BY_ID(uo.wallet_id, w);
 
@@ -1428,18 +1585,22 @@ std::string daemon_backend::push_update_offer(const bc_services::update_offer_de
 // }
 
 
-std::string daemon_backend::get_offers_ex(const bc_services::core_offers_filter& cof, std::list<bc_services::offer_details_ex>& offers, uint64_t& total_count)
+std::string wallets_manager::get_offers_ex(const bc_services::core_offers_filter& cof, std::list<bc_services::offer_details_ex>& offers, uint64_t& total_count)
 {
   if (m_remote_node_mode)
     return API_RETURN_CODE_FAIL;  
+#ifndef MOBILE_WALLET_BUILD
   //TODO: make it proxy-like call
   //m_ccore.get_blockchain_storage().get_offers_ex(cof, offers, total_count);
 	m_offers_service.get_offers_ex(cof, offers, total_count, m_ccore.get_blockchain_storage().get_core_runtime_config().get_core_time());
   return API_RETURN_CODE_OK;
+#else 
+  return API_RETURN_CODE_FAIL;
+#endif
 }
 
 
-std::string daemon_backend::validate_address(const std::string& addr_str, std::string& payment_id)
+std::string wallets_manager::validate_address(const std::string& addr_str, std::string& payment_id)
 {
   currency::account_public_address acc = AUTO_VAL_INIT(acc);
   if (currency::get_account_address_and_payment_id_from_str(acc, payment_id, addr_str))
@@ -1448,12 +1609,12 @@ std::string daemon_backend::validate_address(const std::string& addr_str, std::s
     return API_RETURN_CODE_FALSE;
 }
 
-void daemon_backend::on_new_block(size_t wallet_id, uint64_t /*height*/, const currency::block& /*block*/)
+void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const currency::block& /*block*/)
 {
 
 }
 
-void daemon_backend::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
+void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
 {
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
@@ -1462,11 +1623,11 @@ void daemon_backend::on_transfer2(size_t wallet_id, const tools::wallet_public::
   tei.wallet_id = wallet_id;
   m_pview->money_transfer(tei);
 }
-void daemon_backend::on_pos_block_found(size_t wallet_id, const currency::block& b)
+void wallets_manager::on_pos_block_found(size_t wallet_id, const currency::block& b)
 {
   m_pview->pos_block_found(b);
 }
-void daemon_backend::on_sync_progress(size_t wallet_id, const uint64_t& percents)
+void wallets_manager::on_sync_progress(size_t wallet_id, const uint64_t& percents)
 {
   // do not lock m_wallets_lock down the callstack! It will lead to a deadlock, because wallet locked_object is aready locked
   // and other threads are usually locks m_wallets_lock before locking wallet's locked_object
@@ -1476,12 +1637,12 @@ void daemon_backend::on_sync_progress(size_t wallet_id, const uint64_t& percents
   wspp.wallet_id = wallet_id;
   m_pview->wallet_sync_progress(wspp);
 }
-void daemon_backend::on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti)
+void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti)
 {
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
 
-  CRITICAL_REGION_LOCAL(m_wallets_lock);
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   auto& w = m_wallets[wallet_id].w;
   if (w->get() != nullptr)
   {
@@ -1495,7 +1656,7 @@ void daemon_backend::on_transfer_canceled(size_t wallet_id, const tools::wallet_
   }
   m_pview->money_transfer_cancel(tei);
 }
-void daemon_backend::wallet_vs_options::worker_func()
+void wallets_manager::wallet_vs_options::worker_func()
 {
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet handler thread started, addr: " << w->get()->get_account().get_public_address_str(), LOG_LEVEL_0);
   epee::math_helper::once_a_time_seconds<1> scan_pool_interval;
@@ -1524,6 +1685,13 @@ void daemon_backend::wallet_vs_options::worker_func()
           if (last_wallet_synch_height && *plast_daemon_height - last_wallet_synch_height < 3)
             show_progress = false;
 
+          if(*plast_daemon_height - last_wallet_synch_height > 10)
+          {
+            CRITICAL_REGION_LOCAL(long_refresh_in_progress_lock);
+            long_refresh_in_progress = true;
+          }
+
+
           if (show_progress)
           {
             wallet_state = wsi.wallet_state = view::wallet_status_info::wallet_state_synchronizing;
@@ -1531,6 +1699,7 @@ void daemon_backend::wallet_vs_options::worker_func()
             pview->update_wallet_status(wsi);
           }
           w->get()->refresh(stop_for_refresh);
+          long_refresh_in_progress = false;
           w->get()->resend_unconfirmed();
           {
             auto w_ptr = *w; // get locked exclusive access to the wallet first (it's more likely that wallet is locked for a long time than 'offers')
@@ -1625,7 +1794,7 @@ void daemon_backend::wallet_vs_options::worker_func()
   }
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet thread thread stopped", LOG_LEVEL_0);
 }
-daemon_backend::wallet_vs_options::~wallet_vs_options()
+wallets_manager::wallet_vs_options::~wallet_vs_options()
 {
   do_mining = false;
   major_stop = true;
@@ -1635,7 +1804,7 @@ daemon_backend::wallet_vs_options::~wallet_vs_options()
     miner_thread.join();
 }
 
-std::string daemon_backend::get_wallet_log_prefix(size_t wallet_id) const
+std::string wallets_manager::get_wallet_log_prefix(size_t wallet_id) const
 {
   CRITICAL_REGION_LOCAL(m_wallet_log_prefixes_lock);
 

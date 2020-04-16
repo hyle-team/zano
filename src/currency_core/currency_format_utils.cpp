@@ -7,7 +7,9 @@
 
 #include "include_base_utils.h"
 #include <boost/foreach.hpp>
-#include <boost/locale.hpp>
+#ifndef ANDROID_BUILD
+  #include <boost/locale.hpp>
+#endif
 using namespace epee;
 
 #include "print_fixed_point_helper.h"
@@ -625,7 +627,8 @@ namespace currency
     //put hash into extra
     std::stringstream ss;
     binary_archive<true> oar(ss);
-    ::do_serialize(oar, const_cast<std::vector<attachment_v>&>(attachment));
+    if (!::do_serialize(oar, const_cast<std::vector<attachment_v>&>(attachment)))
+      return;
     std::string buff = ss.str();
     eai.sz = buff.size();
     eai.hsh = get_blob_hash(buff);
@@ -1605,7 +1608,7 @@ namespace currency
       return true;
 
     size_t i = 0;
-    BOOST_FOREACH(const tx_out& o, tx.vout)
+    for(const tx_out& o : tx.vout)
     {
       if (o.target.type() == typeid(txout_to_key))
       {
@@ -2677,6 +2680,7 @@ namespace currency
     return o << "<" << r.n << ":" << r.tx_id << ">";
   }
   //--------------------------------------------------------------------------------
+#ifndef ANDROID_BUILD
   const std::locale& utf8_get_conversion_locale()
   {
     static std::locale loc = boost::locale::generator().generate("en_US.UTF-8");
@@ -2696,6 +2700,7 @@ namespace currency
       return true;
     return utf8_to_lower(s).find(utf8_to_lower(match), 0) != std::string::npos;
   }
+#endif
   //--------------------------------------------------------------------------------
   bool operator ==(const currency::transaction& a, const currency::transaction& b) {
     return currency::get_transaction_hash(a) == currency::get_transaction_hash(b);

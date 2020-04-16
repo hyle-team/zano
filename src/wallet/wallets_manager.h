@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <boost/thread/shared_mutex.hpp>
 #include <boost/program_options.hpp>
 #include "warnings.h"
 PUSH_VS_WARNINGS
@@ -19,16 +20,19 @@ using namespace epee;
 #include "console_handler.h"
 #include "p2p/net_node.h"
 #include "currency_core/checkpoints_create.h"
-#include "currency_core/currency_core.h"
-#include "currency_core/bc_offers_service.h"
-#include "rpc/core_rpc_server.h"
-#include "currency_protocol/currency_protocol_handler.h"
-#include "daemon/daemon_commands_handler.h"
+#ifndef MOBILE_WALLET_BUILD
+  #include "currency_core/currency_core.h"
+  #include "currency_core/bc_offers_service.h"
+  #include "rpc/core_rpc_server.h"
+  #include "currency_protocol/currency_protocol_handler.h"
+  #include "core_fast_rpc_proxy.h"
+#endif
+//#include "daemon/daemon_commands_handler.h"
 //#include "common/miniupnp_helper.h"
 #include "view_iface.h"
-#include "core_fast_rpc_proxy.h"
-#include "wallet/wallet2.h"
+#include "wallet2.h"
 #include "wallet_id_adapter.h"
+#include "wallet_rpc_server.h"
 
 POP_VS_WARNINGS
 
@@ -38,8 +42,6 @@ namespace po = boost::program_options;
 #include <crtdbg.h>
 #endif
 
-//TODO: need refactoring here. (template classes can't be used in BOOST_CLASS_VERSION)
-BOOST_CLASS_VERSION(nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >, CURRENT_P2P_STORAGE_ARCHIVE_VER);
 
 struct wallet_lock_time_watching_policy
 {
@@ -47,7 +49,7 @@ struct wallet_lock_time_watching_policy
 };
 
 
-class daemon_backend : public i_backend_wallet_callback
+class wallets_manager : public i_backend_wallet_callback
 {
 
 public:
@@ -55,6 +57,7 @@ public:
   {
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
+    std::shared_ptr<tools::wallet_rpc_server> rpc_wrapper; //500 bytes of extra data, we can afford it, to have rpc-like invoke map
     std::atomic<bool> do_mining;
     std::atomic<bool> major_stop;
     std::atomic<bool> stop_for_refresh; //use separate var for passing to "refresh" member function, 
@@ -68,6 +71,10 @@ public:
     std::atomic<bool>* plast_daemon_is_disconnected;
     std::atomic<bool> has_related_alias_in_unconfirmed;
     std::atomic<bool> need_to_update_wallet_info;
+
+    std::atomic<bool> long_refresh_in_progress;
+    epee::critical_section long_refresh_in_progress_lock; //secure wallet state and prevent from long wait while long refresh is in work
+
     view::i_view* pview;
     uint64_t wallet_id;
     epee::locked_object<std::list<bc_services::offer_details_ex>> offers;
@@ -78,8 +85,8 @@ public:
     ~wallet_vs_options();
   };
 
-  daemon_backend();
-  ~daemon_backend();
+  wallets_manager();
+  ~wallets_manager();
   bool init(int argc, char* argv[], view::i_view* pview_handler);
   bool start();
   bool stop();
@@ -87,6 +94,8 @@ public:
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr);
+  std::string invoke(uint64_t wallet_id, std::string params);
+  std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);
   std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist);
   std::string get_wallet_info(size_t wallet_id, view::wallet_info& wi);
@@ -97,6 +106,7 @@ public:
   std::string request_cancel_contract(size_t wallet_id, const crypto::hash& contract_id, uint64_t fee, uint64_t expiration_period);
   std::string accept_cancel_contract(size_t wallet_id, const crypto::hash& contract_id);
   
+  std::string get_connectivity_status();
   std::string get_wallet_info(wallet_vs_options& w, view::wallet_info& wi);
   std::string close_wallet(size_t wallet_id);
   std::string push_offer(size_t wallet_id, const bc_services::offer_details_ex& od, currency::transaction& res_tx);
@@ -134,8 +144,10 @@ public:
   std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
   std::string is_valid_brain_restore_data(const std::string& brain_text);
+#ifndef MOBILE_WALLET_BUILD
   void subscribe_to_core_events(currency::i_core_event_handler* pevents_handler);
-  void unsubscribe_to_core_events();
+  //void unsubscribe_to_core_events();
+#endif
   void get_gui_options(view::gui_options& opt);
   std::string get_wallet_log_prefix(size_t wallet_id) const;
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
@@ -152,6 +164,7 @@ private:
   void update_wallets_info();
   void init_wallet_entry(wallet_vs_options& wo, uint64_t id);
   static void prepare_wallet_status_info(wallet_vs_options& wo, view::wallet_status_info& wsi);
+  bool get_is_remote_daemon_connected();
   //----- i_backend_wallet_callback ------
   virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block);
 	virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined);
@@ -164,7 +177,6 @@ private:
   view::i_view m_view_stub;
   view::i_view* m_pview;
   std::shared_ptr<tools::i_core_proxy> m_rpc_proxy;
-  mutable critical_section m_wallets_lock;
   po::variables_map m_vm;
 
   std::atomic<uint64_t> m_last_daemon_height;
@@ -176,12 +188,14 @@ private:
   std::string m_data_dir;
   view::gui_options m_ui_opt;
   
+#ifndef MOBILE_WALLET_BUILD
   //daemon stuff
 	bc_services::bc_offers_service m_offers_service;
   currency::core m_ccore;
   currency::t_currency_protocol_handler<currency::core> m_cprotocol;
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > m_p2psrv;
   currency::core_rpc_server m_rpc_server;
+#endif
 
   bool m_remote_node_mode;
   bool m_qt_logs_enbaled;
@@ -189,6 +203,9 @@ private:
 
 
   std::map<size_t, wallet_vs_options> m_wallets;
+  //mutable critical_section m_wallets_lock;
+  mutable boost::shared_mutex m_wallets_lock;
+
   std::vector<std::string> m_wallet_log_prefixes;
   mutable critical_section m_wallet_log_prefixes_lock;
 };

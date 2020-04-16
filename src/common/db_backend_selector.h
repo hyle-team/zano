@@ -1,48 +1,43 @@
-// Copyright (c) 2014-2019 Zano Project
-// Copyright (c) 2014-2018 The Louisdor Project
+// Copyright (c) 2014-2020 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
 
-#include "db_backend_lmdb.h"
-#include "db_backend_mdbx.h"
-#include "common/command_line.h"
-#include "common/db_abstract_accessor.h"
+#include <boost/program_options.hpp>
+#include "misc_language.h"
+#include "db_backend_base.h"
 
 namespace tools
 {
   namespace db
   {
-    inline
-    bool select_db_engine_from_arg(const boost::program_options::variables_map& vm, tools::db::basic_db_accessor& rdb)
+    enum db_engine_type { db_none = 0, db_lmdb, db_mdbx };
+    
+    class db_backend_selector
     {
-      try
-      {
-        if (command_line::get_arg(vm, command_line::arg_db_engine) == ARG_DB_ENGINE_LMDB)
-        {
-          rdb.reset_backend(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend));
-          return true;
-        }
-        else if (command_line::get_arg(vm, command_line::arg_db_engine) == ARG_DB_ENGINE_MDBX)
-        {
-  #ifdef ENABLED_ENGINE_MDBX
-          rdb.reset_backend(std::shared_ptr<tools::db::i_db_backend>(new tools::db::mdbx_db_backend));
-          return true;
-  #else
-          LOG_PRINT_L0(" DB ENGINE: " << ARG_DB_ENGINE_MDBX << " is not suported by this build(see DISABLE_MDBX cmake option), STOPPING");
-          return false;
-  #endif 
-        }
-      }
-      catch (...)
-      {
-        LOG_ERROR("internal error: arg_db_engine command-line option could not be read (exception caught)");
-        return false;
-      }
+    public:
+      db_backend_selector();
 
-      LOG_PRINT_RED_L0(" UNKNOWN DB ENGINE: " << command_line::get_arg(vm, command_line::arg_db_engine) << ", STOPPING");
-      return false;
-    }
-  }
-}
+      static void init_options(boost::program_options::options_description& desc);
+      bool init(const boost::program_options::variables_map& vm);
+
+      std::string get_db_folder_path() const;
+      std::string get_db_main_file_name() const;
+      db_engine_type get_engine_type() const { return m_engine_type; }
+      std::string get_engine_name() const;
+      std::string get_config_folder() const { return m_config_folder; }
+      std::string get_temp_config_folder() const;
+      std::string get_temp_db_folder_path() const;
+ 
+      std::string get_pool_db_folder_path() const;
+
+      std::shared_ptr<tools::db::i_db_backend> create_backend();
+
+    private:
+      db_engine_type m_engine_type;
+      std::string m_config_folder;
+    };
+
+  } // namespace db
+} // namespace tools

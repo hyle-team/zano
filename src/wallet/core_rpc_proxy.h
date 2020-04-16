@@ -45,6 +45,7 @@ namespace tools
 
 
     virtual bool check_connection(){ return false; }
+    virtual time_t get_last_success_interract_time() { return 0; }
     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id){ return false; }
   };
 }

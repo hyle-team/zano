@@ -1622,7 +1622,7 @@ multisig_and_checkpoints::multisig_and_checkpoints()
 bool multisig_and_checkpoints::set_cp(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   currency::checkpoints checkpoints;
-  checkpoints.add_checkpoint(15, "a8e535abb31cd2c07ebd65dbb8d4160954677a0cebcd3dadf81642297cc557af");
+  checkpoints.add_checkpoint(15, "72d63d6500c62d6783108f5a2e2c9f1dc1f0aae57011cf123583eec679a52cf9");
   c.set_checkpoints(std::move(checkpoints));
 
   return true;
@@ -1674,7 +1674,10 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx");
+
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_1 goes with the block blk_1
   events.push_back(tx_1);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
 
@@ -1695,7 +1698,9 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   bool tx_fully_signed = false;
   r = sign_multisig_input_in_tx(tx_2, 0, alice_acc.get_keys(), tx_1, &tx_fully_signed);
   CHECK_AND_ASSERT_MES(r & tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed: " << tx_fully_signed);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_2 goes with the block blk_2
   events.push_back(tx_2);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx_2);
 
   ADJUST_TEST_CORE_TIME(blk_2.timestamp);
@@ -1708,7 +1713,10 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_3, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx");
+
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_3 goes with the block blk_3
   events.push_back(tx_3);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_3);  // <-- CP
 
@@ -1732,7 +1740,9 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   r = sign_multisig_input_in_tx(tx_4, 0, alice_acc.get_keys(), tx_3, &tx_fully_signed);
   CHECK_AND_ASSERT_MES(r & tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed: " << tx_fully_signed);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_4 goes with the block blk_4
   events.push_back(tx_4);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_4);
 
   // tx_5: normal input -> multisig output
@@ -1815,7 +1825,10 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx");
+
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_1 goes with the block blk_1
   events.push_back(tx_1);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
 
@@ -1829,21 +1842,24 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   boost::get<txin_multisig>(tx_2.vin[0]).sigs_count = 10;
 
   DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   events.push_back(tx_2);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 0, 0, 0, 0, 0));
 
-  // tx_3: no signatures, zero sigs_count in ms input (should FAIL)
+  // tx_3: no signatures, zero sigs_count in ms input (should pass under CP zone)
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
   r = make_tx_multisig_to_key(tx_1, get_tx_out_index_by_amount(tx_1, amount), std::list<account_keys>({ alice_acc.get_keys() }), bob_acc.get_public_address(), tx_3);
   CHECK_AND_ASSERT_MES(r, false, "make_tx_multisig_to_key failed");
   tx_3.signatures.clear();
   boost::get<txin_multisig>(tx_3.vin[0]).sigs_count = 0;
 
-  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   events.push_back(tx_3);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   // tx_4: zero ms out keys (should FAIL)
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
@@ -1857,7 +1873,9 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   txb.step5_sign(sources);
   transaction tx_4 = txb.m_tx;
   DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   events.push_back(tx_4);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   // tx_6: many ms out keys + no sigs (should pass due to CP zone)
   txb = AUTO_VAL_INIT(txb);
@@ -1870,7 +1888,9 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   txb.step5_sign(sources);
   txb.m_tx.signatures.clear();
   transaction tx_6 = txb.m_tx;
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   events.push_back(tx_6);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_6);
 
@@ -1880,7 +1900,9 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   transaction tx_7 = AUTO_VAL_INIT(tx_7);
   r = make_tx_multisig_to_key(tx_6, get_tx_out_index_by_amount(tx_6, amount), std::list<account_keys>({ alice_acc.get_keys() }), bob_acc.get_public_address(), tx_7);
   CHECK_AND_ASSERT_MES(r, false, "make_tx_multisig_to_key failed");
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   events.push_back(tx_7);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_7);
 

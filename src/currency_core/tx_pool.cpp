@@ -20,6 +20,7 @@
 #include "warnings.h"
 #include "crypto/hash.h"
 #include "profile_tools.h"
+#include "common/db_backend_selector.h"
 
 DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated name length exceeded, name was truncated
 
@@ -32,7 +33,6 @@ DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated 
 #define TRANSACTION_POOL_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION 92 // DON'T CHANGE THIS, if you need to resync db! Change TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION instead!
 #define TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION      BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 1
 
-#define CURRENCY_POOLDATA_FOLDERNAME_SUFFIX               "_v1"
 
 #define CONFLICT_KEY_IMAGE_SPENT_DEPTH_TO_REMOVE_TX_FROM_POOL 50 // if there's a conflict in key images between tx in the pool and in the blockchain this much depth in required to remove correspongin tx from pool
 
@@ -92,6 +92,16 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const transaction &tx, const crypto::hash &id, uint64_t blob_size, tx_verification_context& tvc, bool kept_by_block, bool from_core)
   {    
+    if (!kept_by_block && !from_core && m_blockchain.is_in_checkpoint_zone())
+    {
+      // BCS is in CP zone, tx verification is impossible until it gets synchronized
+      tvc.m_added_to_pool = false;
+      tvc.m_should_be_relayed = false;
+      tvc.m_verification_failed = false;
+      tvc.m_verification_impossible = true;
+      return false;
+    }
+
     TIME_MEASURE_START_PD(tx_processing_time);
     TIME_MEASURE_START_PD(check_inputs_types_supported_time);
     if(!check_inputs_types_supported(tx))
@@ -996,12 +1006,12 @@ namespace currency
 
     std::vector<txv> txs_v;
     txs_v.reserve(m_db_transactions.size());
-    std::vector<txv*> txs;
+    std::vector<size_t> txs; // selected transactions, vector of indices of txs_v
 
     
     //keep getting it as a values cz db items cache will keep it as unserialised object stored by shared ptrs 
     m_db_transactions.enumerate_keys([&](uint64_t i, crypto::hash& k){txs_v.resize(i + 1); txs_v[i].first = k; return true;});
-    txs.resize(txs_v.size(), nullptr);
+    txs.resize(txs_v.size(), SIZE_MAX);
     
     for (uint64_t i = 0; i != txs_v.size(); i++)
     {      
@@ -1010,17 +1020,17 @@ namespace currency
       if (!txs_v[i].second)
       {
         LOG_ERROR("Internal tx pool db error: key " << k << " was enumerated as key but couldn't get value");
-        continue;
+        return false;
       }
-      txs[i] = &txs_v[i];
+      txs[i] = i;
     }
 
     
     
-    std::sort(txs.begin(), txs.end(), [](txv *a, txv *b) -> bool {
+    std::sort(txs.begin(), txs.end(), [&txs_v](size_t a, size_t b) -> bool {
       boost::multiprecision::uint128_t a_, b_;
-      a_ = boost::multiprecision::uint128_t(a->second->fee) * b->second->blob_size;
-      b_ = boost::multiprecision::uint128_t(b->second->fee) * a->second->blob_size;
+      a_ = boost::multiprecision::uint128_t(txs_v[a].second->fee) * txs_v[b].second->blob_size;
+      b_ = boost::multiprecision::uint128_t(txs_v[b].second->fee) * txs_v[a].second->blob_size;
       return a_ > b_;
     });
 
@@ -1040,10 +1050,10 @@ namespace currency
 
     // scan txs for alias reg requests - if there are such requests, don't process alias updates
     bool alias_regs_exist = false;
-    for (auto txp : txs) 
+    for (auto txi : txs) 
     {
       tx_extra_info ei = AUTO_VAL_INIT(ei);
-      bool r = parse_and_validate_tx_extra(txp->second->tx, ei);
+      bool r = parse_and_validate_tx_extra(txs_v[txi].second->tx, ei);
       CHECK_AND_ASSERT_MES(r, false, "parse_and_validate_tx_extra failed while looking up the tx pool");
       if (!ei.m_alias.m_alias.empty() && !ei.m_alias.m_sign.size()) {
         alias_regs_exist = true;
@@ -1057,12 +1067,12 @@ namespace currency
 
     for (size_t i = 0; i < txs.size(); i++)
     {
-      txv &tx(*txs[i]);
+      txv &tx(txs_v[txs[i]]);
 
       // expiration time check -- skip expired transactions
       if (is_tx_expired(tx.second->tx, tx_expiration_ts_median))
       {
-          txs[i] = nullptr;
+          txs[i] = SIZE_MAX;
           continue;
       } 
       
@@ -1076,7 +1086,7 @@ namespace currency
         if ((alias_count >= MAX_ALIAS_PER_BLOCK) ||                   // IF this tx registers/updates an alias AND alias per block threshold exceeded
           (update_an_alias && alias_regs_exist))                      // OR this tx updates an alias AND there are alias reg requests...
         {
-          txs[i] = NULL;                                              // ...skip this tx
+          txs[i] = SIZE_MAX;                                          // ...skip this tx
           continue;
         }
       }
@@ -1094,7 +1104,7 @@ namespace currency
       }
 
       if (!is_tx_ready_to_go_result || have_key_images(k_images, tx.second->tx)) {
-        txs[i] = NULL;
+        txs[i] = SIZE_MAX;
         continue;
       }
       append_key_images(k_images, tx.second->tx);
@@ -1121,17 +1131,18 @@ namespace currency
 
     for (size_t i = 0; i != txs.size(); i++)
     {
-      if (txs[i])
+      if (txs[i] != SIZE_MAX)
       {
+        txv &tx(txs_v[txs[i]]);
         if (i < best_position)
         {
-          bl.tx_hashes.push_back(txs[i]->first);
+          bl.tx_hashes.push_back(tx.first);
         }
-        else if (have_attachment_service_in_container(txs[i]->second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
+        else if (have_attachment_service_in_container(tx.second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
         {
           // BC_OFFERS_SERVICE_INSTRUCTION_DEL transactions has zero fee, so include them here regardless of reward effectiveness
-          bl.tx_hashes.push_back(txs[i]->first);
-          total_size += txs[i]->second->blob_size;
+          bl.tx_hashes.push_back(tx.first);
+          total_size += tx.second->blob_size;
         }
       }
     }
@@ -1153,11 +1164,15 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
   {
-    if (!select_db_engine_from_arg(vm, m_db))
+    tools::db::db_backend_selector dbbs;
+    dbbs.init(vm);
+    auto p_backend = dbbs.create_backend();
+    if (!p_backend)
     {
-      LOG_PRINT_RED_L0("Failed to select db engine");
+      LOG_PRINT_RED_L0("Failed to create db engine");
       return false;
     }
+    m_db.reset_backend(p_backend);
     LOG_PRINT_L0("DB ENGINE USED BY POOL: " << m_db.get_backend()->name());
 
     m_config_folder = config_folder;
@@ -1165,7 +1180,7 @@ namespace currency
     uint64_t cache_size_l1 = CACHE_SIZE;
     LOG_PRINT_GREEN("Using pool db file cache size(L1): " << cache_size_l1, LOG_LEVEL_0);
 
-    // remove old incompartible DB
+    // remove old incompatible DB
     const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_POOLDATA_FOLDERNAME_OLD;
     if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
     {
@@ -1173,7 +1188,7 @@ namespace currency
       boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
     }
 
-    const std::string db_folder_path = m_config_folder + ("/" CURRENCY_POOLDATA_FOLDERNAME_PREFIX) + m_db.get_backend()->name() + CURRENCY_POOLDATA_FOLDERNAME_SUFFIX;
+    const std::string db_folder_path = dbbs.get_pool_db_folder_path();
     
     LOG_PRINT_L0("Loading blockchain from " << db_folder_path << "...");
 
@@ -1192,8 +1207,6 @@ namespace currency
 
       res = m_db_transactions.init(TRANSACTION_POOL_CONTAINER_TRANSACTIONS);
       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
-//       res = m_db_key_images_set.init(TRANSACTION_POOL_CONTAINER_KEY_IMAGES);
-//       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
       res = m_db_black_tx_list.init(TRANSACTION_POOL_CONTAINER_BLACK_TX_LIST);
       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
       res = m_db_alias_names.init(TRANSACTION_POOL_CONTAINER_ALIAS_NAMES);

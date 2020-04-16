@@ -7,9 +7,10 @@
 #include <QtWidgets>
 #include <QWebChannel>
 
-#include "view_iface.h"
+#include "wallet/view_iface.h"
+
 #ifndef Q_MOC_RUN
-#include "daemon_backend.h"
+#include "wallet/wallets_manager.h"
 #include "currency_core/offers_services_helpers.h"
 #endif
 
@@ -18,13 +19,7 @@ class QWebEngineView;
 class QLineEdit;
 QT_END_NAMESPACE
 
-#pragma pack(push, 1)
-struct app_data_file_binary_header
-{
-  uint64_t m_signature;
-  uint64_t m_cb_body;
-};
-#pragma pack (pop)
+
 #define  APP_DATA_FILE_BINARY_SIGNATURE   0x1000111101101021LL
 
 
@@ -227,7 +222,7 @@ private:
   QWebChannel* m_channel;
 
   // DATA
-  daemon_backend m_backend;
+  wallets_manager m_backend;
   //std::atomic<bool> m_quit_requested;
   std::atomic<bool> m_gui_deinitialize_done_1;
   std::atomic<bool> m_backend_stopped_2;

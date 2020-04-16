@@ -100,7 +100,7 @@ namespace currency
     res.current_max_allowed_block_size = m_core.get_blockchain_storage().get_current_comulative_blocksize_limit();
     if (!res.outgoing_connections_count)
       res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_connecting;
-    else if (res.synchronized_connections_count > total_conn/2 ) /* m_p2p.get_payload_object().is_synchronized()*/
+    else if (m_p2p.get_payload_object().is_synchronized())
       res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_online;
     else
       res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
@@ -386,6 +386,9 @@ namespace currency
       return true;
     }
 
+    res.tx_expiration_ts_median = m_core.get_blockchain_storage().get_tx_expiration_median();
+
+
     for(auto& tx: txs)
     {
       res.txs.push_back(t_serializable_object_to_blob(tx));
@@ -393,6 +396,7 @@ namespace currency
     res.status = CORE_RPC_STATUS_OK;
     return true;
   }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_scan_pos(const COMMAND_RPC_SCAN_POS::request& req, COMMAND_RPC_SCAN_POS::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
@@ -880,10 +884,10 @@ namespace currency
     }
     //@#@
     //temporary double check timestamp
-    if (time(NULL) - get_actual_timestamp(b) > 5)
+    if (time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) > 5)
     {
       LOG_PRINT_RED_L0("Found block (" << get_block_hash(b) << ") timestamp (" << get_actual_timestamp(b)
-        << ") is suspiciously less (" << time(NULL) - get_actual_timestamp(b) << ") then curren time( " << time(NULL) << ")");
+        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) << ") than current time ( " << time(NULL) << ")");
       //mark node to make it easier to find it via scanner      
       m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend = true;
     }
@@ -937,10 +941,10 @@ namespace currency
     }
     //@#@
     //temporary double check timestamp
-    if (time(NULL) - get_actual_timestamp(b) > 5)
+    if (time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) > 5)
     {
       LOG_PRINT_RED_L0("Found block (" << get_block_hash(b) << ") timestamp (" << get_actual_timestamp(b)
-        << ") is suspiciously less (" << time(NULL) - get_actual_timestamp(b) << ") then curren time( " << time(NULL) << ")");
+        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) << ") than current time ( " << time(NULL) << ")");
       //mark node to make it easier to find it via scanner      
       m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend = true;
     }

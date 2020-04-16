@@ -32,6 +32,13 @@ app-sidebar {
           color: themed(mainTextColor);
         }
 
+        .icon {
+
+          @include themify($themes) {
+            background-color: themed(blueTextColor);
+          }
+        }
+
         .sidebar-account-row {
 
           .text {
@@ -217,6 +224,23 @@ app-sidebar {
 
               @include themify($themes) {
                 background-color: themed(progressBarFullBackgroundColor);
+              }
+            }
+          }
+
+          &.downloading {
+
+            .progress-bar {
+
+              @include themify($themes) {
+                background-color: themed(progressBarBackgroundColor);
+              }
+
+              .fill {
+
+                @include themify($themes) {
+                  background-color: themed(blueTextColor);
+                }
               }
             }
           }
