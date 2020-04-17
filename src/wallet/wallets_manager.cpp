@@ -773,9 +773,13 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       return_code = API_RETURN_CODE_FILE_RESTORED;
       break;
     }
+    catch (const tools::error::invalid_password& )
+    {
+      return std::string(API_RETURN_CODE_WRONG_PASSWORD);
+    }
     catch (const std::exception& e)
     {
-      return std::string(API_RETURN_CODE_WRONG_PASSWORD) + ":" + e.what();
+      return std::string(API_RETURN_CODE_INTERNAL_ERROR) + ", DESCRIPTION: " + e.what();
     }
   }
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
@@ -929,7 +933,11 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     return API_RETURN_CODE_ALREADY_EXISTS;
   }
-
+  catch (const tools::error::wallet_wrong_seed_error&)
+  {
+    return API_RETURN_CODE_WRONG_SEED;
+  }
+  
   catch (const std::exception& e)
   {
     return std::string(API_RETURN_CODE_FAIL) + ":" + e.what();

@@ -2020,7 +2020,7 @@ void wallet2::restore(const std::wstring& path, const std::string& pass, const s
   m_password = pass;
   bool r = m_account.restore_keys_from_braindata(restore_key);
   init_log_prefix();
-  THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
+  THROW_IF_TRUE_WALLET_EX(!r, error::wallet_wrong_seed_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
   boost::system::error_code ignored_ec;
   THROW_IF_TRUE_WALLET_EX(boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));
   store();
