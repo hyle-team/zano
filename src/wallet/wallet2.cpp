@@ -2951,7 +2951,7 @@ bool wallet2::is_transfer_unlocked(const transfer_details& td, bool for_pos_mini
   
 
   uint64_t unlock_time = get_tx_unlock_time(td.m_ptx_wallet_info->m_tx, td.m_internal_output_index);
-  if (for_pos_mining && m_blockchain.size() > m_core_runtime_config.hard_fork1_starts_after_height)
+  if (for_pos_mining && m_blockchain.size() > m_core_runtime_config.hard_fork_01_starts_after_height)
   {
     //allowed of staking locked coins with 
     stake_lock_time = unlock_time;
