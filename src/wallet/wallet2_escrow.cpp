@@ -93,13 +93,13 @@ bool wallet2::validate_escrow_proposal(const wallet_public::wallet_transfer_info
 
   crypto::public_key a_key = AUTO_VAL_INIT(a_key), b_key = AUTO_VAL_INIT(b_key);
   crypto::key_derivation der = AUTO_VAL_INIT(der);
-  r = crypto::generate_key_derivation(cpd.a_addr.m_view_public_key, prop.tx_onetime_secret_key, der);
+  r = crypto::generate_key_derivation(cpd.a_addr.view_public_key, prop.tx_onetime_secret_key, der);
   LOC_CHK(r, "generate_key_derivation failed: A");
-  r = crypto::derive_public_key(der, ms_out_index, cpd.a_addr.m_spend_public_key, a_key);
+  r = crypto::derive_public_key(der, ms_out_index, cpd.a_addr.spend_public_key, a_key);
   LOC_CHK(r, "derive_public_key failed: A");
-  r = crypto::generate_key_derivation(cpd.b_addr.m_view_public_key, prop.tx_onetime_secret_key, der);
+  r = crypto::generate_key_derivation(cpd.b_addr.view_public_key, prop.tx_onetime_secret_key, der);
   LOC_CHK(r, "generate_key_derivation failed: B");
-  r = crypto::derive_public_key(der, ms_out_index, cpd.b_addr.m_spend_public_key, b_key);
+  r = crypto::derive_public_key(der, ms_out_index, cpd.b_addr.spend_public_key, b_key);
   LOC_CHK(r, "derive_public_key failed: B");
   bool correct_keys = (ms.keys[0] == a_key && ms.keys[1] == b_key) || (ms.keys[0] == b_key && ms.keys[1] == a_key);
   LOC_CHK(correct_keys, "template has mulisig output with invalid keys: 0:" << ms.keys[0] << " 1:" << ms.keys[1]);
@@ -176,7 +176,7 @@ bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_n
   // (3/5) outputs
   crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
   crypto::key_derivation der = AUTO_VAL_INIT(der);
-  r = crypto::generate_key_derivation(tx_pub_key, a_keys.m_view_secret_key, der);
+  r = crypto::generate_key_derivation(tx_pub_key, a_keys.view_secret_key, der);
   LOC_CHK(r, "generate_key_derivation failed");
   uint64_t total_outputs_amount = 0, outputs_to_A_amount = 0, outputs_to_null_addr_amount = 0;
   for (size_t i = 0; i != tx.vout.size(); ++i)
@@ -186,7 +186,7 @@ bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_n
       total_outputs_amount += tx.vout[i].amount;
       const txout_to_key& otk = boost::get<txout_to_key>(tx.vout[i].target);
       crypto::public_key ephemeral_pub_key = AUTO_VAL_INIT(ephemeral_pub_key);
-      r = crypto::derive_public_key(der, i, cpd.a_addr.m_spend_public_key, ephemeral_pub_key);
+      r = crypto::derive_public_key(der, i, cpd.a_addr.spend_public_key, ephemeral_pub_key);
       LOC_CHK(r, "derive_public_key failed for output #" << i);
       if (otk.key == ephemeral_pub_key)
         outputs_to_A_amount += tx.vout[i].amount;
@@ -223,10 +223,10 @@ bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_n
   // Having a_keys, we determine index of A key in multisig output keys array.
   // Thus it's possible to determine the order of signatures (A, B or B, A), and, eventually, validate B signature.
   crypto::public_key source_tx_pub_key = get_tx_pub_key_from_extra(source_tx);
-  r = crypto::generate_key_derivation(source_tx_pub_key, a_keys.m_view_secret_key, der);
+  r = crypto::generate_key_derivation(source_tx_pub_key, a_keys.view_secret_key, der);
   LOC_CHK(r, "generate_key_derivation failed");
   crypto::public_key ephemeral_pub_key = AUTO_VAL_INIT(ephemeral_pub_key);
-  r = crypto::derive_public_key(der, source_ms_out_index, a_keys.m_account_address.m_spend_public_key, ephemeral_pub_key);
+  r = crypto::derive_public_key(der, source_ms_out_index, a_keys.account_address.spend_public_key, ephemeral_pub_key);
   LOC_CHK(r, "derive_public_key failed");
 
   LOC_CHK(source_ms_out.keys.size() == 2, "internal error: invalid ms output keys array, size: " << source_ms_out.keys.size());
@@ -358,7 +358,7 @@ bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, co
   // (3/5) outputs
   crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
   crypto::key_derivation der = AUTO_VAL_INIT(der);
-  r = crypto::generate_key_derivation(tx_pub_key, b_keys.m_view_secret_key, der);
+  r = crypto::generate_key_derivation(tx_pub_key, b_keys.view_secret_key, der);
   LOC_CHK(r, "generate_key_derivation failed");
   uint64_t total_outputs_amount = 0, outputs_to_B_amount = 0;
   for (size_t i = 0; i != tx.vout.size(); ++i)
@@ -368,7 +368,7 @@ bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, co
       total_outputs_amount += tx.vout[i].amount;
       const txout_to_key& otk = boost::get<txout_to_key>(tx.vout[i].target);
       crypto::public_key ephemeral_pub_key = AUTO_VAL_INIT(ephemeral_pub_key);
-      r = crypto::derive_public_key(der, i, cpd.b_addr.m_spend_public_key, ephemeral_pub_key);
+      r = crypto::derive_public_key(der, i, cpd.b_addr.spend_public_key, ephemeral_pub_key);
       LOC_CHK(r, "derive_public_key failed for output #" << i);
       if (otk.key == ephemeral_pub_key)
         outputs_to_B_amount += tx.vout[i].amount;
