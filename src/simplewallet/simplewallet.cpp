@@ -1334,7 +1334,7 @@ bool simple_wallet::spendkey(const std::vector<std::string> &args)
 
   const account_keys& keys = m_wallet->get_account().get_keys();
   std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_spend_secret_key) << std::endl;
-  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.m_spend_public_key) << std::endl << std::flush;
+  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.spend_public_key) << std::endl << std::flush;
 
   return true;
 }
@@ -1346,7 +1346,7 @@ bool simple_wallet::viewkey(const std::vector<std::string> &args)
 
   const account_keys& keys = m_wallet->get_account().get_keys();
   std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_view_secret_key) << std::endl;
-  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.m_view_public_key) << std::endl << std::flush;
+  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.view_public_key) << std::endl << std::flush;
 
   return true;
 }

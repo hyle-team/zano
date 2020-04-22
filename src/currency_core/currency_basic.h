@@ -62,17 +62,17 @@ namespace currency
 #pragma pack(push, 1)
   struct account_public_address
   {
-    crypto::public_key m_spend_public_key;
-    crypto::public_key m_view_public_key;
+    crypto::public_key spend_public_key;
+    crypto::public_key view_public_key;
 
     BEGIN_SERIALIZE_OBJECT()
-      FIELD(m_spend_public_key)
-      FIELD(m_view_public_key)
+      FIELD(spend_public_key)
+      FIELD(view_public_key)
     END_SERIALIZE()
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(m_spend_public_key)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(m_view_public_key)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_public_key)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_public_key)
       END_KV_SERIALIZE_MAP()
   };
 #pragma pack(pop)
