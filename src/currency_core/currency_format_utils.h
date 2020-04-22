@@ -348,7 +348,7 @@ namespace currency
   bool is_out_to_acc(const account_keys& acc, const tx_out_t& out_key, const crypto::public_key& tx_pub_key, size_t output_index)
   {
     crypto::key_derivation derivation;
-    generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
+    generate_key_derivation(tx_pub_key, acc.view_secret_key, derivation);
     return is_out_to_acc(acc, out_key, derivation, output_index);
   }
   //----------------------------------------------------------------------------------------------------
