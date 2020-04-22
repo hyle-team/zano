@@ -100,6 +100,7 @@ namespace boost
     {
       a & x.acc_addr;
     }
+
     template <class Archive>
     inline void serialize(Archive &a, currency::tx_crypto_checksum &x, const boost::serialization::version_type ver)
     {
@@ -189,21 +190,25 @@ namespace boost
     {
       a & at.v;
     }
+
     template <class Archive>
     inline void serialize(Archive &a, currency::etc_tx_details_unlock_time2 &at, const boost::serialization::version_type ver)
     {
       a & at.unlock_time_array;
     }
+
     template <class Archive>
     inline void serialize(Archive &a, currency::etc_tx_details_expiration_time &at, const boost::serialization::version_type ver)
     {
       a & at.v;
     }
+
     template <class Archive>
     inline void serialize(Archive &a, currency::etc_tx_details_flags &at, const boost::serialization::version_type ver)
     {
       a & at.v;
     }
+
     template <class Archive>
     inline void serialize(Archive &a, currency::etc_tx_time &at, const boost::serialization::version_type ver)
     {

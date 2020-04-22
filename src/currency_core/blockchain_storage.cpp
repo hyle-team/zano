@@ -3263,11 +3263,11 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
     //std::string signed_buff;
     //make_tx_extra_alias_entry(signed_buff, ai, true);
     std::string old_address = currency::get_account_address_as_str(local_alias_history.back().m_address);
-    bool r = crypto::check_signature(get_sign_buff_hash_for_alias_update(ai), local_alias_history.back().m_address.m_spend_public_key, ai.m_sign.back());
+    bool r = crypto::check_signature(get_sign_buff_hash_for_alias_update(ai), local_alias_history.back().m_address.spend_public_key, ai.m_sign.back());
     CHECK_AND_ASSERT_MES(r, false, "Failed to check signature, alias update failed." << ENDL 
       << "alias: " << ai.m_alias << ENDL
       << "signed_buff_hash: " << get_sign_buff_hash_for_alias_update(ai) << ENDL
-      << "public key: " << local_alias_history.back().m_address.m_spend_public_key << ENDL
+      << "public key: " << local_alias_history.back().m_address.spend_public_key << ENDL
       << "new_address: " << get_account_address_as_str(ai.m_address) << ENDL
       << "signature: " << epee::string_tools::pod_to_hex(ai.m_sign) << ENDL 
       << "alias_history.size() = " << local_alias_history.size());

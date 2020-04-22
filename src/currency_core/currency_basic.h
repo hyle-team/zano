@@ -303,14 +303,12 @@ namespace currency
     std::string m_text_comment;
     std::vector<crypto::secret_key> m_view_key; // only one or zero elments expected (std::vector is using as memory efficient container for such a case)
     std::vector<crypto::signature> m_sign;      // only one or zero elments expected (std::vector is using as memory efficient container for such a case)
-    //uint8_t flags;
 
     BEGIN_SERIALIZE()
       FIELD(m_address)
       FIELD(m_text_comment)
       FIELD(m_view_key)
       FIELD(m_sign)
-      //FIELD(flags)
     END_SERIALIZE()
   };
 
@@ -390,10 +388,15 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector<tx_service_attachment, tx_comment, tx_payer, tx_receiver, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time, etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_uint16_t, etc_tx_details_unlock_time2> all_payload_types;
-  typedef boost::make_variant_over<all_payload_types>::type attachment_v;
-  typedef boost::make_variant_over<all_payload_types>::type extra_v;
+  typedef boost::mpl::vector<
+    tx_service_attachment, tx_comment, tx_payer, tx_receiver, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
+    etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_uint16_t, etc_tx_details_unlock_time2
+  > all_payload_types;
+  
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
+  typedef payload_items_v extra_v;
+  typedef payload_items_v attachment_v;
+
 
   class transaction_prefix
   {

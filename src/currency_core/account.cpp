@@ -47,9 +47,9 @@ namespace currency
   //-----------------------------------------------------------------
   void account_base::generate()
   {   
-    generate_brain_keys(m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key, m_seed, BRAINWALLET_DEFAULT_SEED_SIZE);
+    generate_brain_keys(m_keys.m_account_address.spend_public_key, m_keys.m_spend_secret_key, m_seed, BRAINWALLET_DEFAULT_SEED_SIZE);
     dependent_key(m_keys.m_spend_secret_key, m_keys.m_view_secret_key);
-    if (!crypto::secret_key_to_public_key(m_keys.m_view_secret_key, m_keys.m_account_address.m_view_public_key))
+    if (!crypto::secret_key_to_public_key(m_keys.m_view_secret_key, m_keys.m_account_address.view_public_key))
       throw std::runtime_error("Failed to create public view key");
 
 
@@ -85,7 +85,7 @@ namespace currency
     //CHECK_AND_ASSERT_MES(restore_data.size() == ACCOUNT_RESTORE_DATA_SIZE, false, "wrong restore data size");
     if (restore_data.size() == BRAINWALLET_DEFAULT_SEED_SIZE)
     {
-      crypto::keys_from_default((unsigned char*)restore_data.data(), m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key, BRAINWALLET_DEFAULT_SEED_SIZE);
+      crypto::keys_from_default((unsigned char*)restore_data.data(), m_keys.m_account_address.spend_public_key, m_keys.m_spend_secret_key, BRAINWALLET_DEFAULT_SEED_SIZE);
     }
     else 
     {
@@ -94,7 +94,7 @@ namespace currency
     }
     m_seed = restore_data;
     crypto::dependent_key(m_keys.m_spend_secret_key, m_keys.m_view_secret_key);
-    bool r = crypto::secret_key_to_public_key(m_keys.m_view_secret_key, m_keys.m_account_address.m_view_public_key);
+    bool r = crypto::secret_key_to_public_key(m_keys.m_view_secret_key, m_keys.m_account_address.view_public_key);
     CHECK_AND_ASSERT_MES(r, false, "failed to secret_key_to_public_key for view key");
     set_createtime(0);
     return true;
