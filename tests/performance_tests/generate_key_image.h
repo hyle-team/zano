@@ -24,10 +24,10 @@ public:
     account_keys bob_keys = m_bob.get_keys();
 
     crypto::key_derivation recv_derivation;
-    crypto::generate_key_derivation(m_tx_pub_key, bob_keys.m_view_secret_key, recv_derivation);
+    crypto::generate_key_derivation(m_tx_pub_key, bob_keys.view_secret_key, recv_derivation);
 
-    crypto::derive_public_key(recv_derivation, 0, bob_keys.m_account_address.m_spend_public_key, m_in_ephemeral.pub);
-    crypto::derive_secret_key(recv_derivation, 0, bob_keys.m_spend_secret_key, m_in_ephemeral.sec);
+    crypto::derive_public_key(recv_derivation, 0, bob_keys.account_address.spend_public_key, m_in_ephemeral.pub);
+    crypto::derive_secret_key(recv_derivation, 0, bob_keys.spend_secret_key, m_in_ephemeral.sec);
 
     return true;
   }
