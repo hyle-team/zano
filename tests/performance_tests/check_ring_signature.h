@@ -34,7 +34,7 @@ public:
     m_alice.generate();
 
     std::vector<tx_destination_entry> destinations;
-    destinations.push_back(tx_destination_entry(this->m_source_amount, m_alice.get_keys().m_account_address));
+    destinations.push_back(tx_destination_entry(this->m_source_amount, m_alice.get_keys().account_address));
 
     if (!construct_tx(this->m_miners[this->real_source_idx].get_keys(), this->m_sources, destinations, m_tx, 0))
       return false;
