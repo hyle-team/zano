@@ -44,6 +44,12 @@
 
 #define WALLET_DEFAULT_POS_MINT_PACKING_SIZE                          100
 
+#define WALLET_EVERYBLOCK_SIZE                                        10
+#define WALLET_EVERY_10_BLOCKS_SIZE                                   144
+#define WALLET_EVERY_100_BLOCKS_SIZE                                  144
+#define WALLET_EVERY_1000_BLOCKS_SIZE                                 144
+
+
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
 
@@ -632,7 +638,9 @@ namespace tools
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
-    uint64_t get_blockchain_current_height() const { return m_blockchain.size(); }
+    uint64_t get_blockchain_current_height() const {
+      return m_last_10_blocks.empty() ? 0 : (--m_last_10_blocks.end())->first + 1;
+    }
 
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
@@ -665,8 +673,21 @@ namespace tools
           return;
         }
       }
+      //convert from old version
+      if (ver < CURRENCY_FORMATION_VERSION + 65)
+      {
+        //TODO:      a & m_blockchain;
+      }
+      else
+      {
+        a & m_genesis;
+        a & m_last_10_blocks;
+        a & m_last_144_blocks_every_10;
+        a & m_last_144_blocks_every_100;
+        a & m_last_144_blocks_every_1000;
+      }
 
-      a & m_blockchain;
+
       a & m_transfers;
       a & m_multisig_transfers;
       a & m_key_images;      
@@ -870,6 +891,7 @@ private:
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
+    void push_new_block_id(const crypto::hash& id, uint64_t height);
 
     currency::account_base m_account;
     bool m_watch_only;
@@ -877,7 +899,13 @@ private:
     std::wstring m_wallet_file;
     std::wstring m_pending_ki_file;
     std::string m_password;
-    std::vector<crypto::hash> m_blockchain;
+    //std::vector<crypto::hash> m_blockchain;
+    crypto::hash m_genesis;
+    std::map<uint64_t, crypto::hash> m_last_10_blocks;
+    std::map<uint64_t, crypto::hash> m_last_144_blocks_every_10;   //1 day
+    std::map<uint64_t, crypto::hash> m_last_144_blocks_every_100;  //10 days
+    std::map<uint64_t, crypto::hash> m_last_144_blocks_every_1000; //100 days
+
     std::atomic<uint64_t> m_local_bc_height; //temporary workaround 
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
