@@ -47,9 +47,6 @@
 
 
 
-
-
-
 namespace currency
 {
   bool operator ==(const currency::transaction& a, const currency::transaction& b);
@@ -57,9 +54,8 @@ namespace currency
   bool operator ==(const currency::extra_attachment_info& a, const currency::extra_attachment_info& b);
 
 
-
   typedef boost::multiprecision::uint128_t uint128_tl;
-  
+
 
   struct tx_extra_info 
   {
@@ -71,72 +67,6 @@ namespace currency
   };
 
   //---------------------------------------------------------------------------------------------------------------
-  struct genesis_payment_entry
-  {
-    std::string paid_prm;
-    std::string prm_usd_price;
-    std::string paid_xmr;
-    std::string xmr_usd_price;
-    std::string paid_qtum;
-    std::string qtum_usd_price;
-    std::string paid_bch;
-    std::string bch_usd_price;
-    std::string paid_rep;
-    std::string rep_usd_price;
-    std::string paid_dash;
-    std::string dash_usd_price;
-    std::string paid_ltc;
-    std::string ltc_usd_price;
-    std::string paid_eos;
-    std::string eos_usd_price;
-    std::string paid_eth;
-    std::string eth_usd_price;
-    std::string paid_btc;
-    std::string btc_usd_price;
-	  std::string address_this;
-    double amount_this_coin_fl;
-    double amount_this_coin_int;
-    std::string this_usd_price;
-
-	  BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(paid_prm)
-      KV_SERIALIZE(prm_usd_price)
-      KV_SERIALIZE(paid_xmr)
-      KV_SERIALIZE(xmr_usd_price)
-      KV_SERIALIZE(paid_qtum)
-      KV_SERIALIZE(qtum_usd_price)
-      KV_SERIALIZE(paid_bch)
-      KV_SERIALIZE(bch_usd_price)
-      KV_SERIALIZE(paid_rep)
-      KV_SERIALIZE(rep_usd_price)
-      KV_SERIALIZE(paid_dash)
-      KV_SERIALIZE(dash_usd_price)
-      KV_SERIALIZE(paid_ltc)
-      KV_SERIALIZE(ltc_usd_price)
-      KV_SERIALIZE(paid_eos)
-      KV_SERIALIZE(eos_usd_price)
-      KV_SERIALIZE(paid_eth)
-      KV_SERIALIZE(eth_usd_price)
-      KV_SERIALIZE(paid_btc)
-      KV_SERIALIZE(btc_usd_price)
-      KV_SERIALIZE(address_this)
-      KV_SERIALIZE_N(amount_this_coin_fl, "amount_this")
-      KV_SERIALIZE(this_usd_price)
-	  END_KV_SERIALIZE_MAP()
-  };
-  struct genesis_config_json_struct
-  {
-	  std::list<genesis_payment_entry> payments;
-	  std::string proof_string;
-
-	  BEGIN_KV_SERIALIZE_MAP()
-		  KV_SERIALIZE(payments)
-		  KV_SERIALIZE(proof_string)
-	  END_KV_SERIALIZE_MAP()
-  };
-
-
-  //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
                                                              uint64_t fee, 
@@ -615,6 +545,3 @@ namespace currency
 
 
 } // namespace currency
-
-
-
