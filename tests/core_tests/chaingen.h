@@ -900,10 +900,10 @@ namespace crypto {
     return o <<
       "account: " << std::endl <<
       "  addr:             " << get_account_address_as_str(acc.get_public_address()) << std::endl <<
-      "  spend secret key: " << acc.get_keys().m_spend_secret_key << std::endl <<
-      "  spend public key: " << acc.get_public_address().m_spend_public_key << std::endl <<
-      "  view  secret key: " << acc.get_keys().m_view_secret_key << std::endl <<
-      "  view  public key: " << acc.get_public_address().m_view_public_key << std::endl <<
+      "  spend secret key: " << acc.get_keys().spend_secret_key << std::endl <<
+      "  spend public key: " << acc.get_public_address().spend_public_key << std::endl <<
+      "  view  secret key: " << acc.get_keys().view_secret_key << std::endl <<
+      "  view  public key: " << acc.get_public_address().view_public_key << std::endl <<
       "  timestamp:        " << acc.get_createtime();
   }
 }
@@ -1140,7 +1140,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define MAKE_MINER_TX_AND_KEY_MANUALLY(TX, PREV_BLOCK, P_KEYPAIR)                                                       \
   transaction TX;                                                                                                       \
   if (!construct_miner_tx_manually(get_block_height(PREV_BLOCK) + 1, generator.get_already_generated_coins(PREV_BLOCK), \
-    miner_account.get_keys().m_account_address, TX, 0, P_KEYPAIR))                                                      \
+    miner_account.get_keys().account_address, TX, 0, P_KEYPAIR))                                                      \
     return false;
 
 #define MAKE_MINER_TX_MANUALLY(TX, PREV_BLOCK) MAKE_MINER_TX_AND_KEY_MANUALLY(TX, PREV_BLOCK, nullptr)
