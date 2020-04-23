@@ -35,7 +35,7 @@ bool hard_fork_1_base_test::configure_core(currency::core& c, size_t ev_index, c
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_fork1_starts_after_height = m_hardfork_height;
+  pc.hard_fork_01_starts_after_height = m_hardfork_height;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
@@ -57,7 +57,7 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(m_hardfork_height);
+  generator.set_hardfork_height(1, m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -187,7 +187,7 @@ bool hard_fork_1_unlock_time_2_in_coinbase::generate(std::vector<test_event_entr
   bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(m_hardfork_height);
+  generator.set_hardfork_height(1, m_hardfork_height);
 
   DO_CALLBACK(events, "configure_core");
 
@@ -259,7 +259,7 @@ bool hard_fork_1_chain_switch_pow_only::generate(std::vector<test_event_entry>& 
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(m_hardfork_height);
+  generator.set_hardfork_height(1, m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -310,7 +310,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(m_hardfork_height);
+  generator.set_hardfork_height(1, m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
   DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 7));
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -477,7 +477,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   GENERATE_ACCOUNT(alice_acc);
   GENERATE_ACCOUNT(bob_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(m_hardfork_height);
+  generator.set_hardfork_height(1, m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
@@ -699,7 +699,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   GENERATE_ACCOUNT(alice_acc);
   GENERATE_ACCOUNT(bob_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(m_hardfork_height);
+  generator.set_hardfork_height(1, m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 

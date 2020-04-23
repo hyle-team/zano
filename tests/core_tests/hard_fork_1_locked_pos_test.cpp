@@ -31,7 +31,7 @@ bool hard_fork_1_locked_mining_test::generate(std::vector<test_event_entry>& eve
   std::list<account_base> miner_acc_lst(1, miner_acc);
 
   MAKE_GENESIS_BLOCK(events, blk_0, preminer_acc, 1564434616);
-  generator.set_hardfork_height(get_hardfork_height());
+  generator.set_hardfork_height(1, get_hardfork_height());
 
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
@@ -103,7 +103,7 @@ bool hard_fork_1_locked_mining_test::configure_core(currency::core& c, size_t ev
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
-  pc.hard_fork1_starts_after_height = get_hardfork_height();
+  pc.hard_fork_01_starts_after_height = get_hardfork_height();
 
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;

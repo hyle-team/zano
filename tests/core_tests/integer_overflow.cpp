@@ -146,7 +146,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   }
 
   std::vector<currency::tx_destination_entry> destinations;
-  const account_public_address& bob_addr = bob_account.get_keys().m_account_address;
+  const account_public_address& bob_addr = bob_account.get_keys().account_address;
   destinations.push_back(tx_destination_entry(TX_MAX_TRANSFER_AMOUNT, bob_addr));
   destinations.push_back(tx_destination_entry(TX_MAX_TRANSFER_AMOUNT - 1, bob_addr));
   // sources.front().amount = destinations[0].amount + destinations[2].amount + destinations[3].amount + TESTS_DEFAULT_FEE
@@ -174,7 +174,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
 
   destinations.clear();
   currency::tx_destination_entry de;
-  de.addr.push_back(alice_account.get_keys().m_account_address);
+  de.addr.push_back(alice_account.get_keys().account_address);
   de.amount = TX_MAX_TRANSFER_AMOUNT - TESTS_DEFAULT_FEE;
   destinations.push_back(de);
   destinations.push_back(de);
