@@ -320,7 +320,7 @@ bool gen_block_miner_tx_has_2_in::generate(std::vector<test_event_entry>& events
   sources.push_back(se);
 
   tx_destination_entry de = AUTO_VAL_INIT(de);
-  de.addr.push_back(miner_account.get_keys().m_account_address);
+  de.addr.push_back(miner_account.get_keys().account_address);
   de.amount = se.amount;
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(de);
@@ -363,7 +363,7 @@ bool gen_block_miner_tx_with_txin_to_key::generate(std::vector<test_event_entry>
   sources.push_back(se);
 
   tx_destination_entry de = AUTO_VAL_INIT(de);
-  de.addr.push_back(miner_account.get_keys().m_account_address);
+  de.addr.push_back(miner_account.get_keys().account_address);
   de.amount = se.amount;
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(de);
@@ -444,8 +444,8 @@ bool gen_block_miner_tx_has_out_to_alice::generate(std::vector<test_event_entry>
 
   crypto::key_derivation derivation;
   crypto::public_key out_eph_public_key;
-  crypto::generate_key_derivation(alice.get_keys().m_account_address.m_view_public_key, txkey.sec, derivation);
-  crypto::derive_public_key(derivation, 1, alice.get_keys().m_account_address.m_spend_public_key, out_eph_public_key);
+  crypto::generate_key_derivation(alice.get_keys().account_address.view_public_key, txkey.sec, derivation);
+  crypto::derive_public_key(derivation, 1, alice.get_keys().account_address.spend_public_key, out_eph_public_key);
 
   tx_out out_to_alice;
   out_to_alice.amount = miner_tx.vout[0].amount / 2;

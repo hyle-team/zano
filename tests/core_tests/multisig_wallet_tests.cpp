@@ -1370,10 +1370,10 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
       for (auto& p : participants)
       {
         crypto::key_derivation der = AUTO_VAL_INIT(der);
-        r = crypto::generate_key_derivation(p.m_view_public_key, tx_key.sec, der);
+        r = crypto::generate_key_derivation(p.view_public_key, tx_key.sec, der);
         CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
         crypto::public_key key = AUTO_VAL_INIT(key);
-        r = crypto::derive_public_key(der, multisig_out_idx, p.m_spend_public_key, key);
+        r = crypto::derive_public_key(der, multisig_out_idx, p.spend_public_key, key);
         CHECK_AND_ASSERT_MES(r, false, "derive_public_key failed");
         ms_out_target.keys.push_back(key);
       }

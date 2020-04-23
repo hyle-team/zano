@@ -518,8 +518,8 @@ TEST(integ_address, payment_id_sizes)
       crypto::generate_random_bytes(pid_size, &payment_id.front());
 
     currency::account_public_address addr;
-    addr.m_spend_public_key = currency::keypair::generate().pub;
-    addr.m_view_public_key = currency::keypair::generate().pub;
+    addr.spend_public_key = currency::keypair::generate().pub;
+    addr.view_public_key = currency::keypair::generate().pub;
 
     std::string addr_str = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
 
@@ -538,8 +538,8 @@ TEST(integ_address, payment_id_sizes)
     crypto::generate_random_bytes(pid_size, &payment_id.front());
 
   currency::account_public_address addr;
-  addr.m_spend_public_key = currency::keypair::generate().pub;
-  addr.m_view_public_key = currency::keypair::generate().pub;
+  addr.spend_public_key = currency::keypair::generate().pub;
+  addr.view_public_key = currency::keypair::generate().pub;
 
   // the following line is expected to handle oversized payment id well
   std::string addr_str = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
