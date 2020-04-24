@@ -1205,7 +1205,7 @@ bool wallet2::lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& 
   auto it = pcontainer->find(i);
   //self check
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != pcontainer->end(),
-    "Inernal error: amount " << i << " not found for devider " << devider 
+    "Inernal error: index " << i << " not found for devider " << devider 
     << " pcontainer={" << pcontainer->begin()->first << ":"<< (--pcontainer->end())->first <<"}");
   result = *it;
   return true;
@@ -1255,7 +1255,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::response res = AUTO_VAL_INIT(res);
   get_short_chain_history(req.block_ids);
-  bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT(req, res);
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
 
@@ -1275,11 +1275,11 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
     r = string_tools::parse_tpod_from_hex_string(gbd_res.blocks.back().id, new_genesis_id);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_blocks_details");
     reset_all();
-    m_blockchain.push_back(new_genesis_id);
+    m_genesis = new_genesis_id;
     WLT_LOG_MAGENTA("New genesis set for wallet: " << new_genesis_id, LOG_LEVEL_0);
     get_short_chain_history(req.block_ids);
     //req.block_ids.push_back(new_genesis_id);
-    bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
+    bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT(req, res);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getblocks.bin");
   }
   if (res.status == CORE_RPC_STATUS_BUSY)
@@ -1296,8 +1296,64 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   handle_pulled_blocks(blocks_added, stop, res);
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed)
+{
+  if (!m_last_10_blocks.empty() && i > m_last_10_blocks.begin()->first)
+  {
+    //must be in short sequence (m_last_10_blocks)
+    //self check
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX((--m_last_10_blocks.end())->first >= i,
+      "Inernal error: index " << i << " is not located in expected range of m_last_10_blocks={" 
+      << m_last_10_blocks.begin()->first << ":" << (--m_last_10_blocks.end())->first << "}");
+
+    auto it = m_last_10_blocks.find(i);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_last_10_blocks.end(), 
+      "Inernal error: filde to find index " << i << " in m_last_10_blocks={"
+      << m_last_10_blocks.begin()->first << ":" << (--m_last_10_blocks.end())->first << "}");
+
+    block_found = true;
+    if (id == it->second)
+      block_matched = true;
+    else
+      block_matched = false;
+  }
+  else
+  {
+    //lazy lookup
+    std::pair<uint64_t, crypto::hash> result = AUTO_VAL_INIT(result);
+    bool r = lookup_item_around(i, result);
+    if (!r)
+    {
+      WLT_LOG_L0("Wallet is getting fully resynced due to unmatched block " << id << " at " << i );
+      block_matched = block_found = false;
+      full_reset_needed = true;
+      return;
+    }
+    else
+    {
+      if (result.first == i)
+      {
+        block_found = true;
+        if (result.second == id)
+        {
+          block_matched = true;
+        }
+        else
+        {
+          block_matched = false;
+        }
+      }
+      else
+      {
+        block_found = false;
+        block_matched = false;
+      }
+    }
+  }
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop, 
-  currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res)
+  currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::response& res)
 {
   size_t current_index = res.start_height;
 
@@ -1310,37 +1366,70 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
     ++current_index;
   }
 
+  uint64_t last_matched_index = 0;
+  bool been_matched_block = false;
   for(const auto& bl_entry: res.blocks)
   {
     if (stop)
       break;
 
     const currency::block& bl = bl_entry.block_ptr->bl;
+    uint64_t height = get_block_height(bl);
+    uint64_t processed_blocks_count = get_blockchain_current_height();
 
     //TODO: get_block_hash is slow
     crypto::hash bl_id = get_block_hash(bl);
 
-    if (current_index >= get_blockchain_current_height())
-    {
-      process_new_blockchain_entry(bl, bl_entry, bl_id, current_index);
-      ++blocks_added;
+    if (height > processed_blocks_count)
+    {//internal error: 
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false,
+        "height{" << height <<"} > processed_blocks_count{" << processed_blocks_count << "}");
     }
-    else if(bl_id != m_blockchain[current_index])
+    else if (height == processed_blocks_count)
     {
-      //split detected here !!!
-      THROW_IF_TRUE_WALLET_EX(current_index == res.start_height, error::wallet_internal_error,
-        "wrong daemon response: split starts from the first block in response " + string_tools::pod_to_hex(bl_id) + 
-        " (height " + std::to_string(res.start_height) + "), local block id at this height: " +
-        string_tools::pod_to_hex(m_blockchain[current_index]));
+      //regular block handling
+      //self check
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(been_matched_block,
+        "internal error: been_matched_block == false on process_new_blockchain_entry, bl_id" << bl_id << "h=" << height 
+         << " (start_height=" + std::to_string(res.start_height) + ")");
 
-      detach_blockchain(current_index);
       process_new_blockchain_entry(bl, bl_entry, bl_id, current_index);
       ++blocks_added;
     }
     else
-    {
-      WLT_LOG_L2("Block " << bl_id << " @ " << current_index << " is already in wallet's blockchain");
+    { 
+      //checking if we need reorganize (might be just first matched block)
+      bool block_found = false;
+      bool block_matched = false;
+      bool full_reset_needed = false;
+      check_if_block_matched(height, bl_id, block_found, block_matched, full_reset_needed);
+      if (block_found && block_matched)
+      {
+        //block matched in that number
+        last_matched_index = height;
+        been_matched_block = true;
+        WLT_LOG_L2("Block " << bl_id << " @ " << height << " is already in wallet's blockchain");
+      }
+      else
+      {
+        //this should happen ONLY after block been matched, if not then is internal error
+        if (full_reset_needed)
+        {
+          last_matched_index = 0;
+        }
+        else
+        {
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(been_matched_block,
+            "unmatched block while never been mathced block");
+        }
+
+        //reorganize
+        detach_blockchain(last_matched_index);
+        process_new_blockchain_entry(bl, bl_entry, bl_id, height);
+        ++blocks_added;
+      }
     }
+
 
     ++current_index;
     if (res.current_height > m_height_of_start_sync)

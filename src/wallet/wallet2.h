@@ -814,7 +814,7 @@ private:
                              const std::vector<std::string>& recipients,
                              const std::vector<std::string>& recipients_aliases);
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
-      currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
+      currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::response& blocks);
     std::string get_alias_for_address(const std::string& addr);
     static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, currency::stake_kernel& kernel, uint64_t& coindays_weight, uint64_t timestamp);
     bool is_connected_to_net();
@@ -892,7 +892,8 @@ private:
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
     void push_new_block_id(const crypto::hash& id, uint64_t height);
     bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);
-    void get_short_chain_history(std::list<std::pair<uint64_t, crypto::hash> >& ids);
+    void get_short_chain_history(std::list<epee::pod_pair<uint64_t, crypto::hash> >& ids);
+    void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed);
 
     currency::account_base m_account;
     bool m_watch_only;
