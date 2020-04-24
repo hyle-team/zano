@@ -1149,39 +1149,111 @@ void wallet2::push_new_block_id(const crypto::hash& id, uint64_t height)
 
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_short_chain_history(std::list<crypto::hash>& ids)
+// void wallet2::get_short_chain_history(std::list<crypto::hash>& ids)
+// {
+//   ids.clear();
+//   size_t i = 0;
+//   size_t current_multiplier = 1;
+//   size_t sz = get_blockchain_current_height();
+//   if(!sz)
+//     return;
+//   size_t current_back_offset = 1;
+//   bool genesis_included = false;
+//   while(current_back_offset < sz)
+//   {
+//     ids.push_back(m_blockchain[sz-current_back_offset]);
+//     if(sz-current_back_offset == 0)
+//       genesis_included = true;
+//     if(i < 10)
+//     {
+//       ++current_back_offset;
+//     }else
+//     {
+//       current_back_offset += current_multiplier *= 2;
+//     }
+//     ++i;
+//   }
+//   if(!genesis_included)
+//     ids.push_back(m_blockchain[0]);
+// }
+//----------------------------------------------------------------------------------------------------
+bool wallet2::lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result)
+{
+  //in which container we are looking for?
+  uint64_t devider = 0;
+  std::map<uint64_t, crypto::hash>* pcontainer;
+  if (m_last_144_blocks_every_10.size() && i < m_last_144_blocks_every_10.begin()->first)
+  {
+    devider = 10;
+    pcontainer = &m_last_144_blocks_every_10;
+  }
+  else if (m_last_144_blocks_every_100.size() && i < m_last_144_blocks_every_100.begin()->first)
+  {
+    devider = 100;
+    pcontainer = &m_last_144_blocks_every_100;
+  }
+  else if (m_last_144_blocks_every_1000.size() && i < m_last_144_blocks_every_1000.begin()->first)
+  {
+    devider = 1000;
+    pcontainer = &m_last_144_blocks_every_1000;
+  }
+  else
+    return false;
+
+  //look in every 10'th
+  i = i - i % devider;
+  auto it = pcontainer->find(i);
+  //self check
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != pcontainer->end(),
+    "Inernal error: amount " << i << " not found for devider " << devider 
+    << " pcontainer={" << pcontainer->begin()->first << ":"<< (--pcontainer->end())->first <<"}");
+  result = *it;
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::get_short_chain_history(std::list<epee::pod_pair<uint64_t, crypto::hash> >& ids)
 {
   ids.clear();
-  size_t i = 0;
-  size_t current_multiplier = 1;
-  size_t sz = get_blockchain_current_height();
-  if(!sz)
+  uint64_t i = 0;
+  uint64_t sz = get_blockchain_current_height();
+  if (!sz)
     return;
-  size_t current_back_offset = 1;
-  bool genesis_included = false;
-  while(current_back_offset < sz)
+  
+  //first put last 10
+  for (auto it = m_last_10_blocks.rbegin(); it != m_last_10_blocks.rend(); it++)
   {
-    ids.push_back(m_blockchain[sz-current_back_offset]);
-    if(sz-current_back_offset == 0)
-      genesis_included = true;
-    if(i < 10)
-    {
-      ++current_back_offset;
-    }else
-    {
-      current_back_offset += current_multiplier *= 2;
-    }
-    ++i;
+    ids.push_back({ it->first, it->second });
+    i = it->first;
   }
-  if(!genesis_included)
-    ids.push_back(m_blockchain[0]);
+
+  uint64_t current_back_offset = m_last_10_blocks.size();
+  //self check
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(current_back_offset == sz-i, "Inernal error: current_back_offset{" << current_back_offset << "} == sz-i{" << sz << " - " << i << "} is not equal");
+
+  uint64_t current_offset_distance = 10;
+  current_back_offset += 10;
+  while (current_back_offset < sz)
+  {
+    uint64_t get_item_around = sz - current_back_offset;
+    std::pair<uint64_t, crypto::hash> item = AUTO_VAL_INIT(item);
+    if (!lookup_item_around(get_item_around, item))
+      break;
+
+    //readjust item current_back_offset 
+    current_back_offset = sz - item.first;
+
+    ids.push_back(item);
+    current_offset_distance *= 2;
+    current_back_offset += current_offset_distance;
+  }
+  ids.push_back({ 0, m_genesis });
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
 {
   blocks_added = 0;
-  currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request req = AUTO_VAL_INIT(req);
-  currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response res = AUTO_VAL_INIT(res);
+  currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::request req = AUTO_VAL_INIT(req);
+  currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::response res = AUTO_VAL_INIT(res);
   get_short_chain_history(req.block_ids);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
   if (!r)

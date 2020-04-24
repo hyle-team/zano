@@ -638,7 +638,7 @@ namespace tools
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
-    uint64_t get_blockchain_current_height() const {
+    inline uint64_t get_blockchain_current_height() const {
       return m_last_10_blocks.empty() ? 0 : (--m_last_10_blocks.end())->first + 1;
     }
 
@@ -778,7 +778,6 @@ private:
     void load_keys(const std::string& keys_file_name, const std::string& password);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b);
     void detach_blockchain(uint64_t height);
-    void get_short_chain_history(std::list<crypto::hash>& ids);
     bool extract_offers_from_transfer_entry(size_t i, std::unordered_map<crypto::hash, bc_services::offer_details_ex>& offers_local);
     bool select_my_offers(std::list<bc_services::offer_details_ex>& offers);
     bool clear();
@@ -892,6 +891,8 @@ private:
     bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
     void push_new_block_id(const crypto::hash& id, uint64_t height);
+    bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);
+    void get_short_chain_history(std::list<std::pair<uint64_t, crypto::hash> >& ids);
 
     currency::account_base m_account;
     bool m_watch_only;

@@ -84,6 +84,12 @@ namespace epee
     return res;
   }
 	//-------------------------------------------------------------------------------------------------------------------
-
-
+#pragma pack(push, 1)
+  template<class first_t, class second_t>
+  struct pod_pair
+  {
+    first_t first;
+    second_t second;
+  };
+#pragma pack(pop)
 }
