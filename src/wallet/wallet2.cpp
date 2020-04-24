@@ -1070,8 +1070,8 @@ void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<s
 void wallet2::process_new_blockchain_entry(const currency::block& b, const currency::block_direct_data_entry& bche, const crypto::hash& bl_id, uint64_t height)
 {
   //handle transactions from new block
-  THROW_IF_TRUE_WALLET_EX(height != get_blockchain_current_height(), error::wallet_internal_error,
-    "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_height()));
+  THROW_IF_TRUE_WALLET_EX(height != get_blockchain_current_size(), error::wallet_internal_error,
+    "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_size()));
 
   //optimization: seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
   if (b.timestamp + 60 * 60 * 24 > m_account.get_createtime())
@@ -1092,7 +1092,7 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
     WLT_LOG_L3( "Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime());
   }
   push_new_block_id(bl_id, height); //m_blockchain.push_back(bl_id);
-  ++m_local_bc_height;
+  m_local_bc_size = height + 1;
   m_last_bc_timestamp = b.timestamp;
   if (!is_pos_block(b))
     m_last_pow_block_h = height;
@@ -1106,7 +1106,7 @@ void wallet2::push_new_block_id(const crypto::hash& id, uint64_t height)
   //self check
   if (!m_last_10_blocks.empty())
   {
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_blockchain_current_height() == height, "Inernal error: get_blockchain_current_height(){" << get_blockchain_current_height() << "} == height{" << height << "} is not equal");
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_blockchain_current_size() == height, "Inernal error: get_blockchain_current_height(){" << get_blockchain_current_size() << "} == height{" << height << "} is not equal");
   }
   
   m_last_10_blocks[height] = id;
@@ -1215,7 +1215,7 @@ void wallet2::get_short_chain_history(std::list<epee::pod_pair<uint64_t, crypto:
 {
   ids.clear();
   uint64_t i = 0;
-  uint64_t sz = get_blockchain_current_height();
+  uint64_t sz = get_blockchain_current_size();
   if (!sz)
     return;
   
@@ -1289,9 +1289,9 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
     return;
   }
   THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
-  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_height() && get_blockchain_current_height() <= res.start_height, error::wallet_internal_error,
+  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() && get_blockchain_current_size() <= res.start_height, error::wallet_internal_error,
     "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
-    " not less than local blockchain size=" + std::to_string(get_blockchain_current_height()));
+    " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
 
   handle_pulled_blocks(blocks_added, stop, res);
 }
@@ -1357,7 +1357,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
 {
   size_t current_index = res.start_height;
 
-  if (res.start_height == 0 && get_blockchain_current_height() == 1 && !res.blocks.empty())
+  if (res.start_height == 0 && get_blockchain_current_size() == 1 && !res.blocks.empty())
   {
     const currency::block& genesis = res.blocks.front().block_ptr->bl;
     THROW_IF_TRUE_WALLET_EX(get_block_height(genesis) != 0, error::wallet_internal_error, "first block expected to be genesis");
@@ -1375,7 +1375,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
 
     const currency::block& bl = bl_entry.block_ptr->bl;
     uint64_t height = get_block_height(bl);
-    uint64_t processed_blocks_count = get_blockchain_current_height();
+    uint64_t processed_blocks_count = get_blockchain_current_size();
 
     //TODO: get_block_hash is slow
     crypto::hash bl_id = get_block_hash(bl);
@@ -1422,7 +1422,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
           WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(been_matched_block,
             "unmatched block while never been mathced block");
         }
-
+        //TODO: take into account date of wallet creation
         //reorganize
         detach_blockchain(last_matched_index);
         process_new_blockchain_entry(bl, bl_entry, bl_id, height);
@@ -1443,7 +1443,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
     }
   }
 
-  WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << get_blockchain_current_height());
+  WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << get_blockchain_current_size());
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_sync_progress()
@@ -1820,7 +1820,7 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
   size_t added_blocks = 0;
   size_t try_count = 0;
   crypto::hash last_tx_hash_id = m_transfers.size() ? get_transaction_hash(m_transfers.back().m_ptx_wallet_info->m_tx) : null_hash;
-  m_height_of_start_sync = get_blockchain_current_height();
+  m_height_of_start_sync = get_blockchain_current_size();
   m_last_sync_percent = 0;
   while (!stop.load(std::memory_order_relaxed))
   {
@@ -1929,6 +1929,26 @@ bool wallet2::refresh(size_t & blocks_fetched, bool& received_money, bool& ok, s
   return ok;
 }
 //----------------------------------------------------------------------------------------------------
+void clean_map_from_items_above(std::map<uint64_t, crypto::hash>& container, uint64_t height)
+{
+  while (container.size() && (--container.end())->first > height)
+  {
+    container.erase(--container.end());
+  }
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::detach_from_block_ids(uint64_t height)
+{
+  //calculate number of erased blocks
+  uint64_t blocks_detached = (get_blockchain_current_size() -1 ) - height;
+  //id at height should be kept, the rest - erased
+  clean_map_from_items_above(m_last_10_blocks, height);
+  clean_map_from_items_above(m_last_10_blocks, height);
+  clean_map_from_items_above(m_last_10_blocks, height);
+  clean_map_from_items_above(m_last_10_blocks, height);
+  return blocks_detached;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::detach_blockchain(uint64_t height)
 {
   WLT_LOG_L0("Detaching blockchain on height " << height);
@@ -1953,9 +1973,8 @@ void wallet2::detach_blockchain(uint64_t height)
     }
   }
  
-  size_t blocks_detached = m_blockchain.end() - (m_blockchain.begin()+height);
-  m_blockchain.erase(m_blockchain.begin()+height, m_blockchain.end());
-  m_local_bc_height -= blocks_detached;
+  size_t blocks_detached = detach_from_block_ids(height);
+  m_local_bc_size -= height+1;
 
   //rollback spends
   // do not clear spent flag in spent transfers as corresponding txs are most likely in the pool
@@ -2043,7 +2062,7 @@ bool wallet2::reset_all()
   m_transfer_history.clear();
   //m_account = AUTO_VAL_INIT(m_account);
 
-  m_local_bc_height = 1;
+  m_local_bc_size = 1; //including genesis
   m_last_bc_timestamp = 0;
   m_height_of_start_sync = 0;
   m_last_sync_percent = 0;
@@ -2285,7 +2304,6 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   {
     reset_history();
   }  
-  m_local_bc_height = get_blockchain_current_height();
   THROW_IF_TRUE_WALLET_EX(need_to_resync, error::wallet_load_notice_wallet_restored, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
   WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) << " with public address: " << m_account.get_public_address_str());
@@ -2833,7 +2851,7 @@ bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& sta
     return false;
 
   //prevent staking of after-last-pow-coins
-  if (get_blockchain_current_height() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age)
+  if (get_blockchain_current_size() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age)
     return false;
   
   if (tr.m_ptx_wallet_info->m_block_height > m_last_pow_block_h)
@@ -3155,20 +3173,20 @@ bool wallet2::is_transfer_unlocked(const transfer_details& td, bool for_pos_mini
   if (td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_BLOCKED)
     return false; 
 
-  if (td.m_ptx_wallet_info->m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE > get_blockchain_current_height())
+  if (td.m_ptx_wallet_info->m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE > get_blockchain_current_size())
     return false;
 
   
 
   uint64_t unlock_time = get_tx_unlock_time(td.m_ptx_wallet_info->m_tx, td.m_internal_output_index);
-  if (for_pos_mining && get_blockchain_current_height() > m_core_runtime_config.hard_fork1_starts_after_height)
+  if (for_pos_mining && get_blockchain_current_size() > m_core_runtime_config.hard_fork1_starts_after_height)
   {
     //allowed of staking locked coins with 
     stake_lock_time = unlock_time;
   }
   else
   {
-    if (!currency::is_tx_spendtime_unlocked(unlock_time, get_blockchain_current_height(), m_core_runtime_config.get_core_time()))
+    if (!currency::is_tx_spendtime_unlocked(unlock_time, get_blockchain_current_size(), m_core_runtime_config.get_core_time()))
       return false;
   }
   return true;
@@ -4257,16 +4275,16 @@ void wallet2::process_genesis_if_needed(const currency::block& genesis)
   if (!m_transfers.empty() || !m_key_images.empty())
     return;
 
-  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_height() > 1, error::wallet_internal_error, "Can't change wallet genesis block once the blockchain has been populated");
+  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() > 1, error::wallet_internal_error, "Can't change wallet genesis block once the blockchain has been populated");
 
   crypto::hash genesis_hash = get_block_hash(genesis);
-  if (get_blockchain_current_height() == 1 && m_blockchain[0] != genesis_hash)
+  if (get_blockchain_current_size() == 1 && m_blockchain[0] != genesis_hash)
       WLT_LOG_L0("Changing genesis block for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_blockchain[0] << " -> " << genesis_hash);
 
   m_blockchain.clear();
 
   m_blockchain.push_back(genesis_hash);
-  m_local_bc_height = 1;
+  m_local_bc_size = 1;
   m_last_bc_timestamp = genesis.timestamp;
 
   WLT_LOG_L2("Processing genesis block: " << genesis_hash);
@@ -4275,7 +4293,7 @@ void wallet2::process_genesis_if_needed(const currency::block& genesis)
 
 void wallet2::set_genesis(const crypto::hash& genesis_hash)
 {
-  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_height() != 1, error::wallet_internal_error, "Can't change wallet genesis hash once the blockchain has been populated");
+  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() != 1, error::wallet_internal_error, "Can't change wallet genesis hash once the blockchain has been populated");
   WLT_LOG_L0("Changing genesis hash for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_blockchain[0] << " -> " << genesis_hash);
   m_blockchain[0] = genesis_hash;
 }

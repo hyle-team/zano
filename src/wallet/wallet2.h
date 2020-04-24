@@ -638,8 +638,8 @@ namespace tools
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
-    inline uint64_t get_blockchain_current_height() const {
-      return m_last_10_blocks.empty() ? 0 : (--m_last_10_blocks.end())->first + 1;
+    inline uint64_t get_blockchain_current_size() const {
+      return m_local_bc_size;
     }
 
     template <class t_archive>
@@ -676,10 +676,11 @@ namespace tools
       //convert from old version
       if (ver < CURRENCY_FORMATION_VERSION + 65)
       {
-        //TODO:      a & m_blockchain;
+        //TODO: export from     a & m_blockchain;
       }
       else
       {
+        a & m_local_bc_size;
         a & m_genesis;
         a & m_last_10_blocks;
         a & m_last_144_blocks_every_10;
@@ -715,7 +716,7 @@ namespace tools
     //for unit tests
     friend class ::test_generator;
     
-    //next functions in public area only because of test_generator
+    //next functions in public area only becausce of test_generator
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
     bool prepare_and_sign_pos_block(currency::block& b,
@@ -894,6 +895,7 @@ private:
     bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);
     void get_short_chain_history(std::list<epee::pod_pair<uint64_t, crypto::hash> >& ids);
     void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed);
+    uint64_t detach_from_block_ids(uint64_t height);
 
     currency::account_base m_account;
     bool m_watch_only;
@@ -908,7 +910,7 @@ private:
     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_100;  //10 days
     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_1000; //100 days
 
-    std::atomic<uint64_t> m_local_bc_height; //temporary workaround 
+    std::atomic<uint64_t> m_local_bc_size; //temporary workaround 
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
     uint64_t m_pos_mint_packing_size;
