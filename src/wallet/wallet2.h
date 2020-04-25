@@ -14,6 +14,7 @@
 #include <boost/serialization/shared_ptr.hpp>
 #include <atomic>
 
+
 #include "include_base_utils.h"
 #include "profile_tools.h"
 #include "sync_locked_object.h"
@@ -26,6 +27,7 @@
 #include "wallet_public_structs_defs.h"
 #include "currency_core/currency_format_utils.h"
 #include "common/unordered_containers_boost_serialization.h"
+#include "common/atomics_boost_serialization.h"
 #include "storages/portable_storage_template_helper.h"
 #include "crypto/chacha8.h"
 #include "crypto/hash.h"

@@ -1242,7 +1242,7 @@ void wallet2::get_short_chain_history(std::list<epee::pod_pair<uint64_t, crypto:
     //readjust item current_back_offset 
     current_back_offset = sz - item.first;
 
-    ids.push_back(item);
+    ids.push_back({ item.first, item.second });
     current_offset_distance *= 2;
     current_back_offset += current_offset_distance;
   }
@@ -2041,15 +2041,24 @@ bool wallet2::deinit()
 bool wallet2::clear()
 {
   reset_all();
-  currency::block b;
-  currency::generate_genesis_block(b);
-  m_blockchain.push_back(get_block_hash(b));
+  //currency::block b;
+  //currency::generate_genesis_block(b);
+  m_local_bc_size = 1;
+  m_last_10_blocks.clear();
+  m_last_144_blocks_every_10.clear();
+  m_last_144_blocks_every_100.clear();
+  m_last_144_blocks_every_1000.clear();
+  //m_blockchain.push_back(get_block_hash(b));
   return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::reset_all()
 {
-  m_blockchain.clear();
+  //m_blockchain.clear();
+  m_last_10_blocks.clear();
+  m_last_144_blocks_every_10.clear();
+  m_last_144_blocks_every_100.clear();
+  m_last_144_blocks_every_1000.clear();
   m_transfers.clear();
   m_key_images.clear();
   // m_pending_key_images is not cleared intentionally
@@ -3036,9 +3045,7 @@ bool wallet2::reset_history()
   std::string pass = m_password;
   std::wstring file_path = m_wallet_file;
   account_base acc_tmp = m_account;
-  crypto::hash genesis_hash = m_blockchain[0];
   clear();
-  m_blockchain[0] = genesis_hash;
   m_account = acc_tmp;
   m_password = pass;
   prepare_file_names(file_path);
@@ -4278,12 +4285,13 @@ void wallet2::process_genesis_if_needed(const currency::block& genesis)
   THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() > 1, error::wallet_internal_error, "Can't change wallet genesis block once the blockchain has been populated");
 
   crypto::hash genesis_hash = get_block_hash(genesis);
-  if (get_blockchain_current_size() == 1 && m_blockchain[0] != genesis_hash)
-      WLT_LOG_L0("Changing genesis block for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_blockchain[0] << " -> " << genesis_hash);
+  if (get_blockchain_current_size() == 1 && m_genesis != genesis_hash)
+      WLT_LOG_L0("Changing genesis block for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_genesis << " -> " << genesis_hash);
 
-  m_blockchain.clear();
+  //m_blockchain.clear();
 
-  m_blockchain.push_back(genesis_hash);
+  //m_blockchain.push_back(genesis_hash);
+  m_genesis = genesis_hash;
   m_local_bc_size = 1;
   m_last_bc_timestamp = genesis.timestamp;
 
@@ -4294,8 +4302,8 @@ void wallet2::process_genesis_if_needed(const currency::block& genesis)
 void wallet2::set_genesis(const crypto::hash& genesis_hash)
 {
   THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() != 1, error::wallet_internal_error, "Can't change wallet genesis hash once the blockchain has been populated");
-  WLT_LOG_L0("Changing genesis hash for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_blockchain[0] << " -> " << genesis_hash);
-  m_blockchain[0] = genesis_hash;
+  WLT_LOG_L0("Changing genesis hash for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_genesis << " -> " << genesis_hash);
+  m_genesis = genesis_hash;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee /* = UINT64_MAX */)
