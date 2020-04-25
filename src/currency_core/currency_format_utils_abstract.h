@@ -107,6 +107,28 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
+  template <typename A, typename B, typename container_t, typename callback_t>
+  bool handle_2_alternative_types_in_variant_container(const container_t& container, callback_t& cb)
+  {
+    bool found = false;
+    for (auto& item : container)
+    {
+      if (item.type() == typeid(A))
+      {
+        found = true;
+        if (!cb(boost::get<A>(item)))
+          break;
+      }
+      else if (item.type() == typeid(B))
+      {
+        found = true;
+        if (!cb(boost::get<A>(item)))
+          break;
+      }
+    }
+    return found;
+  }
+  //---------------------------------------------------------------
   template<typename variant_container_t>
   bool check_allowed_types_in_variant_container(const variant_container_t& container, const std::unordered_set<std::type_index>& allowed_types, bool elements_must_be_unique = true)
   {
