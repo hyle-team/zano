@@ -633,6 +633,8 @@ namespace tools
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
     uint64_t get_blockchain_current_height() const { return m_blockchain.size(); }
+    
+    uint64_t get_top_block_height() const { return m_blockchain.empty() ? 0 : m_blockchain.size() - 1; }
 
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
@@ -751,7 +753,10 @@ namespace tools
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
     bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
     uint64_t get_sync_progress();
+
+
 private:
+
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password);
