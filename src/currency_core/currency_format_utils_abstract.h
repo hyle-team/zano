@@ -68,12 +68,12 @@ namespace currency
     return t_unserializable_object_from_blob(b, b_blob);
   }
   //---------------------------------------------------------------
-  template<typename specic_type_t, typename variant_t_container>
+  template<typename specific_type_t, typename variant_t_container>
   bool have_type_in_variant_container(const variant_t_container& av)
   {
     for (auto& ai : av)
     {
-      if (ai.type() == typeid(specic_type_t))
+      if (ai.type() == typeid(specific_type_t))
       {
         return true;
       }
@@ -81,26 +81,26 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
-  template<typename specic_type_t, typename variant_t_container>
+  template<typename specific_type_t, typename variant_t_container>
   size_t count_type_in_variant_container(const variant_t_container& av)
   {
     size_t result = 0;
     for (auto& ai : av)
     {
-      if (ai.type() == typeid(specic_type_t))
+      if (ai.type() == typeid(specific_type_t))
         ++result;
     }
     return result;
   }
   //---------------------------------------------------------------
-  template<typename specic_type_t, typename variant_t_container>
-  bool get_type_in_variant_container(const variant_t_container& av, specic_type_t& a)
+  template<typename specific_type_t, typename variant_t_container>
+  bool get_type_in_variant_container(const variant_t_container& av, specific_type_t& a)
   {
     for (auto& ai : av)
     {
-      if (ai.type() == typeid(specic_type_t))
+      if (ai.type() == typeid(specific_type_t))
       {
-        a = boost::get<specic_type_t>(ai);
+        a = boost::get<specific_type_t>(ai);
         return true;
       }
     }
