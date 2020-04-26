@@ -252,6 +252,7 @@ namespace currency
     size_t get_total_transactions()const;
     bool get_outs(uint64_t amount, std::list<crypto::public_key>& pkeys)const;
     bool get_short_chain_history(std::list<crypto::hash>& ids)const;
+    bool find_blockchain_supplement_fuzzy(const std::list<epee::pod_pair<uint64_t, crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp)const;
     bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp)const;
     bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, uint64_t& starter_offset)const;
     bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count)const;

@@ -288,7 +288,36 @@ namespace currency
     res.status = CORE_RPC_STATUS_OK;
     return true;
   }
-    //------------------------------------------------------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_blocks_fuzzy_direct(const COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::response& res, connection_context& cntx)
+  {
+    CHECK_CORE_READY();
+
+    if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
+    {
+      //genesis mismatch, return specific
+      res.status = CORE_RPC_STATUS_GENESIS_MISMATCH;
+      return true;
+    }
+
+    blockchain_storage::blocks_direct_container bs;
+    if (!m_core.get_blockchain_storage().find_blockchain_supplement2(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT))
+    {
+      res.status = CORE_RPC_STATUS_FAILED;
+      return false;
+    }
+
+    for (auto& b : bs)
+    {
+      res.blocks.resize(res.blocks.size() + 1);
+      res.blocks.back().block_ptr = b.first;
+      res.blocks.back().txs_ptr = std::move(b.second);
+    }
+
+    res.status = CORE_RPC_STATUS_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();

@@ -2938,6 +2938,31 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
 
   return true;
 }
+bool blockchain_storage::find_blockchain_supplement_fuzzy(const std::list<epee::pod_pair<uint64_t, crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp)const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+//   if (!find_blockchain_supplement(qblock_ids, resp.start_height))
+//     return false;
+// 
+//   resp.total_height = get_current_blockchain_size();
+//   size_t count = 0;
+// 
+//   block_context_info* pprevinfo = nullptr;
+//   size_t i = 0;
+//   for (i = resp.start_height; i != m_db_blocks.size() && count < BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT; i++, count++)
+//   {
+//     resp.m_block_ids.push_back(block_context_info());
+// 
+//     if (pprevinfo)
+//       pprevinfo->h = m_db_blocks[i]->bl.prev_id;
+//     resp.m_block_ids.back().cumul_size = m_db_blocks[i]->block_cumulative_size;
+//     pprevinfo = &resp.m_block_ids.back();
+//   }
+//   if (pprevinfo)
+//     pprevinfo->h = get_block_hash(m_db_blocks[--i]->bl);
+
+  return true;
+}
 //------------------------------------------------------------------
 bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count)const
 {
