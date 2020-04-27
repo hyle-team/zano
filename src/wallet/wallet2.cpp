@@ -4501,9 +4501,9 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     set_payment_id_to_tx(ftp.attachments, payment_id);
   // put encrypted payer info into the extra
   ftp.crypt_address = destination_addr;
-  currency::tx_payer txp = AUTO_VAL_INIT(txp);
-  txp.acc_addr = m_account.get_public_address();
-  ftp.extra.push_back(txp);
+  
+  currency::create_and_add_tx_payer_to_container_from_address(ftp.extra, m_account.get_public_address(), get_top_block_height(), m_core_runtime_config);
+  
   ftp.flags = 0;
   // ftp.multisig_id -- not required
   // ftp.prepared_destinations -- will be filled by prepare_tx_destinations
