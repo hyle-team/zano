@@ -14,7 +14,7 @@ TEST(parse_and_validate_tx_extra, is_correct_parse_and_validate_tx_extra)
   currency::account_base acc;
   acc.generate();
   currency::blobdata b = "dsdsdfsdfsf";
-  bool r = currency::construct_miner_tx(0, 0, 10000000000000, 1000, TESTS_DEFAULT_FEE, acc.get_keys().m_account_address, acc.get_keys().m_account_address, tx, b, 1);
+  bool r = currency::construct_miner_tx(0, 0, 10000000000000, 1000, TESTS_DEFAULT_FEE, acc.get_keys().account_address, acc.get_keys().account_address, tx, b, 1);
   ASSERT_TRUE(r);
   crypto::public_key tx_pub_key;
   r = currency::parse_and_validate_tx_extra(tx, tx_pub_key);
@@ -26,7 +26,7 @@ TEST(parse_and_validate_tx_extra, is_correct_extranonce_too_big)
   currency::account_base acc;
   acc.generate();
   currency::blobdata b(260, 0);
-  bool r = currency::construct_miner_tx(0, 0, 10000000000000, 1000, TESTS_DEFAULT_FEE, acc.get_keys().m_account_address, acc.get_keys().m_account_address, tx, b, 1);
+  bool r = currency::construct_miner_tx(0, 0, 10000000000000, 1000, TESTS_DEFAULT_FEE, acc.get_keys().account_address, acc.get_keys().account_address, tx, b, 1);
   ASSERT_FALSE(r);
 }
 
@@ -90,8 +90,8 @@ void force_random(forced_to_pod_t& o)
 //   currency::tx_extra_info ei = AUTO_VAL_INIT(ei);
 //   bool r = parse_and_validate_tx_extra(miner_tx, ei);
 //   ASSERT_TRUE(r);
-//   if(!(ei.m_alias.m_address.m_spend_public_key == alias.m_address.m_spend_public_key &&
-//     ei.m_alias.m_address.m_view_public_key == alias.m_address.m_view_public_key &&
+//   if(!(ei.m_alias.m_address.spend_public_key == alias.m_address.spend_public_key &&
+//     ei.m_alias.m_address.view_public_key == alias.m_address.view_public_key &&
 //     ei.m_alias.m_alias == alias.m_alias &&
 //     ei.m_alias.m_sign == alias.m_sign &&
 //     ei.m_alias.m_text_comment == alias.m_text_comment &&
@@ -110,8 +110,8 @@ void force_random(forced_to_pod_t& o)
 //   ei = AUTO_VAL_INIT(ei);
 //   r = parse_and_validate_tx_extra(miner_tx, ei);
 //   ASSERT_TRUE(r);
-//   if (!(ei.m_alias.m_address.m_spend_public_key == alias.m_address.m_spend_public_key &&
-//     ei.m_alias.m_address.m_view_public_key == alias.m_address.m_view_public_key &&
+//   if (!(ei.m_alias.m_address.spend_public_key == alias.m_address.spend_public_key &&
+//     ei.m_alias.m_address.view_public_key == alias.m_address.view_public_key &&
 //     ei.m_alias.m_alias == alias.m_alias &&
 //     ei.m_alias.m_sign == alias.m_sign &&
 //     ei.m_alias.m_text_comment == alias.m_text_comment &&

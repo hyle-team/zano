@@ -163,11 +163,11 @@ void pos_block_builder::step5_sign(const crypto::public_key& stake_tx_pub_key, s
   CHECK_AND_ASSERT_THROW_MES(m_step == 4, "pos_block_builder: incorrect step sequence");
 
   crypto::key_derivation pos_coin_derivation = AUTO_VAL_INIT(pos_coin_derivation);
-  bool r = crypto::generate_key_derivation(stake_tx_pub_key, stakeholder_account.get_keys().m_view_secret_key, pos_coin_derivation); // derivation(tx_pub; view_sec)
+  bool r = crypto::generate_key_derivation(stake_tx_pub_key, stakeholder_account.get_keys().view_secret_key, pos_coin_derivation); // derivation(tx_pub; view_sec)
   CHECK_AND_ASSERT_THROW_MES(r, "generate_key_derivation failed");
 
   crypto::secret_key derived_secret_ephemeral_key = AUTO_VAL_INIT(derived_secret_ephemeral_key);
-  crypto::derive_secret_key(pos_coin_derivation, stake_tx_out_index, stakeholder_account.get_keys().m_spend_secret_key, derived_secret_ephemeral_key); // derivation.derive(spend_sec, out_idx) => input ephemeral secret key
+  crypto::derive_secret_key(pos_coin_derivation, stake_tx_out_index, stakeholder_account.get_keys().spend_secret_key, derived_secret_ephemeral_key); // derivation.derive(spend_sec, out_idx) => input ephemeral secret key
 
   // sign block actually in coinbase transaction
   crypto::hash block_hash = currency::get_block_hash(m_block);
@@ -216,7 +216,7 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
   }
 
   // reward
-  bool burn_money = reward_receiving_address.m_spend_public_key == null_pkey && reward_receiving_address.m_view_public_key == null_pkey; // if true, burn reward, so no one on Earth can spend them
+  bool burn_money = reward_receiving_address.spend_public_key == null_pkey && reward_receiving_address.view_public_key == null_pkey; // if true, burn reward, so no one on Earth can spend them
   for (size_t output_index = 0; output_index < out_amounts.size(); ++output_index)
   {
     txout_to_key tk;
@@ -236,7 +236,7 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
   }
 
   // stake
-  burn_money = stakeholder_address.m_spend_public_key == null_pkey && stakeholder_address.m_view_public_key == null_pkey; // if true, burn stake
+  burn_money = stakeholder_address.spend_public_key == null_pkey && stakeholder_address.view_public_key == null_pkey; // if true, burn stake
   {
     txout_to_key tk;
     tk.key = null_pkey; // null means burn money

@@ -1202,7 +1202,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
     if (tp.push_payer)
     {
       currency::tx_payer txp = AUTO_VAL_INIT(txp);
-      txp.acc_addr = w->get()->get_account().get_keys().m_account_address;
+      txp.acc_addr = w->get()->get_account().get_keys().account_address;
       extra.push_back(txp);
     }    
     if (!tp.hide_receiver)

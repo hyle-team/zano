@@ -17,9 +17,9 @@ namespace boost
     template <class Archive>
     inline void serialize(Archive &a, currency::account_keys &x, const boost::serialization::version_type ver)
     {
-      a & x.m_account_address;
-      a & x.m_spend_secret_key;
-      a & x.m_view_secret_key;
+      a & x.account_address;
+      a & x.spend_secret_key;
+      a & x.view_secret_key;
     }
 
   }

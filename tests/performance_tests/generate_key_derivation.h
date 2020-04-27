@@ -34,7 +34,7 @@ public:
     for (auto &a : accounts)
     {
       crypto::key_derivation recv_derivation = AUTO_VAL_INIT(recv_derivation);
-      crypto::generate_key_derivation(m_tx_pub_key, a.get_keys().m_view_secret_key, recv_derivation);
+      crypto::generate_key_derivation(m_tx_pub_key, a.get_keys().view_secret_key, recv_derivation);
       g_antioptimisation ^= *(uint64_t*)(&recv_derivation);
     }
 

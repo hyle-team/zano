@@ -186,29 +186,29 @@ inline bool build_custom_escrow_template(const std::vector<test_event_entry>& ev
   int64_t change = get_sources_total_amount(sources) - a_inputs_amount;
   CHECK_AND_ASSERT_MES(change >= 0, false, "fill_tx_sources failed (2)");
   if (change > 0)
-    destinations.push_back(tx_destination_entry(change, a_keys.m_account_address));
+    destinations.push_back(tx_destination_entry(change, a_keys.account_address));
 
   if (custom_config_mask & eccf_template_no_multisig)
-    destinations.push_back(tx_destination_entry(ms_amount, a_keys.m_account_address)); // incorrect
+    destinations.push_back(tx_destination_entry(ms_amount, a_keys.account_address)); // incorrect
   else if (custom_config_mask & eccf_template_inv_multisig)
-    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.m_account_address, a_keys.m_account_address }))); // incorrect
+    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.account_address, a_keys.account_address }))); // incorrect
   else if (custom_config_mask & eccf_template_inv_multisig_2)
   {
-    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.m_account_address, a_keys.m_account_address, a_keys.m_account_address }))); // incorrect
+    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.account_address, a_keys.account_address, a_keys.account_address }))); // incorrect
     destinations.back().minimum_sigs = 2; // pretend to be correct
   }
   else if (custom_config_mask & eccf_template_inv_multisig_low_min_sig)
   {
-    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.m_account_address, cpd.b_addr }))); // seems to be correct
+    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.account_address, cpd.b_addr }))); // seems to be correct
     destinations.back().minimum_sigs = 1; // incorrect
   }
   else if (custom_config_mask & eccf_template_more_than_1_multisig)
   {
-    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.m_account_address, cpd.b_addr }))); // seems to be correct
-    destinations.push_back(tx_destination_entry(TESTS_DEFAULT_FEE, std::list<account_public_address>({ a_keys.m_account_address, cpd.b_addr }))); // double multisig - incorrect
+    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.account_address, cpd.b_addr }))); // seems to be correct
+    destinations.push_back(tx_destination_entry(TESTS_DEFAULT_FEE, std::list<account_public_address>({ a_keys.account_address, cpd.b_addr }))); // double multisig - incorrect
   }
   else
-    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.m_account_address, cpd.b_addr }))); // truly correct
+    destinations.push_back(tx_destination_entry(ms_amount, std::list<account_public_address>({ a_keys.account_address, cpd.b_addr }))); // truly correct
 
   tx_service_attachment sa = AUTO_VAL_INIT(sa);
   sa.service_id = BC_ESCROW_SERVICE_ID;
@@ -302,7 +302,7 @@ inline bool build_custom_escrow_proposal(const std::vector<test_event_entry>& ev
   int64_t change = get_sources_total_amount(sources) - a_fee_proposal;
   CHECK_AND_ASSERT_MES(change >= 0, false, "fill_tx_sources failed (2)");
   if (change > 0)
-    destinations.push_back(tx_destination_entry(change, a_keys.m_account_address));
+    destinations.push_back(tx_destination_entry(change, a_keys.account_address));
 
   account_public_address crypt_addr = cpd.b_addr;
 

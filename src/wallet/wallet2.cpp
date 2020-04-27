@@ -771,7 +771,7 @@ bool wallet2::handle_proposal(wallet_public::wallet_transfer_info& wti, const bc
   wallet_public::escrow_contract_details_basic& ed = epee::misc_utils::get_or_insert_value_initialized(m_contracts, ms_id);
   ed.expiration_time = currency::get_tx_expiration_time(prop.tx_template);
   ed.timestamp = wti.timestamp;
-  ed.is_a = cpd.a_addr.m_spend_public_key == m_account.get_keys().m_account_address.m_spend_public_key;
+  ed.is_a = cpd.a_addr.spend_public_key == m_account.get_keys().account_address.spend_public_key;
   change_contract_state(ed, wallet_public::escrow_contract_details_basic::proposal_sent, ms_id, wti);
   ed.private_detailes = cpd;
   currency::get_payment_id_from_tx(decrypted_items, ed.payment_id);
@@ -1530,8 +1530,8 @@ bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& t
   if (tei.m_alias.m_alias.size())
   {
     //have some check address involved
-    if (tei.m_alias.m_address.m_spend_public_key == m_account.get_keys().m_account_address.m_spend_public_key && 
-      tei.m_alias.m_address.m_view_public_key == m_account.get_keys().m_account_address.m_view_public_key)
+    if (tei.m_alias.m_address.spend_public_key == m_account.get_keys().account_address.spend_public_key && 
+      tei.m_alias.m_address.view_public_key == m_account.get_keys().account_address.view_public_key)
       return true;
 
     //check if it's update and address before was our address
@@ -2231,11 +2231,11 @@ void wallet2::load_keys(const std::string& buff, const std::string& password)
 
   const currency::account_keys& keys = m_account.get_keys();
   r = epee::serialization::load_t_from_binary(m_account, account_data);
-  r = r && verify_keys(keys.m_view_secret_key,  keys.m_account_address.m_view_public_key);
-  if (keys.m_spend_secret_key == currency::null_skey)
+  r = r && verify_keys(keys.view_secret_key,  keys.account_address.view_public_key);
+  if (keys.spend_secret_key == currency::null_skey)
     m_watch_only = true;
   else
-    r = r && verify_keys(keys.m_spend_secret_key, keys.m_account_address.m_spend_public_key);
+    r = r && verify_keys(keys.spend_secret_key, keys.account_address.spend_public_key);
   if (!r)
   {
     WLT_LOG_L0("Wrong password for wallet " << string_encoding::convert_to_ansii(m_wallet_file));
@@ -2662,7 +2662,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
   THROW_IF_FALSE_WALLET_EX(!m_watch_only, error::wallet_common_error, "watch-only wallet is unable to sign transfers, you need to use normal wallet for that");
 
   // decrypt the blob
-  std::string decrypted_src_blob = crypto::chacha_crypt(tx_sources_blob, m_account.get_keys().m_view_secret_key);
+  std::string decrypted_src_blob = crypto::chacha_crypt(tx_sources_blob, m_account.get_keys().view_secret_key);
 
   // deserialize args
   finalized_tx ft = AUTO_VAL_INIT(ft);
@@ -2670,7 +2670,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
   THROW_IF_FALSE_WALLET_EX(r, error::wallet_common_error, "Failed to decrypt tx sources blob");
 
   // make sure unsigned tx was created with the same keys
-  THROW_IF_FALSE_WALLET_EX(ft.ftp.spend_pub_key == m_account.get_keys().m_account_address.m_spend_public_key, error::wallet_common_error, "The was created in a different wallet, keys missmatch");
+  THROW_IF_FALSE_WALLET_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, error::wallet_common_error, "The was created in a different wallet, keys missmatch");
 
   finalize_transaction(ft.ftp, ft.tx, ft.one_time_key, false);
 
@@ -2678,11 +2678,11 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(
       crypto::generate_key_derivation(
-          m_account.get_keys().m_account_address.m_view_public_key,
+          m_account.get_keys().account_address.view_public_key,
           ft.one_time_key,
           derivation),
       "internal error: sign_transfer: failed to generate key derivation("
-          << m_account.get_keys().m_account_address.m_view_public_key
+          << m_account.get_keys().account_address.view_public_key
           << ", view secret key: " << ft.one_time_key << ")");
 
   for (size_t i = 0; i < ft.tx.vout.size(); ++i)
@@ -2693,7 +2693,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
     const txout_to_key& otk = boost::get<txout_to_key>(out.target);
 
     crypto::public_key ephemeral_pub = AUTO_VAL_INIT(ephemeral_pub);
-    if (!crypto::derive_public_key(derivation, i, m_account.get_keys().m_account_address.m_spend_public_key, ephemeral_pub))
+    if (!crypto::derive_public_key(derivation, i, m_account.get_keys().account_address.spend_public_key, ephemeral_pub))
     {
       WLT_LOG_ERROR("derive_public_key failed for tx " << get_transaction_hash(ft.tx) << ", out # " << i);
     }
@@ -2703,7 +2703,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
       // this is the output to the given keys
       // derive secret key and calculate key image
       crypto::secret_key ephemeral_sec = AUTO_VAL_INIT(ephemeral_sec);
-      crypto::derive_secret_key(derivation, i, m_account.get_keys().m_spend_secret_key, ephemeral_sec);
+      crypto::derive_secret_key(derivation, i, m_account.get_keys().spend_secret_key, ephemeral_sec);
       crypto::key_image ki = AUTO_VAL_INIT(ki);
       crypto::generate_key_image(ephemeral_pub, ephemeral_sec, ki);
 
@@ -2713,7 +2713,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
 
   // serialize and encrypt the result
   signed_tx_blob = t_serializable_object_to_blob(ft);
-  crypto::chacha_crypt(signed_tx_blob, m_account.get_keys().m_view_secret_key);
+  crypto::chacha_crypt(signed_tx_blob, m_account.get_keys().view_secret_key);
 
   tx = ft.tx;
 }
@@ -2744,7 +2744,7 @@ bool wallet2::get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution)
 void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx)
 {
   // decrypt sources
-  std::string decrypted_src_blob = crypto::chacha_crypt(signed_tx_blob, m_account.get_keys().m_view_secret_key);
+  std::string decrypted_src_blob = crypto::chacha_crypt(signed_tx_blob, m_account.get_keys().view_secret_key);
 
   // deserialize tx data
   finalized_tx ft = AUTO_VAL_INIT(ft);
@@ -2754,7 +2754,7 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   crypto::hash tx_hash = get_transaction_hash(tx);
 
   // foolproof
-  THROW_IF_FALSE_WALLET_CMN_ERR_EX(ft.ftp.spend_pub_key == m_account.get_keys().m_account_address.m_spend_public_key, "The given tx was created in a different wallet, keys missmatch, tx hash: " << tx_hash);
+  THROW_IF_FALSE_WALLET_CMN_ERR_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, "The given tx was created in a different wallet, keys missmatch, tx hash: " << tx_hash);
 
   try
   {
@@ -2945,17 +2945,17 @@ bool wallet2::prepare_and_sign_pos_block(currency::block& b,
   //derive secret key
   crypto::key_derivation pos_coin_derivation = AUTO_VAL_INIT(pos_coin_derivation);
   bool r = crypto::generate_key_derivation(source_tx_pub_key,
-    m_account.get_keys().m_view_secret_key,
+    m_account.get_keys().view_secret_key,
     pos_coin_derivation);
 
   WLT_CHECK_AND_ASSERT_MES(r, false, "internal error: pos coin base generator: failed to generate_key_derivation("
     <<  source_tx_pub_key
-    << ", view secret key: " << m_account.get_keys().m_view_secret_key << ")");
+    << ", view secret key: " << m_account.get_keys().view_secret_key << ")");
 
   crypto::secret_key derived_secret_ephemeral_key = AUTO_VAL_INIT(derived_secret_ephemeral_key);
   crypto::derive_secret_key(pos_coin_derivation,
     in_tx_output_index,
-    m_account.get_keys().m_spend_secret_key,
+    m_account.get_keys().spend_secret_key,
     derived_secret_ephemeral_key);
 
   // sign block actually in coinbase transaction
@@ -3207,7 +3207,7 @@ bool wallet2::is_transfer_unlocked(const transfer_details& td, bool for_pos_mini
   
 
   uint64_t unlock_time = get_tx_unlock_time(td.m_ptx_wallet_info->m_tx, td.m_internal_output_index);
-  if (for_pos_mining && get_blockchain_current_size() > m_core_runtime_config.hard_fork1_starts_after_height)
+  if (for_pos_mining && m_blockchain.size() > m_core_runtime_config.hard_fork_01_starts_after_height)
   {
     //allowed of staking locked coins with 
     stake_lock_time = unlock_time;
@@ -3223,7 +3223,7 @@ bool wallet2::is_transfer_unlocked(const transfer_details& td, bool for_pos_mini
 void wallet2::push_offer(const bc_services::offer_details_ex& od, currency::transaction& res_tx)
 {
   currency::tx_destination_entry tx_dest;
-  tx_dest.addr.push_back(m_account.get_keys().m_account_address);
+  tx_dest.addr.push_back(m_account.get_keys().account_address);
   tx_dest.amount = m_core_runtime_config.tx_default_fee;
   std::vector<currency::tx_destination_entry> destinations;
   std::vector<currency::extra_v> extra;
@@ -3268,7 +3268,7 @@ void wallet2::cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, uin
 void wallet2::update_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, const bc_services::offer_details_ex& od, currency::transaction& res_tx)
 {
   currency::tx_destination_entry tx_dest;
-  tx_dest.addr.push_back(m_account.get_keys().m_account_address);
+  tx_dest.addr.push_back(m_account.get_keys().account_address);
   tx_dest.amount = m_core_runtime_config.tx_default_fee;
   std::vector<currency::tx_destination_entry> destinations;
   std::vector<currency::extra_v> extra;
@@ -3318,12 +3318,12 @@ void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::tr
   {
     throw std::runtime_error(std::string("wrong alias characters: ") + ai.m_alias);
   }
-  bool r = currency::sign_extra_alias_entry(ai, m_account.get_keys().m_account_address.m_spend_public_key, m_account.get_keys().m_spend_secret_key);
+  bool r = currency::sign_extra_alias_entry(ai, m_account.get_keys().account_address.spend_public_key, m_account.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to sign alias update");
   WLT_LOG_L2("Generated upodate alias info: " << ENDL
     << "alias: " << ai.m_alias << ENDL
     << "signature: " << currency::print_t_array(ai.m_sign) << ENDL
-    << "signed(owner) pub key: " << m_account.get_keys().m_account_address.m_spend_public_key << ENDL
+    << "signed(owner) pub key: " << m_account.get_keys().account_address.spend_public_key << ENDL
     << "transfered to address: " << get_account_address_as_str(ai.m_address) << ENDL
     << "signed_hash: " << currency::get_sign_buff_hash_for_alias_update(ai)
     );
@@ -4209,8 +4209,8 @@ bool wallet2::read_money_transfer2_details_from_tx(const transaction& tx, const 
   PROFILE_FUNC("wallet2::read_money_transfer2_details_from_tx");
   for (auto& d : splitted_dsts)
   {
-    if (d.addr.size() && d.addr.back().m_spend_public_key == m_account.get_keys().m_account_address.m_spend_public_key &&
-      d.addr.back().m_view_public_key == m_account.get_keys().m_account_address.m_view_public_key)
+    if (d.addr.size() && d.addr.back().spend_public_key == m_account.get_keys().account_address.spend_public_key &&
+      d.addr.back().view_public_key == m_account.get_keys().account_address.view_public_key)
       wtd.rcv.push_back(d.amount);
   }
 
@@ -4385,7 +4385,7 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   currency::tx_destination_entry change_dts = AUTO_VAL_INIT(change_dts);
   if (needed_money < found_money)
   {
-    change_dts.addr.push_back(m_account.get_keys().m_account_address);
+    change_dts.addr.push_back(m_account.get_keys().account_address);
     change_dts.amount = found_money - needed_money;
   }
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(found_money >= needed_money, "needed_money==" << needed_money << "  <  found_money==" << found_money);
@@ -4448,7 +4448,7 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
   ftp.shuffle = ctp.shuffle;
   ftp.flags = ctp.flags;
   ftp.multisig_id = ctp.multisig_id;
-  ftp.spend_pub_key = m_account.get_public_address().m_spend_public_key;
+  ftp.spend_pub_key = m_account.get_public_address().spend_public_key;
 
   /* TODO
   WLT_LOG_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"
@@ -4587,7 +4587,7 @@ bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_
 {
   TIME_MEASURE_START(store_unsigned_tx_time);
   blobdata bl = t_serializable_object_to_blob(ftp);
-  crypto::chacha_crypt(bl, m_account.get_keys().m_view_secret_key);
+  crypto::chacha_crypt(bl, m_account.get_keys().view_secret_key);
 
   if (!filename.empty())
   {
@@ -4767,7 +4767,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   // ftp.selected_transfers -- needed only at stage of broadcasting or storing unsigned tx
   ftp.shuffle = false;
   // ftp.sources -- will be filled in try_construct_tx
-  ftp.spend_pub_key = m_account.get_public_address().m_spend_public_key; // needed for offline signing
+  ftp.spend_pub_key = m_account.get_public_address().spend_public_key; // needed for offline signing
   ftp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
   ftp.unlock_time = 0;
   
