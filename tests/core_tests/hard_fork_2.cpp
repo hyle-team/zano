@@ -34,7 +34,8 @@ bool hard_fork_2_base_test::configure_core(currency::core& c, size_t ev_index, c
 hard_fork_2_tx_payer_in_wallet::hard_fork_2_tx_payer_in_wallet()
   : hard_fork_2_base_test(16)
 {
-  REGISTER_CALLBACK_METHOD(hard_fork_2_tx_payer_in_wallet, c1);}
+  REGISTER_CALLBACK_METHOD(hard_fork_2_tx_payer_in_wallet, c1);
+}
 
 bool hard_fork_2_tx_payer_in_wallet::generate(std::vector<test_event_entry>& events) const
 {
