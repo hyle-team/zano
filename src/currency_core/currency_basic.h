@@ -15,7 +15,7 @@
 #include <boost/mpl/unique.hpp>
 #include <boost/mpl/list.hpp>
 #include <boost/mpl/equal.hpp>
-#include <boost/mpl/vector.hpp>
+#include <boost/mpl/vector/vector30.hpp>
 #include <boost/type_traits/is_same.hpp>
 
 #include <vector>
@@ -58,9 +58,9 @@ namespace currency
   /*                                                                      */
   /************************************************************************/
   
-  //since structure used in blockchain as a key accessor, then be sure that there is no padding inside
+//since structure used in blockchain as a key accessor, then be sure that there is no padding inside
 #pragma pack(push, 1)
-  struct account_public_address
+  struct account_public_address_old
   {
     crypto::public_key spend_public_key;
     crypto::public_key view_public_key;
@@ -70,12 +70,72 @@ namespace currency
       FIELD(view_public_key)
     END_SERIALIZE()
 
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_public_key)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_public_key)
-      END_KV_SERIALIZE_MAP()
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_public_key)
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_public_key)
+    END_KV_SERIALIZE_MAP()
   };
 #pragma pack(pop)
+
+
+#define ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER 1
+
+#define ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE 0x01 // auditable address
+
+//since structure used in blockchain as a key accessor, then be sure that there is no padding inside
+#pragma pack(push, 1)
+  struct account_public_address
+  {
+    /*account_public_address()
+    {}
+
+    account_public_address(const account_public_address_old& rhs)
+      : version(ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER)
+      , flags(0)
+      , spend_public_key(rhs.spend_public_key)
+      , view_public_key(rhs.view_public_key)
+    {}*/
+
+    uint8_t version;
+    uint8_t flags;
+    crypto::public_key spend_public_key;
+    crypto::public_key view_public_key;
+
+    DEFINE_SERIALIZATION_VERSION(ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER)
+    BEGIN_SERIALIZE_OBJECT()
+      VERSION_ENTRY(version)
+      FIELD(flags)
+      FIELD(spend_public_key)
+      FIELD(view_public_key)
+      if (version > ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER)
+        return true; // backward compartibility
+    END_SERIALIZE()
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(version) // is it necessary?
+      KV_SERIALIZE(flags)
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_public_key)
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_public_key)
+    END_KV_SERIALIZE_MAP()
+
+    static account_public_address from_old(const account_public_address_old& rhs)
+    {
+      account_public_address result = AUTO_VAL_INIT(result);
+      result.spend_public_key = rhs.spend_public_key;
+      result.view_public_key = rhs.view_public_key;
+      return result;
+    }
+
+    account_public_address_old to_old() const
+    {
+      account_public_address_old result = AUTO_VAL_INIT(result);
+      result.spend_public_key = spend_public_key;
+      result.view_public_key = view_public_key;
+      return result;
+    }
+  };
+#pragma pack(pop)
+
 
   const static account_public_address null_pub_addr = AUTO_VAL_INIT(null_pub_addr);
 
@@ -224,9 +284,30 @@ namespace currency
     END_SERIALIZE()
   };
 
+  struct tx_payer_old
+  {
+    account_public_address_old acc_addr;
+
+    BEGIN_SERIALIZE()
+      FIELD(acc_addr)
+    END_SERIALIZE()
+  };
+
   struct tx_payer
   {
-    account_public_address acc_addr;
+    tx_payer() = default;
+    tx_payer(const tx_payer_old& old) : acc_addr(account_public_address::from_old(old.acc_addr)) {}
+
+    account_public_address acc_addr{};
+
+    BEGIN_SERIALIZE()
+      FIELD(acc_addr)
+    END_SERIALIZE()
+  };
+
+  struct tx_receiver_old
+  {
+    account_public_address_old acc_addr;
 
     BEGIN_SERIALIZE()
       FIELD(acc_addr)
@@ -235,7 +316,10 @@ namespace currency
 
   struct tx_receiver
   {
-    account_public_address acc_addr;
+    tx_receiver() = default;
+    tx_receiver(const tx_receiver_old& old) : acc_addr(account_public_address::from_old(old.acc_addr)) {}
+
+    account_public_address acc_addr{};
 
     BEGIN_SERIALIZE()
       FIELD(acc_addr)
@@ -388,9 +472,10 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector<
-    tx_service_attachment, tx_comment, tx_payer, tx_receiver, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
+  typedef boost::mpl::vector20<
+    tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_uint16_t, etc_tx_details_unlock_time2
+    , tx_payer, tx_receiver//, extra_alias_entry
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -602,7 +687,7 @@ SET_VARIANT_TAGS(currency::transaction, 5, "tx");
 SET_VARIANT_TAGS(currency::block, 6, "block");
 //attachment_v definitions 
 SET_VARIANT_TAGS(currency::tx_comment, 7, "comment");
-SET_VARIANT_TAGS(currency::tx_payer, 8, "payer");
+SET_VARIANT_TAGS(currency::tx_payer_old, 8, "payer");
 SET_VARIANT_TAGS(std::string, 9, "string");
 SET_VARIANT_TAGS(currency::tx_crypto_checksum, 10, "checksum");
 SET_VARIANT_TAGS(currency::tx_derivation_hint, 11, "derivation_hint");

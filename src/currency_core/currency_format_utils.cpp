@@ -2026,7 +2026,7 @@ namespace currency
   //---------------------------------------------------------------
   bool is_showing_sender_addres(const transaction& tx)
   {
-    return have_type_in_variant_container<tx_payer>(tx.attachment);
+    return have_type_in_variant_container<tx_payer>(tx.attachment) || have_type_in_variant_container<tx_payer_old>(tx.attachment);
   }
   //---------------------------------------------------------------
   bool is_mixin_tx(const transaction& tx)
