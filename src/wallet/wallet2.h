@@ -322,6 +322,7 @@ namespace tools
                               m_do_rise_transfer(false),
                               m_watch_only(false), 
                               m_last_pow_block_h(0), 
+                              m_minimum_height(0),
                               m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {};
   public:
@@ -336,6 +337,7 @@ namespace tools
                 m_log_prefix("???"),
                 m_watch_only(false), 
                 m_last_pow_block_h(0), 
+                m_minimum_height(0),
                 m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {
       m_core_runtime_config = currency::get_default_core_runtime_config();
@@ -503,6 +505,7 @@ namespace tools
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
+    void set_minimum_height(uint64_t h);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
     uint64_t balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const;
@@ -895,9 +898,10 @@ private:
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
     void push_new_block_id(const crypto::hash& id, uint64_t height);
     bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);
-    void get_short_chain_history(std::list<epee::pod_pair<uint64_t, crypto::hash> >& ids);
+    void get_short_chain_history(std::list<crypto::hash>& ids);
     void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed);
     uint64_t detach_from_block_ids(uint64_t height);
+    uint64_t get_wallet_minimum_height();
 
     currency::account_base m_account;
     bool m_watch_only;
@@ -911,6 +915,7 @@ private:
     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_10;   //1 day
     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_100;  //10 days
     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_1000; //100 days
+    uint64_t m_minimum_height;
 
     std::atomic<uint64_t> m_local_bc_size; //temporary workaround 
     std::atomic<uint64_t> m_last_bc_timestamp; 

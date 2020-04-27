@@ -33,6 +33,10 @@ namespace tools
     {
       return m_rpc.on_get_blocks_direct(rqt, rsp, m_cntxt_stub);
     }
+    bool call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(const currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& rqt, currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& rsp) override
+    { 
+      return m_rpc.on_get_est_height_from_date(rqt, rsp, m_cntxt_stub);
+    }
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_INFO(const currency::COMMAND_RPC_GET_INFO::request& req, currency::COMMAND_RPC_GET_INFO::response& res) override
     {

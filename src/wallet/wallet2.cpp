@@ -1211,7 +1211,7 @@ bool wallet2::lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& 
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_short_chain_history(std::list<epee::pod_pair<uint64_t, crypto::hash> >& ids)
+void wallet2::get_short_chain_history(std::list<crypto::hash>& ids)
 {
   ids.clear();
   uint64_t i = 0;
@@ -1222,7 +1222,7 @@ void wallet2::get_short_chain_history(std::list<epee::pod_pair<uint64_t, crypto:
   //first put last 10
   for (auto it = m_last_10_blocks.rbegin(); it != m_last_10_blocks.rend(); it++)
   {
-    ids.push_back({ it->first, it->second });
+    ids.push_back(it->second);
     i = it->first;
   }
 
@@ -1242,20 +1242,41 @@ void wallet2::get_short_chain_history(std::list<epee::pod_pair<uint64_t, crypto:
     //readjust item current_back_offset 
     current_back_offset = sz - item.first;
 
-    ids.push_back({ item.first, item.second });
+    ids.push_back(item.second);
     current_offset_distance *= 2;
     current_back_offset += current_offset_distance;
   }
-  ids.push_back({ 0, m_genesis });
+  ids.push_back(m_genesis);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::set_minimum_height(uint64_t h)
+{
+  m_minimum_height = h;
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_wallet_minimum_height()
+{
+  if (m_minimum_height)
+    return m_minimum_height;
+
+  currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request req = AUTO_VAL_INIT(req);
+  currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response res = AUTO_VAL_INIT(res);
+  req.timestamp = m_account.get_createtime();
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(req, res);
+  THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
+  THROW_IF_FALSE_WALLET_EX(res.status == CORE_RPC_STATUS_OK, error::wallet_runtime_error, "FAILED TO CALL COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
+  return res.h;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
 {
   blocks_added = 0;
-  currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::request req = AUTO_VAL_INIT(req);
-  currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::response res = AUTO_VAL_INIT(res);
+  currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request req = AUTO_VAL_INIT(req);
+  currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response res = AUTO_VAL_INIT(res);
+
+  req.minimum_height = get_wallet_minimum_height();
   get_short_chain_history(req.block_ids);
-  bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT(req, res);
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
 
@@ -1353,7 +1374,7 @@ void wallet2::check_if_block_matched(uint64_t i, const crypto::hash& id, bool& b
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop, 
-  currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::response& res)
+  currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res)
 {
   size_t current_index = res.start_height;
 

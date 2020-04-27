@@ -70,6 +70,8 @@ using namespace currency;
 #endif
 #define BLOCK_POS_STRICT_SEQUENCE_LIMIT                               20
 
+#define BLOCKCHAIN_FIRST_BLOCK_TIMESTAMP                              1557342384
+
 
 DISABLE_VS_WARNINGS(4267)
 
@@ -2938,29 +2940,67 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
 
   return true;
 }
-bool blockchain_storage::find_blockchain_supplement_fuzzy(const std::list<epee::pod_pair<uint64_t, crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp)const
+//------------------------------------------------------------------
+bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h)const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-//   if (!find_blockchain_supplement(qblock_ids, resp.start_height))
-//     return false;
-// 
-//   resp.total_height = get_current_blockchain_size();
-//   size_t count = 0;
-// 
-//   block_context_info* pprevinfo = nullptr;
-//   size_t i = 0;
-//   for (i = resp.start_height; i != m_db_blocks.size() && count < BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT; i++, count++)
-//   {
-//     resp.m_block_ids.push_back(block_context_info());
-// 
-//     if (pprevinfo)
-//       pprevinfo->h = m_db_blocks[i]->bl.prev_id;
-//     resp.m_block_ids.back().cumul_size = m_db_blocks[i]->block_cumulative_size;
-//     pprevinfo = &resp.m_block_ids.back();
-//   }
-//   if (pprevinfo)
-//     pprevinfo->h = get_block_hash(m_db_blocks[--i]->bl);
+#define GET_EST_HEIGHT_FROM_DATE_THRESHOLD              1440
 
+  if (date < BLOCKCHAIN_FIRST_BLOCK_TIMESTAMP)
+    return false;
+
+
+  uint64_t calculated_estimated_height = (date - BLOCKCHAIN_FIRST_BLOCK_TIMESTAMP) / DIFFICULTY_TOTAL_TARGET;
+  
+  if (date > m_db_blocks[m_db_blocks.size() - 1]->bl.timestamp)
+  {
+    //that suspicious but also could be(in case someone just created wallet offline in
+    //console and then got it synchronyzing and last block had a little timestamp shift)
+    //let's just return 1 day behind for safety reasons. 
+    if (m_db_blocks.size() > 1440)
+    {
+      res_h = m_db_blocks.size() - 1440;
+      return true;
+    }
+    else 
+    {
+      //likely impossible, but just in case
+      res_h = 1;
+    }
+      
+  }
+  if (calculated_estimated_height > m_db_blocks.size() - 1)
+    calculated_estimated_height = m_db_blocks.size() - 1;
+
+  //goal is to get timestamp in window in between 1day+1hour  and 1 hour before target(1 hour is just to be sure that
+  //we didn't miss actual wallet start because of timestamp and difficulty fluctuations)
+  uint64_t low_boundary = date - 90000; //1 day + 1 hour
+  uint64_t aim = date - 46800;
+  uint64_t high_boundary = date - 3600; //1 hour
+
+  uint64_t iteration_coun = 0;
+  while (true)
+  {
+    iteration_coun++;
+    uint64_t correction = 0;
+    uint64_t ts = m_db_blocks[calculated_estimated_height]->bl.timestamp;
+    if (ts > high_boundary)
+    {
+      //we moved too much forward
+      calculated_estimated_height -= (ts - aim) / DIFFICULTY_TOTAL_TARGET;
+    }
+    else if (ts < low_boundary)
+    {
+      //we too much in past
+      calculated_estimated_height += (aim - ts) / DIFFICULTY_TOTAL_TARGET;
+    }
+    else
+    {
+      res_h = calculated_estimated_height;
+      break;
+    }
+  }
+  LOG_PRINT_L0("[get_est_height_from_date] returned " << calculated_estimated_height << " with " << iteration_coun << " iterations");
   return true;
 }
 //------------------------------------------------------------------
@@ -2983,11 +3023,13 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, blocks_direct_container& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count)const
+bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, blocks_direct_container& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count, uint64_t minimum_height)const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   if (!find_blockchain_supplement(qblock_ids, start_height))
     return false;
+  if (minimum_height > start_height)
+    start_height = minimum_height;
 
   total_height = get_current_blockchain_size();
   size_t count = 0;

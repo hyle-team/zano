@@ -841,6 +841,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   try
   {
     w->generate(path, password);
+    w->set_minimum_height(m_last_daemon_height);
     owr.seed = w->get_account().get_restore_braindata();
   }
   catch (const tools::error::file_exists&)

@@ -115,9 +115,11 @@ namespace currency
 
     struct request
     {
+      uint64_t minimum_height;
       std::list<crypto::hash> block_ids; //*first 10 blocks id goes sequential, next goes in pow(2,n) offset, like 2, 4, 8, 16, 32, 64 and so on, and the last one is always genesis block */
 
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(minimum_height)
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids)
       END_KV_SERIALIZE_MAP()
     };
@@ -141,38 +143,6 @@ namespace currency
   typedef COMMAND_RPC_GET_BLOCKS_FAST_T<block_complete_entry> COMMAND_RPC_GET_BLOCKS_FAST;
   typedef COMMAND_RPC_GET_BLOCKS_FAST_T<block_direct_data_entry> COMMAND_RPC_GET_BLOCKS_DIRECT;
   
-  template<class t_block_complete_entry>
-  struct COMMAND_RPC_GET_BLOCKS_FUZZY_FAST_T
-  {
-
-    struct request
-    {
-      std::list<epee::pod_pair<uint64_t, crypto::hash> > block_ids; //*first 10 blocks id goes sequential, next goes in pow(2,n) offset, like 2, 4, 8, 16, 32, 64 and so on, and the last one is always genesis block */
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::list<t_block_complete_entry> blocks;
-      uint64_t    start_height;
-      uint64_t    current_height;
-      std::string status;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(blocks)
-        KV_SERIALIZE(start_height)
-        KV_SERIALIZE(current_height)
-        KV_SERIALIZE(status)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-  typedef COMMAND_RPC_GET_BLOCKS_FUZZY_FAST_T<block_complete_entry> COMMAND_RPC_GET_BLOCKS_FUZZY_FAST;
-  typedef COMMAND_RPC_GET_BLOCKS_FUZZY_FAST_T<block_direct_data_entry> COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT;
-
-
   //-----------------------------------------------
   struct COMMAND_RPC_GET_TRANSACTIONS
   {
@@ -195,6 +165,30 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs_as_hex)
         KV_SERIALIZE(missed_tx)
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  //-----------------------------------------------
+  struct COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE
+  {
+    struct request
+    {
+      uint64_t timestamp;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(timestamp)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      uint64_t h;
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(h)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };
