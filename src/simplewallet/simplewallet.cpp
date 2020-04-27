@@ -385,7 +385,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   {
     m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
     message_writer(epee::log_space::console_color_white, true) << "Generated new wallet: " << m_wallet->get_account().get_public_address_str();
-    std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_view_secret_key) << std::endl << std::flush;
+    std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
     if(m_do_not_set_date)
       m_wallet->reset_creation_time(0);
 
@@ -427,7 +427,7 @@ bool simple_wallet::restore_wallet(const std::string &wallet_file, const std::st
   {
     m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, restore_seed);
     message_writer(epee::log_space::console_color_white, true) << "Wallet restored: " << m_wallet->get_account().get_public_address_str();
-    std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_view_secret_key) << std::endl << std::flush;
+    std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
   }
@@ -1333,8 +1333,8 @@ bool simple_wallet::spendkey(const std::vector<std::string> &args)
    << "WARNING! Anyone who knows the following secret key can access your wallet and spend your coins.";
 
   const account_keys& keys = m_wallet->get_account().get_keys();
-  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_spend_secret_key) << std::endl;
-  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.m_spend_public_key) << std::endl << std::flush;
+  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.spend_secret_key) << std::endl;
+  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.account_address.spend_public_key) << std::endl << std::flush;
 
   return true;
 }
@@ -1345,8 +1345,8 @@ bool simple_wallet::viewkey(const std::vector<std::string> &args)
     << "WARNING! Anyone who knows the following secret key can view your wallet (but can not spend your coins).";
 
   const account_keys& keys = m_wallet->get_account().get_keys();
-  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_view_secret_key) << std::endl;
-  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.m_view_public_key) << std::endl << std::flush;
+  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.view_secret_key) << std::endl;
+  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.account_address.view_public_key) << std::endl << std::flush;
 
   return true;
 }

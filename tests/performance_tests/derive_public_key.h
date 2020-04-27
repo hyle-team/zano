@@ -19,8 +19,8 @@ public:
     if (!single_tx_test_base::init())
       return false;
 
-    crypto::generate_key_derivation(m_tx_pub_key, m_bob.get_keys().m_view_secret_key, m_key_derivation);
-    m_spend_public_key = m_bob.get_keys().m_account_address.m_spend_public_key;
+    crypto::generate_key_derivation(m_tx_pub_key, m_bob.get_keys().view_secret_key, m_key_derivation);
+    m_spend_public_key = m_bob.get_keys().account_address.spend_public_key;
 
     return true;
   }

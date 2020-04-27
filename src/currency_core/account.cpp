@@ -35,8 +35,8 @@ namespace currency
   void account_base::set_null()
   {
     // fill sensitive data with random bytes
-    crypto::generate_random_bytes(sizeof m_keys.m_spend_secret_key, &m_keys.m_spend_secret_key);
-    crypto::generate_random_bytes(sizeof m_keys.m_view_secret_key, &m_keys.m_view_secret_key);
+    crypto::generate_random_bytes(sizeof m_keys.spend_secret_key, &m_keys.spend_secret_key);
+    crypto::generate_random_bytes(sizeof m_keys.view_secret_key, &m_keys.view_secret_key);
     crypto::generate_random_bytes(m_seed.size(), &m_seed[0]);
     
     // clear
@@ -47,9 +47,9 @@ namespace currency
   //-----------------------------------------------------------------
   void account_base::generate()
   {   
-    generate_brain_keys(m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key, m_seed, BRAINWALLET_DEFAULT_SEED_SIZE);
-    dependent_key(m_keys.m_spend_secret_key, m_keys.m_view_secret_key);
-    if (!crypto::secret_key_to_public_key(m_keys.m_view_secret_key, m_keys.m_account_address.m_view_public_key))
+    generate_brain_keys(m_keys.account_address.spend_public_key, m_keys.spend_secret_key, m_seed, BRAINWALLET_DEFAULT_SEED_SIZE);
+    dependent_key(m_keys.spend_secret_key, m_keys.view_secret_key);
+    if (!crypto::secret_key_to_public_key(m_keys.view_secret_key, m_keys.account_address.view_public_key))
       throw std::runtime_error("Failed to create public view key");
 
 
@@ -85,7 +85,7 @@ namespace currency
     //CHECK_AND_ASSERT_MES(restore_data.size() == ACCOUNT_RESTORE_DATA_SIZE, false, "wrong restore data size");
     if (restore_data.size() == BRAINWALLET_DEFAULT_SEED_SIZE)
     {
-      crypto::keys_from_default((unsigned char*)restore_data.data(), m_keys.m_account_address.m_spend_public_key, m_keys.m_spend_secret_key, BRAINWALLET_DEFAULT_SEED_SIZE);
+      crypto::keys_from_default((unsigned char*)restore_data.data(), m_keys.account_address.spend_public_key, m_keys.spend_secret_key, BRAINWALLET_DEFAULT_SEED_SIZE);
     }
     else 
     {
@@ -93,8 +93,8 @@ namespace currency
       return false;
     }
     m_seed = restore_data;
-    crypto::dependent_key(m_keys.m_spend_secret_key, m_keys.m_view_secret_key);
-    bool r = crypto::secret_key_to_public_key(m_keys.m_view_secret_key, m_keys.m_account_address.m_view_public_key);
+    crypto::dependent_key(m_keys.spend_secret_key, m_keys.view_secret_key);
+    bool r = crypto::secret_key_to_public_key(m_keys.view_secret_key, m_keys.account_address.view_public_key);
     CHECK_AND_ASSERT_MES(r, false, "failed to secret_key_to_public_key for view key");
     set_createtime(0);
     return true;
@@ -126,7 +126,7 @@ namespace currency
   std::string account_base::get_public_address_str() const
   {
     //TODO: change this code into base 58
-    return get_account_address_as_str(m_keys.m_account_address);
+    return get_account_address_as_str(m_keys.account_address);
   }
   //-----------------------------------------------------------------
   void account_base::make_account_watch_only()
@@ -138,16 +138,16 @@ namespace currency
     
     // store to local tmp
     uint64_t local_ts = m_creation_timestamp;
-    account_public_address local_addr = m_keys.m_account_address;
-    crypto::secret_key local_view_sec = m_keys.m_view_secret_key;
+    account_public_address local_addr = m_keys.account_address;
+    crypto::secret_key local_view_sec = m_keys.view_secret_key;
 
     // clear
     set_null();
 
     // restore
     m_creation_timestamp = local_ts;
-    m_keys.m_account_address = local_addr;
-    m_keys.m_view_secret_key = local_view_sec;
+    m_keys.account_address = local_addr;
+    m_keys.view_secret_key = local_view_sec;
   }
   //-----------------------------------------------------------------
   std::string transform_addr_to_str(const account_public_address& addr)

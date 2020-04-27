@@ -37,8 +37,8 @@ namespace boost
     template<class archive_t>
     void serialize(archive_t & ar, currency::extra_alias_entry_base& ai, const unsigned int version)
     {
-      ar & ai.m_address.m_spend_public_key;
-      ar & ai.m_address.m_view_public_key;
+      ar & ai.m_address.spend_public_key;
+      ar & ai.m_address.view_public_key;
       ar & ai.m_view_key;
       ar & ai.m_sign;
       ar & ai.m_text_comment;

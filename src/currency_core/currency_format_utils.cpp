@@ -224,13 +224,13 @@ namespace currency
   bool derive_ephemeral_key_helper(const account_keys& ack, const crypto::public_key& tx_public_key, size_t real_output_index, keypair& in_ephemeral)
   {
     crypto::key_derivation recv_derivation = AUTO_VAL_INIT(recv_derivation);
-    bool r = crypto::generate_key_derivation(tx_public_key, ack.m_view_secret_key, recv_derivation);
-    CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to generate_key_derivation(" << tx_public_key << ", " << ack.m_view_secret_key << ")");
+    bool r = crypto::generate_key_derivation(tx_public_key, ack.view_secret_key, recv_derivation);
+    CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to generate_key_derivation(" << tx_public_key << ", " << ack.view_secret_key << ")");
 
-    r = crypto::derive_public_key(recv_derivation, real_output_index, ack.m_account_address.m_spend_public_key, in_ephemeral.pub);
-    CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to derive_public_key(" << recv_derivation << ", " << real_output_index << ", " << ack.m_account_address.m_spend_public_key << ")");
+    r = crypto::derive_public_key(recv_derivation, real_output_index, ack.account_address.spend_public_key, in_ephemeral.pub);
+    CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to derive_public_key(" << recv_derivation << ", " << real_output_index << ", " << ack.account_address.spend_public_key << ")");
 
-    crypto::derive_secret_key(recv_derivation, real_output_index, ack.m_spend_secret_key, in_ephemeral.sec);
+    crypto::derive_secret_key(recv_derivation, real_output_index, ack.spend_secret_key, in_ephemeral.sec);
     return true;
   }
   //---------------------------------------------------------------
@@ -510,11 +510,11 @@ namespace currency
   //---------------------------------------------------------------
   bool derive_public_key_from_target_address(const account_public_address& destination_addr, const crypto::secret_key& tx_sec_key, size_t index, crypto::public_key& out_eph_public_key, crypto::key_derivation& derivation)
   {    
-    bool r = crypto::generate_key_derivation(destination_addr.m_view_public_key, tx_sec_key, derivation);
-    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to generate_key_derivation(" << destination_addr.m_view_public_key << ", " << tx_sec_key << ")");
+    bool r = crypto::generate_key_derivation(destination_addr.view_public_key, tx_sec_key, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to generate_key_derivation(" << destination_addr.view_public_key << ", " << tx_sec_key << ")");
 
-    r = crypto::derive_public_key(derivation, index, destination_addr.m_spend_public_key, out_eph_public_key);
-    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to derive_public_key(" << derivation << ", " << index << ", " << destination_addr.m_view_public_key << ")");
+    r = crypto::derive_public_key(derivation, index, destination_addr.spend_public_key, out_eph_public_key);
+    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to derive_public_key(" << derivation << ", " << index << ", " << destination_addr.view_public_key << ")");
     return r;
   }
   //---------------------------------------------------------------
@@ -561,7 +561,7 @@ namespace currency
     for (auto& apa : de.addr)
     {
       crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
-      if (apa.m_spend_public_key == null_pkey && apa.m_view_public_key == null_pkey)
+      if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
       {
         //burning money(for example alias reward)
         out_eph_public_key = null_pkey;
@@ -778,15 +778,15 @@ namespace currency
     {
       crypto::public_key tx_pub_key = currency::get_tx_pub_key_from_extra(tx);
 
-      bool r = crypto::generate_key_derivation(tx_pub_key, acc_keys.m_view_secret_key, derivation);
+      bool r = crypto::generate_key_derivation(tx_pub_key, acc_keys.view_secret_key, derivation);
       CHECK_AND_ASSERT_MES(r, null_derivation, "failed to generate_key_derivation");
-      LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key derived from destination addr: " << currency::get_account_address_as_str(acc_keys.m_account_address), LOG_LEVEL_0);
+      LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key derived from destination addr: " << currency::get_account_address_as_str(acc_keys.account_address), LOG_LEVEL_0);
     }
     else
     {
       derivation = crypto_info.encrypted_key_derivation;
-      crypto::chacha_crypt(derivation, acc_keys.m_spend_secret_key);
-      LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key decrypted from sender address: " << currency::get_account_address_as_str(acc_keys.m_account_address), LOG_LEVEL_0);
+      crypto::chacha_crypt(derivation, acc_keys.spend_secret_key);
+      LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key decrypted from sender address: " << currency::get_account_address_as_str(acc_keys.account_address), LOG_LEVEL_0);
     }
 
     //validate derivation we here. Yoda style
@@ -833,7 +833,7 @@ namespace currency
   void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key)
   {
     crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-    bool r = crypto::generate_key_derivation(destination_addr.m_view_public_key, tx_random_key.sec, derivation);
+    bool r = crypto::generate_key_derivation(destination_addr.view_public_key, tx_random_key.sec, derivation);
     CHECK_AND_ASSERT_MES(r, void(), "failed to generate_key_derivation");
     bool was_attachment_crypted_entries = false;
     bool was_extra_crypted_entries = false;
@@ -855,7 +855,7 @@ namespace currency
       chs.derivation_hash = *(uint32_t*)&hash_for_check_sum;
       //put encrypted derivation to let sender decrypt all this data from attachment/extra
       chs.encrypted_key_derivation = derivation;
-      crypto::chacha_crypt(chs.encrypted_key_derivation, sender_keys.m_spend_secret_key);
+      crypto::chacha_crypt(chs.encrypted_key_derivation, sender_keys.spend_secret_key);
       if (was_extra_crypted_entries)
         tx.extra.push_back(chs);
       else
@@ -976,7 +976,7 @@ namespace currency
   {
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "Too many outs (" << destinations.size() << ")! Tx can't be constructed.");
 
-    bool watch_only_mode = sender_account_keys.m_spend_secret_key == null_skey;
+    bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
 
     bool append_mode = false;
     if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
@@ -1138,7 +1138,7 @@ namespace currency
         {
           CHECK_AND_ASSERT_MES(tsa.security.size() == 1, false, "Wrong tsa.security.size() = " << tsa.security.size());
 
-          bool r = derive_public_key_from_target_address(sender_account_keys.m_account_address, one_time_secret_key, att_count, tsa.security.back());
+          bool r = derive_public_key_from_target_address(sender_account_keys.account_address, one_time_secret_key, att_count, tsa.security.back());
           CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_target_address");
         }
         att_count++;
@@ -1524,7 +1524,7 @@ namespace currency
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+    if (!derive_public_key(derivation, output_index, acc.account_address.spend_public_key, pk))
       return false;
     return pk == out_key.key;
   }
@@ -1532,7 +1532,7 @@ namespace currency
   bool is_out_to_acc(const account_keys& acc, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+    if (!derive_public_key(derivation, output_index, acc.account_address.spend_public_key, pk))
       return false;
     auto it = std::find(out_multisig.keys.begin(), out_multisig.keys.end(), pk);
     if (out_multisig.keys.end() == it)
@@ -1576,7 +1576,7 @@ namespace currency
   bool lookup_acc_outs_genesis(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     uint64_t offset = 0;
-    bool r = get_account_genesis_offset_by_address(get_account_address_as_str(acc.m_account_address), offset);
+    bool r = get_account_genesis_offset_by_address(get_account_address_as_str(acc.account_address), offset);
     if (!r)
       return true;
 
@@ -1594,7 +1594,7 @@ namespace currency
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     money_transfered = 0;
-    bool r = generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
+    bool r = generate_key_derivation(tx_pub_key, acc.view_secret_key, derivation);
     CHECK_AND_ASSERT_MES(r, false, "unable to generate derivation from tx_pub = " << tx_pub_key << " * view_sec, invalid tx_pub?");
 
     if (is_coinbase(tx) && get_block_height(tx) == 0 &&  tx_pub_key == ggenesis_tx_pub_key)
@@ -2060,8 +2060,8 @@ namespace currency
   //---------------------------------------------------------------
   bool get_aliases_reward_account(account_public_address& acc)
   {
-    bool r = string_tools::parse_tpod_from_hex_string(ALIAS_REWARDS_ACCOUNT_SPEND_PUB_KEY, acc.m_spend_public_key);
-    r &= string_tools::parse_tpod_from_hex_string(ALIAS_REWARDS_ACCOUNT_VIEW_PUB_KEY, acc.m_view_public_key);
+    bool r = string_tools::parse_tpod_from_hex_string(ALIAS_REWARDS_ACCOUNT_SPEND_PUB_KEY, acc.spend_public_key);
+    r &= string_tools::parse_tpod_from_hex_string(ALIAS_REWARDS_ACCOUNT_VIEW_PUB_KEY, acc.view_public_key);
     return r;
   }
   //------------------------------------------------------------------
@@ -2569,7 +2569,7 @@ namespace currency
       return false;
     }
 
-    if (!crypto::check_key(addr.m_spend_public_key) || !crypto::check_key(addr.m_view_public_key))
+    if (!crypto::check_key(addr.spend_public_key) || !crypto::check_key(addr.view_public_key))
     {
       LOG_PRINT_L1("Failed to validate address keys for address \"" << str << "\"");
       return false;

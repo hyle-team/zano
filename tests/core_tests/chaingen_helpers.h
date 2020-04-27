@@ -193,9 +193,9 @@ inline bool resign_tx(const currency::account_keys& sender_keys, const std::vect
 
     crypto::secret_key in_ephemeral_sec = AUTO_VAL_INIT(in_ephemeral_sec);
     crypto::key_derivation recv_derivation = AUTO_VAL_INIT(recv_derivation);
-    if (!crypto::generate_key_derivation(se.real_out_tx_key, sender_keys.m_view_secret_key, recv_derivation))
+    if (!crypto::generate_key_derivation(se.real_out_tx_key, sender_keys.view_secret_key, recv_derivation))
       return false;
-    crypto::derive_secret_key(recv_derivation, se.real_output_in_tx_index, sender_keys.m_spend_secret_key, in_ephemeral_sec);
+    crypto::derive_secret_key(recv_derivation, se.real_output_in_tx_index, sender_keys.spend_secret_key, in_ephemeral_sec);
 
     tx.signatures.push_back(std::vector<crypto::signature>());
     std::vector<crypto::signature>& sigs = tx.signatures.back();

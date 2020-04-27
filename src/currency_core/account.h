@@ -29,14 +29,14 @@ namespace currency
 
   struct account_keys
   {
-    account_public_address m_account_address;
-    crypto::secret_key   m_spend_secret_key;
-    crypto::secret_key   m_view_secret_key;
+    account_public_address account_address;
+    crypto::secret_key   spend_secret_key;
+    crypto::secret_key   view_secret_key;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(m_account_address)
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(m_spend_secret_key)
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(m_view_secret_key)
+      KV_SERIALIZE(account_address)
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_secret_key)
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_secret_key)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -49,7 +49,7 @@ namespace currency
     account_base();
     void generate();
     const account_keys& get_keys() const;
-    const account_public_address& get_public_address() const { return m_keys.m_account_address; };
+    const account_public_address& get_public_address() const { return m_keys.account_address; };
     std::string get_public_address_str() const;
     std::string get_restore_data() const;
     std::string get_restore_braindata() const;
@@ -92,9 +92,9 @@ namespace currency
 
   inline bool operator==(const account_keys& lhs, const account_keys& rhs)
   {
-    return lhs.m_account_address  == rhs.m_account_address &&
-           lhs.m_spend_secret_key == rhs.m_spend_secret_key &&
-           lhs.m_view_secret_key  == rhs.m_view_secret_key;
+    return lhs.account_address  == rhs.account_address &&
+           lhs.spend_secret_key == rhs.spend_secret_key &&
+           lhs.view_secret_key  == rhs.view_secret_key;
   }
   inline bool operator!=(const account_keys& lhs, const account_keys& rhs)
   {

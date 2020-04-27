@@ -34,7 +34,7 @@ public:
 
     for (size_t i = 0; i < out_count; ++i)
     {
-      m_destinations.push_back(tx_destination_entry(this->m_source_amount / out_count, m_alice.get_keys().m_account_address));
+      m_destinations.push_back(tx_destination_entry(this->m_source_amount / out_count, m_alice.get_keys().account_address));
     }
 
     return true;

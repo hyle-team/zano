@@ -293,7 +293,7 @@ namespace tools
       if (req.push_payer)
       {
         currency::tx_payer txp = AUTO_VAL_INIT(txp);
-        txp.acc_addr = m_wallet.get_account().get_keys().m_account_address;
+        txp.acc_addr = m_wallet.get_account().get_keys().account_address;
         extra.push_back(txp);
       }
       if (!req.hide_receiver)

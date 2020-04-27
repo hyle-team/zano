@@ -58,15 +58,15 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
 
       crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(validated_tx);
       crypto::key_derivation derivation;
-      bool r = generate_key_derivation(tx_pub_key, m_keys.m_view_secret_key, derivation);
+      bool r = generate_key_derivation(tx_pub_key, m_keys.view_secret_key, derivation);
       CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
       crypto::secret_key ephemeral_secret_key;
-      derive_secret_key(derivation, output_tx_index, m_keys.m_spend_secret_key, ephemeral_secret_key);
+      derive_secret_key(derivation, output_tx_index, m_keys.spend_secret_key, ephemeral_secret_key);
 
       crypto::public_key output_public_key = boost::get<txout_to_key>(out.target).key;
 
       /*crypto::public_key ephemeral_public_key;
-      derive_public_key(derivation, output_tx_index, m_keys.m_account_address.m_spend_public_key, ephemeral_public_key);*/
+      derive_public_key(derivation, output_tx_index, m_keys.account_address.spend_public_key, ephemeral_public_key);*/
 
       crypto::key_image ki;
       generate_key_image(output_public_key, ephemeral_secret_key, ki);
@@ -1436,7 +1436,7 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
 
   // these attachments will be use across all the transactions in this test
   currency::tx_payer a_tx_payer = AUTO_VAL_INIT(a_tx_payer);
-  a_tx_payer.acc_addr = miner_acc.get_keys().m_account_address;
+  a_tx_payer.acc_addr = miner_acc.get_keys().account_address;
   currency::tx_comment a_tx_comment = AUTO_VAL_INIT(a_tx_comment);
   a_tx_comment.comment = "Comandante Che Guevara";
   std::string a_tx_message = AUTO_VAL_INIT(a_tx_message);
@@ -1622,7 +1622,7 @@ bool gen_wallet_alias_and_unconfirmed_txs::c1(currency::core& c, size_t ev_index
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = m_accounts[BOB_ACC_IDX].get_public_address();
-  ai.m_view_key.push_back(m_accounts[BOB_ACC_IDX].get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(m_accounts[BOB_ACC_IDX].get_keys().view_secret_key);
 
   uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
   bool r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", alias_reward * 2);
@@ -1659,7 +1659,7 @@ bool gen_wallet_alias_and_unconfirmed_txs::c2(currency::core& c, size_t ev_index
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'b');
   ai.m_address = someone.get_public_address();
-  ai.m_view_key.push_back(someone.get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(someone.get_keys().view_secret_key);
   
   uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
   bool r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", alias_reward * 2);
@@ -1694,9 +1694,9 @@ bool gen_wallet_alias_and_unconfirmed_txs::c3(currency::core& c, size_t ev_index
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "alicealice";
   ai.m_address = m_accounts[MINER_ACC_IDX].get_public_address();
-  ai.m_view_key.push_back(m_accounts[MINER_ACC_IDX].get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(m_accounts[MINER_ACC_IDX].get_keys().view_secret_key);
 
-  bool r = sign_extra_alias_entry(ai, m_accounts[ALICE_ACC_IDX].get_keys().m_account_address.m_spend_public_key, m_accounts[ALICE_ACC_IDX].get_keys().m_spend_secret_key);
+  bool r = sign_extra_alias_entry(ai, m_accounts[ALICE_ACC_IDX].get_keys().account_address.spend_public_key, m_accounts[ALICE_ACC_IDX].get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
 
   std::vector<test_event_entry> stub_events_vec;
