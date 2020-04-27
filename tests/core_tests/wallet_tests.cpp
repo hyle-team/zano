@@ -1434,7 +1434,7 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_0r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  // these attachments will be use across all the transactions in this test
+  // these attachments will be used across all the transactions in this test
   currency::tx_payer a_tx_payer = AUTO_VAL_INIT(a_tx_payer);
   a_tx_payer.acc_addr = miner_acc.get_keys().account_address;
   currency::tx_comment a_tx_comment = AUTO_VAL_INIT(a_tx_comment);
