@@ -1207,11 +1207,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
       for (auto& d : dsts)
       {
         for (auto& a : d.addr)
-        {
-          currency::tx_receiver txr = AUTO_VAL_INIT(txr);
-          txr.acc_addr = a;
-          extra.push_back(txr);
-        }
+          currency::create_and_add_tx_receiver_to_container_from_address(extra, a, w->get()->get_top_block_height(),  w->get()->get_core_runtime_config());
       }
     }
     w->get()->transfer(dsts, tp.mixin_count, unlock_time ? unlock_time + 1 : 0, fee, extra, attachments, res_tx);

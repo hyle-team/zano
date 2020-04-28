@@ -609,6 +609,25 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
+  template <typename container_t>
+  void create_and_add_tx_receiver_to_container_from_address(container_t& container, const account_public_address& addr, uint64_t top_block_height, const core_runtime_config& crc)
+  {
+    if (top_block_height > crc.hard_fork_02_starts_after_height)
+    {
+      // after hardfork 2
+      tx_receiver result = AUTO_VAL_INIT(result);
+      result.acc_addr = addr;
+      container.push_back(result);
+    }
+    else
+    {
+      // before hardfork 2
+      tx_receiver_old result = AUTO_VAL_INIT(result);
+      result.acc_addr = addr.to_old();
+      container.push_back(result);
+    }
+  }
+  //---------------------------------------------------------------
   //---------------------------------------------------------------
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r);
   //---------------------------------------------------------------
