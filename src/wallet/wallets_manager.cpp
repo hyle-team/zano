@@ -1200,9 +1200,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
     }
     if (tp.push_payer)
     {
-      currency::tx_payer txp = AUTO_VAL_INIT(txp);
-      txp.acc_addr = w->get()->get_account().get_keys().account_address;
-      extra.push_back(txp);
+      currency::create_and_add_tx_payer_to_container_from_address(extra, w->get()->get_account().get_keys().account_address,  w->get()->get_top_block_height(),  w->get()->get_core_runtime_config());
     }    
     if (!tp.hide_receiver)
     {
