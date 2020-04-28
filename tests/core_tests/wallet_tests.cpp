@@ -22,18 +22,6 @@ const std::string g_wallet_password = "dofatibmzibeziyekigo";
 const currency::account_base null_account = AUTO_VAL_INIT(null_account);
 
 
-struct wlt_lambda_on_transfer2_wrapper : public tools::i_wallet2_callback
-{
-  typedef std::function<bool(const tools::wallet_public::wallet_transfer_info&, uint64_t, uint64_t, uint64_t)> Func;
-  wlt_lambda_on_transfer2_wrapper(Func callback) : m_result(false), m_callback(callback) {}
-  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override
-  {
-    m_result = m_callback(wti, balance, unlocked_balance, total_mined);
-  }
-  bool m_result;
-  Func m_callback;
-};
-
 POD_MAKE_COMPARABLE(currency, tx_out);
 
 // Determines which output is real and actually spent in tx inputs, when there are fake outputs.
