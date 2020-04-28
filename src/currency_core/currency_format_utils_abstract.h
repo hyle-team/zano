@@ -122,7 +122,7 @@ namespace currency
       else if (item.type() == typeid(B))
       {
         found = true;
-        if (!cb(boost::get<A>(item)))
+        if (!cb(boost::get<B>(item)))
           break;
       }
     }
