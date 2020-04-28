@@ -1188,7 +1188,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
       if (tp.lock_time > CURRENCY_MAX_BLOCK_NUMBER)
         unlock_time = tp.lock_time;
       else
-        unlock_time = w->get()->get_blockchain_current_height() + tp.lock_time;
+        unlock_time = w->get()->get_blockchain_current_size() + tp.lock_time;
     }
       
     

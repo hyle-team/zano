@@ -39,7 +39,6 @@ namespace currency
     bool init(const boost::program_options::variables_map& vm);
     
     bool on_get_blocks_direct(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, connection_context& cntx);
-    bool on_get_blocks_fuzzy_direct(const COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::response& res, connection_context& cntx);
     
 
     bool on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx);

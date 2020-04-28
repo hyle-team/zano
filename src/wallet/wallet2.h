@@ -39,17 +39,13 @@
 #include "currency_core/bc_offers_serialization.h"
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
+#include "wallet_chain_shortener.h"
 
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 
 #define WALLET_DEFAULT_POS_MINT_PACKING_SIZE                          100
-
-#define WALLET_EVERYBLOCK_SIZE                                        10
-#define WALLET_EVERY_10_BLOCKS_SIZE                                   144
-#define WALLET_EVERY_100_BLOCKS_SIZE                                  144
-#define WALLET_EVERY_1000_BLOCKS_SIZE                                 144
 
 
 #undef LOG_DEFAULT_CHANNEL 
@@ -644,10 +640,10 @@ namespace tools
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
     inline uint64_t get_blockchain_current_size() const {
-      return m_local_bc_size;
+      return m_chain.get_blockchain_current_size();
     }
     
-    uint64_t get_top_block_height() const { return m_blockchain.empty() ? 0 : m_blockchain.size() - 1; }
+    uint64_t get_top_block_height() const { return m_chain.get_top_block_height(); }
 
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
@@ -687,12 +683,13 @@ namespace tools
       }
       else
       {
-        a & m_local_bc_size;
-        a & m_genesis;
-        a & m_last_10_blocks;
-        a & m_last_144_blocks_every_10;
-        a & m_last_144_blocks_every_100;
-        a & m_last_144_blocks_every_1000;
+        a & m_chain;
+//        a & m_local_bc_size;
+//         a & m_genesis;
+//         a & m_last_10_blocks;
+//         a & m_last_144_blocks_every_10;
+//         a & m_last_144_blocks_every_100;
+//         a & m_last_144_blocks_every_1000;
       }
 
 
@@ -825,7 +822,7 @@ private:
                              const std::vector<std::string>& recipients,
                              const std::vector<std::string>& recipients_aliases);
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
-      currency::COMMAND_RPC_GET_BLOCKS_FUZZY_DIRECT::response& blocks);
+      currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
     std::string get_alias_for_address(const std::string& addr);
     static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, currency::stake_kernel& kernel, uint64_t& coindays_weight, uint64_t timestamp);
     bool is_connected_to_net();
@@ -915,14 +912,14 @@ private:
     std::wstring m_pending_ki_file;
     std::string m_password;
     //std::vector<crypto::hash> m_blockchain;
-    crypto::hash m_genesis;
-    std::map<uint64_t, crypto::hash> m_last_10_blocks;
-    std::map<uint64_t, crypto::hash> m_last_144_blocks_every_10;   //1 day
-    std::map<uint64_t, crypto::hash> m_last_144_blocks_every_100;  //10 days
-    std::map<uint64_t, crypto::hash> m_last_144_blocks_every_1000; //100 days
+//     crypto::hash m_genesis;
+//     std::map<uint64_t, crypto::hash> m_last_10_blocks;
+//     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_10;   //1 day
+//     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_100;  //10 days
+//     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_1000; //100 days
     uint64_t m_minimum_height;
 
-    std::atomic<uint64_t> m_local_bc_size; //temporary workaround 
+    //std::atomic<uint64_t> m_local_bc_size; //temporary workaround 
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
     uint64_t m_pos_mint_packing_size;
@@ -949,6 +946,7 @@ private:
     uint64_t m_last_pow_block_h;
     currency::core_runtime_config m_core_runtime_config;
     escrow_contracts_container m_contracts;
+    wallet_chain_shortener m_chain;
     std::list<expiration_entry_info> m_money_expirations;
     //optimization for big wallets and batch tx
 
