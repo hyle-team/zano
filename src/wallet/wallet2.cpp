@@ -469,13 +469,13 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att)
 {
   PROFILE_FUNC("wallet2::prepare_wti_decrypted_attachments");
-  tx_payer tp = AUTO_VAL_INIT(tp);
-  wti.show_sender = get_type_in_variant_container(decrypted_att, tp);
 
   if (wti.is_income)
   {
-    if(wti.show_sender)
-      wti.remote_addresses.push_back(currency::get_account_address_as_str(tp.acc_addr));
+    account_public_address sender_address = AUTO_VAL_INIT(sender_address);
+    wti.show_sender = handle_2_alternative_types_in_variant_container<tx_payer, tx_payer_old>(decrypted_att, [&](const tx_payer& p) { sender_address = p.acc_addr; return false; } );
+    if (wti.show_sender)
+      wti.remote_addresses.push_back(currency::get_account_address_as_str(sender_address));
   }
   else
   {
