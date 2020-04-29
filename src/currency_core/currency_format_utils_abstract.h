@@ -107,6 +107,7 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
+  // callback should return true to continue iterating through the container
   template <typename A, typename B, typename container_t, typename callback_t>
   bool handle_2_alternative_types_in_variant_container(const container_t& container, callback_t& cb)
   {

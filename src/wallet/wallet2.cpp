@@ -473,22 +473,22 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
   if (wti.is_income)
   {
     account_public_address sender_address = AUTO_VAL_INIT(sender_address);
-    wti.show_sender = handle_2_alternative_types_in_variant_container<tx_payer, tx_payer_old>(decrypted_att, [&](const tx_payer& p) { sender_address = p.acc_addr; return false; } );
+    wti.show_sender = handle_2_alternative_types_in_variant_container<tx_payer, tx_payer_old>(decrypted_att, [&](const tx_payer& p) { sender_address = p.acc_addr; return false; /* <- continue? */ } );
     if (wti.show_sender)
       wti.remote_addresses.push_back(currency::get_account_address_as_str(sender_address));
   }
   else
   {
-    //TODO: actually recipients could be more then one, handle it in future
-    //tx_receiver tr = AUTO_VAL_INIT(tr);
-    //if (!wti.remote_addresses.size() && get_type_in_variant_container(decrypted_att, tr))
-    //  wti.remote_addresses.push_back(currency::get_account_address_as_str(tr.acc_addr));
-
-    account_public_address receiver_address = AUTO_VAL_INIT(receiver_address);
-    handle_2_alternative_types_in_variant_container<tx_receiver, tx_receiver_old>(decrypted_att, [&](const tx_payer& p) {
-      wti.remote_addresses.push_back(currency::get_account_address_as_str(p.acc_addr));
-      return true; // continue iterating through the container
-    });
+    if (wti.remote_addresses.empty())
+    {
+      account_public_address receiver_address = AUTO_VAL_INIT(receiver_address);
+      handle_2_alternative_types_in_variant_container<tx_receiver, tx_receiver_old>(decrypted_att, [&](const tx_receiver& p) {
+        std::string addr_str = currency::get_account_address_as_str(p.acc_addr);
+        wti.remote_addresses.push_back(addr_str);
+        LOG_PRINT_YELLOW("prepare_wti_decrypted_attachments, income=false, wti.amount = " << print_money_brief(wti.amount) << ", rem. addr = " << addr_str, LOG_LEVEL_0);
+        return true; // continue iterating through the container
+      });
+    }
   }
 
   currency::tx_comment cm;
