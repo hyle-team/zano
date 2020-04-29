@@ -54,9 +54,6 @@ bool hard_fork_2_tx_payer_in_wallet::generate(std::vector<test_event_entry>& eve
 
   DO_CALLBACK(events, "c1");
 
-  // REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
-
-
   return true;
 }
 
@@ -155,7 +152,147 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
 
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(3)), false, "");
 
+  return true;
+}
 
+//------------------------------------------------------------------------------
+
+hard_fork_2_tx_receiver_in_wallet::hard_fork_2_tx_receiver_in_wallet()
+  : hard_fork_2_base_test(23)
+  , m_alice_start_balance(0)
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_2_tx_receiver_in_wallet, c1);
+}
+
+bool hard_fork_2_tx_receiver_in_wallet::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure that wallet uses tx_receiver_old only before HF2 and tx_receiver after
+
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  generator.set_hardfork_height(1, m_hardfork_height);
+  generator.set_hardfork_height(2, m_hardfork_height);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  m_alice_start_balance = MK_TEST_COINS(111);
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, m_alice_start_balance, blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false, stub_bool = false;
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+
+  miner_wlt->refresh();
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, m_alice_start_balance), false, "");
+
+  // wallet RPC server
+  tools::wallet_rpc_server alice_wlt_rpc(*alice_wlt);
+  epee::json_rpc::error je;
+  tools::wallet_rpc_server::connection_context ctx;
+
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request req = AUTO_VAL_INIT(req);
+  tools::wallet_public::transfer_destination td1{ MK_TEST_COINS(1), m_accounts[MINER_ACC_IDX].get_public_address_str() };
+  tools::wallet_public::transfer_destination td2{ MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() };
+  req.destinations.push_back(td1);
+  req.destinations.push_back(td2);
+  req.fee = TESTS_DEFAULT_FEE;
+  req.hide_receiver = false; // just to emphasize, this is false be default
+
+  LOG_PRINT_L0("Miner's address: " << m_accounts[MINER_ACC_IDX].get_public_address_str());
+  LOG_PRINT_L0("Alice's address: " << m_accounts[ALICE_ACC_IDX].get_public_address_str());
+
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response res = AUTO_VAL_INIT(res);
+  
+  r = alice_wlt_rpc.on_transfer(req, res, je, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  crypto::hash tx_hash = null_hash;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(res.tx_hash, tx_hash), false, "");
+  
+  transaction tx = AUTO_VAL_INIT(tx);
+  CHECK_AND_ASSERT_MES(c.get_transaction(tx_hash, tx), false, "");
+
+  r = have_type_in_variant_container<tx_receiver_old>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_receiver_old is not found in extra");
+
+  r = !have_type_in_variant_container<tx_receiver>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_receiver is found in extra");
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
+    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+      CHECK_AND_ASSERT_MES(!wti.is_income, false, "wti.is_income is " << wti.is_income);
+      CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 2, false, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
+      CHECK_AND_ASSERT_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.front is incorrect");
+      CHECK_AND_ASSERT_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.back is incorrect");
+      return true;
+    }
+  ));
+  alice_wlt->callback(l);
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, m_alice_start_balance - MK_TEST_COINS(2) - TESTS_DEFAULT_FEE), false, "");
+
+  // mine blocks 23, 24, 25 to activate HF2
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  miner_wlt->refresh();
+  alice_wlt->refresh();
+
+  // check again
+  req.destinations.front().amount = MK_TEST_COINS(2);
+  req.destinations.back().amount = MK_TEST_COINS(2);
+  r = alice_wlt_rpc.on_transfer(req, res, je, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  tx_hash = null_hash;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(res.tx_hash, tx_hash), false, "");
+  CHECK_AND_ASSERT_MES(c.get_transaction(tx_hash, tx), false, "");
+
+  r = have_type_in_variant_container<tx_receiver>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_receiver is not found in extra");
+  r = !have_type_in_variant_container<tx_receiver_old>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_receiver_old is found in extra");
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l2(new wlt_lambda_on_transfer2_wrapper(
+    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+      CHECK_AND_ASSERT_MES(!wti.is_income, false, "wti.is_income is " << wti.is_income);
+      CHECK_AND_ASSERT_MES(wti.amount == MK_TEST_COINS(4), false, "incorrect wti.amount = " << print_money_brief(wti.amount));
+      CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 2, false, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
+      CHECK_AND_ASSERT_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.front is incorrect");
+      CHECK_AND_ASSERT_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.back is incorrect");
+      return true;
+    }
+  ));
+  alice_wlt->callback(l2);
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, m_alice_start_balance - MK_TEST_COINS(6) - TESTS_DEFAULT_FEE * 2), false, "");
 
   return true;
 }
