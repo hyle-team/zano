@@ -381,6 +381,31 @@ namespace currency
   };
 
 
+  struct extra_alias_entry_base_old
+  {
+    account_public_address_old m_address;
+    std::string m_text_comment;
+    std::vector<crypto::secret_key> m_view_key; // only one or zero elments expected (std::vector is using as memory efficient container for such a case)
+    std::vector<crypto::signature> m_sign;      // only one or zero elments expected (std::vector is using as memory efficient container for such a case)
+
+    BEGIN_SERIALIZE()
+      FIELD(m_address)
+      FIELD(m_text_comment)
+      FIELD(m_view_key)
+      FIELD(m_sign)
+    END_SERIALIZE()
+  };
+
+  struct extra_alias_entry_old : public extra_alias_entry_base_old
+  {
+    std::string m_alias;
+
+    BEGIN_SERIALIZE()
+      FIELD(m_alias)
+      FIELDS(*static_cast<extra_alias_entry_base_old*>(this))
+   END_SERIALIZE()
+  };
+
   struct extra_alias_entry_base
   {
     account_public_address m_address;
@@ -396,13 +421,13 @@ namespace currency
     END_SERIALIZE()
   };
 
-  struct extra_alias_entry: public extra_alias_entry_base
+  struct extra_alias_entry : public extra_alias_entry_base
   {
     std::string m_alias;
 
     BEGIN_SERIALIZE()
       FIELD(m_alias)
-      FIELDS(*static_cast<extra_alias_entry_base *>(this))
+      FIELDS(*static_cast<extra_alias_entry_base*>(this))
    END_SERIALIZE()
   };
 
@@ -701,7 +726,7 @@ SET_VARIANT_TAGS(currency::signed_parts, 17, "signed_outs");
 //extra_v definitions
 SET_VARIANT_TAGS(currency::extra_attachment_info, 18, "extra_attach_info");
 SET_VARIANT_TAGS(currency::extra_user_data, 19, "user_data");
-SET_VARIANT_TAGS(currency::extra_alias_entry, 20, "alias_entry");
+SET_VARIANT_TAGS(currency::extra_alias_entry_old, 20, "alias_entry");
 SET_VARIANT_TAGS(currency::extra_padding, 21, "extra_padding");
 SET_VARIANT_TAGS(crypto::public_key, 22, "pub_key");
 SET_VARIANT_TAGS(currency::etc_tx_uint16_t, 23, "etc_tx_uint16");
@@ -712,7 +737,16 @@ SET_VARIANT_TAGS(uint64_t, 26, "uint64_t");
 //etc
 SET_VARIANT_TAGS(currency::etc_tx_time, 27, "etc_tx_time");
 SET_VARIANT_TAGS(uint32_t, 28, "uint32_t");
-SET_VARIANT_TAGS(currency::tx_receiver, 29, "payer");
+SET_VARIANT_TAGS(currency::tx_receiver_old, 29, "payer"); // -- original
+//SET_VARIANT_TAGS(currency::tx_receiver_old, 29, "receiver");
 SET_VARIANT_TAGS(currency::etc_tx_details_unlock_time2, 30, "unlock_time2");
+
+SET_VARIANT_TAGS(currency::tx_payer, 31, "payer2");
+SET_VARIANT_TAGS(currency::tx_receiver, 32, "receiver2");
+
+// @#@ TODO @#@
+SET_VARIANT_TAGS(currency::extra_alias_entry, 33, "alias_entry2");
+
+
 
 #undef SET_VARIANT_TAGS
