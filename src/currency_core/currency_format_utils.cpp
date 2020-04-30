@@ -2511,12 +2511,24 @@ namespace currency
   //-----------------------------------------------------------------------
   std::string get_account_address_as_str(const account_public_address& addr)
   {
-    return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr));
+    if (addr.flags == 0)
+      return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr.to_old())); // classic Zano address
+
+    if (addr.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
+      return tools::base58::encode_addr(CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (auditable)
+    
+    return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (normal)
   }
   //-----------------------------------------------------------------------
   std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id)
   {
-    return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id);
+    if (addr.flags == 0)
+      return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr.to_old()) + payment_id); // classic integrated Zano address
+
+    if (addr.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
+      return tools::base58::encode_addr(CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id); // new format integrated Zano address (auditable)
+    
+    return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id); // new format integrated Zano address (normal)
   }
   //-----------------------------------------------------------------------
   bool get_account_address_from_str(account_public_address& addr, const std::string& str)
@@ -2527,7 +2539,7 @@ namespace currency
   //-----------------------------------------------------------------------
   bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str)
   {
-    static const size_t addr_blob_size = sizeof(account_public_address);
+    payment_id.clear();
     blobdata blob;
     uint64_t prefix;
     if (!tools::base58::decode_addr(str, prefix, blob))
@@ -2536,42 +2548,88 @@ namespace currency
       return false;
     }
 
-    if (blob.size() < addr_blob_size)
+    if (blob.size() < sizeof(account_public_address_old))
     {
-      LOG_PRINT_L1("Address " << str << " has invalid format: blob size is " << blob.size() << " which is less, than expected " << addr_blob_size);
+      LOG_PRINT_L1("Address " << str << " has invalid format: blob size is " << blob.size() << " which is less, than expected " << sizeof(account_public_address_old));
       return false;
     }
 
-    if (blob.size() > addr_blob_size + BC_PAYMENT_ID_SERVICE_SIZE_MAX)
+    if (blob.size() > sizeof(account_public_address) + BC_PAYMENT_ID_SERVICE_SIZE_MAX)
     {
-      LOG_PRINT_L1("Address " << str << " has invalid format: blob size is " << blob.size() << " which is more, than allowed " << addr_blob_size + BC_PAYMENT_ID_SERVICE_SIZE_MAX);
+      LOG_PRINT_L1("Address " << str << " has invalid format: blob size is " << blob.size() << " which is more, than allowed " << sizeof(account_public_address) + BC_PAYMENT_ID_SERVICE_SIZE_MAX);
       return false;
     }
+
+    bool parse_as_old_format = false;
 
     if (prefix == CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX)
     {
-      // nothing
+      // normal address
+      if (blob.size() == sizeof(account_public_address_old))
+      {
+        parse_as_old_format = true;
+      }
+      else if (blob.size() == sizeof(account_public_address))
+      {
+        parse_as_old_format = false;
+      }
+      else
+      {
+        LOG_PRINT_L1("Account public address cannot be parsed from \"" << str << "\", incorrect size");
+        return false;
+      }
+    }
+    else if (prefix == CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX)
+    {
+      // auditable, parse as new format
+        parse_as_old_format = false;
     }
     else if (prefix == CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX)
     {
-      payment_id = blob.substr(addr_blob_size);
-      blob = blob.substr(0, addr_blob_size);
+      payment_id = blob.substr(sizeof(account_public_address_old));
+      blob = blob.substr(0, sizeof(account_public_address_old));
+      parse_as_old_format = true;
+    }
+    else if (prefix == CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX || prefix == CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX)
+    {
+      payment_id = blob.substr(sizeof(account_public_address));
+      blob = blob.substr(0, sizeof(account_public_address));
+      parse_as_old_format = false;
     }
     else
     {
-      LOG_PRINT_L1("Address " << str << " has wrong prefix " << prefix << ", expected " << CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX << " or " << CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX);
+      LOG_PRINT_L1("Address " << str << " has wrong prefix " << prefix);
       return false;
     }
 
-    if (!::serialization::parse_binary(blob, addr))
+    if (parse_as_old_format)
     {
-      LOG_PRINT_L1("Account public address keys can't be parsed for address \"" << str << "\"");
+      account_public_address_old addr_old = AUTO_VAL_INIT(addr_old);
+      if (!::serialization::parse_binary(blob, addr_old))
+      {
+        LOG_PRINT_L1("Account public address (old) cannot be parsed from \"" << str << "\"");
+        return false;
+      }
+      addr = account_public_address::from_old(addr_old);
+    }
+    else
+    {
+      if (!::serialization::parse_binary(blob, addr))
+      {
+        LOG_PRINT_L1("Account public address cannot be parsed from \"" << str << "\"");
+        return false;
+      }
+    }
+
+    if (payment_id.size() > BC_PAYMENT_ID_SERVICE_SIZE_MAX)
+    {
+      LOG_PRINT_L1("Failed to parse address from \"" << str << "\": payment id size exceeded: " << payment_id.size());
       return false;
     }
 
     if (!crypto::check_key(addr.spend_public_key) || !crypto::check_key(addr.view_public_key))
     {
-      LOG_PRINT_L1("Failed to validate address keys for address \"" << str << "\"");
+      LOG_PRINT_L1("Failed to validate address keys for public address \"" << str << "\"");
       return false;
     }
 

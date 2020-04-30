@@ -29,7 +29,7 @@ namespace boost
     template <class Archive>
     inline void serialize(Archive &a, currency::account_public_address &x, const boost::serialization::version_type ver)
     {
-      a & x.version;
+      //a & x.version;
       a & x.flags;
       a & x.spend_public_key;
       a & x.view_public_key;

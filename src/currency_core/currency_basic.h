@@ -86,36 +86,26 @@ namespace currency
 #pragma pack(push, 1)
   struct account_public_address
   {
-    /*account_public_address()
-    {}
-
-    account_public_address(const account_public_address_old& rhs)
-      : version(ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER)
-      , flags(0)
-      , spend_public_key(rhs.spend_public_key)
-      , view_public_key(rhs.view_public_key)
-    {}*/
-
-    uint8_t version;
-    uint8_t flags;
     crypto::public_key spend_public_key;
     crypto::public_key view_public_key;
+    //uint8_t version;
+    uint8_t flags;
 
     DEFINE_SERIALIZATION_VERSION(ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER)
     BEGIN_SERIALIZE_OBJECT()
-      VERSION_ENTRY(version)
-      FIELD(flags)
       FIELD(spend_public_key)
       FIELD(view_public_key)
-      if (version > ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER)
-        return true; // backward compartibility
+      //VERSION_ENTRY(version)
+      FIELD(flags)
+      //if (version > ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER)
+      //  return true; // backward compartibility
     END_SERIALIZE()
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(version) // is it necessary?
-      KV_SERIALIZE(flags)
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_public_key)
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_public_key)
+      //KV_SERIALIZE(version) // is it necessary?
+      KV_SERIALIZE(flags)
     END_KV_SERIALIZE_MAP()
 
     static account_public_address from_old(const account_public_address_old& rhs)
