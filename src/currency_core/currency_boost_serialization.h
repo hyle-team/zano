@@ -157,19 +157,34 @@ namespace boost
       a & x.m_sign;
     }
 
-    
-      template <class Archive>
-      inline void serialize(Archive &a, currency::signed_parts &x, const boost::serialization::version_type ver)
-    {
-      a & x.n_outs;
-      a & x.n_extras;
-    }
-
     template <class Archive>
     inline void serialize(Archive &a, currency::extra_alias_entry &x, const boost::serialization::version_type ver)
     {
       a & x.m_alias;
       a & static_cast<currency::extra_alias_entry_base&>(x);
+    }
+
+    template <class Archive>
+    inline void serialize(Archive &a, currency::extra_alias_entry_base_old &x, const boost::serialization::version_type ver)
+    {
+      a & x.m_address;
+      a & x.m_text_comment;
+      a & x.m_view_key;
+      a & x.m_sign;
+    }
+
+    template <class Archive>
+    inline void serialize(Archive &a, currency::extra_alias_entry_old &x, const boost::serialization::version_type ver)
+    {
+      a & x.m_alias;
+      a & static_cast<currency::extra_alias_entry_base_old&>(x);
+    }
+
+    template <class Archive>
+    inline void serialize(Archive &a, currency::signed_parts &x, const boost::serialization::version_type ver)
+    {
+      a & x.n_outs;
+      a & x.n_extras;
     }
 
     template <class Archive>
