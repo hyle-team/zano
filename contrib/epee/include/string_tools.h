@@ -604,6 +604,14 @@ POP_GCC_WARNINGS
     return true;
   }
   //----------------------------------------------------------------------------
+  template<class t_pod_type>
+  t_pod_type hex_to_pod(const std::string& hex_str)
+  {
+    t_pod_type p = AUTO_VAL_INIT(p);
+    hex_to_pod(hex_str, p);
+    return p;
+  }
+  //----------------------------------------------------------------------------
 	inline std::string get_extension(const std::string& str)
 	{
 		std::string res;

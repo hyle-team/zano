@@ -1091,8 +1091,7 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
   {
     WLT_LOG_L3( "Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime());
   }
-  push_new_block_id(bl_id, height); //m_blockchain.push_back(bl_id);
-  m_local_bc_size = height + 1;
+  m_chain.push_new_block_id(bl_id, height); //m_blockchain.push_back(bl_id);
   m_last_bc_timestamp = b.timestamp;
   if (!is_pos_block(b))
     m_last_pow_block_h = height;
@@ -1178,7 +1177,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
     r = string_tools::parse_tpod_from_hex_string(gbd_res.blocks.back().id, new_genesis_id);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_blocks_details");
     reset_all();
-    m_genesis = new_genesis_id;
+    m_chain.set_genesis(new_genesis_id);
     WLT_LOG_MAGENTA("New genesis set for wallet: " << new_genesis_id, LOG_LEVEL_0);
     get_short_chain_history(req.block_ids);
     //req.block_ids.push_back(new_genesis_id);
@@ -1812,7 +1811,6 @@ void wallet2::detach_blockchain(uint64_t height)
   }
  
   size_t blocks_detached = detach_from_block_ids(height);
-  m_local_bc_size -= height+1;
 
   //rollback spends
   // do not clear spent flag in spent transfers as corresponding txs are most likely in the pool
@@ -4116,25 +4114,24 @@ void wallet2::process_genesis_if_needed(const currency::block& genesis)
   THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() > 1, error::wallet_internal_error, "Can't change wallet genesis block once the blockchain has been populated");
 
   crypto::hash genesis_hash = get_block_hash(genesis);
-  if (get_blockchain_current_size() == 1 && m_genesis != genesis_hash)
-      WLT_LOG_L0("Changing genesis block for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_genesis << " -> " << genesis_hash);
+  if (get_blockchain_current_size() == 1 && m_chain.get_genesis() != genesis_hash)
+      WLT_LOG_L0("Changing genesis block for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_chain.get_genesis() << " -> " << genesis_hash);
 
   //m_blockchain.clear();
 
   //m_blockchain.push_back(genesis_hash);
-  m_genesis = genesis_hash;
-  m_local_bc_size = 1;
+  m_chain.set_genesis(genesis_hash);
   m_last_bc_timestamp = genesis.timestamp;
 
   WLT_LOG_L2("Processing genesis block: " << genesis_hash);
   process_new_transaction(genesis.miner_tx, 0, genesis);
 }
-
+//----------------------------------------------------------------------------------------------------
 void wallet2::set_genesis(const crypto::hash& genesis_hash)
 {
   THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() != 1, error::wallet_internal_error, "Can't change wallet genesis hash once the blockchain has been populated");
-  WLT_LOG_L0("Changing genesis hash for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_genesis << " -> " << genesis_hash);
-  m_genesis = genesis_hash;
+  WLT_LOG_L0("Changing genesis hash for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_chain.get_genesis() << " -> " << genesis_hash);
+  m_chain.set_genesis(genesis_hash);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee /* = UINT64_MAX */)

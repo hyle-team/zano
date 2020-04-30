@@ -14,6 +14,8 @@
 #include <atomic>
 #include <map>
 
+#include "crypto/crypto.h"
+
 #include "include_base_utils.h"
 #include "crypto/crypto.h"
 
@@ -21,6 +23,7 @@
 class wallet_chain_shortener
 {
 public:
+  wallet_chain_shortener();
   void push_new_block_id(const crypto::hash& id, uint64_t height);
   uint64_t get_top_block_height() const;
   uint64_t get_blockchain_current_size() const;
@@ -29,20 +32,25 @@ public:
   void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed) const;
   void detach(uint64_t height);
   void clear();
+  void set_genesis(const crypto::hash& id);
+  const crypto::hash& get_genesis();
   template <class t_archive>
   inline void serialize(t_archive &a, const unsigned int ver)
   {
     a & m_local_bc_size;
     a & m_genesis;
-    a & m_last_10_blocks;
+    a & m_last_20_blocks;
     a & m_last_144_blocks_every_10;
     a & m_last_144_blocks_every_100;
     a & m_last_144_blocks_every_1000;
   }
+
+  //debug functions
+  
 private:
   std::atomic<uint64_t> m_local_bc_size; //temporary workaround 
   crypto::hash m_genesis;
-  std::map<uint64_t, crypto::hash> m_last_10_blocks;
+  std::map<uint64_t, crypto::hash> m_last_20_blocks;
   std::map<uint64_t, crypto::hash> m_last_144_blocks_every_10;   //1 day
   std::map<uint64_t, crypto::hash> m_last_144_blocks_every_100;  //10 days
   std::map<uint64_t, crypto::hash> m_last_144_blocks_every_1000; //100 days
