@@ -134,7 +134,7 @@ void wallet_chain_shortener::get_short_chain_history(std::list<crypto::hash>& id
 
   uint64_t current_back_offset = ids.size()+1;
   //self check
-  THROW_IF_FALSE_WALLET_INT_ERR_EX(current_back_offset == sz - i + 1, "Inernal error: current_back_offset{" << current_back_offset << "} == sz-i{" << sz << " - " << i << "} is not equal");
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(current_back_offset == sz - i + 1 || !count, "Inernal error: current_back_offset{" << current_back_offset << "} == sz-i{" << sz << " - " << i << "} is not equal");
 
   uint64_t current_offset_distance = 1;
   while (current_back_offset < sz)

@@ -25,6 +25,31 @@ TEST(wallet_chain_shortener, wallet_chain_shortener)
   {
     LOG_PRINT_L0("{" << *((uint64_t*)&id) << "}{" << counter - *((uint64_t*)&id) << "}" << ENDL);
   }
+
+
+  ws.detach(counter - 10000);
+  short_chain.clear();
+  ws.get_short_chain_history(short_chain);
+  for (auto& id : short_chain)
+  {
+    LOG_PRINT_L0("{" << *((uint64_t*)&id) << "}{" << counter - *((uint64_t*)&id) << "}" << ENDL);
+  }
+
+  for (counter = counter - 10000 + 1; counter != 1000000; counter++)
+  {
+    crypto::hash id_ = AUTO_VAL_INIT(id_);
+    *((uint64_t*)&id_) = counter;
+
+    ws.push_new_block_id(id_, counter);
+  }
+
+  short_chain.clear();
+  ws.get_short_chain_history(short_chain);
+  for (auto& id : short_chain)
+  {
+    LOG_PRINT_L0("{" << *((uint64_t*)&id) << "}{" << counter - *((uint64_t*)&id) << "}" << ENDL);
+  }
+
   LOG_PRINT_L0("Finished");
 
 }
