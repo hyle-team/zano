@@ -481,7 +481,6 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
   {
     if (wti.remote_addresses.empty())
     {
-      account_public_address receiver_address = AUTO_VAL_INIT(receiver_address);
       handle_2_alternative_types_in_variant_container<tx_receiver, tx_receiver_old>(decrypted_att, [&](const tx_receiver& p) {
         std::string addr_str = currency::get_account_address_as_str(p.acc_addr);
         wti.remote_addresses.push_back(addr_str);
