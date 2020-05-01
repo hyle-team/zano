@@ -19,18 +19,18 @@ TEST(wallet_chain_shortener, wallet_chain_shortener)
     ws.push_new_block_id(id_, counter);
   }
 
-  std::list<crypto::hash> short_chain;
-  ws.get_short_chain_history(short_chain);
-  for(auto& id: short_chain)
+  std::list<crypto::hash> short_chain1;
+  ws.get_short_chain_history(short_chain1);
+  for(auto& id: short_chain1)
   {
     LOG_PRINT_L0("{" << *((uint64_t*)&id) << "}{" << counter - *((uint64_t*)&id) << "}" << ENDL);
   }
 
 
   ws.detach(counter - 10000);
-  short_chain.clear();
-  ws.get_short_chain_history(short_chain);
-  for (auto& id : short_chain)
+  std::list<crypto::hash> short_chain2;
+  ws.get_short_chain_history(short_chain2);
+  for (auto& id : short_chain2)
   {
     LOG_PRINT_L0("{" << *((uint64_t*)&id) << "}{" << counter - *((uint64_t*)&id) << "}" << ENDL);
   }
@@ -43,14 +43,17 @@ TEST(wallet_chain_shortener, wallet_chain_shortener)
     ws.push_new_block_id(id_, counter);
   }
 
-  short_chain.clear();
-  ws.get_short_chain_history(short_chain);
-  for (auto& id : short_chain)
+  std::list<crypto::hash> short_chain3;
+  ws.get_short_chain_history(short_chain3);
+  for (auto& id : short_chain3)
   {
     LOG_PRINT_L0("{" << *((uint64_t*)&id) << "}{" << counter - *((uint64_t*)&id) << "}" << ENDL);
   }
 
   LOG_PRINT_L0("Finished");
+
+  ASSERT_EQ(short_chain3.size(), short_chain1.size());
+  ASSERT_EQ(short_chain3, short_chain1);
 
 }
 
