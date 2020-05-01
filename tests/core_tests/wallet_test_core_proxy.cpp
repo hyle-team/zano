@@ -93,6 +93,13 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::
 
 }
 
+bool wallet_test_core_proxy::call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(const currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& rqt, currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& rsp)
+{
+  rsp.h = 0;
+  rsp.status = CORE_RPC_STATUS_OK;
+  return true;
+}
+
 bool wallet_test_core_proxy::call_COMMAND_RPC_GET_INFO(const currency::COMMAND_RPC_GET_INFO::request& rqt, currency::COMMAND_RPC_GET_INFO::response& rsp)
 {
   rsp.synchronized_connections_count = 1;
