@@ -398,6 +398,15 @@ namespace currency
 
   struct extra_alias_entry_base
   {
+    extra_alias_entry_base() = default;
+    extra_alias_entry_base(const extra_alias_entry_base_old& old)
+      : m_address(account_public_address::from_old(old.m_address))
+      , m_text_comment(old.m_text_comment)
+      , m_view_key(old.m_view_key)
+      , m_sign(old.m_sign)
+    {
+    }
+
     account_public_address m_address;
     std::string m_text_comment;
     std::vector<crypto::secret_key> m_view_key; // only one or zero elments expected (std::vector is using as memory efficient container for such a case)
@@ -413,12 +422,29 @@ namespace currency
 
   struct extra_alias_entry : public extra_alias_entry_base
   {
+    extra_alias_entry() = default;
+    extra_alias_entry(const extra_alias_entry_old& old)
+      : extra_alias_entry_base(old)
+      , m_alias(old.m_alias)
+    {}
+    
     std::string m_alias;
 
     BEGIN_SERIALIZE()
       FIELD(m_alias)
       FIELDS(*static_cast<extra_alias_entry_base*>(this))
-   END_SERIALIZE()
+    END_SERIALIZE()
+
+    extra_alias_entry_old to_old() const
+    {
+      extra_alias_entry_old result = AUTO_VAL_INIT(result);
+      result.m_address = m_address.to_old();
+      result.m_text_comment = m_text_comment;
+      result.m_view_key = m_view_key;
+      result.m_sign = m_sign;
+      result.m_alias = m_alias;
+      return result;
+    }
   };
 
 
@@ -487,10 +513,10 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector20<
+  typedef boost::mpl::vector21<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
-    etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry, extra_user_data, extra_padding, etc_tx_uint16_t, etc_tx_details_unlock_time2
-    , tx_payer, tx_receiver//, extra_alias_entry
+    etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_uint16_t, etc_tx_details_unlock_time2,
+    tx_payer, tx_receiver, extra_alias_entry
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
