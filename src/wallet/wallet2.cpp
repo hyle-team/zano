@@ -1156,7 +1156,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response res = AUTO_VAL_INIT(res);
 
   req.minimum_height = get_wallet_minimum_height();
-  get_short_chain_history(req.block_ids);
+  m_chain.get_short_chain_history(req.block_ids);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
@@ -1179,7 +1179,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
     reset_all();
     m_chain.set_genesis(new_genesis_id);
     WLT_LOG_MAGENTA("New genesis set for wallet: " << new_genesis_id, LOG_LEVEL_0);
-    get_short_chain_history(req.block_ids);
+    m_chain.get_short_chain_history(req.block_ids);
     //req.block_ids.push_back(new_genesis_id);
     bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getblocks.bin");
@@ -1203,7 +1203,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res)
 {
   size_t current_index = res.start_height;
-
+  bool been_matched_block = false;
   if (res.start_height == 0 && get_blockchain_current_size() == 1 && !res.blocks.empty())
   {
     const currency::block& genesis = res.blocks.front().block_ptr->bl;
@@ -1211,10 +1211,10 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
     process_genesis_if_needed(genesis);
     res.blocks.pop_front();
     ++current_index;
+    been_matched_block = true;
   }
 
   uint64_t last_matched_index = 0;
-  bool been_matched_block = false;
   for(const auto& bl_entry: res.blocks)
   {
     if (stop)
@@ -1249,7 +1249,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
       bool block_found = false;
       bool block_matched = false;
       bool full_reset_needed = false;
-      check_if_block_matched(height, bl_id, block_found, block_matched, full_reset_needed);
+      m_chain.check_if_block_matched(height, bl_id, block_found, block_matched, full_reset_needed);
       if (block_found && block_matched)
       {
         //block matched in that number

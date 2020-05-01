@@ -70,7 +70,6 @@ using namespace currency;
 #endif
 #define BLOCK_POS_STRICT_SEQUENCE_LIMIT                               20
 
-#define BLOCKCHAIN_FIRST_BLOCK_TIMESTAMP                              1557342384
 
 
 DISABLE_VS_WARNINGS(4267)
@@ -111,7 +110,8 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_is_reorganize_in_process(false), 
                                                                  m_deinit_is_done(false), 
                                                                  m_cached_next_pow_difficulty(0), 
-                                                                 m_cached_next_pos_difficulty(0)
+                                                                 m_cached_next_pos_difficulty(0), 
+                                                                 m_blockchain_launch_timestamp(0)
 
 
 {
@@ -2941,16 +2941,31 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
   return true;
 }
 //------------------------------------------------------------------
+uint64_t blockchain_storage::get_blockchain_launch_timestamp()const
+{
+  if (m_blockchain_launch_timestamp)
+    return m_blockchain_launch_timestamp;
+
+  if (m_db_blocks.size() > 2)
+  {
+    m_blockchain_launch_timestamp = m_db_blocks[1]->bl.timestamp;
+  }
+  return m_blockchain_launch_timestamp;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h)const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 #define GET_EST_HEIGHT_FROM_DATE_THRESHOLD              1440
 
-  if (date < BLOCKCHAIN_FIRST_BLOCK_TIMESTAMP)
-    return false;
+  if (date < get_blockchain_launch_timestamp())
+  {
+    res_h = 0;
+    return true;
+  }
 
 
-  uint64_t calculated_estimated_height = (date - BLOCKCHAIN_FIRST_BLOCK_TIMESTAMP) / DIFFICULTY_TOTAL_TARGET;
+  uint64_t calculated_estimated_height = (date - get_blockchain_launch_timestamp()) / DIFFICULTY_TOTAL_TARGET;
   
   if (date > m_db_blocks[m_db_blocks.size() - 1]->bl.timestamp)
   {
@@ -2965,7 +2980,7 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
     else 
     {
       //likely impossible, but just in case
-      res_h = 1;
+      res_h = 0;
     }
       
   }
@@ -2987,7 +3002,13 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
     if (ts > high_boundary)
     {
       //we moved too much forward
-      calculated_estimated_height -= (ts - aim) / DIFFICULTY_TOTAL_TARGET;
+      uint64_t offset = (ts - aim) / DIFFICULTY_TOTAL_TARGET;
+      if (offset > calculated_estimated_height)
+      {
+        res_h = 0;
+        break;
+      }
+      calculated_estimated_height -= offset;
     }
     else if (ts < low_boundary)
     {

@@ -535,7 +535,7 @@ namespace currency
     mutable uint64_t m_current_fee_median_effective_index;
     bool m_is_reorganize_in_process;    
     mutable std::atomic<bool> m_deinit_is_done;
-
+    mutable uint64_t m_blockchain_launch_timestamp;
 
     bool init_tx_fee_median();
     bool update_tx_fee_median();
@@ -616,6 +616,7 @@ namespace currency
     void pop_block_from_per_block_increments(uint64_t height_);
     void calculate_local_gindex_lookup_table_for_height(uint64_t split_height, std::map<uint64_t, uint64_t>& increments) const;
     void do_erase_altblock(alt_chain_container::iterator it);
+    uint64_t get_blockchain_launch_timestamp()const;
 
 
 

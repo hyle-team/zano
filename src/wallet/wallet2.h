@@ -900,8 +900,8 @@ private:
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
     void push_new_block_id(const crypto::hash& id, uint64_t height);
     bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);
-    void get_short_chain_history(std::list<crypto::hash>& ids);
-    void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed);
+    //void get_short_chain_history(std::list<crypto::hash>& ids);
+    //void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed);
     uint64_t detach_from_block_ids(uint64_t height);
     uint64_t get_wallet_minimum_height();
 

@@ -12,7 +12,7 @@
 #define WALLET_EVERY_100_BLOCKS_SIZE                                  144
 #define WALLET_EVERY_1000_BLOCKS_SIZE                                 144
 
-void exception_handler(){}
+static void exception_handler(){}
 
 
 wallet_chain_shortener::wallet_chain_shortener(): m_genesis(currency::gdefault_genesis)
