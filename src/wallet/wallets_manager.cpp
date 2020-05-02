@@ -841,6 +841,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   try
   {
     w->generate(path, password);
+    w->set_minimum_height(m_last_daemon_height);
     owr.seed = w->get_account().get_restore_braindata();
   }
   catch (const tools::error::file_exists&)
@@ -1187,7 +1188,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
       if (tp.lock_time > CURRENCY_MAX_BLOCK_NUMBER)
         unlock_time = tp.lock_time;
       else
-        unlock_time = w->get()->get_blockchain_current_height() + tp.lock_time;
+        unlock_time = w->get()->get_blockchain_current_size() + tp.lock_time;
     }
       
     

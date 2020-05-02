@@ -272,7 +272,7 @@ namespace currency
     }
 
     blockchain_storage::blocks_direct_container bs;
-    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT))
+    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
     {
       res.status = CORE_RPC_STATUS_FAILED;
       return false;
@@ -288,7 +288,7 @@ namespace currency
     res.status = CORE_RPC_STATUS_OK;
     return true;
   }
-    //------------------------------------------------------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
@@ -1257,6 +1257,17 @@ namespace currency
     res.reward = get_alias_coast_from_fee(req.alias, std::max(default_tx_fee, current_median_fee));
 
     if (res.reward)
+      res.status = CORE_RPC_STATUS_OK;
+    else
+      res.status = CORE_RPC_STATUS_NOT_FOUND;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_est_height_from_date(const COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& req, COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& res, connection_context& cntx)
+  {
+    bool r = m_core.get_blockchain_storage().get_est_height_from_date(req.timestamp, res.h);
+
+    if (r)
       res.status = CORE_RPC_STATUS_OK;
     else
       res.status = CORE_RPC_STATUS_NOT_FOUND;
