@@ -52,6 +52,12 @@ const crypto::hash& wallet_chain_shortener::get_genesis()
 //----------------------------------------------------------------------------------------------------
 void wallet_chain_shortener::push_new_block_id(const crypto::hash& id, uint64_t height)
 {
+  if (height == 0)
+  {
+    m_genesis = id;
+    m_local_bc_size = 1;
+    return;
+  }
 
   //primary 10
   //self check
@@ -195,6 +201,25 @@ bool wallet_chain_shortener::lookup_item_around(uint64_t i, std::pair<uint64_t, 
 //----------------------------------------------------------------------------------------------------
 void wallet_chain_shortener::check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed)const
 {
+  if (i == 0)
+  {
+    //check genesis
+    if (m_local_bc_size > 0)
+    {
+      block_found = true;
+      block_matched = id == m_genesis;
+      if (!block_matched) {
+        full_reset_needed = true;
+      }
+    }
+    else
+    {
+      block_found = false;
+      block_matched = false;
+      full_reset_needed = true;
+    }
+    return;
+  }
   if (!m_last_20_blocks.empty() && i > m_last_20_blocks.begin()->first)
   {
     //must be in short sequence (m_last_20_blocks)
@@ -221,7 +246,7 @@ void wallet_chain_shortener::check_if_block_matched(uint64_t i, const crypto::ha
     bool r = lookup_item_around(i, result);
     if (!r)
     {
-      LOG_PRINT_L0("Wallet is getting fully resynced due to unmatched block " << id << " at " << i);
+      LOG_PRINT_L0("Wallet is getting fully resynced due to lookup_item_around failed at " << i);
       block_matched = block_found = false;
       full_reset_needed = true;
       return;
@@ -251,17 +276,17 @@ void wallet_chain_shortener::check_if_block_matched(uint64_t i, const crypto::ha
 //----------------------------------------------------------------------------------------------------
 void clean_map_from_items_above(std::map<uint64_t, crypto::hash>& container, uint64_t height)
 {
-  while (container.size() && (--container.end())->first > height)
+  while (container.size() && (--container.end())->first >= height)
   {
     container.erase(--container.end());
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet_chain_shortener::detach(uint64_t height)
+void wallet_chain_shortener::detach(uint64_t including_height)
 {
-  clean_map_from_items_above(m_last_20_blocks, height);
-  clean_map_from_items_above(m_last_144_blocks_every_10, height);
-  clean_map_from_items_above(m_last_144_blocks_every_100, height);
-  clean_map_from_items_above(m_last_144_blocks_every_1000, height);
-  m_local_bc_size = height + 1;
+  clean_map_from_items_above(m_last_20_blocks, including_height);
+  clean_map_from_items_above(m_last_144_blocks_every_10, including_height);
+  clean_map_from_items_above(m_last_144_blocks_every_100, including_height);
+  clean_map_from_items_above(m_last_144_blocks_every_1000, including_height);
+  m_local_bc_size = including_height;
 }

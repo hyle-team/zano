@@ -1263,6 +1263,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
         if (full_reset_needed)
         {
           last_matched_index = 0;
+          been_matched_block = true;
         }
         else
         {
@@ -1271,7 +1272,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
         }
         //TODO: take into account date of wallet creation
         //reorganize
-        detach_blockchain(last_matched_index);
+        detach_blockchain(last_matched_index+1);
         process_new_blockchain_entry(bl, bl_entry, bl_id, height);
         ++blocks_added;
       }
@@ -1777,23 +1778,23 @@ bool wallet2::refresh(size_t & blocks_fetched, bool& received_money, bool& ok, s
 }
 
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::detach_from_block_ids(uint64_t height)
+uint64_t wallet2::detach_from_block_ids(uint64_t including_height)
 {
   //calculate number of erased blocks
-  uint64_t blocks_detached = (get_blockchain_current_size() -1 ) - height;
+  uint64_t blocks_detached = get_blockchain_current_size() - including_height;
   //id at height should be kept, the rest - erased
-  m_chain.detach(height);
+  m_chain.detach(including_height);
   return blocks_detached;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::detach_blockchain(uint64_t height)
+void wallet2::detach_blockchain(uint64_t including_height)
 {
-  WLT_LOG_L0("Detaching blockchain on height " << height);
+  WLT_LOG_L0("Detaching blockchain on height " << including_height);
   size_t transfers_detached = 0;
 
   // rollback incoming transfers from detaching subchain
   {
-    auto it = std::find_if(m_transfers.begin(), m_transfers.end(), [&](const transfer_details& td){return td.m_ptx_wallet_info->m_block_height >= height; });
+    auto it = std::find_if(m_transfers.begin(), m_transfers.end(), [&](const transfer_details& td){return td.m_ptx_wallet_info->m_block_height >= including_height; });
     if (it != m_transfers.end())
     {
       size_t i_start = it - m_transfers.begin();
@@ -1802,7 +1803,7 @@ void wallet2::detach_blockchain(uint64_t height)
       {
         auto it_ki = m_key_images.find(m_transfers[i].m_key_image);
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= height, "transfer #" << i << " block height is less than " << height);
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
         m_key_images.erase(it_ki);
         ++transfers_detached;
       }
@@ -1810,7 +1811,7 @@ void wallet2::detach_blockchain(uint64_t height)
     }
   }
  
-  size_t blocks_detached = detach_from_block_ids(height);
+  size_t blocks_detached = detach_from_block_ids(including_height);
 
   //rollback spends
   // do not clear spent flag in spent transfers as corresponding txs are most likely in the pool
@@ -1818,7 +1819,7 @@ void wallet2::detach_blockchain(uint64_t height)
   for (size_t i = 0, sz = m_transfers.size(); i < sz; ++i)
   {
     auto& tr = m_transfers[i];
-    if (tr.m_spent_height >= height)
+    if (tr.m_spent_height >= including_height)
     {
       WLT_LOG_BLUE("Transfer [" << i << "] spent height: " << tr.m_spent_height << " -> 0, reason: detaching blockchain", LOG_LEVEL_1);
       tr.m_spent_height = 0;
@@ -1829,7 +1830,7 @@ void wallet2::detach_blockchain(uint64_t height)
   auto tr_hist_it = m_transfer_history.rend();
   for (auto it = m_transfer_history.rbegin(); it != m_transfer_history.rend(); it++)
   {
-    if (it->height < height)
+    if (it->height < including_height)
       break;
     tr_hist_it = it; // note that tr_hist_it->height >= height
   }
@@ -1859,13 +1860,13 @@ void wallet2::detach_blockchain(uint64_t height)
   //rollback payments
   for (auto it = m_payments.begin(); it != m_payments.end(); )
   {
-    if(height <= it->second.m_block_height)
+    if(including_height <= it->second.m_block_height)
       it = m_payments.erase(it);
     else
       ++it;
   }
 
-  WLT_LOG_L0("Detached blockchain on height " << height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached);
+  WLT_LOG_L0("Detached blockchain on height " << including_height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::deinit()

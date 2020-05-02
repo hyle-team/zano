@@ -30,7 +30,7 @@ public:
   void get_short_chain_history(std::list<crypto::hash>& ids)const;
   bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result)const;
   void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed) const;
-  void detach(uint64_t height);
+  void detach(uint64_t including_height);
   void clear();
   void set_genesis(const crypto::hash& id);
   const crypto::hash& get_genesis();

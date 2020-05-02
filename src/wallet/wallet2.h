@@ -785,7 +785,7 @@ private:
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b);
-    void detach_blockchain(uint64_t height);
+    void detach_blockchain(uint64_t including_height);
     bool extract_offers_from_transfer_entry(size_t i, std::unordered_map<crypto::hash, bc_services::offer_details_ex>& offers_local);
     bool select_my_offers(std::list<bc_services::offer_details_ex>& offers);
     bool clear();
