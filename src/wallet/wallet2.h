@@ -449,7 +449,7 @@ namespace tools
       END_SERIALIZE()
     };
     void assign_account(const currency::account_base& acc);
-    void generate(const std::wstring& path, const std::string& password);
+    void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
     void restore(const std::wstring& path, const std::string& pass, const std::string& restore_key);
     void load(const std::wstring& path, const std::string& password);
     void store();

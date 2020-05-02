@@ -12,7 +12,8 @@
 
 #define BRAINWALLET_DEFAULT_SEED_SIZE 32 
 #define ACCOUNT_RESTORE_DATA_SIZE     BRAINWALLET_DEFAULT_SEED_SIZE    
-#define BRAINWALLET_DEFAULT_WORDS_COUNT 25
+#define SEED_PHRASE_V1_WORDS_COUNT 25
+#define SEED_PHRASE_V2_WORDS_COUNT 26
 
 
 
@@ -47,15 +48,13 @@ namespace currency
   {
   public:
     account_base();
-    void generate();
+    void generate(bool auditable = false);
     const account_keys& get_keys() const;
     const account_public_address& get_public_address() const { return m_keys.account_address; };
     std::string get_public_address_str() const;
-    std::string get_restore_data() const;
+    
     std::string get_restore_braindata() const;
-
-    bool restore_keys(const std::string& restore_data);
-    bool restore_keys_from_braindata(const std::string& restore_data);
+    bool restore_keys_from_braindata(const std::string& seed_phrase);
 
     uint64_t get_createtime() const { return m_creation_timestamp; }
     void set_createtime(uint64_t val) { m_creation_timestamp = val; }
@@ -70,20 +69,23 @@ namespace currency
     {
       a & m_keys;
       a & m_creation_timestamp;
-      a & m_seed;
+      a & m_keys_seed_binary;
     }
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_keys)
       KV_SERIALIZE(m_creation_timestamp)
-      KV_SERIALIZE(m_seed)
+      KV_SERIALIZE(m_keys_seed_binary)
     END_KV_SERIALIZE_MAP()
 
   private:
     void set_null();
+    bool restore_keys(const std::vector<unsigned char>& keys_seed_binary);
+
     account_keys m_keys;
     uint64_t m_creation_timestamp;
-    std::string m_seed;
+
+    std::vector<unsigned char> m_keys_seed_binary;
   };
 
 

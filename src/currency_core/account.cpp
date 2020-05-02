@@ -17,15 +17,10 @@
 
 using namespace std;
 
-DISABLE_VS_WARNINGS(4244 4345)
-
-
+//DISABLE_VS_WARNINGS(4244 4345)
 
 namespace currency
 {
-
-
-
   //-----------------------------------------------------------------
   account_base::account_base()
   {
@@ -37,18 +32,22 @@ namespace currency
     // fill sensitive data with random bytes
     crypto::generate_random_bytes(sizeof m_keys.spend_secret_key, &m_keys.spend_secret_key);
     crypto::generate_random_bytes(sizeof m_keys.view_secret_key, &m_keys.view_secret_key);
-    crypto::generate_random_bytes(m_seed.size(), &m_seed[0]);
+    if (m_keys_seed_binary.size())
+      crypto::generate_random_bytes(m_keys_seed_binary.size(), &m_keys_seed_binary[0]);
     
     // clear
     m_keys = account_keys();
     m_creation_timestamp = 0;
-    m_seed.clear();
+    m_keys_seed_binary.clear();
   }
   //-----------------------------------------------------------------
-  void account_base::generate()
+  void account_base::generate(bool auditable /* = false */)
   {   
-    generate_brain_keys(m_keys.account_address.spend_public_key, m_keys.spend_secret_key, m_seed, BRAINWALLET_DEFAULT_SEED_SIZE);
-    dependent_key(m_keys.spend_secret_key, m_keys.view_secret_key);
+    if (auditable)
+      m_keys.account_address.flags = ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
+
+    crypto::generate_seed_keys(m_keys.account_address.spend_public_key, m_keys.spend_secret_key, m_keys_seed_binary, BRAINWALLET_DEFAULT_SEED_SIZE);
+    crypto::dependent_key(m_keys.spend_secret_key, m_keys.view_secret_key);
     if (!crypto::secret_key_to_public_key(m_keys.view_secret_key, m_keys.account_address.view_public_key))
       throw std::runtime_error("Failed to create public view key");
 
@@ -61,65 +60,108 @@ namespace currency
     return m_keys;
   }
   //-----------------------------------------------------------------
-  std::string account_base::get_restore_data() const
-  {
-    return m_seed;
-  }
-  //-----------------------------------------------------------------
-
   std::string account_base::get_restore_braindata() const 
   {
-    std::string restore_buff = get_restore_data();
-    if (restore_buff.empty())
+    if (m_keys_seed_binary.empty())
       return "";
-    std::vector<unsigned char> v;
-    v.assign((unsigned char*)restore_buff.data(), (unsigned char*)restore_buff.data() + restore_buff.size());
-    std::string seed_brain_data = tools::mnemonic_encoding::binary2text(v);
+    std::string keys_seed_text = tools::mnemonic_encoding::binary2text(m_keys_seed_binary);
     std::string timestamp_word = currency::get_word_from_timstamp(m_creation_timestamp);
-    seed_brain_data = seed_brain_data + timestamp_word;
-    return seed_brain_data;
+
+    // floor creation time to WALLET_BRAIN_DATE_QUANTUM to make checksum calculation stable
+    uint64_t creation_timestamp_rounded = get_timstamp_from_word(timestamp_word);
+
+    constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
+    crypto::hash h = crypto::cn_fast_hash(m_keys_seed_binary.data(), m_keys_seed_binary.size());
+    *reinterpret_cast<uint64_t*>(&h) = creation_timestamp_rounded;
+    h = crypto::cn_fast_hash(&h, sizeof h);
+    uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
+    uint16_t checksum = h_64 % (checksum_max + 1);
+    
+    uint8_t auditable_flag = 0;
+    if (m_keys.account_address.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
+      auditable_flag = 1;
+
+    uint64_t auditable_flag_and_checksum = (auditable_flag & 1) | (checksum << 1);
+    std::string auditable_flag_and_checksum_word = tools::mnemonic_encoding::word_by_num(auditable_flag_and_checksum);
+
+    return keys_seed_text + " " + timestamp_word + " " + auditable_flag_and_checksum_word;
   }
   //-----------------------------------------------------------------
-  bool account_base::restore_keys(const std::string& restore_data)
+  bool account_base::restore_keys(const std::vector<unsigned char>& keys_seed_binary)
   {
-    //CHECK_AND_ASSERT_MES(restore_data.size() == ACCOUNT_RESTORE_DATA_SIZE, false, "wrong restore data size");
-    if (restore_data.size() == BRAINWALLET_DEFAULT_SEED_SIZE)
-    {
-      crypto::keys_from_default((unsigned char*)restore_data.data(), m_keys.account_address.spend_public_key, m_keys.spend_secret_key, BRAINWALLET_DEFAULT_SEED_SIZE);
-    }
-    else 
-    {
-      LOG_ERROR("wrong restore data size=" << restore_data.size());
-      return false;
-    }
-    m_seed = restore_data;
+    CHECK_AND_ASSERT_MES(keys_seed_binary.size() == BRAINWALLET_DEFAULT_SEED_SIZE, false, "wrong restore data size: " << keys_seed_binary.size());
+    crypto::keys_from_default(keys_seed_binary.data(), m_keys.account_address.spend_public_key, m_keys.spend_secret_key, keys_seed_binary.size());
     crypto::dependent_key(m_keys.spend_secret_key, m_keys.view_secret_key);
     bool r = crypto::secret_key_to_public_key(m_keys.view_secret_key, m_keys.account_address.view_public_key);
     CHECK_AND_ASSERT_MES(r, false, "failed to secret_key_to_public_key for view key");
-    set_createtime(0);
     return true;
   }
   //-----------------------------------------------------------------
-  bool account_base::restore_keys_from_braindata(const std::string& restore_data_)
+  bool account_base::restore_keys_from_braindata(const std::string& seed_phrase)
   {
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
-    boost::split(words, restore_data_, boost::is_space());
-    CHECK_AND_ASSERT_MES(words.size() == BRAINWALLET_DEFAULT_WORDS_COUNT, false, "Words count missmatch: " << words.size());
-
-    std::string timestamp_word = words.back();
-    words.erase(--words.end());
-
-    std::string restore_data_local = boost::algorithm::join(words, " ");
+    boost::split(words, seed_phrase, boost::is_space());
     
-    std::vector<unsigned char> bin = tools::mnemonic_encoding::text2binary(restore_data_local);
-    if (!bin.size())
+    std::string keys_seed_text, timestamp_word, auditable_flag_and_checksum_word;
+    if (words.size() == SEED_PHRASE_V1_WORDS_COUNT)
+    {
+      // 24 seed words + one timestamp word = 25 total
+      timestamp_word = words.back();
+      words.erase(--words.end());
+      keys_seed_text = boost::algorithm::join(words, " ");
+    }
+    else if (words.size() == SEED_PHRASE_V2_WORDS_COUNT)
+    {
+      // 24 seed words + one timestamp word + one flags & checksum = 26 total
+      auditable_flag_and_checksum_word = words.back();
+      words.erase(--words.end());
+      timestamp_word = words.back();
+      words.erase(--words.end());
+      keys_seed_text = boost::algorithm::join(words, " ");
+    }
+    else
+    {
+      LOG_ERROR("Invalid seed words count: " << words.size());
       return false;
+    }
+    
+    uint64_t auditable_flag_and_checksum = 0;
+    try
+    {
+      auditable_flag_and_checksum = tools::mnemonic_encoding::num_by_word(auditable_flag_and_checksum_word);
+    }
+    catch(...)
+    {
+      LOG_ERROR("cannot convert seed word: " << auditable_flag_and_checksum_word);
+      return false;
+    }
 
-    std::string restore_buff((const char*)&bin[0], bin.size());
-    bool r = restore_keys(restore_buff);
-    CHECK_AND_ASSERT_MES(r, false, "restore_keys failed");
+    bool auditable_flag = (auditable_flag_and_checksum & 1) != 0; // auditable flag is the lower 1 bit
+    uint16_t checksum = auditable_flag_and_checksum >> 1; // checksum -- everything else
+    constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
+
+    std::vector<unsigned char> keys_seed_binary = tools::mnemonic_encoding::text2binary(keys_seed_text);
+    CHECK_AND_ASSERT_MES(keys_seed_binary.size(), false, "text2binary failed to convert the given text"); // don't prints event incorrect seed into the log for security
+
     m_creation_timestamp = get_timstamp_from_word(timestamp_word);
+
+    // check the checksum
+    crypto::hash h = crypto::cn_fast_hash(keys_seed_binary.data(), keys_seed_binary.size());
+    *reinterpret_cast<uint64_t*>(&h) = m_creation_timestamp;
+    h = crypto::cn_fast_hash(&h, sizeof h);
+    uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
+    uint16_t checksum_calculated = h_64 % (checksum_max + 1);
+    CHECK_AND_ASSERT_MES(checksum == checksum_calculated, false, "seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
+
+    bool r = restore_keys(keys_seed_binary);
+    CHECK_AND_ASSERT_MES(r, false, "restore_keys failed");
+
+    m_keys_seed_binary = keys_seed_binary;
+
+    if (auditable_flag)
+      m_keys.account_address.flags |= ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
+
     return true;
   }
   //-----------------------------------------------------------------

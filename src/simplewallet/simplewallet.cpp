@@ -40,6 +40,7 @@ namespace
 {
   const command_line::arg_descriptor<std::string> arg_wallet_file = {"wallet-file", "Use wallet <arg>", ""};
   const command_line::arg_descriptor<std::string> arg_generate_new_wallet = {"generate-new-wallet", "Generate new wallet and save it to <arg> or <address>.wallet by default", ""};
+  const command_line::arg_descriptor<std::string> arg_generate_new_auditable_wallet = {"generate-new-auditable-wallet", "Generate new auditable wallet and store it to <arg>", ""};
   const command_line::arg_descriptor<std::string> arg_daemon_address = {"daemon-address", "Use daemon instance at <host>:<port>", ""};
   const command_line::arg_descriptor<std::string> arg_daemon_host = {"daemon-host", "Use daemon instance at host <arg> instead of localhost", ""};
   const command_line::arg_descriptor<std::string> arg_password = {"password", "Wallet password", "", true};
@@ -270,9 +271,9 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     return false;
   }
 
-  if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty())
+  if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty() && m_generate_new_aw.empty())
   {
-    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet or --restore-wallet";
+    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet, --generate-new-auditable-wallet or --restore-wallet";
     return false;
   }
 
@@ -311,9 +312,13 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 
   if (!m_generate_new.empty())
   {
-    bool r = new_wallet(m_generate_new, pwd_container.password());
-    CHECK_AND_ASSERT_MES(r, false, "account creation failed");
-    
+    bool r = new_wallet(m_generate_new, pwd_container.password(), false);
+    CHECK_AND_ASSERT_MES(r, false, "failed to create new wallet");
+  }
+  else if (!m_generate_new_aw.empty())
+  {
+    bool r = new_wallet(m_generate_new_aw, pwd_container.password(), true);
+    CHECK_AND_ASSERT_MES(r, false, "failed to create new auditable wallet");
   }
   else if (!m_restore_wallet.empty())
   {
@@ -354,6 +359,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
 {
   m_wallet_file     = command_line::get_arg(vm, arg_wallet_file);
   m_generate_new    = command_line::get_arg(vm, arg_generate_new_wallet);
+  m_generate_new_aw = command_line::get_arg(vm, arg_generate_new_auditable_wallet);
   m_daemon_address  = command_line::get_arg(vm, arg_daemon_address);
   m_daemon_host     = command_line::get_arg(vm, arg_daemon_host);
   m_daemon_port     = command_line::get_arg(vm, arg_daemon_port);
@@ -374,7 +380,7 @@ bool simple_wallet::try_connect_to_daemon()
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::new_wallet(const string &wallet_file, const std::string& password)
+bool simple_wallet::new_wallet(const string &wallet_file, const std::string& password, bool create_auditable_wallet)
 {
   m_wallet_file = wallet_file;
 
@@ -383,10 +389,10 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   m_wallet->set_do_rise_transfer(false);
   try
   {
-    m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
-    message_writer(epee::log_space::console_color_white, true) << "Generated new wallet: " << m_wallet->get_account().get_public_address_str();
+    m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, create_auditable_wallet);
+    message_writer(epee::log_space::console_color_white, true) << "Generated new " << (create_auditable_wallet ? "AUDITABLE" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
     std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
-    if(m_do_not_set_date)
+    if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
 
     if (m_print_brain_wallet)
@@ -407,11 +413,6 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   success_msg_writer() <<
     "**********************************************************************\n" <<
     "Your wallet has been generated.\n" <<
-    "To start synchronizing with the daemon use \"refresh\" command.\n" <<
-    "Use \"help\" command to see the list of available commands.\n" <<
-    "Always use \"exit\" command when closing simplewallet to save\n" <<
-    "current session's state. Otherwise, you will possibly need to synchronize \n" <<
-    "your wallet again. Your wallet key is NOT under risk anyway.\n" <<
     "**********************************************************************";
   return true;
 }
@@ -433,7 +434,7 @@ bool simple_wallet::restore_wallet(const std::string &wallet_file, const std::st
   }
   catch (const std::exception& e)
   {
-    fail_msg_writer() << "failed to restore wallet: " << e.what();
+    fail_msg_writer() << "failed to restore wallet, check your seed phrase!" << ENDL << e.what();
     return false;
   }
 
@@ -1322,7 +1323,7 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 bool simple_wallet::show_seed(const std::vector<std::string> &args)
 {
   success_msg_writer() << "Here's your wallet's seed phrase. Write it down and keep in a safe place.";
-  success_msg_writer(true) << "Anyone who knows the following 25 words can access your wallet:";
+  success_msg_writer(true) << "Anyone who knows the following 26 words can access your wallet:";
   std::cout << m_wallet->get_account().get_restore_braindata() << std::endl << std::flush;
   return true;
 }
@@ -1693,6 +1694,8 @@ int main(int argc, char* argv[])
   const char* const* argv = argv_vec.data();
 #endif
 
+  epee::debug::get_set_enable_assert(true, false);
+
   string_tools::set_module_name_and_folder(argv[0]);
 
   po::options_description desc_general("General options");
@@ -1702,6 +1705,7 @@ int main(int argc, char* argv[])
   po::options_description desc_params("Wallet options");
   command_line::add_arg(desc_params, arg_wallet_file);
   command_line::add_arg(desc_params, arg_generate_new_wallet);
+  command_line::add_arg(desc_params, arg_generate_new_auditable_wallet);
   command_line::add_arg(desc_params, arg_password);
   command_line::add_arg(desc_params, arg_daemon_address);
   command_line::add_arg(desc_params, arg_daemon_host);
@@ -1848,7 +1852,7 @@ int main(int argc, char* argv[])
       {
         LOG_PRINT_L0("Initializing wallet...");
         wal.init(daemon_address);
-        if (command_line::get_arg(vm, arg_generate_new_wallet).size())
+        if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
           return EXIT_FAILURE;
 
         if (!offline_mode)
@@ -1903,7 +1907,7 @@ int main(int argc, char* argv[])
     sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
     CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet");
-    if (command_line::get_arg(vm, arg_generate_new_wallet).size())
+    if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
       return EXIT_FAILURE;
 
 

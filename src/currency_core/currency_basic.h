@@ -426,7 +426,8 @@ namespace currency
     extra_alias_entry(const extra_alias_entry_old& old)
       : extra_alias_entry_base(old)
       , m_alias(old.m_alias)
-    {}
+    {
+    }
     
     std::string m_alias;
 

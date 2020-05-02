@@ -44,7 +44,7 @@ namespace currency
 
     bool run_console_handler();
 
-    bool new_wallet(const std::string &wallet_file, const std::string& password);
+    bool new_wallet(const std::string &wallet_file, const std::string& password, bool create_auditable_wallet);
     bool open_wallet(const std::string &wallet_file, const std::string& password);
     bool restore_wallet(const std::string &wallet_file, const std::string &restore_seed, const std::string& password);
     bool close_wallet();
@@ -153,6 +153,7 @@ namespace currency
   private:
     std::string m_wallet_file;
     std::string m_generate_new;
+    std::string m_generate_new_aw;
     std::string m_import_path;
 
     std::string m_daemon_address;

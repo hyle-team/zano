@@ -1997,7 +1997,7 @@ void wallet2::assign_account(const currency::account_base& acc)
   init_log_prefix();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::generate(const std::wstring& path, const std::string& pass)
+void wallet2::generate(const std::wstring& path, const std::string& pass, bool auditable_wallet)
 {
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass), "new wallet generation failed: password contains forbidden characters")
   clear();
@@ -2006,7 +2006,7 @@ void wallet2::generate(const std::wstring& path, const std::string& pass)
   check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
 
   m_password = pass;
-  m_account.generate();
+  m_account.generate(auditable_wallet);
   init_log_prefix();
   boost::system::error_code ignored_ec;
   THROW_IF_TRUE_WALLET_EX(boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));

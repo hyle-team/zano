@@ -840,7 +840,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
 
   try
   {
-    w->generate(path, password);
+    w->generate(path, password, false);
     owr.seed = w->get_account().get_restore_braindata();
   }
   catch (const tools::error::file_exists&)

@@ -1251,7 +1251,7 @@ namespace currency
   {
     uint64_t date_offset = timestamp > WALLET_BRAIN_DATE_OFFSET ? timestamp - WALLET_BRAIN_DATE_OFFSET : 0;
     uint64_t weeks_count = date_offset / WALLET_BRAIN_DATE_QUANTUM;
-    CHECK_AND_ASSERT_THROW_MES(weeks_count < std::numeric_limits<uint32_t>::max(), "internal error: unable to converto to uint32, val = " << weeks_count);
+    CHECK_AND_ASSERT_THROW_MES(weeks_count < std::numeric_limits<uint32_t>::max(), "internal error: unable to convert to uint32, val = " << weeks_count);
     uint32_t weeks_count_32 = static_cast<uint32_t>(weeks_count);
 
     return tools::mnemonic_encoding::word_by_num(weeks_count_32);
