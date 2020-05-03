@@ -679,17 +679,19 @@ namespace tools
       //convert from old version
       if (ver < CURRENCY_FORMATION_VERSION + 65)
       {
-        //TODO: export from     a & m_blockchain;
+        LOG_PRINT_MAGENTA("Converting blockchain into a short form...", LOG_LEVEL_0);
+        std::vector<crypto::hash> old_blockchain;
+        a & old_blockchain;
+        uint64_t count = 0;
+        for (auto& h : old_blockchain)
+        {
+          m_chain.push_new_block_id(h, count);
+        }
+        LOG_PRINT_MAGENTA("Converting done", LOG_LEVEL_0);
       }
       else
       {
         a & m_chain;
-//        a & m_local_bc_size;
-//         a & m_genesis;
-//         a & m_last_10_blocks;
-//         a & m_last_144_blocks_every_10;
-//         a & m_last_144_blocks_every_100;
-//         a & m_last_144_blocks_every_1000;
       }
 
 
@@ -911,15 +913,8 @@ private:
     std::wstring m_wallet_file;
     std::wstring m_pending_ki_file;
     std::string m_password;
-    //std::vector<crypto::hash> m_blockchain;
-//     crypto::hash m_genesis;
-//     std::map<uint64_t, crypto::hash> m_last_10_blocks;
-//     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_10;   //1 day
-//     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_100;  //10 days
-//     std::map<uint64_t, crypto::hash> m_last_144_blocks_every_1000; //100 days
     uint64_t m_minimum_height;
 
-    //std::atomic<uint64_t> m_local_bc_size; //temporary workaround 
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
     uint64_t m_pos_mint_packing_size;
