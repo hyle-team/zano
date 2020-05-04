@@ -47,6 +47,7 @@
 
 #define WALLET_DEFAULT_POS_MINT_PACKING_SIZE                          100
 
+const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -318,7 +319,7 @@ namespace tools
                               m_do_rise_transfer(false),
                               m_watch_only(false), 
                               m_last_pow_block_h(0), 
-                              m_minimum_height(0),
+                              m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
                               m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {};
   public:
@@ -333,7 +334,7 @@ namespace tools
                 m_log_prefix("???"),
                 m_watch_only(false), 
                 m_last_pow_block_h(0), 
-                m_minimum_height(0),
+                m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
                 m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {
       m_core_runtime_config = currency::get_default_core_runtime_config();
@@ -677,7 +678,7 @@ namespace tools
         }
       }
       //convert from old version
-      if (ver < CURRENCY_FORMATION_VERSION + 65)
+      if (ver < 150)
       {
         LOG_PRINT_MAGENTA("Converting blockchain into a short form...", LOG_LEVEL_0);
         std::vector<crypto::hash> old_blockchain;
@@ -686,12 +687,14 @@ namespace tools
         for (auto& h : old_blockchain)
         {
           m_chain.push_new_block_id(h, count);
+          count++;
         }
         LOG_PRINT_MAGENTA("Converting done", LOG_LEVEL_0);
       }
       else
       {
         a & m_chain;
+        a & m_minimum_height;
       }
 
 

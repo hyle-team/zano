@@ -1070,7 +1070,7 @@ void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<s
 void wallet2::process_new_blockchain_entry(const currency::block& b, const currency::block_direct_data_entry& bche, const crypto::hash& bl_id, uint64_t height)
 {
   //handle transactions from new block
-  THROW_IF_TRUE_WALLET_EX(height != get_blockchain_current_size(), error::wallet_internal_error,
+  THROW_IF_TRUE_WALLET_EX(height != get_blockchain_current_size() && !(height == m_minimum_height && get_blockchain_current_size() <= 1), error::wallet_internal_error,
     "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_size()));
 
   //optimization: seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
@@ -1137,7 +1137,8 @@ void wallet2::set_minimum_height(uint64_t h)
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_wallet_minimum_height()
 {
-  if (m_minimum_height)
+ 
+  if (m_minimum_height != WALLET_MINIMUM_HEIGHT_UNSET_CONST)
     return m_minimum_height;
 
   currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request req = AUTO_VAL_INIT(req);
@@ -1146,6 +1147,7 @@ uint64_t wallet2::get_wallet_minimum_height()
   bool r = m_core_proxy->call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(req, res);
   THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(res.status == CORE_RPC_STATUS_OK, "FAILED TO CALL COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
+  m_minimum_height = res.h;
   return res.h;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1191,7 +1193,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
     return;
   }
   THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
-  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() && get_blockchain_current_size() <= res.start_height, error::wallet_internal_error,
+  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() && get_blockchain_current_size() <= res.start_height && res.start_height != m_minimum_height, error::wallet_internal_error,
     "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
     " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
 
@@ -1227,7 +1229,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
     //TODO: get_block_hash is slow
     crypto::hash bl_id = get_block_hash(bl);
 
-    if (height > processed_blocks_count)
+    if (processed_blocks_count != 1 && height > processed_blocks_count)
     {//internal error: 
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false,
         "height{" << height <<"} > processed_blocks_count{" << processed_blocks_count << "}");

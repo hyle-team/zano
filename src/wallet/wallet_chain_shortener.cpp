@@ -61,12 +61,12 @@ void wallet_chain_shortener::push_new_block_id(const crypto::hash& id, uint64_t 
 
   //primary 10
   //self check
-  if (!m_last_20_blocks.empty())
+  if (m_local_bc_size != 1)
   {
     THROW_IF_FALSE_WALLET_INT_ERR_EX(get_blockchain_current_size() == height, "Inernal error: get_blockchain_current_height(){" << get_blockchain_current_size() << "} == height{" << height << "} is not equal");
   }
 
-  m_local_bc_size++;
+  m_local_bc_size = height+1;
   m_last_20_blocks[height] = id;
   if (m_last_20_blocks.size() > WALLET_EVERYBLOCK_SIZE)
   {
