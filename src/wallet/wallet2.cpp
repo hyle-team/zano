@@ -3050,7 +3050,11 @@ void wallet2::request_alias_registration(const currency::extra_alias_entry& ai, 
   std::vector<currency::tx_destination_entry> destinations;
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
-  extra.push_back(ai);
+
+  if (get_top_block_height() > m_core_runtime_config.hard_fork_02_starts_after_height)
+    extra.push_back(ai);
+  else
+    extra.push_back(ai.to_old());
 
   currency::tx_destination_entry tx_dest_alias_reward;
   tx_dest_alias_reward.addr.resize(1);
@@ -3080,7 +3084,12 @@ void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::tr
   std::vector<currency::tx_destination_entry> destinations;
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
-  extra.push_back(ai);
+
+  if (get_top_block_height() > m_core_runtime_config.hard_fork_02_starts_after_height)
+    extra.push_back(ai);
+  else
+    extra.push_back(ai.to_old());
+
   transfer(destinations, 0, 0, fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
 //----------------------------------------------------------------------------------------------------
