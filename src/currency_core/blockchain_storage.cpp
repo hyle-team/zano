@@ -296,11 +296,19 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     bool need_reinit = false;
     if (m_db_blocks.size() != 0)
     {
+#ifndef TESTNET
       if (m_db_storage_major_compatibility_version == 93 && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 94)
       {
         // do not reinit db if moving from version 93 to version 94
         LOG_PRINT_MAGENTA("DB storage does not need reinit because moving from v93 to v94", LOG_LEVEL_0);
       }
+#else
+      if (m_db_storage_major_compatibility_version == 95 && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 96)
+      {
+        // do not reinit TESTNET db if moving from version 95 to version 96
+        LOG_PRINT_MAGENTA("DB storage does not need reinit because moving from v95 to v96", LOG_LEVEL_0);
+      }
+#endif
       else if (m_db_storage_major_compatibility_version != BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION)
       {
         need_reinit = true;
