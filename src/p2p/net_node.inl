@@ -1442,6 +1442,7 @@ namespace nodetool
     std::string s = ss.str();
     return s;
   }
+
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   void node_server<t_payload_net_handler>::on_connection_new(p2p_connection_context& context)

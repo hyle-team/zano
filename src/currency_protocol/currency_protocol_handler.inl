@@ -22,6 +22,7 @@ namespace currency
     , m_want_stop(false)
     , m_last_median2local_time_difference(0)
     , m_last_ntp2local_time_difference(0)
+    , m_debug_ip_address(0)
   {
     if(!m_p2p)
       m_p2p = &m_p2p_stub;
@@ -241,6 +242,10 @@ namespace currency
     template<class t_core> 
     int t_currency_protocol_handler<t_core>::handle_notify_new_block(int command, NOTIFY_NEW_BLOCK::request& arg, currency_connection_context& context)
   {
+    //do not process requests if it comes from node wich is debugged
+    if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
+        return 1;
+
     if(context.m_state != currency_connection_context::state_normal)
       return 1;
 
@@ -363,6 +368,10 @@ namespace currency
   template<class t_core> 
   int t_currency_protocol_handler<t_core>::handle_notify_new_transactions(int command, NOTIFY_NEW_TRANSACTIONS::request& arg, currency_connection_context& context)
   {
+    //do not process requests if it comes from node wich is debugged
+    if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
+      return 1;
+
     if(context.m_state != currency_connection_context::state_normal)
       return 1;
     uint64_t inital_tx_count = arg.txs.size();
@@ -400,6 +409,10 @@ namespace currency
   template<class t_core> 
   int t_currency_protocol_handler<t_core>::handle_request_get_objects(int command, NOTIFY_REQUEST_GET_OBJECTS::request& arg, currency_connection_context& context)
   {
+    //do not process requests if it comes from node wich is debugged
+    if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
+      return 1;
+
     LOG_PRINT_L2("[HANDLE]NOTIFY_REQUEST_GET_OBJECTS: arg.blocks.size() = " << arg.blocks.size() << ", arg.txs.size()="<< arg.txs.size());
     LOG_PRINT_L3("[HANDLE]NOTIFY_REQUEST_GET_OBJECTS: " << ENDL << currency::print_kv_structure(arg));
 
@@ -445,6 +458,10 @@ namespace currency
   template<class t_core>
   int t_currency_protocol_handler<t_core>::handle_response_get_objects(int command, NOTIFY_RESPONSE_GET_OBJECTS::request& arg, currency_connection_context& context)
   {
+    //do not process requests if it comes from node wich is debugged
+    if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
+      return 1;
+
     LOG_PRINT_L2("[HANDLE]NOTIFY_RESPONSE_GET_OBJECTS: arg.blocks.size()=" << arg.blocks.size() << ", arg.missed_ids.size()=" << arg.missed_ids.size() << ", arg.txs.size()=" << arg.txs.size());
     LOG_PRINT_L3("[HANDLE]NOTIFY_RESPONSE_GET_OBJECTS: " << ENDL << currency::print_kv_structure(arg));
     if(context.m_last_response_height > arg.current_blockchain_height)
@@ -627,6 +644,10 @@ namespace currency
   template<class t_core>
   int t_currency_protocol_handler<t_core>::handle_request_chain(int command, NOTIFY_REQUEST_CHAIN::request& arg, currency_connection_context& context)
   {
+    //do not process requests if it comes from node wich is debugged
+    if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
+      return 1;
+
     LOG_PRINT_L2("[HANDLE]NOTIFY_REQUEST_CHAIN: block_ids.size()=" << arg.block_ids.size());
     LOG_PRINT_L3("[HANDLE]NOTIFY_REQUEST_CHAIN: " << print_kv_structure(arg));
     NOTIFY_RESPONSE_CHAIN_ENTRY::request r;
@@ -851,10 +872,19 @@ namespace currency
 
     return !(std::abs(m_last_median2local_time_difference) > TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE && std::abs(m_last_ntp2local_time_difference) > TIME_SYNC_NTP_TO_LOCAL_MAX_DIFFERENCE);
   }
+  template<class t_core>
+  void t_currency_protocol_handler<t_core>::set_to_debug_mode(uint32_t ip)
+  {
+    m_debug_ip_address = ip;
+  }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
   int t_currency_protocol_handler<t_core>::handle_response_chain_entry(int command, NOTIFY_RESPONSE_CHAIN_ENTRY::request& arg, currency_connection_context& context)
   {
+    //do not process requests if it comes from node wich is debugged
+    if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
+      return 1;
+
     LOG_PRINT_L2("[HANDLE]NOTIFY_RESPONSE_CHAIN_ENTRY: m_block_ids.size()=" << arg.m_block_ids.size() 
       << ", m_start_height=" << arg.start_height << ", m_total_height=" << arg.total_height);
     LOG_PRINT_L3("[HANDLE]NOTIFY_RESPONSE_CHAIN_ENTRY: " << ENDL << currency::print_kv_structure(arg));
