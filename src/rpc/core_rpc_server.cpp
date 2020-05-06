@@ -301,7 +301,7 @@ namespace currency
     }
 
     std::list<std::pair<block, std::list<transaction> > > bs;
-    if(!m_core.find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT))
+    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
     {
       res.status = CORE_RPC_STATUS_FAILED;
       return false;
