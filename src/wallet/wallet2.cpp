@@ -1162,7 +1162,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
-
+  WLT_LOG_L0("COMMAND_RPC_GET_BLOCKS_DIRECT: " << epee::serialization::store_t_to_json(req));
   if (res.status == CORE_RPC_STATUS_GENESIS_MISMATCH)
   {
     WLT_LOG_MAGENTA("Reseting genesis block...", LOG_LEVEL_0);
