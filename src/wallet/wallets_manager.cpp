@@ -760,6 +760,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history);
+      owr.wallet_local_bc_size = w->get_blockchain_current_size();
       //workaround for missed fee
       owr.seed = w->get_account().get_restore_braindata();
       break;

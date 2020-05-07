@@ -431,6 +431,7 @@ public:
     wallet_info wi;
     std::string seed;
     bool recovered;
+    uint64_t wallet_local_height;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -438,6 +439,7 @@ public:
       KV_SERIALIZE(wi)
       KV_SERIALIZE(seed)
       KV_SERIALIZE(recovered)
+      KV_SERIALIZE(wallet_local_height)
     END_KV_SERIALIZE_MAP()
   };
 
