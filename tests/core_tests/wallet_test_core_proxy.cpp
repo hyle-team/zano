@@ -49,7 +49,7 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(cons
 {
   auto it = m_txs_outs.find(rqt.txid);
   CHECK_AND_ASSERT_MES(it != m_txs_outs.end(), false, "tx " << rqt.txid << " was not found in tx global outout indexes");
-  rsp.status = CORE_RPC_STATUS_OK;
+  rsp.status = API_RETURN_CODE_OK;
   rsp.o_indexes = it->second;
   return true;
 }
@@ -75,7 +75,7 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_FAST(const currency::CO
   }
 
   rsp.current_height = m_blocks.size();
-  rsp.status = CORE_RPC_STATUS_OK;
+  rsp.status = API_RETURN_CODE_OK;
   if (!m_first_call)
   {
     m_first_call = true;
@@ -101,7 +101,7 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::
   currency::COMMAND_RPC_GET_BLOCKS_FAST::response res = AUTO_VAL_INIT(res);
   bool r = this->call_COMMAND_RPC_GET_BLOCKS_FAST(req, res);
   rsp.status = res.status;
-  if (rsp.status == CORE_RPC_STATUS_OK)
+  if (rsp.status == API_RETURN_CODE_OK)
   {
     rsp.current_height = res.current_height;
     rsp.start_height = res.start_height;
@@ -114,7 +114,7 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::
 bool wallet_test_core_proxy::call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(const currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& rqt, currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& rsp)
 {
   rsp.h = 0;
-  rsp.status = CORE_RPC_STATUS_OK;
+  rsp.status = API_RETURN_CODE_OK;
   return true;
 }
 
@@ -126,13 +126,13 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_INFO(const currency::COMMAND_R
 
 bool wallet_test_core_proxy::call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& rqt, currency::COMMAND_RPC_SEND_RAW_TX::response& rsp)
 {
-  rsp.status = CORE_RPC_STATUS_OK;
+  rsp.status = API_RETURN_CODE_OK;
   return true;
 }
 
 bool wallet_test_core_proxy::call_COMMAND_RPC_GET_TX_POOL(const currency::COMMAND_RPC_GET_TX_POOL::request& rqt, currency::COMMAND_RPC_GET_TX_POOL::response& rsp)
 {
-  rsp.status = CORE_RPC_STATUS_OK;
+  rsp.status = API_RETURN_CODE_OK;
   rsp.txs = m_unconfirmed_txs;
   return true;
 }
@@ -148,7 +148,7 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MED
   }
 
   res.expiration_median = epee::misc_utils::median(tiemstamps);  
-  res.status = CORE_RPC_STATUS_OK;
+  res.status = API_RETURN_CODE_OK;
   return true;
 }
 

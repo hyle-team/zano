@@ -37,7 +37,7 @@ namespace tools
       if (!cb(req_alias_info, alias_info))
         return false;
 
-      if (alias_info.status != CORE_RPC_STATUS_OK || !alias_info.alias_details.address.size())
+      if (alias_info.status != API_RETURN_CODE_OK || !alias_info.alias_details.address.size())
         return false;
 
       addr_str_local = alias_info.alias_details.address;

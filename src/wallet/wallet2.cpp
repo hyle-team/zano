@@ -323,8 +323,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     req.txid = get_transaction_hash(tx);
     bool r = m_core_proxy->call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(req, res);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_o_indexes.bin");
-    THROW_IF_TRUE_WALLET_EX(res.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "get_o_indexes.bin");
-    THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_out_indices_error, res.status);
+    THROW_IF_TRUE_WALLET_EX(res.status == API_RETURN_CODE_BUSY, error::daemon_busy, "get_o_indexes.bin");
+    THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_out_indices_error, res.status);
     THROW_IF_TRUE_WALLET_EX(res.o_indexes.size() != tx.vout.size(), error::wallet_internal_error,
       "transactions outputs size=" + std::to_string(tx.vout.size()) +
       " not match with COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES response size=" + std::to_string(res.o_indexes.size()));
@@ -507,7 +507,7 @@ void wallet2::resend_unconfirmed()
   
   bool r = m_core_proxy->call_COMMAND_RPC_FORCE_RELAY_RAW_TXS(req, res);
   WLT_CHECK_AND_ASSERT_MES(r, void(), "wrong result at call_COMMAND_RPC_FORCE_RELAY_RAW_TXS");
-  WLT_CHECK_AND_ASSERT_MES(res.status == CORE_RPC_STATUS_OK, void(), "wrong result at call_COMMAND_RPC_FORCE_RELAY_RAW_TXS: status != OK, status=" << res.status);		
+  WLT_CHECK_AND_ASSERT_MES(res.status == API_RETURN_CODE_OK, void(), "wrong result at call_COMMAND_RPC_FORCE_RELAY_RAW_TXS: status != OK, status=" << res.status);		
 
   WLT_LOG_GREEN("Relayed " << req.txs_as_hex.size() << " txs", LOG_LEVEL_0);
 }
@@ -1146,7 +1146,7 @@ uint64_t wallet2::get_wallet_minimum_height()
   req.timestamp = m_account.get_createtime();
   bool r = m_core_proxy->call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(req, res);
   THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(res.status == CORE_RPC_STATUS_OK, "FAILED TO CALL COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(res.status == API_RETURN_CODE_OK, "FAILED TO CALL COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
   m_minimum_height = res.h;
   return res.h;
 }
@@ -1163,7 +1163,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
   WLT_LOG_L0("COMMAND_RPC_GET_BLOCKS_DIRECT: " << epee::serialization::store_t_to_json(req));
-  if (res.status == CORE_RPC_STATUS_GENESIS_MISMATCH)
+  if (res.status == API_RETURN_CODE_GENESIS_MISMATCH)
   {
     WLT_LOG_MAGENTA("Reseting genesis block...", LOG_LEVEL_0);
     COMMAND_RPC_GET_BLOCKS_DETAILS::request gbd_req = AUTO_VAL_INIT(gbd_req);
@@ -1173,7 +1173,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
     gbd_req.ignore_transactions = true;
     r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DETAILS(gbd_req, gbd_res);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_blocks_details");
-    THROW_IF_TRUE_WALLET_EX(gbd_res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, gbd_res.status);
+    THROW_IF_TRUE_WALLET_EX(gbd_res.status != API_RETURN_CODE_OK, error::get_blocks_error, gbd_res.status);
     THROW_IF_TRUE_WALLET_EX(gbd_res.blocks.size() == 0, error::get_blocks_error, gbd_res.status);
     crypto::hash new_genesis_id = null_hash;
     r = string_tools::parse_tpod_from_hex_string(gbd_res.blocks.back().id, new_genesis_id);
@@ -1186,13 +1186,13 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
     bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getblocks.bin");
   }
-  if (res.status == CORE_RPC_STATUS_BUSY)
+  if (res.status == API_RETURN_CODE_BUSY)
   {
     WLT_LOG_L1("Core is busy, pull cancelled");
     stop = true;
     return;
   }
-  THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
+  THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
   THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() && get_blockchain_current_size() <= res.start_height && res.start_height != m_minimum_height, error::wallet_internal_error,
     "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
     " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
@@ -1345,8 +1345,8 @@ void wallet2::update_current_tx_limit()
   currency::COMMAND_RPC_GET_INFO::response res = AUTO_VAL_INIT(res);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_INFO(req, res);
   THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getinfo");
-  THROW_IF_TRUE_WALLET_EX(res.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "getinfo");
-  THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
+  THROW_IF_TRUE_WALLET_EX(res.status == API_RETURN_CODE_BUSY, error::daemon_busy, "getinfo");
+  THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
   THROW_IF_TRUE_WALLET_EX(res.current_blocks_median < CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE, error::get_blocks_error, "bad median size");
   m_upper_transaction_size_limit = res.current_blocks_median - CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
 }
@@ -1368,7 +1368,7 @@ bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& t
     currency::COMMAND_RPC_GET_ALIAS_DETAILS::response res = AUTO_VAL_INIT(res);
     req.alias = tei.m_alias.m_alias;
     m_core_proxy->call_COMMAND_RPC_GET_ALIAS_DETAILS(req, res);
-    if (res.status != CORE_RPC_STATUS_OK)
+    if (res.status != API_RETURN_CODE_OK)
       return false;
     if (local_adr == res.alias_details.address)
       return true;
@@ -1383,11 +1383,11 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
   currency::COMMAND_RPC_GET_TX_POOL::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_TX_POOL::response res = AUTO_VAL_INIT(res);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_TX_POOL(req, res);
-  if (res.status == CORE_RPC_STATUS_BUSY)
+  if (res.status == API_RETURN_CODE_BUSY)
     throw error::daemon_busy(LOCATION_STR, "get_tx_pool");
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "get_tx_pool");
-  THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
+  THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
   
 
   //- @#@ ----- debug 
@@ -2817,14 +2817,14 @@ bool wallet2::fill_mining_context(mining_context& ctx)
 
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request pos_details_req = AUTO_VAL_INIT(pos_details_req);
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::response pos_details_resp = AUTO_VAL_INIT(pos_details_resp);
-  ctx.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
+  ctx.rsp.status = API_RETURN_CODE_NOT_FOUND;
   m_core_proxy->call_COMMAND_RPC_GET_POS_MINING_DETAILS(pos_details_req, pos_details_resp);
-  if (pos_details_resp.status != CORE_RPC_STATUS_OK)
+  if (pos_details_resp.status != API_RETURN_CODE_OK)
     return false;
   ctx.basic_diff.assign(pos_details_resp.pos_basic_difficulty);
   ctx.sm = pos_details_resp.sm;
   ctx.rsp.last_block_hash = pos_details_resp.last_block_hash;
-  ctx.rsp.status = CORE_RPC_STATUS_OK;
+  ctx.rsp.status = API_RETURN_CODE_OK;
   ctx.rsp.is_pos_allowed = pos_details_resp.pos_mining_allowed;
   ctx.rsp.starter_timestamp = pos_details_resp.starter_timestamp;
   return true;
@@ -2862,7 +2862,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     return true;
   }, m_core_runtime_config);
   
-  if (ctx.rsp.status == CORE_RPC_STATUS_OK)
+  if (ctx.rsp.status == API_RETURN_CODE_OK)
   {
     build_minted_block(ctx.sp, ctx.rsp, miner_address);
   }
@@ -2918,7 +2918,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
       WLT_LOG_GREEN("Packing inputs: " << pack_tx.vin.size() << " inputs consolidated in tx " << get_transaction_hash(pack_tx), LOG_LEVEL_0);
     }
     m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
-    WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == CORE_RPC_STATUS_OK, false, "Failed to create block template after kernel hash found!");
+    WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == API_RETURN_CODE_OK, false, "Failed to create block template after kernel hash found!");
 
     currency::block b = AUTO_VAL_INIT(b);
     currency::blobdata block_blob;
@@ -2967,7 +2967,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
       subm_req.explicit_txs.push_back(hexemizer{ tmpl_req.explicit_transaction });
     
     m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
-    if (subm_rsp.status != CORE_RPC_STATUS_OK)
+    if (subm_rsp.status != API_RETURN_CODE_OK)
     {
       WLT_LOG_ERROR("Constructed block is not accepted by core, status: " << subm_rsp.status);
       return false;
@@ -3609,8 +3609,8 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
 
     bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, daemon_resp);
     THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs.bin");
-    THROW_IF_FALSE_WALLET_EX(daemon_resp.status != CORE_RPC_STATUS_BUSY, error::daemon_busy, "getrandom_outs.bin");
-    THROW_IF_FALSE_WALLET_EX(daemon_resp.status == CORE_RPC_STATUS_OK, error::get_random_outs_error, daemon_resp.status);
+    THROW_IF_FALSE_WALLET_EX(daemon_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs.bin");
+    THROW_IF_FALSE_WALLET_EX(daemon_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, daemon_resp.status);
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(daemon_resp.outs.size() == selected_indicies.size(), 
       "daemon returned wrong response for getrandom_outs.bin, wrong amounts count = " << daemon_resp.outs.size() << ", expected: " << selected_indicies.size());
 
@@ -3719,9 +3719,9 @@ void wallet2::send_transaction_to_network(const transaction& tx)
   COMMAND_RPC_SEND_RAW_TX::response daemon_send_resp;
   bool r = m_core_proxy->call_COMMAND_RPC_SEND_RAW_TX(req, daemon_send_resp);
   THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "sendrawtransaction");
-  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "sendrawtransaction");
-  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == CORE_RPC_STATUS_DISCONNECTED, error::wallet_internal_error, "Transfer attempt while daemon offline");
-  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != CORE_RPC_STATUS_OK, error::tx_rejected, tx, daemon_send_resp.status);
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_BUSY, error::daemon_busy, "sendrawtransaction");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::wallet_internal_error, "Transfer attempt while daemon offline");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, error::tx_rejected, tx, daemon_send_resp.status);
 
   WLT_LOG_L2("transaction " << get_transaction_hash(tx) << " generated ok and sent to daemon:" << ENDL << currency::obj_to_json_str(tx));
 }
@@ -4160,7 +4160,7 @@ uint64_t wallet2::get_tx_expiration_median() const
   currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response res = AUTO_VAL_INIT(res);
   m_core_proxy->call_COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN(req, res);
 
-  if (res.status != CORE_RPC_STATUS_OK)
+  if (res.status != API_RETURN_CODE_OK)
   {
     WLT_LOG_ERROR("COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN failed, status: " << res.status);
     return 0;
@@ -4549,8 +4549,8 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, rpc_get_random_outs_resp);
     
     THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs.bin");
-    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status != CORE_RPC_STATUS_BUSY, error::daemon_busy, "getrandom_outs.bin");
-    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status == CORE_RPC_STATUS_OK, error::get_random_outs_error, rpc_get_random_outs_resp.status);
+    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs.bin");
+    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, rpc_get_random_outs_resp.status);
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(rpc_get_random_outs_resp.outs.size() == selected_transfers.size(),
       "daemon returned wrong number of amounts for getrandom_outs.bin: " << rpc_get_random_outs_resp.outs.size() << ", requested: " << selected_transfers.size());
 

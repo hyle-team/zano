@@ -1095,7 +1095,7 @@ namespace tools
     idle_condition_cb_t idle_condition_cb,
     const currency::core_runtime_config &runtime_config)
   {
-    cxt.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
+    cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
     uint64_t timstamp_start = runtime_config.get_core_time();
     uint64_t timstamp_last_idle_call = runtime_config.get_core_time();
     cxt.rsp.iterations_processed = 0;
@@ -1134,7 +1134,7 @@ namespace tools
           if (!idle_condition_cb())
           {
             LOG_PRINT_L0("Detected new block, minting interrupted");
-            cxt.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
+            cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
             return false;
           }
           timstamp_last_idle_call = runtime_config.get_core_time();
@@ -1178,7 +1178,7 @@ namespace tools
             LOG_LEVEL_0);
           cxt.rsp.index = i;
           cxt.rsp.block_timestamp = ts;
-          cxt.rsp.status = CORE_RPC_STATUS_OK;
+          cxt.rsp.status = API_RETURN_CODE_OK;
           return true;
         }
         
@@ -1187,7 +1187,7 @@ namespace tools
         
       }
     }
-    cxt.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
+    cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
     return false;
   }
 

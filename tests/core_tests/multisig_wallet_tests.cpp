@@ -92,9 +92,9 @@ void transfer_multisig(tools::wallet2& w,
       COMMAND_RPC_SEND_RAW_TX::response daemon_send_resp;
       bool r = w.get_core_proxy()->call_COMMAND_RPC_SEND_RAW_TX(req, daemon_send_resp);
       THROW_IF_TRUE_WALLET_EX(!r, tools::error::no_connection_to_daemon, "sendrawtransaction");
-      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == CORE_RPC_STATUS_BUSY, tools::error::daemon_busy, "sendrawtransaction");
-      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == CORE_RPC_STATUS_DISCONNECTED, tools::error::wallet_internal_error, "Transfer attempt while daemon offline");
-      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != CORE_RPC_STATUS_OK, tools::error::tx_rejected, tx, daemon_send_resp.status);
+      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_BUSY, tools::error::daemon_busy, "sendrawtransaction");
+      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, tools::error::wallet_internal_error, "Transfer attempt while daemon offline");
+      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, tools::error::tx_rejected, tx, daemon_send_resp.status);
     }
 }
 

@@ -992,7 +992,7 @@ std::string wallets_manager::get_aliases(view::alias_set& al_set)
 
 
   currency::COMMAND_RPC_GET_ALL_ALIASES::response aliases = AUTO_VAL_INIT(aliases);
-  if (m_rpc_proxy->call_COMMAND_RPC_GET_ALL_ALIASES(aliases) && aliases.status == CORE_RPC_STATUS_OK)
+  if (m_rpc_proxy->call_COMMAND_RPC_GET_ALL_ALIASES(aliases) && aliases.status == API_RETURN_CODE_OK)
   {
     al_set.aliases = aliases.aliases;
     return API_RETURN_CODE_OK;
@@ -1066,7 +1066,7 @@ std::string wallets_manager::request_alias_registration(const currency::alias_rp
   currency::COMMAND_RPC_GET_ALIAS_DETAILS::request req = AUTO_VAL_INIT(req);
   req.alias = ai.m_alias;
   currency::COMMAND_RPC_GET_ALIAS_DETAILS::response rsp = AUTO_VAL_INIT(rsp);
-  if (m_rpc_proxy->call_COMMAND_RPC_GET_ALIAS_DETAILS(req, rsp) && rsp.status == CORE_RPC_STATUS_NOT_FOUND)
+  if (m_rpc_proxy->call_COMMAND_RPC_GET_ALIAS_DETAILS(req, rsp) && rsp.status == API_RETURN_CODE_NOT_FOUND)
   {
     GET_WALLET_BY_ID(wallet_id, w);
     try
@@ -1105,7 +1105,7 @@ std::string wallets_manager::request_alias_update(const currency::alias_rpc_deta
   currency::COMMAND_RPC_GET_ALIAS_DETAILS::request req;
   req.alias = ai.m_alias;
   currency::COMMAND_RPC_GET_ALIAS_DETAILS::response rsp = AUTO_VAL_INIT(rsp);
-  if (m_rpc_proxy->call_COMMAND_RPC_GET_ALIAS_DETAILS(req, rsp) && rsp.status == CORE_RPC_STATUS_OK)
+  if (m_rpc_proxy->call_COMMAND_RPC_GET_ALIAS_DETAILS(req, rsp) && rsp.status == API_RETURN_CODE_OK)
   {
     GET_WALLET_BY_ID(wallet_id, w);
     try
@@ -1749,7 +1749,7 @@ void wallets_manager::wallet_vs_options::worker_func()
         pos_minin_interval.do_call([this](){
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
           LOG_PRINT_L1(get_log_prefix() + " Starting PoS mint iteration");
-          if (!w->get()->fill_mining_context(ctx) || ctx.rsp.status != CORE_RPC_STATUS_OK)
+          if (!w->get()->fill_mining_context(ctx) || ctx.rsp.status != API_RETURN_CODE_OK)
           {
             LOG_PRINT_L1(get_log_prefix() + " cannot obtain PoS mining context, skip iteration");
             return true;
@@ -1763,7 +1763,7 @@ void wallets_manager::wallet_vs_options::worker_func()
             return *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online &&  *plast_daemon_height == last_wallet_synch_height;
           }, core_conf);
 
-          if (ctx.rsp.status == CORE_RPC_STATUS_OK)
+          if (ctx.rsp.status == API_RETURN_CODE_OK)
           {
             w->get()->build_minted_block(ctx.sp, ctx.rsp);
           }

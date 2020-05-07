@@ -60,11 +60,11 @@ namespace
     std::string err;
     if (ok)
     {
-      if (status == CORE_RPC_STATUS_BUSY)
+      if (status == API_RETURN_CODE_BUSY)
       {
         err = "daemon is busy. Please try later";
       }
-      else if (status != CORE_RPC_STATUS_OK)
+      else if (status != API_RETURN_CODE_OK)
       {
         err = status;
       }

@@ -5613,12 +5613,12 @@ bool blockchain_storage::scan_pos(const COMMAND_RPC_SCAN_POS::request& sp, COMMA
         LOG_PRINT_GREEN("Found kernel: amount=" << print_money(sp.pos_entries[i].amount) << ", key_image" << sp.pos_entries[i].keyimage, LOG_LEVEL_0);
         rsp.index = i;
         rsp.block_timestamp = ts;
-        rsp.status = CORE_RPC_STATUS_OK;
+        rsp.status = API_RETURN_CODE_OK;
         return true;
       }
     }
   }
-  rsp.status = CORE_RPC_STATUS_NOT_FOUND;
+  rsp.status = API_RETURN_CODE_NOT_FOUND;
   return false;
 }
 //------------------------------------------------------------------

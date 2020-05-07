@@ -144,7 +144,7 @@ inline bool mine_next_pos_block_in_playtime_with_wallet(tools::wallet2& w, const
   std::atomic<bool> stop(false);
   w.scan_pos(ctx, stop, [&w](){size_t blocks_fetched; w.refresh(blocks_fetched); return blocks_fetched == 0; }, w.get_core_runtime_config());
   
-  if (ctx.rsp.status != CORE_RPC_STATUS_OK)
+  if (ctx.rsp.status != API_RETURN_CODE_OK)
     return false;
   
   return w.build_minted_block(ctx.sp, ctx.rsp, miner_address);

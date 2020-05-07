@@ -319,7 +319,7 @@ namespace plain_wallet
   {
     CRITICAL_REGION_LOCAL(gjobs_lock);
     gjobs[job_id] = res;
-    LOG_PRINT_L0("[ASYNC_CALL]: Finished(result put), job id: " << job_id);
+    LOG_PRINT_L2("[ASYNC_CALL]: Finished(result put), job id: " << job_id);
   }
 
 
@@ -396,7 +396,7 @@ namespace plain_wallet
 
     std::thread t([async_callback]() {async_callback(); });
     t.detach();
-    LOG_PRINT_L0("[ASYNC_CALL]: started " << method_name << ", job id: " << job_id);
+    LOG_PRINT_L2("[ASYNC_CALL]: started " << method_name << ", job id: " << job_id);
     return std::string("{ \"job_id\": ") + std::to_string(job_id) + "}";
   }
 

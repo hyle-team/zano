@@ -15,16 +15,10 @@
 #include "storages/portable_storage_base.h"
 #include "currency_core/offers_service_basics.h"
 #include "currency_core/basic_api_response_codes.h"
+#include "common/error_codes.h"
 namespace currency
 {
   //-----------------------------------------------
-#define CORE_RPC_STATUS_OK                 BASIC_RESPONSE_STATUS_OK
-#define CORE_RPC_STATUS_BUSY               BASIC_RESPONSE_STATUS_BUSY
-#define CORE_RPC_STATUS_NOT_FOUND          BASIC_RESPONSE_STATUS_NOT_FOUND
-#define CORE_RPC_STATUS_FAILED             BASIC_RESPONSE_STATUS_FAILED
-#define CORE_RPC_STATUS_GENESIS_MISMATCH   "GENESIS_MISMATCH"
-#define CORE_RPC_STATUS_DISCONNECTED       "DISCONNECTED"
-
 
   struct alias_rpc_details_base
   {

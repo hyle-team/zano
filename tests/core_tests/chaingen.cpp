@@ -386,7 +386,7 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
     {
       auto it = m_txs_outs.find(rqt.txid);
       CHECK_AND_ASSERT_MES(it != m_txs_outs.end(), false, "tx " << rqt.txid << " was not found in tx global outout indexes");
-      rsp.status = CORE_RPC_STATUS_OK;
+      rsp.status = API_RETURN_CODE_OK;
       rsp.o_indexes = it->second;
       return true; 
     }

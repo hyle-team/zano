@@ -42,7 +42,7 @@ namespace tools
     currency::COMMAND_RPC_GET_BLOCKS_FAST::response res = AUTO_VAL_INIT(res);
     bool r = call_COMMAND_RPC_GET_BLOCKS_FAST(req, res);
     rsp.status = res.status;
-    if (rsp.status == CORE_RPC_STATUS_OK)
+    if (rsp.status == API_RETURN_CODE_OK)
     {
       rsp.current_height = res.current_height;
       rsp.start_height = res.start_height;
