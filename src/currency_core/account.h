@@ -35,9 +35,9 @@ namespace currency
     crypto::secret_key   view_secret_key;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(account_address)
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_secret_key)
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_secret_key)
+      KV_SERIALIZE_N(account_address, "m_account_address")
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(spend_secret_key, "m_spend_secret_key")
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(view_secret_key, "m_view_secret_key")
     END_KV_SERIALIZE_MAP()
   };
 

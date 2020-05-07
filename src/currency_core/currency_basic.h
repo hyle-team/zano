@@ -71,8 +71,8 @@ namespace currency
     END_SERIALIZE()
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_public_key)
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_public_key)
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(spend_public_key, "m_spend_public_key")
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(view_public_key, "m_view_public_key")
     END_KV_SERIALIZE_MAP()
   };
 #pragma pack(pop)
@@ -88,23 +88,18 @@ namespace currency
   {
     crypto::public_key spend_public_key;
     crypto::public_key view_public_key;
-    //uint8_t version;
     uint8_t flags;
 
     DEFINE_SERIALIZATION_VERSION(ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER)
     BEGIN_SERIALIZE_OBJECT()
       FIELD(spend_public_key)
       FIELD(view_public_key)
-      //VERSION_ENTRY(version)
       FIELD(flags)
-      //if (version > ACCOUNT_PUBLIC_ADDRESS_SERIZALIZATION_VER)
-      //  return true; // backward compartibility
     END_SERIALIZE()
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_public_key)
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_public_key)
-      //KV_SERIALIZE(version) // is it necessary?
       KV_SERIALIZE(flags)
     END_KV_SERIALIZE_MAP()
 
