@@ -97,7 +97,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
-  bool account_base::restore_keys_from_braindata(const std::string& seed_phrase)
+  bool account_base::restore_from_braindata(const std::string& seed_phrase)
   {
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
@@ -126,33 +126,30 @@ namespace currency
       return false;
     }
     
-    uint64_t auditable_flag_and_checksum = 0;
-    try
-    {
+    uint64_t auditable_flag_and_checksum = UINT64_MAX;
+    if (!auditable_flag_and_checksum_word.empty())
       auditable_flag_and_checksum = tools::mnemonic_encoding::num_by_word(auditable_flag_and_checksum_word);
-    }
-    catch(...)
-    {
-      LOG_ERROR("cannot convert seed word: " << auditable_flag_and_checksum_word);
-      return false;
-    }
-
-    bool auditable_flag = (auditable_flag_and_checksum & 1) != 0; // auditable flag is the lower 1 bit
-    uint16_t checksum = auditable_flag_and_checksum >> 1; // checksum -- everything else
-    constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
 
     std::vector<unsigned char> keys_seed_binary = tools::mnemonic_encoding::text2binary(keys_seed_text);
     CHECK_AND_ASSERT_MES(keys_seed_binary.size(), false, "text2binary failed to convert the given text"); // don't prints event incorrect seed into the log for security
 
     m_creation_timestamp = get_timstamp_from_word(timestamp_word);
 
-    // check the checksum
-    crypto::hash h = crypto::cn_fast_hash(keys_seed_binary.data(), keys_seed_binary.size());
-    *reinterpret_cast<uint64_t*>(&h) = m_creation_timestamp;
-    h = crypto::cn_fast_hash(&h, sizeof h);
-    uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
-    uint16_t checksum_calculated = h_64 % (checksum_max + 1);
-    CHECK_AND_ASSERT_MES(checksum == checksum_calculated, false, "seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
+    bool auditable_flag = false;
+
+    // check the checksum if checksum word provided
+    if (auditable_flag_and_checksum != UINT64_MAX)
+    {
+      auditable_flag = (auditable_flag_and_checksum & 1) != 0; // auditable flag is the lower 1 bit
+      uint16_t checksum = auditable_flag_and_checksum >> 1; // checksum -- everything else
+      constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
+      crypto::hash h = crypto::cn_fast_hash(keys_seed_binary.data(), keys_seed_binary.size());
+      *reinterpret_cast<uint64_t*>(&h) = m_creation_timestamp;
+      h = crypto::cn_fast_hash(&h, sizeof h);
+      uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
+      uint16_t checksum_calculated = h_64 % (checksum_max + 1);
+      CHECK_AND_ASSERT_MES(checksum == checksum_calculated, false, "seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
+    }
 
     bool r = restore_keys(keys_seed_binary);
     CHECK_AND_ASSERT_MES(r, false, "restore_keys failed");

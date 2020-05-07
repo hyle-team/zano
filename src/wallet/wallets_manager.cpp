@@ -886,7 +886,7 @@ std::string wallets_manager::is_pos_allowed()
 std::string wallets_manager::is_valid_brain_restore_data(const std::string& brain_text)
 {
   currency::account_base acc;
-  if (acc.restore_keys_from_braindata(brain_text))
+  if (acc.restore_from_braindata(brain_text))
     return API_RETURN_CODE_TRUE;
   else
     return API_RETURN_CODE_FALSE;

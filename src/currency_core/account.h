@@ -54,7 +54,7 @@ namespace currency
     std::string get_public_address_str() const;
     
     std::string get_restore_braindata() const;
-    bool restore_keys_from_braindata(const std::string& seed_phrase);
+    bool restore_from_braindata(const std::string& seed_phrase);
 
     uint64_t get_createtime() const { return m_creation_timestamp; }
     void set_createtime(uint64_t val) { m_creation_timestamp = val; }

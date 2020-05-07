@@ -103,6 +103,11 @@ namespace currency
       KV_SERIALIZE(flags)
     END_KV_SERIALIZE_MAP()
 
+    bool is_auditable() const
+    {
+      return (flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE) != 0;
+    }
+
     static account_public_address from_old(const account_public_address_old& rhs)
     {
       account_public_address result = AUTO_VAL_INIT(result);

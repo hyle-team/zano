@@ -2018,12 +2018,12 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   store();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& restore_key)
+void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_phrase)
 {
   clear();
   prepare_file_names(path);
   m_password = pass;
-  bool r = m_account.restore_keys_from_braindata(restore_key);
+  bool r = m_account.restore_from_braindata(seed_phrase);
   init_log_prefix();
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_wrong_seed_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
   boost::system::error_code ignored_ec;
