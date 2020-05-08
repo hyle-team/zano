@@ -296,3 +296,102 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+hard_fork_2_tx_extra_alias_entry_in_wallet::hard_fork_2_tx_extra_alias_entry_in_wallet()
+  : hard_fork_2_base_test(22)
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_2_tx_extra_alias_entry_in_wallet, c1);
+}
+
+bool hard_fork_2_tx_extra_alias_entry_in_wallet::generate(std::vector<test_event_entry>& events) const
+{
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  generator.set_hardfork_height(1, m_hardfork_height);
+  generator.set_hardfork_height(2, m_hardfork_height);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  uint64_t biggest_alias_reward = get_alias_coast_from_fee("a", TESTS_DEFAULT_FEE);
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, biggest_alias_reward + TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, biggest_alias_reward + TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX(events, tx_2, miner_acc, alice_acc, biggest_alias_reward + TESTS_DEFAULT_FEE, blk_0r);
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1, tx_2 }));
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false, stub_bool = false;
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
+
+  size_t blocks_fetched = 0;
+  bool received_money;
+  std::atomic<bool> atomic_false = ATOMIC_VAR_INIT(false);
+  alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
+  CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE, false, "Incorrect numbers of blocks fetched");
+
+  extra_alias_entry ai = AUTO_VAL_INIT(ai);
+  ai.m_alias = "alicealice";
+  ai.m_address = m_accounts[ALICE_ACC_IDX].get_public_address();
+  uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
+  transaction res_tx = AUTO_VAL_INIT(res_tx);
+  alice_wlt->request_alias_registration(ai, res_tx, TESTS_DEFAULT_FEE, alias_reward);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+
+  // before the HF2 -- old structure should be present
+  r = have_type_in_variant_container<extra_alias_entry_old>(res_tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry_old is not found in extra");
+  r = !have_type_in_variant_container<extra_alias_entry>(res_tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry is found in extra");
+
+  // mine few block to activate HF2
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+  
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 4, false, "Incorrect blockchain size");
+
+  alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
+  CHECK_AND_ASSERT_MES(blocks_fetched == 3, false, "Incorrect numbers of blocks fetched");
+
+  // update alias, change comment and address
+  ai.m_text_comment = "Update!";
+  ai.m_address = m_accounts[MINER_ACC_IDX].get_public_address();
+  alice_wlt->request_alias_update(ai, res_tx, TESTS_DEFAULT_FEE, 0);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+
+  // after HF2: extra_alias_entry should be here, not extra_alias_entry_old
+  r = have_type_in_variant_container<extra_alias_entry>(res_tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry is not found in extra");
+  r = !have_type_in_variant_container<extra_alias_entry_old>(res_tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry_old is found in extra");
+
+  // make sure alias was updated indeed
+  extra_alias_entry ai2 = AUTO_VAL_INIT(ai2);
+  r = c.get_blockchain_storage().get_alias_info(ai.m_alias, ai2);
+  CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
+  CHECK_AND_ASSERT_MES(ai2.m_text_comment == ai.m_text_comment && ai2.m_address == m_accounts[MINER_ACC_IDX].get_public_address(),
+    false, "Incorrect alias info retunred by get_alias_info");
+
+  return true;
+}

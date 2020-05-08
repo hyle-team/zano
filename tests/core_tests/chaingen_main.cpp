@@ -1002,6 +1002,7 @@ int main(int argc, char* argv[])
     // Hardfork 2 tests
     GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
     GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
+    GENERATE_AND_PLAY(hard_fork_2_tx_extra_alias_entry_in_wallet);
 
 
     // GENERATE_AND_PLAY(gen_block_reward);

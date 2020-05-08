@@ -29,3 +29,10 @@ struct hard_fork_2_tx_receiver_in_wallet : public wallet_test, public hard_fork_
 
   mutable uint64_t m_alice_start_balance;
 };
+
+struct hard_fork_2_tx_extra_alias_entry_in_wallet : public wallet_test, public hard_fork_2_base_test
+{
+  hard_fork_2_tx_extra_alias_entry_in_wallet();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
