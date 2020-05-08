@@ -421,12 +421,15 @@ namespace currency
       rei.m_attachment_info = ai;
       return true;
     }
-
     bool operator()(const extra_alias_entry& ae) const
     {
       ENSURE_ONETIME(was_alias, "alias");
       rei.m_alias = ae;
       return true;
+    }
+    bool operator()(const extra_alias_entry_old& ae) const
+    {
+      return operator()(static_cast<const extra_alias_entry&>(ae));
     }
     bool operator()(const extra_user_data& ud) const
     {
@@ -2181,6 +2184,10 @@ namespace currency
 
       return true;
     }
+    bool operator()(const extra_alias_entry_old& ee)
+    {
+      return operator()(static_cast<const extra_alias_entry&>(ee));
+    }
     bool operator()(const extra_user_data& ee)
     {
       tv.type = "user_data";
@@ -2214,11 +2221,24 @@ namespace currency
 
       return true;
     }
+    bool operator()(const tx_payer_old&)
+    {
+      tv.type = "payer_old";
+      tv.short_view = "(encrypted)";
 
+      return true;
+    }
     bool operator()(const tx_receiver& ee)
     {
       //const tx_payer& ee = boost::get<tx_payer>(extra);
       tv.type = "receiver";
+      tv.short_view = "(encrypted)";
+
+      return true;
+    }
+    bool operator()(const tx_receiver_old& ee)
+    {
+      tv.type = "receiver_old";
       tv.short_view = "(encrypted)";
 
       return true;
