@@ -241,6 +241,17 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(sl);
   }
 
+  std::string delete_wallet(const std::string& file_name)
+  {
+    std::string wallet_files_path = get_wallets_folder();
+    strings_list sl = AUTO_VAL_INIT(sl);
+    boost::system::error_code er;
+    boost::filesystem::remove(wallet_files_path + file_name, er);
+    epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+    ok_response.result.return_code = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(ok_response);
+  }
+
   std::string open(const std::string& path, const std::string& password)
   {
     std::string full_path = get_wallets_folder() + path;
