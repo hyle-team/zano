@@ -592,7 +592,12 @@ namespace currency
       //out to key
       txout_to_key tk;
       tk.key = target_keys.back();
-      tk.mix_attr = tx_outs_attr;
+
+      if (de.addr.front().is_auditable()) // check only the first address because there's only one in this branch
+        tk.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
+      else
+        tk.mix_attr = tx_outs_attr;
+      
       out.target = tk;
     }
     else
@@ -1109,7 +1114,7 @@ namespace currency
     //fill outputs
     size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
     std::set<uint16_t> deriv_cache;
-    BOOST_FOREACH(const tx_destination_entry& dst_entr, shuffled_dsts)
+    for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
       bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, tx_outs_attr);
