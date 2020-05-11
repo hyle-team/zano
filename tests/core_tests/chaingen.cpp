@@ -386,7 +386,7 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
     {
       auto it = m_txs_outs.find(rqt.txid);
       CHECK_AND_ASSERT_MES(it != m_txs_outs.end(), false, "tx " << rqt.txid << " was not found in tx global outout indexes");
-      rsp.status = CORE_RPC_STATUS_OK;
+      rsp.status = API_RETURN_CODE_OK;
       rsp.o_indexes = it->second;
       return true; 
     }
@@ -923,6 +923,10 @@ bool test_generator::refresh_test_wallet(const std::vector<test_event_entry>& ev
   std::atomic<bool> atomic_false = ATOMIC_VAR_INIT(false);
   bool r = w->refresh(blocks_fetched, received_money, ok, atomic_false);
   CHECK_AND_ASSERT_MES(r, false, "test wallet refersh failed");
+  if (expected_blocks_to_be_fetched != blocks_fetched)
+  {
+    std::cout << "dd";
+  }
   CHECK_AND_ASSERT_MES(expected_blocks_to_be_fetched == std::numeric_limits<size_t>::max() || expected_blocks_to_be_fetched == blocks_fetched, false, "test wallet refresh fetched " << blocks_fetched << ", expected: " << expected_blocks_to_be_fetched);
 
   bool has_aliases;

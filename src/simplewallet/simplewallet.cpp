@@ -61,11 +61,11 @@ namespace
     std::string err;
     if (ok)
     {
-      if (status == CORE_RPC_STATUS_BUSY)
+      if (status == API_RETURN_CODE_BUSY)
       {
         err = "daemon is busy. Please try later";
       }
-      else if (status != CORE_RPC_STATUS_OK)
+      else if (status != API_RETURN_CODE_OK)
       {
         err = status;
       }
@@ -1117,7 +1117,7 @@ bool simple_wallet::show_blockchain_height(const std::vector<std::string>& args)
 bool simple_wallet::show_wallet_bcheight(const std::vector<std::string>& args)
 {
 
-  uint64_t bc_height = m_wallet->get_blockchain_current_height();
+  uint64_t bc_height = m_wallet->get_blockchain_current_size();
   success_msg_writer() << bc_height;
   return true;
 }

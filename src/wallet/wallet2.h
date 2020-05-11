@@ -14,6 +14,7 @@
 #include <boost/serialization/shared_ptr.hpp>
 #include <atomic>
 
+
 #include "include_base_utils.h"
 #include "profile_tools.h"
 #include "sync_locked_object.h"
@@ -26,6 +27,7 @@
 #include "wallet_public_structs_defs.h"
 #include "currency_core/currency_format_utils.h"
 #include "common/unordered_containers_boost_serialization.h"
+#include "common/atomics_boost_serialization.h"
 #include "storages/portable_storage_template_helper.h"
 #include "crypto/chacha8.h"
 #include "crypto/hash.h"
@@ -37,12 +39,15 @@
 #include "currency_core/bc_offers_serialization.h"
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
+#include "wallet_chain_shortener.h"
 
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 
 #define WALLET_DEFAULT_POS_MINT_PACKING_SIZE                          100
+
+const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -314,6 +319,7 @@ namespace tools
                               m_do_rise_transfer(false),
                               m_watch_only(false), 
                               m_last_pow_block_h(0), 
+                              m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
                               m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {};
   public:
@@ -328,6 +334,7 @@ namespace tools
                 m_log_prefix("???"),
                 m_watch_only(false), 
                 m_last_pow_block_h(0), 
+                m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
                 m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
     {
       m_core_runtime_config = currency::get_default_core_runtime_config();
@@ -495,6 +502,7 @@ namespace tools
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
+    void set_minimum_height(uint64_t h);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
     uint64_t balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const;
@@ -632,9 +640,11 @@ namespace tools
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
-    uint64_t get_blockchain_current_height() const { return m_blockchain.size(); }
+    inline uint64_t get_blockchain_current_size() const {
+      return m_chain.get_blockchain_current_size();
+    }
     
-    uint64_t get_top_block_height() const { return m_blockchain.empty() ? 0 : m_blockchain.size() - 1; }
+    uint64_t get_top_block_height() const { return m_chain.get_top_block_height(); }
 
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
@@ -667,8 +677,27 @@ namespace tools
           return;
         }
       }
+      //convert from old version
+      if (ver < 150)
+      {
+        LOG_PRINT_MAGENTA("Converting blockchain into a short form...", LOG_LEVEL_0);
+        std::vector<crypto::hash> old_blockchain;
+        a & old_blockchain;
+        uint64_t count = 0;
+        for (auto& h : old_blockchain)
+        {
+          m_chain.push_new_block_id(h, count);
+          count++;
+        }
+        LOG_PRINT_MAGENTA("Converting done", LOG_LEVEL_0);
+      }
+      else
+      {
+        a & m_chain;
+        a & m_minimum_height;
+      }
 
-      a & m_blockchain;
+
       a & m_transfers;
       a & m_multisig_transfers;
       a & m_key_images;      
@@ -696,7 +725,7 @@ namespace tools
     //for unit tests
     friend class ::test_generator;
     
-    //next functions in public area only because of test_generator
+    //next functions in public area only becausce of test_generator
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
     bool prepare_and_sign_pos_block(currency::block& b,
@@ -761,8 +790,7 @@ private:
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b);
-    void detach_blockchain(uint64_t height);
-    void get_short_chain_history(std::list<crypto::hash>& ids);
+    void detach_blockchain(uint64_t including_height);
     bool extract_offers_from_transfer_entry(size_t i, std::unordered_map<crypto::hash, bc_services::offer_details_ex>& offers_local);
     bool select_my_offers(std::list<bc_services::offer_details_ex>& offers);
     bool clear();
@@ -875,6 +903,12 @@ private:
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
+    void push_new_block_id(const crypto::hash& id, uint64_t height);
+    bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);
+    //void get_short_chain_history(std::list<crypto::hash>& ids);
+    //void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed);
+    uint64_t detach_from_block_ids(uint64_t height);
+    uint64_t get_wallet_minimum_height();
 
     currency::account_base m_account;
     bool m_watch_only;
@@ -882,8 +916,8 @@ private:
     std::wstring m_wallet_file;
     std::wstring m_pending_ki_file;
     std::string m_password;
-    std::vector<crypto::hash> m_blockchain;
-    std::atomic<uint64_t> m_local_bc_height; //temporary workaround 
+    uint64_t m_minimum_height;
+
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
     uint64_t m_pos_mint_packing_size;
@@ -910,6 +944,7 @@ private:
     uint64_t m_last_pow_block_h;
     currency::core_runtime_config m_core_runtime_config;
     escrow_contracts_container m_contracts;
+    wallet_chain_shortener m_chain;
     std::list<expiration_entry_info> m_money_expirations;
     //optimization for big wallets and batch tx
 
@@ -1060,7 +1095,7 @@ namespace tools
     idle_condition_cb_t idle_condition_cb,
     const currency::core_runtime_config &runtime_config)
   {
-    cxt.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
+    cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
     uint64_t timstamp_start = runtime_config.get_core_time();
     uint64_t timstamp_last_idle_call = runtime_config.get_core_time();
     cxt.rsp.iterations_processed = 0;
@@ -1099,7 +1134,7 @@ namespace tools
           if (!idle_condition_cb())
           {
             LOG_PRINT_L0("Detected new block, minting interrupted");
-            cxt.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
+            cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
             return false;
           }
           timstamp_last_idle_call = runtime_config.get_core_time();
@@ -1143,7 +1178,7 @@ namespace tools
             LOG_LEVEL_0);
           cxt.rsp.index = i;
           cxt.rsp.block_timestamp = ts;
-          cxt.rsp.status = CORE_RPC_STATUS_OK;
+          cxt.rsp.status = API_RETURN_CODE_OK;
           return true;
         }
         
@@ -1152,7 +1187,7 @@ namespace tools
         
       }
     }
-    cxt.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
+    cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
     return false;
   }
 

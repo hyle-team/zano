@@ -218,7 +218,8 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+65)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+66)
+
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
@@ -233,6 +234,7 @@
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   1440
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999
 #endif
+
 
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");

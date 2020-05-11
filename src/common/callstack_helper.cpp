@@ -118,9 +118,9 @@ namespace tools
 
     DWORD cb_needed;
     std::vector<HMODULE> module_handles(1);
-    EnumProcessModules(h_process, &module_handles[0], module_handles.size() * sizeof(HMODULE), &cb_needed);
+    EnumProcessModules(h_process, &module_handles[0], static_cast<DWORD>(module_handles.size() * sizeof(HMODULE)), &cb_needed);
     module_handles.resize(cb_needed / sizeof(HMODULE));
-    EnumProcessModules(h_process, &module_handles[0], module_handles.size() * sizeof(HMODULE), &cb_needed);
+    EnumProcessModules(h_process, &module_handles[0], static_cast<DWORD>(module_handles.size() * sizeof(HMODULE)), &cb_needed);
 
     std::vector<module_data> modules;
     std::transform(module_handles.begin(), module_handles.end(), std::back_inserter(modules), get_mod_info(h_process));

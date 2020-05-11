@@ -323,8 +323,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     req.txid = get_transaction_hash(tx);
     bool r = m_core_proxy->call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(req, res);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_o_indexes.bin");
-    THROW_IF_TRUE_WALLET_EX(res.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "get_o_indexes.bin");
-    THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_out_indices_error, res.status);
+    THROW_IF_TRUE_WALLET_EX(res.status == API_RETURN_CODE_BUSY, error::daemon_busy, "get_o_indexes.bin");
+    THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_out_indices_error, res.status);
     THROW_IF_TRUE_WALLET_EX(res.o_indexes.size() != tx.vout.size(), error::wallet_internal_error,
       "transactions outputs size=" + std::to_string(tx.vout.size()) +
       " not match with COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES response size=" + std::to_string(res.o_indexes.size()));
@@ -512,7 +512,7 @@ void wallet2::resend_unconfirmed()
   
   bool r = m_core_proxy->call_COMMAND_RPC_FORCE_RELAY_RAW_TXS(req, res);
   WLT_CHECK_AND_ASSERT_MES(r, void(), "wrong result at call_COMMAND_RPC_FORCE_RELAY_RAW_TXS");
-  WLT_CHECK_AND_ASSERT_MES(res.status == CORE_RPC_STATUS_OK, void(), "wrong result at call_COMMAND_RPC_FORCE_RELAY_RAW_TXS: status != OK, status=" << res.status);		
+  WLT_CHECK_AND_ASSERT_MES(res.status == API_RETURN_CODE_OK, void(), "wrong result at call_COMMAND_RPC_FORCE_RELAY_RAW_TXS: status != OK, status=" << res.status);		
 
   WLT_LOG_GREEN("Relayed " << req.txs_as_hex.size() << " txs", LOG_LEVEL_0);
 }
@@ -1075,8 +1075,8 @@ void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<s
 void wallet2::process_new_blockchain_entry(const currency::block& b, const currency::block_direct_data_entry& bche, const crypto::hash& bl_id, uint64_t height)
 {
   //handle transactions from new block
-  THROW_IF_TRUE_WALLET_EX(height != m_blockchain.size(), error::wallet_internal_error,
-    "current_index=" + std::to_string(height) + ", m_blockchain.size()=" + std::to_string(m_blockchain.size()));
+  THROW_IF_TRUE_WALLET_EX(height != get_blockchain_current_size() && !(height == m_minimum_height && get_blockchain_current_size() <= 1), error::wallet_internal_error,
+    "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_size()));
 
   //optimization: seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
   if (b.timestamp + 60 * 60 * 24 > m_account.get_createtime())
@@ -1096,8 +1096,7 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
   {
     WLT_LOG_L3( "Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime());
   }
-  m_blockchain.push_back(bl_id);
-  ++m_local_bc_height;
+  m_chain.push_new_block_id(bl_id, height); //m_blockchain.push_back(bl_id);
   m_last_bc_timestamp = b.timestamp;
   if (!is_pos_block(b))
     m_last_pow_block_h = height;
@@ -1105,32 +1104,56 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
   m_wcallback->on_new_block(height, b);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_short_chain_history(std::list<crypto::hash>& ids)
+
+//----------------------------------------------------------------------------------------------------
+// void wallet2::get_short_chain_history(std::list<crypto::hash>& ids)
+// {
+//   ids.clear();
+//   size_t i = 0;
+//   size_t current_multiplier = 1;
+//   size_t sz = get_blockchain_current_height();
+//   if(!sz)
+//     return;
+//   size_t current_back_offset = 1;
+//   bool genesis_included = false;
+//   while(current_back_offset < sz)
+//   {
+//     ids.push_back(m_blockchain[sz-current_back_offset]);
+//     if(sz-current_back_offset == 0)
+//       genesis_included = true;
+//     if(i < 10)
+//     {
+//       ++current_back_offset;
+//     }else
+//     {
+//       current_back_offset += current_multiplier *= 2;
+//     }
+//     ++i;
+//   }
+//   if(!genesis_included)
+//     ids.push_back(m_blockchain[0]);
+// }
+
+//----------------------------------------------------------------------------------------------------
+void wallet2::set_minimum_height(uint64_t h)
 {
-  ids.clear();
-  size_t i = 0;
-  size_t current_multiplier = 1;
-  size_t sz = m_blockchain.size();
-  if(!sz)
-    return;
-  size_t current_back_offset = 1;
-  bool genesis_included = false;
-  while(current_back_offset < sz)
-  {
-    ids.push_back(m_blockchain[sz-current_back_offset]);
-    if(sz-current_back_offset == 0)
-      genesis_included = true;
-    if(i < 10)
-    {
-      ++current_back_offset;
-    }else
-    {
-      current_back_offset += current_multiplier *= 2;
-    }
-    ++i;
-  }
-  if(!genesis_included)
-    ids.push_back(m_blockchain[0]);
+  m_minimum_height = h;
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_wallet_minimum_height()
+{
+ 
+  if (m_minimum_height != WALLET_MINIMUM_HEIGHT_UNSET_CONST)
+    return m_minimum_height;
+
+  currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request req = AUTO_VAL_INIT(req);
+  currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response res = AUTO_VAL_INIT(res);
+  req.timestamp = m_account.get_createtime();
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(req, res);
+  THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(res.status == API_RETURN_CODE_OK, "FAILED TO CALL COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE");
+  m_minimum_height = res.h;
+  return res.h;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
@@ -1138,12 +1161,14 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   blocks_added = 0;
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response res = AUTO_VAL_INIT(res);
-  get_short_chain_history(req.block_ids);
+
+  req.minimum_height = get_wallet_minimum_height();
+  m_chain.get_short_chain_history(req.block_ids);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "getblocks.bin");
-
-  if (res.status == CORE_RPC_STATUS_GENESIS_MISMATCH)
+  WLT_LOG_L0("COMMAND_RPC_GET_BLOCKS_DIRECT: " << epee::serialization::store_t_to_json(req));
+  if (res.status == API_RETURN_CODE_GENESIS_MISMATCH)
   {
     WLT_LOG_MAGENTA("Reseting genesis block...", LOG_LEVEL_0);
     COMMAND_RPC_GET_BLOCKS_DETAILS::request gbd_req = AUTO_VAL_INIT(gbd_req);
@@ -1153,78 +1178,113 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
     gbd_req.ignore_transactions = true;
     r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DETAILS(gbd_req, gbd_res);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_blocks_details");
-    THROW_IF_TRUE_WALLET_EX(gbd_res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, gbd_res.status);
+    THROW_IF_TRUE_WALLET_EX(gbd_res.status != API_RETURN_CODE_OK, error::get_blocks_error, gbd_res.status);
     THROW_IF_TRUE_WALLET_EX(gbd_res.blocks.size() == 0, error::get_blocks_error, gbd_res.status);
     crypto::hash new_genesis_id = null_hash;
     r = string_tools::parse_tpod_from_hex_string(gbd_res.blocks.back().id, new_genesis_id);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_blocks_details");
     reset_all();
-    m_blockchain.push_back(new_genesis_id);
+    m_chain.set_genesis(new_genesis_id);
     WLT_LOG_MAGENTA("New genesis set for wallet: " << new_genesis_id, LOG_LEVEL_0);
-    get_short_chain_history(req.block_ids);
+    m_chain.get_short_chain_history(req.block_ids);
     //req.block_ids.push_back(new_genesis_id);
     bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getblocks.bin");
   }
-  if (res.status == CORE_RPC_STATUS_BUSY)
+  if (res.status == API_RETURN_CODE_BUSY)
   {
     WLT_LOG_L1("Core is busy, pull cancelled");
     stop = true;
     return;
   }
-  THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
-  THROW_IF_TRUE_WALLET_EX(m_blockchain.size() && m_blockchain.size() <= res.start_height, error::wallet_internal_error,
+  THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
+  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() && get_blockchain_current_size() <= res.start_height && res.start_height != m_minimum_height, error::wallet_internal_error,
     "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
-    " not less than local blockchain size=" + std::to_string(m_blockchain.size()));
+    " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
 
   handle_pulled_blocks(blocks_added, stop, res);
 }
+
 //----------------------------------------------------------------------------------------------------
 void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop, 
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res)
 {
   size_t current_index = res.start_height;
-
-  if (res.start_height == 0 && m_blockchain.size() == 1 && !res.blocks.empty())
+  bool been_matched_block = false;
+  if (res.start_height == 0 && get_blockchain_current_size() == 1 && !res.blocks.empty())
   {
     const currency::block& genesis = res.blocks.front().block_ptr->bl;
     THROW_IF_TRUE_WALLET_EX(get_block_height(genesis) != 0, error::wallet_internal_error, "first block expected to be genesis");
     process_genesis_if_needed(genesis);
     res.blocks.pop_front();
     ++current_index;
+    been_matched_block = true;
   }
 
+  uint64_t last_matched_index = 0;
   for(const auto& bl_entry: res.blocks)
   {
     if (stop)
       break;
 
     const currency::block& bl = bl_entry.block_ptr->bl;
+    uint64_t height = get_block_height(bl);
+    uint64_t processed_blocks_count = get_blockchain_current_size();
 
     //TODO: get_block_hash is slow
     crypto::hash bl_id = get_block_hash(bl);
 
-    if (current_index >= m_blockchain.size())
-    {
-      process_new_blockchain_entry(bl, bl_entry, bl_id, current_index);
-      ++blocks_added;
+    if (processed_blocks_count != 1 && height > processed_blocks_count)
+    {//internal error: 
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false,
+        "height{" << height <<"} > processed_blocks_count{" << processed_blocks_count << "}");
     }
-    else if(bl_id != m_blockchain[current_index])
+    else if (height == processed_blocks_count)
     {
-      //split detected here !!!
-      THROW_IF_TRUE_WALLET_EX(current_index == res.start_height, error::wallet_internal_error,
-        "wrong daemon response: split starts from the first block in response " + string_tools::pod_to_hex(bl_id) + 
-        " (height " + std::to_string(res.start_height) + "), local block id at this height: " +
-        string_tools::pod_to_hex(m_blockchain[current_index]));
+      //regular block handling
+      //self check
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(been_matched_block,
+        "internal error: been_matched_block == false on process_new_blockchain_entry, bl_id" << bl_id << "h=" << height 
+         << " (start_height=" + std::to_string(res.start_height) + ")");
 
-      detach_blockchain(current_index);
       process_new_blockchain_entry(bl, bl_entry, bl_id, current_index);
       ++blocks_added;
     }
     else
-    {
-      WLT_LOG_L2("Block " << bl_id << " @ " << current_index << " is already in wallet's blockchain");
+    { 
+      //checking if we need reorganize (might be just first matched block)
+      bool block_found = false;
+      bool block_matched = false;
+      bool full_reset_needed = false;
+      m_chain.check_if_block_matched(height, bl_id, block_found, block_matched, full_reset_needed);
+      if (block_found && block_matched)
+      {
+        //block matched in that number
+        last_matched_index = height;
+        been_matched_block = true;
+        WLT_LOG_L2("Block " << bl_id << " @ " << height << " is already in wallet's blockchain");
+      }
+      else
+      {
+        //this should happen ONLY after block been matched, if not then is internal error
+        if (full_reset_needed)
+        {
+          last_matched_index = 0;
+          been_matched_block = true;
+        }
+        else
+        {
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(been_matched_block,
+            "unmatched block while never been mathced block");
+        }
+        //TODO: take into account date of wallet creation
+        //reorganize
+        detach_blockchain(last_matched_index+1);
+        process_new_blockchain_entry(bl, bl_entry, bl_id, height);
+        ++blocks_added;
+      }
     }
+
 
     ++current_index;
     if (res.current_height > m_height_of_start_sync)
@@ -1238,7 +1298,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
     }
   }
 
-  WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << m_blockchain.size());
+  WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << get_blockchain_current_size());
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_sync_progress()
@@ -1290,8 +1350,8 @@ void wallet2::update_current_tx_limit()
   currency::COMMAND_RPC_GET_INFO::response res = AUTO_VAL_INIT(res);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_INFO(req, res);
   THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getinfo");
-  THROW_IF_TRUE_WALLET_EX(res.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "getinfo");
-  THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
+  THROW_IF_TRUE_WALLET_EX(res.status == API_RETURN_CODE_BUSY, error::daemon_busy, "getinfo");
+  THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
   THROW_IF_TRUE_WALLET_EX(res.current_blocks_median < CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE, error::get_blocks_error, "bad median size");
   m_upper_transaction_size_limit = res.current_blocks_median - CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
 }
@@ -1313,7 +1373,7 @@ bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& t
     currency::COMMAND_RPC_GET_ALIAS_DETAILS::response res = AUTO_VAL_INIT(res);
     req.alias = tei.m_alias.m_alias;
     m_core_proxy->call_COMMAND_RPC_GET_ALIAS_DETAILS(req, res);
-    if (res.status != CORE_RPC_STATUS_OK)
+    if (res.status != API_RETURN_CODE_OK)
       return false;
     if (local_adr == res.alias_details.address)
       return true;
@@ -1328,11 +1388,11 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
   currency::COMMAND_RPC_GET_TX_POOL::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_TX_POOL::response res = AUTO_VAL_INIT(res);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_TX_POOL(req, res);
-  if (res.status == CORE_RPC_STATUS_BUSY)
+  if (res.status == API_RETURN_CODE_BUSY)
     throw error::daemon_busy(LOCATION_STR, "get_tx_pool");
   if (!r)
     throw error::no_connection_to_daemon(LOCATION_STR, "get_tx_pool");
-  THROW_IF_TRUE_WALLET_EX(res.status != CORE_RPC_STATUS_OK, error::get_blocks_error, res.status);
+  THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
   
 
   //- @#@ ----- debug 
@@ -1615,7 +1675,7 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
   size_t added_blocks = 0;
   size_t try_count = 0;
   crypto::hash last_tx_hash_id = m_transfers.size() ? get_transaction_hash(m_transfers.back().m_ptx_wallet_info->m_tx) : null_hash;
-  m_height_of_start_sync = m_blockchain.size();
+  m_height_of_start_sync = get_blockchain_current_size();
   m_last_sync_percent = 0;
   while (!stop.load(std::memory_order_relaxed))
   {
@@ -1723,15 +1783,25 @@ bool wallet2::refresh(size_t & blocks_fetched, bool& received_money, bool& ok, s
   }
   return ok;
 }
+
 //----------------------------------------------------------------------------------------------------
-void wallet2::detach_blockchain(uint64_t height)
+uint64_t wallet2::detach_from_block_ids(uint64_t including_height)
 {
-  WLT_LOG_L0("Detaching blockchain on height " << height);
+  //calculate number of erased blocks
+  uint64_t blocks_detached = get_blockchain_current_size() - including_height;
+  //id at height should be kept, the rest - erased
+  m_chain.detach(including_height);
+  return blocks_detached;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::detach_blockchain(uint64_t including_height)
+{
+  WLT_LOG_L0("Detaching blockchain on height " << including_height);
   size_t transfers_detached = 0;
 
   // rollback incoming transfers from detaching subchain
   {
-    auto it = std::find_if(m_transfers.begin(), m_transfers.end(), [&](const transfer_details& td){return td.m_ptx_wallet_info->m_block_height >= height; });
+    auto it = std::find_if(m_transfers.begin(), m_transfers.end(), [&](const transfer_details& td){return td.m_ptx_wallet_info->m_block_height >= including_height; });
     if (it != m_transfers.end())
     {
       size_t i_start = it - m_transfers.begin();
@@ -1740,7 +1810,7 @@ void wallet2::detach_blockchain(uint64_t height)
       {
         auto it_ki = m_key_images.find(m_transfers[i].m_key_image);
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= height, "transfer #" << i << " block height is less than " << height);
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
         m_key_images.erase(it_ki);
         ++transfers_detached;
       }
@@ -1748,9 +1818,7 @@ void wallet2::detach_blockchain(uint64_t height)
     }
   }
  
-  size_t blocks_detached = m_blockchain.end() - (m_blockchain.begin()+height);
-  m_blockchain.erase(m_blockchain.begin()+height, m_blockchain.end());
-  m_local_bc_height -= blocks_detached;
+  size_t blocks_detached = detach_from_block_ids(including_height);
 
   //rollback spends
   // do not clear spent flag in spent transfers as corresponding txs are most likely in the pool
@@ -1758,7 +1826,7 @@ void wallet2::detach_blockchain(uint64_t height)
   for (size_t i = 0, sz = m_transfers.size(); i < sz; ++i)
   {
     auto& tr = m_transfers[i];
-    if (tr.m_spent_height >= height)
+    if (tr.m_spent_height >= including_height)
     {
       WLT_LOG_BLUE("Transfer [" << i << "] spent height: " << tr.m_spent_height << " -> 0, reason: detaching blockchain", LOG_LEVEL_1);
       tr.m_spent_height = 0;
@@ -1769,7 +1837,7 @@ void wallet2::detach_blockchain(uint64_t height)
   auto tr_hist_it = m_transfer_history.rend();
   for (auto it = m_transfer_history.rbegin(); it != m_transfer_history.rend(); it++)
   {
-    if (it->height < height)
+    if (it->height < including_height)
       break;
     tr_hist_it = it; // note that tr_hist_it->height >= height
   }
@@ -1799,13 +1867,13 @@ void wallet2::detach_blockchain(uint64_t height)
   //rollback payments
   for (auto it = m_payments.begin(); it != m_payments.end(); )
   {
-    if(height <= it->second.m_block_height)
+    if(including_height <= it->second.m_block_height)
       it = m_payments.erase(it);
     else
       ++it;
   }
 
-  WLT_LOG_L0("Detached blockchain on height " << height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached);
+  WLT_LOG_L0("Detached blockchain on height " << including_height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::deinit()
@@ -1817,15 +1885,17 @@ bool wallet2::deinit()
 bool wallet2::clear()
 {
   reset_all();
-  currency::block b;
-  currency::generate_genesis_block(b);
-  m_blockchain.push_back(get_block_hash(b));
+  //currency::block b;
+  //currency::generate_genesis_block(b);
+  m_chain.clear();
+  //m_blockchain.push_back(get_block_hash(b));
   return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::reset_all()
 {
-  m_blockchain.clear();
+  //m_blockchain.clear();
+  m_chain.clear();
   m_transfers.clear();
   m_key_images.clear();
   // m_pending_key_images is not cleared intentionally
@@ -1838,7 +1908,7 @@ bool wallet2::reset_all()
   m_transfer_history.clear();
   //m_account = AUTO_VAL_INIT(m_account);
 
-  m_local_bc_height = 1;
+  //m_local_bc_size = 1; //including genesis
   m_last_bc_timestamp = 0;
   m_height_of_start_sync = 0;
   m_last_sync_percent = 0;
@@ -2080,7 +2150,6 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   {
     reset_history();
   }  
-  m_local_bc_height = m_blockchain.size();
   THROW_IF_TRUE_WALLET_EX(need_to_resync, error::wallet_load_notice_wallet_restored, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
   WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) << " with public address: " << m_account.get_public_address_str());
@@ -2628,7 +2697,7 @@ bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& sta
     return false;
 
   //prevent staking of after-last-pow-coins
-  if (m_blockchain.size() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age)
+  if (get_blockchain_current_size() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age)
     return false;
   
   if (tr.m_ptx_wallet_info->m_block_height > m_last_pow_block_h)
@@ -2753,14 +2822,14 @@ bool wallet2::fill_mining_context(mining_context& ctx)
 
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request pos_details_req = AUTO_VAL_INIT(pos_details_req);
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::response pos_details_resp = AUTO_VAL_INIT(pos_details_resp);
-  ctx.rsp.status = CORE_RPC_STATUS_NOT_FOUND;
+  ctx.rsp.status = API_RETURN_CODE_NOT_FOUND;
   m_core_proxy->call_COMMAND_RPC_GET_POS_MINING_DETAILS(pos_details_req, pos_details_resp);
-  if (pos_details_resp.status != CORE_RPC_STATUS_OK)
+  if (pos_details_resp.status != API_RETURN_CODE_OK)
     return false;
   ctx.basic_diff.assign(pos_details_resp.pos_basic_difficulty);
   ctx.sm = pos_details_resp.sm;
   ctx.rsp.last_block_hash = pos_details_resp.last_block_hash;
-  ctx.rsp.status = CORE_RPC_STATUS_OK;
+  ctx.rsp.status = API_RETURN_CODE_OK;
   ctx.rsp.is_pos_allowed = pos_details_resp.pos_mining_allowed;
   ctx.rsp.starter_timestamp = pos_details_resp.starter_timestamp;
   return true;
@@ -2798,7 +2867,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     return true;
   }, m_core_runtime_config);
   
-  if (ctx.rsp.status == CORE_RPC_STATUS_OK)
+  if (ctx.rsp.status == API_RETURN_CODE_OK)
   {
     build_minted_block(ctx.sp, ctx.rsp, miner_address);
   }
@@ -2813,9 +2882,7 @@ bool wallet2::reset_history()
   std::string pass = m_password;
   std::wstring file_path = m_wallet_file;
   account_base acc_tmp = m_account;
-  crypto::hash genesis_hash = m_blockchain[0];
   clear();
-  m_blockchain[0] = genesis_hash;
   m_account = acc_tmp;
   m_password = pass;
   prepare_file_names(file_path);
@@ -2856,7 +2923,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
       WLT_LOG_GREEN("Packing inputs: " << pack_tx.vin.size() << " inputs consolidated in tx " << get_transaction_hash(pack_tx), LOG_LEVEL_0);
     }
     m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
-    WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == CORE_RPC_STATUS_OK, false, "Failed to create block template after kernel hash found!");
+    WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == API_RETURN_CODE_OK, false, "Failed to create block template after kernel hash found!");
 
     currency::block b = AUTO_VAL_INIT(b);
     currency::blobdata block_blob;
@@ -2905,7 +2972,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
       subm_req.explicit_txs.push_back(hexemizer{ tmpl_req.explicit_transaction });
     
     m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
-    if (subm_rsp.status != CORE_RPC_STATUS_OK)
+    if (subm_rsp.status != API_RETURN_CODE_OK)
     {
       WLT_LOG_ERROR("Constructed block is not accepted by core, status: " << subm_rsp.status);
       return false;
@@ -2950,20 +3017,20 @@ bool wallet2::is_transfer_unlocked(const transfer_details& td, bool for_pos_mini
   if (td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_BLOCKED)
     return false; 
 
-  if (td.m_ptx_wallet_info->m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE > m_blockchain.size())
+  if (td.m_ptx_wallet_info->m_block_height + WALLET_DEFAULT_TX_SPENDABLE_AGE > get_blockchain_current_size())
     return false;
 
   
 
   uint64_t unlock_time = get_tx_unlock_time(td.m_ptx_wallet_info->m_tx, td.m_internal_output_index);
-  if (for_pos_mining && m_blockchain.size() > m_core_runtime_config.hard_fork_01_starts_after_height)
+  if (for_pos_mining && get_blockchain_current_size() > m_core_runtime_config.hard_fork_01_starts_after_height)
   {
     //allowed of staking locked coins with 
     stake_lock_time = unlock_time;
   }
   else
   {
-    if (!currency::is_tx_spendtime_unlocked(unlock_time, m_blockchain.size(), m_core_runtime_config.get_core_time()))
+    if (!currency::is_tx_spendtime_unlocked(unlock_time, get_blockchain_current_size(), m_core_runtime_config.get_core_time()))
       return false;
   }
   return true;
@@ -3556,8 +3623,8 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
 
     bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, daemon_resp);
     THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs.bin");
-    THROW_IF_FALSE_WALLET_EX(daemon_resp.status != CORE_RPC_STATUS_BUSY, error::daemon_busy, "getrandom_outs.bin");
-    THROW_IF_FALSE_WALLET_EX(daemon_resp.status == CORE_RPC_STATUS_OK, error::get_random_outs_error, daemon_resp.status);
+    THROW_IF_FALSE_WALLET_EX(daemon_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs.bin");
+    THROW_IF_FALSE_WALLET_EX(daemon_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, daemon_resp.status);
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(daemon_resp.outs.size() == selected_indicies.size(), 
       "daemon returned wrong response for getrandom_outs.bin, wrong amounts count = " << daemon_resp.outs.size() << ", expected: " << selected_indicies.size());
 
@@ -3666,9 +3733,9 @@ void wallet2::send_transaction_to_network(const transaction& tx)
   COMMAND_RPC_SEND_RAW_TX::response daemon_send_resp;
   bool r = m_core_proxy->call_COMMAND_RPC_SEND_RAW_TX(req, daemon_send_resp);
   THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "sendrawtransaction");
-  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "sendrawtransaction");
-  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == CORE_RPC_STATUS_DISCONNECTED, error::wallet_internal_error, "Transfer attempt while daemon offline");
-  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != CORE_RPC_STATUS_OK, error::tx_rejected, tx, daemon_send_resp.status);
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_BUSY, error::daemon_busy, "sendrawtransaction");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::wallet_internal_error, "Transfer attempt while daemon offline");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, error::tx_rejected, tx, daemon_send_resp.status);
 
   WLT_LOG_L2("transaction " << get_transaction_hash(tx) << " generated ok and sent to daemon:" << ENDL << currency::obj_to_json_str(tx));
 }
@@ -4061,27 +4128,27 @@ void wallet2::process_genesis_if_needed(const currency::block& genesis)
   if (!m_transfers.empty() || !m_key_images.empty())
     return;
 
-  THROW_IF_TRUE_WALLET_EX(m_blockchain.size() > 1, error::wallet_internal_error, "Can't change wallet genesis block once the blockchain has been populated");
+  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() > 1, error::wallet_internal_error, "Can't change wallet genesis block once the blockchain has been populated");
 
   crypto::hash genesis_hash = get_block_hash(genesis);
-  if (m_blockchain.size() == 1 && m_blockchain[0] != genesis_hash)
-      WLT_LOG_L0("Changing genesis block for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_blockchain[0] << " -> " << genesis_hash);
+  if (get_blockchain_current_size() == 1 && m_chain.get_genesis() != genesis_hash)
+      WLT_LOG_L0("Changing genesis block for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_chain.get_genesis() << " -> " << genesis_hash);
 
-  m_blockchain.clear();
+  //m_blockchain.clear();
 
-  m_blockchain.push_back(genesis_hash);
-  m_local_bc_height = 1;
+  //m_blockchain.push_back(genesis_hash);
+  m_chain.set_genesis(genesis_hash);
   m_last_bc_timestamp = genesis.timestamp;
 
   WLT_LOG_L2("Processing genesis block: " << genesis_hash);
   process_new_transaction(genesis.miner_tx, 0, genesis);
 }
-
+//----------------------------------------------------------------------------------------------------
 void wallet2::set_genesis(const crypto::hash& genesis_hash)
 {
-  THROW_IF_TRUE_WALLET_EX(m_blockchain.size() != 1, error::wallet_internal_error, "Can't change wallet genesis hash once the blockchain has been populated");
-  WLT_LOG_L0("Changing genesis hash for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_blockchain[0] << " -> " << genesis_hash);
-  m_blockchain[0] = genesis_hash;
+  THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() != 1, error::wallet_internal_error, "Can't change wallet genesis hash once the blockchain has been populated");
+  WLT_LOG_L0("Changing genesis hash for wallet " << m_account.get_public_address_str() << ":" << ENDL << "    " << m_chain.get_genesis() << " -> " << genesis_hash);
+  m_chain.set_genesis(genesis_hash);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee /* = UINT64_MAX */)
@@ -4107,7 +4174,7 @@ uint64_t wallet2::get_tx_expiration_median() const
   currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response res = AUTO_VAL_INIT(res);
   m_core_proxy->call_COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN(req, res);
 
-  if (res.status != CORE_RPC_STATUS_OK)
+  if (res.status != API_RETURN_CODE_OK)
   {
     WLT_LOG_ERROR("COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN failed, status: " << res.status);
     return 0;
@@ -4496,8 +4563,8 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, rpc_get_random_outs_resp);
     
     THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs.bin");
-    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status != CORE_RPC_STATUS_BUSY, error::daemon_busy, "getrandom_outs.bin");
-    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status == CORE_RPC_STATUS_OK, error::get_random_outs_error, rpc_get_random_outs_resp.status);
+    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs.bin");
+    THROW_IF_FALSE_WALLET_EX(rpc_get_random_outs_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, rpc_get_random_outs_resp.status);
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(rpc_get_random_outs_resp.outs.size() == selected_transfers.size(),
       "daemon returned wrong number of amounts for getrandom_outs.bin: " << rpc_get_random_outs_resp.outs.size() << ", requested: " << selected_transfers.size());
 

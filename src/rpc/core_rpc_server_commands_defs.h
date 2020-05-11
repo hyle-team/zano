@@ -15,16 +15,10 @@
 #include "storages/portable_storage_base.h"
 #include "currency_core/offers_service_basics.h"
 #include "currency_core/basic_api_response_codes.h"
+#include "common/error_codes.h"
 namespace currency
 {
   //-----------------------------------------------
-#define CORE_RPC_STATUS_OK                 BASIC_RESPONSE_STATUS_OK
-#define CORE_RPC_STATUS_BUSY               BASIC_RESPONSE_STATUS_BUSY
-#define CORE_RPC_STATUS_NOT_FOUND          BASIC_RESPONSE_STATUS_NOT_FOUND
-#define CORE_RPC_STATUS_FAILED             BASIC_RESPONSE_STATUS_FAILED
-#define CORE_RPC_STATUS_GENESIS_MISMATCH   "GENESIS_MISMATCH"
-#define CORE_RPC_STATUS_DISCONNECTED       "DISCONNECTED"
-
 
   struct alias_rpc_details_base
   {
@@ -115,9 +109,11 @@ namespace currency
 
     struct request
     {
+      uint64_t minimum_height;
       std::list<crypto::hash> block_ids; //*first 10 blocks id goes sequential, next goes in pow(2,n) offset, like 2, 4, 8, 16, 32, 64 and so on, and the last one is always genesis block */
 
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(minimum_height)
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids)
       END_KV_SERIALIZE_MAP()
     };
@@ -141,8 +137,6 @@ namespace currency
   typedef COMMAND_RPC_GET_BLOCKS_FAST_T<block_complete_entry> COMMAND_RPC_GET_BLOCKS_FAST;
   typedef COMMAND_RPC_GET_BLOCKS_FAST_T<block_direct_data_entry> COMMAND_RPC_GET_BLOCKS_DIRECT;
   
-
-
   //-----------------------------------------------
   struct COMMAND_RPC_GET_TRANSACTIONS
   {
@@ -165,6 +159,30 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs_as_hex)
         KV_SERIALIZE(missed_tx)
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  //-----------------------------------------------
+  struct COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE
+  {
+    struct request
+    {
+      uint64_t timestamp;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(timestamp)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      uint64_t h;
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(h)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };
