@@ -631,6 +631,7 @@ namespace tools
     void enumerate_unconfirmed_transfers(callback_t cb) const;
 
     bool is_watch_only() const { return m_watch_only; }
+    bool is_auditable() const { return m_account.get_public_address().is_auditable(); }
     void sign_transfer(const std::string& tx_sources_blob, std::string& signed_tx_blob, currency::transaction& tx);
     void sign_transfer_files(const std::string& tx_sources_file, const std::string& signed_tx_file, currency::transaction& tx);
     void submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx);

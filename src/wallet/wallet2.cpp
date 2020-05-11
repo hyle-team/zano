@@ -263,10 +263,15 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   {
     if (in.type() == typeid(currency::txin_to_key))
     {
-      auto it = m_key_images.find(boost::get<currency::txin_to_key>(in).k_image);
+      const currency::txin_to_key& intk = boost::get<currency::txin_to_key>(in);
+      
+      // TODO: check for references to our UTXO (auditability)
+      // intk.key_offsets;
+
+      auto it = m_key_images.find(intk.k_image);
       if (it != m_key_images.end())
       {
-        tx_money_spent_in_ins += boost::get<currency::txin_to_key>(in).amount;
+        tx_money_spent_in_ins += intk.amount;
         transfer_details& td = m_transfers[it->second];
         uint32_t flags_before = td.m_flags;
         td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT;
@@ -341,6 +346,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         crypto::key_image ki = currency::null_ki;
         if (m_watch_only)
         {
+          if (!is_auditable())
+        {
           // don't have spend secret key, so we unable to calculate key image for an output
           // look it up in special container instead
           auto it = m_pending_key_images.find(otk.key);
@@ -354,6 +361,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             ki = currency::null_ki;
             WLT_LOG_L1("can't find pending key image by out pub key: " << otk.key << ", key image temporarily set to null");
           }
+        }
         }
         else
         {
