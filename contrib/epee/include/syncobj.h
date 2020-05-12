@@ -705,7 +705,8 @@ namespace epee
 #define  EXCLUSIVE_CRITICAL_REGION_LOCAL(x) boost::unique_lock< boost::shared_mutex > critical_region_var(x)
 
 #define  SHARED_CRITICAL_REGION_BEGIN(x) { SHARED_CRITICAL_REGION_LOCAL(x)
+#define  SHARED_CRITICAL_REGION_END() }
 #define  EXCLUSIVE_CRITICAL_REGION_BEGIN(x) { EXCLUSIVE_CRITICAL_REGION_LOCAL(x)
-
+#define  EXCLUSIVE_CRITICAL_REGION_END() }
 
 }

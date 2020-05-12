@@ -732,6 +732,16 @@ std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter
 
 std::string wallets_manager::open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr)
 {
+  // check if that file already opened
+  SHARED_CRITICAL_REGION_BEGIN(m_wallets_lock);
+  for (auto& wallet_entry : m_wallets)
+  {
+    if (wallet_entry.second.w.unlocked_get()->get_wallet_path() == path)
+      return API_RETURN_CODE_ALREADY_EXISTS;
+  }
+  SHARED_CRITICAL_REGION_END();
+
+
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   owr.wallet_id = m_wallet_id_counter++;
 
@@ -784,6 +794,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     }
   }
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
+
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   get_wallet_info(wo, owr.wi);
