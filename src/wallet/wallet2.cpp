@@ -4472,12 +4472,28 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_payment_id, "sending funds to yourself with payment id is not allowed");
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::check_and_throw_if_auditable_address_is_targeted_before_hf2(const construct_tx_param& ctp)
+{
+  if (get_top_block_height() <= m_core_runtime_config.hard_fork_02_starts_after_height)
+  {
+    // before HF2
+    for (auto& d : ctp.dsts)
+    {
+      for (auto& addr : d.addr)
+      {
+        WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!addr.is_auditable(), "sending fund to an auditable address is not supported until HF2, address = " << get_account_address_as_str(addr));
+      }
+    }
+  }
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::transfer(const construct_tx_param& ctp,
   currency::transaction &tx,
   bool send_to_network,
   std::string* p_signed_tx_blob_str)
 {
   check_and_throw_if_self_directed_tx_with_payment_id_requested(ctp);
+  check_and_throw_if_auditable_address_is_targeted_before_hf2(ctp);
 
   TIME_MEASURE_START(prepare_transaction_time);
   finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
