@@ -5,9 +5,6 @@
 #include "chaingen.h"
 #include "hard_fork_2.h"
 #include "../../src/wallet/wallet_rpc_server.h"
-//#include "pos_block_builder.h"
-//#include "tx_builder.h"
-//#include "random_helper.h"
 
 using namespace currency;
 
@@ -392,6 +389,112 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
   CHECK_AND_ASSERT_MES(ai2.m_text_comment == ai.m_text_comment && ai2.m_address == m_accounts[MINER_ACC_IDX].get_public_address(),
     false, "Incorrect alias info retunred by get_alias_info");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+hard_fork_2_auditable_addresses_basics::hard_fork_2_auditable_addresses_basics()
+  : hard_fork_2_base_test(23)
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_2_auditable_addresses_basics, c1);
+}
+
+bool hard_fork_2_auditable_addresses_basics::generate(std::vector<test_event_entry>& events) const
+{
+  /*
+    Test idea: make sure that:
+      (1) before HF2 txs with mix_attr == 1 can be sent and then they are recognized by wallet;
+      (2) before HF2 txs to an auditable address can't be sent via wallet2::transfer()
+      (3) after HF2 txs to an auditable address CAN be sent via wallet2::transfer()
+  */
+
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  generator.set_hardfork_height(1, m_hardfork_height);
+  generator.set_hardfork_height(2, m_hardfork_height);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(11), blk_0r);
+  
+  // tx_1 has outputs to an auditable address, it's allowed before HF2
+  MAKE_TX(events, tx_1, miner_acc, bob_acc, MK_TEST_COINS(5), blk_0r);
+
+  // make sure all Bob's outputs has mix_attr = 1
+  for (auto& out : tx_1.vout)
+  {
+    if (out.amount != MK_TEST_COINS(5))
+      continue; // skip change
+    uint8_t mix_attr = boost::get<txout_to_key>(out.target).mix_attr;
+    CHECK_AND_ASSERT_MES(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, false, "Incorrect mix_attr in tx_1: " << mix_attr);
+  }
+  
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1 }));
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false, stub_bool = false;
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(11), false, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(5), false, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE), false, "");
+
+  // sending coins to an auditable address should not be allowed until HF2
+  std::vector<tx_destination_entry> destination{tx_destination_entry(MK_TEST_COINS(1), bob_wlt->get_account().get_public_address())};
+  transaction tx = AUTO_VAL_INIT(tx);
+  bool exception_caught = false;
+  try
+  {
+    alice_wlt->transfer(destination, 0, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tx);
+  }
+  catch (tools::error::wallet_common_error& e)
+  {
+    exception_caught = true;
+  }
+  CHECK_AND_ASSERT_MES(exception_caught, false, "exception was not cought as expected");
+
+  // mine few block to activate HF2
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(11), false, 3), false, "");
+
+  // now coins should be normally sent
+  alice_wlt->transfer(destination, 0, 0, TESTS_DEFAULT_FEE, empty_extra, empty_attachment, tx);
+
+  // make sure all Bob's outputs has mix_attr = 1
+  for (auto& out : tx.vout)
+  {
+    if (out.amount != MK_TEST_COINS(1))
+      continue; // skip change
+    uint8_t mix_attr = boost::get<txout_to_key>(out.target).mix_attr;
+    CHECK_AND_ASSERT_MES(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, false, "Incorrect mix_attr in tx: " << mix_attr);
+  }
+
+  // mine a block to confirm the tx
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+
+  // make sure the funds were received
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(5 + 1), false, 3 + 1), false, "");
 
   return true;
 }
