@@ -350,6 +350,8 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
     m_wallet.store();
+    boost::system::error_code ec = AUTO_VAL_INIT(ec);
+    res.wallet_file_size = boost::filesystem::file_size(m_wallet.get_wallet_path(), ec);
     WALLET_RPC_CATCH_TRY_ENTRY();
     return true;
   }

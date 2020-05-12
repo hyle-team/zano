@@ -359,7 +359,10 @@ namespace wallet_public
 
     struct response
     {
+      uint64_t wallet_file_size;
+
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(wallet_file_size)
       END_KV_SERIALIZE_MAP()
     };
   };

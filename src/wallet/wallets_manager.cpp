@@ -794,7 +794,8 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     }
   }
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
-
+  boost::system::error_code ec = AUTO_VAL_INIT(ec);
+  owr.wallet_file_size = boost::filesystem::file_size(path, ec);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   get_wallet_info(wo, owr.wi);
