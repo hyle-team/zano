@@ -1533,7 +1533,6 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
     std::shared_ptr<transaction> tx_ptr;
     if (!get_transaction_from_pool_or_db(tx_id, tx_ptr))
     {
-      LOG_ERROR("failed to get alt block tx " << tx_id << " on block detach from alts");
       continue;
     }
     transaction& tx = *tx_ptr;
@@ -6006,7 +6005,11 @@ bool blockchain_storage::get_transaction_from_pool_or_db(const crypto::hash& tx_
   if (!m_tx_pool.get_transaction(tx_id, *tx_ptr)) // first try to get from the pool
   {
     auto p = m_db_transactions.get(tx_id); // if not found in the pool -- get from the DB
-    CHECK_AND_ASSERT_MES(p != nullptr, false, "can't get tx " << tx_id << " neither from the pool, nor from db_transactions");
+    if (p == nullptr)
+    {
+      return false;
+    }
+    //CHECK_AND_ASSERT_MES(p != nullptr, false, "can't get tx " << tx_id << " neither from the pool, nor from db_transactions");
     CHECK_AND_ASSERT_MES(p->m_keeper_block_height >= min_allowed_block_height, false, "tx " << tx_id << " found in the main chain at height " << p->m_keeper_block_height << " while required min allowed height is " << min_allowed_block_height);
     *tx_ptr = p->tx;
   }
