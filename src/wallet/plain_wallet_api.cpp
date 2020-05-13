@@ -42,7 +42,7 @@ struct plain_wallet_instance
 
 std::shared_ptr<plain_wallet_instance> ginstance_ptr;
 
-epee::misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([&]()
+epee::misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([]()
 {
   std::cout << "[LEAVE HANDLER CALLED]" << ENDL;
 });
