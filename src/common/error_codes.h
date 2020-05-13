@@ -34,5 +34,6 @@
 #define API_RETURN_CODE_WRONG_SEED                              "WRONG_SEED"
 #define API_RETURN_CODE_GENESIS_MISMATCH                        "GENESIS_MISMATCH"
 #define API_RETURN_CODE_DISCONNECTED                            "DISCONNECTED"
+#define API_RETURN_CODE_UNINITIALIZED                           "UNINITIALIZED"
 
 
