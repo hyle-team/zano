@@ -88,7 +88,7 @@ namespace tools
     };
 
     tools::create_directories_if_necessary(working_folder);
-    r = cl.download_and_unzip(cb, downloading_file_path, url, 1000 /* timout */, "GET", std::string(), 3 /* fails count */);
+    r = cl.download_and_unzip(cb, downloading_file_path, url, 5000 /* timout */, "GET", std::string(), 30 /* fails count */);
     if (!r)
     {
       LOG_PRINT_RED("Download failed", LOG_LEVEL_0);
