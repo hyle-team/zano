@@ -88,7 +88,7 @@ wallets_manager::~wallets_manager()
 {
   TRY_ENTRY();
   stop();
-  LOG_LEVEL_0("[~WALLETS_MANAGER] destroyed");
+  LOG_PRINT_L0("[~WALLETS_MANAGER] destroyed");
   CATCH_ENTRY_NO_RETURN();
 }
 
