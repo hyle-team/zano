@@ -51,12 +51,14 @@ std::shared_ptr<plain_wallet_instance> ginstance_ptr;
     ok_response.result.return_code = API_RETURN_CODE_UNINITIALIZED; \
     return epee::serialization::store_t_to_json(ok_response); \
   }
-
-void deinit();
+namespace plain_wallet
+{
+  void deinit();
+}
 epee::misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([]()
 {
   std::cout << "[BEFORE DEINIT]" << ENDL;
-  deinit();
+  plain_wallet::deinit();
   std::cout << "[AFTER DEINIT]" << ENDL;
 });
 
