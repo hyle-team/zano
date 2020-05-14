@@ -7214,7 +7214,7 @@ var SendComponent = /** @class */ (function () {
                     return null;
                 }]),
             comment: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](''),
-            mixin: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](0, _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required),
+            mixin: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](10, _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required),
             fee: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](this.variablesService.default_fee, [_angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required, function (g) {
                     if ((new bignumber_js__WEBPACK_IMPORTED_MODULE_6__["BigNumber"](g.value)).isLessThan(_this.variablesService.default_fee)) {
                         return { 'less_min': true };
@@ -7246,7 +7246,7 @@ var SendComponent = /** @class */ (function () {
                 address: _this.variablesService.currentWallet.send_data['address'],
                 amount: _this.variablesService.currentWallet.send_data['amount'],
                 comment: _this.variablesService.currentWallet.send_data['comment'],
-                mixin: _this.variablesService.currentWallet.send_data['mixin'] || 0,
+                mixin: _this.variablesService.currentWallet.send_data['mixin'] || 10,
                 fee: _this.variablesService.currentWallet.send_data['fee'] || _this.variablesService.default_fee,
                 hide: _this.variablesService.currentWallet.send_data['hide'] || false
             });
