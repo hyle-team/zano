@@ -42,9 +42,22 @@ struct plain_wallet_instance
 
 std::shared_ptr<plain_wallet_instance> ginstance_ptr;
 
+#define GET_INSTANCE_PTR(ptr_name) \
+  auto ptr_name = std::atomic_load(&ginstance_ptr); \
+  if (!ptr_name) \
+  { \
+    LOG_ERROR("Core already deinitialised or not initialized yet."); \
+    epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response); \
+    ok_response.result.return_code = API_RETURN_CODE_UNINITIALIZED; \
+    return epee::serialization::store_t_to_json(ok_response); \
+  }
+
+void deinit();
 epee::misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([]()
 {
-  std::cout << "[LEAVE HANDLER CALLED]" << ENDL;
+  std::cout << "[BEFORE DEINIT]" << ENDL;
+  deinit();
+  std::cout << "[AFTER DEINIT]" << ENDL;
 });
 
 namespace plain_wallet
@@ -132,7 +145,11 @@ namespace plain_wallet
       //wait other callers finish
       local_ptr->gjobs_lock.lock();
       local_ptr->gjobs_lock.unlock();
+      bool r = local_ptr->gwm.quick_stop_no_save();        
+      std::cout << "[QUICK_STOP_NO_SAVE] return " << r;
+      //let's prepare wallet manager for quick shutdown
       local_ptr.reset();
+
     }
   }
   
@@ -250,16 +267,6 @@ namespace plain_wallet
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     ok_response.result.return_code = API_RETURN_CODE_OK;
     return epee::serialization::store_t_to_json(ok_response);
-  }
-
-#define GET_INSTANCE_PTR(ptr_name) \
-  auto ptr_name = std::atomic_load(&ginstance_ptr); \
-  if (!ptr_name) \
-  { \
-    LOG_ERROR("Core already deinitialised or not initialized yet."); \
-    epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response); \
-    ok_response.result.return_code = API_RETURN_CODE_UNINITIALIZED; \
-    return epee::serialization::store_t_to_json(ok_response); \
   }
 
   std::string get_connectivity_status()

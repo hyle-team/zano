@@ -71,7 +71,6 @@ public:
     std::atomic<bool>* plast_daemon_is_disconnected;
     std::atomic<bool> has_related_alias_in_unconfirmed;
     std::atomic<bool> need_to_update_wallet_info;
-
     std::atomic<bool> long_refresh_in_progress;
     epee::critical_section long_refresh_in_progress_lock; //secure wallet state and prevent from long wait while long refresh is in work
 
@@ -90,6 +89,7 @@ public:
   bool init(int argc, char* argv[], view::i_view* pview_handler);
   bool start();
   bool stop();
+  bool quick_stop_no_save(); //stop without storing wallets
   bool send_stop_signal();
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
@@ -184,6 +184,7 @@ private:
   std::atomic<bool> m_last_daemon_is_disconnected;
 //  std::atomic<uint64_t> m_last_wallet_synch_height;
   std::atomic<uint64_t> m_wallet_id_counter;
+  std::atomic<bool> dont_save_wallet_at_stop;
 
   std::string m_data_dir;
   view::gui_options m_ui_opt;

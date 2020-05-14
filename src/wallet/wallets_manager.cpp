@@ -56,7 +56,8 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_ui_opt(AUTO_VAL_INIT(m_ui_opt)), 
                                  m_remote_node_mode(false),
                                  m_is_pos_allowed(false),
-                                 m_qt_logs_enbaled(false)
+                                 m_qt_logs_enbaled(false), 
+                                 dont_save_wallet_at_stop(false)
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
@@ -87,6 +88,7 @@ wallets_manager::~wallets_manager()
 {
   TRY_ENTRY();
   stop();
+  LOG_LEVEL_0("[~WALLETS_MANAGER] destroyed");
   CATCH_ENTRY_NO_RETURN();
 }
 
@@ -297,10 +299,15 @@ bool wallets_manager::stop()
 	  LOG_PRINT_L0("Waiting for backend main worker thread: " << m_main_worker_thread.get_id());
 	  m_main_worker_thread.join();
   }
-    
-
-
+   
   return true;
+}
+
+
+bool wallets_manager::quick_stop_no_save() //stop without storing wallets
+{
+  dont_save_wallet_at_stop = true;
+  return stop();
 }
 
 std::string wallets_manager::get_config_folder()
@@ -508,7 +515,8 @@ void wallets_manager::main_worker(const po::variables_map& m_vm)
       wo.second.stop_for_refresh = true;
       wo.second.w.unlocked_get()->stop();
 
-      wo.second.w->get()->store();
+      if(!dont_save_wallet_at_stop)
+        wo.second.w->get()->store();
     }
     catch (const std::exception& e)
     {
