@@ -31,7 +31,7 @@
 #pragma once
 
 #include <memory>
-
+#include "static_helpers.h"
 
 template<class owned_object_t>
 class abstract_singleton
@@ -39,7 +39,7 @@ class abstract_singleton
 
   static std::shared_ptr<owned_object_t> get_set_instance_internal(bool is_need_set = false, owned_object_t* pnew_obj = nullptr)
   {
-    static std::shared_ptr<owned_object_t> val_pobj;
+    static epee::static_helpers::wrapper<std::shared_ptr<owned_object_t>> val_pobj;
 
     if (is_need_set)
       val_pobj.reset(pnew_obj);

@@ -83,7 +83,7 @@ namespace plain_wallet
 
   std::string get_set_working_dir(bool need_to_set = false, const std::string val = "")
   {
-    static std::string working_dir;
+    DEFINE_SECURE_STATIC_VAR(std::string, working_dir);
     if (need_to_set)
       working_dir = val;
     return working_dir;

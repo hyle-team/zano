@@ -513,7 +513,7 @@ void wallets_manager::main_worker(const po::variables_map& m_vm)
     {
       wo.second.major_stop = true;
       wo.second.stop_for_refresh = true;
-      wo.second.w.unlocked_get()->stop();
+      wo.second.stop();
 
       if(!dont_save_wallet_at_stop)
         wo.second.w->get()->store();
@@ -1824,14 +1824,19 @@ void wallets_manager::wallet_vs_options::worker_func()
   }
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet thread thread stopped", LOG_LEVEL_0);
 }
-wallets_manager::wallet_vs_options::~wallet_vs_options()
+void wallets_manager::wallet_vs_options::stop()
 {
+  w.unlocked_get()->stop();
   do_mining = false;
   major_stop = true;
   stop_for_refresh = true;
   break_mining_loop = true;
   if (miner_thread.joinable())
     miner_thread.join();
+}
+wallets_manager::wallet_vs_options::~wallet_vs_options()
+{
+  stop();
 }
 
 std::string wallets_manager::get_wallet_log_prefix(size_t wallet_id) const

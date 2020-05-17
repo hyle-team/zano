@@ -33,6 +33,10 @@
 #include <boost/thread.hpp>
 #include "include_base_utils.h"
 #include "auto_val_init.h"
+
+#define DEFINE_SECURE_STATIC_VAR(type, var) static epee::static_helpers::wrapper<type> var##inst; \
+  static type& var = var##inst;
+
 namespace epee
 {
   namespace static_helpers

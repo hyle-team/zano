@@ -1205,7 +1205,7 @@ namespace log_space
     //get_enabled_channels not thread-safe, at the moment leave it like this because it's configured in main, before other threads started
     static std::set<std::string>& get_enabled_channels()
     {
-      static std::set<std::string> genabled_channels;
+      static epee::static_helpers::wrapper<std::set<std::string>> genabled_channels;
       return genabled_channels;
     }
 
