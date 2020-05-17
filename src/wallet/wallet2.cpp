@@ -1070,7 +1070,8 @@ void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<s
 void wallet2::process_new_blockchain_entry(const currency::block& b, const currency::block_direct_data_entry& bche, const crypto::hash& bl_id, uint64_t height)
 {
   //handle transactions from new block
-  THROW_IF_TRUE_WALLET_EX(height != get_blockchain_current_size() && !(height == m_minimum_height && get_blockchain_current_size() <= 1), error::wallet_internal_error,
+  THROW_IF_TRUE_WALLET_EX(height != get_blockchain_current_size() &&
+    !(height == m_minimum_height || get_blockchain_current_size() <= 1), error::wallet_internal_error,
     "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_size()));
 
   //optimization: seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
