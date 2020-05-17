@@ -1229,10 +1229,19 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
     //TODO: get_block_hash is slow
     crypto::hash bl_id = get_block_hash(bl);
 
-    if (processed_blocks_count != 1 && height > processed_blocks_count && height != m_minimum_height)
-    {//internal error: 
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false,
-        "height{" << height <<"} > processed_blocks_count{" << processed_blocks_count << "}");
+    if (processed_blocks_count != 1 && height > processed_blocks_count)
+    {
+      if (height != m_minimum_height)
+      {
+        //internal error: 
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false,
+          "height{" << height << "} > processed_blocks_count{" << processed_blocks_count << "}");
+      }
+      else
+      {
+        //possible case, wallet rewound to m_minimum_height
+        m_chain.clear();
+      }
     }
     else if (height == processed_blocks_count)
     {
