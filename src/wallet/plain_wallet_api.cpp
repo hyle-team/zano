@@ -12,6 +12,8 @@
 #include "wallets_manager.h"
 #include "common/base58.h"
 #include "common/config_encrypt_helper.h"
+#include "static_helpers.h"
+
 
 #define ANDROID_PACKAGE_NAME    "com.zano_mobile"
 
@@ -57,17 +59,22 @@ namespace plain_wallet
   void deinit();
 }
 
-
-
-
-#ifdef MOBILE_WALLET_BUILD  
-void on_lib_unload() __attribute__((destructor));
-void on_lib_unload() {
-  std::cout << "[ON_LIB_UNLOAD]-->>" << ENDL;
+void static_destroy_handler()
+{
+  std::cout << "[DESTROY CALLBACK HANDLER STARTED]: " << std::endl;
   plain_wallet::deinit();
-  std::cout << "[ON_LIB_UNLOAD]<<--" << ENDL;
+  std::cout << "[DESTROY CALLBACK HANDLER FINISHED]: " << std::endl;
 }
-#endif
+
+
+// #ifdef MOBILE_WALLET_BUILD  
+// void on_lib_unload() __attribute__((destructor));
+// void on_lib_unload() {
+//   std::cout << "[ON_LIB_UNLOAD]-->>" << ENDL;
+//   plain_wallet::deinit();
+//   std::cout << "[ON_LIB_UNLOAD]<<--" << ENDL;
+// }
+// #endif
 
 namespace plain_wallet
 {
@@ -172,6 +179,8 @@ namespace plain_wallet
       ok_response.result.return_code = API_RETURN_CODE_ALREADY_EXISTS;
       return epee::serialization::store_t_to_json(ok_response);
     }
+
+    epee::static_helpers::set_or_call_on_destruct(true, static_destroy_handler);
 
     std::cout << "[INIT PLAIN_WALLET_INSTANCE]" << ENDL;
     std::shared_ptr<plain_wallet_instance> ptr(new plain_wallet_instance());

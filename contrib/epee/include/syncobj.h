@@ -35,7 +35,7 @@
 #include <boost/thread/recursive_mutex.hpp>
 
 #include "singleton.h"
-#include "static_initializer.h"
+#include "static_helpers.h"
 #include "misc_helpers.h"
 
 //#define DISABLE_DEADLOCK_GUARD
@@ -532,7 +532,7 @@ namespace epee
     }
   };
 
-  const static initializer<abstract_singleton<deadlock_guard> > singleton_initializer;
+  //const static initializer<abstract_singleton<deadlock_guard> > singleton_initializer;
 
   /************************************************************************/
   /*                                                                      */
