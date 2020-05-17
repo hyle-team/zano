@@ -28,6 +28,7 @@
 
 //TODO: global objects, subject to refactoring
 
+
 struct plain_wallet_instance
 {
   plain_wallet_instance() :initialized(false), gjobs_counter(1)
@@ -55,12 +56,18 @@ namespace plain_wallet
 {
   void deinit();
 }
-epee::misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([]()
-{
-  std::cout << "[BEFORE DEINIT]" << ENDL;
+
+
+
+
+#ifdef MOBILE_WALLET_BUILD  
+void on_lib_unload() __attribute__((destructor));
+void on_lib_unload() {
+  std::cout << "[ON_LIB_UNLOAD]-->>" << ENDL;
   plain_wallet::deinit();
-  std::cout << "[AFTER DEINIT]" << ENDL;
-});
+  std::cout << "[ON_LIB_UNLOAD]<<--" << ENDL;
+}
+#endif
 
 namespace plain_wallet
 {
