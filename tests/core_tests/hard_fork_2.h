@@ -43,3 +43,10 @@ struct hard_fork_2_auditable_addresses_basics : public wallet_test, public hard_
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct hard_fork_2_no_new_structures_before_hf : public wallet_test, public hard_fork_2_base_test
+{
+  hard_fork_2_no_new_structures_before_hf();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
