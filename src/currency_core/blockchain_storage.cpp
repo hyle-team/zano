@@ -2836,43 +2836,73 @@ void blockchain_storage::print_last_n_difficulty_numbers(uint64_t n) const
 //------------------------------------------------------------------
 void blockchain_storage::print_blockchain_outs_stat() const
 {
-  LOG_ERROR("NOT IMPLEMENTED YET");
-//   std::stringstream ss;
-//   CRITICAL_REGION_LOCAL(m_blockchain_lock);
-//   BOOST_FOREACH(const outputs_container::value_type& v, m_db_outputs)
-//   {
-//     const std::vector<std::pair<crypto::hash, size_t> >& vals = v.second;
-//     if (vals.size())
-//     {
-//       ss << "amount: " << print_money(v.first);
-//       uint64_t total_count = vals.size();
-//       uint64_t unused_count = 0;
-//       for (size_t i = 0; i != vals.size(); i++)
-//       {
-//         bool used = false;
-//         auto it_tx = m_db_transactions.find(vals[i].first);
-//         if (it_tx == m_db_transactions.end())
-//         {
-//           LOG_ERROR("Tx with id not found " << vals[i].first);
-//         }
-//         else
-//         {
-//           if (vals[i].second >= it_tx->second.m_spent_flags.size())
-//           {
-//             LOG_ERROR("Tx with id " << vals[i].first << " in global index have wrong entry in global index, offset in tx = " << vals[i].second
-//               << ", it_tx->second.m_spent_flags.size()=" << it_tx->second.m_spent_flags.size()
-//               << ", it_tx->second.tx.vin.size()=" << it_tx->second.tx.vin.size());
-//           }
-//           used = it_tx->second.m_spent_flags[vals[i].second];
-//           
-//         }
-//         if (!used)
-//           ++unused_count;        
-//       }
-//       ss << "\t total: " << total_count << "\t unused: " << unused_count << ENDL;
-//     }
-//   }
-//   LOG_PRINT_L0("OUTS: " << ENDL << ss.str());
+  std::stringstream ss;
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  struct output_stat_t
+  {
+    uint64_t total = 0;
+    uint64_t unspent = 0;
+    uint64_t mixable = 0;
+  };
+
+  std::map<uint64_t, output_stat_t> outputs_stats;
+  
+  const uint64_t subitems_cnt = m_db_outputs.size();
+  uint64_t progress = 0;
+
+  auto lambda_handler = [&](uint64_t i, uint64_t amount, uint64_t index, const currency::global_output_entry& output_entry) -> bool
+  {
+    uint64_t progress_current = 20 * i / subitems_cnt;
+    if (progress_current != progress)
+    {
+      progress = progress_current;
+      LOG_PRINT_L0(progress * 5 << "%");
+    }
+
+    auto p_tx = m_db_transactions.find(output_entry.tx_id);
+    if (!p_tx)
+    {
+      LOG_ERROR("tx " << output_entry.tx_id << " not found");
+      return true; // continue
+    }
+    if (output_entry.out_no >= p_tx->m_spent_flags.size())
+    {
+      LOG_ERROR("tx with id " << output_entry.tx_id << " has wrong entry in global index, out_no = " << output_entry.out_no
+        << ", p_tx->m_spent_flags.size() = " << p_tx->m_spent_flags.size()
+        << ", p_tx->tx.vin.size() = " << p_tx->tx.vin.size());
+      return true; // continue
+    }
+    if (p_tx->tx.vout.size() != p_tx->m_spent_flags.size())
+    {
+      LOG_ERROR("Tx with id " << output_entry.tx_id << " has wrong entry in global index, out_no = " << output_entry.out_no
+        << ", p_tx->tx.vout.size() = " << p_tx->tx.vout.size()
+        << ", p_tx->m_spent_flags.size() = " << p_tx->m_spent_flags.size());
+      return true; // continue
+    }
+
+    auto& stat = outputs_stats[amount];
+    ++stat.total;
+      
+    bool spent = p_tx->m_spent_flags[output_entry.out_no];
+    if (!spent)
+      ++stat.unspent;
+      
+    if (!spent && p_tx->tx.vout[output_entry.out_no].target.type() == typeid(txout_to_key))
+    {
+      if (boost::get<txout_to_key>(p_tx->tx.vout[output_entry.out_no].target).mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+        ++stat.mixable;
+    }
+    return true;
+  };
+
+  m_db_outputs.enumerate_subitems(lambda_handler);
+
+  ss << std::right << std::setw(15) << "amount" << std::setw(10) << "total" << std::setw(10) << "unspent" << std::setw(10) << "mixable" << ENDL;
+  for(auto it = outputs_stats.begin(); it != outputs_stats.end(); ++it)
+    ss << std::setw(15) << print_money_brief(it->first) << std::setw(10) << it->second.total << std::setw(10) << it->second.unspent << std::setw(10) << it->second.mixable << ENDL;
+
+  LOG_PRINT_L0("OUTS: " << ENDL << ss.str());
 }
 //------------------------------------------------------------------
 void blockchain_storage::print_blockchain_outs(const std::string& file) const
