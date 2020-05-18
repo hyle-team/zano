@@ -72,10 +72,13 @@ namespace currency
       a & m_keys_seed_binary;
     }
 
+    static std::string vector_of_chars_to_string(const std::vector<unsigned char>& v) { return std::string(v.begin(), v.end()); }
+    static std::vector<unsigned char> string_to_vector_of_chars(const std::string& v) { return std::vector<unsigned char>(v.begin(), v.end()); }
+
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_keys)
       KV_SERIALIZE(m_creation_timestamp)
-      KV_SERIALIZE(m_keys_seed_binary)
+      KV_SERIALIZE_CUSTOM_N(m_keys_seed_binary, std::string, vector_of_chars_to_string, string_to_vector_of_chars, "m_seed")
     END_KV_SERIALIZE_MAP()
 
   private:

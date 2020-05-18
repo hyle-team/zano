@@ -100,8 +100,8 @@ namespace currency
     END_SERIALIZE()
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(spend_public_key)
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(view_public_key)
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(spend_public_key, "m_spend_public_key")
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(view_public_key, "m_view_public_key")
       KV_SERIALIZE(flags)
     END_KV_SERIALIZE_MAP()
 
