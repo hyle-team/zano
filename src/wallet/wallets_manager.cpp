@@ -345,7 +345,10 @@ bool wallets_manager::init_local_daemon()
 
       return static_cast<bool>(m_stop_singal_sent);
     });
-    CHECK_AND_ASSERT_AND_SET_GUI(res,  "pre-downloading failed");
+    if (!res)
+    {
+      LOG_PRINT_RED("pre-downloading failed, continue with normal network synchronization", LOG_LEVEL_0);
+    }
   }
 
 
