@@ -712,7 +712,7 @@ int main(int argc, char* argv[])
       run_single_test = command_line::get_arg(g_vm, arg_run_single_test);
     }
     
-    /*if (run_single_test.empty())
+    if (run_single_test.empty())
     {
       CALL_TEST("Random text test", get_random_text_test);
       CALL_TEST("Random state manipulation test", random_state_manupulation_test);
@@ -721,7 +721,7 @@ int main(int argc, char* argv[])
       CALL_TEST("check_allowed_types_in_variant_container() test", check_allowed_types_in_variant_container_test);
       CALL_TEST("check_u8_str_case_funcs", check_u8_str_case_funcs);
       CALL_TEST("chec_u8_str_matching", chec_u8_str_matching);
-    }*/
+    }
 
     //CALL_TEST("check_hash_and_difficulty_monte_carlo_test", check_hash_and_difficulty_monte_carlo_test); // it's rather an experiment with unclean results than a solid test, for further research...
     std::set<std::string> postponed_tests;
@@ -741,9 +741,6 @@ int main(int argc, char* argv[])
 
 #undef MARK_TEST_AS_POSTPONED
 
-    GENERATE_AND_PLAY(hard_fork_2_no_new_structures_before_hf);
-
-    /*
     GENERATE_AND_PLAY(pos_minting_tx_packing);
 
     GENERATE_AND_PLAY(multisig_wallet_test);
