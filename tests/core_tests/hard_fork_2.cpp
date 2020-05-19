@@ -10,8 +10,14 @@ using namespace currency;
 
 //------------------------------------------------------------------------------
 
-hard_fork_2_base_test::hard_fork_2_base_test(size_t hardfork_height)
-  : m_hardfork_height(hardfork_height)
+hard_fork_2_base_test::hard_fork_2_base_test(size_t hardfork_02_height)
+  : hard_fork_2_base_test(1, hardfork_02_height)
+{
+}
+
+hard_fork_2_base_test::hard_fork_2_base_test(size_t hardfork_01_height, size_t hardfork_02_height)
+  : m_hardfork_01_height(hardfork_01_height)
+  , m_hardfork_02_height(hardfork_02_height)
 {
   REGISTER_CALLBACK_METHOD(hard_fork_2_base_test, configure_core);
 }
@@ -21,10 +27,16 @@ bool hard_fork_2_base_test::configure_core(currency::core& c, size_t ev_index, c
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_fork_01_starts_after_height = m_hardfork_height;
-  pc.hard_fork_02_starts_after_height = m_hardfork_height;
+  pc.hard_fork_01_starts_after_height = m_hardfork_01_height;
+  pc.hard_fork_02_starts_after_height = m_hardfork_02_height;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
+}
+
+void hard_fork_2_base_test::set_hard_fork_heights_to_generator(test_generator& generator) const
+{
+  generator.set_hardfork_height(1, m_hardfork_01_height);
+  generator.set_hardfork_height(2, m_hardfork_02_height);
 }
 
 //------------------------------------------------------------------------------
@@ -44,8 +56,7 @@ bool hard_fork_2_tx_payer_in_wallet::generate(std::vector<test_event_entry>& eve
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(1, m_hardfork_height);
-  generator.set_hardfork_height(2, m_hardfork_height);
+  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
@@ -171,8 +182,7 @@ bool hard_fork_2_tx_receiver_in_wallet::generate(std::vector<test_event_entry>& 
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(1, m_hardfork_height);
-  generator.set_hardfork_height(2, m_hardfork_height);
+  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
@@ -310,8 +320,7 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::generate(std::vector<test_event
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(1, m_hardfork_height);
-  generator.set_hardfork_height(2, m_hardfork_height);
+  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -416,8 +425,7 @@ bool hard_fork_2_auditable_addresses_basics::generate(std::vector<test_event_ent
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(1, m_hardfork_height);
-  generator.set_hardfork_height(2, m_hardfork_height);
+  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -521,8 +529,7 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  generator.set_hardfork_height(1, m_hardfork_height);
-  generator.set_hardfork_height(2, m_hardfork_height);
+  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 

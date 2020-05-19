@@ -8,10 +8,14 @@
 
 struct hard_fork_2_base_test : virtual public test_chain_unit_enchanced
 {
-  hard_fork_2_base_test(size_t hardfork_height);
+  hard_fork_2_base_test(size_t hardfork_02_height);
+  hard_fork_2_base_test(size_t hardfork_01_height, size_t hardfork_02_height);
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
-  size_t m_hardfork_height;
+  void set_hard_fork_heights_to_generator(test_generator& generator) const;
+
+  size_t m_hardfork_01_height;
+  size_t m_hardfork_02_height;
 };
 
 struct hard_fork_2_tx_payer_in_wallet : public wallet_test, public hard_fork_2_base_test

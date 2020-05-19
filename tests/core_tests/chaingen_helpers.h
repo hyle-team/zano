@@ -243,21 +243,22 @@ inline std::string gen_random_alias(size_t len)
   return buffer;
 }
 
+template<typename alias_entry_t>
 inline bool put_alias_via_tx_to_list(std::vector<test_event_entry>& events,
     std::list<currency::transaction>& tx_set,
     const currency::block& head_block,
     const currency::account_base& miner_acc,
-    currency::extra_alias_entry ai2,
+    const alias_entry_t& ae,
     test_generator& generator)
 {
   std::vector<currency::extra_v> ex;
-  ex.push_back(ai2);
+  ex.push_back(ae);
   currency::account_base reward_acc;
   currency::account_keys& ak = const_cast<currency::account_keys&>(reward_acc.get_keys());
   currency::get_aliases_reward_account(ak.account_address, ak.view_secret_key);
 
   uint64_t fee_median = generator.get_last_n_blocks_fee_median(get_block_hash(head_block));
-  uint64_t reward = currency::get_alias_coast_from_fee(ai2.m_alias, fee_median);
+  uint64_t reward = currency::get_alias_coast_from_fee(ae.m_alias, fee_median);
 
   MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(events, 
     tx_set,
