@@ -2037,20 +2037,27 @@ bool wallet2::prepare_file_names(const std::wstring& file_path)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::load_keys(const std::string& buff, const std::string& password)
+void wallet2::load_keys(const std::string& buff, const std::string& password, uint64_t file_signature)
 {
-  wallet2::keys_file_data keys_file_data;
-//  std::string buf;
-//  bool r = epee::file_io_utils::load_file_to_string(keys_file_name, buf);
-//  CHECK_AND_THROW_WALLET_EX(!r, error::file_read_error, keys_file_name);
-  bool r = ::serialization::parse_binary(buff, keys_file_data);
+  bool r = false;
+  wallet2::keys_file_data kf_data = AUTO_VAL_INIT(kf_data);
+  if (file_signature == WALLET_FILE_SIGNATURE_OLD)
+  {
+    wallet2::keys_file_data_old kf_data_old;
+    r = ::serialization::parse_binary(buff, kf_data_old);
+    kf_data = wallet2::keys_file_data::from_old(kf_data_old);
+  }
+  else if (file_signature == WALLET_FILE_SIGNATURE_V2)
+  {
+    r = ::serialization::parse_binary(buff, kf_data);
+  }
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "internal error: failed to deserialize");
 
   crypto::chacha8_key key;
   crypto::generate_chacha8_key(password, key);
   std::string account_data;
-  account_data.resize(keys_file_data.account_data.size());
-  crypto::chacha8(keys_file_data.account_data.data(), keys_file_data.account_data.size(), key, keys_file_data.iv, &account_data[0]);
+  account_data.resize(kf_data.account_data.size());
+  crypto::chacha8(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
 
   const currency::account_keys& keys = m_account.get_keys();
   r = epee::serialization::load_t_from_binary(m_account, account_data);
@@ -2131,22 +2138,22 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   THROW_IF_TRUE_WALLET_EX(e || !exists, error::file_not_found, epee::string_encoding::convert_to_ansii(m_wallet_file));
   boost::filesystem::ifstream data_file;
   data_file.open(m_wallet_file, std::ios_base::binary | std::ios_base::in);
-  THROW_IF_TRUE_WALLET_EX(data_file.fail(), error::file_not_found, epee::string_encoding::convert_to_ansii(m_wallet_file));
+  THROW_IF_TRUE_WALLET_EX(data_file.fail(), error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
   wallet_file_binary_header wbh = AUTO_VAL_INIT(wbh);
 
   data_file.read((char*)&wbh, sizeof(wbh));
-  THROW_IF_TRUE_WALLET_EX(data_file.fail(), error::file_not_found, epee::string_encoding::convert_to_ansii(m_wallet_file));
+  THROW_IF_TRUE_WALLET_EX(data_file.fail(), error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
-  THROW_IF_TRUE_WALLET_EX(wbh.m_signature != WALLET_FILE_SIGNATURE, error::file_not_found, epee::string_encoding::convert_to_ansii(m_wallet_file));
+  THROW_IF_TRUE_WALLET_EX(wbh.m_signature != WALLET_FILE_SIGNATURE_OLD && wbh.m_signature != WALLET_FILE_SIGNATURE_V2, error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
   THROW_IF_TRUE_WALLET_EX(wbh.m_cb_body > WALLET_FILE_MAX_BODY_SIZE || 
-    wbh.m_cb_keys > WALLET_FILE_MAX_KEYS_SIZE, error::file_not_found, epee::string_encoding::convert_to_ansii(m_wallet_file));
+    wbh.m_cb_keys > WALLET_FILE_MAX_KEYS_SIZE, error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
 
   keys_buff.resize(wbh.m_cb_keys);
   data_file.read((char*)keys_buff.data(), wbh.m_cb_keys);
 
-  load_keys(keys_buff, password);
+  load_keys(keys_buff, password, wbh.m_signature);
 
   bool need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
 
@@ -2188,7 +2195,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   //store data
   wallet_file_binary_header wbh = AUTO_VAL_INIT(wbh);
-  wbh.m_signature = WALLET_FILE_SIGNATURE;
+  wbh.m_signature = WALLET_FILE_SIGNATURE_V2;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
   wbh.m_cb_body = 1000;

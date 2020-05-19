@@ -769,6 +769,10 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     {
       return API_RETURN_CODE_FILE_NOT_FOUND;
     }
+    catch (const tools::error::file_read_error&)
+    {
+      return API_RETURN_CODE_INVALID_FILE;
+    }
     catch (const tools::error::wallet_load_notice_wallet_restored& /**/)
     {
       return_code = API_RETURN_CODE_FILE_RESTORED;

@@ -143,7 +143,8 @@
 #define POS_MINIMUM_COINSTAKE_AGE                       10 // blocks count
 
 
-#define WALLET_FILE_SIGNATURE                           0x1111012101101011LL  //Bender's nightmare
+#define WALLET_FILE_SIGNATURE_OLD                       0x1111012101101011LL  // Bender's nightmare
+#define WALLET_FILE_SIGNATURE_V2                        0x111101120101011LL  // another Bender's nightmare
 #define WALLET_FILE_MAX_BODY_SIZE                       0x88888888L //2GB
 #define WALLET_FILE_MAX_KEYS_SIZE                       10000 //
 #define WALLET_BRAIN_DATE_OFFSET                        1543622400

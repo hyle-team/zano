@@ -445,7 +445,7 @@ namespace tools
     typedef std::map<uint64_t, std::set<size_t> > free_amounts_cache_type;
 
 
-    struct keys_file_data
+    struct keys_file_data_old
     {
       crypto::chacha8_iv iv;
       std::string account_data;
@@ -455,6 +455,29 @@ namespace tools
         FIELD(account_data)
       END_SERIALIZE()
     };
+
+    struct keys_file_data
+    {
+      uint8_t             version;
+      crypto::chacha8_iv  iv;
+      std::string         account_data;
+
+      static keys_file_data from_old(const keys_file_data_old& v)
+      {
+        keys_file_data result = AUTO_VAL_INIT(result);
+        result.iv = v.iv;
+        result.account_data = v.account_data;
+        return result;
+      }
+
+      DEFINE_SERIALIZATION_VERSION(1)
+      BEGIN_SERIALIZE_OBJECT()
+        VERSION_ENTRY(version)
+        FIELD(iv)
+        FIELD(account_data)
+      END_SERIALIZE()
+    };
+
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
     void restore(const std::wstring& path, const std::string& pass, const std::string& seed_phrase);
@@ -789,7 +812,7 @@ private:
 
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
-    void load_keys(const std::string& keys_file_name, const std::string& password);
+    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b);
     void detach_blockchain(uint64_t including_height);
     bool extract_offers_from_transfer_entry(size_t i, std::unordered_map<crypto::hash, bc_services::offer_details_ex>& offers_local);
