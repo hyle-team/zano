@@ -80,7 +80,7 @@ public:
 
     std::thread miner_thread;
     void worker_func();
-    void stop();
+    void stop(bool wait = true);
     std::string get_log_prefix() const { return std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":" + w->get()->get_log_prefix() + "]"; }
     ~wallet_vs_options();
   };
@@ -174,7 +174,11 @@ private:
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
 
   std::thread m_main_worker_thread;
+  
   std::atomic<bool> m_stop_singal_sent;
+  std::mutex m_stop_singal_sent_mutex;
+  std::condition_variable m_stop_singal_sent_mutex_cv;
+
   view::i_view m_view_stub;
   view::i_view* m_pview;
   std::shared_ptr<tools::i_core_proxy> m_rpc_proxy;
