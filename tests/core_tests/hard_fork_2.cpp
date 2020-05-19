@@ -518,12 +518,14 @@ bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_ind
 //------------------------------------------------------------------------------
 
 hard_fork_2_no_new_structures_before_hf::hard_fork_2_no_new_structures_before_hf()
-  : hard_fork_2_base_test(13)
+  : hard_fork_2_base_test(16)
 {
+  REGISTER_CALLBACK_METHOD(hard_fork_2_no_new_structures_before_hf, c1);
 }
 
 bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_entry>& events) const
 {
+  bool r = false;
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
@@ -535,6 +537,7 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
 
   std::vector<currency::extra_v> extra;
 
+
   // extra with tx_payer -- not allowed before HF2
   tx_payer payer = AUTO_VAL_INIT(payer);
   payer.acc_addr = miner_acc.get_public_address();
@@ -543,7 +546,16 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
 
   // blk_1b_1 is invalid as containing tx_0
   DO_CALLBACK(events, "mark_invalid_block");
-  MAKE_NEXT_BLOCK_TX1(events, blk_1b_1, blk_0r, miner_acc, tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1b, blk_0r, miner_acc, tx_0);
+
+
+  // extra with tx_payer_old -- okay
+  extra.clear();
+  tx_payer_old payer_old = AUTO_VAL_INIT(payer_old);
+  payer_old.acc_addr = miner_acc.get_public_address().to_old();
+  extra.push_back(payer_old);
+  MAKE_TX_MIX_ATTR_EXTRA(events, tx_0_old, miner_acc, alice_acc, MK_TEST_COINS(1), 0, blk_0r, 0, extra, true);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0_old);
 
 
   // extra with tx_receiver -- not allowed before HF2
@@ -551,50 +563,82 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   tx_receiver receiver = AUTO_VAL_INIT(receiver);
   receiver.acc_addr = miner_acc.get_public_address();
   extra.push_back(receiver);
-  MAKE_TX_MIX_ATTR_EXTRA(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(1), 0, blk_0r, 0, extra, true);
+  MAKE_TX_MIX_ATTR_EXTRA(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(1), 0, blk_1, 0, extra, true);
 
   // blk_1b_2 is invalid as containing tx_1
   DO_CALLBACK(events, "mark_invalid_block");
-  MAKE_NEXT_BLOCK_TX1(events, blk_1b_2, blk_1b_1, miner_acc, tx_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2b, blk_1, miner_acc, tx_1);
 
 
-  // extra with tx_receiver -- not allowed before HF2
+  // extra with tx_receiver_old -- okay
   extra.clear();
+  tx_receiver_old receiver_old = AUTO_VAL_INIT(receiver_old);
+  receiver_old.acc_addr = miner_acc.get_public_address().to_old();
+  extra.push_back(receiver_old);
+  MAKE_TX_MIX_ATTR_EXTRA(events, tx_1_old, miner_acc, alice_acc, MK_TEST_COINS(1), 0, blk_1, 0, extra, true);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx_1_old);
 
+
+  // extra with extra_alias_entry -- not allowed before HF2
   extra_alias_entry alias_entry = AUTO_VAL_INIT(alias_entry);
   alias_entry.m_address = miner_acc.get_public_address();
-  alias_entry.m_alias = "aabbcc";
-  extra.push_back(alias_entry);
+  alias_entry.m_alias = "minerminer";
 
   std::list<transaction> tx_set;
-  bool r = put_alias_via_tx_to_list(events, tx_set, blk_0r, miner_acc, alias_entry, generator);
+  r = put_alias_via_tx_to_list(events, tx_set, blk_2, miner_acc, alias_entry, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   transaction tx_2 = tx_set.front();
 
   // blk_1b_3 is invalid as containing tx_2
   DO_CALLBACK(events, "mark_invalid_block");
-  MAKE_NEXT_BLOCK_TX1(events, blk_1b_3, blk_1b_2, miner_acc, tx_2);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3b, blk_2, miner_acc, tx_2);
+
+
+  // extra with extra_alias_entry_old -- okay
+  extra_alias_entry_old alias_entry_old = AUTO_VAL_INIT(alias_entry_old);
+  alias_entry_old.m_address = alice_acc.get_public_address().to_old();
+  alias_entry_old.m_alias = "alicealice";
+
+  tx_set.clear();
+  r = put_alias_via_tx_to_list(events, tx_set, blk_2, miner_acc, alias_entry_old, generator);
+  CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
+  transaction tx_2_old = tx_set.front();
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_2_old);
+
 
   // activate HF2
-  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
-  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
-  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);
 
 
   // tx_0 with tx_payer should be accepted after HF2
-  MAKE_NEXT_BLOCK_TX1(events, blk_5, blk_4, miner_acc, tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_8, blk_7, miner_acc, tx_0);
 
   // tx_1 with tx_receiver should be accepted after HF2
-  MAKE_NEXT_BLOCK_TX1(events, blk_6, blk_5, miner_acc, tx_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_9, blk_8, miner_acc, tx_1);
 
   // tx_2 with extra_alias_entry should be accepted after HF2
-  MAKE_NEXT_BLOCK_TX1(events, blk_7, blk_6, miner_acc, tx_2);
+  MAKE_NEXT_BLOCK_TX1(events, blk_10, blk_9, miner_acc, tx_2);
+
+  // check aliases
+  DO_CALLBACK(events, "c1");
 
   return true;
 }
 
 bool hard_fork_2_no_new_structures_before_hf::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  extra_alias_entry_base ai = AUTO_VAL_INIT(ai);
+  bool r = c.get_blockchain_storage().get_alias_info("alicealice", ai);
+  CHECK_AND_ASSERT_MES(r, false, "failed to get alias");
+  CHECK_AND_ASSERT_MES(ai.m_address == m_accounts[ALICE_ACC_IDX].get_public_address(), false, "invalid address for alicealice alias");
+
+  ai = AUTO_VAL_INIT(ai);
+  r = c.get_blockchain_storage().get_alias_info("minerminer", ai);
+  CHECK_AND_ASSERT_MES(r, false, "failed to get alias minerminer");
+  CHECK_AND_ASSERT_MES(ai.m_address == m_accounts[MINER_ACC_IDX].get_public_address(), false, "invalid address for minerminer alias");
+
   return true;
 }
