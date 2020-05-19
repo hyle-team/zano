@@ -2834,7 +2834,7 @@ void blockchain_storage::print_last_n_difficulty_numbers(uint64_t n) const
   LOG_PRINT_L0("LAST BLOCKS:" << ss.str());
 }
 //------------------------------------------------------------------
-void blockchain_storage::print_blockchain_outs_stat() const
+void blockchain_storage::print_blockchain_outs_stats() const
 {
   std::stringstream ss;
   CRITICAL_REGION_LOCAL(m_read_lock);

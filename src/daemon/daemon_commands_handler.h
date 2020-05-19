@@ -39,7 +39,7 @@ public:
     //m_cmd_binder.set_handler("print_bci", boost::bind(&daemon_commands_handler::print_bci, this, _1));
     m_cmd_binder.set_handler("print_bc_outs", boost::bind(&daemon_commands_handler::print_bc_outs, this, _1));
     m_cmd_binder.set_handler("print_market", boost::bind(&daemon_commands_handler::print_market, this, _1));
-    m_cmd_binder.set_handler("print_bc_outs_stat", boost::bind(&daemon_commands_handler::print_bc_outs_stat, this, _1));
+    m_cmd_binder.set_handler("print_bc_outs_stats", boost::bind(&daemon_commands_handler::print_bc_outs_stats, this, _1));
     m_cmd_binder.set_handler("print_block", boost::bind(&daemon_commands_handler::print_block, this, _1), "Print block, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_commands_handler::print_block_info, this, _1), "Print block info, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, _1), "Print transaction, print_tx <transaction_hash>");
@@ -218,9 +218,9 @@ private:
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool print_bc_outs_stat(const std::vector<std::string>& args)
+  bool print_bc_outs_stats(const std::vector<std::string>& args)
   {
-    m_srv.get_payload_object().get_core().get_blockchain_storage().print_blockchain_outs_stat();
+    m_srv.get_payload_object().get_core().get_blockchain_storage().print_blockchain_outs_stats();
     return true;
   }
   //--------------------------------------------------------------------------------
