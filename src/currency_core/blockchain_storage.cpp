@@ -4601,6 +4601,26 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     return true;
   }
 
+  if (block_height <= m_core_runtime_config.hard_fork_02_starts_after_height)
+  {
+    // before hardfork 2
+
+    auto check_lambda = [&](const std::vector<payload_items_v>& container) -> bool
+    {
+      for (const auto& el : container)
+      {
+        const auto& type = el.type();
+        CHECK_AND_ASSERT_MES(type != typeid(tx_payer), false, "tx " << tx_id << " contains tx_payer which is not allowed on height " << block_height);
+        CHECK_AND_ASSERT_MES(type != typeid(tx_receiver), false, "tx " << tx_id << " contains tx_receiver which is not allowed on height " << block_height);
+        CHECK_AND_ASSERT_MES(type != typeid(extra_alias_entry), false, "tx " << tx_id << " contains extra_alias_entry which is not allowed on height " << block_height);
+      }
+      return true;
+    };
+
+    return check_lambda(tx.extra) && check_lambda(tx.attachment);
+  }
+
+
   return true;
 }
 //------------------------------------------------------------------
