@@ -927,7 +927,6 @@ private:
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
-    void check_and_throw_if_auditable_address_is_targeted_before_hf2(const construct_tx_param& ctp);
     void push_new_block_id(const crypto::hash& id, uint64_t height);
     bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);
     //void get_short_chain_history(std::list<crypto::hash>& ids);
