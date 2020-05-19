@@ -602,10 +602,13 @@ namespace currency
     }
     else
     {
-      // before hardfork 2
-      tx_payer_old result = AUTO_VAL_INIT(result);
-      result.acc_addr = addr.to_old();
-      container.push_back(result);
+      // before hardfork 2 -- add only if addr is not auditable
+      if (!addr.is_auditable())
+      {
+        tx_payer_old result = AUTO_VAL_INIT(result);
+        result.acc_addr = addr.to_old();
+        container.push_back(result);
+      }
     }
   }
   //---------------------------------------------------------------
@@ -621,10 +624,13 @@ namespace currency
     }
     else
     {
-      // before hardfork 2
-      tx_receiver_old result = AUTO_VAL_INIT(result);
-      result.acc_addr = addr.to_old();
-      container.push_back(result);
+      // before hardfork 2 -- add only if addr is not auditable
+      if (!addr.is_auditable())
+      {
+        tx_receiver_old result = AUTO_VAL_INIT(result);
+        result.acc_addr = addr.to_old();
+        container.push_back(result);
+      }
     }
   }
   //---------------------------------------------------------------
