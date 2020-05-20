@@ -42,7 +42,7 @@ void hard_fork_2_base_test::set_hard_fork_heights_to_generator(test_generator& g
 //------------------------------------------------------------------------------
 
 hard_fork_2_tx_payer_in_wallet::hard_fork_2_tx_payer_in_wallet()
-  : hard_fork_2_base_test(16)
+  : hard_fork_2_base_test(24)
 {
   REGISTER_CALLBACK_METHOD(hard_fork_2_tx_payer_in_wallet, c1);
 }
@@ -54,11 +54,17 @@ bool hard_fork_2_tx_payer_in_wallet::generate(std::vector<test_event_entry>& eve
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
-  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_0, miner_acc, bob_acc, MK_TEST_COINS(12), blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   DO_CALLBACK(events, "c1");
 
@@ -71,25 +77,27 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
 
   miner_wlt->refresh();
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(12)), false, "");
 
   // wallet RPC server
   tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
-  tools::wallet_public::COMMAND_RPC_TRANSFER::request req = AUTO_VAL_INIT(req);
-  tools::wallet_public::transfer_destination td{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() };
-  req.destinations.push_back(td);
-  req.fee = TESTS_DEFAULT_FEE;
-  req.push_payer = true;
+  // Before HF2: Miner -> Alice (normal address) with payer info
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request req_a = AUTO_VAL_INIT(req_a);
+  req_a.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
+  req_a.fee = TESTS_DEFAULT_FEE;
+  req_a.push_payer = true;
 
   tools::wallet_public::COMMAND_RPC_TRANSFER::response res = AUTO_VAL_INIT(res);
   
-  r = miner_wlt_rpc.on_transfer(req, res, je, ctx);
+  r = miner_wlt_rpc.on_transfer(req_a, res, je, ctx);
   CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
-
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   crypto::hash tx_hash = null_hash;
@@ -100,7 +108,78 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
 
   r = have_type_in_variant_container<tx_payer_old>(tx.extra);
   CHECK_AND_ASSERT_MES(r, false, "tx_payer_old is not found in extra");
+  r = !have_type_in_variant_container<tx_payer>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_payer is found in extra");
 
+
+  // Before HF2: Miner -> Bob (auditable address) with payer info
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request req_b = AUTO_VAL_INIT(req_b);
+  req_b.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() });
+  req_b.fee = TESTS_DEFAULT_FEE;
+  req_b.push_payer = true;
+
+  res = AUTO_VAL_INIT(res);
+  
+  r = miner_wlt_rpc.on_transfer(req_b, res, je, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  tx_hash = null_hash;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(res.tx_hash, tx_hash), false, "");
+  
+  tx = AUTO_VAL_INIT(tx);
+  CHECK_AND_ASSERT_MES(c.get_transaction(tx_hash, tx), false, "");
+
+  r = have_type_in_variant_container<tx_payer_old>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_payer_old is not found in extra");
+  r = !have_type_in_variant_container<tx_payer>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_payer is found in extra");
+
+
+  // mine a block and confirm both transactions
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  size_t callback_counter = 0;
+  std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
+    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+      CHECK_AND_ASSERT_THROW_MES(wti.show_sender, "show_sender is false");
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 1, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
+      ++callback_counter;
+      return true;
+    }
+  ));
+  alice_wlt->callback(l);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(1)), false, "");
+  CHECK_AND_ASSERT_MES(callback_counter == 1, false, "callback_counter = " << callback_counter);
+
+  bob_wlt->callback(l); // same callback -- same changes
+  callback_counter = 0;
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(13)), false, "");
+  CHECK_AND_ASSERT_MES(callback_counter == 1, false, "callback_counter = " << callback_counter);
+
+  alice_wlt->callback(std::make_shared<tools::i_wallet2_callback>()); // clear callback
+  bob_wlt->callback(std::make_shared<tools::i_wallet2_callback>()); // clear callback
+
+  // Before HF2: Bob (auditable address) -> Alice with payer info requested (should NOT put tx_payer or tx_payer_old)
+  tools::wallet_rpc_server bob_wlt_rpc(*bob_wlt);
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request req_c = AUTO_VAL_INIT(req_c);
+  req_c.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
+  req_c.fee = TESTS_DEFAULT_FEE;
+  req_c.push_payer = true;
+  res = AUTO_VAL_INIT(res);
+  r = bob_wlt_rpc.on_transfer(req_c, res, je, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  tx_hash = null_hash;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(res.tx_hash, tx_hash), false, "");
+  tx = AUTO_VAL_INIT(tx);
+  CHECK_AND_ASSERT_MES(c.get_transaction(tx_hash, tx), false, "");
+  r = !have_type_in_variant_container<tx_payer_old>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_payer_old is found in extra");
   r = !have_type_in_variant_container<tx_payer>(tx.extra);
   CHECK_AND_ASSERT_MES(r, false, "tx_payer is found in extra");
 
@@ -108,19 +187,12 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
-  std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_MES(wti.show_sender, false, "show_sender is false");
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 1, false, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.front is incorrect");
-      return true;
-    }
-  ));
-  alice_wlt->callback(l);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(11)), false, "");
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(1)), false, "");
 
-  // mine blocks 15, 16, 17 to activate HF2
+  //
+  // mine blocks 24, 25, 26 to activate HF2
+  //
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -128,9 +200,9 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   miner_wlt->refresh();
   alice_wlt->refresh();
 
-  // check again
-  req.destinations.front().amount = MK_TEST_COINS(2);
-  r = miner_wlt_rpc.on_transfer(req, res, je, ctx);
+  // check again (Miner -> Alice), with different amount
+  req_a.destinations.front().amount = MK_TEST_COINS(2);
+  r = miner_wlt_rpc.on_transfer(req_a, res, je, ctx);
   CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -143,22 +215,72 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   r = !have_type_in_variant_container<tx_payer_old>(tx.extra);
   CHECK_AND_ASSERT_MES(r, false, "tx_payer_old is found in extra");
 
+
+  // check again (Miner -> Bob), with different amount
+  req_b.destinations.front().amount = MK_TEST_COINS(2);
+  r = miner_wlt_rpc.on_transfer(req_b, res, je, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  tx_hash = null_hash;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(res.tx_hash, tx_hash), false, "");
+  CHECK_AND_ASSERT_MES(c.get_transaction(tx_hash, tx), false, "");
+
+  r = have_type_in_variant_container<tx_payer>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_payer is not found in extra");
+  r = !have_type_in_variant_container<tx_payer_old>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_payer_old is found in extra");
+
+
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l2(new wlt_lambda_on_transfer2_wrapper(
     [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_MES(wti.amount == MK_TEST_COINS(2), false, "incorrect wti.amount = " << print_money_brief(wti.amount));
-      CHECK_AND_ASSERT_MES(wti.show_sender, false, "show_sender is false");
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 1, false, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.front is incorrect");
+      CHECK_AND_ASSERT_THROW_MES(wti.amount == MK_TEST_COINS(2), "incorrect wti.amount = " << print_money_brief(wti.amount));
+      CHECK_AND_ASSERT_THROW_MES(wti.show_sender, "show_sender is false");
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 1, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
+      ++callback_counter;
       return true;
     }
   ));
-  alice_wlt->callback(l2);
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(3)), false, "");
+  alice_wlt->callback(l2);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(4)), false, "");
+
+  bob_wlt->callback(l2);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(13)), false, "");
+
+  alice_wlt->callback(std::make_shared<tools::i_wallet2_callback>()); // clear callback
+  bob_wlt->callback(std::make_shared<tools::i_wallet2_callback>()); // clear callback
+
+  // After HF2: Bob (auditable address) -> Alice with payer info requested (should put tx_payer)
+  req_c = AUTO_VAL_INIT(req_c);
+  req_c.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
+  req_c.fee = TESTS_DEFAULT_FEE;
+  req_c.push_payer = true;
+  res = AUTO_VAL_INIT(res);
+  r = bob_wlt_rpc.on_transfer(req_c, res, je, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "on_transfer failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  tx_hash = null_hash;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(res.tx_hash, tx_hash), false, "");
+  tx = AUTO_VAL_INIT(tx);
+  CHECK_AND_ASSERT_MES(c.get_transaction(tx_hash, tx), false, "");
+  r = !have_type_in_variant_container<tx_payer_old>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_payer_old is found in extra");
+  r = have_type_in_variant_container<tx_payer>(tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "tx_payer is NOT found in extra");
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(5)), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(11)), false, "");
 
   return true;
 }
@@ -179,7 +301,7 @@ bool hard_fork_2_tx_receiver_in_wallet::generate(std::vector<test_event_entry>& 
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
-  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   set_hard_fork_heights_to_generator(generator);
@@ -203,9 +325,11 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
 
   miner_wlt->refresh();
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, m_alice_start_balance), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, 0), false, "");
 
   // wallet RPC server
   tools::wallet_rpc_server alice_wlt_rpc(*alice_wlt);
@@ -213,15 +337,14 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   tools::wallet_rpc_server::connection_context ctx;
 
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req = AUTO_VAL_INIT(req);
-  tools::wallet_public::transfer_destination td1{ MK_TEST_COINS(1), m_accounts[MINER_ACC_IDX].get_public_address_str() };
-  tools::wallet_public::transfer_destination td2{ MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() };
-  req.destinations.push_back(td1);
-  req.destinations.push_back(td2);
+  req.destinations.push_back(tools::wallet_public::transfer_destination { MK_TEST_COINS(1), m_accounts[MINER_ACC_IDX].get_public_address_str() }); 
+  req.destinations.push_back(tools::wallet_public::transfer_destination { MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str() });  // auditable address
   req.fee = TESTS_DEFAULT_FEE;
-  req.hide_receiver = false; // just to emphasize, this is false be default
+  req.hide_receiver = false; // just to emphasize, this is false by default
 
   LOG_PRINT_L0("Miner's address: " << m_accounts[MINER_ACC_IDX].get_public_address_str());
   LOG_PRINT_L0("Alice's address: " << m_accounts[ALICE_ACC_IDX].get_public_address_str());
+  LOG_PRINT_L0("Bob's address: "   << m_accounts[BOB_ACC_IDX].get_public_address_str());
 
   tools::wallet_public::COMMAND_RPC_TRANSFER::response res = AUTO_VAL_INIT(res);
   
@@ -236,11 +359,12 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   transaction tx = AUTO_VAL_INIT(tx);
   CHECK_AND_ASSERT_MES(c.get_transaction(tx_hash, tx), false, "");
 
-  r = have_type_in_variant_container<tx_receiver_old>(tx.extra);
-  CHECK_AND_ASSERT_MES(r, false, "tx_receiver_old is not found in extra");
+  // there should be one tx_receiver_old, as Bob's auditable address should not be supported for tx_receiver
+  size_t count = count_type_in_variant_container<tx_receiver_old>(tx.extra);
+  CHECK_AND_ASSERT_MES(count == 1, false, "tx_receiver_old count: " << count);
 
-  r = !have_type_in_variant_container<tx_receiver>(tx.extra);
-  CHECK_AND_ASSERT_MES(r, false, "tx_receiver is found in extra");
+  count = count_type_in_variant_container<tx_receiver>(tx.extra);
+  CHECK_AND_ASSERT_MES(count == 0, false, "tx_receiver count: " << count);
 
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
@@ -248,10 +372,10 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
 
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
     [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_MES(!wti.is_income, false, "wti.is_income is " << wti.is_income);
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 2, false, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.front is incorrect");
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.back is incorrect");
+      CHECK_AND_ASSERT_THROW_MES(!wti.is_income, "wti.is_income is " << wti.is_income);
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 2, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), "wti.remote_addresses.back is incorrect");
       return true;
     }
   ));
@@ -278,10 +402,11 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(res.tx_hash, tx_hash), false, "");
   CHECK_AND_ASSERT_MES(c.get_transaction(tx_hash, tx), false, "");
 
-  r = have_type_in_variant_container<tx_receiver>(tx.extra);
-  CHECK_AND_ASSERT_MES(r, false, "tx_receiver is not found in extra");
-  r = !have_type_in_variant_container<tx_receiver_old>(tx.extra);
-  CHECK_AND_ASSERT_MES(r, false, "tx_receiver_old is found in extra");
+  // shouold be 2 tx_receiver as we passed HF2 and auditable addresses CAN be used with tx_receiver
+  count = count_type_in_variant_container<tx_receiver>(tx.extra);
+  CHECK_AND_ASSERT_MES(count == 2, false, "tx_receiver count = " << count);
+  count = count_type_in_variant_container<tx_receiver_old>(tx.extra);
+  CHECK_AND_ASSERT_MES(count == 0, false, "tx_receiver_old count = " << count);
 
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
@@ -289,11 +414,11 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
 
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l2(new wlt_lambda_on_transfer2_wrapper(
     [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_MES(!wti.is_income, false, "wti.is_income is " << wti.is_income);
-      CHECK_AND_ASSERT_MES(wti.amount == MK_TEST_COINS(4), false, "incorrect wti.amount = " << print_money_brief(wti.amount));
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 2, false, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.front is incorrect");
-      CHECK_AND_ASSERT_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), false, "wti.remote_addresses.back is incorrect");
+      CHECK_AND_ASSERT_THROW_MES(!wti.is_income, "wti.is_income is " << wti.is_income);
+      CHECK_AND_ASSERT_THROW_MES(wti.amount == MK_TEST_COINS(4), "incorrect wti.amount = " << print_money_brief(wti.amount));
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 2, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
+      CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), "wti.remote_addresses.back is incorrect");
       return true;
     }
   ));
