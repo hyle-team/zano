@@ -934,6 +934,8 @@ private:
     uint64_t detach_from_block_ids(uint64_t height);
     uint64_t get_wallet_minimum_height();
 
+    void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
+
     currency::account_base m_account;
     bool m_watch_only;
     std::string m_log_prefix; // part of pub address, prefix for logging functions

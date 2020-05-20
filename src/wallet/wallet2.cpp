@@ -3121,6 +3121,21 @@ void wallet2::update_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, con
   transfer(destinations, 0, 0, od.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx);
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra)
+{
+  if (get_top_block_height() > m_core_runtime_config.hard_fork_02_starts_after_height)
+  {
+    // after HF2
+    extra.push_back(ai);
+  }
+  else
+  {
+    // before HF2
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!ai.m_address.is_auditable(), "auditable addresses are not supported in aliases prior to HF2");
+    extra.push_back(ai.to_old());
+  }
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_registration(const currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)
 {
   if (!validate_alias_name(ai.m_alias))
@@ -3132,10 +3147,7 @@ void wallet2::request_alias_registration(const currency::extra_alias_entry& ai, 
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
 
-  if (get_top_block_height() > m_core_runtime_config.hard_fork_02_starts_after_height)
-    extra.push_back(ai);
-  else
-    extra.push_back(ai.to_old());
+  push_alias_info_to_extra_according_to_hf_status(ai, extra);
 
   currency::tx_destination_entry tx_dest_alias_reward;
   tx_dest_alias_reward.addr.resize(1);
@@ -3166,10 +3178,7 @@ void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::tr
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
 
-  if (get_top_block_height() > m_core_runtime_config.hard_fork_02_starts_after_height)
-    extra.push_back(ai);
-  else
-    extra.push_back(ai.to_old());
+  push_alias_info_to_extra_according_to_hf_status(ai, extra);
 
   transfer(destinations, 0, 0, fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
