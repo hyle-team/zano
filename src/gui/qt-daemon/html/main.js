@@ -7296,7 +7296,7 @@ var SendComponent = /** @class */ (function () {
                                 if (send_status) {
                                     _this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
                                     _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null, hide: null };
-                                    _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 0, fee: _this.variablesService.default_fee, hide: false });
+                                    _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 10, fee: _this.variablesService.default_fee, hide: false });
                                 }
                             });
                         }
