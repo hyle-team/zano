@@ -876,7 +876,7 @@ namespace currency
   void t_currency_protocol_handler<t_core>::set_to_debug_mode(uint32_t ip)
   {
     m_debug_ip_address = ip;
-    LOG_PRINT_L0("debug mode is set for IP " << epee:string_tools::get_ip_string_from_int32(m_debug_ip_address));
+    LOG_PRINT_L0("debug mode is set for IP " << epee::string_tools::get_ip_string_from_int32(m_debug_ip_address));
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
