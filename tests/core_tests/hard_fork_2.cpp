@@ -432,7 +432,7 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
 //------------------------------------------------------------------------------
 
 hard_fork_2_tx_extra_alias_entry_in_wallet::hard_fork_2_tx_extra_alias_entry_in_wallet()
-  : hard_fork_2_base_test(22)
+  : hard_fork_2_base_test(23)
 {
   REGISTER_CALLBACK_METHOD(hard_fork_2_tx_extra_alias_entry_in_wallet, c1);
 }
@@ -442,7 +442,7 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::generate(std::vector<test_event
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
-  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   set_hard_fork_heights_to_generator(generator);
@@ -491,18 +491,59 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   r = !have_type_in_variant_container<extra_alias_entry>(res_tx.extra);
   CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry is found in extra");
 
-  // mine few block to activate HF2
-  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  // before the HF2 an alias to an auditable address is not supported
+  extra_alias_entry ai_bob = AUTO_VAL_INIT(ai_bob);
+  ai_bob.m_alias = "bobbobbob";
+  ai_bob.m_address = m_accounts[BOB_ACC_IDX].get_public_address();
+  alias_reward = get_alias_coast_from_fee(ai_bob.m_alias, TESTS_DEFAULT_FEE);
+  res_tx = AUTO_VAL_INIT(res_tx);
+  r = false;
+  try
+  {
+    alice_wlt->request_alias_registration(ai_bob, res_tx, TESTS_DEFAULT_FEE, alias_reward);
+  }
+  catch (...)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "exception was not cought as expected");
+
+  // should be still one tx in the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
-  
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // try to update Alice's alias to an auditable address
+  extra_alias_entry ai_alice_update = ai;
+  ai_alice_update.m_text_comment = "Update to auditable";
+  ai_alice_update.m_address = m_accounts[BOB_ACC_IDX].get_public_address(); // auditable
+  CHECK_AND_ASSERT_MES(ai_alice_update.m_address.is_auditable(), false, "address is not auditable");
+  r = false;
+  try
+  {
+    alice_wlt->request_alias_update(ai_alice_update, res_tx, TESTS_DEFAULT_FEE, 0);
+  }
+  catch (...)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "exception was not cought as expected");
+
+
+  // mine few blocks to activate HF2
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 2);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 4, false, "Incorrect blockchain size");
 
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == 3, false, "Incorrect numbers of blocks fetched");
 
   // update alias, change comment and address
-  ai.m_text_comment = "Update!";
+  ai.m_text_comment = "Update to normal";
   ai.m_address = m_accounts[MINER_ACC_IDX].get_public_address();
   alice_wlt->request_alias_update(ai, res_tx, TESTS_DEFAULT_FEE, 0);
 
@@ -518,10 +559,56 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry_old is found in extra");
 
   // make sure alias was updated indeed
-  extra_alias_entry ai2 = AUTO_VAL_INIT(ai2);
-  r = c.get_blockchain_storage().get_alias_info(ai.m_alias, ai2);
+  extra_alias_entry ai_check = AUTO_VAL_INIT(ai_check);
+  r = c.get_blockchain_storage().get_alias_info(ai.m_alias, ai_check);
   CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
-  CHECK_AND_ASSERT_MES(ai2.m_text_comment == ai.m_text_comment && ai2.m_address == m_accounts[MINER_ACC_IDX].get_public_address(),
+  CHECK_AND_ASSERT_MES(ai_check.m_text_comment == ai.m_text_comment && ai_check.m_address == m_accounts[MINER_ACC_IDX].get_public_address(),
+    false, "Incorrect alias info retunred by get_alias_info");
+
+
+  // make sure an alias to auditable address can be registered now
+  alice_wlt->request_alias_registration(ai_bob, res_tx, TESTS_DEFAULT_FEE, alias_reward);
+  // after HF2: extra_alias_entry should be here, not extra_alias_entry_old
+  r = have_type_in_variant_container<extra_alias_entry>(res_tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry is not found in extra");
+  r = !have_type_in_variant_container<extra_alias_entry_old>(res_tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry_old is found in extra");
+
+  // miner a block to confirm it
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+
+  // make sure alias was updated to an auditable address indeed
+  ai_check = AUTO_VAL_INIT(ai_check);
+  r = c.get_blockchain_storage().get_alias_info(ai_bob.m_alias, ai_check);
+  CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
+  CHECK_AND_ASSERT_MES(ai_check.m_text_comment == ai_bob.m_text_comment && ai_check.m_address == m_accounts[BOB_ACC_IDX].get_public_address(),
+    false, "Incorrect alias info retunred by get_alias_info");
+
+  miner_wlt->refresh();
+  
+  // update alias once again, change comment and address to auditable
+  // alias updated by miner, as he's the owner now
+  miner_wlt->request_alias_update(ai_alice_update, res_tx, TESTS_DEFAULT_FEE, 0);
+
+  // after HF2: extra_alias_entry should be here, not extra_alias_entry_old
+  r = have_type_in_variant_container<extra_alias_entry>(res_tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry is not found in extra");
+  r = !have_type_in_variant_container<extra_alias_entry_old>(res_tx.extra);
+  CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry_old is found in extra");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+
+  // make sure alias was updated to an auditable address indeed
+  ai_check = AUTO_VAL_INIT(ai_check);
+  r = c.get_blockchain_storage().get_alias_info(ai_alice_update.m_alias, ai_check);
+  CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
+  CHECK_AND_ASSERT_MES(ai_check.m_text_comment == ai_alice_update.m_text_comment && ai_check.m_address == m_accounts[BOB_ACC_IDX].get_public_address(),
     false, "Incorrect alias info retunred by get_alias_info");
 
   return true;
