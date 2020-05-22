@@ -891,7 +891,6 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
 #else 
     LOG_ERROR("Unexpected location reached");
 #endif
-
   }
 
   try

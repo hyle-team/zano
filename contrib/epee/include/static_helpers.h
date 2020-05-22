@@ -73,12 +73,11 @@ namespace epee
       }
       if (!deinit_called)
       {
-        std::cout << "[ENTERING DESTROY CALLBACK]: " << std::endl;
+
         if (static_destroy_handler)
           static_destroy_handler();
 
         deinit_called = true;
-        std::cout << "[DESTROY CALLBACK FINISHED]: " << std::endl;
       }
 
       return true;
@@ -89,7 +88,6 @@ namespace epee
     {
       ~wrapper()
       {
-        std::cout << "[DESTROYING STATIC]: " << typeid(t_base).name() << std::endl;
         set_or_call_on_destruct();
       }
 
