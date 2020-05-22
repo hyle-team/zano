@@ -925,6 +925,7 @@ using namespace std;
     class interruptible_http_client : public http_simple_client
     {
       std::shared_ptr<idle_handler_base> m_pcb;
+      bool m_permanent_error = false;
 
       virtual bool handle_target_data(std::string& piece_of_transfer)
       {
@@ -943,6 +944,7 @@ using namespace std;
         if (p_hri && !(p_hri->m_response_code >= 200 && p_hri->m_response_code < 300))
         {
           LOG_PRINT_L0("HTTP request to " << url << " failed with code: " << p_hri->m_response_code);
+          m_permanent_error = true;
           return false;
         }
         return r;
@@ -1002,22 +1004,31 @@ using namespace std;
         };
         uint64_t current_err_count = 0;
         bool r = false;
-
+        m_permanent_error = false;
         while (!r && current_err_count < fails_count)
         {
-          LOG_PRINT_L0("Attempt to invoke http: " << url << " (offset:" << state_received_bytes_base << ")");
+          LOG_PRINT_L0("Attempt " << current_err_count + 1 << "/" << fails_count << " to get " << url << " (offset:" << state_received_bytes_base << ")");
           fields_list additional_params_local = additional_params;
           additional_params_local.push_back(std::make_pair<std::string, std::string>("Range", std::string("bytes=") + std::to_string(state_received_bytes_base) + "-"));
           r = this->invoke_cb(local_cb, url, timeout, method, body, additional_params_local);
           if (!r)
           {
-            if (stopped)
+            if (stopped || m_permanent_error)
               break;
             current_err_count++;
             state_received_bytes_base += state_received_bytes_current;
             state_received_bytes_current = 0;
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(2000));
           }
+        }
+
+        if (current_err_count >= fails_count)
+        {
+          LOG_PRINT_YELLOW("Downloading from " << url << " FAILED as it's reached maximum (" << fails_count << ") number of attempts. Downloaded " << state_received_bytes_base << " bytes.", LOG_LEVEL_0);
+        }
+        else if (m_permanent_error)
+        {
+          LOG_PRINT_YELLOW("Downloading from " << url << " FAILED due to permanent HTTP error. Downloaded " << state_received_bytes_base << " bytes.", LOG_LEVEL_0);
         }
 
         fs.close();

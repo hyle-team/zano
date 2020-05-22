@@ -105,6 +105,11 @@ namespace tools
 
   std::string get_callstack_win_x64()
   {
+    // @TODO@
+    // static epee::static_helpers::wrapper<std::recursive_mutex> cs;
+    static std::recursive_mutex cs;
+    std::lock_guard<std::recursive_mutex> lock(cs);
+
     HANDLE h_process = GetCurrentProcess();
     HANDLE h_thread = GetCurrentThread();
 

@@ -1396,7 +1396,7 @@ namespace nodetool
     get_local_node_data(rsp.node_data);
     m_payload_handler.get_payload_sync_data(rsp.payload_data);
     fill_maintainers_entry(rsp.maintrs_entry);
-    LOG_PRINT_GREEN("COMMAND_HANDSHAKE", LOG_LEVEL_1);
+    LOG_PRINT_GREEN("COMMAND_HANDSHAKE: v" << arg.payload_data.client_version << " top: " << epee::string_tools::pod_to_hex(arg.payload_data.top_id).substr(0, 6) << " @ " << arg.payload_data.current_height - 1, LOG_LEVEL_1);
     return 1;
   }
   //-----------------------------------------------------------------------------------
@@ -1442,6 +1442,7 @@ namespace nodetool
     std::string s = ss.str();
     return s;
   }
+
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   void node_server<t_payload_net_handler>::on_connection_new(p2p_connection_context& context)
