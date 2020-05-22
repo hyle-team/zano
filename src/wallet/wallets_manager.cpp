@@ -4,7 +4,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-
+#include <chrono>
 #include "wallets_manager.h"
 #include "currency_core/alias_helper.h"
 #ifndef MOBILE_WALLET_BUILD
@@ -33,7 +33,12 @@
     return API_RETURN_CODE_WALLET_WRONG_ID; \
   auto& name = it->second.w;
 
-#define DAEMON_IDLE_UPDATE_TIME_MS        2000
+#ifdef MOBILE_WALLET_BUILD
+  #define DAEMON_IDLE_UPDATE_TIME_MS        10000
+#else
+  #define DAEMON_IDLE_UPDATE_TIME_MS        2000
+#endif
+
 #define HTTP_PROXY_TIMEOUT                2000
 #define HTTP_PROXY_ATTEMPTS_COUNT         1
 
@@ -56,7 +61,8 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_ui_opt(AUTO_VAL_INIT(m_ui_opt)), 
                                  m_remote_node_mode(false),
                                  m_is_pos_allowed(false),
-                                 m_qt_logs_enbaled(false)
+                                 m_qt_logs_enbaled(false), 
+                                 dont_save_wallet_at_stop(false)
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
@@ -87,6 +93,7 @@ wallets_manager::~wallets_manager()
 {
   TRY_ENTRY();
   stop();
+  LOG_PRINT_L0("[~WALLETS_MANAGER] destroyed");
   CATCH_ENTRY_NO_RETURN();
 }
 
@@ -280,13 +287,6 @@ bool wallets_manager::start()
   CATCH_ENTRY_L0("main", false);
  }
 
- 
-
-bool wallets_manager::send_stop_signal()
-{
-  m_stop_singal_sent = true;
-  return true;
-}
 
 
 bool wallets_manager::stop()
@@ -297,10 +297,15 @@ bool wallets_manager::stop()
 	  LOG_PRINT_L0("Waiting for backend main worker thread: " << m_main_worker_thread.get_id());
 	  m_main_worker_thread.join();
   }
-    
-
-
+   
   return true;
+}
+
+
+bool wallets_manager::quick_stop_no_save() //stop without storing wallets
+{
+  dont_save_wallet_at_stop = true;
+  return stop();
 }
 
 std::string wallets_manager::get_config_folder()
@@ -345,7 +350,10 @@ bool wallets_manager::init_local_daemon()
 
       return static_cast<bool>(m_stop_singal_sent);
     });
-    CHECK_AND_ASSERT_AND_SET_GUI(res,  "pre-downloading failed");
+    if (!res)
+    {
+      LOG_PRINT_RED("pre-downloading failed, continue with normal network synchronization", LOG_LEVEL_0);
+    }
   }
 
 
@@ -497,6 +505,25 @@ void wallets_manager::main_worker(const po::variables_map& m_vm)
   
 
   SHARED_CRITICAL_REGION_BEGIN(m_wallets_lock);
+  //first send stop signal to all wallets
+  for (auto& wo : m_wallets)
+  {
+    try
+    {
+      wo.second.stop(false);
+    }
+    catch (const std::exception& e)
+    {
+      LOG_ERROR("Exception rised at storing wallet: " << e.what());
+      continue;
+    }
+    catch (...)
+    {
+      LOG_ERROR("Exception rised at storing wallet");
+      continue;
+    }
+  }
+
   for (auto& wo : m_wallets)
   {
     LOG_PRINT_L0("Storing wallet data...");
@@ -504,11 +531,9 @@ void wallets_manager::main_worker(const po::variables_map& m_vm)
     //m_pview->update_daemon_status(dsi);
     try
     {
-      wo.second.major_stop = true;
-      wo.second.stop_for_refresh = true;
-      wo.second.w.unlocked_get()->stop();
-
-      wo.second.w->get()->store();
+      wo.second.stop();
+      if(!dont_save_wallet_at_stop)
+        wo.second.w->get()->store();
     }
     catch (const std::exception& e)
     {
@@ -605,13 +630,34 @@ void wallets_manager::toggle_pos_mining()
   //update_wallets_info();
 }
 
+bool wallets_manager::send_stop_signal()
+{
+  m_stop_singal_sent = true;
+  m_stop_singal_sent_mutex_cv.notify_one();
+  return true;
+}
+
+
 void wallets_manager::loop()
 {
-  while(!m_stop_singal_sent)
+
+  while (!m_stop_singal_sent)
   {
-    update_state_info();
-    std::this_thread::sleep_for(std::chrono::milliseconds(DAEMON_IDLE_UPDATE_TIME_MS));
+    {
+      std::unique_lock<std::mutex> lk(m_stop_singal_sent_mutex);
+      m_stop_singal_sent_mutex_cv.wait_for(lk, std::chrono::microseconds(DAEMON_IDLE_UPDATE_TIME_MS), [&] {return m_stop_singal_sent.load(); });
+    }
+    if (!m_stop_singal_sent)
+    {
+      update_state_info();
+    }
+
   }
+//   while(!m_stop_singal_sent)
+//   {
+//     update_state_info();
+//     std::this_thread::sleep_for(std::chrono::milliseconds(DAEMON_IDLE_UPDATE_TIME_MS));
+//   }
 }
 
 void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
@@ -732,6 +778,16 @@ std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter
 
 std::string wallets_manager::open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr)
 {
+  // check if that file already opened
+  SHARED_CRITICAL_REGION_BEGIN(m_wallets_lock);
+  for (auto& wallet_entry : m_wallets)
+  {
+    if (wallet_entry.second.w.unlocked_get()->get_wallet_path() == path)
+      return API_RETURN_CODE_ALREADY_EXISTS;
+  }
+  SHARED_CRITICAL_REGION_END();
+
+
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   owr.wallet_id = m_wallet_id_counter++;
 
@@ -788,6 +844,8 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     }
   }
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
+  boost::system::error_code ec = AUTO_VAL_INIT(ec);
+  owr.wallet_file_size = boost::filesystem::file_size(path, ec);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   get_wallet_info(wo, owr.wi);
@@ -840,7 +898,6 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
 #else 
     LOG_ERROR("Unexpected location reached");
 #endif
-
   }
 
   try
@@ -1802,14 +1859,22 @@ void wallets_manager::wallet_vs_options::worker_func()
   }
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet thread thread stopped", LOG_LEVEL_0);
 }
-wallets_manager::wallet_vs_options::~wallet_vs_options()
+void wallets_manager::wallet_vs_options::stop(bool wait)
 {
+  w.unlocked_get()->stop();
   do_mining = false;
   major_stop = true;
   stop_for_refresh = true;
   break_mining_loop = true;
-  if (miner_thread.joinable())
-    miner_thread.join();
+  if (wait)
+  {
+    if (miner_thread.joinable())
+      miner_thread.join();
+  }
+}
+wallets_manager::wallet_vs_options::~wallet_vs_options()
+{
+  stop();
 }
 
 std::string wallets_manager::get_wallet_log_prefix(size_t wallet_id) const

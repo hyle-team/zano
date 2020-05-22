@@ -1,4 +1,4 @@
-// Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
+// Copyright (c) 2006-2020, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
@@ -26,59 +26,76 @@
 
 
 
-#ifndef _STATIC_INITIALIZER_H_
-#define _STATIC_INITIALIZER_H_
+#pragma once
+#include <limits>
+#include <set>
+#include <iterator>
+#include <boost/thread.hpp>
+#include "include_base_utils.h"
+#include "auto_val_init.h"
 
+#define DEFINE_SECURE_STATIC_VAR(type, var) static epee::static_helpers::wrapper<type> var##inst; \
+  static type& var = var##inst;
 
 namespace epee
 {
-/***********************************************************************
-class initializer - useful to initialize some static classes 
-                       which have init() and un_init() static members
-************************************************************************/
+  namespace static_helpers
+  {
+    template<class to_initialize>
+    class initializer
+    {
+    public:
+      initializer()
+      {
+        to_initialize::init();
+        //get_set_is_initialized(true, true);
+      }
+      ~initializer()
+      {
+        to_initialize::un_init();
+        //get_set_is_uninitialized(true, true);
+      }
+    };
 
 
+    typedef void(*static_destroy_handler_type)();
 
-template<class to_initialize>
-class initializer
-{
-public:
-	initializer()
-	{
-		to_initialize::init();
-		//get_set_is_initialized(true, true);
-	}
-	~initializer()
-	{
-		to_initialize::un_init();
-		//get_set_is_uninitialized(true, true);
-	}
+    inline
+      bool set_or_call_on_destruct(bool set = false, static_destroy_handler_type destr_ptr = nullptr)
+    {
+      volatile static bool deinit_called = false;
+      volatile static static_destroy_handler_type static_destroy_handler = nullptr;
 
-	/*static inline bool is_initialized()
-	{
-		return get_set_is_initialized();
-	}
-	static inline bool is_uninitialized()
-	{
-		return get_set_is_uninitialized();
-	}
+      if (set)
+      {
+        static_destroy_handler = destr_ptr;
+        return true;
+      }
+      if (!deinit_called)
+      {
 
-private: 
-	static inline bool get_set_is_initialized(bool need_to_set = false, bool val_to_set= false)
-	{
-		static bool val_is_initialized = false;
-		if(need_to_set)
-			val_is_initialized = val_to_set;
-		return val_is_initialized;
-	}
-	static inline bool get_set_is_uninitialized(bool need_to_set = false, bool val_to_set = false)
-	{
-		static bool val_is_uninitialized = false;
-		if(need_to_set)
-			val_is_uninitialized = val_to_set;
-		return val_is_uninitialized;
-	}*/
-};
+        if (static_destroy_handler)
+          static_destroy_handler();
+
+        deinit_called = true;
+      }
+
+      return true;
+    }
+
+    template<class t_base>
+    struct wrapper : public t_base
+    {
+      ~wrapper()
+      {
+        set_or_call_on_destruct();
+      }
+
+    };
+
+  }
+  
+
+
 
 }
-#endif //_STATIC_INITIALIZER_H_

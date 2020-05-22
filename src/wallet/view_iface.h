@@ -432,6 +432,7 @@ public:
     std::string seed;
     bool recovered;
     uint64_t wallet_local_bc_size;
+    uint64_t wallet_file_size;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -440,6 +441,7 @@ public:
       KV_SERIALIZE(seed)
       KV_SERIALIZE(recovered)
       KV_SERIALIZE(wallet_local_bc_size)
+      KV_SERIALIZE(wallet_file_size)
     END_KV_SERIALIZE_MAP()
   };
 

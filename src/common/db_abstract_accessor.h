@@ -913,27 +913,47 @@ namespace tools
     {
       typedef basic_key_value_accessor<composite_key<t_key, uint64_t>, t_value, is_t_access_strategy> basic_accessor_type;
 
-//      template<class t_key>
       solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type>
-        get_counter_accessor(const t_key& container_id)
+      get_counter_accessor(const t_key& container_id)
       {
- 
         static_assert(std::is_pod<t_key>::value, "t_pod_key must be a POD type.");
         composite_key<t_key, guid_key> cc = { container_id, const_counter_suffix}; 
 
         return solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type >(cc, *this);
       }
 
-//      template<class t_key>
       const solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type >
-        get_counter_accessor(const t_key& container_id) const
+      get_counter_accessor(const t_key& container_id) const
       {
+        static_assert(std::is_pod<t_key>::value, "t_pod_key must be a POD type.");
+        composite_key<t_key, guid_key> cc = { container_id, const_counter_suffix };
 
-          static_assert(std::is_pod<t_key>::value, "t_pod_key must be a POD type.");
-          composite_key<t_key, guid_key> cc = { container_id, const_counter_suffix };
+        return solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type >(cc, const_cast<basic_accessor_type&>(static_cast<const basic_accessor_type&>(*this)));
+      }
 
-          return solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type >(cc, const_cast<basic_accessor_type&>(static_cast<const basic_accessor_type&>(*this)));
+      template<typename callback_t>
+      struct subitems_visitor : public i_db_callback
+      {
+        subitems_visitor(callback_t cb)
+          : m_callback(cb)
+        {}
+
+        virtual bool on_enum_item(uint64_t i, const void* key_data, uint64_t key_size, const void* value_data, uint64_t value_size) override
+        {
+          if (key_size != sizeof(composite_key<t_key, uint64_t>))
+            return true; // skip solo values containing items size
+
+          composite_key<t_key, uint64_t> key = AUTO_VAL_INIT(key);
+          key_from_ptr(key, key_data, key_size);
+
+          t_value value = AUTO_VAL_INIT(value);
+          access_strategy_selector<is_t_access_strategy>::from_buff_to_obj(value_data, value_size, value);
+
+          return m_callback(i, key.container_id, key.sufix, value);
         }
+
+        callback_t m_callback;
+      };
 
     public:
       basic_key_to_array_accessor(basic_db_accessor& db) : basic_key_value_accessor<composite_key<t_key, uint64_t>, t_value, is_t_access_strategy>(db)
@@ -991,6 +1011,14 @@ namespace tools
 
         counter = 0;
       }
+
+      template<typename callback_t>
+      void enumerate_subitems(callback_t callback) const
+      {
+        subitems_visitor<callback_t> visitor(callback);
+        basic_accessor_type::bdb.get_backend()->enumerate(basic_accessor_type::m_h, &visitor);
+      }
+
     };
 
     /************************************************************************/

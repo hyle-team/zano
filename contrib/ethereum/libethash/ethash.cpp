@@ -149,7 +149,7 @@ epoch_context_full* create_epoch_context(
       LOG_CUSTOM_WITH_CALLSTACK("CRITICAL: std::calloc(" << alloc_size << ") failed in create_epoch_context()", 0);
       return nullptr;  // Signal out-of-memory by returning null pointer.
     }
-    LOG_CUSTOM("context for epoch " << epoch_number << " allocated, size: " << alloc_size << " bytes", 0);
+    LOG_CUSTOM("context for epoch " << epoch_number << " allocated, size: " << alloc_size << " bytes, full dataset size: " << full_dataset_size << " bytes", 0);
 
     hash512* const light_cache = reinterpret_cast<hash512*>(alloc_data + context_alloc_size);
     const hash256 epoch_seed = calculate_epoch_seed(epoch_number);
