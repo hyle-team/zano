@@ -3030,7 +3030,7 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
   uint64_t aim = date - 46800;
   uint64_t high_boundary = date - 3600; //1 hour
 
-  std::cout << "ENTRY: low_boundary(minutes):" << low_boundary/60 << " high_boundary(minutes): " << high_boundary / 60 << std::endl;
+  //std::cout << "ENTRY: low_boundary(minutes):" << low_boundary/60 << " high_boundary(minutes): " << high_boundary / 60 << std::endl;
 
   uint64_t iteration_coun = 0;
   uint64_t current_low_boundary = 0;
@@ -3060,8 +3060,8 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
         return true;
       }
 
-      std::cout << "est_h:" << calculated_estimated_height << ", ts(min): " << ts / 60 << " distance to RIGHT minutes: " << int64_t((int64_t(ts) - int64_t(high_boundary))) / 60 << std::endl;
-      std::cout << "OOFFSET: -" << offset << std::endl;
+      //std::cout << "est_h:" << calculated_estimated_height << ", ts(min): " << ts / 60 << " distance to RIGHT minutes: " << int64_t((int64_t(ts) - int64_t(high_boundary))) / 60 << std::endl;
+      //std::cout << "OOFFSET: -" << offset << std::endl;
       calculated_estimated_height -= offset;
     }
     else if (ts < low_boundary)
@@ -3080,8 +3080,8 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
       //CHECK_AND_ASSERT_MES(offset > 2, true,
       //  "offset is too low = " << offset);
 
-      std::cout << "est_h:" << calculated_estimated_height << ", ts(min): " << ts / 60 << " distance to LEFT minutes: " << int64_t((int64_t(low_boundary) - int64_t(ts))) / 60 << std::endl;
-      std::cout << "OOFFSET: +" << offset << std::endl;
+      //std::cout << "est_h:" << calculated_estimated_height << ", ts(min): " << ts / 60 << " distance to LEFT minutes: " << int64_t((int64_t(low_boundary) - int64_t(ts))) / 60 << std::endl;
+      //std::cout << "OOFFSET: +" << offset << std::endl;
       calculated_estimated_height += offset;
     }
     else
