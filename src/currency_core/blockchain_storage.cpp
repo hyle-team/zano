@@ -2995,9 +2995,10 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
   CRITICAL_REGION_LOCAL(m_read_lock);
 #define GET_EST_HEIGHT_FROM_DATE_THRESHOLD              1440
 
+  res_h = 0;
+
   if (date < get_blockchain_launch_timestamp())
   {
-    res_h = 0;
     return true;
   }
 
@@ -3012,14 +3013,13 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
     if (m_db_blocks.size() > 1440)
     {
       res_h = m_db_blocks.size() - 1440;
-      return true;
     }
     else 
     {
       //likely impossible, but just in case
       res_h = 0;
     }
-      
+    return true;
   }
   if (calculated_estimated_height > m_db_blocks.size() - 1)
     calculated_estimated_height = m_db_blocks.size() - 1;
@@ -3030,27 +3030,59 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
   uint64_t aim = date - 46800;
   uint64_t high_boundary = date - 3600; //1 hour
 
+  //std::cout << "ENTRY: low_boundary(minutes):" << low_boundary/60 << " high_boundary(minutes): " << high_boundary / 60 << std::endl;
+
   uint64_t iteration_coun = 0;
+  uint64_t current_low_boundary = 0;
+  uint64_t current_hight_boundary = m_db_blocks.size() - 1;
   while (true)
   {
     iteration_coun++;
+    if (iteration_coun > 29) // Log2(CURRENCY_MAX_BLOCK_NUMBER) 
+    {
+      LOG_ERROR("Internal error: too much iterations on get_est_height_from_date, date = " << date);
+      return true;
+    }
     uint64_t correction = 0;
     uint64_t ts = m_db_blocks[calculated_estimated_height]->bl.timestamp;
     if (ts > high_boundary)
     {
       //we moved too much forward
-      uint64_t offset = (ts - aim) / DIFFICULTY_TOTAL_TARGET;
-      if (offset > calculated_estimated_height)
+      
+      current_hight_boundary = calculated_estimated_height;
+      CHECK_AND_ASSERT_MES(current_hight_boundary > current_low_boundary, true, 
+        "Internal error: current_hight_boundary(" << current_hight_boundary << ") > current_low_boundary("<< current_low_boundary << ")");
+      uint64_t offset = (current_hight_boundary - current_low_boundary)/2;
+      if (offset <= 2)
       {
-        res_h = 0;
-        break;
+        //something really wrong with distribution of blocks, just use current_low_boundary to be sure that we didn't mess any transactions 
+        res_h = current_low_boundary;
+        return true;
       }
+
+      //std::cout << "est_h:" << calculated_estimated_height << ", ts(min): " << ts / 60 << " distance to RIGHT minutes: " << int64_t((int64_t(ts) - int64_t(high_boundary))) / 60 << std::endl;
+      //std::cout << "OOFFSET: -" << offset << std::endl;
       calculated_estimated_height -= offset;
     }
     else if (ts < low_boundary)
     {
       //we too much in past
-      calculated_estimated_height += (aim - ts) / DIFFICULTY_TOTAL_TARGET;
+      current_low_boundary = calculated_estimated_height;
+      CHECK_AND_ASSERT_MES(current_hight_boundary > current_low_boundary, true,
+        "Internal error: current_hight_boundary(" << current_hight_boundary << ") > current_low_boundary(" << current_low_boundary << ")");
+      uint64_t offset = (current_hight_boundary - current_low_boundary) / 2;
+      if (offset <= 2)
+      {
+        //something really wrong with distribution of blocks, just use current_low_boundary to be sure that we didn't mess any transactions 
+        res_h = current_low_boundary;
+        return true;
+      }
+      //CHECK_AND_ASSERT_MES(offset > 2, true,
+      //  "offset is too low = " << offset);
+
+      //std::cout << "est_h:" << calculated_estimated_height << ", ts(min): " << ts / 60 << " distance to LEFT minutes: " << int64_t((int64_t(low_boundary) - int64_t(ts))) / 60 << std::endl;
+      //std::cout << "OOFFSET: +" << offset << std::endl;
+      calculated_estimated_height += offset;
     }
     else
     {
@@ -3058,6 +3090,7 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
       break;
     }
   }
+
   LOG_PRINT_L0("[get_est_height_from_date] returned " << calculated_estimated_height << " with " << iteration_coun << " iterations");
   return true;
 }
