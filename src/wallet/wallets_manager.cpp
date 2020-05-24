@@ -643,14 +643,15 @@ void wallets_manager::loop()
 
   while (!m_stop_singal_sent)
   {
-    {
-      std::unique_lock<std::mutex> lk(m_stop_singal_sent_mutex);
-      m_stop_singal_sent_mutex_cv.wait_for(lk, std::chrono::microseconds(DAEMON_IDLE_UPDATE_TIME_MS), [&] {return m_stop_singal_sent.load(); });
-    }
     if (!m_stop_singal_sent)
     {
       update_state_info();
     }
+    {
+      std::unique_lock<std::mutex> lk(m_stop_singal_sent_mutex);
+      m_stop_singal_sent_mutex_cv.wait_for(lk, std::chrono::microseconds(DAEMON_IDLE_UPDATE_TIME_MS), [&] {return m_stop_singal_sent.load(); });
+    }
+
 
   }
 //   while(!m_stop_singal_sent)
