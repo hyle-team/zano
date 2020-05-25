@@ -265,8 +265,35 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     {
       const currency::txin_to_key& intk = boost::get<currency::txin_to_key>(in);
       
-      // TODO: check for references to our UTXO (auditability)
-      // intk.key_offsets;
+      if (is_auditable())
+      {
+        // auditable wallet
+        // try to find a reference among own UTXOs
+        std::vector<txout_v> abs_key_offsets = relative_output_offsets_to_absolute(intk.key_offsets);
+        for(auto v : abs_key_offsets)
+        {
+          if (v.type() != typeid(uint64_t))
+            continue;
+          uint64_t gindex = boost::get<uint64_t>(v);
+          auto it = m_amount_gindex_to_transfer_id.find(std::make_pair(intk.amount, gindex));
+          if (it != m_amount_gindex_to_transfer_id.end())
+          {
+            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "invalid tid: " << it->second << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
+            auto& td = m_transfers[it->second];
+            if (intk.key_offsets.size() != 1)
+            {
+              // own output was used in non-direct transaction
+              // the core should not allow this to happen, the only way it may happen - mixing in own output that was sent without mix_attr == 1
+              // log strange situation
+              LOG_PRINT_YELLOW("own transfer tid=" << it->second << " tx=" << td.tx_hash() << " mix_attr=" << td.mix_attr() << ", is referenced by a transaction with mixins, ref from input with amount: " << intk.amount << ", gindex: " << gindex , LOG_LEVEL_0);
+              continue;
+            }
+            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!td.is_spent(), "transfer is spent, tid: " << it->second << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
+            // own output is spent, handle it
+            ///
+          }
+        }
+      }
 
       auto it = m_key_images.find(intk.k_image);
       if (it != m_key_images.end())
@@ -347,21 +374,21 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         if (m_watch_only)
         {
           if (!is_auditable())
-        {
-          // don't have spend secret key, so we unable to calculate key image for an output
-          // look it up in special container instead
-          auto it = m_pending_key_images.find(otk.key);
-          if (it != m_pending_key_images.end())
           {
-            ki = it->second;
-            WLT_LOG_L1("pending key image " << ki << " was found by out pub key " << otk.key);
+            // don't have spend secret key, so we unable to calculate key image for an output
+            // look it up in special container instead
+            auto it = m_pending_key_images.find(otk.key);
+            if (it != m_pending_key_images.end())
+            {
+              ki = it->second;
+              WLT_LOG_L1("pending key image " << ki << " was found by out pub key " << otk.key);
+            }
+            else
+            {
+              ki = currency::null_ki;
+              WLT_LOG_L1("can't find pending key image by out pub key: " << otk.key << ", key image temporarily set to null");
+            }
           }
-          else
-          {
-            ki = currency::null_ki;
-            WLT_LOG_L1("can't find pending key image by out pub key: " << otk.key << ", key image temporarily set to null");
-          }
-        }
         }
         else
         {
@@ -373,6 +400,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         
         if (ki != currency::null_ki)
         {
+          // make sure calculated key image for this own output has not been seen before
           auto it = m_key_images.find(ki);
           if (it != m_key_images.end())
           {
@@ -407,6 +435,10 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         if (td.m_key_image != currency::null_ki)
           m_key_images[td.m_key_image] = transfer_index;
         add_transfer_to_transfers_cache(tx.vout[o].amount, transfer_index);
+        uint64_t amount = tx.vout[o].amount;
+
+       r = m_amount_gindex_to_transfer_id.insert(std::make_pair(std::make_pair(amount, td.m_global_output_index), transfer_index)).second;
+       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "cannot update m_amount_gindex_to_transfer_id: amount " << amount << ", gindex " << td.m_global_output_index << " already exists");
 
         if (max_out_unlock_time < get_tx_unlock_time(tx, o))
           max_out_unlock_time = get_tx_unlock_time(tx, o);
@@ -1811,6 +1843,17 @@ uint64_t wallet2::detach_from_block_ids(uint64_t including_height)
   return blocks_detached;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::remove_transfer_from_amount_gindex_map(uint64_t tid)
+{
+  for (auto it = m_amount_gindex_to_transfer_id.begin(); it != m_amount_gindex_to_transfer_id.end(); )
+  {
+    if (it->second == tid)
+      it = m_amount_gindex_to_transfer_id.erase(it);
+    else
+      ++it;
+  }
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::detach_blockchain(uint64_t including_height)
 {
   WLT_LOG_L0("Detaching blockchain on height " << including_height);
@@ -1829,6 +1872,7 @@ void wallet2::detach_blockchain(uint64_t including_height)
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
         m_key_images.erase(it_ki);
+        remove_transfer_from_amount_gindex_map(i);
         ++transfers_detached;
       }
       m_transfers.erase(it, m_transfers.end());
@@ -1914,6 +1958,7 @@ bool wallet2::reset_all()
   //m_blockchain.clear();
   m_chain.clear();
   m_transfers.clear();
+  m_amount_gindex_to_transfer_id.clear();
   m_key_images.clear();
   // m_pending_key_images is not cleared intentionally
   m_unconfirmed_in_transfers.clear();
@@ -2170,14 +2215,16 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   if (m_watch_only)
     load_keys2ki(true, need_to_resync);
 
+  WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) << " with public address: " << m_account.get_public_address_str());
+  WLT_LOG_L0("(after loading: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
+
   if (need_to_resync)
   {
     reset_history();
+    WLT_LOG_L0("Unable to load history data from wallet file, wallet will be resynced!");
   }  
-  THROW_IF_TRUE_WALLET_EX(need_to_resync, error::wallet_load_notice_wallet_restored, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
-  WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) << " with public address: " << m_account.get_public_address_str());
-  WLT_LOG_L0("(after loading: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
+  THROW_IF_TRUE_WALLET_EX(need_to_resync, error::wallet_load_notice_wallet_restored, epee::string_encoding::convert_to_ansii(m_wallet_file));
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::store()

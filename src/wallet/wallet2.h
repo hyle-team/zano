@@ -380,6 +380,9 @@ namespace tools
       uint32_t m_flags;
 
       uint64_t amount() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index].amount; }
+      const currency::tx_out& output() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index]; }
+      uint8_t mix_attr() const { return output().target.type() == typeid(currency::txout_to_key) ? boost::get<const currency::txout_to_key&>(output().target).mix_attr : UINT8_MAX; }
+      crypto::hash tx_hash() const { return get_transaction_hash(m_ptx_wallet_info->m_tx); }
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
       bool is_spendable() const { return (m_flags & (WALLET_TRANSFER_DETAIL_FLAG_SPENT | WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION | WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION)) == 0; }
       bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
@@ -443,6 +446,7 @@ namespace tools
     typedef std::unordered_map<crypto::hash, transfer_details_base> multisig_transfer_container;
     typedef std::unordered_map<crypto::hash, tools::wallet_public::escrow_contract_details_basic> escrow_contracts_container;
     typedef std::map<uint64_t, std::set<size_t> > free_amounts_cache_type;
+    typedef std::unordered_map<std::pair<uint64_t, uint64_t>, uint64_t> amount_gindex_to_transfer_id_container; // maps [amount; gindex] -> tid
 
 
     struct keys_file_data_old
@@ -503,7 +507,7 @@ namespace tools
 
     //i_wallet2_callback* callback() const { return m_wcallback; }
     //void callback(i_wallet2_callback* callback) { m_callback = callback; }
-    void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = true; }
+    void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = (callback != nullptr); }
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
@@ -724,6 +728,7 @@ namespace tools
 
       a & m_transfers;
       a & m_multisig_transfers;
+      a & m_amount_gindex_to_transfer_id;
       a & m_key_images;      
       a & m_unconfirmed_txs;
       a & m_unconfirmed_multisig_transfers;
@@ -935,6 +940,7 @@ private:
     uint64_t get_wallet_minimum_height();
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
+    void remove_transfer_from_amount_gindex_map(uint64_t tid);
 
     currency::account_base m_account;
     bool m_watch_only;
@@ -950,6 +956,7 @@ private:
 
     transfer_container m_transfers;
     multisig_transfer_container m_multisig_transfers;
+    amount_gindex_to_transfer_id_container m_amount_gindex_to_transfer_id;
     payment_container m_payments;
     std::unordered_map<crypto::key_image, size_t> m_key_images;
     std::unordered_map<crypto::public_key, crypto::key_image> m_pending_key_images; // (out_pk -> ki) pairs of change outputs to be added in watch-only wallet without spend sec key
