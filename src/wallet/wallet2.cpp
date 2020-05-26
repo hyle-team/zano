@@ -264,12 +264,16 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     if (in.type() == typeid(currency::txin_to_key))
     {
       const currency::txin_to_key& intk = boost::get<currency::txin_to_key>(in);
+
+      // check if this input spends our output
+      transfer_details* p_td = nullptr;
+      uint64_t tid = UINT64_MAX;
       
-      if (is_auditable())
+      if (is_auditable() && is_watch_only())
       {
         // auditable wallet
         // try to find a reference among own UTXOs
-        std::vector<txout_v> abs_key_offsets = relative_output_offsets_to_absolute(intk.key_offsets);
+        std::vector<txout_v> abs_key_offsets = relative_output_offsets_to_absolute(intk.key_offsets); // potential speed-up: don't convert to abs offsets as we interested only in direct spends for auditable wallets. Now it's kind a bit paranoid.
         for(auto v : abs_key_offsets)
         {
           if (v.type() != typeid(uint64_t))
@@ -278,28 +282,41 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           auto it = m_amount_gindex_to_transfer_id.find(std::make_pair(intk.amount, gindex));
           if (it != m_amount_gindex_to_transfer_id.end())
           {
-            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "invalid tid: " << it->second << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
+            tid = it->second;
+            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tid < m_transfers.size(), "invalid tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
             auto& td = m_transfers[it->second];
             if (intk.key_offsets.size() != 1)
             {
               // own output was used in non-direct transaction
               // the core should not allow this to happen, the only way it may happen - mixing in own output that was sent without mix_attr == 1
               // log strange situation
-              LOG_PRINT_YELLOW("own transfer tid=" << it->second << " tx=" << td.tx_hash() << " mix_attr=" << td.mix_attr() << ", is referenced by a transaction with mixins, ref from input with amount: " << intk.amount << ", gindex: " << gindex , LOG_LEVEL_0);
+              std::stringstream ss;
+              ss << "own transfer tid=" << tid << " tx=" << td.tx_hash() << " mix_attr=" << td.mix_attr() << ", is referenced by a transaction with mixins, ref from input with amount: " << intk.amount << ", gindex: " << gindex;
+              WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
+              if (m_wcallback)
+                m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
               continue;
             }
-            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!td.is_spent(), "transfer is spent, tid: " << it->second << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
+            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!td.is_spent(), "transfer is spent, tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
             // own output is spent, handle it
-            ///
+            break;
           }
         }
       }
+      else
+      {
+        // wallet with spend secret key -- we can calculate own key images and then search by them
+        auto it = m_key_images.find(intk.k_image);
+        if (it != m_key_images.end())
+        {
+          tid = it->second;
+        }
+      }
 
-      auto it = m_key_images.find(intk.k_image);
-      if (it != m_key_images.end())
+      if (tid != UINT64_MAX)
       {
         tx_money_spent_in_ins += intk.amount;
-        transfer_details& td = m_transfers[it->second];
+        transfer_details& td = m_transfers[tid];
         uint32_t flags_before = td.m_flags;
         td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT;
         td.m_spent_height = height;
@@ -307,10 +324,10 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           is_derived_from_coinbase = true;
         else
           is_derived_from_coinbase = false;
-        WLT_LOG_L0("Spent key out, transfer #" << it->second << ", amount: " << print_money(m_transfers[it->second].amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height <<
+        WLT_LOG_L0("Spent key out, transfer #" << tid << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height <<
           "; flags: " << flags_before << " -> " << td.m_flags);
         mtd.spent_indices.push_back(i);
-        remove_transfer_from_expiration_list(it->second);
+        remove_transfer_from_expiration_list(tid);
       }
     }
     else if (in.type() == typeid(currency::txin_multisig))
@@ -406,13 +423,28 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           {
             WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "m_key_images entry has wrong m_transfers index, it->second: " << it->second << ", m_transfers.size(): " << m_transfers.size());
             const transfer_details& local_td = m_transfers[it->second];
-            WLT_LOG_YELLOW("tx " << get_transaction_hash(tx) << " @ block " << height << " has output #" << o << " with key image " << ki << " that has already been seen in output #" <<
+            std::stringstream ss;
+            ss << "tx " << get_transaction_hash(tx) << " @ block " << height << " has output #" << o << " with key image " << ki << " that has already been seen in output #" <<
               local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx) << " @ block " << local_td.m_spent_height <<
-              ". This output can't ever be spent and will be skipped.", LOG_LEVEL_0);
+              ". This output can't ever be spent and will be skipped.";
+            WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
+            if (m_wcallback)
+              m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
             WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tx_money_got_in_outs >= tx.vout[o].amount, "tx_money_got_in_outs: " << tx_money_got_in_outs << ", tx.vout[o].amount:" << tx.vout[o].amount);
             tx_money_got_in_outs -= tx.vout[o].amount;
             continue; // skip the output
           }
+        }
+
+        if (is_auditable() && otk.mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+        {
+          std::stringstream ss;
+          ss << "output #" << o << " from tx " << get_transaction_hash(tx) << " with amount " << print_money_brief(tx.vout[o].amount)
+            << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)otk.mix_attr << ". Output will be IGNORED.";
+          WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
+          if (m_wcallback)
+            m_wcallback->on_message(i_wallet2_callback::ms_red, ss.str());
+          continue; // skip the output
         }
 
         mtd.receive_indices.push_back(o);
@@ -437,8 +469,9 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         add_transfer_to_transfers_cache(tx.vout[o].amount, transfer_index);
         uint64_t amount = tx.vout[o].amount;
 
-       r = m_amount_gindex_to_transfer_id.insert(std::make_pair(std::make_pair(amount, td.m_global_output_index), transfer_index)).second;
-       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "cannot update m_amount_gindex_to_transfer_id: amount " << amount << ", gindex " << td.m_global_output_index << " already exists");
+        auto amount_gindex_pair = std::make_pair(amount, td.m_global_output_index);
+        WLT_CHECK_AND_ASSERT_MES_NO_RET(m_amount_gindex_to_transfer_id.count(amount_gindex_pair) == 0, "update m_amount_gindex_to_transfer_id: amount " << amount << ", gindex " << td.m_global_output_index << " already exists");
+        m_amount_gindex_to_transfer_id[amount_gindex_pair] = transfer_index;
 
         if (max_out_unlock_time < get_tx_unlock_time(tx, o))
           max_out_unlock_time = get_tx_unlock_time(tx, o);

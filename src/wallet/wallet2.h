@@ -72,6 +72,22 @@ const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>
 
 class test_generator;
 
+namespace std
+{
+
+  template <class T1, class T2>
+  struct hash<pair<T1, T2>>
+  {
+    size_t operator()(const pair<T1, T2>& p) const
+    {
+      auto hash1 = hash<T1>{}(p.first);
+      auto hash2 = hash<T2>{}(p.second);
+      return hash1 ^ hash2;
+    }
+  };
+
+} // namespace std
+
 namespace tools
 {
 #pragma pack(push, 1)
@@ -94,6 +110,8 @@ namespace tools
   class i_wallet2_callback
   {
   public:
+    enum message_severity { ms_red, ms_yellow, ms_normal };
+
     virtual ~i_wallet2_callback() = default;
 
     virtual void on_new_block(uint64_t /*height*/, const currency::block& /*block*/) {}
@@ -101,6 +119,7 @@ namespace tools
     virtual void on_pos_block_found(const currency::block& /*block*/) {}
     virtual void on_sync_progress(const uint64_t& /*percents*/) {}
     virtual void on_transfer_canceled(const wallet_public::wallet_transfer_info& wti) {}
+    virtual void on_message(message_severity /*severity*/, const std::string& /*m*/) {}
   };
 
   struct tx_dust_policy
@@ -725,10 +744,12 @@ namespace tools
         a & m_minimum_height;
       }
 
+      // v151: m_amount_gindex_to_transfer_id added
+      if (ver >= 151)
+        a & m_amount_gindex_to_transfer_id;
 
       a & m_transfers;
       a & m_multisig_transfers;
-      a & m_amount_gindex_to_transfer_id;
       a & m_key_images;      
       a & m_unconfirmed_txs;
       a & m_unconfirmed_multisig_transfers;
