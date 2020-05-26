@@ -93,9 +93,8 @@ namespace currency
     bool try_connect_to_daemon();
 
     //----------------- i_wallet2_callback ---------------------
-    virtual void on_new_block(uint64_t height, const currency::block& block);
-    virtual void on_money_received(uint64_t height, const currency::transaction& tx, size_t out_index);
-    virtual void on_money_spent(uint64_t height, const currency::transaction& in_tx, size_t out_index, const currency::transaction& spend_tx);
+    virtual void on_new_block(uint64_t height, const currency::block& block) override;
+    virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override;
     //----------------------------------------------------------
 
     friend class refresh_progress_reporter_t;

@@ -593,22 +593,15 @@ void simple_wallet::on_new_block(uint64_t height, const currency::block& block)
   m_refresh_progress_reporter.update(height, false);
 }
 //----------------------------------------------------------------------------------------------------
-void simple_wallet::on_money_received(uint64_t height, const currency::transaction& tx, size_t out_index)
+void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
 {
-  message_writer(epee::log_space::console_color_green, false) <<
-    "Height " << height <<
-    ", transaction " << get_transaction_hash(tx) <<
-    ", received " << print_money(tx.vout[out_index].amount);
-  m_refresh_progress_reporter.update(height, true);
-}
-//----------------------------------------------------------------------------------------------------
-void simple_wallet::on_money_spent(uint64_t height, const currency::transaction& in_tx, size_t out_index, const currency::transaction& spend_tx)
-{
-  message_writer(epee::log_space::console_color_magenta, false) <<
-    "Height " << height <<
-    ", transaction " << get_transaction_hash(spend_tx) <<
-    ", spent " << print_money(in_tx.vout[out_index].amount);
-  m_refresh_progress_reporter.update(height, true);
+  epee::log_space::console_colors color = wti.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
+  message_writer(color, false) <<
+    "height " << wti.height <<
+    ", tx " << wti.tx_hash <<
+    (wti.is_income ? ", received " : ", spent ") << print_money_brief(wti.amount) <<
+    ", balance: " << print_money_brief(balance);
+  m_refresh_progress_reporter.update(wti.height, true);
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::refresh(const std::vector<std::string>& args)
