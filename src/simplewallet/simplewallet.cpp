@@ -463,7 +463,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     try
     {
       m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
-      message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+      message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
 
       if (m_print_brain_wallet)
         std::cout << "Brain wallet: " << m_wallet->get_account().get_restore_braindata() << std::endl << std::flush;
@@ -602,6 +602,17 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
     (wti.is_income ? ", received " : ", spent ") << print_money_brief(wti.amount) <<
     ", balance: " << print_money_brief(balance);
   m_refresh_progress_reporter.update(wti.height, true);
+}
+//----------------------------------------------------------------------------------------------------
+void simple_wallet::on_message(i_wallet2_callback::message_severity severity, const std::string& m)
+{
+  epee::log_space::console_colors color = epee::log_space::console_color_white;
+  if (severity == i_wallet2_callback::ms_red)
+    color = epee::log_space::console_color_red;
+  else if (severity == i_wallet2_callback::ms_yellow)
+    color = epee::log_space::console_color_yellow;
+
+  message_writer(color, true, std::string()) << m;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::refresh(const std::vector<std::string>& args)
