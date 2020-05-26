@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2020 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -37,3 +37,21 @@ namespace std { \
     } \
   }; \
 }
+
+namespace std
+{
+
+  // this allows using std::pair<> as a key in unordered std containers
+  template <class T1, class T2>
+  struct hash<pair<T1, T2>>
+  {
+    size_t operator()(const pair<T1, T2>& p) const
+    {
+      auto hash1 = hash<T1>{}(p.first);
+      auto hash2 = hash<T2>{}(p.second);
+      return hash1 ^ hash2;
+    }
+  };
+
+} // namespace std
+

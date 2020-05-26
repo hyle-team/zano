@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2020 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -24,6 +24,7 @@
 #include "currency_core/account_boost_serialization.h"
 #include "currency_core/currency_format_utils.h"
 
+#include "common/make_hashable.h"
 #include "wallet_public_structs_defs.h"
 #include "currency_core/currency_format_utils.h"
 #include "common/unordered_containers_boost_serialization.h"
@@ -71,22 +72,6 @@ const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>
 #define WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
 
 class test_generator;
-
-namespace std
-{
-
-  template <class T1, class T2>
-  struct hash<pair<T1, T2>>
-  {
-    size_t operator()(const pair<T1, T2>& p) const
-    {
-      auto hash1 = hash<T1>{}(p.first);
-      auto hash2 = hash<T2>{}(p.second);
-      return hash1 ^ hash2;
-    }
-  };
-
-} // namespace std
 
 namespace tools
 {

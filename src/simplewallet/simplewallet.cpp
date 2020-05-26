@@ -593,14 +593,28 @@ void simple_wallet::on_new_block(uint64_t height, const currency::block& block)
   m_refresh_progress_reporter.update(height, false);
 }
 //----------------------------------------------------------------------------------------------------
+std::string print_money_trailing_zeros_replaced_with_spaces(uint64_t amount)
+{
+  std::string s = print_money(amount);
+  size_t p = s.find_last_not_of('0');
+  if (p != std::string::npos)
+  {
+    if (s[p] == '.')
+      ++p;
+    size_t l = s.length() - p - 1;
+    return s.replace(p + 1, l, l, ' ');
+  }
+  return s;
+}
+//----------------------------------------------------------------------------------------------------
 void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
 {
   epee::log_space::console_colors color = wti.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
   message_writer(color, false) <<
     "height " << wti.height <<
     ", tx " << wti.tx_hash <<
-    (wti.is_income ? ", received " : ", spent ") << print_money_brief(wti.amount) <<
-    ", balance: " << print_money_brief(balance);
+    " " << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(wti.amount) << (wti.is_income ? " received," : " spent,   ") <<
+    " balance: " << print_money_brief(balance);
   m_refresh_progress_reporter.update(wti.height, true);
 }
 //----------------------------------------------------------------------------------------------------
