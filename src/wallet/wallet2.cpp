@@ -2183,7 +2183,7 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   init_log_prefix();
   boost::system::error_code ignored_ec;
   THROW_IF_TRUE_WALLET_EX(boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));
-  if (m_watch_only)
+  if (m_watch_only && !auditable_wallet)
   {
     bool stub;
     load_keys2ki(true, stub);
@@ -2259,7 +2259,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
 
   bool need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
 
-  if (m_watch_only)
+  if (m_watch_only && !is_auditable())
     load_keys2ki(true, need_to_resync);
 
   WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) << " with public address: " << m_account.get_public_address_str());
@@ -2385,8 +2385,11 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!boost::filesystem::exists(wo.m_pending_ki_file), "file " << epee::string_encoding::convert_to_ansii(wo.m_pending_ki_file) << " already exists");
 
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(wo.m_pending_key_images.empty(), "pending key images is expected to be empty");
-  bool stub = false;
-  wo.load_keys2ki(true, stub); // to create outkey2ki file
+  if (!is_auditable())
+  {
+    bool stub = false;
+    wo.load_keys2ki(true, stub); // to create outkey2ki file
+  }
   
   // populate pending key images for spent outputs (this will help to resync watch-only wallet)
   for (size_t ti = 0; ti < wo.m_transfers.size(); ++ti)
