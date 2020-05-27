@@ -6,7 +6,7 @@
 #pragma once 
 #include "chaingen.h"
 
-struct wallet_test : public test_chain_unit_enchanced
+struct wallet_test : virtual public test_chain_unit_enchanced
 {
   enum { MINER_ACC_IDX = 0, ALICE_ACC_IDX = 1, BOB_ACC_IDX = 2, CAROL_ACC_IDX = 3, DAN_ACC_IDX = 4, TOTAL_ACCS_COUNT = 5 }; // to be used as index for m_accounts
 
