@@ -4582,6 +4582,8 @@ void wallet2::transfer(const construct_tx_param& ctp,
   bool send_to_network,
   std::string* p_signed_tx_blob_str)
 {
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!is_auditable() || !is_watch_only(), "You can't initiate coins transfer using an auditable watch-only wallet."); // btw, watch-only wallets can call transfer() within cold-signing process
+
   check_and_throw_if_self_directed_tx_with_payment_id_requested(ctp);
 
   TIME_MEASURE_START(prepare_transaction_time);
