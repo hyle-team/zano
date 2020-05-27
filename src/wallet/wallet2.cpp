@@ -2191,29 +2191,28 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   store();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_phrase)
+void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_phrase_or_awo_blob, bool auditable_watch_only)
 {
+  bool r = false;
   clear();
   prepare_file_names(path);
   m_password = pass;
-  bool r = m_account.restore_from_braindata(seed_phrase);
-  init_log_prefix();
-  THROW_IF_TRUE_WALLET_EX(!r, error::wallet_wrong_seed_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
+  
+  if (auditable_watch_only)
+  {
+    r = m_account.restore_from_awo_blob(seed_phrase_or_awo_blob);
+    init_log_prefix();
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load auditable watch-only wallet from a given blob: invalid awo blob");
+  }
+  else
+  {
+    r = m_account.restore_from_braindata(seed_phrase_or_awo_blob);
+    init_log_prefix();
+    THROW_IF_FALSE_WALLET_EX(r, error::wallet_wrong_seed_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
+  }
+
   boost::system::error_code ignored_ec;
   THROW_IF_TRUE_WALLET_EX(boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));
-  store();
-}
-//----------------------------------------------------------------------------------------------------
-void wallet2::restore_awo(const std::wstring& path, const std::string& pass, const std::string& awo_blob)
-{
-  clear();
-  prepare_file_names(path);
-  m_password = pass;
-  bool r = m_account.restore_from_awo_blob(awo_blob);
-  init_log_prefix();
-  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load auditable watch-only wallet from a given blob: invalid awo blob");
-  boost::system::error_code ignored_ec;
-  THROW_IF_FALSE_WALLET_EX(!boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));
   store();
 }
 //----------------------------------------------------------------------------------------------------

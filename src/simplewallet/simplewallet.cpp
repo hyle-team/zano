@@ -450,13 +450,13 @@ bool simple_wallet::restore_wallet(const std::string &wallet_file, const std::st
   {
     if (auditable_watch_only)
     {
-      m_wallet->restore_awo(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_awo_blob);
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_awo_blob, true);
       message_writer(epee::log_space::console_color_white, true) << "Auditable watch-only wallet restored: " << m_wallet->get_account().get_public_address_str();
     }
     else
     {
       // normal wallet
-      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_awo_blob);
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_awo_blob, false);
       message_writer(epee::log_space::console_color_white, true) << "Wallet restored: " << m_wallet->get_account().get_public_address_str();
       std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
     }
