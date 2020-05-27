@@ -440,10 +440,11 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         {
           std::stringstream ss;
           ss << "output #" << o << " from tx " << get_transaction_hash(tx) << " with amount " << print_money_brief(tx.vout[o].amount)
-            << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)otk.mix_attr << ". Output will be IGNORED.";
+            << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)otk.mix_attr << ". Output IGNORED.";
           WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
           if (m_wcallback)
             m_wcallback->on_message(i_wallet2_callback::ms_red, ss.str());
+          tx_money_got_in_outs -= tx.vout[o].amount;
           continue; // skip the output
         }
 
