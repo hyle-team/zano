@@ -68,7 +68,7 @@ namespace tools
         return ss.str();
       }
 
-      virtual const char* what() const
+      virtual const char* what() const noexcept
       {
         m_what = to_string();
         return m_what.c_str();
