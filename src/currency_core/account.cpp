@@ -162,6 +162,13 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
+  bool account_base::restore_from_awo_blob(const std::string& awo_blob)
+  {
+    set_null();
+    bool r = parse_awo_blob(awo_blob, m_keys.account_address, m_keys.view_secret_key, m_creation_timestamp);
+    return r;
+  }
+  //-----------------------------------------------------------------
   std::string account_base::get_public_address_str() const
   {
     //TODO: change this code into base 58
@@ -172,7 +179,7 @@ namespace currency
   {
     // keep only:
     // timestamp
-    // view pub & spend pub (public address)
+    // view pub & spend pub + flags (public address)
     // view sec
     
     // store to local tmp

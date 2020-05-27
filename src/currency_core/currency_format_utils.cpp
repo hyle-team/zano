@@ -313,6 +313,46 @@ namespace currency
     return string_tools::get_xtype_from_string(amount, str_amount);
   }
   //--------------------------------------------------------------------------------
+  bool parse_awo_blob(const std::string& awo_blob, account_public_address& address, crypto::secret_key& view_sec_key, uint64_t& creation_timestamp)
+  {
+    std::vector<std::string> parts;
+    boost::split(parts, awo_blob, [](char x){ return x == ':'; } );
+    if (parts.size() != 2 && parts.size() != 3)
+      return false;
+
+    if (!get_account_address_from_str(address, parts[0]))
+      return false;
+
+    if (!address.is_auditable())
+      return false;
+
+    if (!epee::string_tools::parse_tpod_from_hex_string(parts[1], view_sec_key))
+      return false;
+
+    crypto::public_key view_pub_key = AUTO_VAL_INIT(view_pub_key);
+    if (!crypto::secret_key_to_public_key(view_sec_key, view_pub_key))
+      return false;
+
+    if (view_pub_key != address.view_public_key)
+      return false;
+
+    creation_timestamp = 0;
+    if (parts.size() == 3)
+    {
+      // parse timestamp
+      int64_t ts = 0;
+      if (!epee::string_tools::string_to_num_fast(parts[2], ts))
+        return false;
+
+      if (ts < WALLET_BRAIN_DATE_OFFSET)
+        return false;
+      
+      creation_timestamp = ts;
+    }
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
   std::string print_stake_kernel_info(const stake_kernel& sk)
   {
     std::stringstream ss;

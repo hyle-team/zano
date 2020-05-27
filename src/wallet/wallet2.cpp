@@ -2203,6 +2203,19 @@ void wallet2::restore(const std::wstring& path, const std::string& pass, const s
   store();
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::restore_awo(const std::wstring& path, const std::string& pass, const std::string& awo_blob)
+{
+  clear();
+  prepare_file_names(path);
+  m_password = pass;
+  bool r = m_account.restore_from_awo_blob(awo_blob);
+  init_log_prefix();
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load auditable watch-only wallet from a given blob: invalid awo blob");
+  boost::system::error_code ignored_ec;
+  THROW_IF_FALSE_WALLET_EX(!boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));
+  store();
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::check_connection()
 {
   return m_core_proxy->check_connection();

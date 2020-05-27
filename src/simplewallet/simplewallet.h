@@ -46,7 +46,7 @@ namespace currency
 
     bool new_wallet(const std::string &wallet_file, const std::string& password, bool create_auditable_wallet);
     bool open_wallet(const std::string &wallet_file, const std::string& password);
-    bool restore_wallet(const std::string &wallet_file, const std::string &restore_seed, const std::string& password);
+    bool restore_wallet(const std::string &wallet_file, const std::string &seed_or_awo_blob, const std::string& password, bool auditable_watch_only);
     bool close_wallet();
 
     bool help(const std::vector<std::string> &args = std::vector<std::string>());
@@ -81,6 +81,7 @@ namespace currency
     bool enable_console_logger(const std::vector<std::string> &args);
     bool integrated_address(const std::vector<std::string> &args);
     bool get_tx_key(const std::vector<std::string> &args_);
+    bool awo_blob(const std::vector<std::string> &args_);
     bool save_watch_only(const std::vector<std::string> &args);
     bool sign_transfer(const std::vector<std::string> &args);
     bool submit_transfer(const std::vector<std::string> &args);
@@ -166,6 +167,7 @@ namespace currency
     bool m_do_pos_mining;
     bool m_offline_mode;
     std::string m_restore_wallet;
+    std::string m_restore_awo_wallet;
 
     epee::console_handlers_binder m_cmd_binder;
 

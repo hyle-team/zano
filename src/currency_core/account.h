@@ -55,6 +55,7 @@ namespace currency
     
     std::string get_restore_braindata() const;
     bool restore_from_braindata(const std::string& seed_phrase);
+    bool restore_from_awo_blob(const std::string& awo_blob);
 
     uint64_t get_createtime() const { return m_creation_timestamp; }
     void set_createtime(uint64_t val) { m_creation_timestamp = val; }
