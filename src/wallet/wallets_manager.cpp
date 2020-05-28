@@ -805,7 +805,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     try
     {
       w->load(path, password);
-      if (w->is_watch_only())
+      if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
       w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
