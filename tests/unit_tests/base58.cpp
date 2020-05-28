@@ -439,7 +439,8 @@ namespace
     "\xf7\x24\xbc\x5c\x6c\xfb\xb9\xd9\x76\x02\xc3\x00\x42\x3a\x2f\x28"
     "\x64\x18\x74\x51\x3a\x03\x57\x78\xa0\xc1\x77\x8d\x83\x32\x01\xe9"
     "\x22\x09\x39\x68\x9e\xdf\x1a\xbd\x5b\xc1\xd0\x31\xf7\x3e\xcd\x6c"
-    "\x99\x3a\xdd\x66\xd6\x80\x88\x70\x45\x6a\xfe\xb8\xe7\xee\xb6\x8d");
+    "\x99\x3a\xdd\x66\xd6\x80\x88\x70\x45\x6a\xfe\xb8\xe7\xee\xb6\x8d"
+    "\x00");
   std::string test_keys_addr_str = "ZxDqHy6WnyYY5yQcdApjMb8tVPik5BC3LFdaevfbGq7X1KY5vdsWmUi5UQgse2GBZFbMsb47TFqBmPpdFHDDwDxR2ZuZ6zX4W"; // correct str address depends on CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX value
 }
 
@@ -499,7 +500,7 @@ TEST(get_account_address_from_str, fails_on_invalid_address_spend_key)
 TEST(get_account_address_from_str, fails_on_invalid_address_view_key)
 {
   std::string serialized_keys_copy = test_serialized_keys;
-  serialized_keys_copy.back() = '\x01';
+  serialized_keys_copy[serialized_keys_copy.size() - 2] = '\x01';
   std::string addr_str = base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, serialized_keys_copy);
 
   currency::account_public_address addr;

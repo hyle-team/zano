@@ -903,7 +903,7 @@ namespace lmdb_test
 
     static const uint64_t buffer_size = 64 * 1024;                                         // 64 KB
     static const uint64_t db_total_size = static_cast<uint64_t>(2.1 * 1024 * 1024 * 1024); // 2.1 GB -- a bit more than 2GB to test 2GB boundary
-    static const std::string db_file_path = std::string("2gb_") + typeid(db_backend_t).name() + "_test"; 
+    static const std::string db_file_path = boost::algorithm::replace_all_copy(boost::algorithm::replace_all_copy(std::string("2gb_") + typeid(db_backend_t).name() + "_test", ":", "_"), " ", "_");
 
     std::shared_ptr<db_backend_t> lmdb_ptr = std::make_shared<db_backend_t>();
     db::basic_db_accessor bdba(lmdb_ptr, rw_lock);
