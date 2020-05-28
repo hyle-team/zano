@@ -215,6 +215,8 @@ public:
     std::string address;
     std::string tracking_hey;
     std::string path;
+    bool is_auditable;
+    bool is_watch_only;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(unlocked_balance)
@@ -223,6 +225,8 @@ public:
       KV_SERIALIZE(address)
       KV_SERIALIZE(tracking_hey)
       KV_SERIALIZE(path)
+      KV_SERIALIZE(is_auditable);
+      KV_SERIALIZE(is_watch_only);
     END_KV_SERIALIZE_MAP()
   };
 
