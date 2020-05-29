@@ -35,7 +35,7 @@ TEST(wallet_chain_shortener, wallet_chain_shortener)
     LOG_PRINT_L0("{" << *((uint64_t*)&id) << "}{" << counter - *((uint64_t*)&id) << "}" << ENDL);
   }
 
-  for (counter = counter - 10000 + 1; counter != 1000000; counter++)
+  for (counter = counter - 10000; counter != 1000000; counter++)
   {
     crypto::hash id_ = AUTO_VAL_INIT(id_);
     *((uint64_t*)&id_) = counter;
