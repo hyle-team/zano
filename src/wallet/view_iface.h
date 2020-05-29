@@ -213,7 +213,7 @@ public:
     uint64_t balance;
 		uint64_t mined_total;
     std::string address;
-    std::string tracking_hey;
+    std::string view_sec_key;
     std::string path;
     bool is_auditable;
     bool is_watch_only;
@@ -223,7 +223,7 @@ public:
       KV_SERIALIZE(balance)
 			KV_SERIALIZE(mined_total)			
       KV_SERIALIZE(address)
-      KV_SERIALIZE(tracking_hey)
+      KV_SERIALIZE(view_sec_key)
       KV_SERIALIZE(path)
       KV_SERIALIZE(is_auditable);
       KV_SERIALIZE(is_watch_only);
