@@ -168,6 +168,15 @@ namespace plain_wallet
 
     }
   }
+
+  std::string reset()
+  {
+    GET_INSTANCE_PTR(inst_ptr);
+    inst_ptr->gwm.quick_stop_no_save();
+    epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+    ok_response.result.return_code = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(ok_response);
+  }
   
   std::string init(const std::string& ip, const std::string& port, const std::string& working_dir, int log_level)
   {
