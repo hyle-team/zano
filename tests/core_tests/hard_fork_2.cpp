@@ -483,7 +483,7 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   transaction res_tx = AUTO_VAL_INIT(res_tx);
   alice_wlt->request_alias_registration(ai, res_tx, TESTS_DEFAULT_FEE, alias_reward);
 
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // before the HF2 -- old structure should be present
   r = have_type_in_variant_container<extra_alias_entry_old>(res_tx.extra);
@@ -547,10 +547,10 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   ai.m_address = m_accounts[MINER_ACC_IDX].get_public_address();
   alice_wlt->request_alias_update(ai, res_tx, TESTS_DEFAULT_FEE, 0);
 
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // after HF2: extra_alias_entry should be here, not extra_alias_entry_old
   r = have_type_in_variant_container<extra_alias_entry>(res_tx.extra);
@@ -575,10 +575,10 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry_old is found in extra");
 
   // miner a block to confirm it
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // make sure alias was updated to an auditable address indeed
   ai_check = AUTO_VAL_INIT(ai_check);
@@ -599,10 +599,10 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   r = !have_type_in_variant_container<extra_alias_entry_old>(res_tx.extra);
   CHECK_AND_ASSERT_MES(r, false, "extra_alias_entry_old is found in extra");
 
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // make sure alias was updated to an auditable address indeed
   ai_check = AUTO_VAL_INIT(ai_check);
@@ -690,15 +690,15 @@ bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_ind
   }
 
   // mine a block to confirm the tx
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // mine few block to activate HF2
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 2);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(20), false, 3), false, "");
 
@@ -715,10 +715,10 @@ bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_ind
   }
 
   // mine a block to confirm the tx
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // make sure the funds were received
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(5 + 1 + 1), false, 3 + 1), false, "");
