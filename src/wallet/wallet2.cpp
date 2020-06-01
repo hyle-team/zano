@@ -2203,6 +2203,7 @@ void wallet2::restore(const std::wstring& path, const std::string& pass, const s
     r = m_account.restore_from_awo_blob(seed_phrase_or_awo_blob);
     init_log_prefix();
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load auditable watch-only wallet from a given blob: invalid awo blob");
+    m_watch_only = true;
   }
   else
   {
