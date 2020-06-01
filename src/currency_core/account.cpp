@@ -87,6 +87,13 @@ namespace currency
     return keys_seed_text + " " + timestamp_word + " " + auditable_flag_and_checksum_word;
   }
   //-----------------------------------------------------------------
+  std::string account_base::get_awo_blob() const
+  {
+    return get_public_address_str() + ":" +
+      epee::string_tools::pod_to_hex(m_keys.view_secret_key) +
+      (m_creation_timestamp ? ":" : "") + (m_creation_timestamp ? epee::string_tools::num_to_string_fast(m_creation_timestamp) : "");
+  }
+  //-----------------------------------------------------------------
   bool account_base::restore_keys(const std::vector<unsigned char>& keys_seed_binary)
   {
     CHECK_AND_ASSERT_MES(keys_seed_binary.size() == BRAINWALLET_DEFAULT_SEED_SIZE, false, "wrong restore data size: " << keys_seed_binary.size());

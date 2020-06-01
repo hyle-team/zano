@@ -54,6 +54,7 @@ namespace currency
     std::string get_public_address_str() const;
     
     std::string get_restore_braindata() const;
+    std::string get_awo_blob() const;
     bool restore_from_braindata(const std::string& seed_phrase);
     bool restore_from_awo_blob(const std::string& awo_blob);
 

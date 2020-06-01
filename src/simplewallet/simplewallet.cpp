@@ -1510,13 +1510,8 @@ bool simple_wallet::awo_blob(const std::vector<std::string> &args_)
     return true;
   }
 
-  const account_base& acc = m_wallet->get_account();
-
-  success_msg_writer() << "Auditable watch-only blob for this wallet is: ";
-  std::cout << acc.get_public_address_str() << ":" << epee::string_tools::pod_to_hex(acc.get_keys().view_secret_key);
-  if (acc.get_createtime())
-    std::cout << ":" << acc.get_createtime();
-  std::cout << ENDL;
+  success_msg_writer() << "Auditable watch-only blob for this wallet is:";
+  std::cout << m_wallet->get_account().get_awo_blob() << ENDL;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
