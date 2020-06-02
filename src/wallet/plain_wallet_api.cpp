@@ -4,7 +4,7 @@
 
 
 #ifdef ANDROID_BUILD
-  #include <log.h>
+  #include <android/log.h>
 #endif
 #include "plain_wallet_api.h"
 #include "plain_wallet_api_defs.h"
