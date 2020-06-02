@@ -18,72 +18,20 @@ using namespace currency;
 #define FIFTH_NAME         "fifth--01234567890"
 #define SIX_NAME           "sixsix-double--01234567890"
 
-std::string gen_random_alias(size_t len)
-{
-  const char allowed_chars[] = "abcdefghijklmnopqrstuvwxyz0123456789";
-  char buffer[2048] = "";
-  if (len >= sizeof buffer)
-    return "";
-
-  crypto::generate_random_bytes(len, buffer);
-  buffer[len] = 0;
-  for(size_t i = 0; i < len; ++i)
-    buffer[i] = allowed_chars[buffer[i] % (sizeof allowed_chars - 1)];
-  return buffer;
-}
-
 bool put_alias_via_tx_to_list(std::vector<test_event_entry>& events,
-    std::list<currency::transaction>& tx_set,
-    const block& head_block,
-    const account_base& miner_acc,
-    currency::extra_alias_entry ai2,
-    test_generator& generator)
-  {
-
-  std::vector<currency::extra_v> ex;
-  ex.push_back(ai2);
-  account_base reward_acc;
-  account_keys& ak = const_cast<account_keys&>(reward_acc.get_keys());
-  currency::get_aliases_reward_account(ak.account_address, ak.view_secret_key);
-
-  uint64_t fee_median = generator.get_last_n_blocks_fee_median(get_block_hash(head_block));
-  uint64_t reward = currency::get_alias_coast_from_fee(ai2.m_alias, fee_median);
-
-  MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(events, 
-    tx_set,
-    miner_acc,
-    reward_acc,
-    reward,
-    0,
-    head_block,
-    CURRENCY_TO_KEY_OUT_RELAXED,
-    ex,
-    std::vector<currency::attachment_v>());
-  
-
-  uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx_set.back());
-  if (found_alias_reward != reward)
-  {
-    LOCAL_ASSERT(false);
-    CHECK_AND_ASSERT_MES(false, false, "wrong transaction constructed, first input value not match alias amount or account");
-    return false;
-  }
-  return true;
+  std::list<currency::transaction>& tx_set,
+  const block& head_block,
+  const std::string& alias_name,
+  const account_base& miner_acc,
+  const account_base& alias_acc,
+  test_generator& generator)
+{
+  currency::extra_alias_entry ai2 = AUTO_VAL_INIT(ai2);
+  ai2.m_alias = alias_name;
+  ai2.m_address = alias_acc.get_keys().account_address;
+  ai2.m_text_comment = "ssdss";
+  return put_alias_via_tx_to_list(events, tx_set, head_block, miner_acc, ai2, generator);
 }
-  bool put_alias_via_tx_to_list(std::vector<test_event_entry>& events,
-    std::list<currency::transaction>& tx_set,
-    const block& head_block,
-    const std::string& alias_name,
-    const account_base& miner_acc,
-    const account_base& alias_acc,
-    test_generator& generator)
-  {
-    currency::extra_alias_entry ai2 = AUTO_VAL_INIT(ai2);
-    ai2.m_alias = alias_name;
-    ai2.m_address = alias_acc.get_keys().account_address;
-    ai2.m_text_comment = "ssdss";
-    return put_alias_via_tx_to_list(events, tx_set, head_block, miner_acc, ai2, generator);
-  }
 
 bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events, 
                                      block& b, 
@@ -92,13 +40,13 @@ bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events,
                                      const currency::extra_alias_entry& ai,
                                      test_generator& generator)
 {
-    std::list<currency::transaction> txs_0;
-    if (!put_alias_via_tx_to_list(events, txs_0, head_block, miner_acc, ai, generator))
-      return false;
+  std::list<currency::transaction> txs_0;
+  if (!put_alias_via_tx_to_list(events, txs_0, head_block, miner_acc, ai, generator))
+    return false;
     
-    MAKE_NEXT_BLOCK_TX_LIST(events, blk, head_block, miner_acc, txs_0);
-    b = blk;
-    return true;
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk, head_block, miner_acc, txs_0);
+  b = blk;
+  return true;
 }
 
 

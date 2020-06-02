@@ -292,20 +292,15 @@ namespace tools
 
       if (req.push_payer)
       {
-        currency::tx_payer txp = AUTO_VAL_INIT(txp);
-        txp.acc_addr = m_wallet.get_account().get_keys().account_address;
-        extra.push_back(txp);
+        currency::create_and_add_tx_payer_to_container_from_address(extra, m_wallet.get_account().get_keys().account_address, m_wallet.get_top_block_height(), m_wallet.get_core_runtime_config());
       }
+      
       if (!req.hide_receiver)
       {
         for (auto& d : dsts)
         {
           for (auto& a : d.addr)
-          {
-            currency::tx_receiver txr = AUTO_VAL_INIT(txr);
-            txr.acc_addr = a;
-            extra.push_back(txr);
-          }
+            currency::create_and_add_tx_receiver_to_container_from_address(extra, a, m_wallet.get_top_block_height(), m_wallet.get_core_runtime_config());
         }
       }
 

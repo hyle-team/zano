@@ -15,7 +15,6 @@
 #include "currency_core/currency_core.h"
 #include "wallet/wallet2.h"
 #include "test_core_time.h"
-#include "chaingen_helpers.h"
 
 #define TESTS_DEFAULT_FEE                   ((uint64_t)TX_DEFAULT_FEE)
 #define MK_TEST_COINS(amount)               (static_cast<uint64_t>(amount) * TX_DEFAULT_FEE)
@@ -1205,3 +1204,4 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 // --- end of gentime wallet helpers -----------------------------------------------------------------------
 
+#include "chaingen_helpers.h"

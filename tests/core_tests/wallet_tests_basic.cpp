@@ -72,6 +72,7 @@ bool wallet_test::check_balance(currency::core& c, size_t ev_index, const std::v
 
   return true;
 }
+
 std::shared_ptr<tools::wallet2> wallet_test::init_playtime_test_wallet(const std::vector<test_event_entry>& events, currency::core& c, const account_base& acc) const
 {
   CHECK_AND_ASSERT_THROW_MES(events.size() > 0 && events[0].type() == typeid(currency::block), "Invalid events queue, can't find genesis block at the beginning");
@@ -84,6 +85,7 @@ std::shared_ptr<tools::wallet2> wallet_test::init_playtime_test_wallet(const std
   w->set_core_proxy(m_core_proxy);
   return w;
 }
+
 std::shared_ptr<tools::wallet2> wallet_test::init_playtime_test_wallet(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const
 {
   CHECK_AND_ASSERT_THROW_MES(account_index < m_accounts.size(), "Invalid account index");

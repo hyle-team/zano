@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2020 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -24,6 +24,7 @@
 #include "currency_core/account_boost_serialization.h"
 #include "currency_core/currency_format_utils.h"
 
+#include "common/make_hashable.h"
 #include "wallet_public_structs_defs.h"
 #include "currency_core/currency_format_utils.h"
 #include "common/unordered_containers_boost_serialization.h"
@@ -94,6 +95,8 @@ namespace tools
   class i_wallet2_callback
   {
   public:
+    enum message_severity { ms_red, ms_yellow, ms_normal };
+
     virtual ~i_wallet2_callback() = default;
 
     virtual void on_new_block(uint64_t /*height*/, const currency::block& /*block*/) {}
@@ -101,6 +104,7 @@ namespace tools
     virtual void on_pos_block_found(const currency::block& /*block*/) {}
     virtual void on_sync_progress(const uint64_t& /*percents*/) {}
     virtual void on_transfer_canceled(const wallet_public::wallet_transfer_info& wti) {}
+    virtual void on_message(message_severity /*severity*/, const std::string& /*m*/) {}
   };
 
   struct tx_dust_policy
@@ -380,6 +384,9 @@ namespace tools
       uint32_t m_flags;
 
       uint64_t amount() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index].amount; }
+      const currency::tx_out& output() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index]; }
+      uint8_t mix_attr() const { return output().target.type() == typeid(currency::txout_to_key) ? boost::get<const currency::txout_to_key&>(output().target).mix_attr : UINT8_MAX; }
+      crypto::hash tx_hash() const { return get_transaction_hash(m_ptx_wallet_info->m_tx); }
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
       bool is_spendable() const { return (m_flags & (WALLET_TRANSFER_DETAIL_FLAG_SPENT | WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION | WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION)) == 0; }
       bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
@@ -443,9 +450,10 @@ namespace tools
     typedef std::unordered_map<crypto::hash, transfer_details_base> multisig_transfer_container;
     typedef std::unordered_map<crypto::hash, tools::wallet_public::escrow_contract_details_basic> escrow_contracts_container;
     typedef std::map<uint64_t, std::set<size_t> > free_amounts_cache_type;
+    typedef std::unordered_map<std::pair<uint64_t, uint64_t>, uint64_t> amount_gindex_to_transfer_id_container; // maps [amount; gindex] -> tid
 
 
-    struct keys_file_data
+    struct keys_file_data_old
     {
       crypto::chacha8_iv iv;
       std::string account_data;
@@ -455,9 +463,32 @@ namespace tools
         FIELD(account_data)
       END_SERIALIZE()
     };
+
+    struct keys_file_data
+    {
+      uint8_t             version;
+      crypto::chacha8_iv  iv;
+      std::string         account_data;
+
+      static keys_file_data from_old(const keys_file_data_old& v)
+      {
+        keys_file_data result = AUTO_VAL_INIT(result);
+        result.iv = v.iv;
+        result.account_data = v.account_data;
+        return result;
+      }
+
+      DEFINE_SERIALIZATION_VERSION(1)
+      BEGIN_SERIALIZE_OBJECT()
+        VERSION_ENTRY(version)
+        FIELD(iv)
+        FIELD(account_data)
+      END_SERIALIZE()
+    };
+
     void assign_account(const currency::account_base& acc);
-    void generate(const std::wstring& path, const std::string& password);
-    void restore(const std::wstring& path, const std::string& pass, const std::string& restore_key);
+    void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
+    void restore(const std::wstring& path, const std::string& pass, const std::string& seed_phrase_or_awo_blob, bool auditable_watch_only);
     void load(const std::wstring& path, const std::string& password);
     void store();
     void store(const std::wstring& path);
@@ -480,7 +511,7 @@ namespace tools
 
     //i_wallet2_callback* callback() const { return m_wcallback; }
     //void callback(i_wallet2_callback* callback) { m_callback = callback; }
-    void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = true; }
+    void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = (callback != nullptr); }
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
@@ -631,6 +662,7 @@ namespace tools
     void enumerate_unconfirmed_transfers(callback_t cb) const;
 
     bool is_watch_only() const { return m_watch_only; }
+    bool is_auditable() const { return m_account.get_public_address().is_auditable(); }
     void sign_transfer(const std::string& tx_sources_blob, std::string& signed_tx_blob, currency::transaction& tx);
     void sign_transfer_files(const std::string& tx_sources_file, const std::string& signed_tx_file, currency::transaction& tx);
     void submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx);
@@ -697,6 +729,9 @@ namespace tools
         a & m_minimum_height;
       }
 
+      // v151: m_amount_gindex_to_transfer_id added
+      if (ver >= 151)
+        a & m_amount_gindex_to_transfer_id;
 
       a & m_transfers;
       a & m_multisig_transfers;
@@ -788,7 +823,7 @@ private:
 
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
-    void load_keys(const std::string& keys_file_name, const std::string& password);
+    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b);
     void detach_blockchain(uint64_t including_height);
     bool extract_offers_from_transfer_entry(size_t i, std::unordered_map<crypto::hash, bc_services::offer_details_ex>& offers_local);
@@ -910,6 +945,9 @@ private:
     uint64_t detach_from_block_ids(uint64_t height);
     uint64_t get_wallet_minimum_height();
 
+    void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
+    void remove_transfer_from_amount_gindex_map(uint64_t tid);
+
     currency::account_base m_account;
     bool m_watch_only;
     std::string m_log_prefix; // part of pub address, prefix for logging functions
@@ -924,6 +962,7 @@ private:
 
     transfer_container m_transfers;
     multisig_transfer_container m_multisig_transfers;
+    amount_gindex_to_transfer_id_container m_amount_gindex_to_transfer_id;
     payment_container m_payments;
     std::unordered_map<crypto::key_image, size_t> m_key_images;
     std::unordered_map<crypto::public_key, crypto::key_image> m_pending_key_images; // (out_pk -> ki) pairs of change outputs to be added in watch-only wallet without spend sec key

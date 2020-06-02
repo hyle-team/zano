@@ -48,8 +48,6 @@ namespace tools
 	{
 		using namespace std;
 
-		const int NUMWORDS = 1626;
-
 		const map<string,uint32_t> wordsMap = {
 			{"like", 0},
 			{"just", 1},
@@ -3358,7 +3356,7 @@ namespace tools
 				throw runtime_error("Invalid binary data size for mnemonic encoding");
 			// 4 bytes -> 3 words.  8 digits base 16 -> 3 digits base 1626
 			string res;
-			for (unsigned int i=0; i < binary.size() / 4; i++, res += ' ')
+			for (unsigned int i=0; i < binary.size() / 4; i++)
 			{
 				const uint32_t* val = 
 					reinterpret_cast<const uint32_t*>(&binary[i * 4]);
@@ -3369,8 +3367,9 @@ namespace tools
 
 				res += wordsArray[w1] + " ";
 				res += wordsArray[w2] + " ";
-				res += wordsArray[w3];
+				res += wordsArray[w3] + " ";
 			}
+      res.erase(--res.end()); // remove trailing space
 			return res;
 		}
     std::string word_by_num(uint32_t n)

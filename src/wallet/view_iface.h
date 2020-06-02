@@ -213,16 +213,20 @@ public:
     uint64_t balance;
 		uint64_t mined_total;
     std::string address;
-    std::string tracking_hey;
+    std::string view_sec_key;
     std::string path;
+    bool is_auditable;
+    bool is_watch_only;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(unlocked_balance)
       KV_SERIALIZE(balance)
 			KV_SERIALIZE(mined_total)			
       KV_SERIALIZE(address)
-      KV_SERIALIZE(tracking_hey)
+      KV_SERIALIZE(view_sec_key)
       KV_SERIALIZE(path)
+      KV_SERIALIZE(is_auditable);
+      KV_SERIALIZE(is_watch_only);
     END_KV_SERIALIZE_MAP()
   };
 
@@ -416,11 +420,13 @@ public:
     std::string pass;
     std::string path;
     std::string restore_key;
+    bool auditable_watch_only;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
       KV_SERIALIZE(restore_key)
+      KV_SERIALIZE(auditable_watch_only)
     END_KV_SERIALIZE_MAP()
   };
 

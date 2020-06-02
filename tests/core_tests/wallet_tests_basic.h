@@ -6,7 +6,7 @@
 #pragma once 
 #include "chaingen.h"
 
-struct wallet_test : public test_chain_unit_enchanced
+struct wallet_test : virtual public test_chain_unit_enchanced
 {
   enum { MINER_ACC_IDX = 0, ALICE_ACC_IDX = 1, BOB_ACC_IDX = 2, CAROL_ACC_IDX = 3, DAN_ACC_IDX = 4, TOTAL_ACCS_COUNT = 5 }; // to be used as index for m_accounts
 
@@ -86,4 +86,16 @@ struct wallet_callback_balance_checker : public tools::i_wallet2_callback
   uint64_t m_balance;
   uint64_t m_unlocked_balance;
   uint64_t m_total_mined;
+};
+
+struct wlt_lambda_on_transfer2_wrapper : public tools::i_wallet2_callback
+{
+  typedef std::function<bool(const tools::wallet_public::wallet_transfer_info&, uint64_t, uint64_t, uint64_t)> Func;
+  wlt_lambda_on_transfer2_wrapper(Func callback) : m_result(false), m_callback(callback) {}
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override
+  {
+    m_result = m_callback(wti, balance, unlocked_balance, total_mined);
+  }
+  bool m_result;
+  Func m_callback;
 };

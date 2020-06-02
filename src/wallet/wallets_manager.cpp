@@ -805,7 +805,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     try
     {
       w->load(path, password);
-      if (w->is_watch_only())
+      if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
       w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
@@ -818,6 +818,10 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     catch (const tools::error::file_not_found& /**/)
     {
       return API_RETURN_CODE_FILE_NOT_FOUND;
+    }
+    catch (const tools::error::file_read_error&)
+    {
+      return API_RETURN_CODE_INVALID_FILE;
     }
     catch (const tools::error::wallet_load_notice_wallet_restored& /**/)
     {
@@ -892,7 +896,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
 
   try
   {
-    w->generate(path, password);
+    w->generate(path, password, false);
     w->set_minimum_height(m_last_daemon_height);
     owr.seed = w->get_account().get_restore_braindata();
   }
@@ -939,7 +943,7 @@ std::string wallets_manager::is_pos_allowed()
 std::string wallets_manager::is_valid_brain_restore_data(const std::string& brain_text)
 {
   currency::account_base acc;
-  if (acc.restore_keys_from_braindata(brain_text))
+  if (acc.restore_from_braindata(brain_text))
     return API_RETURN_CODE_TRUE;
   else
     return API_RETURN_CODE_FALSE;
@@ -957,7 +961,7 @@ void wallets_manager::get_gui_options(view::gui_options& opt)
 {
   opt = m_ui_opt;
 }
-std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr)
+std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, bool auditable_watch_only, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   owr.wallet_id = m_wallet_id_counter++;
@@ -979,7 +983,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   currency::account_base acc;
   try
   {
-    w->restore(path, password, restore_key);
+    w->restore(path, password, restore_key, auditable_watch_only);
     owr.seed = w->get_account().get_restore_braindata();
   }
   catch (const tools::error::file_exists&)
@@ -1253,20 +1257,14 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
     }
     if (tp.push_payer)
     {
-      currency::tx_payer txp = AUTO_VAL_INIT(txp);
-      txp.acc_addr = w->get()->get_account().get_keys().account_address;
-      extra.push_back(txp);
+      currency::create_and_add_tx_payer_to_container_from_address(extra, w->get()->get_account().get_keys().account_address,  w->get()->get_top_block_height(),  w->get()->get_core_runtime_config());
     }    
     if (!tp.hide_receiver)
     {
       for (auto& d : dsts)
       {
         for (auto& a : d.addr)
-        {
-          currency::tx_receiver txr = AUTO_VAL_INIT(txr);
-          txr.acc_addr = a;
-          extra.push_back(txr);
-        }
+          currency::create_and_add_tx_receiver_to_container_from_address(extra, a, w->get()->get_top_block_height(),  w->get()->get_core_runtime_config());
       }
     }
     w->get()->transfer(dsts, tp.mixin_count, unlock_time ? unlock_time + 1 : 0, fee, extra, attachments, res_tx);

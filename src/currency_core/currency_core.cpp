@@ -493,7 +493,17 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_block(const block& b, block_verification_context& bvc)
   {
-    return m_blockchain_storage.add_new_block(b, bvc);
+    bool r = m_blockchain_storage.add_new_block(b, bvc);
+    if (r && bvc.m_added_to_main_chain)
+    {
+      uint64_t h = get_block_height(b);
+      auto& crc = m_blockchain_storage.get_core_runtime_config();
+      if (h == crc.hard_fork_01_starts_after_height + 1)
+      { LOG_PRINT_GREEN("Hardfork 1 activated at height " << h, LOG_LEVEL_0); }
+      else if (h == crc.hard_fork_02_starts_after_height + 1)
+      { LOG_PRINT_GREEN("Hardfork 2 activated at height " << h, LOG_LEVEL_0); }
+    }
+    return r;
   }
   //-----------------------------------------------------------------------------------------------
   bool core::parse_block(const blobdata& block_blob, block& b, block_verification_context& bvc)
