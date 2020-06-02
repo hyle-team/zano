@@ -3,6 +3,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 
+#ifdef ANDROID_BUILD
+  #include <log.h>
+#endif
 #include "plain_wallet_api.h"
 #include "plain_wallet_api_defs.h"
 #include "currency_core/currency_config.h"
@@ -61,20 +64,10 @@ namespace plain_wallet
 
 void static_destroy_handler()
 {
-  std::cout << "[DESTROY CALLBACK HANDLER STARTED]: " << std::endl;
+  LOG_PRINT_L0("[DESTROY CALLBACK HANDLER STARTED]: ");
   plain_wallet::deinit();
-  std::cout << "[DESTROY CALLBACK HANDLER FINISHED]: " << std::endl;
+  LOG_PRINT_L0("[DESTROY CALLBACK HANDLER FINISHED]: ");
 }
-
-
-// #ifdef MOBILE_WALLET_BUILD  
-// void on_lib_unload() __attribute__((destructor));
-// void on_lib_unload() {
-//   std::cout << "[ON_LIB_UNLOAD]-->>" << ENDL;
-//   plain_wallet::deinit();
-//   std::cout << "[ON_LIB_UNLOAD]<<--" << ENDL;
-// }
-// #endif
 
 namespace plain_wallet
 {
@@ -92,17 +85,6 @@ namespace plain_wallet
   std::string get_bundle_working_dir()
   {
     return get_set_working_dir();
-// #ifdef WIN32
-//     return boost::dll::program_location().parent_path().string();
-// #elif IOS_BUILD
-//     char* env = getenv("HOME");
-//     return env ? env : "";
-// #elif ANDROID_BUILD
-//     ///      data/data/com.zano_mobile/files
-//     return "/data/data/" ANDROID_PACKAGE_NAME;
-// #else
-//     return "";
-// #endif
   }
   void set_bundle_working_dir(const std::string& dir)
   {
@@ -128,8 +110,18 @@ namespace plain_wallet
     return path;
 #endif // WIN32
   }
-
-  
+#ifdef ANDROID_BUILD
+  class android_logger : public log_space::ibase_log_stream
+  {
+  public:
+    int get_type() { return LOGGER_CONSOLE; }
+    virtual bool out_buffer(const char* buffer, int buffer_len, int log_level, int color, const char* plog_name = NULL)
+    {
+      __android_log_write(ANDROID_LOG_INFO, "[tag]", buffer);
+      return  true;
+    }
+  };
+#endif
 
   void initialize_logs(int log_level)
   {
@@ -139,7 +131,12 @@ namespace plain_wallet
     log_space::get_set_need_thread_id(true, true);
     log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
     epee::log_space::get_set_log_detalisation_level(true, log_level);
+#ifdef ANDROID_BUILD
+    epee::log_space::log_singletone::add_logger(new android_logger());
+#else
     epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
+#endif
+
     epee::log_space::log_singletone::add_logger(LOGGER_FILE, "plain_wallet.log", log_dir.c_str());
     LOG_PRINT_L0("Plain wallet initialized: " << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ", log location: " << log_dir + "/plain_wallet.log");
 
@@ -162,7 +159,7 @@ namespace plain_wallet
       local_ptr->gjobs_lock.lock();
       local_ptr->gjobs_lock.unlock();
       bool r = local_ptr->gwm.quick_stop_no_save();        
-      std::cout << "[QUICK_STOP_NO_SAVE] return " << r;
+      LOG_PRINT_L0("[QUICK_STOP_NO_SAVE] return " << r);
       //let's prepare wallet manager for quick shutdown
       local_ptr.reset();
 
