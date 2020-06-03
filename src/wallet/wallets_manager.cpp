@@ -18,7 +18,6 @@
 #include "common/db_backend_selector.h"
 #include "common/pre_download.h"
 
-
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    \
   auto it = m_wallets.find(wallet_id);      \
@@ -35,8 +34,10 @@
 
 #ifdef MOBILE_WALLET_BUILD
   #define DAEMON_IDLE_UPDATE_TIME_MS        10000
+  #define TX_POOL_SCAN_INTERVAL             5
 #else
   #define DAEMON_IDLE_UPDATE_TIME_MS        2000
+  #define TX_POOL_SCAN_INTERVAL             1
 #endif
 
 #define HTTP_PROXY_TIMEOUT                2000
@@ -1765,7 +1766,7 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
 void wallets_manager::wallet_vs_options::worker_func()
 {
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet handler thread started, addr: " << w->get()->get_account().get_public_address_str(), LOG_LEVEL_0);
-  epee::math_helper::once_a_time_seconds<1> scan_pool_interval;
+  epee::math_helper::once_a_time_seconds<TX_POOL_SCAN_INTERVAL> scan_pool_interval;
   epee::math_helper::once_a_time_seconds<POS_WALLET_MINING_SCAN_INTERVAL> pos_minin_interval;
   view::wallet_status_info wsi = AUTO_VAL_INIT(wsi);
   while (!major_stop)
