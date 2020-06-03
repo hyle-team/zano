@@ -91,7 +91,9 @@ public:
   bool start();
   bool stop();
   bool quick_stop_no_save(); //stop without storing wallets
+  bool quick_clear_wallets_no_save();
   bool send_stop_signal();
+  bool get_opened_wallets(std::list<view::open_wallet_response>& result);
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, bool auditable_watch_only, view::open_wallet_response& owr);
@@ -189,7 +191,7 @@ private:
   std::atomic<bool> m_last_daemon_is_disconnected;
 //  std::atomic<uint64_t> m_last_wallet_synch_height;
   std::atomic<uint64_t> m_wallet_id_counter;
-  std::atomic<bool> dont_save_wallet_at_stop;
+  std::atomic<bool> m_dont_save_wallet_at_stop;
 
   std::string m_data_dir;
   view::gui_options m_ui_opt;

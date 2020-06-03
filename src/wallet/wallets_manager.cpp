@@ -62,7 +62,7 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_remote_node_mode(false),
                                  m_is_pos_allowed(false),
                                  m_qt_logs_enbaled(false), 
-                                 dont_save_wallet_at_stop(false)
+                                 m_dont_save_wallet_at_stop(false)
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
@@ -304,8 +304,38 @@ bool wallets_manager::stop()
 
 bool wallets_manager::quick_stop_no_save() //stop without storing wallets
 {
-  dont_save_wallet_at_stop = true;
-  return stop();
+  m_dont_save_wallet_at_stop = true;
+  bool r = stop();
+  EXCLUSIVE_CRITICAL_REGION_BEGIN(m_wallets_lock);
+  m_wallets.clear();
+  m_wallet_log_prefixes.clear();
+  m_stop_singal_sent = false;
+  EXCLUSIVE_CRITICAL_REGION_END();
+  return r;
+}
+
+bool wallets_manager::quick_clear_wallets_no_save() //stop without storing wallets
+{
+  SHARED_CRITICAL_REGION_BEGIN(m_wallets_lock);
+  LOG_PRINT_L0("Wallets[" << m_wallets.size() << "] stopping...");
+  for (auto& w : m_wallets)
+  {
+    w.second.stop(false);
+  }
+  LOG_PRINT_L0("Wallets[" << m_wallets.size() << "] waiting...");
+  for (auto& w : m_wallets)
+  {
+    w.second.stop(true);
+  }
+  SHARED_CRITICAL_REGION_END();
+
+  EXCLUSIVE_CRITICAL_REGION_BEGIN(m_wallets_lock);
+  LOG_PRINT_L0("Wallets[" << m_wallets.size() << "] closing...");
+  m_wallets.clear();
+  m_wallet_log_prefixes.clear();
+  m_stop_singal_sent = false;
+  EXCLUSIVE_CRITICAL_REGION_END();
+  return true;
 }
 
 std::string wallets_manager::get_config_folder()
@@ -532,7 +562,7 @@ void wallets_manager::main_worker(const po::variables_map& m_vm)
     try
     {
       wo.second.stop();
-      if(!dont_save_wallet_at_stop)
+      if(!m_dont_save_wallet_at_stop)
         wo.second.w->get()->store();
     }
     catch (const std::exception& e)
@@ -838,14 +868,31 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     }
   }
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
-  boost::system::error_code ec = AUTO_VAL_INIT(ec);
-  owr.wallet_file_size = boost::filesystem::file_size(path, ec);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
+  owr.wallet_file_size = w->get_wallet_file_size();
   get_wallet_info(wo, owr.wi);
   init_wallet_entry(wo, owr.wallet_id);
   
   return return_code;
+}
+
+bool wallets_manager::get_opened_wallets(std::list<view::open_wallet_response>& result)
+{
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock); 
+  for (auto& w : m_wallets)
+  {
+    result.push_back(view::open_wallet_response());
+    view::open_wallet_response& owr = result.back();
+    owr.wallet_id = w.first;
+    owr.wallet_file_size = w.second.w.unlocked_get()->get_wallet_file_size();
+    owr.wallet_local_bc_size = w.second.w->get()->get_blockchain_current_size();
+    std::string path = epee::string_encoding::convert_to_ansii(w.second.w.unlocked_get()->get_wallet_path());    
+    owr.name = boost::filesystem::path(path).filename().string();
+    owr.pass = w.second.w.unlocked_get()->get_wallet_password();
+    get_wallet_info(w.second, owr.wi);
+  }
+  return true;
 }
 
 std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist)

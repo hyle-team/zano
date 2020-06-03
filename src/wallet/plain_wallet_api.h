@@ -27,6 +27,7 @@ namespace plain_wallet
   std::string open(const std::string& path, const std::string& password);
   std::string restore(const std::string& seed, const std::string& path, const std::string& password);
   std::string generate(const std::string& path, const std::string& password);
+  std::string get_opened_wallets();
 
   std::string get_wallet_status(hwallet h);
   std::string close_wallet(hwallet h);

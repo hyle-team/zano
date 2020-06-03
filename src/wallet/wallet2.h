@@ -324,7 +324,8 @@ namespace tools
                               m_watch_only(false), 
                               m_last_pow_block_h(0), 
                               m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
-                              m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
+                              m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE), 
+                              m_current_wallet_file_size(0)
     {};
   public:
     wallet2() : m_stop(false), 
@@ -339,7 +340,8 @@ namespace tools
                 m_watch_only(false), 
                 m_last_pow_block_h(0), 
                 m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
-                m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
+                m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
+                m_current_wallet_file_size(0) 
     {
       m_core_runtime_config = currency::get_default_core_runtime_config();
     };
@@ -495,7 +497,8 @@ namespace tools
     void store(const std::wstring& path, const std::string& password);
     void store_watch_only(const std::wstring& path, const std::string& password) const;
     bool store_keys(std::string& buff, const std::string& password, bool store_as_watch_only = false);
-    std::wstring get_wallet_path(){ return m_wallet_file; }
+    std::wstring get_wallet_path()const { return m_wallet_file; }
+    std::string get_wallet_password()const { return m_password; }
     currency::account_base& get_account() { return m_account; }
     const currency::account_base& get_account() const { return m_account; }
 
@@ -817,7 +820,7 @@ namespace tools
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
     bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
     uint64_t get_sync_progress();
-
+    uint64_t get_wallet_file_size()const;
 
 private:
 
@@ -991,6 +994,7 @@ private:
     uint64_t m_fake_outputs_count;
     std::string m_miner_text_info;
 
+    mutable uint64_t m_current_wallet_file_size;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  

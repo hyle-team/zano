@@ -2009,6 +2009,7 @@ bool wallet2::reset_all()
   m_height_of_start_sync = 0;
   m_last_sync_percent = 0;
   m_last_pow_block_h = 0;
+  m_current_wallet_file_size = 0;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2269,7 +2270,10 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   {
     reset_history();
     WLT_LOG_L0("Unable to load history data from wallet file, wallet will be resynced!");
-  }  
+  } 
+
+  boost::system::error_code ec = AUTO_VAL_INIT(ec);
+  m_current_wallet_file_size = boost::filesystem::file_size(wallet_, ec);
 
   THROW_IF_TRUE_WALLET_EX(need_to_resync, error::wallet_load_notice_wallet_restored, epee::string_encoding::convert_to_ansii(m_wallet_file));
 }
@@ -2353,6 +2357,9 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   bool path_to_save_exists       = boost::filesystem::is_regular_file(path_to_save);
   bool tmp_file_path_exists      = boost::filesystem::is_regular_file(tmp_file_path);
   bool tmp_old_file_path_exists  = boost::filesystem::is_regular_file(tmp_old_file_path);
+  
+  boost::system::error_code ec = AUTO_VAL_INIT(ec);
+  m_current_wallet_file_size = boost::filesystem::file_size(path_to_save, ec);
   if (path_to_save_exists && !tmp_file_path_exists && !tmp_old_file_path_exists)
   {
     WLT_LOG_L0("Wallet was successfully stored to " << ascii_path_to_save);
@@ -2362,6 +2369,11 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
     WLT_LOG_ERROR("Wallet stroing to " << ascii_path_to_save << " might not be successfull: path_to_save_exists=" << path_to_save_exists << ", tmp_file_path_exists=" << tmp_file_path_exists << ", tmp_old_file_path_exists=" << tmp_old_file_path_exists);
     throw tools::error::wallet_common_error(LOCATION_STR, "Wallet file storing might not be successfull. Please make sure you have backed up your seed phrase and check log for details.");
   }
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_wallet_file_size()const
+{
+  return m_current_wallet_file_size;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
