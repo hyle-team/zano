@@ -914,6 +914,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(get_random_outs_test);
     GENERATE_AND_PLAY(mix_attr_tests);
     GENERATE_AND_PLAY(mix_in_spent_outs);
+    GENERATE_AND_PLAY(random_outs_and_burnt_coins);
 
     // Block verification tests
     GENERATE_AND_PLAY(gen_block_big_major_version);
