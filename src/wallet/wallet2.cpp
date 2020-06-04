@@ -266,7 +266,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
       const currency::txin_to_key& intk = boost::get<currency::txin_to_key>(in);
 
       // check if this input spends our output
-      transfer_details* p_td = nullptr;
+      //transfer_details* p_td = nullptr;
       uint64_t tid = UINT64_MAX;
       
       if (is_auditable() && is_watch_only())

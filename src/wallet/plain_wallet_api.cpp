@@ -401,7 +401,7 @@ namespace plain_wallet
   {
     GET_INSTANCE_PTR(inst_ptr);
     epee::json_rpc::response<std::list<view::open_wallet_response>, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    bool r = inst_ptr->gwm.get_opened_wallets(ok_response.result);
+    inst_ptr->gwm.get_opened_wallets(ok_response.result);
     return epee::serialization::store_t_to_json(ok_response);
   }
 

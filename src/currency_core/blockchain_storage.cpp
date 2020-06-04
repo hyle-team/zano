@@ -3027,7 +3027,6 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
   //goal is to get timestamp in window in between 1day+1hour  and 1 hour before target(1 hour is just to be sure that
   //we didn't miss actual wallet start because of timestamp and difficulty fluctuations)
   uint64_t low_boundary = date - 90000; //1 day + 1 hour
-  uint64_t aim = date - 46800;
   uint64_t high_boundary = date - 3600; //1 hour
 
   //std::cout << "ENTRY: low_boundary(minutes):" << low_boundary/60 << " high_boundary(minutes): " << high_boundary / 60 << std::endl;
@@ -3043,7 +3042,6 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
       LOG_ERROR("Internal error: too much iterations on get_est_height_from_date, date = " << date);
       return true;
     }
-    uint64_t correction = 0;
     uint64_t ts = m_db_blocks[calculated_estimated_height]->bl.timestamp;
     if (ts > high_boundary)
     {
