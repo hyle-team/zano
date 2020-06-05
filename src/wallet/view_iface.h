@@ -449,6 +449,7 @@ public:
       KV_SERIALIZE(seed)
       KV_SERIALIZE(recovered)
       KV_SERIALIZE(wallet_local_bc_size)
+      KV_SERIALIZE(wallet_file_size)
       KV_SERIALIZE(name)
       KV_SERIALIZE(pass)
     END_KV_SERIALIZE_MAP()
