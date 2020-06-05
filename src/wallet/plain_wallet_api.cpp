@@ -337,15 +337,14 @@ namespace plain_wallet
   {
     currency::account_public_address apa = AUTO_VAL_INIT(apa);
     currency::payment_id_t pid = AUTO_VAL_INIT(pid);
-    if(!currency::get_account_address_and_payment_id_from_str(apa, pid, addr))
+    bool valid = false;
+    if(currency::get_account_address_and_payment_id_from_str(apa, pid, addr))
     {
-      error_response err_result = AUTO_VAL_INIT(err_result);
-      err_result.error.code = API_RETURN_CODE_BAD_ARG;
-      return epee::serialization::store_t_to_json(err_result);
+      valid = true;
     }
     //lazy to make struct for it
     std::stringstream res;
-    res << "{ \"valid\": true, \"auditable\" : "
+    res << "{ \"valid\": " << (valid?"true":"false") << ", \"auditable\" : "
       << (apa.flags&ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE ? "true" : "false")
       << "\"payment_is\" : " << (pid.size() ? "true" : "false") << "}";
     return res.str();
