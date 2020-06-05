@@ -16,6 +16,7 @@ namespace plain_wallet
   std::string get_version();
   std::string get_wallet_files();
   std::string delete_wallet(const std::string& file_name);
+  std::string get_address_info(const std::string& addr);
 
   std::string get_appconfig(const std::string& encryption_key);
   std::string set_appconfig(const std::string& conf_str, const std::string& encryption_key);
@@ -27,7 +28,7 @@ namespace plain_wallet
   std::string open(const std::string& path, const std::string& password);
   std::string restore(const std::string& seed, const std::string& path, const std::string& password);
   std::string generate(const std::string& path, const std::string& password);
-  std::string get_opened_wallets();
+  std::string get_opened_wallets();  
 
   std::string get_wallet_status(hwallet h);
   std::string close_wallet(hwallet h);
