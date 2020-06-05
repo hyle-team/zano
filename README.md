@@ -44,7 +44,7 @@ Recommended OS version: Ubuntu 18.04 LTS.
 
 3. Install Qt
 
-       wget https://download.qt.io/archive/qt/5.11/5.11.2/qt-opensource-linux-x64-5.11.2.run
+       wget https://download.qt.io/new_archive/qt/5.11/5.11.2/qt-opensource-linux-x64-5.11.2.run
        chmod +x qt-opensource-linux-x64-5.11.2.run
        ./qt-opensource-linux-x64-5.11.2.run
     Then follow the instructions in Wizard. Don't forget to tick WebEngine module!
