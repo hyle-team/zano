@@ -5155,7 +5155,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     TIME_MEASURE_START_PD(tx_append_time);
     if(!add_transaction_from_block(tx, tx_id, id, current_bc_size, actual_timestamp))
     {
-       LOG_PRINT_L0("Block with id: " << id << " failed to add transaction to blockchain storage");
+       LOG_PRINT_L0("Block " << id << " contains tx " << tx_id << " that can't be added to the blockchain storage");
        if (taken_from_pool)
        {
          currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
