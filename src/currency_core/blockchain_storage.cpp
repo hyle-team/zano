@@ -3093,7 +3093,7 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count, uint64_t minimum_height)const
+bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count, uint64_t minimum_height, bool need_global_indexes)const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   blocks_direct_container blocks_direct;

@@ -48,7 +48,15 @@
 
 #define WALLET_DEFAULT_POS_MINT_PACKING_SIZE                          100
 
+#define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            uint32_t(1 << 0)
+#define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          uint32_t(1 << 1)       
+#define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
+#define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
+#define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
+
+
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
+const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -346,11 +354,6 @@ namespace tools
       m_core_runtime_config = currency::get_default_core_runtime_config();
     };
 
-#define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            uint32_t(1 << 0)
-#define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          uint32_t(1 << 1)       
-#define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
-#define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
-#define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
 
     static std::string transfer_flags_to_str(uint32_t flags);
     static std::string transform_tx_to_str(const currency::transaction& tx);

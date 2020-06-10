@@ -365,6 +365,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     pwallet_info->m_block_height = height;
     pwallet_info->m_block_timestamp = b.timestamp;
 
+#ifndef MOBILE_WALLET_BUILD
     //good news - got money! take care about it
     //usually we have only one transfer for user in transaction
     currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request req = AUTO_VAL_INIT(req);
@@ -377,6 +378,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     THROW_IF_TRUE_WALLET_EX(res.o_indexes.size() != tx.vout.size(), error::wallet_internal_error,
       "transactions outputs size=" + std::to_string(tx.vout.size()) +
       " not match with COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES response size=" + std::to_string(res.o_indexes.size()));
+#endif
 
     for (size_t i_in_outs = 0; i_in_outs != outs.size(); i_in_outs++)
     {
@@ -455,7 +457,12 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         td.m_ptx_wallet_info = pwallet_info;
         td.m_internal_output_index = o;
         td.m_key_image = ki;
+#ifdef MOBILE_WALLET_BUILD
+        td.m_global_output_index = WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED;
+#else
         td.m_global_output_index = res.o_indexes[o];
+#endif
+
         if (coin_base_tx)
         {
           //last out in coinbase tx supposed to be change from coinstake

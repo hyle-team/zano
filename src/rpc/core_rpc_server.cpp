@@ -314,20 +314,31 @@ namespace currency
       return true;
     }
 
-    std::list<std::pair<block, std::list<transaction> > > bs;
-    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
+    blockchain_storage::blocks_direct_container bs;
+    if (!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
     {
       res.status = API_RETURN_CODE_FAIL;
       return false;
     }
 
-    BOOST_FOREACH(auto& b, bs)
+    for (auto& b : bs)
     {
       res.blocks.resize(res.blocks.size()+1);
-      res.blocks.back().block = block_to_blob(b.first);
+      res.blocks.back().block = block_to_blob(b.first->bl);
+      if (req.need_global_indexes)
+      {
+        res.blocks.back().tx_global_outs.resize(b.second.size());
+      }
+      size_t i = 0;
+      
       BOOST_FOREACH(auto& t, b.second)
       {
-        res.blocks.back().txs.push_back(tx_to_blob(t));
+        res.blocks.back().txs.push_back(tx_to_blob(t->tx));
+        if (req.need_global_indexes)
+        {
+          res.blocks.back().tx_global_outs[i].v = t->m_global_output_indexes;
+        }
+        i++;
       }
     }
 
