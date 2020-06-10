@@ -419,15 +419,10 @@ namespace currency
   //---------------------------------------------------------------
   crypto::hash get_sign_buff_hash_for_alias_update(const extra_alias_entry& ai)
   {
-    const extra_alias_entry* pale = &ai;
-    extra_alias_entry eae_local = AUTO_VAL_INIT(eae_local);
-    if (ai.m_sign.size())
-    {
-      eae_local = ai;
-      eae_local.m_sign.clear();
-      pale = &eae_local;
-    }
-    return get_object_hash(*pale);
+    extra_alias_entry_old ai_old = ai.to_old();
+    if (ai_old.m_sign.size())
+      ai_old.m_sign.clear();
+    return get_object_hash(ai_old);
   }
   //---------------------------------------------------------------
   struct tx_extra_handler : public boost::static_visitor<bool>
