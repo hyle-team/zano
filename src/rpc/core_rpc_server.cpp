@@ -279,7 +279,7 @@ namespace currency
     }
 
     blockchain_storage::blocks_direct_container bs;
-    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
+    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height, req.need_global_indexes))
     {
       res.status = API_RETURN_CODE_FAIL;
       return false;
@@ -290,6 +290,7 @@ namespace currency
       res.blocks.resize(res.blocks.size()+1);
       res.blocks.back().block_ptr = b.first;
       res.blocks.back().txs_ptr = std::move(b.second);
+      res.blocks.back().coinbase_ptr = b.third;
     }
 
     res.status = API_RETURN_CODE_OK;

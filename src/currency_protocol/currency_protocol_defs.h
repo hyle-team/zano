@@ -41,6 +41,7 @@ namespace currency
   struct block_direct_data_entry
   {
     std::shared_ptr<const block_extended_info> block_ptr;
+    std::shared_ptr<const transaction_chain_entry> coinbase_ptr;
     std::list<std::shared_ptr<const transaction_chain_entry> > txs_ptr;
   };
 
