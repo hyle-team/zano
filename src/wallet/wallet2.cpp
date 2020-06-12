@@ -544,6 +544,12 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
 {
   PROFILE_FUNC("wallet2::prepare_wti_decrypted_attachments");
 
+  if (!wti.payment_id.empty())
+  {
+    LOG_ERROR("wti.payment_id is expected to be empty. Go ahead.");
+  }
+  get_payment_id_from_tx(decrypted_att, wti.payment_id);
+
   if (wti.is_income)
   {
     account_public_address sender_address = AUTO_VAL_INIT(sender_address);
