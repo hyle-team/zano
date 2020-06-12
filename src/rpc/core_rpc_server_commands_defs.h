@@ -238,19 +238,21 @@ namespace currency
   {
     struct request
     {
-      crypto::hash txid;
+      std::list<crypto::hash> txids;
+
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_VAL_POD_AS_BLOB(txid)
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(txids)
       END_KV_SERIALIZE_MAP()
     };
 
 
     struct response
     {
-      std::vector<uint64_t> o_indexes;
+      std::vector<struct_with_one_t_type<std::vector<uint64_t> > > tx_global_outs;
+      //std::vector<uint64_t> o_indexes;
       std::string status;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(o_indexes)
+        KV_SERIALIZE(tx_global_outs)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };

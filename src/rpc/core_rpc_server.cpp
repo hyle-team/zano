@@ -379,14 +379,19 @@ namespace currency
   bool core_rpc_server::on_get_indexes(const COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& req, COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
-    bool r = m_core.get_tx_outputs_gindexs(req.txid, res.o_indexes);
-    if(!r)
+    res.tx_global_outs.resize(req.txids.size());
+    size_t i = 0;
+    for (auto& txid : req.txids)
     {
-      res.status = "Failed";
-      return true;
+      bool r = m_core.get_tx_outputs_gindexs(txid, res.tx_global_outs[i].v);
+      if (!r)
+      {
+        res.status = API_RETURN_CODE_FAIL;
+        return true;
+      }
+      i++;
     }
     res.status = API_RETURN_CODE_OK;
-    LOG_PRINT_L2("COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES: [" << res.o_indexes.size() << "]");
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
