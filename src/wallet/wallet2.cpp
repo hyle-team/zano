@@ -4789,6 +4789,10 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   if (selected_transfers.size() > tx_sources_for_querying_random_outs_max)
     selected_transfers.erase(selected_transfers.begin() + tx_sources_for_querying_random_outs_max, selected_transfers.end());
 
+  //
+  // TODO: prefetch gindexes here for each element of selected_transfers
+  //
+
   typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
   typedef currency::tx_source_entry::output_entry tx_output_entry;
 
