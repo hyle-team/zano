@@ -400,6 +400,9 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
   if(!outs.empty() /*&& tx_money_got_in_outs*/)
   {
+    //good news - got money! take care about it
+    //usually we have only one transfer for user in transaction
+
     //create once instance of tx for all entries
     std::shared_ptr<transaction_wallet_info> pwallet_info(new transaction_wallet_info());
     pwallet_info->m_tx = tx;
@@ -414,16 +417,13 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
     if (!pglobal_indexes)
     {
-#ifndef MOBILE_WALLET_BUILD
-      //good news - got money! take care about it
-      //usually we have only one transfer for user in transaction
-      fetch_tx_global_indixes(tx, outputs_index_local);
-      pglobal_indexes = &outputs_index_local;
-#endif
+      if (!m_use_deffered_global_outputs)
+      {
+        fetch_tx_global_indixes(tx, outputs_index_local);
+        pglobal_indexes = &outputs_index_local;
+      }
     }
-    
-
-
+   
     for (size_t i_in_outs = 0; i_in_outs != outs.size(); i_in_outs++)
     {
       size_t o = outs[i_in_outs];
@@ -501,16 +501,18 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         td.m_ptx_wallet_info = pwallet_info;
         td.m_internal_output_index = o;
         td.m_key_image = ki;
-#ifdef MOBILE_WALLET_BUILD
-        if (pglobal_indexes && pglobal_indexes->size() > o)
-          td.m_global_output_index = (*pglobal_indexes)[o];
+        if (m_use_deffered_global_outputs)
+        {
+          if (pglobal_indexes && pglobal_indexes->size() > o)
+            td.m_global_output_index = (*pglobal_indexes)[o];
+          else
+            td.m_global_output_index = WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED;
+        }
         else
-          td.m_global_output_index = WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED;
-#else
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(pglobal_indexes, "pglobal_indexes IS NULL in non mobile wallet");
-        td.m_global_output_index = (*pglobal_indexes)[o];
-#endif
-
+        {
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(pglobal_indexes, "pglobal_indexes IS NULL in non mobile wallet");
+          td.m_global_output_index = (*pglobal_indexes)[o];
+        }
         if (coin_base_tx)
         {
           //last out in coinbase tx supposed to be change from coinstake
@@ -3834,6 +3836,7 @@ void wallet2::prefetch_global_indicies_if_needed(std::vector<uint64_t>& selected
   {
     transfer_details& td = m_transfers[*it_indices];
     td.m_global_output_index = (*it_ooutputs)[td.m_internal_output_index];
+    it_ooutputs++; it_indices++;
   }
 }
 //----------------------------------------------------------------------------------------------------

@@ -384,10 +384,16 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
     {}
     virtual bool call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(const currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& rqt, currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& rsp)
     {
-      auto it = m_txs_outs.find(rqt.txid);
-      CHECK_AND_ASSERT_MES(it != m_txs_outs.end(), false, "tx " << rqt.txid << " was not found in tx global outout indexes");
+      rsp.tx_global_outs.resize(rqt.txids.size());
+      size_t i = 0;
+      for (auto& txid : rqt.txids)
+      {
+        auto it = m_txs_outs.find(txid);
+        CHECK_AND_ASSERT_MES(it != m_txs_outs.end(), false, "tx " << txid << " was not found in tx global outout indexes");
+        rsp.tx_global_outs[i].v = it->second;
+        i++;
+      }
       rsp.status = API_RETURN_CODE_OK;
-      rsp.o_indexes = it->second;
       return true; 
     }
   };
