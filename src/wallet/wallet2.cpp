@@ -49,7 +49,7 @@ namespace tools
                         m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
                         m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
                         m_current_wallet_file_size(0),
-                        m_use_deffered_global_outputs(false)
+                        m_use_deffered_global_outputs(true)
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
   }
@@ -2952,10 +2952,20 @@ bool wallet2::get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req)
   for (size_t i = 0; i != m_transfers.size(); i++)
   {
     auto& tr = m_transfers[i];
-    WLT_CHECK_AND_ASSERT_MES(tr.m_global_output_index != WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED, false, "Wrong output input in transaction");
+
     uint64_t stake_unlock_time = 0;
     if (!is_transfer_okay_for_pos(tr, stake_unlock_time))
       continue;
+
+    if (tr.m_global_output_index == WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED)
+    {
+      //TODO: this code needed mostly for coretests, since in real life cases only mobile wallet supposed to 
+      //      have WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED, and mobile wallet is not supposed to do PoS mining
+      std::vector<uint64_t> indicies; indicies.push_back(i);
+      prefetch_global_indicies_if_needed(indicies);
+    }
+    //WLT_CHECK_AND_ASSERT_MES(tr.m_global_output_index != WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED, false, "Wrong output input in transaction");
+
     currency::pos_entry pe = AUTO_VAL_INIT(pe);
     pe.amount = tr.amount();
     pe.index = tr.m_global_output_index;
