@@ -207,6 +207,8 @@ namespace plain_wallet
       return GENERAL_INTERNAL_ERRROR_INIT;
     }
     
+    ptr->gwm.set_use_deffered_global_outputs(true);
+    
     if(!ptr->gwm.start())
     {
       LOG_ERROR("Failed to start wallets_manager");

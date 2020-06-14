@@ -63,6 +63,7 @@ public:
     std::atomic<bool> stop_for_refresh; //use separate var for passing to "refresh" member function, 
                                         //because it can be changed there due to internal interruption logis
 
+
     std::atomic<bool> break_mining_loop;
     std::atomic<uint64_t> wallet_state;
     std::atomic<uint64_t> last_wallet_synch_height;
@@ -154,7 +155,7 @@ public:
   void get_gui_options(view::gui_options& opt);
   std::string get_wallet_log_prefix(size_t wallet_id) const;
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
-
+  void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
 private:
   void main_worker(const po::variables_map& vm);
   bool init_local_daemon();
@@ -186,6 +187,7 @@ private:
   std::shared_ptr<tools::i_core_proxy> m_rpc_proxy;
   po::variables_map m_vm;
 
+  bool m_use_deffered_global_outputs;
   std::atomic<uint64_t> m_last_daemon_height;
   std::atomic<uint64_t> m_last_daemon_network_state;
   std::atomic<bool> m_last_daemon_is_disconnected;

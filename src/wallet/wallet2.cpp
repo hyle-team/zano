@@ -49,7 +49,7 @@ namespace tools
                         m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
                         m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
                         m_current_wallet_file_size(0),
-                        m_use_deffered_global_outputs(true)
+                        m_use_deffered_global_outputs(false)
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
   }

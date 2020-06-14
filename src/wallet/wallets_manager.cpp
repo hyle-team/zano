@@ -63,7 +63,8 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_remote_node_mode(false),
                                  m_is_pos_allowed(false),
                                  m_qt_logs_enbaled(false), 
-                                 m_dont_save_wallet_at_stop(false)
+                                 m_dont_save_wallet_at_stop(false), 
+                                 m_use_deffered_global_outputs(false)
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
@@ -814,6 +815,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
 
 
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
+  w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   owr.wallet_id = m_wallet_id_counter++;
 
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
@@ -927,6 +929,7 @@ std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t off
 std::string wallets_manager::generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
+  w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   owr.wallet_id = m_wallet_id_counter++;
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
   if (m_remote_node_mode)
@@ -1012,6 +1015,7 @@ void wallets_manager::get_gui_options(view::gui_options& opt)
 std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, bool auditable_watch_only, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
+  w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   owr.wallet_id = m_wallet_id_counter++;
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
   if (m_remote_node_mode)
