@@ -1734,12 +1734,24 @@ namespace currency
       bool r = currency::parse_and_validate_block_from_blob(bl_entry.block, blextin_ptr->bl);
       bdde.block_ptr = blextin_ptr;
       CHECK_AND_ASSERT_MES(r, false, "failed to parse block from blob: " << string_tools::buff_to_hex_nodelimer(bl_entry.block));
+      size_t i = 0;
+      if (bl_entry.tx_global_outs.size())
+      {
+        CHECK_AND_ASSERT_MES(bl_entry.tx_global_outs.size() == bl_entry.txs.size(), false, "tx_global_outs count " << bl_entry.tx_global_outs.size() << " count missmatch with bl_entry.txs count " << bl_entry.txs.size());
+      }
+
       for (const auto& tx_blob : bl_entry.txs)
       {
         std::shared_ptr<currency::transaction_chain_entry> tche_ptr(new currency::transaction_chain_entry());
         r = parse_and_validate_tx_from_blob(tx_blob, tche_ptr->tx);
         CHECK_AND_ASSERT_MES(r, false, "failed to parse tx from blob: " << string_tools::buff_to_hex_nodelimer(tx_blob));
         bdde.txs_ptr.push_back(tche_ptr);
+        if (bl_entry.tx_global_outs.size())
+        {
+          CHECK_AND_ASSERT_MES(bl_entry.tx_global_outs[i].v.size() == tche_ptr->tx.vout.size(), false, "tx_global_outs for tx" << bl_entry.tx_global_outs[i].v.size() << " count missmatch with tche_ptr->tx.vout.size() count " << tche_ptr->tx.vout.size());
+          tche_ptr->m_global_output_indexes = bl_entry.tx_global_outs[i].v;
+        }
+        i++;
       }
     }
     return true;

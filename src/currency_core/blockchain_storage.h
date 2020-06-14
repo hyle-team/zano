@@ -168,7 +168,7 @@ namespace currency
 
     typedef tools::db::basic_key_to_array_accessor<uint64_t, global_output_entry, false>  outputs_container; // out_amount => ['global_output', ...]
     typedef tools::db::cached_key_value_accessor<crypto::key_image, uint64_t, false, false> key_images_container;
-    typedef std::list<std::pair<std::shared_ptr<const block_extended_info>, std::list<std::shared_ptr<const transaction_chain_entry> > > > blocks_direct_container;
+    typedef std::list<epee::misc_utils::triple<std::shared_ptr<const block_extended_info>, std::list<std::shared_ptr<const transaction_chain_entry> >, std::shared_ptr<const transaction_chain_entry> > > blocks_direct_container;
 
     friend struct add_transaction_input_visitor;
     //---------------------------------------------------------------------------------
@@ -254,8 +254,8 @@ namespace currency
     bool get_short_chain_history(std::list<crypto::hash>& ids)const;
     bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp)const;
     bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, uint64_t& starter_offset)const;
-    bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count, uint64_t minimum_height = 0)const;
-    bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, blocks_direct_container& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count, uint64_t minimum_height = 0)const;
+    bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count, uint64_t minimum_height = 0, bool need_global_indexes = false)const;
+    bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, blocks_direct_container& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count, uint64_t minimum_height = 0, bool request_coinbase_info = false)const;
     //bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count)const;
     bool handle_get_objects(NOTIFY_REQUEST_GET_OBJECTS::request& arg, NOTIFY_RESPONSE_GET_OBJECTS::request& rsp)const;
     bool handle_get_objects(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res)const;

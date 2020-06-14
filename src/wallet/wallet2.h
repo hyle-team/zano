@@ -48,7 +48,15 @@
 
 #define WALLET_DEFAULT_POS_MINT_PACKING_SIZE                          100
 
+#define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            uint32_t(1 << 0)
+#define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          uint32_t(1 << 1)       
+#define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
+#define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
+#define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
+
+
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
+const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -316,41 +324,9 @@ namespace tools
 
   class wallet2
   {
-    wallet2(const wallet2&) : m_stop(false),
-                              m_wcallback(new i_wallet2_callback()), 
-                              m_height_of_start_sync(0), 
-                              m_last_sync_percent(0), 
-                              m_do_rise_transfer(false),
-                              m_watch_only(false), 
-                              m_last_pow_block_h(0), 
-                              m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
-                              m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE), 
-                              m_current_wallet_file_size(0)
-    {};
+    wallet2(const wallet2&) = delete;
   public:
-    wallet2() : m_stop(false), 
-                m_wcallback(new i_wallet2_callback()), //stub
-                m_core_proxy(new default_http_core_proxy()), 
-                m_upper_transaction_size_limit(0), 
-                m_height_of_start_sync(0), 
-                m_last_sync_percent(0), 
-                m_fake_outputs_count(0),
-                m_do_rise_transfer(false),
-                m_log_prefix("???"),
-                m_watch_only(false), 
-                m_last_pow_block_h(0), 
-                m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
-                m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
-                m_current_wallet_file_size(0) 
-    {
-      m_core_runtime_config = currency::get_default_core_runtime_config();
-    };
-
-#define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            uint32_t(1 << 0)
-#define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          uint32_t(1 << 1)       
-#define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
-#define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
-#define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
+    wallet2();
 
     static std::string transfer_flags_to_str(uint32_t flags);
     static std::string transform_tx_to_str(const currency::transaction& tx);
@@ -821,13 +797,16 @@ namespace tools
     bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
+    void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use;}
 
 private:
 
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature);
-    void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b);
+    void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes);
+    void fetch_tx_global_indixes(const currency::transaction& tx, std::vector<uint64_t>& goutputs_indexes);
+    void fetch_tx_global_indixes(const std::list<std::reference_wrapper<const currency::transaction>>& txs, std::vector<std::vector<uint64_t>>& goutputs_indexes);
     void detach_blockchain(uint64_t including_height);
     bool extract_offers_from_transfer_entry(size_t i, std::unordered_map<crypto::hash, bc_services::offer_details_ex>& offers_local);
     bool select_my_offers(std::list<bc_services::offer_details_ex>& offers);
@@ -879,6 +858,7 @@ private:
     bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
+    void prefetch_global_indicies_if_needed(std::vector<uint64_t>& selected_indicies);
     uint64_t get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
     void prepare_tx_destinations(uint64_t needed_money,
       uint64_t found_money,
@@ -995,6 +975,7 @@ private:
     std::string m_miner_text_info;
 
     mutable uint64_t m_current_wallet_file_size;
+    bool m_use_deffered_global_outputs;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  

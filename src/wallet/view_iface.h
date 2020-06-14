@@ -19,8 +19,10 @@ DISABLE_VS_WARNINGS(4503)
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "wallet/wallet_public_structs_defs.h"
 #include "currency_core/offers_services_helpers.h"
+#include "currency_core/basic_kv_structs.h"
 #include "currency_core/basic_api_response_codes.h"
 #include "common/error_codes.h"
+
 POP_VS_WARNINGS
 
 //#endif
@@ -769,16 +771,6 @@ public:
     END_KV_SERIALIZE_MAP()
   };
   
-  template<typename t_type>
-  struct struct_with_one_t_type
-  {
-    t_type v;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(v)
-    END_KV_SERIALIZE_MAP()
-  };
-
 #define API_MAX_ALIASES_COUNT                                   10000
 
   struct i_view
