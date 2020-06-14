@@ -35,7 +35,24 @@ using namespace currency;
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
 namespace tools
 {
-
+  wallet2::wallet2() :  m_stop(false),
+                        m_wcallback(new i_wallet2_callback()), //stub
+                        m_core_proxy(new default_http_core_proxy()),
+                        m_upper_transaction_size_limit(0),
+                        m_height_of_start_sync(0),
+                        m_last_sync_percent(0),
+                        m_fake_outputs_count(0),
+                        m_do_rise_transfer(false),
+                        m_log_prefix("???"),
+                        m_watch_only(false),
+                        m_last_pow_block_h(0),
+                        m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
+                        m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
+                        m_current_wallet_file_size(0),
+                        m_use_deffered_global_outputs(false)
+  {
+    m_core_runtime_config = currency::get_default_core_runtime_config();
+  }
   //---------------------------------------------------------------
   uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td)
   {
@@ -415,9 +432,13 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
     std::vector<uint64_t> outputs_index_local;
 
-    if (!pglobal_indexes)
+    if (!pglobal_indexes || (pglobal_indexes->size() == 0 && tx.vout.size() != 0))
     {
-      if (!m_use_deffered_global_outputs)
+      if (m_use_deffered_global_outputs)
+      {
+        pglobal_indexes = nullptr;
+      }
+      else
       {
         fetch_tx_global_indixes(tx, outputs_index_local);
         pglobal_indexes = &outputs_index_local;
@@ -501,6 +522,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         td.m_ptx_wallet_info = pwallet_info;
         td.m_internal_output_index = o;
         td.m_key_image = ki;
+        LOG_PRINT_L0("pglobal_indexes = " << pglobal_indexes);
         if (m_use_deffered_global_outputs)
         {
           if (pglobal_indexes && pglobal_indexes->size() > o)
@@ -511,6 +533,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         else
         {
           WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(pglobal_indexes, "pglobal_indexes IS NULL in non mobile wallet");
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(pglobal_indexes->size() > o, "pglobal_indexes size()(" << pglobal_indexes->size() << ") <= o " << o );
           td.m_global_output_index = (*pglobal_indexes)[o];
         }
         if (coin_base_tx)
@@ -4768,9 +4791,9 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   amount_total = 0;
   outs_swept = 0;
 
-  std::vector<size_t> selected_transfers;
+  std::vector<uint64_t> selected_transfers;
   selected_transfers.reserve(m_transfers.size());
-  for (size_t i = 0; i < m_transfers.size(); ++i)
+  for (uint64_t i = 0; i < m_transfers.size(); ++i)
   {
     const transfer_details& td = m_transfers[i];
     uint64_t amount = td.amount();
@@ -4786,15 +4809,13 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!selected_transfers.empty(), "No spendable outputs meet the criterion");
 
   // sort by amount descending in order to spend bigger outputs first
-  std::sort(selected_transfers.begin(), selected_transfers.end(), [this](size_t a, size_t b) { return m_transfers[b].amount() < m_transfers[a].amount(); });
+  std::sort(selected_transfers.begin(), selected_transfers.end(), [this](uint64_t a, uint64_t b) { return m_transfers[b].amount() < m_transfers[a].amount(); });
 
   // limit RPC request with reasonable number of sources
   if (selected_transfers.size() > tx_sources_for_querying_random_outs_max)
     selected_transfers.erase(selected_transfers.begin() + tx_sources_for_querying_random_outs_max, selected_transfers.end());
 
-  //
-  // TODO: prefetch gindexes here for each element of selected_transfers
-  //
+  prefetch_global_indicies_if_needed(selected_transfers);
 
   typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
   typedef currency::tx_source_entry::output_entry tx_output_entry;
@@ -4805,7 +4826,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
     req.use_forced_mix_outs = false;
     req.outs_count = fake_outs_count + 1;
-    for (size_t i : selected_transfers)
+    for (uint64_t i : selected_transfers)
       req.amounts.push_back(m_transfers[i].amount());
 
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, rpc_get_random_outs_resp);
@@ -4858,7 +4879,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     for (size_t st_index = 0; st_index < st_index_upper_boundary; ++st_index)
     {
       currency::tx_source_entry& src = ftp.sources[st_index];
-      size_t tr_index = selected_transfers[st_index];
+      uint64_t tr_index = selected_transfers[st_index];
       transfer_details& td = m_transfers[tr_index];
       src.transfer_index = tr_index;
       src.amount = td.amount();

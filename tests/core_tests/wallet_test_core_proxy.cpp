@@ -104,6 +104,8 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::
 {
   currency::COMMAND_RPC_GET_BLOCKS_FAST::request req = AUTO_VAL_INIT(req);
   req.block_ids = rqt.block_ids;
+  req.minimum_height = rqt.minimum_height;
+  req.need_global_indexes = rqt.need_global_indexes;
   currency::COMMAND_RPC_GET_BLOCKS_FAST::response res = AUTO_VAL_INIT(res);
   bool r = this->call_COMMAND_RPC_GET_BLOCKS_FAST(req, res);
   rsp.status = res.status;
@@ -114,7 +116,6 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::
     r = unserialize_block_complete_entry(res, rsp);
   }
   return r;
-
 }
 
 bool wallet_test_core_proxy::call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(const currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& rqt, currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& rsp)

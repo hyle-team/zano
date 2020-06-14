@@ -324,37 +324,9 @@ namespace tools
 
   class wallet2
   {
-    wallet2(const wallet2&) : m_stop(false),
-                              m_wcallback(new i_wallet2_callback()), 
-                              m_height_of_start_sync(0), 
-                              m_last_sync_percent(0), 
-                              m_do_rise_transfer(false),
-                              m_watch_only(false), 
-                              m_last_pow_block_h(0), 
-                              m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
-                              m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE), 
-                              m_current_wallet_file_size(0), 
-                              m_use_deffered_global_outputs(false)
-    {};
+    wallet2(const wallet2&) = delete;
   public:
-    wallet2() : m_stop(false), 
-                m_wcallback(new i_wallet2_callback()), //stub
-                m_core_proxy(new default_http_core_proxy()), 
-                m_upper_transaction_size_limit(0), 
-                m_height_of_start_sync(0), 
-                m_last_sync_percent(0), 
-                m_fake_outputs_count(0),
-                m_do_rise_transfer(false),
-                m_log_prefix("???"),
-                m_watch_only(false), 
-                m_last_pow_block_h(0), 
-                m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
-                m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
-                m_current_wallet_file_size(0) 
-    {
-      m_core_runtime_config = currency::get_default_core_runtime_config();
-    };
-
+    wallet2();
 
     static std::string transfer_flags_to_str(uint32_t flags);
     static std::string transform_tx_to_str(const currency::transaction& tx);
