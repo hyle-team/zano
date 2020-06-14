@@ -347,8 +347,8 @@ namespace plain_wallet
     //lazy to make struct for it
     std::stringstream res;
     res << "{ \"valid\": " << (valid?"true":"false") << ", \"auditable\": "
-      << (apa.flags&ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE ? "true" : "false")
-      << ",\"payment_is\": " << (pid.size() ? "true" : "false") << "}";
+      << (apa.is_auditable() ? "true" : "false")
+      << ",\"payment_id\": " << (pid.size() ? "true" : "false") << "}";
     return res.str();
   }
 

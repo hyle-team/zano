@@ -628,6 +628,12 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
 {
   PROFILE_FUNC("wallet2::prepare_wti_decrypted_attachments");
 
+  if (!wti.payment_id.empty())
+  {
+    LOG_ERROR("wti.payment_id is expected to be empty. Go ahead.");
+  }
+  get_payment_id_from_tx(decrypted_att, wti.payment_id);
+
   if (wti.is_income)
   {
     account_public_address sender_address = AUTO_VAL_INIT(sender_address);
@@ -640,7 +646,11 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
     if (wti.remote_addresses.empty())
     {
       handle_2_alternative_types_in_variant_container<tx_receiver, tx_receiver_old>(decrypted_att, [&](const tx_receiver& p) {
-        std::string addr_str = currency::get_account_address_as_str(p.acc_addr);
+        std::string addr_str;
+        if (wti.payment_id.empty())
+          addr_str = currency::get_account_address_as_str(p.acc_addr);
+        else
+          addr_str = currency::get_account_address_and_payment_id_as_str(p.acc_addr, wti.payment_id); // show integrated address if there's a payment id provided
         wti.remote_addresses.push_back(addr_str);
         LOG_PRINT_YELLOW("prepare_wti_decrypted_attachments, income=false, wti.amount = " << print_money_brief(wti.amount) << ", rem. addr = " << addr_str, LOG_LEVEL_0);
         return true; // continue iterating through the container
@@ -4019,6 +4029,9 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx,
   const std::vector<currency::tx_destination_entry>& destinations,
   const std::vector<uint64_t>& selected_transfers)
 {
+  payment_id_t payment_id;
+  get_payment_id_from_tx(tx.attachment, payment_id);
+
   std::vector<std::string> recipients;
   std::unordered_set<account_public_address> used_addresses;
   for (const auto& d : destinations)
@@ -4026,13 +4039,13 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx,
     for (const auto& addr : d.addr)
     {
       if (used_addresses.insert(addr).second && addr != m_account.get_public_address())
-        recipients.push_back(get_account_address_as_str(addr));
+        recipients.push_back(payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_and_payment_id_as_str(addr, payment_id));
     }
   }
   if (!recipients.size())
   {
 	  //transaction send to ourself
-	  recipients.push_back(get_account_address_as_str(m_account.get_public_address()));
+	  recipients.push_back(payment_id.empty() ? get_account_address_as_str(m_account.get_public_address()) : get_account_address_and_payment_id_as_str(m_account.get_public_address(), payment_id));
   }
 
   add_sent_unconfirmed_tx(tx, recipients, selected_transfers, destinations);

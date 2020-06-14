@@ -6,6 +6,7 @@
 
 #pragma once 
 #include "chaingen.h"
+#include "wallet_tests_basic.h"
 
 struct get_random_outs_test : public test_chain_unit_enchanced
 {
@@ -15,4 +16,14 @@ struct get_random_outs_test : public test_chain_unit_enchanced
 
 private:
   mutable uint64_t m_amount;
+};
+
+struct random_outs_and_burnt_coins : public wallet_test
+{
+  random_outs_and_burnt_coins();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable uint64_t m_amount;
+  static constexpr uint64_t m_fake_amounts_count = 3;
 };

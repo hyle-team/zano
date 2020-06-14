@@ -2365,6 +2365,7 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   
   const transaction& tx = tx_ptr->tx;
   CHECK_AND_ASSERT_MES(tx.vout[out_ptr->out_no].target.type() == typeid(txout_to_key), false, "unknown tx out type");
+  const txout_to_key& otk = boost::get<txout_to_key>(tx.vout[out_ptr->out_no].target);
 
   CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() == tx.vout.size(), false, "internal error");
 
@@ -2372,12 +2373,16 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   if (tx_ptr->m_spent_flags[out_ptr->out_no])
     return false;
 
+  // do not use burned coins
+  if (otk.key == null_pkey)
+    return false;
+
   //check if transaction is unlocked
   if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
     return false;
 
   //use appropriate mix_attr out 
-  uint8_t mix_attr = boost::get<txout_to_key>(tx.vout[out_ptr->out_no].target).mix_attr;
+  uint8_t mix_attr = otk.mix_attr;
   
   if(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
     return false; //COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS call means that ring signature will have more than one entry.
@@ -2389,7 +2394,7 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
 
   COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
   oen.global_amount_index = i;
-  oen.out_key = boost::get<txout_to_key>(tx.vout[out_ptr->out_no].target).key;
+  oen.out_key = otk.key;
   return true;
 }
 //------------------------------------------------------------------
@@ -5157,7 +5162,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     TIME_MEASURE_START_PD(tx_append_time);
     if(!add_transaction_from_block(tx, tx_id, id, current_bc_size, actual_timestamp))
     {
-       LOG_PRINT_L0("Block with id: " << id << " failed to add transaction to blockchain storage");
+       LOG_PRINT_L0("Block " << id << " contains tx " << tx_id << " that can't be added to the blockchain storage");
        if (taken_from_pool)
        {
          currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
