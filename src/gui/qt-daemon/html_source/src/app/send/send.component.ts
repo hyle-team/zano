@@ -75,7 +75,7 @@ export class SendComponent implements OnInit, OnDestroy {
       return null;
     }]),
     comment: new FormControl(''),
-    mixin: new FormControl(0, Validators.required),
+    mixin: new FormControl(10, Validators.required),
     fee: new FormControl(this.variablesService.default_fee, [Validators.required, (g: FormControl) => {
       if ((new BigNumber(g.value)).isLessThan(this.variablesService.default_fee)) {
         return {'less_min': true};
@@ -120,7 +120,7 @@ export class SendComponent implements OnInit, OnDestroy {
         address: this.variablesService.currentWallet.send_data['address'],
         amount: this.variablesService.currentWallet.send_data['amount'],
         comment: this.variablesService.currentWallet.send_data['comment'],
-        mixin: this.variablesService.currentWallet.send_data['mixin'] || 0,
+        mixin: this.variablesService.currentWallet.send_data['mixin'] || 10,
         fee: this.variablesService.currentWallet.send_data['fee'] || this.variablesService.default_fee,
         hide: this.variablesService.currentWallet.send_data['hide'] || false
       });
@@ -159,7 +159,7 @@ export class SendComponent implements OnInit, OnDestroy {
                 if (send_status) {
                   this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
                   this.variablesService.currentWallet.send_data = {address: null, amount: null, comment: null, mixin: null, fee: null, hide: null};
-                  this.sendForm.reset({address: null, amount: null, comment: null, mixin: 0, fee: this.variablesService.default_fee, hide: false});
+                  this.sendForm.reset({address: null, amount: null, comment: null, mixin: 10, fee: this.variablesService.default_fee, hide: false});
                 }
               });
           }
@@ -184,7 +184,7 @@ export class SendComponent implements OnInit, OnDestroy {
                   if (send_status) {
                     this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
                     this.variablesService.currentWallet.send_data = {address: null, amount: null, comment: null, mixin: null, fee: null, hide: null};
-                    this.sendForm.reset({address: null, amount: null, comment: null, mixin: 0, fee: this.variablesService.default_fee, hide: false});
+                    this.sendForm.reset({address: null, amount: null, comment: null, mixin: 10, fee: this.variablesService.default_fee, hide: false});
                   }
                 });
             }
