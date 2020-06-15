@@ -13,6 +13,7 @@
 #include "gui_utils.h"
 #include "notification_helper.h"
 #include "common/config_encrypt_helper.h"
+#include "currency_core/basic_kv_structs.h"
 
 #define PREPARE_ARG_FROM_JSON(arg_type, var_name)   \
   arg_type var_name = AUTO_VAL_INIT(var_name); \
@@ -867,7 +868,7 @@ QString MainWindow::get_alias_coast(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(view::struct_with_one_t_type<std::string>, lvl);
+  PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<std::string>, lvl);
   view::get_alias_coast_response resp;
   resp.error_code = m_backend.get_alias_coast(lvl.v, resp.coast);
   return epee::serialization::store_t_to_json(resp, 0, epee::serialization::eol_lf).c_str();
@@ -1333,7 +1334,7 @@ QString MainWindow::get_all_aliases()
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  //PREPARE_ARG_FROM_JSON(view::struct_with_one_t_type<uint64_t>, param);
+  //PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<uint64_t>, param);
   PREPARE_RESPONSE(view::alias_set, rsp);
 
   rsp.error_code = m_backend.get_aliases(rsp.response_data);
@@ -1373,7 +1374,7 @@ QString MainWindow::set_log_level(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(view::struct_with_one_t_type<int64_t>, lvl);
+  PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<int64_t>, lvl);
   epee::log_space::get_set_log_detalisation_level(true, lvl.v);
   default_ar.error_code = API_RETURN_CODE_OK;
   LOG_PRINT("[LOG LEVEL]: set to " << lvl.v, LOG_LEVEL_MIN);
@@ -1385,7 +1386,7 @@ QString MainWindow::get_log_level(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_RESPONSE(view::struct_with_one_t_type<int>, ar);
+  PREPARE_RESPONSE(currency::struct_with_one_t_type<int>, ar);
   ar.response_data.v = epee::log_space::get_set_log_detalisation_level();
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
@@ -1851,7 +1852,7 @@ QString MainWindow::toggle_autostart(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(view::struct_with_one_t_type<bool>, as);
+  PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<bool>, as);
 
   if (gui_tools::SetStartOnSystemStartup(as.v))
     default_ar.error_code = API_RETURN_CODE_OK;
