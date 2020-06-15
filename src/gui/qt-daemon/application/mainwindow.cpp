@@ -104,6 +104,9 @@ MainWindow::MainWindow():
   m_view = new QWebEngineView(this);
   m_channel = new QWebChannel(m_view->page());
   m_view->page()->setWebChannel(m_channel);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
+  m_view->page()->setDevToolsPage(m_view->page());
+#endif 
 
   // register QObjects to be exposed to JavaScript
   m_channel->registerObject(QStringLiteral("mediator_object"), this);
