@@ -37,6 +37,8 @@
   #endif
   #include <windows.h>
 #endif
+#include "warnings.h"
+
 
 namespace epee
 {

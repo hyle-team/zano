@@ -101,19 +101,38 @@ MainWindow::MainWindow():
   m_backend_stopped_2(false), 
   m_system_shutdown(false)
 {
+
+  /*
   m_view = new QWebEngineView(this);
   m_channel = new QWebChannel(m_view->page());
   m_view->page()->setWebChannel(m_channel);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
   m_view->page()->setDevToolsPage(m_view->page());
 #endif 
+  */
+
+  //temporary
+  m_view    = new QWebEngineView(this);
+  m_channel = new QWebChannel(m_view->page());
+  m_view->page()->setWebChannel(m_channel);
+  
+  
+  QSplitter* pspliter = new QSplitter(Qt::Horizontal);
+  pspliter->addWidget(m_view);
+  QWebEngineView* pinspector = new QWebEngineView();
+  pspliter->addWidget(pinspector);
+  pinspector->page()->setInspectedPage(m_view->page());
+  
+
+
 
   // register QObjects to be exposed to JavaScript
   m_channel->registerObject(QStringLiteral("mediator_object"), this);
 
   connect(m_view, SIGNAL(loadFinished(bool)), SLOT(on_load_finished(bool)));  
   
-  setCentralWidget(m_view);
+  setCentralWidget(pspliter);
+  //setCentralWidget(m_view);
   //this->setMouseTracking(true);
 
   m_view->page()->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true);
@@ -363,8 +382,8 @@ bool MainWindow::init(const std::string& html_path)
   }
 
   //----
-  this->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
-  m_view->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
+  //this->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
+  //m_view->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
 
   return true;
   CATCH_ENTRY2(false);
