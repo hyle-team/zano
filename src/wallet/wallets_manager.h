@@ -88,7 +88,8 @@ public:
 
   wallets_manager();
   ~wallets_manager();
-  bool init(int argc, char* argv[], view::i_view* pview_handler);
+  bool init_command_line(int argc, char* argv[]);
+  bool init(view::i_view* pview_handler);
   bool start();
   bool stop();
   bool quick_stop_no_save(); //stop without storing wallets
@@ -155,6 +156,7 @@ public:
   void get_gui_options(view::gui_options& opt);
   std::string get_wallet_log_prefix(size_t wallet_id) const;
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
+  std::string get_qt_dev_tools_option() const { return m_qt_dev_tools; }
   void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
 private:
   void main_worker(const po::variables_map& vm);
@@ -209,6 +211,7 @@ private:
 
   bool m_remote_node_mode;
   bool m_qt_logs_enbaled;
+  std::string m_qt_dev_tools;
   std::atomic<bool> m_is_pos_allowed;
 
 

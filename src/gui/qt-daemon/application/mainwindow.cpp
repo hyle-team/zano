@@ -94,45 +94,92 @@ std::wstring convert_to_lower_via_qt(const std::wstring& w)
 	return QString().fromStdWString(w).toLower().toStdWString();
 }
 
-
-MainWindow::MainWindow():
-  //m_quit_requested(false),
-  m_gui_deinitialize_done_1(false),
-  m_backend_stopped_2(false), 
-  m_system_shutdown(false)
+MainWindow::MainWindow()
+  : m_gui_deinitialize_done_1(false)
+  , m_backend_stopped_2(false)
+  , m_system_shutdown(false)
+  , m_view(nullptr)
+  , m_channel(nullptr)
 {
+#ifndef _MSC_VER
+  //workaround for macos broken tolower from std, very dirty hack
+  bc_services::set_external_to_low_converter(convert_to_lower_via_qt);
+#endif
+}
 
-  /*
+MainWindow::~MainWindow()
+{
+  m_backend.subscribe_to_core_events(nullptr);
+  if (m_view)
+  {
+    m_view->page()->setWebChannel(nullptr);
+    m_view = nullptr;
+  }
+  if (m_channel)
+  {
+    m_channel->deregisterObject(this);
+    delete m_channel;
+    m_channel = nullptr;
+  }
+}
+
+void MainWindow::on_load_finished(bool ok)
+{
+  TRY_ENTRY();
+  LOG_PRINT("MainWindow::on_load_finished(ok = " << (ok ? "true" : "false") << ")", LOG_LEVEL_0);
+  CATCH_ENTRY2(void());
+}
+
+bool MainWindow::init_window()
+{
   m_view = new QWebEngineView(this);
   m_channel = new QWebChannel(m_view->page());
   m_view->page()->setWebChannel(m_channel);
+
+  QWidget* central_widget_to_be_set = m_view;
+
+  std::string qt_dev_tools_option = m_backend.get_qt_dev_tools_option();
+  if (!qt_dev_tools_option.empty())
+  {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
-  m_view->page()->setDevToolsPage(m_view->page());
-#endif 
-  */
+    std::vector<std::string> qt_dev_tools_option_parts;
+    boost::split(qt_dev_tools_option_parts, qt_dev_tools_option, [](char c) { return c == ','; });
+    
+    Qt::Orientation orientation = Qt::Vertical;
+    if (qt_dev_tools_option_parts.size() >= 1 && qt_dev_tools_option_parts[0] == "horizontal")
+      orientation = Qt::Horizontal;
 
-  //temporary
-  m_view    = new QWebEngineView(this);
-  m_channel = new QWebChannel(m_view->page());
-  m_view->page()->setWebChannel(m_channel);
-  
-  
-  QSplitter* pspliter = new QSplitter(Qt::Horizontal);
-  pspliter->addWidget(m_view);
-  QWebEngineView* pinspector = new QWebEngineView();
-  pspliter->addWidget(pinspector);
-  pinspector->page()->setInspectedPage(m_view->page());
-  
+    double zoom_factor = 1.3;
+    if (qt_dev_tools_option_parts.size() >= 2)
+      epee::string_tools::get_xtype_from_string(zoom_factor, qt_dev_tools_option_parts[1]);
 
+    QSplitter* spliter = new QSplitter(orientation);
+    spliter->addWidget(m_view);
+    QWebEngineView* inspector = new QWebEngineView();
+    spliter->addWidget(inspector);
+    m_view->page()->setDevToolsPage(inspector->page());
+    inspector->setZoomFactor(zoom_factor);
 
+    spliter->setCollapsible(0, false);
+    spliter->setCollapsible(1, false);
+
+    QList<int> Sizes;
+    Sizes.append(0.5 * m_view->sizeHint().height());
+    Sizes.append(0.5 * m_view->sizeHint().height());
+    spliter->setSizes(Sizes);
+
+    central_widget_to_be_set = spliter;
+#else
+    LOG_ERROR("Qt Dev Tool is not available for this Qt version, try building with Qt 5.11.0 or higher");
+#endif
+  }
 
   // register QObjects to be exposed to JavaScript
   m_channel->registerObject(QStringLiteral("mediator_object"), this);
 
-  connect(m_view, SIGNAL(loadFinished(bool)), SLOT(on_load_finished(bool)));  
-  
-  setCentralWidget(pspliter);
-  //setCentralWidget(m_view);
+  connect(m_view, SIGNAL(loadFinished(bool)), SLOT(on_load_finished(bool)));
+
+  setCentralWidget(central_widget_to_be_set);
   //this->setMouseTracking(true);
 
   m_view->page()->settings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, true);
@@ -156,30 +203,9 @@ MainWindow::MainWindow():
   m_localization[localization_id_tray_menu_show] = "localization_id_tray_menu_show";
   m_localization[localization_id_tray_menu_minimize] = "localization_id_tray_menu_minimize";
 
-#ifndef _MSC_VER
-	//workaround for macos broken tolower from std, very dirty hack
-  bc_services::set_external_to_low_converter(convert_to_lower_via_qt);
-#endif
+  return true;
 }
 
-MainWindow::~MainWindow()
-{
-  m_backend.subscribe_to_core_events(nullptr);
-  m_view->page()->setWebChannel(nullptr);
-  m_channel->deregisterObject(this);
-  delete m_channel;
-}
-
-void MainWindow::on_load_finished(bool ok)
-{
-  TRY_ENTRY();
-  LOG_PRINT("MainWindow::on_load_finished(ok = " << (ok ? "true" : "false") << ")", LOG_LEVEL_0);
-  CATCH_ENTRY2(void());
-}
-
-
-
-//-------------
 QString MainWindow::get_default_user_dir(const QString& param)
 {
   TRY_ENTRY();
@@ -195,6 +221,7 @@ bool MainWindow::toggle_mining()
   return true;
   CATCH_ENTRY2(false);
 }
+
 QString MainWindow::get_exchange_last_top(const QString& params)
 {
   TRY_ENTRY();
@@ -211,10 +238,6 @@ QString MainWindow::get_tx_pool_info()
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
-// bool MainWindow::store_config()
-// {
-//   return true;
-// }
 
 QString MainWindow::get_default_fee()
 {
@@ -682,7 +705,13 @@ void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, c
 bool MainWindow::init_backend(int argc, char* argv[])
 {
   TRY_ENTRY();
-  if (!m_backend.init(argc, argv, this))
+  if (!m_backend.init_command_line(argc, argv))
+    return false;
+
+  if (!init_window())
+    return false;
+
+  if (!m_backend.init(this))
     return false;
 
   if (m_backend.is_qt_logs_enabled())

@@ -80,7 +80,7 @@ const command_line::arg_descriptor<uint32_t> arg_qt_remote_debugging_port = { "r
 const command_line::arg_descriptor<std::string> arg_remote_node = { "remote-node", "Switch GUI to work with remote node instead of local daemon", "",  true };
 const command_line::arg_descriptor<bool> arg_enable_qt_logs = { "enable-qt-logs", "Forward Qt log messages into main log", false,  true };
 const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
-//const command_line::arg_descriptor<bool> arg_disable_logs_init = { "disable-logs-init", "Disable log initialization in GUI" };
+const command_line::arg_descriptor<std::string> arg_qt_dev_tools = { "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "",  false };
 
 
 void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
@@ -106,32 +106,8 @@ void terminate_handler_func()
   std::abort(); // default terminate handler's behavior
 }
 
-bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
+bool wallets_manager::init_command_line(int argc, char* argv[])
 {
-  m_stop_singal_sent = false;
-  if (pview_handler)
-    m_pview = pview_handler;
-
-  view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
-  dsi.pos_difficulty = dsi.pow_difficulty = "---";
-  m_pview->update_daemon_status(dsi);
-
-  tools::signal_handler::install_fatal([](int sig_number, void* address) {
-    LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
-    std::fflush(nullptr); // all open output streams are flushed
-  });
-
-  // setup custom callstack retrieving function
-  epee::misc_utils::get_callstack(tools::get_callstack);
-//#ifndef MOBILE_WALLET_BUILD
-  // setup custom terminate functions
-  std::set_terminate(&terminate_handler_func);
-//#endif
-  //#if !defined(NDEBUG)
-  //  log_space::log_singletone::add_logger(LOGGER_DEBUGGER, nullptr, nullptr);
-  //#endif
-  LOG_PRINT_L0("Initing...");
-
   TRY_ENTRY();
   po::options_description desc_cmd_only("Command line options");
   po::options_description desc_cmd_sett("Command line options and settings options");
@@ -155,11 +131,12 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
   command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
   command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
+  command_line::add_arg(desc_cmd_sett, arg_qt_dev_tools);
   command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
-  
+
 
 #ifndef MOBILE_WALLET_BUILD
   currency::core::init_options(desc_cmd_sett);
@@ -206,6 +183,50 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
     return true;
   });
 
+  if (!coomand_line_parsed)
+  {
+    std::stringstream ss;
+    ss << "Command line has wrong arguments: " << std::endl;
+    for (int i = 0; i != argc; i++)
+      ss << "[" << i << "] " << argv[i] << std::endl;
+    std::cerr << ss.str() << std::endl;
+    return false;
+  }
+
+  m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
+  m_qt_dev_tools = command_line::get_arg(m_vm, arg_qt_dev_tools);
+
+  return true;
+  CATCH_ENTRY2(false);
+}
+
+bool wallets_manager::init(view::i_view* pview_handler)
+{
+  m_stop_singal_sent = false;
+  if (pview_handler)
+    m_pview = pview_handler;
+
+  view::daemon_status_info dsi = AUTO_VAL_INIT(dsi);
+  dsi.pos_difficulty = dsi.pow_difficulty = "---";
+  m_pview->update_daemon_status(dsi);
+
+  tools::signal_handler::install_fatal([](int sig_number, void* address) {
+    LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
+    std::fflush(nullptr); // all open output streams are flushed
+  });
+
+  // setup custom callstack retrieving function
+  epee::misc_utils::get_callstack(tools::get_callstack);
+//#ifndef MOBILE_WALLET_BUILD
+  // setup custom terminate functions
+  std::set_terminate(&terminate_handler_func);
+//#endif
+  //#if !defined(NDEBUG)
+  //  log_space::log_singletone::add_logger(LOGGER_DEBUGGER, nullptr, nullptr);
+  //#endif
+  LOG_PRINT_L0("Initing...");
+
+  TRY_ENTRY();
   //set up logging options
   if (command_line::has_arg(m_vm, arg_alloc_win_console))
   {
@@ -260,21 +281,11 @@ bool wallets_manager::init(int argc, char* argv[], view::i_view* pview_handler)
   {
     log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
     LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
-    LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
+    //LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
   }
-
-  m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
 
   m_pview->init(path_to_html);
 
-  if (!coomand_line_parsed)
-  {
-    std::stringstream ss;
-    for (int i = 0; i != argc; i++)
-      ss << "[" << i << "] " << argv[i] << std::endl;
-
-    LOG_PRINT_L0("Command line has wrong arguments: " << std::endl << ss.str());
-  }
   return true;
   CATCH_ENTRY_L0("init", false);
 }
