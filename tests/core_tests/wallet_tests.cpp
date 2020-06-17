@@ -3361,3 +3361,90 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+#endif
+
+wallet_sending_to_integrated_address::wallet_sending_to_integrated_address()
+{
+  REGISTER_CALLBACK_METHOD(wallet_sending_to_integrated_address, c1);
+}
+
+bool wallet_sending_to_integrated_address::generate(std::vector<test_event_entry>& events) const
+{
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  miner_wlt->refresh();
+
+  std::string payment_id = "super-payment-id-1948503537205028248";
+  std::string alice_integrated_address = get_account_address_and_payment_id_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
+
+  bool callback_succeded = false;
+  std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
+    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+    LOG_PRINT_YELLOW("on_transfer: " << print_money_brief(wti.amount) << " pid len: " << wti.payment_id.size() << " remote addr: " << (wti.remote_addresses.size() > 0 ? wti.remote_addresses[0] : ""), LOG_LEVEL_0);
+    if (wti.payment_id.empty())
+      return true; // skip another outputs
+    CHECK_AND_ASSERT_MES(wti.payment_id == payment_id, false, "incorrect payment id");
+    CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 1, false, "remote_addressed.size() = " << wti.remote_addresses.size());
+    CHECK_AND_ASSERT_MES(wti.remote_addresses[0] == alice_integrated_address, false, "incorrect remote address");
+    callback_succeded = true;
+    return true;
+  }
+  ));
+  miner_wlt->callback(l);
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(2), m_accounts[ALICE_ACC_IDX].get_public_address()));
+
+  std::vector<payload_items_v> extra, attachments;
+  // add tx_receiver to show the recipient in wti
+  uint64_t top_block_height = 0;
+  crypto::hash stub_hash;
+  r = c.get_blockchain_top(top_block_height, stub_hash);
+  CHECK_AND_ASSERT_MES(r, false, "get_blockchain_top failed");
+  currency::create_and_add_tx_receiver_to_container_from_address(extra, m_accounts[ALICE_ACC_IDX].get_public_address(), top_block_height, miner_wlt->get_core_runtime_config());
+  // add payment_id
+  set_payment_id_to_tx(attachments, payment_id);
+
+  
+  callback_succeded = false;
+  miner_wlt->transfer(destinations, /* fake outs */ 0, /* unlock time */ 0, TESTS_DEFAULT_FEE, extra, attachments);
+  CHECK_AND_ASSERT_MES(callback_succeded, false, "callback was not succeded");
+
+  refresh_wallet_and_check_balance("", "alice", alice_wlt, MK_TEST_COINS(2));
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
+
+ // miner_wlt->get_payments()
+
+
+  // check one again with normal sync (callback should be called as well)
+  std::shared_ptr<tools::wallet2> miner_wlt_2 = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt_2->callback(l);
+
+  callback_succeded = false;
+  miner_wlt_2->refresh();
+  CHECK_AND_ASSERT_MES(callback_succeded, false, "callback was not succeded (2)");
+
+  return true;
+}
