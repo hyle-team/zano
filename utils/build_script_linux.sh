@@ -27,6 +27,7 @@ fi
 
 if [ -n "$testnet" ] || [ -n "$qt_dev_tools" ]; then
   copy_qt_dev_tools=true
+  ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}devtools-
 fi
 
 
