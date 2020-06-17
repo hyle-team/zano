@@ -2674,6 +2674,7 @@ var VariablesService = /** @class */ (function () {
         this.count = 40;
         this.maxPages = 5;
         this.wallets = [];
+        this.walletIsAuditable = [];
         this.aliases = [];
         this.aliasesChecked = {};
         this.enableAliasSearch = false;
@@ -5868,6 +5869,9 @@ var OpenWalletModalComponent = /** @class */ (function () {
             return;
         }
         this.backend.openWallet(this.wallet.path, this.wallet.pass, this.variablesService.count, false, function (open_status, open_data, open_error) {
+            if (open_data.wi.is_auditable) {
+                _this.variablesService.walletIsAuditable = { id: open_data.wallet_id, isAuditable: open_data.wi.is_auditable };
+            }
             if (open_error && open_error === 'FILE_NOT_FOUND') {
                 var error_translate = _this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
                 error_translate += ':<br>' + _this.wallet.path;
@@ -6049,6 +6053,9 @@ var OpenWalletComponent = /** @class */ (function () {
         var _this = this;
         if (this.openForm.valid && this.openForm.get('name').value.length <= this.variablesService.maxWalletNameLength) {
             this.backend.openWallet(this.filePath, this.openForm.get('password').value, this.variablesService.count, false, function (open_status, open_data, open_error) {
+                if (open_data && open_data.wi && open_data.wi.is_auditable) {
+                    _this.variablesService.walletIsAuditable = { id: open_data.wallet_id, isAuditable: open_data.wi.is_auditable };
+                }
                 if (open_error && open_error === 'FILE_NOT_FOUND') {
                     var error_translate = _this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
                     error_translate += ':<br>' + _this.filePath;
@@ -7214,7 +7221,7 @@ var SendComponent = /** @class */ (function () {
                     return null;
                 }]),
             comment: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](''),
-            mixin: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](10, _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required),
+            mixin: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](0, _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required),
             fee: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](this.variablesService.default_fee, [_angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required, function (g) {
                     if ((new bignumber_js__WEBPACK_IMPORTED_MODULE_6__["BigNumber"](g.value)).isLessThan(_this.variablesService.default_fee)) {
                         return { 'less_min': true };
@@ -7242,11 +7249,16 @@ var SendComponent = /** @class */ (function () {
         var _this = this;
         this.parentRouting = this.route.parent.params.subscribe(function (params) {
             _this.currentWalletId = params['id'];
+            _this.mixin = _this.variablesService.currentWallet.send_data['mixin'] || 10;
+            if (_this.variablesService.walletIsAuditable.isAuditable && _this.variablesService.walletIsAuditable.id === +_this.currentWalletId) {
+                _this.mixin = 0;
+                _this.sendForm.controls['mixin'].disable();
+            }
             _this.sendForm.reset({
                 address: _this.variablesService.currentWallet.send_data['address'],
                 amount: _this.variablesService.currentWallet.send_data['amount'],
                 comment: _this.variablesService.currentWallet.send_data['comment'],
-                mixin: _this.variablesService.currentWallet.send_data['mixin'] || 10,
+                mixin: _this.mixin,
                 fee: _this.variablesService.currentWallet.send_data['fee'] || _this.variablesService.default_fee,
                 hide: _this.variablesService.currentWallet.send_data['hide'] || false
             });
@@ -7276,7 +7288,7 @@ var SendComponent = /** @class */ (function () {
                             if (send_status) {
                                 _this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
                                 _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null, hide: null };
-                                _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 10, fee: _this.variablesService.default_fee, hide: false });
+                                _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: _this.mixin, fee: _this.variablesService.default_fee, hide: false });
                             }
                         });
                     }
@@ -7296,7 +7308,7 @@ var SendComponent = /** @class */ (function () {
                                 if (send_status) {
                                     _this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
                                     _this.variablesService.currentWallet.send_data = { address: null, amount: null, comment: null, mixin: null, fee: null, hide: null };
-                                    _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: 10, fee: _this.variablesService.default_fee, hide: false });
+                                    _this.sendForm.reset({ address: null, amount: null, comment: null, mixin: _this.mixin, fee: _this.variablesService.default_fee, hide: false });
                                 }
                             });
                         }

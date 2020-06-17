@@ -16,6 +16,7 @@ export class SendComponent implements OnInit, OnDestroy {
   isOpen = false;
   localAliases = [];
   isModalDialogVisible = false;
+  mixin: number;
 
   currentWalletId = null;
   parentRouting;
@@ -75,7 +76,7 @@ export class SendComponent implements OnInit, OnDestroy {
       return null;
     }]),
     comment: new FormControl(''),
-    mixin: new FormControl(10, Validators.required),
+    mixin: new FormControl(0, Validators.required),
     fee: new FormControl(this.variablesService.default_fee, [Validators.required, (g: FormControl) => {
       if ((new BigNumber(g.value)).isLessThan(this.variablesService.default_fee)) {
         return {'less_min': true};
@@ -116,11 +117,16 @@ export class SendComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(params => {
       this.currentWalletId = params['id'];
+      this.mixin = this.variablesService.currentWallet.send_data['mixin'] || 10;
+      if (this.variablesService.walletIsAuditable.isAuditable && this.variablesService.walletIsAuditable.id === +this.currentWalletId) {
+        this.mixin = 0;
+        this.sendForm.controls['mixin'].disable();
+      }
       this.sendForm.reset({
         address: this.variablesService.currentWallet.send_data['address'],
         amount: this.variablesService.currentWallet.send_data['amount'],
         comment: this.variablesService.currentWallet.send_data['comment'],
-        mixin: this.variablesService.currentWallet.send_data['mixin'] || 10,
+        mixin: this.mixin,
         fee: this.variablesService.currentWallet.send_data['fee'] || this.variablesService.default_fee,
         hide: this.variablesService.currentWallet.send_data['hide'] || false
       });
@@ -159,7 +165,7 @@ export class SendComponent implements OnInit, OnDestroy {
                 if (send_status) {
                   this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
                   this.variablesService.currentWallet.send_data = {address: null, amount: null, comment: null, mixin: null, fee: null, hide: null};
-                  this.sendForm.reset({address: null, amount: null, comment: null, mixin: 10, fee: this.variablesService.default_fee, hide: false});
+                  this.sendForm.reset({address: null, amount: null, comment: null, mixin: this.mixin, fee: this.variablesService.default_fee, hide: false});
                 }
               });
           }
@@ -184,7 +190,7 @@ export class SendComponent implements OnInit, OnDestroy {
                   if (send_status) {
                     this.modalService.prepareModal('success', 'SEND.SUCCESS_SENT');
                     this.variablesService.currentWallet.send_data = {address: null, amount: null, comment: null, mixin: null, fee: null, hide: null};
-                    this.sendForm.reset({address: null, amount: null, comment: null, mixin: 10, fee: this.variablesService.default_fee, hide: false});
+                    this.sendForm.reset({address: null, amount: null, comment: null, mixin: this.mixin, fee: this.variablesService.default_fee, hide: false});
                   }
                 });
             }

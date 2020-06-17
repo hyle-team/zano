@@ -55,6 +55,9 @@ export class OpenWalletModalComponent implements OnInit {
       return;
     }
     this.backend.openWallet(this.wallet.path, this.wallet.pass, this.variablesService.count, false, (open_status, open_data, open_error) => {
+      if (open_data.wi.is_auditable) {
+        this.variablesService.walletIsAuditable = {id: open_data.wallet_id, isAuditable: open_data.wi.is_auditable};
+      }
       if (open_error && open_error === 'FILE_NOT_FOUND') {
         let error_translate = this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
         error_translate += ':<br>' + this.wallet.path;
