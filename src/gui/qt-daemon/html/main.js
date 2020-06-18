@@ -5885,7 +5885,10 @@ var OpenWalletModalComponent = /** @class */ (function () {
         }
         this.backend.openWallet(this.wallet.path, this.wallet.pass, this.variablesService.count, false, function (open_status, open_data, open_error) {
             if (open_data.wi.is_auditable) {
-                _this.variablesService.walletIsAuditable = { id: open_data.wallet_id, isAuditable: open_data.wi.is_auditable };
+                var address = open_data['wi'].address;
+                if (_this.variablesService.walletIsAuditable.indexOf(address) === -1) {
+                    _this.variablesService.walletIsAuditable.push(address);
+                }
             }
             if (open_error && open_error === 'FILE_NOT_FOUND') {
                 var error_translate = _this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
@@ -6068,8 +6071,11 @@ var OpenWalletComponent = /** @class */ (function () {
         var _this = this;
         if (this.openForm.valid && this.openForm.get('name').value.length <= this.variablesService.maxWalletNameLength) {
             this.backend.openWallet(this.filePath, this.openForm.get('password').value, this.variablesService.count, false, function (open_status, open_data, open_error) {
-                if (open_data && open_data.wi && open_data.wi.is_auditable) {
-                    _this.variablesService.walletIsAuditable = { id: open_data.wallet_id, isAuditable: open_data.wi.is_auditable };
+                if (open_data.wi.is_auditable) {
+                    var address = open_data['wi'].address;
+                    if (_this.variablesService.walletIsAuditable.indexOf(address) === -1) {
+                        _this.variablesService.walletIsAuditable.push(address);
+                    }
                 }
                 if (open_error && open_error === 'FILE_NOT_FOUND') {
                     var error_translate = _this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
@@ -7267,7 +7273,7 @@ var SendComponent = /** @class */ (function () {
         this.parentRouting = this.route.parent.params.subscribe(function (params) {
             _this.currentWalletId = params['id'];
             _this.mixin = _this.variablesService.currentWallet.send_data['mixin'] || _shared_constants__WEBPACK_IMPORTED_MODULE_7__["MIXIN"];
-            if (_this.variablesService.walletIsAuditable.isAuditable && _this.variablesService.walletIsAuditable.id === +_this.currentWalletId) {
+            if (_this.variablesService.walletIsAuditable.indexOf(_this.variablesService.currentWallet.address) !== -1) {
                 _this.mixin = 0;
                 _this.sendForm.controls['mixin'].disable();
             }

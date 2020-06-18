@@ -62,8 +62,11 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
   openWallet() {
     if (this.openForm.valid && this.openForm.get('name').value.length <= this.variablesService.maxWalletNameLength) {
       this.backend.openWallet(this.filePath, this.openForm.get('password').value, this.variablesService.count, false, (open_status, open_data, open_error) => {
-        if (open_data && open_data.wi && open_data.wi.is_auditable) {
-          this.variablesService.walletIsAuditable = {id: open_data.wallet_id, isAuditable: open_data.wi.is_auditable};
+        if (open_data.wi.is_auditable) {
+          let address = open_data['wi'].address;
+          if (this.variablesService.walletIsAuditable.indexOf(address) === -1) {
+            this.variablesService.walletIsAuditable.push(address);
+          }
         }
         if (open_error && open_error === 'FILE_NOT_FOUND') {
           let error_translate = this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
