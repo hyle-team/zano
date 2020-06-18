@@ -5,6 +5,7 @@ import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {ModalService} from '../_helpers/services/modal.service';
 import {BigNumber} from 'bignumber.js';
+import {MIXIN} from '../_shared/constants'
 
 @Component({
   selector: 'app-send',
@@ -76,7 +77,7 @@ export class SendComponent implements OnInit, OnDestroy {
       return null;
     }]),
     comment: new FormControl(''),
-    mixin: new FormControl(0, Validators.required),
+    mixin: new FormControl(MIXIN, Validators.required),
     fee: new FormControl(this.variablesService.default_fee, [Validators.required, (g: FormControl) => {
       if ((new BigNumber(g.value)).isLessThan(this.variablesService.default_fee)) {
         return {'less_min': true};
@@ -117,7 +118,7 @@ export class SendComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(params => {
       this.currentWalletId = params['id'];
-      this.mixin = this.variablesService.currentWallet.send_data['mixin'] || 10;
+      this.mixin = this.variablesService.currentWallet.send_data['mixin'] || MIXIN;
       if (this.variablesService.walletIsAuditable.isAuditable && this.variablesService.walletIsAuditable.id === +this.currentWalletId) {
         this.mixin = 0;
         this.sendForm.controls['mixin'].disable();

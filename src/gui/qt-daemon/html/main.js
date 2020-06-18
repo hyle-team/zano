@@ -2821,6 +2821,21 @@ var VariablesService = /** @class */ (function () {
 
 /***/ }),
 
+/***/ "./src/app/_shared/constants.ts":
+/*!**************************************!*\
+  !*** ./src/app/_shared/constants.ts ***!
+  \**************************************/
+/*! exports provided: MIXIN */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "MIXIN", function() { return MIXIN; });
+var MIXIN = 10;
+
+
+/***/ }),
+
 /***/ "./src/app/add-contacts/add-contacts.component.html":
 /*!**********************************************************!*\
   !*** ./src/app/add-contacts/add-contacts.component.html ***!
@@ -7133,6 +7148,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _helpers_services_modal_service__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_helpers/services/modal.service */ "./src/app/_helpers/services/modal.service.ts");
 /* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! bignumber.js */ "./node_modules/bignumber.js/bignumber.js");
 /* harmony import */ var bignumber_js__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(bignumber_js__WEBPACK_IMPORTED_MODULE_6__);
+/* harmony import */ var _shared_constants__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../_shared/constants */ "./src/app/_shared/constants.ts");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -7142,6 +7158,7 @@ var __decorate = (undefined && undefined.__decorate) || function (decorators, ta
 var __metadata = (undefined && undefined.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+
 
 
 
@@ -7221,7 +7238,7 @@ var SendComponent = /** @class */ (function () {
                     return null;
                 }]),
             comment: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](''),
-            mixin: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](0, _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required),
+            mixin: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](_shared_constants__WEBPACK_IMPORTED_MODULE_7__["MIXIN"], _angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required),
             fee: new _angular_forms__WEBPACK_IMPORTED_MODULE_1__["FormControl"](this.variablesService.default_fee, [_angular_forms__WEBPACK_IMPORTED_MODULE_1__["Validators"].required, function (g) {
                     if ((new bignumber_js__WEBPACK_IMPORTED_MODULE_6__["BigNumber"](g.value)).isLessThan(_this.variablesService.default_fee)) {
                         return { 'less_min': true };
@@ -7249,7 +7266,7 @@ var SendComponent = /** @class */ (function () {
         var _this = this;
         this.parentRouting = this.route.parent.params.subscribe(function (params) {
             _this.currentWalletId = params['id'];
-            _this.mixin = _this.variablesService.currentWallet.send_data['mixin'] || 10;
+            _this.mixin = _this.variablesService.currentWallet.send_data['mixin'] || _shared_constants__WEBPACK_IMPORTED_MODULE_7__["MIXIN"];
             if (_this.variablesService.walletIsAuditable.isAuditable && _this.variablesService.walletIsAuditable.id === +_this.currentWalletId) {
                 _this.mixin = 0;
                 _this.sendForm.controls['mixin'].disable();
