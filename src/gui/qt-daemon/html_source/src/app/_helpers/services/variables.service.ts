@@ -56,6 +56,7 @@ export class VariablesService {
 
   public wallets: Array<Wallet> = [];
   public currentWallet: Wallet;
+  public walletIsAuditable: any = [];
   public selectWallet: number;
   public aliases: any = [];
   public aliasesChecked: any = {};
