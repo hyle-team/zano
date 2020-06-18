@@ -661,7 +661,6 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
   currency::tx_comment cm;
   if (currency::get_type_in_variant_container(decrypted_att, cm))
     wti.comment = cm.comment;
-  currency::get_payment_id_from_tx(decrypted_att, wti.payment_id);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::resend_unconfirmed()
