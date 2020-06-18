@@ -797,7 +797,7 @@ namespace tools
     bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
-    void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use;}
+    void set_use_deffered_global_outputs(bool use);
 
 private:
 

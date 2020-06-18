@@ -2478,6 +2478,12 @@ uint64_t wallet2::get_wallet_file_size()const
   return m_current_wallet_file_size;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::set_use_deffered_global_outputs(bool use)
+{
+  LOG_PRINT_L0("[DEFFERED_MODE]: " << use);
+  m_use_deffered_global_outputs = use;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
 {
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(path_to_save != m_wallet_file, "trying to save watch-only wallet to the same wallet file!");
