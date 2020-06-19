@@ -3,6 +3,7 @@ import {ActivatedRoute, NavigationStart, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
 import { ModalService } from '../_helpers/services/modal.service';
+import {ZANO_SITE} from '../_shared/constants';
 
 import icons from '../../assets/icons/icons.json';
 
@@ -19,6 +20,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   contacts = icons.contacts;
   settings = icons.settings;
   exit = icons.exit;
+  zanoSite: string = ZANO_SITE;
 
   isModalDialogVisible = false;
   closeWalletId: number;

@@ -17,13 +17,59 @@
 
     width: 2rem;
     height: 2rem;
-  
+
     path, circle, polygon {
       fill: #4db1ff;
     }
-  } 
+  }
 }
-
+.wallet-type {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 7px;
+  background-color: transparent;
+  .content {
+    padding: 5px;
+    font-size: 14px;
+    text-align: center;
+    color: #000000;
+    text-transform: capitalize;
+    opacity: 0;
+    transition: all ease .3s;
+    a {
+      font-size: 14px;
+      color: #000000;
+      text-decoration: none;
+    }
+  }
+  &:hover {
+    height: auto;
+    .content {
+      opacity: 1;
+    }
+  }
+  .auditable {
+    height: 100%;
+    width: 100%;
+    background-color: #5cda9d;
+  }
+  .tracking {
+    height: 100%;
+    width: 100%;
+    background-color: #8686ff;
+  }
+  .auditable-tracking {
+    height: 100%;
+    width: 100%;
+    font-size: 0;
+    > div {
+      display: inline-block;
+      width: 50%;
+    }
+  }
+}
 .sidebar-accounts {
   position: relative;
   display: flex;
@@ -57,12 +103,13 @@
     overflow-y: overlay;
 
     .sidebar-account {
+      position: relative;
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
       cursor: pointer;
-      padding: 2rem 3rem;
-      
+      padding: 2.5rem 4rem 2rem 2rem;
+
       .close-wallet-wrapper {
         display: flex;
         justify-content: flex-end;
@@ -70,12 +117,13 @@
         button {
           display: flex;
           position: absolute;
+          top: 6px;
+          right: -24px;
           padding: 0;
           height: auto;
           background: transparent;
           border: none;
-          margin: -1.3rem 1.6rem;
-    
+
           .icon {
             width: 1.3rem;
             height: 1.3rem;
@@ -86,7 +134,7 @@
           }
         }
       }
-      
+
 
       .sidebar-account-row {
         display: flex;
@@ -205,7 +253,7 @@
           }
         }
 
-        
+
       }
 
       &:focus {
@@ -323,7 +371,7 @@
           font-size: 1.3rem;
           line-height: 0.7rem;
           padding-left: 0.7rem;
-        }       
+        }
       }
 
       .loading {

@@ -30,7 +30,10 @@
 <div class="tabs">
   <div class="tabs-header">
     <ng-container *ngFor="let tab of tabs; let index = index">
-      <div class="tab" [class.active]="tab.active" [class.disabled]="(tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && (variablesService.daemon_state !== 2 || !variablesService.currentWallet.loaded)" (click)="changeTab(index)" (mouseover)="itemHovered(index, true)" (mouseleave)="itemHovered(index, false)">
+      <div class="tab" [class.active]="tab.active"
+           [class.disabled]="((tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && (variablesService.daemon_state !== 2 || !variablesService.currentWallet.loaded))
+                || ((tab.link === '/send' || tab.link === '/contracts') && variablesService.currentWallet.is_watch_only && variablesService.currentWallet.is_auditable)"
+           (click)="changeTab(index)" (mouseover)="itemHovered(index, true)" (mouseleave)="itemHovered(index, false)">
         <i class="icon" [ngClass]="tab.icon"  *ngIf="!tab.itemHovered; else svgAnimated"></i>
         <ng-template #svgAnimated>
           <div class="animated" [innerHTML]="tab.animated | safeHTML"></div>
@@ -47,7 +50,7 @@
     <div class="pagination">
         <button [disabled]="variablesService.currentWallet.currentPage === 1" (click)="setPage(variablesService.currentWallet.currentPage - 1)"><</button>
         <ng-container *ngFor="let page of variablesService.currentWallet.pages">
-          <button [ngClass]="{ 'active': variablesService.currentWallet.currentPage === page }" 
+          <button [ngClass]="{ 'active': variablesService.currentWallet.currentPage === page }"
           (click)="setPage(page)">{{page}}</button>
         </ng-container>
         <button [disabled]="variablesService.currentWallet.currentPage === variablesService.currentWallet.totalPages" (click)="setPage(variablesService.currentWallet.currentPage + 1)">></button>

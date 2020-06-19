@@ -135,7 +135,8 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   changeTab(index) {
-    if ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts' || this.tabs[index].link === '/staking') && (this.variablesService.daemon_state !== 2 || !this.variablesService.currentWallet.loaded)) {
+    if (((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts' || this.tabs[index].link === '/staking') && (this.variablesService.daemon_state !== 2 || !this.variablesService.currentWallet.loaded))
+    || ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts') && this.variablesService.currentWallet.is_watch_only && this.variablesService.currentWallet.is_auditable)) {
       return;
     }
     this.tabs.forEach((tab) => {
