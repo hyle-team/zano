@@ -20,7 +20,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
   contacts = icons.contacts;
   settings = icons.settings;
   exit = icons.exit;
-  zanoSite: string = ZANO_SITE;
 
   isModalDialogVisible = false;
   closeWalletId: number;
@@ -108,6 +107,10 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   getUpdate() {
     this.backend.openUrlInBrowser('zano.org/downloads.html');
+  }
+  goToZanoSite(e) {
+    e.preventDefault();
+    this.backend.openUrlInBrowser(ZANO_SITE);
   }
 
   logOut() {

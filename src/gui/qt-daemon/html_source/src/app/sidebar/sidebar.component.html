@@ -4,19 +4,19 @@
   </div>
   <div class="sidebar-accounts-list scrolled-content">
     <div class="sidebar-account" *ngFor="let wallet of variablesService.wallets" [class.active]="wallet?.wallet_id === walletActive" [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">
-      <div class="wallet-type" (click)="$event.stopPropagation()">
+      <div class="wallet-type" (click)="goToZanoSite($event)">
         <div class="auditable" *ngIf="wallet.is_auditable && !wallet.is_watch_only">
-          <div class="content"><a title="{{zanoSite}}" href="{{zanoSite}}">auditable</a></div>
+          <div class="content">Auditable</div>
         </div>
-        <div class="tracking" *ngIf="!wallet.is_auditable && wallet.is_watch_only">
-          <div class="content"><a title="{{zanoSite}}" href="{{zanoSite}}">tracking</a></div>
+        <div class="watch-only" *ngIf="!wallet.is_auditable && wallet.is_watch_only">
+          <div class="content">Watch-only</div>
         </div>
-        <div class="auditable-tracking" *ngIf="wallet.is_auditable && wallet.is_watch_only">
-          <div class="auditable">
-            <div class="content"><a title="{{zanoSite}}" href="{{zanoSite}}">auditable</a></div>
+        <div class="auditable-watch-only" *ngIf="wallet.is_auditable && wallet.is_watch_only">
+          <div>
+            <div class="content">Auditable</div>
           </div>
-          <div class="tracking">
-            <div class="content"><a title="{{zanoSite}}" href="{{zanoSite}}">tracking</a></div>
+          <div>
+            <div class="content">Watch-only</div>
           </div>
         </div>
       </div>

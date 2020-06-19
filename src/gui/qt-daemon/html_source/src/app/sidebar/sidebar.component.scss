@@ -30,43 +30,70 @@
   width: 100%;
   height: 7px;
   background-color: transparent;
-  .content {
-    padding: 5px;
-    font-size: 14px;
-    text-align: center;
-    color: #000000;
-    text-transform: capitalize;
-    opacity: 0;
-    transition: all ease .3s;
-    a {
-      font-size: 14px;
-      color: #000000;
-      text-decoration: none;
-    }
+  transition: all ease .3s;
+  > div {
+    height: 100%;
+    width: 100%;
   }
   &:hover {
     height: auto;
     .content {
       opacity: 1;
     }
+    .auditable {
+      background-color: transparent;
+      .content {
+        margin: 0 3rem;
+        background-color: #5cda9d;
+      }
+    }
+    .watch-only {
+      background-color: transparent;
+      .content {
+        margin: 0 3rem;
+        background-color: #8686ff;
+      }
+    }
+    .auditable-watch-only {
+      > div:first-child {
+        margin-right: 10px;
+        margin-left: 3rem;
+      }
+      > div:last-child {
+        margin-right: 3rem;
+      }
+    }
+  }
+  .content {
+    padding: 5px;
+    font-size: 12px;
+    text-align: center;
+    color: #000000;
+    text-decoration: none;
+    text-transform: capitalize;
+    transition: all ease .3s;
+    opacity: 0;
   }
   .auditable {
-    height: 100%;
-    width: 100%;
     background-color: #5cda9d;
   }
-  .tracking {
-    height: 100%;
-    width: 100%;
+  .watch-only {
     background-color: #8686ff;
   }
-  .auditable-tracking {
-    height: 100%;
-    width: 100%;
-    font-size: 0;
+  .auditable-watch-only {
+    display: flex;
     > div {
-      display: inline-block;
-      width: 50%;
+      transition: all ease .3s;
+      width: 100%;
+      .content {
+        transition: none;
+      }
+      &:first-child {
+        background-color: #5cda9d;
+      }
+      &:last-child {
+        background-color: #8686ff;
+      }
     }
   }
 }
@@ -108,7 +135,7 @@
       flex-direction: column;
       flex-shrink: 0;
       cursor: pointer;
-      padding: 2.5rem 4rem 2rem 2rem;
+      padding: 2rem 3rem;
 
       .close-wallet-wrapper {
         display: flex;
@@ -118,7 +145,7 @@
           display: flex;
           position: absolute;
           top: 6px;
-          right: -24px;
+          right: -20px;
           padding: 0;
           height: auto;
           background: transparent;
