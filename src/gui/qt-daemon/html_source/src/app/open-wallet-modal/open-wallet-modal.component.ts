@@ -55,12 +55,6 @@ export class OpenWalletModalComponent implements OnInit {
       return;
     }
     this.backend.openWallet(this.wallet.path, this.wallet.pass, this.variablesService.count, false, (open_status, open_data, open_error) => {
-      if (open_data.wi.is_auditable) {
-        let address = open_data['wi'].address;
-        if (this.variablesService.walletIsAuditable.indexOf(address) === -1) {
-          this.variablesService.walletIsAuditable.push(address);
-        }
-      }
       if (open_error && open_error === 'FILE_NOT_FOUND') {
         let error_translate = this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
         error_translate += ':<br>' + this.wallet.path;
@@ -92,6 +86,8 @@ export class OpenWalletModalComponent implements OnInit {
               open_data['wi'].tracking_hey
             );
             new_wallet.alias = this.backend.getWalletAlias(new_wallet.address);
+            new_wallet.is_auditable = open_data['wi'].is_auditable;
+            new_wallet.is_watch_only = open_data['wi'].is_watch_only;
             if (open_data.recent_history && open_data.recent_history.history) {
               new_wallet.total_history_item = open_data.recent_history.total_history_items;
               new_wallet.totalPages = Math.ceil( open_data.recent_history.total_history_items / this.variablesService.count);

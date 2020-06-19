@@ -119,7 +119,7 @@ export class SendComponent implements OnInit, OnDestroy {
     this.parentRouting = this.route.parent.params.subscribe(params => {
       this.currentWalletId = params['id'];
       this.mixin = this.variablesService.currentWallet.send_data['mixin'] || MIXIN;
-      if (this.variablesService.walletIsAuditable.indexOf(this.variablesService.currentWallet.address) !== -1) {
+      if (this.variablesService.currentWallet.is_auditable) {
         this.mixin = 0;
         this.sendForm.controls['mixin'].disable();
       }
