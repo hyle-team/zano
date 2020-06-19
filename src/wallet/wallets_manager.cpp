@@ -1023,7 +1023,7 @@ void wallets_manager::get_gui_options(view::gui_options& opt)
 {
   opt = m_ui_opt;
 }
-std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, bool auditable_watch_only, view::open_wallet_response& owr)
+std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
@@ -1046,6 +1046,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   currency::account_base acc;
   try
   {
+    bool auditable_watch_only = restore_key.find(':') != std::string::npos;
     w->restore(path, password, restore_key, auditable_watch_only);
     owr.seed = w->get_account().get_restore_braindata();
   }

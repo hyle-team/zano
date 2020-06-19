@@ -1639,7 +1639,7 @@ QString MainWindow::restore_wallet(const QString& param)
   //return que_call2<view::restore_wallet_request>("restore_wallet", param, [this](const view::restore_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::restore_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
-  ar.error_code = m_backend.restore_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.restore_key, owd.auditable_watch_only, ar.response_data);
+  ar.error_code = m_backend.restore_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.restore_key, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }

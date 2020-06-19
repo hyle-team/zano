@@ -98,7 +98,7 @@ public:
   bool get_opened_wallets(std::list<view::open_wallet_response>& result);
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
-  std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, bool auditable_watch_only, view::open_wallet_response& owr);
+  std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr);
   std::string invoke(uint64_t wallet_id, std::string params);
   std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);

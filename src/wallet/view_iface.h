@@ -422,13 +422,11 @@ public:
     std::string pass;
     std::string path;
     std::string restore_key;
-    bool auditable_watch_only;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
       KV_SERIALIZE(restore_key)
-      KV_SERIALIZE(auditable_watch_only)
     END_KV_SERIALIZE_MAP()
   };
 
