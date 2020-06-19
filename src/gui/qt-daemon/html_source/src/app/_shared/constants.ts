@@ -1,2 +1,2 @@
 export const MIXIN: number = 10;
-export const ZANO_SITE: string = 'zano.org';
+export const AUDITABLE_WALLET_HELP_PAGE: string = 'zano.org';

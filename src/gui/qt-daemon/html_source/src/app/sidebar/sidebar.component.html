@@ -4,7 +4,7 @@
   </div>
   <div class="sidebar-accounts-list scrolled-content">
     <div class="sidebar-account" *ngFor="let wallet of variablesService.wallets" [class.active]="wallet?.wallet_id === walletActive" [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">
-      <div class="wallet-type" (click)="goToZanoSite($event)">
+      <div class="wallet-type" (click)="goToAuditableWalletHelpPage($event)">
         <div class="auditable" *ngIf="wallet.is_auditable && !wallet.is_watch_only">
           <div class="content">Auditable</div>
         </div>

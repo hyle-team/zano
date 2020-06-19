@@ -3,7 +3,7 @@ import {ActivatedRoute, NavigationStart, Router} from '@angular/router';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
 import { ModalService } from '../_helpers/services/modal.service';
-import {ZANO_SITE} from '../_shared/constants';
+import {AUDITABLE_WALLET_HELP_PAGE} from '../_shared/constants';
 
 import icons from '../../assets/icons/icons.json';
 
@@ -108,9 +108,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
   getUpdate() {
     this.backend.openUrlInBrowser('zano.org/downloads.html');
   }
-  goToZanoSite(e) {
+  goToAuditableWalletHelpPage(e) {
     e.preventDefault();
-    this.backend.openUrlInBrowser(ZANO_SITE);
+    this.backend.openUrlInBrowser(AUDITABLE_WALLET_HELP_PAGE);
   }
 
   logOut() {
