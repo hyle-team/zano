@@ -5540,6 +5540,8 @@ var LoginComponent = /** @class */ (function () {
                         else {
                             new_wallet.staking = false;
                         }
+                        new_wallet.is_auditable = open_data['wi'].is_auditable;
+                        new_wallet.is_watch_only = open_data['wi'].is_watch_only;
                         new_wallet.currentPage = 1;
                         if (open_data.recent_history && open_data.recent_history.history) {
                             new_wallet.total_history_item = open_data.recent_history.total_history_items;
@@ -5910,6 +5912,7 @@ var OpenWalletModalComponent = /** @class */ (function () {
                         new_wallet_1.alias = _this.backend.getWalletAlias(new_wallet_1.address);
                         new_wallet_1.is_auditable = open_data['wi'].is_auditable;
                         new_wallet_1.is_watch_only = open_data['wi'].is_watch_only;
+                        new_wallet_1.currentPage = 1;
                         if (open_data.recent_history && open_data.recent_history.history) {
                             new_wallet_1.total_history_item = open_data.recent_history.total_history_items;
                             new_wallet_1.totalPages = Math.ceil(open_data.recent_history.total_history_items / _this.variablesService.count);
