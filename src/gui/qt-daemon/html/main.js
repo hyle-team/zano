@@ -2824,15 +2824,17 @@ var VariablesService = /** @class */ (function () {
 /*!**************************************!*\
   !*** ./src/app/_shared/constants.ts ***!
   \**************************************/
-/*! exports provided: MIXIN, AUDITABLE_WALLET_HELP_PAGE */
+/*! exports provided: MIXIN, AUDITABLE_WALLET_HELP_PAGE, RCV_ADDR_QR_SCALE */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "MIXIN", function() { return MIXIN; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AUDITABLE_WALLET_HELP_PAGE", function() { return AUDITABLE_WALLET_HELP_PAGE; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "RCV_ADDR_QR_SCALE", function() { return RCV_ADDR_QR_SCALE; });
 var MIXIN = 10;
 var AUDITABLE_WALLET_HELP_PAGE = 'zano.org';
+var RCV_ADDR_QR_SCALE = 2;
 
 
 /***/ }),
@@ -6643,6 +6645,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _helpers_services_backend_service__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../_helpers/services/backend.service */ "./src/app/_helpers/services/backend.service.ts");
 /* harmony import */ var _helpers_services_variables_service__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../_helpers/services/variables.service */ "./src/app/_helpers/services/variables.service.ts");
 /* harmony import */ var _angular_router__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @angular/router */ "./node_modules/@angular/router/fesm5/router.js");
+/* harmony import */ var _shared_constants__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_shared/constants */ "./src/app/_shared/constants.ts");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -6652,6 +6655,7 @@ var __decorate = (undefined && undefined.__decorate) || function (decorators, ta
 var __metadata = (undefined && undefined.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+
 
 
 
@@ -6668,8 +6672,8 @@ var ReceiveComponent = /** @class */ (function () {
         var _this = this;
         this.parentRouting = this.route.parent.params.subscribe(function () {
             qrcode__WEBPACK_IMPORTED_MODULE_1___default.a.toDataURL(_this.variablesService.currentWallet.address, {
-                width: 106,
-                height: 106
+                width: 106 * _shared_constants__WEBPACK_IMPORTED_MODULE_5__["RCV_ADDR_QR_SCALE"],
+                height: 106 * _shared_constants__WEBPACK_IMPORTED_MODULE_5__["RCV_ADDR_QR_SCALE"]
             }).then(function (url) {
                 _this.qrImageSrc = url;
             }).catch(function (err) {
