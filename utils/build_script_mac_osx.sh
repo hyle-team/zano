@@ -151,7 +151,7 @@ fi
 read checksum <<< $( shasum -a 256 $package_filepath | awk '/^/ { print $1 }' )
 
 mail_msg="New ${build_prefix_label}${testnet_label}build for macOS-x64:<br>
-http://build.zano.org:8081/builds/$package_filename<br>
+https://build.zano.org/builds/$package_filename<br>
 sha256: $checksum"
 
 echo "$mail_msg"
