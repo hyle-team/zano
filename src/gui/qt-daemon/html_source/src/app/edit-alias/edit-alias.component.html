@@ -17,7 +17,11 @@
       <label for="alias-name">
         {{ 'EDIT_ALIAS.NAME.LABEL' | translate }}
       </label>
-      <input type="text" id="alias-name" [value]="alias.name" placeholder="{{ 'EDIT_ALIAS.NAME.PLACEHOLDER' | translate }}" readonly>
+      <input type="text"
+             id="alias-name"
+             [(ngModel)]="alias.name"
+             [ngModelOptions]="{standalone: true}"
+             placeholder="{{ 'EDIT_ALIAS.NAME.PLACEHOLDER' | translate }}">
     </div>
 
     <div class="input-block textarea">
