@@ -3404,12 +3404,12 @@ void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::tr
   }
   bool r = currency::sign_extra_alias_entry(ai, m_account.get_keys().account_address.spend_public_key, m_account.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to sign alias update");
-  WLT_LOG_L2("Generated upodate alias info: " << ENDL
+  WLT_LOG_L2("Generated update alias info: " << ENDL
     << "alias: " << ai.m_alias << ENDL
     << "signature: " << currency::print_t_array(ai.m_sign) << ENDL
     << "signed(owner) pub key: " << m_account.get_keys().account_address.spend_public_key << ENDL
     << "transfered to address: " << get_account_address_as_str(ai.m_address) << ENDL
-    << "signed_hash: " << currency::get_sign_buff_hash_for_alias_update(ai)
+    << "sign_buff_hash: " << currency::get_sign_buff_hash_for_alias_update(ai)
     );
 
   std::vector<currency::tx_destination_entry> destinations;
@@ -4236,8 +4236,9 @@ bool wallet2::get_actual_offers(std::list<bc_services::offer_details_ex>& offers
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_indexes, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count)
 {
-  WLT_LOG_GREEN("Selecting indices for transfer found_free_amounts.size()=" << found_free_amounts.size() << "...", LOG_LEVEL_0);
+  WLT_LOG_GREEN("Selecting indices for transfer of " << print_money_brief(needed_money) << " with " << fake_outputs_count << " fake outs, found_free_amounts.size()=" << found_free_amounts.size() << "...", LOG_LEVEL_0);
   uint64_t found_money = 0;
+  std::string selected_amounts_str;
   while(found_money < needed_money && found_free_amounts.size())
   {
     auto it = found_free_amounts.lower_bound(needed_money - found_money);
@@ -4251,13 +4252,14 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
       found_money += it->first;
       selected_indexes.push_back(*it->second.begin());
       WLT_LOG_L2("Selected index: " << *it->second.begin() << ", transfer_details: " << ENDL << epee::serialization::store_t_to_json(m_transfers[*it->second.begin()]));
+      selected_amounts_str += (selected_amounts_str.empty() ? "" : "+") + print_money_brief(it->first);
     }
     it->second.erase(it->second.begin());
     if (!it->second.size())
       found_free_amounts.erase(it);
 
   }
-  WLT_LOG_GREEN("Selected " << print_money(found_money) << " coins, found_free_amounts.size()=" << found_free_amounts.size(), LOG_LEVEL_0);
+  WLT_LOG_GREEN("Found " << print_money_brief(found_money) << " as " << selected_indexes.size() << " out(s): " << selected_amounts_str << ", found_free_amounts.size()=" << found_free_amounts.size(), LOG_LEVEL_0);
   return found_money;
 }
 //----------------------------------------------------------------------------------------------------
