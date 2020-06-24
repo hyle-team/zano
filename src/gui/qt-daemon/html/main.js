@@ -6807,7 +6807,7 @@ var RestoreWalletComponent = /** @class */ (function () {
         var _this = this;
         this.ngZone.run(function () {
             _this.progressWidth = '100%';
-            _this.router.navigate(['/seed-phrase'], { queryParams: { wallet_id: _this.wallet.id } });
+            _this.runWallet();
         });
     };
     RestoreWalletComponent.prototype.saveWallet = function () {
@@ -6828,6 +6828,9 @@ var RestoreWalletComponent = /** @class */ (function () {
                                 if (restore_status) {
                                     _this.wallet.id = restore_data.wallet_id;
                                     _this.variablesService.opening_wallet = new _helpers_models_wallet_model__WEBPACK_IMPORTED_MODULE_6__["Wallet"](restore_data.wallet_id, _this.restoreForm.get('name').value, _this.restoreForm.get('password').value, restore_data['wi'].path, restore_data['wi'].address, restore_data['wi'].balance, restore_data['wi'].unlocked_balance, restore_data['wi'].mined_total, restore_data['wi'].tracking_hey);
+                                    _this.variablesService.opening_wallet.is_auditable = restore_data['wi'].is_auditable;
+                                    _this.variablesService.opening_wallet.is_watch_only = restore_data['wi'].is_watch_only;
+                                    _this.variablesService.opening_wallet.currentPage = 1;
                                     _this.variablesService.opening_wallet.alias = _this.backend.getWalletAlias(_this.variablesService.opening_wallet.address);
                                     _this.variablesService.opening_wallet.pages = new Array(1).fill(1);
                                     _this.variablesService.opening_wallet.totalPages = 1;
@@ -6860,6 +6863,40 @@ var RestoreWalletComponent = /** @class */ (function () {
                         }
                     });
                 }
+            });
+        }
+    };
+    RestoreWalletComponent.prototype.runWallet = function () {
+        var _this = this;
+        var exists = false;
+        this.variablesService.wallets.forEach(function (wallet) {
+            if (wallet.address === _this.variablesService.opening_wallet.address) {
+                exists = true;
+            }
+        });
+        if (!exists) {
+            this.backend.runWallet(this.wallet.id, function (run_status, run_data) {
+                if (run_status) {
+                    _this.variablesService.wallets.push(_this.variablesService.opening_wallet);
+                    if (_this.variablesService.appPass) {
+                        _this.backend.storeSecureAppData();
+                    }
+                    _this.ngZone.run(function () {
+                        _this.router.navigate(['/wallet/' + _this.wallet.id]);
+                    });
+                }
+                else {
+                    console.log(run_data['error_code']);
+                }
+            });
+        }
+        else {
+            this.variablesService.opening_wallet = null;
+            this.modalService.prepareModal('error', 'OPEN_WALLET.WITH_ADDRESS_ALREADY_OPEN');
+            this.backend.closeWallet(this.wallet.id, function () {
+                _this.ngZone.run(function () {
+                    _this.router.navigate(['/']);
+                });
             });
         }
     };

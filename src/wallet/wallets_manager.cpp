@@ -1007,8 +1007,14 @@ std::string wallets_manager::is_valid_brain_restore_data(const std::string& brai
   currency::account_base acc;
   if (acc.restore_from_braindata(brain_text))
     return API_RETURN_CODE_TRUE;
-  else
-    return API_RETURN_CODE_FALSE;
+
+  currency::account_public_address addr;
+  crypto::secret_key view_sec_key;
+  uint64_t ts;
+  if (currency::parse_awo_blob(brain_text, addr, view_sec_key, ts))
+    return API_RETURN_CODE_TRUE;
+
+  return API_RETURN_CODE_FALSE;
 }
 #ifndef MOBILE_WALLET_BUILD
 void wallets_manager::subscribe_to_core_events(currency::i_core_event_handler* pevents_handler)

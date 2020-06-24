@@ -2452,14 +2452,14 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
       }
       if (result_outs.outs.size() < req.outs_count)
       {
-        LOG_PRINT_RED_L0("Not enough inputs for amount " << amount << ", needed " << req.outs_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total");
+        LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.outs_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total");
       }
     }else
     {
       size_t added = 0;
       for (size_t i = 0; i != up_index_limit; i++)
         added += add_out_to_get_random_outs(result_outs, amount, i, req.outs_count, req.use_forced_mix_outs) ? 1 : 0;
-      LOG_PRINT_RED_L0("Not enough inputs for amount " << amount << ", needed " << req.outs_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs");
+      LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.outs_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs");
     }
   }
   return true;
