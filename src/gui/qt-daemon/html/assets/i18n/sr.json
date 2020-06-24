@@ -108,7 +108,7 @@
   },
   "RESTORE_WALLET": {
     "LABEL_NAME": "Wallet name",
-    "LABEL_PHRASE_KEY": "Seed phrase / private key",
+    "LABEL_PHRASE_KEY": "Seed phrase / tracking seed",
     "PASS": "Wallet password",
     "CONFIRM": "Confirm wallet password",
     "BUTTON_SELECT": "Select wallet location",
