@@ -49,6 +49,7 @@ export class EditAliasComponent implements OnInit {
       if (status) {
         this.modalService.prepareModal('success', '');
         this.wallet.alias['comment'] = this.alias.comment;
+        this.wallet.alias['name'] = this.alias.name;
         this.ngZone.run(() => {
           this.router.navigate(['/wallet/' + this.wallet.wallet_id]);
         });
