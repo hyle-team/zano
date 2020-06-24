@@ -1242,3 +1242,100 @@ template hard_fork_2_alias_update_using_old_tx<false>::hard_fork_2_alias_update_
 template bool hard_fork_2_alias_update_using_old_tx<false>::generate(std::vector<test_event_entry>& events) const;
 template hard_fork_2_alias_update_using_old_tx<true>::hard_fork_2_alias_update_using_old_tx();
 template bool hard_fork_2_alias_update_using_old_tx<true>::generate(std::vector<test_event_entry>& events) const;
+
+
+//------------------------------------------------------------------------------
+
+template<bool before_hf_2>
+hard_fork_2_alias_update<before_hf_2>::hard_fork_2_alias_update()
+  : hard_fork_2_base_test(before_hf_2 ? 100 : 3)
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_2_alias_update, c1);
+}
+
+template<bool before_hf_2>
+bool hard_fork_2_alias_update<before_hf_2>::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  transaction tx_0 = AUTO_VAL_INIT(tx_0);
+  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
+  events.push_back(tx_0);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+template<bool before_hf_2>
+bool hard_fork_2_alias_update<before_hf_2>::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  extra_alias_entry ai = AUTO_VAL_INIT(ai);
+  ai.m_alias = "alicealice";
+  ai.m_address = m_accounts[ALICE_ACC_IDX].get_public_address();
+  uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
+  transaction res_tx = AUTO_VAL_INIT(res_tx);
+  alice_wlt->request_alias_registration(ai, res_tx, TESTS_DEFAULT_FEE, alias_reward);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+
+  // make sure the aliase registration is correct
+  extra_alias_entry_base eaeb = AUTO_VAL_INIT(eaeb);
+  r = c.get_blockchain_storage().get_alias_info("alicealice", eaeb);
+  CHECK_AND_ASSERT_MES(r && eaeb.m_address == m_accounts[ALICE_ACC_IDX].get_public_address(), false, "aliase check failed: alicealice");
+
+  extra_alias_entry ai_upd = ai;
+
+  // update alias
+  ai_upd.m_alias = "alicealice2";
+  ai_upd.m_text_comment = "updated";
+  
+  transaction tx_upd = AUTO_VAL_INIT(tx_upd);
+  alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE, 0);
+  //std::string tx_upd_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_upd));
+  //LOG_PRINT_L0("tx upd: " << ENDL << tx_upd_hex);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+
+  /*
+  // make sure the aliase registration is correct
+  eaeb = AUTO_VAL_INIT(eaeb);
+  r = c.get_blockchain_storage().get_alias_info("alicealice2", eaeb);
+  CHECK_AND_ASSERT_MES(r && eaeb.m_address == m_accounts[ALICE_ACC_IDX].get_public_address(), false, "aliase check failed: alicealice2");
+  */
+
+  return true;
+}
+
+template hard_fork_2_alias_update<false>::hard_fork_2_alias_update();
+template bool hard_fork_2_alias_update<false>::generate(std::vector<test_event_entry>& events) const;
+template hard_fork_2_alias_update<true>::hard_fork_2_alias_update();
+template bool hard_fork_2_alias_update<true>::generate(std::vector<test_event_entry>& events) const;

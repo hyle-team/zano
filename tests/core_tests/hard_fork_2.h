@@ -69,8 +69,6 @@ struct hard_fork_2_awo_wallets_basic_test : public wallet_test, public hard_fork
 template<bool before_hf_2>
 struct hard_fork_2_alias_update_using_old_tx : public wallet_test, public hard_fork_2_base_test
 {
-  //using hard_fork_2_base_test::check_block_verification_context; // this is necessary for correct work of do_check_block_verification_context, consider rafactoring
-
   hard_fork_2_alias_update_using_old_tx();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
@@ -78,3 +76,10 @@ struct hard_fork_2_alias_update_using_old_tx : public wallet_test, public hard_f
   random_state_test_restorer m_random_state_restorer;
 };
 
+template<bool before_hf_2>
+struct hard_fork_2_alias_update : public wallet_test, public hard_fork_2_base_test
+{
+  hard_fork_2_alias_update();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
