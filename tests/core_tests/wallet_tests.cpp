@@ -3364,8 +3364,6 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
 //------------------------------------------------------------------------------
 
-#endif
-
 wallet_sending_to_integrated_address::wallet_sending_to_integrated_address()
 {
   REGISTER_CALLBACK_METHOD(wallet_sending_to_integrated_address, c1);
