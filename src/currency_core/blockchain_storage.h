@@ -294,7 +294,7 @@ namespace currency
     i_core_event_handler* get_event_handler() const;
     uint64_t get_last_timestamps_check_window_median() const;
     uint64_t get_last_n_blocks_timestamps_median(size_t n) const;
-    bool prevalidate_alias_info(const transaction& tx, extra_alias_entry& eae);
+    bool prevalidate_alias_info(const transaction& tx, const extra_alias_entry& eae);
     bool validate_miner_transaction(const block& b, size_t cumulative_block_size, uint64_t fee, uint64_t& base_reward, const boost::multiprecision::uint128_t& already_generated_coins) const;
     performnce_data& get_performnce_data()const;
     bool validate_instance(const std::string& path);

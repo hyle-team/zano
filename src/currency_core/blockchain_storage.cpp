@@ -3526,7 +3526,7 @@ uint64_t blockchain_storage::validate_alias_reward(const transaction& tx, const 
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::prevalidate_alias_info(const transaction& tx, extra_alias_entry& eae)
+bool blockchain_storage::prevalidate_alias_info(const transaction& tx, const extra_alias_entry& eae)
 {
   
   bool r = validate_alias_name(eae.m_alias);
