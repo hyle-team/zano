@@ -77,9 +77,9 @@ struct hard_fork_2_alias_update_using_old_tx : public wallet_test, public hard_f
 };
 
 template<bool before_hf_2>
-struct hard_fork_2_alias_update : public wallet_test, public hard_fork_2_base_test
+struct hard_fork_2_incorrect_alias_update : public wallet_test, public hard_fork_2_base_test
 {
-  hard_fork_2_alias_update();
+  hard_fork_2_incorrect_alias_update();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };

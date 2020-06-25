@@ -1011,6 +1011,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<false>);
     GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<true>);
     GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<false>);
+    GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<true>);
+    GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<false>);
 
 
     // GENERATE_AND_PLAY(gen_block_reward);

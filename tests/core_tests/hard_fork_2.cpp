@@ -1247,14 +1247,14 @@ template bool hard_fork_2_alias_update_using_old_tx<true>::generate(std::vector<
 //------------------------------------------------------------------------------
 
 template<bool before_hf_2>
-hard_fork_2_alias_update<before_hf_2>::hard_fork_2_alias_update()
+hard_fork_2_incorrect_alias_update<before_hf_2>::hard_fork_2_incorrect_alias_update()
   : hard_fork_2_base_test(before_hf_2 ? 100 : 3)
 {
-  REGISTER_CALLBACK_METHOD(hard_fork_2_alias_update, c1);
+  REGISTER_CALLBACK_METHOD(hard_fork_2_incorrect_alias_update, c1);
 }
 
 template<bool before_hf_2>
-bool hard_fork_2_alias_update<before_hf_2>::generate(std::vector<test_event_entry>& events) const
+bool hard_fork_2_incorrect_alias_update<before_hf_2>::generate(std::vector<test_event_entry>& events) const
 {
   bool r = false;
   m_accounts.resize(TOTAL_ACCS_COUNT);
@@ -1282,7 +1282,7 @@ bool hard_fork_2_alias_update<before_hf_2>::generate(std::vector<test_event_entr
 }
 
 template<bool before_hf_2>
-bool hard_fork_2_alias_update<before_hf_2>::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+bool hard_fork_2_incorrect_alias_update<before_hf_2>::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   bool r = false;
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
@@ -1310,32 +1310,31 @@ bool hard_fork_2_alias_update<before_hf_2>::c1(currency::core& c, size_t ev_inde
 
   extra_alias_entry ai_upd = ai;
 
-  // update alias
+  // update alias incorrectly by changing its name and keeping the address the same
   ai_upd.m_alias = "alicealice2";
   ai_upd.m_text_comment = "updated";
   
   transaction tx_upd = AUTO_VAL_INIT(tx_upd);
-  alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE, 0);
-  //std::string tx_upd_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_upd));
-  //LOG_PRINT_L0("tx upd: " << ENDL << tx_upd_hex);
+  r = false;
+  try
+  {
+    alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE, 0);
+  }
+  catch (tools::error::tx_rejected&)
+  {
+    // this should cause an exception with certain type
+    r = true;
+  }
+  
+  CHECK_AND_ASSERT_MES(r, false, "incorrect alias update request accepted");
 
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
-  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  // make sure tx pool is still having no txs
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
-
-
-  /*
-  // make sure the aliase registration is correct
-  eaeb = AUTO_VAL_INIT(eaeb);
-  r = c.get_blockchain_storage().get_alias_info("alicealice2", eaeb);
-  CHECK_AND_ASSERT_MES(r && eaeb.m_address == m_accounts[ALICE_ACC_IDX].get_public_address(), false, "aliase check failed: alicealice2");
-  */
 
   return true;
 }
 
-template hard_fork_2_alias_update<false>::hard_fork_2_alias_update();
-template bool hard_fork_2_alias_update<false>::generate(std::vector<test_event_entry>& events) const;
-template hard_fork_2_alias_update<true>::hard_fork_2_alias_update();
-template bool hard_fork_2_alias_update<true>::generate(std::vector<test_event_entry>& events) const;
+template hard_fork_2_incorrect_alias_update<false>::hard_fork_2_incorrect_alias_update();
+template bool hard_fork_2_incorrect_alias_update<false>::generate(std::vector<test_event_entry>& events) const;
+template hard_fork_2_incorrect_alias_update<true>::hard_fork_2_incorrect_alias_update();
+template bool hard_fork_2_incorrect_alias_update<true>::generate(std::vector<test_event_entry>& events) const;
