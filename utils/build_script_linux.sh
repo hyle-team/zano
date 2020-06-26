@@ -25,6 +25,11 @@ if [ -n "$testnet" ]; then
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
 fi
 
+if [ -n "$testnet" ] || [ -n "$qt_dev_tools" ]; then
+  copy_qt_dev_tools=true
+  ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}devtools-
+fi
+
 
 prj_root=$(pwd)
 
@@ -98,6 +103,9 @@ cp $QT_PREFIX_PATH/resources/qtwebengine_resources_100p.pak ./Zano
 cp $QT_PREFIX_PATH/resources/qtwebengine_resources_200p.pak ./Zano
 cp $QT_PREFIX_PATH/resources/icudtl.dat ./Zano
 
+if [ "$copy_qt_dev_tools" = true ] ; then
+  cp $QT_PREFIX_PATH/resources/qtwebengine_devtools_resources.pak ./Zano
+fi
 
 mkdir ./Zano/lib/platforms
 cp $QT_PREFIX_PATH/plugins/platforms/libqxcb.so ./Zano/lib/platforms
@@ -132,7 +140,7 @@ fi
 read checksum <<< $(sha256sum $package_filename | awk '/^/ { print $1 }' )
 
 mail_msg="New ${build_prefix_label}${testnet_label}build for linux-x64:<br>
-http://build.zano.org:8081/builds/$package_filename<br>
+https://build.zano.org/builds/$package_filename<br>
 sha256: $checksum"
 
 echo "$mail_msg"

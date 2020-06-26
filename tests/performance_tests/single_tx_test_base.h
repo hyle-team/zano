@@ -17,7 +17,7 @@ public:
 
     m_bob.generate();
 
-    if (!construct_miner_tx(0, 0, 0, 2, 0, m_bob.get_keys().m_account_address, m_bob.get_keys().m_account_address, m_tx, blobdata(), CURRENCY_MINER_TX_MAX_OUTS))
+    if (!construct_miner_tx(0, 0, 0, 2, 0, m_bob.get_keys().account_address, m_bob.get_keys().account_address, m_tx, blobdata(), CURRENCY_MINER_TX_MAX_OUTS))
       return false;
 
     m_tx_pub_key = get_tx_pub_key_from_extra(m_tx);

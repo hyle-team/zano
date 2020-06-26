@@ -12,6 +12,8 @@ export class Wallet {
   unlocked_balance: BigNumber;
   mined_total: number;
   tracking_hey: string;
+  is_auditable: boolean;
+  is_watch_only: boolean;
   alias_available: boolean;
 
   alias?: object;

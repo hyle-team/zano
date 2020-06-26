@@ -35,7 +35,7 @@
 #include <boost/thread/recursive_mutex.hpp>
 
 #include "singleton.h"
-#include "static_initializer.h"
+#include "static_helpers.h"
 #include "misc_helpers.h"
 
 //#define DISABLE_DEADLOCK_GUARD
@@ -532,7 +532,7 @@ namespace epee
     }
   };
 
-  const static initializer<abstract_singleton<deadlock_guard> > singleton_initializer;
+  //const static initializer<abstract_singleton<deadlock_guard> > singleton_initializer;
 
   /************************************************************************/
   /*                                                                      */
@@ -705,7 +705,8 @@ namespace epee
 #define  EXCLUSIVE_CRITICAL_REGION_LOCAL(x) boost::unique_lock< boost::shared_mutex > critical_region_var(x)
 
 #define  SHARED_CRITICAL_REGION_BEGIN(x) { SHARED_CRITICAL_REGION_LOCAL(x)
+#define  SHARED_CRITICAL_REGION_END() }
 #define  EXCLUSIVE_CRITICAL_REGION_BEGIN(x) { EXCLUSIVE_CRITICAL_REGION_LOCAL(x)
-
+#define  EXCLUSIVE_CRITICAL_REGION_END() }
 
 }

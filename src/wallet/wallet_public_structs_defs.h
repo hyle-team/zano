@@ -300,7 +300,7 @@ namespace wallet_public
 
 
   
-  struct trnsfer_destination
+  struct transfer_destination
   {
     uint64_t amount;
     std::string address;
@@ -314,7 +314,7 @@ namespace wallet_public
   {
     struct request
     {
-      std::list<trnsfer_destination> destinations;
+      std::list<transfer_destination> destinations;
       uint64_t fee;
       uint64_t mixin;
       //uint64_t unlock_time;
@@ -359,7 +359,10 @@ namespace wallet_public
 
     struct response
     {
+      uint64_t wallet_file_size;
+
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(wallet_file_size)
       END_KV_SERIALIZE_MAP()
     };
   };

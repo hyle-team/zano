@@ -324,8 +324,9 @@ namespace currency
   {
     LOCAL_READONLY_TRANSACTION();
     extra_alias_entry eai = AUTO_VAL_INIT(eai);
-    if (get_type_in_variant_container(tx.extra, eai))
-    {
+
+    bool r = false;
+    bool found = handle_2_alternative_types_in_variant_container<extra_alias_entry, extra_alias_entry_old>(tx.extra, [this, &r, &tx, is_in_block](const extra_alias_entry& eai) {
       //check in blockchain
       extra_alias_entry eai2 = AUTO_VAL_INIT(eai2);
       bool already_have_alias_registered = m_blockchain.get_alias_info(eai.m_alias, eai2);
@@ -334,7 +335,8 @@ namespace currency
       if (!is_in_block  && !eai.m_sign.size() && already_have_alias_registered)
       {
         LOG_PRINT_L0("Alias \"" << eai.m_alias  << "\" already registered in blockchain, transaction rejected");
-        return false;
+        r = false;
+        return false; // stop handling
       }
 
       std::string prev_alias = m_blockchain.get_alias_by_address(eai.m_address);
@@ -343,8 +345,9 @@ namespace currency
       {
         LOG_PRINT_L0("Address \"" << get_account_address_as_str(eai.m_address)  
           << "\" already registered with \""<< prev_alias 
-          << "\" aliass in blockchain (new alias: \"" << eai.m_alias  << "\"), transaction rejected");
-        return false;
+          << "\" alias in blockchain (new alias: \"" << eai.m_alias  << "\"), transaction rejected");
+        r = false;
+        return false; // stop handling
       }
 
       if (!is_in_block)
@@ -352,24 +355,29 @@ namespace currency
         if (m_db_alias_names.get(eai.m_alias))
         {
           LOG_PRINT_L0("Alias \"" << eai.m_alias << "\" already in transaction pool, transaction rejected");
-          return false;
+          r = false;
+          return false; // stop handling
         }
         if (m_db_alias_addresses.get(eai.m_address))
         {
           LOG_PRINT_L0("Alias \"" << eai.m_alias << "\" already in transaction pool by it's address(" << get_account_address_as_str(eai.m_address) << ") , transaction rejected");
-          return false;
+          r = false;
+          return false; // stop handling
         }
         //validate alias reward
         if (!m_blockchain.prevalidate_alias_info(tx, eai))
         {
           LOG_PRINT_L0("Alias \"" << eai.m_alias << "\" reward validation failed, transaction rejected");
-          return false;
+          r = false;
+          return false; // stop handling
         }
       }
 
+      r = true;
+      return true; // continue handling
+    });
 
-    }
-    return true;
+    return !found || r; // if found, r must be true for success
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const transaction &tx, tx_verification_context& tvc, bool kept_by_block, bool from_core)

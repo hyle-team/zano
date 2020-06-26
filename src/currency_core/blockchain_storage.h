@@ -168,7 +168,7 @@ namespace currency
 
     typedef tools::db::basic_key_to_array_accessor<uint64_t, global_output_entry, false>  outputs_container; // out_amount => ['global_output', ...]
     typedef tools::db::cached_key_value_accessor<crypto::key_image, uint64_t, false, false> key_images_container;
-    typedef std::list<std::pair<std::shared_ptr<const block_extended_info>, std::list<std::shared_ptr<const transaction_chain_entry> > > > blocks_direct_container;
+    typedef std::list<epee::misc_utils::triple<std::shared_ptr<const block_extended_info>, std::list<std::shared_ptr<const transaction_chain_entry> >, std::shared_ptr<const transaction_chain_entry> > > blocks_direct_container;
 
     friend struct add_transaction_input_visitor;
     //---------------------------------------------------------------------------------
@@ -254,8 +254,8 @@ namespace currency
     bool get_short_chain_history(std::list<crypto::hash>& ids)const;
     bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp)const;
     bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, uint64_t& starter_offset)const;
-    bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count)const;
-    bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, blocks_direct_container& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count)const;
+    bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count, uint64_t minimum_height = 0, bool need_global_indexes = false)const;
+    bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, blocks_direct_container& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count, uint64_t minimum_height = 0, bool request_coinbase_info = false)const;
     //bool find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::list<std::pair<block, std::list<transaction> > >& blocks, uint64_t& total_height, uint64_t& start_height, size_t max_count)const;
     bool handle_get_objects(NOTIFY_REQUEST_GET_OBJECTS::request& arg, NOTIFY_RESPONSE_GET_OBJECTS::request& rsp)const;
     bool handle_get_objects(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res)const;
@@ -294,7 +294,7 @@ namespace currency
     i_core_event_handler* get_event_handler() const;
     uint64_t get_last_timestamps_check_window_median() const;
     uint64_t get_last_n_blocks_timestamps_median(size_t n) const;
-    bool prevalidate_alias_info(const transaction& tx, extra_alias_entry& eae);
+    bool prevalidate_alias_info(const transaction& tx, const extra_alias_entry& eae);
     bool validate_miner_transaction(const block& b, size_t cumulative_block_size, uint64_t fee, uint64_t& base_reward, const boost::multiprecision::uint128_t& already_generated_coins) const;
     performnce_data& get_performnce_data()const;
     bool validate_instance(const std::string& path);
@@ -421,7 +421,7 @@ namespace currency
 
     template<class archive_t>
     void serialize(archive_t & ar, const unsigned int version);
-
+    bool get_est_height_from_date(uint64_t date, uint64_t& res_h)const;
 
 
     //debug functions
@@ -535,7 +535,7 @@ namespace currency
     mutable uint64_t m_current_fee_median_effective_index;
     bool m_is_reorganize_in_process;    
     mutable std::atomic<bool> m_deinit_is_done;
-
+    mutable uint64_t m_blockchain_launch_timestamp;
 
     bool init_tx_fee_median();
     bool update_tx_fee_median();
@@ -616,6 +616,7 @@ namespace currency
     void pop_block_from_per_block_increments(uint64_t height_);
     void calculate_local_gindex_lookup_table_for_height(uint64_t split_height, std::map<uint64_t, uint64_t>& increments) const;
     void do_erase_altblock(alt_chain_container::iterator it);
+    uint64_t get_blockchain_launch_timestamp()const;
 
 
 

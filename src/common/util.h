@@ -259,14 +259,14 @@ namespace tools
 
     static void handle_signal()
     {
-      static std::mutex m_mutex;
+      static epee::static_helpers::wrapper<std::mutex> m_mutex;
       std::unique_lock<std::mutex> lock(m_mutex);
       m_handler();
     }
 
     static void handle_fatal_signal(int sig_number, void* address)
     {
-      static std::mutex m_mutex_fatal;
+      static epee::static_helpers::wrapper<std::mutex> m_mutex_fatal;
       std::unique_lock<std::mutex> lock(m_mutex_fatal);
       m_fatal_handler(sig_number, address);
       uninstall_fatal();

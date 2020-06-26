@@ -177,6 +177,8 @@ export class LoginComponent implements OnInit, OnDestroy {
             } else {
               new_wallet.staking = false;
             }
+            new_wallet.is_auditable = open_data['wi'].is_auditable;
+            new_wallet.is_watch_only = open_data['wi'].is_watch_only;
             new_wallet.currentPage = 1;
             if (open_data.recent_history && open_data.recent_history.history) {
               new_wallet.total_history_item = open_data.recent_history.total_history_items;

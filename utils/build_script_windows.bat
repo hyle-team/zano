@@ -192,7 +192,7 @@ IF %ERRORLEVEL% NEQ 0 (
 )
 call :sha256 %build_zip_path% build_zip_checksum
 
-set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: http://build.zano.org:8081/builds/%installer_file% <br>sha256: %installer_checksum%<br><br>ZIP:  http://build.zano.org:8081/builds/%build_zip_filename% <br>sha256: %build_zip_checksum%<br>"
+set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: https://build.zano.org/builds/%installer_file% <br>sha256: %installer_checksum%<br><br>ZIP:  https://build.zano.org/builds/%build_zip_filename% <br>sha256: %build_zip_checksum%<br>"
 
 echo %mail_msg%
 

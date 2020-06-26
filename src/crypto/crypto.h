@@ -74,10 +74,10 @@ namespace crypto {
 
     static void generate_keys(public_key &, secret_key &);
     friend void generate_keys(public_key &, secret_key &);
-    static void generate_brain_keys(public_key &, secret_key &, std::string& seed, size_t brain_wallet_seed_size);
-    friend void generate_brain_keys(public_key &, secret_key &, std::string& seed, size_t brain_wallet_seed_size);
-    static void keys_from_default(unsigned char* a_part, public_key &pub, secret_key &sec, size_t brain_wallet_seed_size);
-    friend void keys_from_default(unsigned char* a_part, public_key &pub, secret_key &sec, size_t brain_wallet_seed_size);
+    static void generate_seed_keys(public_key &pub, secret_key &sec, std::vector<unsigned char>& keys_seed_binary, size_t keys_seed_binary_size);
+    friend void generate_seed_keys(public_key &pub, secret_key &sec, std::vector<unsigned char>& keys_seed_binary, size_t keys_seed_binary_size);
+    static void keys_from_default(const unsigned char* a_part, public_key &pub, secret_key &sec, size_t keys_seed_binary_size);
+    friend void keys_from_default(const unsigned char* a_part, public_key &pub, secret_key &sec, size_t keys_seed_binary_size);
     static void dependent_key(const secret_key& first, secret_key& second);
     friend void dependent_key(const secret_key& first, secret_key& second);
     static bool check_key(const public_key &);
@@ -136,14 +136,14 @@ namespace crypto {
     crypto_ops::generate_keys(pub, sec);
   }
 
-  inline void generate_brain_keys(public_key &pub, secret_key &sec, std::string& seed, size_t brain_wallet_seed_size) {
-    crypto_ops::generate_brain_keys(pub, sec, seed,  brain_wallet_seed_size);
+  inline void generate_seed_keys(public_key &pub, secret_key &sec, std::vector<unsigned char>& keys_seed_binary, size_t keys_seed_binary_size)
+  {
+    crypto_ops::generate_seed_keys(pub, sec, keys_seed_binary, keys_seed_binary_size);
   }
 
-
-  inline void keys_from_default(unsigned char* a_part, public_key &pub, secret_key &sec, size_t brain_wallet_seed_size)
+  inline void keys_from_default(const unsigned char* a_part, public_key &pub, secret_key &sec, size_t keys_seed_binary_size)
   {
-    crypto_ops::keys_from_default(a_part, pub, sec,  brain_wallet_seed_size);
+    crypto_ops::keys_from_default(a_part, pub, sec, keys_seed_binary_size);
   }
 
   inline void dependent_key(const secret_key& first, secret_key& second){
@@ -290,8 +290,7 @@ namespace crypto {
     bool            m_ready;
   };
 
-}
-
+} // namespace crypto
 
 POD_MAKE_HASHABLE(crypto, public_key)
 POD_MAKE_COMPARABLE(crypto, secret_key)

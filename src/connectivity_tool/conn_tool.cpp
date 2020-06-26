@@ -854,7 +854,7 @@ bool handle_update_maintainers_info(po::variables_map& vm)
     std::cout << "ERROR: failed to invoke request" << ENDL;
     return false;
   }
-  if(res.status != CORE_RPC_STATUS_OK)
+  if(res.status != API_RETURN_CODE_OK)
   {
     std::cout << "ERROR: failed to update maintainers info: " << res.status << ENDL;
     return false;

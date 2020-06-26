@@ -40,6 +40,7 @@ namespace
 {
   const command_line::arg_descriptor<std::string> arg_wallet_file = {"wallet-file", "Use wallet <arg>", ""};
   const command_line::arg_descriptor<std::string> arg_generate_new_wallet = {"generate-new-wallet", "Generate new wallet and save it to <arg> or <address>.wallet by default", ""};
+  const command_line::arg_descriptor<std::string> arg_generate_new_auditable_wallet = {"generate-new-auditable-wallet", "Generate new auditable wallet and store it to <arg>", ""};
   const command_line::arg_descriptor<std::string> arg_daemon_address = {"daemon-address", "Use daemon instance at <host>:<port>", ""};
   const command_line::arg_descriptor<std::string> arg_daemon_host = {"daemon-host", "Use daemon instance at host <arg> instead of localhost", ""};
   const command_line::arg_descriptor<std::string> arg_password = {"password", "Wallet password", "", true};
@@ -51,6 +52,7 @@ namespace
   const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
   const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address = { "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" };
   const command_line::arg_descriptor<std::string> arg_restore_wallet = { "restore-wallet", "Restore wallet from the seed phrase and save it to <arg>", "" };
+  const command_line::arg_descriptor<std::string> arg_restore_awo_wallet = { "restore-awo-wallet", "Restore auditable watch-only wallet from address and view key. Use \"address:viewkey\" as argument", "" };
   const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
@@ -60,11 +62,11 @@ namespace
     std::string err;
     if (ok)
     {
-      if (status == CORE_RPC_STATUS_BUSY)
+      if (status == API_RETURN_CODE_BUSY)
       {
         err = "daemon is busy. Please try later";
       }
-      else if (status != CORE_RPC_STATUS_OK)
+      else if (status != API_RETURN_CODE_OK)
       {
         err = status;
       }
@@ -219,6 +221,8 @@ simple_wallet::simple_wallet()
   
   m_cmd_binder.set_handler("get_tx_key", boost::bind(&simple_wallet::get_tx_key, this, _1), "Get transaction one-time secret key (r) for a given <txid>");
 
+  m_cmd_binder.set_handler("awo_blob", boost::bind(&simple_wallet::awo_blob, this, _1), "For auditable wallets: prints auditable watch-only blob for wallet's audit by a third party");
+
   m_cmd_binder.set_handler("save", boost::bind(&simple_wallet::save, this, _1), "Save wallet synchronized data");
   m_cmd_binder.set_handler("save_watch_only", boost::bind(&simple_wallet::save_watch_only, this, _1), "save_watch_only <filename> <password> - save as watch-only wallet file.");
 
@@ -270,9 +274,9 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     return false;
   }
 
-  if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty())
+  if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty() && m_restore_awo_wallet.empty() && m_generate_new_aw.empty())
   {
-    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet or --restore-wallet";
+    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet, --generate-new-auditable-wallet, --restore-wallet or --restore-awo-wallet";
     return false;
   }
 
@@ -311,9 +315,13 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 
   if (!m_generate_new.empty())
   {
-    bool r = new_wallet(m_generate_new, pwd_container.password());
-    CHECK_AND_ASSERT_MES(r, false, "account creation failed");
-    
+    bool r = new_wallet(m_generate_new, pwd_container.password(), false);
+    CHECK_AND_ASSERT_MES(r, false, "failed to create new wallet");
+  }
+  else if (!m_generate_new_aw.empty())
+  {
+    bool r = new_wallet(m_generate_new_aw, pwd_container.password(), true);
+    CHECK_AND_ASSERT_MES(r, false, "failed to create new auditable wallet");
   }
   else if (!m_restore_wallet.empty())
   {
@@ -330,7 +338,25 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       return false;
     }
     
-    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password());
+    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), false);
+    CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
+  }
+  else if (!m_restore_awo_wallet.empty())
+  {
+    if (boost::filesystem::exists(m_restore_awo_wallet))
+    {
+      fail_msg_writer() << "file " << m_restore_awo_wallet << " already exists";
+      return false;
+    }
+
+    tools::password_container restore_addr_and_viewkey_container;
+    if (!restore_addr_and_viewkey_container.read_password("please, enter wallet auditable address, viewkey and timestamp, separated by a colon (\"address:viewkey:timestamp\"):\n"))
+    {
+      fail_msg_writer() << "failed to read seed phrase";
+      return false;
+    }
+
+    bool r = restore_wallet(m_restore_awo_wallet, restore_addr_and_viewkey_container.password(), pwd_container.password(), true);
     CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
   }
   else
@@ -354,12 +380,14 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
 {
   m_wallet_file     = command_line::get_arg(vm, arg_wallet_file);
   m_generate_new    = command_line::get_arg(vm, arg_generate_new_wallet);
+  m_generate_new_aw = command_line::get_arg(vm, arg_generate_new_auditable_wallet);
   m_daemon_address  = command_line::get_arg(vm, arg_daemon_address);
   m_daemon_host     = command_line::get_arg(vm, arg_daemon_host);
   m_daemon_port     = command_line::get_arg(vm, arg_daemon_port);
   m_do_not_set_date = command_line::get_arg(vm, arg_dont_set_date);
   m_do_pos_mining   = command_line::get_arg(vm, arg_do_pos_mining);
   m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
+  m_restore_awo_wallet = command_line::get_arg(vm, arg_restore_awo_wallet);
 } 
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::try_connect_to_daemon()
@@ -374,7 +402,7 @@ bool simple_wallet::try_connect_to_daemon()
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::new_wallet(const string &wallet_file, const std::string& password)
+bool simple_wallet::new_wallet(const string &wallet_file, const std::string& password, bool create_auditable_wallet)
 {
   m_wallet_file = wallet_file;
 
@@ -383,10 +411,10 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   m_wallet->set_do_rise_transfer(false);
   try
   {
-    m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
-    message_writer(epee::log_space::console_color_white, true) << "Generated new wallet: " << m_wallet->get_account().get_public_address_str();
-    std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_view_secret_key) << std::endl << std::flush;
-    if(m_do_not_set_date)
+    m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, create_auditable_wallet);
+    message_writer(epee::log_space::console_color_white, true) << "Generated new " << (create_auditable_wallet ? "AUDITABLE" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+    std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
+    if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
 
     if (m_print_brain_wallet)
@@ -407,16 +435,11 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   success_msg_writer() <<
     "**********************************************************************\n" <<
     "Your wallet has been generated.\n" <<
-    "To start synchronizing with the daemon use \"refresh\" command.\n" <<
-    "Use \"help\" command to see the list of available commands.\n" <<
-    "Always use \"exit\" command when closing simplewallet to save\n" <<
-    "current session's state. Otherwise, you will possibly need to synchronize \n" <<
-    "your wallet again. Your wallet key is NOT under risk anyway.\n" <<
     "**********************************************************************";
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::restore_wallet(const std::string &wallet_file, const std::string &restore_seed, const std::string& password)
+bool simple_wallet::restore_wallet(const std::string &wallet_file, const std::string &seed_or_awo_blob, const std::string& password, bool auditable_watch_only)
 {
   m_wallet_file = wallet_file;
 
@@ -425,15 +448,24 @@ bool simple_wallet::restore_wallet(const std::string &wallet_file, const std::st
   m_wallet->set_do_rise_transfer(false);
   try
   {
-    m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, restore_seed);
-    message_writer(epee::log_space::console_color_white, true) << "Wallet restored: " << m_wallet->get_account().get_public_address_str();
-    std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().m_view_secret_key) << std::endl << std::flush;
+    if (auditable_watch_only)
+    {
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_awo_blob, true);
+      message_writer(epee::log_space::console_color_white, true) << "Auditable watch-only wallet restored: " << m_wallet->get_account().get_public_address_str();
+    }
+    else
+    {
+      // normal wallet
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_awo_blob, false);
+      message_writer(epee::log_space::console_color_white, true) << "Wallet restored: " << m_wallet->get_account().get_public_address_str();
+      std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
+    }
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
   }
   catch (const std::exception& e)
   {
-    fail_msg_writer() << "failed to restore wallet: " << e.what();
+    fail_msg_writer() << "failed to restore wallet, check your " << (auditable_watch_only ? "awo blob!" : "seed phrase!") << ENDL << e.what();
     return false;
   }
 
@@ -462,7 +494,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     try
     {
       m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
-      message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+      message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
 
       if (m_print_brain_wallet)
         std::cout << "Brain wallet: " << m_wallet->get_account().get_restore_braindata() << std::endl << std::flush;
@@ -592,22 +624,40 @@ void simple_wallet::on_new_block(uint64_t height, const currency::block& block)
   m_refresh_progress_reporter.update(height, false);
 }
 //----------------------------------------------------------------------------------------------------
-void simple_wallet::on_money_received(uint64_t height, const currency::transaction& tx, size_t out_index)
+std::string print_money_trailing_zeros_replaced_with_spaces(uint64_t amount)
 {
-  message_writer(epee::log_space::console_color_green, false) <<
-    "Height " << height <<
-    ", transaction " << get_transaction_hash(tx) <<
-    ", received " << print_money(tx.vout[out_index].amount);
-  m_refresh_progress_reporter.update(height, true);
+  std::string s = print_money(amount);
+  size_t p = s.find_last_not_of('0');
+  if (p != std::string::npos)
+  {
+    if (s[p] == '.')
+      ++p;
+    size_t l = s.length() - p - 1;
+    return s.replace(p + 1, l, l, ' ');
+  }
+  return s;
 }
 //----------------------------------------------------------------------------------------------------
-void simple_wallet::on_money_spent(uint64_t height, const currency::transaction& in_tx, size_t out_index, const currency::transaction& spend_tx)
+void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
 {
-  message_writer(epee::log_space::console_color_magenta, false) <<
-    "Height " << height <<
-    ", transaction " << get_transaction_hash(spend_tx) <<
-    ", spent " << print_money(in_tx.vout[out_index].amount);
-  m_refresh_progress_reporter.update(height, true);
+  epee::log_space::console_colors color = wti.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
+  message_writer(color, false) <<
+    "height " << wti.height <<
+    ", tx " << wti.tx_hash <<
+    " " << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(wti.amount) << (wti.is_income ? " received," : " spent,   ") <<
+    " balance: " << print_money_brief(balance);
+  m_refresh_progress_reporter.update(wti.height, true);
+}
+//----------------------------------------------------------------------------------------------------
+void simple_wallet::on_message(i_wallet2_callback::message_severity severity, const std::string& m)
+{
+  epee::log_space::console_colors color = epee::log_space::console_color_white;
+  if (severity == i_wallet2_callback::ms_red)
+    color = epee::log_space::console_color_red;
+  else if (severity == i_wallet2_callback::ms_yellow)
+    color = epee::log_space::console_color_yellow;
+
+  message_writer(color, true, std::string()) << m;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::refresh(const std::vector<std::string>& args)
@@ -1116,7 +1166,7 @@ bool simple_wallet::show_blockchain_height(const std::vector<std::string>& args)
 bool simple_wallet::show_wallet_bcheight(const std::vector<std::string>& args)
 {
 
-  uint64_t bc_height = m_wallet->get_blockchain_current_height();
+  uint64_t bc_height = m_wallet->get_blockchain_current_size();
   success_msg_writer() << bc_height;
   return true;
 }
@@ -1322,7 +1372,7 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 bool simple_wallet::show_seed(const std::vector<std::string> &args)
 {
   success_msg_writer() << "Here's your wallet's seed phrase. Write it down and keep in a safe place.";
-  success_msg_writer(true) << "Anyone who knows the following 25 words can access your wallet:";
+  success_msg_writer(true) << "Anyone who knows the following 26 words can access your wallet:";
   std::cout << m_wallet->get_account().get_restore_braindata() << std::endl << std::flush;
   return true;
 }
@@ -1333,8 +1383,8 @@ bool simple_wallet::spendkey(const std::vector<std::string> &args)
    << "WARNING! Anyone who knows the following secret key can access your wallet and spend your coins.";
 
   const account_keys& keys = m_wallet->get_account().get_keys();
-  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_spend_secret_key) << std::endl;
-  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.m_spend_public_key) << std::endl << std::flush;
+  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.spend_secret_key) << std::endl;
+  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.account_address.spend_public_key) << std::endl << std::flush;
 
   return true;
 }
@@ -1345,8 +1395,8 @@ bool simple_wallet::viewkey(const std::vector<std::string> &args)
     << "WARNING! Anyone who knows the following secret key can view your wallet (but can not spend your coins).";
 
   const account_keys& keys = m_wallet->get_account().get_keys();
-  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.m_view_secret_key) << std::endl;
-  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.m_account_address.m_view_public_key) << std::endl << std::flush;
+  std::cout << "secret: " << epee::string_tools::pod_to_hex(keys.view_secret_key) << std::endl;
+  std::cout << "public: " << epee::string_tools::pod_to_hex(keys.account_address.view_public_key) << std::endl << std::flush;
 
   return true;
 }
@@ -1450,6 +1500,19 @@ bool simple_wallet::get_tx_key(const std::vector<std::string> &args_)
     fail_msg_writer() << "no tx keys found for this txid";
     return true;
   }
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::awo_blob(const std::vector<std::string> &args_)
+{
+  if (!m_wallet->is_auditable())
+  {
+    fail_msg_writer() << "this command is allowed for auditable wallets only";
+    return true;
+  }
+
+  success_msg_writer() << "Auditable watch-only blob for this wallet is:";
+  std::cout << m_wallet->get_account().get_awo_blob() << ENDL;
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::set_offline_mode(bool offline_mode)
@@ -1702,6 +1765,7 @@ int main(int argc, char* argv[])
   po::options_description desc_params("Wallet options");
   command_line::add_arg(desc_params, arg_wallet_file);
   command_line::add_arg(desc_params, arg_generate_new_wallet);
+  command_line::add_arg(desc_params, arg_generate_new_auditable_wallet);
   command_line::add_arg(desc_params, arg_password);
   command_line::add_arg(desc_params, arg_daemon_address);
   command_line::add_arg(desc_params, arg_daemon_host);
@@ -1714,6 +1778,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_do_pos_mining);
   command_line::add_arg(desc_params, arg_pos_mining_reward_address);
   command_line::add_arg(desc_params, arg_restore_wallet);
+  command_line::add_arg(desc_params, arg_restore_awo_wallet);
   command_line::add_arg(desc_params, arg_offline_mode);
   command_line::add_arg(desc_params, command_line::arg_log_file);
   command_line::add_arg(desc_params, command_line::arg_log_level);
@@ -1848,7 +1913,7 @@ int main(int argc, char* argv[])
       {
         LOG_PRINT_L0("Initializing wallet...");
         wal.init(daemon_address);
-        if (command_line::get_arg(vm, arg_generate_new_wallet).size())
+        if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
           return EXIT_FAILURE;
 
         if (!offline_mode)
@@ -1903,7 +1968,7 @@ int main(int argc, char* argv[])
     sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
     CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet");
-    if (command_line::get_arg(vm, arg_generate_new_wallet).size())
+    if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
       return EXIT_FAILURE;
 
 

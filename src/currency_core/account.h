@@ -12,7 +12,8 @@
 
 #define BRAINWALLET_DEFAULT_SEED_SIZE 32 
 #define ACCOUNT_RESTORE_DATA_SIZE     BRAINWALLET_DEFAULT_SEED_SIZE    
-#define BRAINWALLET_DEFAULT_WORDS_COUNT 25
+#define SEED_PHRASE_V1_WORDS_COUNT 25
+#define SEED_PHRASE_V2_WORDS_COUNT 26
 
 
 
@@ -29,14 +30,14 @@ namespace currency
 
   struct account_keys
   {
-    account_public_address m_account_address;
-    crypto::secret_key   m_spend_secret_key;
-    crypto::secret_key   m_view_secret_key;
+    account_public_address account_address;
+    crypto::secret_key   spend_secret_key;
+    crypto::secret_key   view_secret_key;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(m_account_address)
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(m_spend_secret_key)
-      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(m_view_secret_key)
+      KV_SERIALIZE_N(account_address, "m_account_address")
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(spend_secret_key, "m_spend_secret_key")
+      KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(view_secret_key, "m_view_secret_key")
     END_KV_SERIALIZE_MAP()
   };
 
@@ -47,15 +48,15 @@ namespace currency
   {
   public:
     account_base();
-    void generate();
+    void generate(bool auditable = false);
     const account_keys& get_keys() const;
-    const account_public_address& get_public_address() const { return m_keys.m_account_address; };
+    const account_public_address& get_public_address() const { return m_keys.account_address; };
     std::string get_public_address_str() const;
-    std::string get_restore_data() const;
+    
     std::string get_restore_braindata() const;
-
-    bool restore_keys(const std::string& restore_data);
-    bool restore_keys_from_braindata(const std::string& restore_data);
+    std::string get_awo_blob() const;
+    bool restore_from_braindata(const std::string& seed_phrase);
+    bool restore_from_awo_blob(const std::string& awo_blob);
 
     uint64_t get_createtime() const { return m_creation_timestamp; }
     void set_createtime(uint64_t val) { m_creation_timestamp = val; }
@@ -70,20 +71,26 @@ namespace currency
     {
       a & m_keys;
       a & m_creation_timestamp;
-      a & m_seed;
+      a & m_keys_seed_binary;
     }
+
+    static std::string vector_of_chars_to_string(const std::vector<unsigned char>& v) { return std::string(v.begin(), v.end()); }
+    static std::vector<unsigned char> string_to_vector_of_chars(const std::string& v) { return std::vector<unsigned char>(v.begin(), v.end()); }
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_keys)
       KV_SERIALIZE(m_creation_timestamp)
-      KV_SERIALIZE(m_seed)
+      KV_SERIALIZE_CUSTOM_N(m_keys_seed_binary, std::string, vector_of_chars_to_string, string_to_vector_of_chars, "m_seed")
     END_KV_SERIALIZE_MAP()
 
   private:
     void set_null();
+    bool restore_keys(const std::vector<unsigned char>& keys_seed_binary);
+
     account_keys m_keys;
     uint64_t m_creation_timestamp;
-    std::string m_seed;
+
+    std::vector<unsigned char> m_keys_seed_binary;
   };
 
 
@@ -92,9 +99,9 @@ namespace currency
 
   inline bool operator==(const account_keys& lhs, const account_keys& rhs)
   {
-    return lhs.m_account_address  == rhs.m_account_address &&
-           lhs.m_spend_secret_key == rhs.m_spend_secret_key &&
-           lhs.m_view_secret_key  == rhs.m_view_secret_key;
+    return lhs.account_address  == rhs.account_address &&
+           lhs.spend_secret_key == rhs.spend_secret_key &&
+           lhs.view_secret_key  == rhs.view_secret_key;
   }
   inline bool operator!=(const account_keys& lhs, const account_keys& rhs)
   {
