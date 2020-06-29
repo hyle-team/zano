@@ -27,6 +27,7 @@ fi
 
 if [ -n "$testnet" ] || [ -n "$qt_dev_tools" ]; then
   copy_qt_dev_tools=true
+  copy_qt_dev_tools_label="devtools "
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}devtools-
 fi
 
@@ -139,12 +140,12 @@ fi
 
 read checksum <<< $(sha256sum $package_filename | awk '/^/ { print $1 }' )
 
-mail_msg="New ${build_prefix_label}${testnet_label}build for linux-x64:<br>
+mail_msg="New ${build_prefix_label}${testnet_label}${copy_qt_dev_tools_label}build for linux-x64:<br>
 https://build.zano.org/builds/$package_filename<br>
 sha256: $checksum"
 
 echo "$mail_msg"
 
-echo "$mail_msg" | mail -s "Zano linux-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}
+echo "$mail_msg" | mail -s "Zano linux-x64 ${build_prefix_label}${testnet_label}${copy_qt_dev_tools_label}build $version_str" ${emails}
 
 exit 0

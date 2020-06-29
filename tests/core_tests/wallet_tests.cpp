@@ -3433,9 +3433,6 @@ bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index
   CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
 
- // miner_wlt->get_payments()
-
-
   // check one again with normal sync (callback should be called as well)
   std::shared_ptr<tools::wallet2> miner_wlt_2 = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   miner_wlt_2->callback(l);
