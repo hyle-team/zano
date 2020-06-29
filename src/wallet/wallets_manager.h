@@ -63,6 +63,7 @@ public:
     std::atomic<bool> stop_for_refresh; //use separate var for passing to "refresh" member function, 
                                         //because it can be changed there due to internal interruption logis
 
+
     std::atomic<bool> break_mining_loop;
     std::atomic<uint64_t> wallet_state;
     std::atomic<uint64_t> last_wallet_synch_height;
@@ -71,7 +72,6 @@ public:
     std::atomic<bool>* plast_daemon_is_disconnected;
     std::atomic<bool> has_related_alias_in_unconfirmed;
     std::atomic<bool> need_to_update_wallet_info;
-
     std::atomic<bool> long_refresh_in_progress;
     epee::critical_section long_refresh_in_progress_lock; //secure wallet state and prevent from long wait while long refresh is in work
 
@@ -81,16 +81,21 @@ public:
 
     std::thread miner_thread;
     void worker_func();
+    void stop(bool wait = true);
     std::string get_log_prefix() const { return std::string("[") + epee::string_tools::num_to_string_fast(wallet_id) + ":" + w->get()->get_log_prefix() + "]"; }
     ~wallet_vs_options();
   };
 
   wallets_manager();
   ~wallets_manager();
-  bool init(int argc, char* argv[], view::i_view* pview_handler);
+  bool init_command_line(int argc, char* argv[]);
+  bool init(view::i_view* pview_handler);
   bool start();
   bool stop();
+  bool quick_stop_no_save(); //stop without storing wallets
+  bool quick_clear_wallets_no_save();
   bool send_stop_signal();
+  bool get_opened_wallets(std::list<view::open_wallet_response>& result);
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr);
@@ -143,7 +148,7 @@ public:
   void toggle_pos_mining();
   std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
-  std::string is_valid_brain_restore_data(const std::string& brain_text);
+  std::string is_valid_brain_restore_data(const std::string& seed_phrase);
 #ifndef MOBILE_WALLET_BUILD
   void subscribe_to_core_events(currency::i_core_event_handler* pevents_handler);
   //void unsubscribe_to_core_events();
@@ -151,7 +156,8 @@ public:
   void get_gui_options(view::gui_options& opt);
   std::string get_wallet_log_prefix(size_t wallet_id) const;
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
-
+  std::string get_qt_dev_tools_option() const { return m_qt_dev_tools; }
+  void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
 private:
   void main_worker(const po::variables_map& vm);
   bool init_local_daemon();
@@ -173,17 +179,23 @@ private:
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
 
   std::thread m_main_worker_thread;
+  
   std::atomic<bool> m_stop_singal_sent;
+  std::mutex m_stop_singal_sent_mutex;
+  std::condition_variable m_stop_singal_sent_mutex_cv;
+
   view::i_view m_view_stub;
   view::i_view* m_pview;
   std::shared_ptr<tools::i_core_proxy> m_rpc_proxy;
   po::variables_map m_vm;
 
+  bool m_use_deffered_global_outputs;
   std::atomic<uint64_t> m_last_daemon_height;
   std::atomic<uint64_t> m_last_daemon_network_state;
   std::atomic<bool> m_last_daemon_is_disconnected;
 //  std::atomic<uint64_t> m_last_wallet_synch_height;
   std::atomic<uint64_t> m_wallet_id_counter;
+  std::atomic<bool> m_dont_save_wallet_at_stop;
 
   std::string m_data_dir;
   view::gui_options m_ui_opt;
@@ -199,6 +211,7 @@ private:
 
   bool m_remote_node_mode;
   bool m_qt_logs_enbaled;
+  std::string m_qt_dev_tools;
   std::atomic<bool> m_is_pos_allowed;
 
 

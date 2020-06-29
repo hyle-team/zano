@@ -865,6 +865,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
     GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
     GENERATE_AND_PLAY(wallet_chain_switch_with_spending_the_same_ki);
+    GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
 
     // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
     // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
@@ -914,6 +915,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(get_random_outs_test);
     GENERATE_AND_PLAY(mix_attr_tests);
     GENERATE_AND_PLAY(mix_in_spent_outs);
+    GENERATE_AND_PLAY(random_outs_and_burnt_coins);
 
     // Block verification tests
     GENERATE_AND_PLAY(gen_block_big_major_version);
@@ -987,7 +989,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_uint_overflow_2);
 
 
-    // Hardfok1 tests
+    // Hardfok 1 tests
     GENERATE_AND_PLAY(before_hard_fork_1_cumulative_difficulty);
     GENERATE_AND_PLAY(inthe_middle_hard_fork_1_cumulative_difficulty);
     GENERATE_AND_PLAY(after_hard_fork_1_cumulative_difficulty);
@@ -998,10 +1000,23 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_1_chain_switch_pow_only);
     GENERATE_AND_PLAY(hard_fork_1_checkpoint_basic_test);
     GENERATE_AND_PLAY(hard_fork_1_pos_locked_height_vs_time);
-    //GENERATE_AND_PLAY(gen_block_reward); */
+
+    // Hardfork 2 tests
+    GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
+    GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
+    GENERATE_AND_PLAY(hard_fork_2_tx_extra_alias_entry_in_wallet);
+    GENERATE_AND_PLAY(hard_fork_2_auditable_addresses_basics);
+    GENERATE_AND_PLAY(hard_fork_2_no_new_structures_before_hf);
+    GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<true>);
+    GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<false>);
+    GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<true>);
+    GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<false>);
+    GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<true>);
+    GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<false>);
 
 
-
+    // GENERATE_AND_PLAY(gen_block_reward);
+    // END OF TESTS  */
 
     size_t failed_postponed_tests_count = 0;
     uint64_t total_time = 0;

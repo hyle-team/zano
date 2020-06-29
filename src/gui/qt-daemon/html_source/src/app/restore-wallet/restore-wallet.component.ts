@@ -52,7 +52,7 @@ export class RestoreWalletComponent implements OnInit {
   createWallet() {
     this.ngZone.run(() => {
       this.progressWidth = '100%';
-      this.router.navigate(['/seed-phrase'], {queryParams: {wallet_id: this.wallet.id}});
+      this.runWallet();
     });
   }
 
@@ -82,6 +82,9 @@ export class RestoreWalletComponent implements OnInit {
                     restore_data['wi'].mined_total,
                     restore_data['wi'].tracking_hey
                   );
+                  this.variablesService.opening_wallet.is_auditable = restore_data['wi'].is_auditable;
+                  this.variablesService.opening_wallet.is_watch_only = restore_data['wi'].is_watch_only;
+                  this.variablesService.opening_wallet.currentPage = 1;
                   this.variablesService.opening_wallet.alias = this.backend.getWalletAlias(this.variablesService.opening_wallet.address);
                   this.variablesService.opening_wallet.pages = new Array(1).fill(1);
                   this.variablesService.opening_wallet.totalPages = 1;
@@ -117,5 +120,35 @@ export class RestoreWalletComponent implements OnInit {
     }
   }
 
-
+  runWallet() {
+    let exists = false;
+    this.variablesService.wallets.forEach((wallet) => {
+      if (wallet.address === this.variablesService.opening_wallet.address) {
+        exists = true;
+      }
+    });
+    if (!exists) {
+      this.backend.runWallet(this.wallet.id, (run_status, run_data) => {
+        if (run_status) {
+          this.variablesService.wallets.push(this.variablesService.opening_wallet);
+          if (this.variablesService.appPass) {
+            this.backend.storeSecureAppData();
+          }
+          this.ngZone.run(() => {
+            this.router.navigate(['/wallet/' + this.wallet.id]);
+          });
+        } else {
+          console.log(run_data['error_code']);
+        }
+      });
+    } else {
+      this.variablesService.opening_wallet = null;
+      this.modalService.prepareModal('error', 'OPEN_WALLET.WITH_ADDRESS_ALREADY_OPEN');
+      this.backend.closeWallet(this.wallet.id, () => {
+        this.ngZone.run(() => {
+          this.router.navigate(['/']);
+        });
+      });
+    }
+  }
 }

@@ -16,10 +16,10 @@ namespace currency
   {
     for (const auto& de : destinations)
     {
-      if (de.addr.size() == 1 && sender_account_keys.m_account_address != de.addr.back())
+      if (de.addr.size() == 1 && sender_account_keys.account_address != de.addr.back())
         return de.addr.back();                    // return the first destination address that is non-multisig and not equal to the sender's address
     }
-    return sender_account_keys.m_account_address; // otherwise, fallback to sender's address
+    return sender_account_keys.account_address; // otherwise, fallback to sender's address
   }
   //------------------------------------------------------------------
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)

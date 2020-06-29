@@ -55,7 +55,7 @@ bool do_send_money(tools::wallet2& w1, tools::wallet2& w2, size_t mix_in_factor,
   for (size_t i = 0; i < parts; ++i)
   {
     currency::tx_destination_entry de;
-    de.addr.push_back(w2.get_account().get_keys().m_account_address);
+    de.addr.push_back(w2.get_account().get_keys().account_address);
 
     if (i < parts - 1)
       de.amount = random(max_part);
@@ -157,7 +157,7 @@ bool do_send_money_by_fractions(tools::wallet2& w1, tools::wallet2& w2, size_t m
   for (size_t i = 0; i < ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP; ++i)
   {
     currency::tx_destination_entry de;
-    de.addr.push_back(w2.get_account().get_keys().m_account_address);
+    de.addr.push_back(w2.get_account().get_keys().account_address);
 
     if (i == ESTIMATE_INPUTS_COUNT_LIMIT_FOR_TX_BLOWUP - 1)
     {

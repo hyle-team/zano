@@ -612,8 +612,8 @@ gen_no_attchments_in_coinbase::gen_no_attchments_in_coinbase()
   // NOTE: This test is made deterministic to be able to correctly set up checkpoint.
   random_state_test_restorer::reset_random(); // random generator's state was previously stored, will be restore on dtor (see also m_random_state_test_restorer)
 
-  bool r = m_miner_acc.restore_keys_from_braindata("battle harsh arrow gain best doubt nose raw protect salty apart tell distant final yeah stubborn true stop shoulder breathe throne problem everyone stranger only");
-  CHECK_AND_ASSERT_THROW_MES(r, "gen_no_attchments_in_coinbase: Can't restore account from braindata");
+  bool r = m_miner_acc.restore_from_seed_phrase("battle harsh arrow gain best doubt nose raw protect salty apart tell distant final yeah stubborn true stop shoulder breathe throne problem everyone stranger only");
+  CHECK_AND_ASSERT_THROW_MES(r, "gen_no_attchments_in_coinbase: Can't restore account from seed phrase");
 
   REGISTER_CALLBACK_METHOD(gen_no_attchments_in_coinbase, c1);
   REGISTER_CALLBACK_METHOD(gen_no_attchments_in_coinbase, init_config_set_cp);

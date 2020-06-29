@@ -212,6 +212,7 @@ private:
   void restore_pos(bool consider_showed = false);
   bool store_app_config();
   bool load_app_config();
+  bool init_window();
 
   std::string get_wallet_log_prefix(size_t wallet_id) const { return m_backend.get_wallet_log_prefix(wallet_id); }
 

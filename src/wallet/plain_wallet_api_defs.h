@@ -19,15 +19,15 @@ namespace plain_wallet
   };
   
 
-  struct open_wallet_response
-  {
-    view::transfers_array recent_history;
-    view::wallet_info wi;
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(recent_history)
-      KV_SERIALIZE(wi)
-    END_KV_SERIALIZE_MAP()
-  };
+//   struct open_wallet_response
+//   {
+//     view::transfers_array recent_history;
+//     view::wallet_info wi;
+//     BEGIN_KV_SERIALIZE_MAP()
+//       KV_SERIALIZE(recent_history)
+//       KV_SERIALIZE(wi)
+//     END_KV_SERIALIZE_MAP()
+//   };
 
   struct sync_status_response
   {

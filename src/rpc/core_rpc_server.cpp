@@ -72,13 +72,13 @@ namespace currency
     return true;
   }
 #define check_core_ready() check_core_ready_(LOCAL_FUNCTION_DEF__)
-#define CHECK_CORE_READY() if(!check_core_ready()){res.status =  CORE_RPC_STATUS_BUSY;return true;}
+#define CHECK_CORE_READY() if(!check_core_ready()){res.status =  API_RETURN_CODE_BUSY;return true;}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
     res.height = m_core.get_current_blockchain_size();
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -256,7 +256,7 @@ namespace currency
       
 
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -267,14 +267,21 @@ namespace currency
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
-      res.status = CORE_RPC_STATUS_GENESIS_MISMATCH;
+      res.status = API_RETURN_CODE_GENESIS_MISMATCH;
+      return true;
+    }
+
+    if (req.minimum_height >= m_core.get_blockchain_storage().get_current_blockchain_size())
+    {
+      //wrong minimum_height
+      res.status = API_RETURN_CODE_BAD_ARG;
       return true;
     }
 
     blockchain_storage::blocks_direct_container bs;
-    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT))
+    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height, req.need_global_indexes))
     {
-      res.status = CORE_RPC_STATUS_FAILED;
+      res.status = API_RETURN_CODE_FAIL;
       return false;
     }
 
@@ -283,12 +290,13 @@ namespace currency
       res.blocks.resize(res.blocks.size()+1);
       res.blocks.back().block_ptr = b.first;
       res.blocks.back().txs_ptr = std::move(b.second);
+      res.blocks.back().coinbase_ptr = b.third;
     }
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
-    //------------------------------------------------------------------------------------------------------------------------------
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
@@ -296,28 +304,46 @@ namespace currency
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
-      res.status = CORE_RPC_STATUS_GENESIS_MISMATCH;
+      res.status = API_RETURN_CODE_GENESIS_MISMATCH;
       return true;
     }
 
-    std::list<std::pair<block, std::list<transaction> > > bs;
-    if(!m_core.find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT))
+    if (req.minimum_height >= m_core.get_blockchain_storage().get_current_blockchain_size())
     {
-      res.status = CORE_RPC_STATUS_FAILED;
+      //wrong minimum_height
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    blockchain_storage::blocks_direct_container bs;
+    if (!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
+    {
+      res.status = API_RETURN_CODE_FAIL;
       return false;
     }
 
-    BOOST_FOREACH(auto& b, bs)
+    for (auto& b : bs)
     {
       res.blocks.resize(res.blocks.size()+1);
-      res.blocks.back().block = block_to_blob(b.first);
+      res.blocks.back().block = block_to_blob(b.first->bl);
+      if (req.need_global_indexes)
+      {
+        res.blocks.back().tx_global_outs.resize(b.second.size());
+      }
+      size_t i = 0;
+      
       BOOST_FOREACH(auto& t, b.second)
       {
-        res.blocks.back().txs.push_back(tx_to_blob(t));
+        res.blocks.back().txs.push_back(tx_to_blob(t->tx));
+        if (req.need_global_indexes)
+        {
+          res.blocks.back().tx_global_outs[i].v = t->m_global_output_indexes;
+        }
+        i++;
       }
     }
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -330,7 +356,7 @@ namespace currency
       return true;
     }
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     std::stringstream ss;
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount outs_for_amount;
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
@@ -346,21 +372,26 @@ namespace currency
     });
     std::string s = ss.str();
     LOG_PRINT_L2("COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS: " << ENDL << s);
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_indexes(const COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& req, COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
-    bool r = m_core.get_tx_outputs_gindexs(req.txid, res.o_indexes);
-    if(!r)
+    res.tx_global_outs.resize(req.txids.size());
+    size_t i = 0;
+    for (auto& txid : req.txids)
     {
-      res.status = "Failed";
-      return true;
+      bool r = m_core.get_tx_outputs_gindexs(txid, res.tx_global_outs[i].v);
+      if (!r)
+      {
+        res.status = API_RETURN_CODE_FAIL;
+        return true;
+      }
+      i++;
     }
-    res.status = CORE_RPC_STATUS_OK;
-    LOG_PRINT_L2("COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES: [" << res.o_indexes.size() << "]");
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -372,7 +403,7 @@ namespace currency
       return true;
     }
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -393,7 +424,7 @@ namespace currency
     {
       res.txs.push_back(t_serializable_object_to_blob(tx));
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -407,7 +438,7 @@ namespace currency
   bool core_rpc_server::on_check_keyimages(const COMMAND_RPC_CHECK_KEYIMAGES::request& req, COMMAND_RPC_CHECK_KEYIMAGES::response& res, connection_context& cntx)
   {
     m_core.get_blockchain_storage().check_keyimages(req.images, res.images_stat);
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -450,14 +481,14 @@ namespace currency
       res.missed_tx.push_back(string_tools::pod_to_hex(miss_tx));
     }
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_offers_ex(const COMMAND_RPC_GET_OFFERS_EX::request& req, COMMAND_RPC_GET_OFFERS_EX::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
     m_of.get_offers_ex(req.filter, res.offers, res.total_offers, m_core.get_blockchain_storage().get_core_runtime_config().get_core_time());
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -465,13 +496,13 @@ namespace currency
   {
     if (!m_p2p.get_connections_count())
     {
-      res.status = CORE_RPC_STATUS_DISCONNECTED;
+      res.status = API_RETURN_CODE_DISCONNECTED;
       return true;
     }
     res.pos_mining_allowed = m_core.get_blockchain_storage().is_pos_allowed();
     if (!res.pos_mining_allowed)
     {
-      res.status = CORE_RPC_STATUS_NOT_FOUND;
+      res.status = API_RETURN_CODE_NOT_FOUND;
       return true;
     }
 
@@ -480,21 +511,21 @@ namespace currency
     
     //TODO: need atomic operation with  build_stake_modifier()
     res.starter_timestamp = m_core.get_blockchain_storage().get_last_timestamps_check_window_median();
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_current_core_tx_expiration_median(const COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::request& req, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response& res, connection_context& cntx)
   {
     res.expiration_median = m_core.get_blockchain_storage().get_tx_expiration_median();
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_rpc_get_blocks_details(const COMMAND_RPC_GET_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_BLOCKS_DETAILS::response& res, connection_context& cntx)
   {
     m_core.get_blockchain_storage().get_main_blocks_rpc_details(req.height_start, req.count, req.ignore_transactions, res.blocks);
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------  
@@ -517,7 +548,7 @@ namespace currency
       }
 
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -528,25 +559,25 @@ namespace currency
       return false;
 
     m_core.get_blockchain_storage().search_by_id(id, res.types_found);
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_out_info(const COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_BY_AMOUNT::request& req, COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_BY_AMOUNT::response& res, connection_context& cntx)
   {
     if (!m_core.get_blockchain_storage().get_global_index_details(req, res))
-      res.status = CORE_RPC_STATUS_NOT_FOUND;
+      res.status = API_RETURN_CODE_NOT_FOUND;
     else
-      res.status = CORE_RPC_STATUS_OK;
+      res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_multisig_info(const COMMAND_RPC_GET_MULTISIG_INFO::request& req, COMMAND_RPC_GET_MULTISIG_INFO::response& res, connection_context& cntx)
   {
     if (!m_core.get_blockchain_storage().get_multisig_id_details(req, res))
-      res.status = CORE_RPC_STATUS_NOT_FOUND;
+      res.status = API_RETURN_CODE_NOT_FOUND;
     else
-      res.status = CORE_RPC_STATUS_OK;
+      res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -560,7 +591,7 @@ namespace currency
     {
       m_core.get_tx_pool().get_transactions_details(req.ids, res.txs);
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -574,14 +605,14 @@ namespace currency
     {
       m_core.get_tx_pool().get_transactions_brief_details(req.ids, res.txs);
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_all_pool_tx_list(const COMMAND_RPC_GET_ALL_POOL_TX_LIST::request& req, COMMAND_RPC_GET_ALL_POOL_TX_LIST::response& res, connection_context& cntx)
   {
     m_core.get_tx_pool().get_all_transactions_list(res.ids);
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -593,7 +624,7 @@ namespace currency
     {
       res.aliases_que.push_back(alias_info_to_rpc_alias_info(a));
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -605,7 +636,7 @@ namespace currency
       error_resp.message = "the requested block has not been found";
       return false;
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -617,14 +648,14 @@ namespace currency
       error_resp.message = "the requested block has not been found";
       return false;
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_alt_blocks_details(const COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::response& res, connection_context& cntx)
   {
     m_core.get_blockchain_storage().get_alt_blocks_rpc_details(req.offset, req.count, res.blocks);
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -643,7 +674,7 @@ namespace currency
     if (!m_p2p.get_payload_object().get_synchronized_connections_count())
     {
       LOG_PRINT_L0("[on_send_raw_tx]: Failed to send, daemon not connected to net");
-      res.status = CORE_RPC_STATUS_DISCONNECTED;
+      res.status = API_RETURN_CODE_DISCONNECTED;
       return true;
     }
 
@@ -675,7 +706,7 @@ namespace currency
     r.txs.push_back(tx_blob);
     m_core.get_protocol()->relay_transactions(r, fake_context);
     //TODO: make sure that tx has reached other nodes here, probably wait to receive reflections from other nodes
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
 	//------------------------------------------------------------------------------------------------------------------------------
@@ -699,7 +730,7 @@ namespace currency
 		currency_connection_context fake_context = AUTO_VAL_INIT(fake_context);
 		bool call_res = m_core.get_protocol()->relay_transactions(r, fake_context);
 		if (call_res)
-			res.status = CORE_RPC_STATUS_OK;
+			res.status = API_RETURN_CODE_OK;
 		return call_res;
 	}
   //------------------------------------------------------------------------------------------------------------------------------
@@ -718,7 +749,7 @@ namespace currency
       res.status = "Failed, mining not started";
       return true;
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -730,7 +761,7 @@ namespace currency
       res.status = "Failed, mining not stopped";
       return true;
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -738,7 +769,7 @@ namespace currency
   {
     CHECK_CORE_READY();
     res.count = m_core.get_current_blockchain_size();
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -839,7 +870,7 @@ namespace currency
     //calculate epoch seed
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
 
     return true;
   }
@@ -1004,7 +1035,7 @@ namespace currency
       error_resp.message = "Internal error: can't produce valid response.";
       return false;
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1045,7 +1076,7 @@ namespace currency
       error_resp.message = "Internal error: can't produce valid response.";
       return false;
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1072,7 +1103,7 @@ namespace currency
       error_resp.message = "Internal error: can't produce valid response.";
       return false;
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1092,7 +1123,7 @@ namespace currency
     }
     if(!m_core.get_blockchain_storage().get_alias_info(req.alias, aib))
     {
-      res.status = CORE_RPC_STATUS_NOT_FOUND;
+      res.status = API_RETURN_CODE_NOT_FOUND;
       return true;
     }
     res.alias_details.address = currency::get_account_address_as_str(aib.m_address);
@@ -1100,7 +1131,7 @@ namespace currency
     if (aib.m_view_key.size())
       res.alias_details.tracking_key = string_tools::pod_to_hex(aib.m_view_key.back());
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1121,7 +1152,7 @@ namespace currency
       return true;
     });
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
 
@@ -1140,7 +1171,7 @@ namespace currency
       alias_info_to_rpc_alias_info(alias, ai, res.aliases.back());
     }, req.offset, req.count);
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
 
@@ -1205,7 +1236,7 @@ namespace currency
   {
     if(!check_core_ready())
     {
-      res.status = CORE_RPC_STATUS_BUSY;
+      res.status = API_RETURN_CODE_BUSY;
       return true;
     }
     
@@ -1224,7 +1255,7 @@ namespace currency
       }
     }
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1232,7 +1263,7 @@ namespace currency
   {
     if(!check_core_ready())
     {
-      res.status = CORE_RPC_STATUS_BUSY;
+      res.status = API_RETURN_CODE_BUSY;
       return true;
     }
     
@@ -1257,9 +1288,20 @@ namespace currency
     res.reward = get_alias_coast_from_fee(req.alias, std::max(default_tx_fee, current_median_fee));
 
     if (res.reward)
-      res.status = CORE_RPC_STATUS_OK;
+      res.status = API_RETURN_CODE_OK;
     else
-      res.status = CORE_RPC_STATUS_NOT_FOUND;
+      res.status = API_RETURN_CODE_NOT_FOUND;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_est_height_from_date(const COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& req, COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& res, connection_context& cntx)
+  {
+    bool r = m_core.get_blockchain_storage().get_est_height_from_date(req.timestamp, res.h);
+
+    if (r)
+      res.status = API_RETURN_CODE_OK;
+    else
+      res.status = API_RETURN_CODE_NOT_FOUND;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1268,7 +1310,7 @@ namespace currency
     account_public_address addr = AUTO_VAL_INIT(addr);
     if (!get_account_address_from_str(addr, req))
     {
-      res.status = CORE_RPC_STATUS_FAILED;
+      res.status = API_RETURN_CODE_FAIL;
       return true;
     }
     //res.alias = m_core.get_blockchain_storage().get_alias_by_address(addr);
@@ -1278,20 +1320,20 @@ namespace currency
     req2.alias = m_core.get_blockchain_storage().get_alias_by_address(addr);
     if (!req2.alias.size())
     {
-      res.status = CORE_RPC_STATUS_NOT_FOUND;
+      res.status = API_RETURN_CODE_NOT_FOUND;
       return true;
     }
 
     bool r = this->on_get_alias_details(req2, res2, error_resp, cntx);
-    if (!r || res2.status != CORE_RPC_STATUS_OK)
+    if (!r || res2.status != API_RETURN_CODE_OK)
     {
-      res.status = CORE_RPC_STATUS_FAILED;
+      res.status = API_RETURN_CODE_FAIL;
       return true;
     }
 
     res.alias_info.details = res2.alias_details;
     res.alias_info.alias = req2.alias;
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1299,7 +1341,7 @@ namespace currency
   {
     if(!check_core_ready())
     {
-      res.status = CORE_RPC_STATUS_BUSY;
+      res.status = API_RETURN_CODE_BUSY;
       return true;
     }
     block b = AUTO_VAL_INIT(b);
@@ -1317,7 +1359,7 @@ namespace currency
       LOG_ERROR("Submited block not accepted");
       return true;
     }
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1325,19 +1367,19 @@ namespace currency
   {
     if (!check_core_ready())
     {
-      res.status = CORE_RPC_STATUS_BUSY;
+      res.status = API_RETURN_CODE_BUSY;
       return true;
     }
 
 
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_reset_transaction_pool(const COMMAND_RPC_RESET_TX_POOL::request& req, COMMAND_RPC_RESET_TX_POOL::response& res, connection_context& cntx)
   {
     m_core.get_tx_pool().purge_transactions();
-    res.status = CORE_RPC_STATUS_OK;
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
 }

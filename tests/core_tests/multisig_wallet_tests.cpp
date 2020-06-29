@@ -92,9 +92,9 @@ void transfer_multisig(tools::wallet2& w,
       COMMAND_RPC_SEND_RAW_TX::response daemon_send_resp;
       bool r = w.get_core_proxy()->call_COMMAND_RPC_SEND_RAW_TX(req, daemon_send_resp);
       THROW_IF_TRUE_WALLET_EX(!r, tools::error::no_connection_to_daemon, "sendrawtransaction");
-      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == CORE_RPC_STATUS_BUSY, tools::error::daemon_busy, "sendrawtransaction");
-      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == CORE_RPC_STATUS_DISCONNECTED, tools::error::wallet_internal_error, "Transfer attempt while daemon offline");
-      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != CORE_RPC_STATUS_OK, tools::error::tx_rejected, tx, daemon_send_resp.status);
+      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_BUSY, tools::error::daemon_busy, "sendrawtransaction");
+      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, tools::error::wallet_internal_error, "Transfer attempt while daemon offline");
+      THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, tools::error::tx_rejected, tx, daemon_send_resp.status);
     }
 }
 
@@ -1370,10 +1370,10 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
       for (auto& p : participants)
       {
         crypto::key_derivation der = AUTO_VAL_INIT(der);
-        r = crypto::generate_key_derivation(p.m_view_public_key, tx_key.sec, der);
+        r = crypto::generate_key_derivation(p.view_public_key, tx_key.sec, der);
         CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
         crypto::public_key key = AUTO_VAL_INIT(key);
-        r = crypto::derive_public_key(der, multisig_out_idx, p.m_spend_public_key, key);
+        r = crypto::derive_public_key(der, multisig_out_idx, p.spend_public_key, key);
         CHECK_AND_ASSERT_MES(r, false, "derive_public_key failed");
         ms_out_target.keys.push_back(key);
       }

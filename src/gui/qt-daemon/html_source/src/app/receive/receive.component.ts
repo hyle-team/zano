@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {ActivatedRoute} from '@angular/router';
+import {RCV_ADDR_QR_SCALE} from '../_shared/constants';
 
 @Component({
   selector: 'app-receive',
@@ -24,8 +25,8 @@ export class ReceiveComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.parentRouting = this.route.parent.params.subscribe(() => {
       QRCode.toDataURL(this.variablesService.currentWallet.address, {
-        width: 106,
-        height: 106
+        width: 106 * RCV_ADDR_QR_SCALE,
+        height: 106 * RCV_ADDR_QR_SCALE
       }).then(url => {
         this.qrImageSrc = url;
       }).catch(err => {

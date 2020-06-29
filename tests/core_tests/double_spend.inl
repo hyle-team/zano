@@ -88,7 +88,7 @@ bool gen_double_spend_in_tx<txs_kept_by_block>::generate(std::vector<test_event_
   sources.push_back(se);
 
   currency::tx_destination_entry de = AUTO_VAL_INIT(de);
-  de.addr.push_back(alice_account.get_keys().m_account_address);
+  de.addr.push_back(alice_account.get_keys().account_address);
   de.amount = 2 * se.amount - TESTS_DEFAULT_FEE;
   std::vector<currency::tx_destination_entry> destinations;
   destinations.push_back(de);

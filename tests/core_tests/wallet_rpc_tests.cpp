@@ -117,7 +117,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   tools::wallet_public::COMMAND_RPC_TRANSFER::request  req = AUTO_VAL_INIT(req);
   req.fee = TESTS_DEFAULT_FEE;
   req.mixin = 0;
-  tools::wallet_public::trnsfer_destination tds = AUTO_VAL_INIT(tds);
+  tools::wallet_public::transfer_destination tds = AUTO_VAL_INIT(tds);
   tds.address = alice_integrated_address;
   tds.amount = MK_TEST_COINS(3);
   req.destinations.push_back(tds);
@@ -152,7 +152,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
 
   // 3. standard address + invalid external payment id => fail
   req.destinations.clear();
-  tools::wallet_public::trnsfer_destination tds2 = AUTO_VAL_INIT(tds2);
+  tools::wallet_public::transfer_destination tds2 = AUTO_VAL_INIT(tds2);
   tds2.address = m_accounts[ALICE_ACC_IDX].get_public_address_str();
   tds2.amount = MK_TEST_COINS(7);
   req.destinations.push_back(tds2);

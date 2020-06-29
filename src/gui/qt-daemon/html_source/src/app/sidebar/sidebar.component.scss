@@ -17,13 +17,86 @@
 
     width: 2rem;
     height: 2rem;
-  
+
     path, circle, polygon {
       fill: #4db1ff;
     }
-  } 
+  }
 }
-
+.wallet-type {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 7px;
+  background-color: transparent;
+  transition: all ease .3s;
+  > div {
+    height: 100%;
+    width: 100%;
+  }
+  &:hover {
+    height: auto;
+    .content {
+      opacity: 1;
+    }
+    .auditable {
+      background-color: transparent;
+      .content {
+        margin: 0 3rem;
+        background-color: #5cda9d;
+      }
+    }
+    .watch-only {
+      background-color: transparent;
+      .content {
+        margin: 0 3rem;
+        background-color: #8686ff;
+      }
+    }
+    .auditable-watch-only {
+      > div:first-child {
+        margin-right: 10px;
+        margin-left: 3rem;
+      }
+      > div:last-child {
+        margin-right: 3rem;
+      }
+    }
+  }
+  .content {
+    padding: 5px;
+    font-size: 12px;
+    text-align: center;
+    color: #000000;
+    text-decoration: none;
+    text-transform: capitalize;
+    transition: all ease .3s;
+    opacity: 0;
+  }
+  .auditable {
+    background-color: #5cda9d;
+  }
+  .watch-only {
+    background-color: #8686ff;
+  }
+  .auditable-watch-only {
+    display: flex;
+    > div {
+      transition: all ease .3s;
+      width: 100%;
+      .content {
+        transition: none;
+      }
+      &:first-child {
+        background-color: #5cda9d;
+      }
+      &:last-child {
+        background-color: #8686ff;
+      }
+    }
+  }
+}
 .sidebar-accounts {
   position: relative;
   display: flex;
@@ -57,12 +130,13 @@
     overflow-y: overlay;
 
     .sidebar-account {
+      position: relative;
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
       cursor: pointer;
       padding: 2rem 3rem;
-      
+
       .close-wallet-wrapper {
         display: flex;
         justify-content: flex-end;
@@ -70,12 +144,13 @@
         button {
           display: flex;
           position: absolute;
+          top: 6px;
+          right: -20px;
           padding: 0;
           height: auto;
           background: transparent;
           border: none;
-          margin: -1.3rem 1.6rem;
-    
+
           .icon {
             width: 1.3rem;
             height: 1.3rem;
@@ -86,7 +161,7 @@
           }
         }
       }
-      
+
 
       .sidebar-account-row {
         display: flex;
@@ -205,7 +280,7 @@
           }
         }
 
-        
+
       }
 
       &:focus {
@@ -323,7 +398,7 @@
           font-size: 1.3rem;
           line-height: 0.7rem;
           padding-left: 0.7rem;
-        }       
+        }
       }
 
       .loading {

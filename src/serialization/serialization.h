@@ -98,14 +98,14 @@ do { \
   if (!ar.stream().good()) return false; \
 } while (0);
 
-#define DEFINE_SERIALIZATION_VERSION(v) inline static uint32_t get_serialization_veraion(){ return v; }
+#define DEFINE_SERIALIZATION_VERSION(v) inline static uint32_t get_serialization_version() { return v; }
 
 
 #define VERSION_ENTRY(f) \
 do { \
   ar.tag(#f); \
   if (ar.is_saving_arch())  \
-    f = this->get_serialization_veraion(); \
+    f = this->get_serialization_version(); \
   bool r = ::do_serialize(ar, f); \
   if (!r || !ar.stream().good()) return false; \
 } while (0);
