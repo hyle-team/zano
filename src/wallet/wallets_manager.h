@@ -148,7 +148,7 @@ public:
   void toggle_pos_mining();
   std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
-  std::string is_valid_brain_restore_data(const std::string& brain_text);
+  std::string is_valid_brain_restore_data(const std::string& seed_phrase);
 #ifndef MOBILE_WALLET_BUILD
   void subscribe_to_core_events(currency::i_core_event_handler* pevents_handler);
   //void unsubscribe_to_core_events();

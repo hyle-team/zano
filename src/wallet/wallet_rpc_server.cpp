@@ -196,7 +196,7 @@ namespace tools
       res.path = epee::string_encoding::convert_to_ansii(m_wallet.get_wallet_path());
       res.transfers_count = m_wallet.get_recent_transfers_total_count();
       res.transfer_entries_count = m_wallet.get_transfer_entries_count();
-      res.seed = m_wallet.get_account().get_restore_braindata();
+      res.seed = m_wallet.get_account().get_seed_phrase();
       std::map<uint64_t, uint64_t> distribution;
       m_wallet.get_utxo_distribution(distribution);
       for (const auto& ent : distribution)

@@ -313,10 +313,10 @@ namespace currency
     return string_tools::get_xtype_from_string(amount, str_amount);
   }
   //--------------------------------------------------------------------------------
-  bool parse_awo_blob(const std::string& awo_blob, account_public_address& address, crypto::secret_key& view_sec_key, uint64_t& creation_timestamp)
+  bool parse_tracking_seed(const std::string& tracking_seed, account_public_address& address, crypto::secret_key& view_sec_key, uint64_t& creation_timestamp)
   {
     std::vector<std::string> parts;
-    boost::split(parts, awo_blob, [](char x){ return x == ':'; } );
+    boost::split(parts, tracking_seed, [](char x){ return x == ':'; } );
     if (parts.size() != 2 && parts.size() != 3)
       return false;
 

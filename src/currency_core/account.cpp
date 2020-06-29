@@ -60,7 +60,7 @@ namespace currency
     return m_keys;
   }
   //-----------------------------------------------------------------
-  std::string account_base::get_restore_braindata() const 
+  std::string account_base::get_seed_phrase() const 
   {
     if (m_keys_seed_binary.empty())
       return "";
@@ -87,7 +87,7 @@ namespace currency
     return keys_seed_text + " " + timestamp_word + " " + auditable_flag_and_checksum_word;
   }
   //-----------------------------------------------------------------
-  std::string account_base::get_awo_blob() const
+  std::string account_base::get_tracking_seed() const
   {
     return get_public_address_str() + ":" +
       epee::string_tools::pod_to_hex(m_keys.view_secret_key) +
@@ -104,7 +104,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
-  bool account_base::restore_from_braindata(const std::string& seed_phrase)
+  bool account_base::restore_from_seed_phrase(const std::string& seed_phrase)
   {
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
@@ -169,10 +169,10 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
-  bool account_base::restore_from_awo_blob(const std::string& awo_blob)
+  bool account_base::restore_from_tracking_seed(const std::string& tracking_seed)
   {
     set_null();
-    bool r = parse_awo_blob(awo_blob, m_keys.account_address, m_keys.view_secret_key, m_creation_timestamp);
+    bool r = parse_tracking_seed(tracking_seed, m_keys.account_address, m_keys.view_secret_key, m_creation_timestamp);
     return r;
   }
   //-----------------------------------------------------------------

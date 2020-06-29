@@ -1036,13 +1036,13 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
   // Make sure a wallet, restored from awo blob will has the very same balance
   //
   account_base& bob_acc = m_accounts[BOB_ACC_IDX];
-  std::string bob_awo_blob = bob_acc.get_awo_blob();
+  std::string bob_tracking_seed = bob_acc.get_tracking_seed();
 
   std::shared_ptr<tools::wallet2> bob_wlt_awo_restored = std::make_shared<tools::wallet2>();
 
   boost::filesystem::remove(bob_wo_restored_filename, ec);
 
-  bob_wlt_awo_restored->restore(bob_wo_restored_filename, "", bob_awo_blob, true);
+  bob_wlt_awo_restored->restore(bob_wo_restored_filename, "", bob_tracking_seed, true);
   bob_wlt_awo_restored->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
   bob_wlt_awo_restored->set_core_proxy(m_core_proxy);
 
@@ -1073,7 +1073,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
   // Restore Bob wallet as non-auditable and spend mix_attr!=1 output => make sure other auditable Bob's wallets remain intact
   //
 
-  std::string bob_seed = bob_wlt->get_account().get_restore_braindata();
+  std::string bob_seed = bob_wlt->get_account().get_seed_phrase();
   bob_seed.erase(bob_seed.find_last_of(" ")); // remove the last word (with flags and checksum) to make seed old-format 25-words non-auditable with the same keys
 
   std::shared_ptr<tools::wallet2> bob_wlt_non_auditable = std::make_shared<tools::wallet2>();
@@ -1139,9 +1139,9 @@ bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::generate(std::vector<te
   test_core_time::adjust(ts);
 
   m_accounts.resize(TOTAL_ACCS_COUNT);
-  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); // miner_acc.restore_from_braindata("use use use use use use use use use use use use use use use use use use use use use use use use out");
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); // miner_acc.restore_from_seed_phrase("use use use use use use use use use use use use use use use use use use use use use use use use out");
   miner_acc.set_createtime(ts);
-  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); // alice_acc.restore_from_braindata("any any any any any any any any any any any any any any any any any any any any any any any any out");
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); // alice_acc.restore_from_seed_phrase("any any any any any any any any any any any any any any any any any any any any any any any any out");
   alice_acc.set_createtime(ts);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
