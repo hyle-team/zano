@@ -1,16 +1,18 @@
 <div class="header">
   <div>
     <h3 tooltip="{{ variablesService.currentWallet.name }}" placement="bottom-left" tooltipClass="table-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{variablesService.currentWallet.name}}</h3>
-    <button [routerLink]="['/assign-alias']" *ngIf="!variablesService.currentWallet.alias.hasOwnProperty('name') && variablesService.currentWallet.loaded && variablesService.daemon_state === 2 && variablesService.currentWallet.alias_available">
-      <i class="icon account"></i>
-      <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>
-    </button>
-    <div class="alias" *ngIf="variablesService.currentWallet.alias.hasOwnProperty('name') && variablesService.currentWallet.loaded && variablesService.daemon_state === 2">
-      <span>{{variablesService.currentWallet.alias['name']}}</span>
-      <ng-container *ngIf="variablesService.currentWallet.alias_available">
-        <i class="icon edit" [routerLink]="['/edit-alias']" tooltip="{{ 'WALLET.TOOLTIPS.EDIT_ALIAS' | translate }}" placement="bottom-right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500"></i>
-        <i class="icon transfer" [routerLink]="['/transfer-alias']" tooltip="{{ 'WALLET.TOOLTIPS.TRANSFER_ALIAS' | translate }}" placement="right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500"></i>
-      </ng-container>
+    <div *ngIf="!variablesService.currentWallet.is_auditable">
+      <button [routerLink]="['/assign-alias']" *ngIf="!variablesService.currentWallet.alias.hasOwnProperty('name') && variablesService.currentWallet.loaded && variablesService.daemon_state === 2 && variablesService.currentWallet.alias_available">
+        <i class="icon account"></i>
+        <span>{{ 'WALLET.REGISTER_ALIAS' | translate }}</span>
+      </button>
+      <div class="alias" *ngIf="variablesService.currentWallet.alias.hasOwnProperty('name') && variablesService.currentWallet.loaded && variablesService.daemon_state === 2">
+        <span>{{variablesService.currentWallet.alias['name']}}</span>
+        <ng-container *ngIf="variablesService.currentWallet.alias_available">
+          <i class="icon edit" [routerLink]="['/edit-alias']" tooltip="{{ 'WALLET.TOOLTIPS.EDIT_ALIAS' | translate }}" placement="bottom-right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500"></i>
+          <i class="icon transfer" [routerLink]="['/transfer-alias']" tooltip="{{ 'WALLET.TOOLTIPS.TRANSFER_ALIAS' | translate }}" placement="right" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500"></i>
+        </ng-container>
+      </div>
     </div>
   </div>
   <div>

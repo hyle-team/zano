@@ -73,6 +73,15 @@
       > label {
         top: 3.5rem;
       }
+      &.disabled-checkbox-block {
+        label {
+          cursor: not-allowed;
+          &:before {
+            background-color: #556576;
+            border: 0.1rem solid #556576;
+          }
+        }
+      }
     }
   }
 
