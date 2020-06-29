@@ -7,16 +7,16 @@
 #include "include_base_utils.h"
 #include "currency_core/account.h"
 
-TEST(brain_wallet, store_restore_test) 
+TEST(wallet_seed, store_restore_test) 
 {
   for (size_t i = 0; i != 100; i++)
   {
     currency::account_base acc;
     acc.generate();
-    auto seed_phrase = acc.get_restore_braindata();
+    auto seed_phrase = acc.get_seed_phrase();
     
     currency::account_base acc2;
-    bool r = acc2.restore_from_braindata(seed_phrase);
+    bool r = acc2.restore_from_seed_phrase(seed_phrase);
     ASSERT_TRUE(r);
 
     if (memcmp(&acc2.get_keys(), &acc.get_keys(), sizeof(currency::account_keys)))
@@ -29,10 +29,10 @@ TEST(brain_wallet, store_restore_test)
   {
     currency::account_base acc;
     acc.generate();
-    auto seed_phrase = acc.get_restore_braindata();
+    auto seed_phrase = acc.get_seed_phrase();
 
     currency::account_base acc2;
-    bool r = acc2.restore_from_braindata(seed_phrase);
+    bool r = acc2.restore_from_seed_phrase(seed_phrase);
     ASSERT_TRUE(r);
 
     if (memcmp(&acc2.get_keys(), &acc.get_keys(), sizeof(currency::account_keys)))
@@ -148,7 +148,7 @@ TEST(wallet_seed, basic_test)
     bool r = false;
     try
     {
-      r = acc.restore_from_braindata(wse.seed_phrase);
+      r = acc.restore_from_seed_phrase(wse.seed_phrase);
     }
     catch (...)
     {
