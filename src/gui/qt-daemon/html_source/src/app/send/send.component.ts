@@ -17,6 +17,7 @@ export class SendComponent implements OnInit, OnDestroy {
   isOpen = false;
   localAliases = [];
   isModalDialogVisible = false;
+  hideWalletAddress = false;
   mixin: number;
 
   currentWalletId = null;
@@ -122,6 +123,10 @@ export class SendComponent implements OnInit, OnDestroy {
       if (this.variablesService.currentWallet.is_auditable) {
         this.mixin = 0;
         this.sendForm.controls['mixin'].disable();
+      }
+      this.hideWalletAddress = this.variablesService.currentWallet.is_auditable && !this.variablesService.currentWallet.is_watch_only;
+      if (this.hideWalletAddress) {
+        this.sendForm.controls['hide'].disable();
       }
       this.sendForm.reset({
         address: this.variablesService.currentWallet.send_data['address'],

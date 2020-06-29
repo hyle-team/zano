@@ -76,8 +76,8 @@
       </div>
     </div>
 
-    <div class="checkbox-block">
-      <input type="checkbox" id="send-hide" class="style-checkbox" formControlName="hide">
+    <div class="checkbox-block" [ngClass]="{'disabled-checkbox-block': hideWalletAddress}">
+      <input type="checkbox" id="send-hide" class="style-checkbox" formControlName="hide" [checked]= "hideWalletAddress">
       <label for="send-hide">{{ 'SEND.HIDE' | translate }}</label>
     </div>
 
