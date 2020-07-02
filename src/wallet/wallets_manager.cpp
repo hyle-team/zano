@@ -117,6 +117,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[])
   command_line::add_arg(desc_cmd_only, command_line::arg_os_version);
   // tools::get_default_data_dir() can't be called during static initialization
   command_line::add_arg(desc_cmd_only, command_line::arg_data_dir, tools::get_default_data_dir());
+  command_line::add_arg(desc_cmd_only, command_line::arg_stop_after_height);
   command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
 
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_dir);

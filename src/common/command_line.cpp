@@ -13,6 +13,8 @@ namespace command_line
   const arg_descriptor<bool>		arg_help = {"help", "Produce help message"};
   const arg_descriptor<bool>		arg_version = {"version", "Output version information"};
   const arg_descriptor<std::string> arg_data_dir = {"data-dir", "Specify data directory", ""};
+  
+  const arg_descriptor<int>         arg_stop_after_height = { "stop-after-height", "If specified, the daemon will stop immediately after a block with the given height is added", 0 };
 
   const arg_descriptor<std::string> arg_config_file =  { "config-file", "Specify configuration file", std::string(CURRENCY_NAME_SHORT ".conf") };
   const arg_descriptor<bool>        arg_os_version =   { "os-version", "" };

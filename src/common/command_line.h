@@ -198,6 +198,7 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_help;
   extern const arg_descriptor<bool>        arg_version;
   extern const arg_descriptor<std::string> arg_data_dir;
+  extern const arg_descriptor<int>         arg_stop_after_height;
   extern const arg_descriptor<std::string> arg_config_file;
   extern const arg_descriptor<bool>        arg_os_version;
   extern const arg_descriptor<std::string> arg_log_dir;

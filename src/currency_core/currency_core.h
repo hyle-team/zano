@@ -143,6 +143,7 @@ namespace currency
      miner m_miner;
      account_public_address m_miner_address;
      std::string m_config_folder;
+     uint64_t m_stop_after_height;
      currency_protocol_stub m_protocol_stub;
      math_helper::once_a_time_seconds<60*60*12, false> m_prune_alt_blocks_interval;
      math_helper::once_a_time_seconds<60, true> m_check_free_space_interval;
