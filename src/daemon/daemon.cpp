@@ -88,6 +88,16 @@ struct core_critical_error_handler_t : public currency::i_critical_error_handler
     */
   }
 
+  virtual bool on_immediate_stop_requested() override
+  {
+    LOG_PRINT_L0(ENDL << ENDL << "immediate daemon stop requested, stopping..." << ENDL << ENDL);
+
+    dch.stop_handling();
+    p2psrv.send_stop_signal();
+    return true; // the caller must stop processing
+  }
+
+
   daemon_commands_handler& dch;
   p2psrv_t& p2psrv;
   bool dont_stop_on_time_error;
@@ -137,6 +147,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_only, command_line::arg_os_version);
   // tools::get_default_data_dir() can't be called during static initialization
   command_line::add_arg(desc_cmd_only, command_line::arg_data_dir, tools::get_default_data_dir());
+  command_line::add_arg(desc_cmd_only, command_line::arg_stop_after_height);
   command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
   command_line::add_arg(desc_cmd_only, command_line::arg_disable_upnp);
 

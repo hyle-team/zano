@@ -59,13 +59,24 @@ namespace tools
 
     bool lmdb_db_backend::open_container(const std::string& name, container_handle& h)
     {
-
       MDB_dbi dbi = AUTO_VAL_INIT(dbi);
       begin_transaction();
       int res = mdb_dbi_open(get_current_tx(), name.c_str(), MDB_CREATE, &dbi);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_dbi_open with container name: " << name);
       commit_transaction();
       h = static_cast<container_handle>(dbi);
+      return true;
+    }
+
+    bool lmdb_db_backend::close_container(container_handle& h)
+    {
+      static const container_handle null_handle = AUTO_VAL_INIT(null_handle);
+      CHECK_AND_ASSERT_MES(h != null_handle, false, "close_container is called for null container handle");
+      MDB_dbi dbi = static_cast<MDB_dbi>(h);
+      begin_transaction();
+      mdb_dbi_close(m_penv, dbi);
+      commit_transaction();
+      h = null_handle;
       return true;
     }
 

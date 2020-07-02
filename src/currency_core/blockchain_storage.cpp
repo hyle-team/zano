@@ -299,12 +299,65 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     if (m_db_blocks.size() != 0)
     {
 #ifndef TESTNET
-      if (m_db_storage_major_compatibility_version == 93 && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 94)
+      if ((m_db_storage_major_compatibility_version == 93 || m_db_storage_major_compatibility_version == 94) && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 95)
+      {
+        // migrate DB to rebuild aliases container
+        LOG_PRINT_MAGENTA("Migrating DB: " << m_db_storage_major_compatibility_version << " -> " << BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION, LOG_LEVEL_0);
+
+        res = m_db_aliases.deinit();
+        CHECK_AND_ASSERT_MES(res, false, "Unable to deinit db container");
+
+        typedef tools::db::cached_key_value_accessor<std::string, std::list<extra_alias_entry_base_old>, true, true> aliases_container_old;
+        aliases_container_old db_aliases_old(m_db);
+        res = db_aliases_old.init(BLOCKCHAIN_STORAGE_CONTAINER_ALIASES);
+        CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+
+        // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
+        m_db.begin_transaction();
+        uint64_t tmp_db_maj_version = m_db_storage_major_compatibility_version;
+        m_db_storage_major_compatibility_version = 0;
+        m_db.commit_transaction();
+
+        typedef std::vector<std::pair<std::string, std::list<extra_alias_entry_base>>> tmp_container_t;
+        tmp_container_t temp_container;
+        db_aliases_old.enumerate_items([&temp_container](uint64_t i, const std::string& alias, const std::list<extra_alias_entry_base_old>& alias_entries)
+        {
+          std::pair<std::string, std::list<extra_alias_entry_base>> p(alias, std::list<extra_alias_entry_base>());
+          for(auto& entry : alias_entries)
+            p.second.push_back(static_cast<extra_alias_entry_base>(entry)); // here conversion to the new format goes
+          temp_container.emplace_back(p);
+          return true;
+        });
+
+        // clear and close old format container
+        m_db.begin_transaction();
+        db_aliases_old.clear();
+        m_db.commit_transaction();
+        db_aliases_old.deinit();
+  
+        res = m_db_aliases.init(BLOCKCHAIN_STORAGE_CONTAINER_ALIASES);
+        CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+
+        // re-populate all alias entries back
+        m_db.begin_transaction();
+        for(auto& el : temp_container)
+          m_db_aliases.set(el.first, el.second);
+        m_db.commit_transaction();
+
+        // restore db maj compartibility
+        m_db.begin_transaction();
+        m_db_storage_major_compatibility_version = tmp_db_maj_version;
+        m_db.commit_transaction();
+
+        LOG_PRINT_MAGENTA("Migrating DB: successfully done", LOG_LEVEL_0);
+      }
+      else if (m_db_storage_major_compatibility_version == 93 && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 94)
       {
         // do not reinit db if moving from version 93 to version 94
         LOG_PRINT_MAGENTA("DB storage does not need reinit because moving from v93 to v94", LOG_LEVEL_0);
       }
 #else
+      // TESTNET
       if (m_db_storage_major_compatibility_version == 95 && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 96)
       {
         // do not reinit TESTNET db if moving from version 95 to version 96

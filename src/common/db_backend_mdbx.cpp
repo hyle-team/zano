@@ -66,13 +66,25 @@ namespace tools
 
     bool mdbx_db_backend::open_container(const std::string& name, container_handle& h)
     {
-
       MDBX_dbi dbi = AUTO_VAL_INIT(dbi);
       begin_transaction();
       int res = mdbx_dbi_open(get_current_tx(), name.c_str(), MDBX_CREATE, &dbi);
       CHECK_AND_ASSERT_MESS_MDBX_DB(res, false, "Unable to mdbx_dbi_open with container name: " << name);
       commit_transaction();
       h = static_cast<container_handle>(dbi);
+      return true;
+    }
+
+    bool mdbx_db_backend::close_container(container_handle& h)
+    {
+      static const container_handle null_handle = AUTO_VAL_INIT(null_handle);
+      CHECK_AND_ASSERT_MES(h != null_handle, false, "close_container is called for null container handle");
+
+      MDBX_dbi dbi = static_cast<MDBX_dbi>(h);
+      begin_transaction();
+      mdbx_dbi_close(m_penv, dbi);
+      commit_transaction();
+      h = null_handle;
       return true;
     }
 

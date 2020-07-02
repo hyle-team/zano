@@ -584,10 +584,13 @@ namespace tools
         m_explicit_set_profiler.m_name  = "";
         m_commit_profiler.m_name        = "";
 #endif
+        bool r = true;
+        if (m_h)
+          r = bdb.get_backend()->close_container(m_h);
         m_h = AUTO_VAL_INIT(m_h);
         size_cache = 0;
         size_cache_valid = false;
-        return true;
+        return r;
       }
 
       template<class t_cb>
