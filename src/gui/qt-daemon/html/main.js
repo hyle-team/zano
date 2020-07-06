@@ -225,8 +225,8 @@ var InputValidateDirective = /** @class */ (function () {
         }
         currentValue = _zero_fill.join('.');
         if (currentValue !== originalValue) {
-            var cursorPosition = event.target.selectionEnd;
             event.target.value = currentValue;
+            var cursorPosition = event.target.selectionEnd;
             event.target.setSelectionRange(cursorPosition, cursorPosition);
             event.target.dispatchEvent(new Event('input'));
         }
