@@ -60,7 +60,9 @@ export class LoginComponent implements OnInit, OnDestroy {
           this.backend.storeSecureAppData({pass: this.variablesService.appPass});
           this.variablesService.appLogin = true;
           this.variablesService.dataIsLoaded = true;
-          this.variablesService.startCountdown();
+          if (this.variablesService.settings.appLockTime) {
+            this.variablesService.startCountdown();
+          }
           this.ngZone.run(() => {
             this.router.navigate(['/']);
           });
@@ -95,7 +97,9 @@ export class LoginComponent implements OnInit, OnDestroy {
          this.backend.checkMasterPassword({pass: this.variablesService.appPass}, (status, data) => {
            if (status) {
               this.variablesService.appLogin = true;
-              this.variablesService.startCountdown();
+               if (this.variablesService.settings.appLockTime) {
+                 this.variablesService.startCountdown();
+               }
               this.ngZone.run(() => {
                 this.router.navigate(['/']);
               });
@@ -112,7 +116,9 @@ export class LoginComponent implements OnInit, OnDestroy {
       if (!data.error_code) {
         this.variablesService.appLogin = true;
         this.variablesService.dataIsLoaded = true;
-        this.variablesService.startCountdown();
+        if (this.variablesService.settings.appLockTime) {
+          this.variablesService.startCountdown();
+        }
         this.variablesService.appPass = appPass;
         const isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
 
