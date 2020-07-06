@@ -5430,7 +5430,9 @@ var LoginComponent = /** @class */ (function () {
                     _this.backend.storeSecureAppData({ pass: _this.variablesService.appPass });
                     _this.variablesService.appLogin = true;
                     _this.variablesService.dataIsLoaded = true;
-                    _this.variablesService.startCountdown();
+                    if (_this.variablesService.settings.appLockTime) {
+                        _this.variablesService.startCountdown();
+                    }
                     _this.ngZone.run(function () {
                         _this.router.navigate(['/']);
                     });
@@ -5465,7 +5467,9 @@ var LoginComponent = /** @class */ (function () {
                 this.backend.checkMasterPassword({ pass: this.variablesService.appPass }, function (status, data) {
                     if (status) {
                         _this.variablesService.appLogin = true;
-                        _this.variablesService.startCountdown();
+                        if (_this.variablesService.settings.appLockTime) {
+                            _this.variablesService.startCountdown();
+                        }
                         _this.ngZone.run(function () {
                             _this.router.navigate(['/']);
                         });
@@ -5483,7 +5487,9 @@ var LoginComponent = /** @class */ (function () {
             if (!data.error_code) {
                 _this.variablesService.appLogin = true;
                 _this.variablesService.dataIsLoaded = true;
-                _this.variablesService.startCountdown();
+                if (_this.variablesService.settings.appLockTime) {
+                    _this.variablesService.startCountdown();
+                }
                 _this.variablesService.appPass = appPass;
                 var isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
                 if (_this.variablesService.wallets.length) {
@@ -7608,7 +7614,9 @@ var SettingsComponent = /** @class */ (function () {
                         _this.backend.storeSecureAppData({ pass: _this.variablesService.appPass });
                         _this.variablesService.appLogin = true;
                         _this.variablesService.dataIsLoaded = true;
-                        _this.variablesService.startCountdown();
+                        if (_this.variablesService.settings.appLockTime) {
+                            _this.variablesService.startCountdown();
+                        }
                     }
                     else {
                         console.log(data['error_code']);
@@ -7622,7 +7630,7 @@ var SettingsComponent = /** @class */ (function () {
         }
     };
     SettingsComponent.prototype.onLockChange = function () {
-        if (this.variablesService.appLogin) {
+        if (this.variablesService.appLogin && this.variablesService.settings.appLockTime) {
             this.variablesService.restartCountdown();
         }
         this.backend.storeAppData();

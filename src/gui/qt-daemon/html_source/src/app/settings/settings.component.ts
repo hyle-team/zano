@@ -153,7 +153,9 @@ export class SettingsComponent implements OnInit {
             this.backend.storeSecureAppData({pass: this.variablesService.appPass});
             this.variablesService.appLogin = true;
             this.variablesService.dataIsLoaded = true;
-            this.variablesService.startCountdown();
+            if (this.variablesService.settings.appLockTime) {
+              this.variablesService.startCountdown();
+            }
           } else {
             console.log(data['error_code']);
           }
@@ -166,7 +168,7 @@ export class SettingsComponent implements OnInit {
   }
 
   onLockChange() {
-    if (this.variablesService.appLogin) {
+    if (this.variablesService.appLogin && this.variablesService.settings.appLockTime) {
       this.variablesService.restartCountdown();
     }
     this.backend.storeAppData();
