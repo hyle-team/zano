@@ -6,9 +6,13 @@
 
 #include <cstdint>
 #include <vector>
+#include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/invert.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
 
-#include "common/encryption_sink.h"
+#include "common/encryption_filter.h"
 #include "crypto/crypto.h"
+
 
 TEST(chacha_stream_test, chacha_stream_test)
 {
@@ -19,53 +23,94 @@ TEST(chacha_stream_test, chacha_stream_test)
   {
     buff[i] = i % 255;
   }
-  for (size_t i = 0;  i!= 100; i++)
-  {
-    std::cout << "Encrypting..." << std::endl;
-    std::stringstream encrypted;
-    crypto::chacha8_iv iv = crypto::rand<crypto::chacha8_iv>();
+//   for (size_t i = 0;  i!= 100; i++)
+//   {
+//     std::cout << "Encrypting..." << std::endl;
+//     std::stringstream encrypted;
+//     crypto::chacha8_iv iv = crypto::rand<crypto::chacha8_iv>();
+// 
+//     encrypt_chacha_sink sink(encrypted, "pass", iv);
+// 
+//     size_t offset = 0;
+//     while (offset < buff_size)
+//     {
+//       std::streamsize count = std::rand() % 1000;
+//       if (count + offset > buff_size)
+//       {
+//         count = buff_size - offset;
+//       }
+//       sink.write(&buff[offset], count);
+// 
+//       offset += count;
+//     }
+//     sink.flush();
+//     std::string buff_encrypted = encrypted.str();
+// 
+//     std::cout << "Decrypting...";
+//     std::stringstream decrypted;
+//     encrypt_chacha_sink sink2(decrypted, "pass", iv);
+//     offset = 0;
+//     while (offset < buff_size)
+//     {
+//       std::streamsize count = std::rand() % 1000;
+//       if (count + offset > buff_size)
+//       {
+//         count = buff_size - offset;
+//       }
+//       sink2.write(&buff_encrypted[offset], count);
+// 
+//       offset += count;
+//     }
+//     sink2.flush();
+//     std::string buff_decrypted = decrypted.str();
+// 
+//     if (buff_decrypted != buff)
+//     {
+//       std::cout << "Failed" << std::endl;
+//       ASSERT_TRUE(false);
+//     }
+//     std::cout << "OK" << std::endl;
+//   }
 
-    encrypt_chacha_sink sink(encrypted, "pass", iv);
 
-    size_t offset = 0;
-    while (offset < buff_size)
-    {
-      std::streamsize count = std::rand() % 1000;
-      if (count + offset > buff_size)
-      {
-        count = buff_size - offset;
-      }
-      sink.write(&buff[offset], count);
+  crypto::chacha8_iv iv = crypto::rand<crypto::chacha8_iv>();
+  boost::filesystem::ofstream store_data_file;
+  store_data_file.open("./test.bin", std::ios_base::binary | std::ios_base::out | std::ios::trunc);
+  encrypt_chacha_filter encrypt_filter("pass", iv);
+  //boost::iostreams::stream<encrypt_chacha_sink> outputStream(sink_encrypt);
+  boost::iostreams::filtering_ostream out;
+  out.push(encrypt_filter);
+  out.push(store_data_file);
+  out << buff;
+  out.flush();
+  store_data_file.close();
 
-      offset += count;
-    }
-    sink.flush();
-    std::string buff_encrypted = encrypted.str();
 
-    std::cout << "Decrypting...";
-    std::stringstream decrypted;
-    encrypt_chacha_sink sink2(decrypted, "pass", iv);
-    offset = 0;
-    while (offset < buff_size)
-    {
-      std::streamsize count = std::rand() % 1000;
-      if (count + offset > buff_size)
-      {
-        count = buff_size - offset;
-      }
-      sink2.write(&buff_encrypted[offset], count);
+  boost::filesystem::ifstream data_file;
+  data_file.open("./test.bin", std::ios_base::binary | std::ios_base::in);
+  encrypt_chacha_filter decrypt_filter("pass", iv);
 
-      offset += count;
-    }
-    sink2.flush();
-    std::string buff_decrypted = decrypted.str();
+  boost::iostreams::filtering_istream in;
+  in.push(boost::iostreams::invert(decrypt_filter));
+  in.push(data_file);
+ 
+  //todo: read from stream
+  auto size = buff_size;
+  std::string str(size, '\0'); // construct string to stream size
 
-    if (buff_decrypted != buff)
-    {
-      std::cout << "Failed" << std::endl;
-      ASSERT_TRUE(false);
-    }
-    std::cout << "OK" << std::endl;
+  try {
+
+    in.read(&str[0], size+1);
+    std::cout << "ddd";
+
   }
+  catch (std::exception& err)
+  {
+    std::cout << err.what();
+    std::cout << err.what();
+  }
+  
+
+
 
 }
