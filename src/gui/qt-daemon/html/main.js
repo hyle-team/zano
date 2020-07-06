@@ -225,8 +225,8 @@ var InputValidateDirective = /** @class */ (function () {
         }
         currentValue = _zero_fill.join('.');
         if (currentValue !== originalValue) {
-            var cursorPosition = event.target.selectionEnd;
             event.target.value = currentValue;
+            var cursorPosition = event.target.selectionEnd;
             event.target.setSelectionRange(cursorPosition, cursorPosition);
             event.target.dispatchEvent(new Event('input'));
         }
@@ -5430,7 +5430,9 @@ var LoginComponent = /** @class */ (function () {
                     _this.backend.storeSecureAppData({ pass: _this.variablesService.appPass });
                     _this.variablesService.appLogin = true;
                     _this.variablesService.dataIsLoaded = true;
-                    _this.variablesService.startCountdown();
+                    if (_this.variablesService.settings.appLockTime) {
+                        _this.variablesService.startCountdown();
+                    }
                     _this.ngZone.run(function () {
                         _this.router.navigate(['/']);
                     });
@@ -5465,7 +5467,9 @@ var LoginComponent = /** @class */ (function () {
                 this.backend.checkMasterPassword({ pass: this.variablesService.appPass }, function (status, data) {
                     if (status) {
                         _this.variablesService.appLogin = true;
-                        _this.variablesService.startCountdown();
+                        if (_this.variablesService.settings.appLockTime) {
+                            _this.variablesService.startCountdown();
+                        }
                         _this.ngZone.run(function () {
                             _this.router.navigate(['/']);
                         });
@@ -5483,7 +5487,9 @@ var LoginComponent = /** @class */ (function () {
             if (!data.error_code) {
                 _this.variablesService.appLogin = true;
                 _this.variablesService.dataIsLoaded = true;
-                _this.variablesService.startCountdown();
+                if (_this.variablesService.settings.appLockTime) {
+                    _this.variablesService.startCountdown();
+                }
                 _this.variablesService.appPass = appPass;
                 var isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
                 if (_this.variablesService.wallets.length) {
@@ -7075,7 +7081,7 @@ var SeedPhraseComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"modal\">\n  <div class=\"title\">\n    <span>{{ 'CONFIRM.TITLE' | translate }}</span>\n  </div>\n  <div class=\"content\">\n    <div class=\"message-container\">\n      <div class=\"message-block\">\n        <div class=\"message-label\">{{ 'CONFIRM.MESSAGE.SEND' | translate }}</div>\n        <div class=\"message-text\">{{ form.get('amount').value }} {{variablesService.defaultCurrency}}</div>\n      </div>\n      <div class=\"message-block\">\n        <div class=\"message-label\">{{ 'CONFIRM.MESSAGE.FROM' | translate }}</div>\n        <div class=\"message-text\">{{ variablesService.currentWallet.address }}</div>\n      </div>\n      <div class=\"message-block\">\n        <div class=\"message-label\">{{ 'CONFIRM.MESSAGE.TO' | translate }}</div>\n        <div class=\"message-text\">{{ form.get('address').value }}</div>\n      </div>\n      <ng-container *ngIf=\"form.get('comment').value != ''\">\n        <div class=\"message-block\" *ngIf=\"form.get('comment').value != null\">\n          <div class=\"message-label\">{{ 'CONFIRM.MESSAGE.COMMENT' | translate }}</div>\n          <div class=\"message-text\">{{ form.get('comment').value }}</div>\n        </div>  \n      </ng-container>   \n    </div>\n  </div>\n  <div class=\"wrapper-buttons\">\n    <button type=\"button\" class=\"blue-button\" (click)=\"confirm()\">{{ 'CONFIRM.BUTTON_CONFIRM' | translate }}</button>\n    <button type=\"button\" class=\"blue-button\" (click)=\"onClose()\">{{ 'CONFIRM.BUTTON_CANCEL' | translate }}</button>\n  </div>\n</div>\n"
+module.exports = "<div class=\"modal\">\n  <div class=\"title\">\n    <span>{{ 'CONFIRM.TITLE' | translate }}</span>\n  </div>\n  <div class=\"content\">\n    <div class=\"message-container\">\n      <div class=\"message-block\">\n        <div class=\"message-label\">{{ 'CONFIRM.MESSAGE.SEND' | translate }}</div>\n        <div class=\"message-text\">{{ +form.get('amount').value }} {{variablesService.defaultCurrency}}</div>\n      </div>\n      <div class=\"message-block\">\n        <div class=\"message-label\">{{ 'CONFIRM.MESSAGE.FROM' | translate }}</div>\n        <div class=\"message-text\">{{ variablesService.currentWallet.address }}</div>\n      </div>\n      <div class=\"message-block\">\n        <div class=\"message-label\">{{ 'CONFIRM.MESSAGE.TO' | translate }}</div>\n        <div class=\"message-text\">{{ form.get('address').value }}</div>\n      </div>\n      <ng-container *ngIf=\"form.get('comment').value != ''\">\n        <div class=\"message-block\" *ngIf=\"form.get('comment').value != null\">\n          <div class=\"message-label\">{{ 'CONFIRM.MESSAGE.COMMENT' | translate }}</div>\n          <div class=\"message-text\">{{ form.get('comment').value }}</div>\n        </div>\n      </ng-container>\n    </div>\n  </div>\n  <div class=\"wrapper-buttons\">\n    <button type=\"button\" class=\"blue-button\" (click)=\"confirm()\">{{ 'CONFIRM.BUTTON_CONFIRM' | translate }}</button>\n    <button type=\"button\" class=\"blue-button\" (click)=\"onClose()\">{{ 'CONFIRM.BUTTON_CANCEL' | translate }}</button>\n  </div>\n</div>\n"
 
 /***/ }),
 
@@ -7608,7 +7614,9 @@ var SettingsComponent = /** @class */ (function () {
                         _this.backend.storeSecureAppData({ pass: _this.variablesService.appPass });
                         _this.variablesService.appLogin = true;
                         _this.variablesService.dataIsLoaded = true;
-                        _this.variablesService.startCountdown();
+                        if (_this.variablesService.settings.appLockTime) {
+                            _this.variablesService.startCountdown();
+                        }
                     }
                     else {
                         console.log(data['error_code']);
@@ -7622,7 +7630,7 @@ var SettingsComponent = /** @class */ (function () {
         }
     };
     SettingsComponent.prototype.onLockChange = function () {
-        if (this.variablesService.appLogin) {
+        if (this.variablesService.appLogin && this.variablesService.settings.appLockTime) {
             this.variablesService.restartCountdown();
         }
         this.backend.storeAppData();
