@@ -72,11 +72,24 @@ TEST(chacha_stream_test, chacha_stream_test)
 //     std::cout << "OK" << std::endl;
 //   }
 
+//   struct category_out: //public boost::iostreams::seekable_device_tag,
+//                    public boost::iostreams::multichar_output_filter_tag,
+//        	           public boost::iostreams::flushable_tag
+//                    //public boost::iostreams::seekable_filter_tag
+//   { };
+  
+//   struct category_in : //public boost::iostreams::seekable_device_tag,
+//     public boost::iostreams::multichar_output_filter_tag,
+//     public boost::iostreams::flushable_tag
+//     //public boost::iostreams::seekable_filter_tag
+//   { };
+
+
 
   crypto::chacha8_iv iv = crypto::rand<crypto::chacha8_iv>();
   boost::filesystem::ofstream store_data_file;
   store_data_file.open("./test.bin", std::ios_base::binary | std::ios_base::out | std::ios::trunc);
-  encrypt_chacha_filter encrypt_filter("pass", iv);
+  encrypt_chacha_out_filter encrypt_filter("pass", iv);
   //boost::iostreams::stream<encrypt_chacha_sink> outputStream(sink_encrypt);
   boost::iostreams::filtering_ostream out;
   out.push(encrypt_filter);
@@ -88,16 +101,17 @@ TEST(chacha_stream_test, chacha_stream_test)
 
   boost::filesystem::ifstream data_file;
   data_file.open("./test.bin", std::ios_base::binary | std::ios_base::in);
-  encrypt_chacha_filter decrypt_filter("pass", iv);
+  encrypt_chacha_in_filter decrypt_filter("pass", iv);
 
   boost::iostreams::filtering_istream in;
-  in.push(boost::iostreams::invert(decrypt_filter));
+  //in.push(boost::iostreams::invert(decrypt_filter));
+  in.push(decrypt_filter);
   in.push(data_file);
  
   //todo: read from stream
-  auto size = buff_size;
+  size_t size = buff_size;//in.tellg();
   std::string str(size, '\0'); // construct string to stream size
-
+  //in.seekg(0);
   try {
 
     in.read(&str[0], size+1);
