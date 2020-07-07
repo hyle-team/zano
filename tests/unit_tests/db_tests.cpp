@@ -26,7 +26,7 @@ namespace db_test
   crypto::hash null_hash = AUTO_VAL_INIT(null_hash);
 
   template<typename T>
-  T random_t_from_range(T from, T to)
+  inline T random_t_from_range(T from, T to)
   {
     if (from >= to)
       return from;
@@ -34,6 +34,13 @@ namespace db_test
     crypto::generate_random_bytes(sizeof result, &result);
     return from + result % (to - from + 1);
   }
+
+  template<typename db_backend_t>
+  inline std::string get_db_decorated_name()
+  {
+    return boost::algorithm::replace_all_copy(boost::algorithm::replace_all_copy(std::string(typeid(db_backend_t).name()), ":", "_"), " ", "_");
+  }
+
 
   //////////////////////////////////////////////////////////////////////////////
   // basic_test
@@ -47,7 +54,7 @@ namespace db_test
 
     bool r = false;
     
-    r = dbb.open("test_lmdb");
+    r = dbb.open(get_db_decorated_name<db_backend_t>());
     ASSERT_TRUE(r);
 
     db::container_handle tid_decapod;
@@ -70,7 +77,7 @@ namespace db_test
     ASSERT_TRUE(r);
 
 
-    r = dbb.open("test_lmdb");
+    r = dbb.open(get_db_decorated_name<db_backend_t>());
     ASSERT_TRUE(r);
     r = backend_ptr->open_container("decapod", tid_decapod);
     ASSERT_TRUE(r);
@@ -983,7 +990,7 @@ namespace db_test
 
     static const uint64_t buffer_size = 64 * 1024;                                         // 64 KB
     static const uint64_t db_total_size = static_cast<uint64_t>(2.1 * 1024 * 1024 * 1024); // 2.1 GB -- a bit more than 2GB to test 2GB boundary
-    static const std::string db_file_path = boost::algorithm::replace_all_copy(boost::algorithm::replace_all_copy(std::string("2gb_") + typeid(db_backend_t).name() + "_test", ":", "_"), " ", "_");
+    static const std::string db_file_path = std::string("2gb_") + get_db_decorated_name<db_backend_t>() + "_test";
 
     std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
     db::basic_db_accessor bdba(backend_ptr, rw_lock);
@@ -1144,5 +1151,100 @@ namespace db_test
   {
     db_2gb_test<db::mdbx_db_backend>();
   }
+
+
+  //////////////////////////////////////////////////////////////////////////////
+  // close_contaier_test
+  //////////////////////////////////////////////////////////////////////////////
+  template<typename db_backend_t>
+  void close_contaier_test()
+  {
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
+    epee::shared_recursive_mutex db_lock;
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
+
+    bool r = false;
+
+    r = dbb.open(get_db_decorated_name<db_backend_t>());
+    ASSERT_TRUE(r);
+
+
+    std::unordered_map<uint64_t, crypto::hash> map;
+    std::vector<size_t> container_ids;
+    static const size_t containers_total = 1000; // this number considered to be much higher than max opened containers limits
+    for (size_t i = 0; i < containers_total; ++i)
+    {
+      crypto::hash h;
+      crypto::generate_random_bytes(sizeof h, &h);
+      map.insert(std::make_pair(i, h));
+
+      container_ids.push_back(i);
+    }
+
+    std::shuffle(container_ids.begin(), container_ids.end(), crypto::uniform_random_bit_generator());
+
+    for (size_t i = 0; i < containers_total; ++i)
+    {
+      size_t container_id = container_ids[i];
+      db::container_handle cid;
+      r = backend_ptr->open_container("container_#" + epee::string_tools::num_to_string_fast(container_id), cid);
+      ASSERT_TRUE(r);
+
+      ASSERT_TRUE(backend_ptr->begin_transaction());
+      ASSERT_TRUE(backend_ptr->clear(cid));
+
+      const crypto::hash& h = map[container_id];
+      r = backend_ptr->set(cid, (char*)&container_id, sizeof container_id, (char*)&h, sizeof h);
+      ASSERT_TRUE(r);
+
+      ASSERT_TRUE(backend_ptr->commit_transaction());
+
+      r = backend_ptr->close_container(cid);
+      ASSERT_TRUE(r);
+    }
+
+
+    std::shuffle(container_ids.begin(), container_ids.end(), crypto::uniform_random_bit_generator());
+
+    for (size_t i = 0; i < containers_total; ++i)
+    {
+      size_t container_id = container_ids[i];
+      db::container_handle cid;
+
+      r = backend_ptr->open_container("container_#" + epee::string_tools::num_to_string_fast(container_id), cid);
+      ASSERT_TRUE(r);
+
+      ASSERT_TRUE(backend_ptr->begin_transaction());
+
+      std::string out_buffer;
+      r = backend_ptr->get(cid, (char*)&container_id, sizeof container_id, out_buffer);
+      ASSERT_TRUE(r);
+
+      const crypto::hash& h_buff = *reinterpret_cast<const crypto::hash*>(out_buffer.c_str());
+      const crypto::hash& h = map[container_id];
+      ASSERT_EQ(h, h_buff);
+
+      ASSERT_TRUE(backend_ptr->commit_transaction());
+
+      r = backend_ptr->close_container(cid);
+      ASSERT_TRUE(r);
+    }
+
+
+    r = dbb.close();
+    ASSERT_TRUE(r);
+
+  }
+
+  TEST(lmdb, close_contaier_test)
+  {
+    close_contaier_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, close_contaier_test)
+  {
+    close_contaier_test<db::mdbx_db_backend>();
+  }
+
 
 } // namespace lmdb_test
