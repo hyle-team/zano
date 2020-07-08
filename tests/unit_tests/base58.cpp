@@ -548,9 +548,6 @@ TEST(integ_address, payment_id_sizes)
   currency::account_public_address addr2 = AUTO_VAL_INIT_T(currency::account_public_address);
   std::string integrated_payment_id;
   ASSERT_FALSE(currency::get_account_address_and_payment_id_from_str(addr2, integrated_payment_id, addr_str));
-
-  ASSERT_NE(addr2, addr);
-  ASSERT_NE(integrated_payment_id, payment_id);
 }
 
 
