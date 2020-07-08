@@ -663,13 +663,13 @@ namespace tools
       // do not load wallet if data version is greather than the code version 
       if (ver > WALLET_FILE_SERIALIZATION_VERSION)
       {
-        LOG_PRINT_MAGENTA("Wallet file truncated due to WALLET_FILE_SERIALIZATION_VERSION is more then curren build", LOG_LEVEL_0);
+        WLT_LOG_MAGENTA("Wallet file truncated due to WALLET_FILE_SERIALIZATION_VERSION is more then curren build", LOG_LEVEL_0);
         return;
       }
 
       if (ver < 149)
       {
-        LOG_PRINT_MAGENTA("Wallet file truncated due to old version", LOG_LEVEL_0);
+        WLT_LOG_MAGENTA("Wallet file truncated due to old version", LOG_LEVEL_0);
         return;
       }
 
@@ -684,14 +684,14 @@ namespace tools
         a & formation_ver;
         if (formation_ver != CURRENCY_FORMATION_VERSION)
         {
-          LOG_PRINT_MAGENTA("Wallet file truncated due to mismatch CURRENCY_FORMATION_VERSION", LOG_LEVEL_0);
+          WLT_LOG_MAGENTA("Wallet file truncated due to mismatch CURRENCY_FORMATION_VERSION", LOG_LEVEL_0);
           return;
         }
       }
       //convert from old version
       if (ver < 150)
       {
-        LOG_PRINT_MAGENTA("Converting blockchain into a short form...", LOG_LEVEL_0);
+        WLT_LOG_MAGENTA("Converting blockchain into a short form...", LOG_LEVEL_0);
         std::vector<crypto::hash> old_blockchain;
         a & old_blockchain;
         uint64_t count = 0;
@@ -700,7 +700,7 @@ namespace tools
           m_chain.push_new_block_id(h, count);
           count++;
         }
-        LOG_PRINT_MAGENTA("Converting done", LOG_LEVEL_0);
+        WLT_LOG_MAGENTA("Converting done", LOG_LEVEL_0);
       }
       else
       {
