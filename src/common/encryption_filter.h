@@ -199,6 +199,7 @@ public:
             m_buff.resize(n_lambda + offset_before_flush);
           }
           std::memcpy((char*)&m_buff.data()[offset_before_flush], buf_lambda, n_lambda);
+          m_buff.resize(offset_before_flush + n_lambda);
         });
 
         //just to make sure that it's over
@@ -207,6 +208,10 @@ public:
         CHECK_AND_ASSERT_THROW_MES(r == -1, "expected EOF");
         m_was_eof = true;
         return withdraw_to_read_buff(s, n);
+      }
+      else 
+      {
+        return -1;      
       }
     }
   }
