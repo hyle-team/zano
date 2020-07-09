@@ -208,7 +208,7 @@ namespace boost
     inline void serialize(Archive &a, currency::keypair &kp, const boost::serialization::version_type ver)
     {
       a & kp.pub;
-      a & kp.sec;
+      a & kp.sec; 
     }
 
     template <class Archive>

@@ -6,6 +6,8 @@
 
 #pragma once 
 
+#include "currency_boost_serialization.h"
+
 namespace boost
 {
   namespace serialization

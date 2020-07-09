@@ -24,6 +24,7 @@ public:
   typedef char                          char_type;
   //typedef boost::iostreams::multichar_output_filter_tag    category;
   //typedef boost::iostreams::flushable_tag    category;
+  static const uint32_t block_size = ECRYPT_BLOCKLENGTH;
 
   encrypt_chacha_processer_base(std::string const &pass, const crypto::chacha8_iv& iv) :m_iv(iv), m_ctx(AUTO_VAL_INIT(m_ctx))
   {
@@ -152,49 +153,83 @@ public:
   template<typename Source>
   std::streamsize read(Source& src, char* s, std::streamsize n)
   {
-    std::streamsize result = 0;
-    if ((result = boost::iostreams::read(src, s, n)) == -1)
+    if(m_buff.size() >= n)
     {
-      if (!m_was_eof)
-      {
-        m_was_eof = true;
-        std::streamsize written_butes = 0;
-        encrypt_chacha_processer_base::flush([&](char_type const * const buf_lambda, std::streamsize const n_lambda) {
-          return written_butes = withdraw_to_read_buff(s, n, buf_lambda, n_lambda);
-        });
-        if (!written_butes)
-          return -1;
-        return written_butes;
-      }
-      else
-      {
-        if (!m_buff.size())
-        {
-          return -1;
-        }
-        else
-        {
-          return withdraw_to_read_buff(s, n, "", 0);
-        }
-      }
+      return withdraw_to_read_buff(s, n);
+    }
+    if(m_was_eof && m_buff.empty()) 
+    {
+      return -1;
     }
 
-    return encrypt_chacha_processer_base::process(s, result, [&](char_type const * const buf_lambda, std::streamsize const n_lambda) {
-      return withdraw_to_read_buff(s, n, buf_lambda, n_lambda);
-    });
+    std::streamsize size_to_read_for_decrypt = (n - m_buff.size());
+    size_to_read_for_decrypt += size_to_read_for_decrypt % encrypt_chacha_processer_base::block_size;
+    size_t offset_in_buff = m_buff.size();
+    m_buff.resize(m_buff.size() + size_to_read_for_decrypt);
+
+    std::streamsize result = boost::iostreams::read(src, (char*)&m_buff.data()[offset_in_buff], size_to_read_for_decrypt);
+    if(result == size_to_read_for_decrypt)
+    {
+      //regular read proocess, readed data enought to get decrypteds
+      encrypt_chacha_processer_base::process(&m_buff.data()[offset_in_buff], size_to_read_for_decrypt, [&](char_type const* const buf_lambda, std::streamsize const n_lambda) 
+      {
+        CHECK_AND_ASSERT_THROW_MES(n_lambda == size_to_read_for_decrypt, "Error in decrypt: check n_lambda == size_to_read_for_decrypt failed");
+        std::memcpy((char*)&m_buff.data()[offset_in_buff], buf_lambda, n_lambda);
+      });
+      return withdraw_to_read_buff(s, n);
+    }
+    else
+    {
+      //been read some size_but it's basically might be eof
+      if(!m_was_eof) 
+      {
+        size_t offset_before_flush = offset_in_buff;
+        if(result != -1)
+        {
+          //eof
+          encrypt_chacha_processer_base::process(&m_buff.data()[offset_in_buff], result, [&](char_type const* const buf_lambda, std::streamsize const n_lambda) {
+            std::memcpy((char*)&m_buff.data()[offset_in_buff], buf_lambda, n_lambda);
+            offset_before_flush = offset_in_buff + n_lambda;
+          });
+        }
+
+        encrypt_chacha_processer_base::flush([&](char_type const* const buf_lambda, std::streamsize const n_lambda) {
+          if(n_lambda + offset_before_flush > m_buff.size()) 
+          {
+            m_buff.resize(n_lambda + offset_before_flush);
+          }
+          std::memcpy((char*)&m_buff.data()[offset_before_flush], buf_lambda, n_lambda);
+        });
+
+        //just to make sure that it's over
+        std::string buff_stub(10, ' ');
+        std::streamsize r = boost::iostreams::read(src, (char*)&buff_stub.data()[0], 10);
+        CHECK_AND_ASSERT_THROW_MES(r == -1, "expected EOF");
+        m_was_eof = true;
+        return withdraw_to_read_buff(s, n);
+      }
+    }
   }
 
 
   template<typename Sink>
   bool flush(Sink& snk)
   {
-    encrypt_chacha_processer_base::flush([&](char_type const * const buf_lambda, std::streamsize const n_lambda) {
-      boost::iostreams::write(snk, &buf_lambda[0], n_lambda);
-    });
+
     return true;
   }
 
 private:
+
+  std::streamsize withdraw_to_read_buff(char* s, std::streamsize n)
+  {
+    size_t copy_size = m_buff.size() > n ? n : m_buff.size();
+    std::memcpy(s, m_buff.data(), copy_size);
+    m_buff.erase(0, copy_size);
+    return copy_size;
+  }
+
+  /*
   std::streamsize withdraw_to_read_buff(char* s, std::streamsize n, char_type const * const buf_lambda, std::streamsize const n_lambda)
   {
     if (m_buff.size())
@@ -218,6 +253,7 @@ private:
       return copy_size;
     }
   }
+  */
 
   std::string m_buff;
   bool m_was_eof;

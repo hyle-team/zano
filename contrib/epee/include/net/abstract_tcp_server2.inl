@@ -326,7 +326,7 @@ bool connection<t_protocol_handler>::do_send(const void* ptr, size_t cb)
 
     boost::asio::async_write(socket_, boost::asio::buffer(m_send_que.front().data(), m_send_que.front().size()),
                              //strand_.wrap(
-                             boost::bind(&connection<t_protocol_handler>::handle_write, self, _1, _2)
+                             boost::bind(&connection<t_protocol_handler>::handle_write, self, boost::placeholders::_1, boost::placeholders::_2)
                              //)
     );
 
@@ -404,7 +404,7 @@ void connection<t_protocol_handler>::handle_write(const boost::system::error_cod
     //have more data to send
     boost::asio::async_write(socket_, boost::asio::buffer(m_send_que.front().data(), m_send_que.front().size()),
                              //strand_.wrap(
-                             boost::bind(&connection<t_protocol_handler>::handle_write, connection<t_protocol_handler>::shared_from_this(), _1, _2));
+                             boost::bind(&connection<t_protocol_handler>::handle_write, connection<t_protocol_handler>::shared_from_this(), boost::placeholders::_1, boost::placeholders::_2));
     //);
   }
   CRITICAL_REGION_END();

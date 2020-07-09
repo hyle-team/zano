@@ -12,6 +12,9 @@
 
 #include "common/encryption_filter.h"
 #include "crypto/crypto.h"
+#include "currency_core/blockchain_storage_basic.h"
+#include "currency_core/blockchain_storage_boost_serialization.h"
+#include "common/boost_serialization_helper.h"
 
 
 TEST(chacha_stream_test, chacha_stream_test)
@@ -84,7 +87,14 @@ TEST(chacha_stream_test, chacha_stream_test)
 //     //public boost::iostreams::seekable_filter_tag
 //   { };
 
+  std::list<currency::block_extended_info> test_list;
+  for(size_t i = 0; i != 1000; i++) {
+    test_list.push_back(currency::block_extended_info());
+    test_list.back().height = i;
+    test_list.back().this_block_tx_fee_median = i;
+  }
 
+  std::list<currency::block_extended_info> verification_list;
 
   crypto::chacha8_iv iv = crypto::rand<crypto::chacha8_iv>();
   boost::filesystem::ofstream store_data_file;
@@ -94,10 +104,13 @@ TEST(chacha_stream_test, chacha_stream_test)
   boost::iostreams::filtering_ostream out;
   out.push(encrypt_filter);
   out.push(store_data_file);
-  out << buff;
+
+
+  //out << buff;
+  bool res = tools::portble_serialize_obj_to_stream(test_list, out);
+  
   out.flush();
   store_data_file.close();
-
 
   boost::filesystem::ifstream data_file;
   data_file.open("./test.bin", std::ios_base::binary | std::ios_base::in);
@@ -109,12 +122,34 @@ TEST(chacha_stream_test, chacha_stream_test)
   in.push(data_file);
  
   //todo: read from stream
-  size_t size = buff_size;//in.tellg();
-  std::string str(size, '\0'); // construct string to stream size
+  //size_t size = buff_size;//in.tellg();
+  ///std::string str(size+10, '\0'); // construct string to stream size
   //in.seekg(0);
   try {
+    
+    bool res2 = tools::portable_unserialize_obj_from_stream(verification_list, in);
+    //if(verification_list != test_list) 
+    {
+      std::cout << "erroor";
+    }
+    //in.read(&str[0], size+10);
+    //std::streamsize sz = in.gcount();
+    //if(!in) {
+    //  std::cout << "error";
+    //}
+    /*
+    in.read(&str[0], size + 10);
+    sz = in.gcount();
+    if(!in) {
+      std::cout << "error";
+    }
 
-    in.read(&str[0], size+1);
+    in.read(&str[0], size + 10);
+    sz = in.gcount();
+    if(!in) {
+      std::cout << "error";
+    }
+    */
     std::cout << "ddd";
 
   }
