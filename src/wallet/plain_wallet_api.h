@@ -15,6 +15,7 @@ namespace plain_wallet
   std::string set_log_level(int log_level);
   std::string get_version();
   std::string get_wallet_files();
+  std::string get_export_private_info(const std::string& target_dir);
   std::string delete_wallet(const std::string& file_name);
   std::string get_address_info(const std::string& addr);
 

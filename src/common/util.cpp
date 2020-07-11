@@ -695,4 +695,60 @@ std::string get_nix_version_display_string()
     return true;
   }
 
+  //this code was taken from https://stackoverflow.com/a/8594696/5566653 
+  //credits goes to @nijansen: https://stackoverflow.com/users/1056003/nijansen 
+  bool copy_dir( boost::filesystem::path const & source, boost::filesystem::path const & destination)
+  {
+    namespace fs = boost::filesystem;
+    try
+    {
+      // Check whether the function call is valid
+      if (!fs::exists(source) ||!fs::is_directory(source))
+      {
+        LOG_ERROR("Source directory " << source.string() << " does not exist or is not a directory.");
+        return false;
+      }
+      if (!fs::exists(destination))
+      {
+        if (!fs::create_directory(destination))
+        {
+          LOG_ERROR("Unable to create destination directory" << destination.string());
+          return false;
+        }
+      }
+      // Create the destination directory
+    }
+    catch (fs::filesystem_error const & e)
+    {
+      LOG_ERROR("Exception: " << e.what());
+      return false;
+    }
+    // Iterate through the source directory
+    for (fs::directory_iterator file(source); file != fs::directory_iterator(); ++file)
+    {
+      try
+      {
+        fs::path current(file->path());
+        if (fs::is_directory(current))
+        {
+          // Found directory: Recursion
+          if (!copy_dir(current, destination / current.filename()))
+          {
+            return false;
+          }
+        }
+        else
+        {
+          // Found file: Copy
+          fs::copy_file( current, destination / current.filename());
+        }
+      }
+      catch (fs::filesystem_error const & e)
+      {
+        LOG_ERROR("Exception: " << e.what());
+      }
+    }
+    return true;
+  }
+
 } // namespace tools
