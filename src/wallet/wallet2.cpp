@@ -1370,9 +1370,11 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   if (res.status == API_RETURN_CODE_BUSY)
   {
     WLT_LOG_L1("Core is busy, pull cancelled");
+    m_core_proxy->get_editable_proxy_diagnostic_info()->is_busy = true;
     stop = true;
     return;
   }
+  m_core_proxy->get_editable_proxy_diagnostic_info()->is_busy = false;
   THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
   THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() && get_blockchain_current_size() <= res.start_height && res.start_height != m_minimum_height, error::wallet_internal_error,
     "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
@@ -1500,6 +1502,7 @@ void wallet2::refresh()
 void wallet2::refresh(size_t & blocks_fetched)
 {
   bool received_money = false;
+  m_stop = false;
   refresh(blocks_fetched, received_money, m_stop);
 }
 //----------------------------------------------------------------------------------------------------
