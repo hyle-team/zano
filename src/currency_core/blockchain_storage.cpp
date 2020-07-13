@@ -305,12 +305,19 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         LOG_PRINT_MAGENTA("Migrating DB: " << m_db_storage_major_compatibility_version << " -> " << BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION, LOG_LEVEL_0);
 
         res = m_db_aliases.deinit();
-        CHECK_AND_ASSERT_MES(res, false, "Unable to deinit db container");
+        CHECK_AND_ASSERT_MES(res, false, "Unable to deinit m_db_aliases");
+        res = m_db_addr_to_alias.deinit();
+        CHECK_AND_ASSERT_MES(res, false, "Unable to deinit m_db_addr_to_alias");
 
         typedef tools::db::cached_key_value_accessor<std::string, std::list<extra_alias_entry_base_old>, true, true> aliases_container_old;
         aliases_container_old db_aliases_old(m_db);
         res = db_aliases_old.init(BLOCKCHAIN_STORAGE_CONTAINER_ALIASES);
-        CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+        CHECK_AND_ASSERT_MES(res, false, "Unable to init db_aliases_old");
+        
+        typedef tools::db::cached_key_value_accessor<account_public_address_old, std::set<std::string>, true, false> address_to_aliases_container_old;
+        address_to_aliases_container_old db_addr_to_alias_old(m_db);
+        res = db_addr_to_alias_old.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS);
+        CHECK_AND_ASSERT_MES(res, false, "Unable to init db_addr_to_alias_old");
 
         // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
         m_db.begin_transaction();
@@ -329,19 +336,33 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
           return true;
         });
 
+        typedef std::vector<std::pair<account_public_address, std::set<std::string>>> add_to_alias_container_t;
+        add_to_alias_container_t addr_to_alias_container;
+        db_addr_to_alias_old.enumerate_items([&addr_to_alias_container](uint64_t n, const account_public_address_old& addr_old, const std::set<std::string>& aliases){
+          addr_to_alias_container.emplace_back(std::make_pair(account_public_address::from_old(addr_old), aliases));
+          return true;
+        });
+
         // clear and close old format container
         m_db.begin_transaction();
         db_aliases_old.clear();
+        db_addr_to_alias_old.clear();
         m_db.commit_transaction();
         db_aliases_old.deinit();
+        db_addr_to_alias_old.deinit();
   
         res = m_db_aliases.init(BLOCKCHAIN_STORAGE_CONTAINER_ALIASES);
-        CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+        CHECK_AND_ASSERT_MES(res, false, "Unable to init m_db_aliases");
+        res = m_db_addr_to_alias.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS);
+        CHECK_AND_ASSERT_MES(res, false, "Unable to init m_db_addr_to_alias");
 
         // re-populate all alias entries back
         m_db.begin_transaction();
         for(auto& el : temp_container)
           m_db_aliases.set(el.first, el.second);
+
+        for(auto& el : addr_to_alias_container)
+          m_db_addr_to_alias.set(el.first, el.second);
         m_db.commit_transaction();
 
         // restore db maj compartibility
@@ -3511,6 +3532,20 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
     else
     {
       LOG_ERROR("Wrong m_addr_to_alias state: address not found " << get_account_address_as_str(local_alias_history.back().m_address));
+
+      std::stringstream ss;
+      ss << "History for alias " << ai.m_alias << ":" << ENDL;
+      size_t i = 0;
+      for (auto el : local_alias_history)
+      {
+        ss << std::setw(2) << i++ << " "
+          << get_account_address_as_str(el.m_address) << " "
+          << (el.m_sign.empty() ? " no sig " : " SIGNED ") << " "
+          << el.m_text_comment << ENDL;
+      }
+
+      LOG_PRINT_L0(ss.str());
+
     }
 
     //update alias db
