@@ -167,7 +167,6 @@ namespace currency
     bool m_do_pos_mining;
     bool m_offline_mode;
     std::string m_restore_wallet;
-    std::string m_restore_awo_wallet;
 
     epee::console_handlers_binder m_cmd_binder;
 
