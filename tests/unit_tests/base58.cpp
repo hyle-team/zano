@@ -518,13 +518,13 @@ TEST(integ_address, payment_id_sizes)
     if (pid_size > 0)
       crypto::generate_random_bytes(pid_size, &payment_id.front());
 
-    currency::account_public_address addr;
+    currency::account_public_address addr = AUTO_VAL_INIT_T(currency::account_public_address);
     addr.spend_public_key = currency::keypair::generate().pub;
     addr.view_public_key = currency::keypair::generate().pub;
 
     std::string addr_str = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
 
-    currency::account_public_address addr2;
+    currency::account_public_address addr2 = AUTO_VAL_INIT_T(currency::account_public_address);
     std::string integrated_payment_id;
     ASSERT_TRUE(currency::get_account_address_and_payment_id_from_str(addr2, integrated_payment_id, addr_str));
 
@@ -538,19 +538,16 @@ TEST(integ_address, payment_id_sizes)
   if (pid_size > 0)
     crypto::generate_random_bytes(pid_size, &payment_id.front());
 
-  currency::account_public_address addr;
+  currency::account_public_address addr = AUTO_VAL_INIT_T(currency::account_public_address);
   addr.spend_public_key = currency::keypair::generate().pub;
   addr.view_public_key = currency::keypair::generate().pub;
 
   // the following line is expected to handle oversized payment id well
   std::string addr_str = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
 
-  currency::account_public_address addr2;
+  currency::account_public_address addr2 = AUTO_VAL_INIT_T(currency::account_public_address);
   std::string integrated_payment_id;
   ASSERT_FALSE(currency::get_account_address_and_payment_id_from_str(addr2, integrated_payment_id, addr_str));
-
-  ASSERT_NE(addr2, addr);
-  ASSERT_NE(integrated_payment_id, payment_id);
 }
 
 

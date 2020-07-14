@@ -31,13 +31,14 @@ namespace currency
 {
 
   //-----------------------------------------------------------------------------------------------
-  core::core(i_currency_protocol* pprotocol):
-              m_mempool(m_blockchain_storage, pprotocol),
-              m_blockchain_storage(m_mempool),
-              m_miner(this, m_blockchain_storage),
-              m_miner_address(boost::value_initialized<account_public_address>()), 
-              m_starter_message_showed(false),
-              m_critical_error_handler(nullptr)
+  core::core(i_currency_protocol* pprotocol)
+    : m_mempool(m_blockchain_storage, pprotocol)
+    , m_blockchain_storage(m_mempool)
+    , m_miner(this, m_blockchain_storage)
+    , m_miner_address(boost::value_initialized<account_public_address>())
+    , m_starter_message_showed(false)
+    , m_critical_error_handler(nullptr)
+    , m_stop_after_height(0)
   {
     set_currency_protocol(pprotocol);
   }

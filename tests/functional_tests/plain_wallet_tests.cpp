@@ -32,6 +32,7 @@ void run_plain_wallet_api_test()
 {
   LOG_PRINT_L0("Creating instance...");
   std::string s = plain_wallet::init("195.201.107.230", "11211", boost::dll::program_location().parent_path().string(), 1);
+  s = plain_wallet::get_export_private_info("E:\\tmp\\check_export");
 
   std::string key = plain_wallet::generate_random_key(10);
   std::string test_data = "1234567890 test test ";

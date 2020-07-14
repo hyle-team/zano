@@ -8,6 +8,7 @@
 #include "currency_core/miner.h"
 #include "wallet/wallet2.h"
 #include "test_core_time.h"
+#include "chaingen.h"
 
 // chaingen-independent helpers that may be used outside of core_tests (for ex. in functional_tests)
 

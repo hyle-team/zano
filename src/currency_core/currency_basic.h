@@ -711,6 +711,7 @@ namespace currency
 } // namespace currency
 
 POD_MAKE_HASHABLE(currency, account_public_address);
+POD_MAKE_HASHABLE(currency, account_public_address_old);
 
 BLOB_SERIALIZER(currency::txout_to_key);
 

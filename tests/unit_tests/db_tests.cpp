@@ -20,13 +20,13 @@
 
 using namespace tools;
 
-namespace lmdb_test
+namespace db_test
 {
 
   crypto::hash null_hash = AUTO_VAL_INIT(null_hash);
 
   template<typename T>
-  T random_t_from_range(T from, T to)
+  inline T random_t_from_range(T from, T to)
   {
     if (from >= to)
       return from;
@@ -35,62 +35,82 @@ namespace lmdb_test
     return from + result % (to - from + 1);
   }
 
+  template<typename db_backend_t>
+  inline std::string get_db_decorated_name()
+  {
+    return boost::algorithm::replace_all_copy(boost::algorithm::replace_all_copy(std::string(typeid(db_backend_t).name()), ":", "_"), " ", "_");
+  }
+
+
   //////////////////////////////////////////////////////////////////////////////
   // basic_test
   //////////////////////////////////////////////////////////////////////////////
-  TEST(lmdb, basic_test)
+  template<typename db_backend_t>
+  void basic_test()
   {
-    std::shared_ptr<db::lmdb_db_backend> lmdb_ptr = std::make_shared<db::lmdb_db_backend>();
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
     epee::shared_recursive_mutex db_lock;
-    db::basic_db_accessor dbb(lmdb_ptr, db_lock);
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
 
     bool r = false;
     
-    r = dbb.open("test_lmdb");
+    r = dbb.open(get_db_decorated_name<db_backend_t>());
     ASSERT_TRUE(r);
 
     db::container_handle tid_decapod;
-    r = lmdb_ptr->open_container("decapod", tid_decapod);
+    r = backend_ptr->open_container("decapod", tid_decapod);
     ASSERT_TRUE(r);
 
-    ASSERT_TRUE(lmdb_ptr->begin_transaction());
+    ASSERT_TRUE(backend_ptr->begin_transaction());
 
-    ASSERT_TRUE(lmdb_ptr->clear(tid_decapod));
+    ASSERT_TRUE(backend_ptr->clear(tid_decapod));
 
     uint64_t key = 10;
     std::string buf = "nxjdu47flrp20soam19e7nfhxbcy48owks03of92sbf31n1oqkanmdb47";
 
-    r = lmdb_ptr->set(tid_decapod, (char*)&key, sizeof key, buf.c_str(), buf.size());
+    r = backend_ptr->set(tid_decapod, (char*)&key, sizeof key, buf.c_str(), buf.size());
     ASSERT_TRUE(r);
 
-    ASSERT_TRUE(lmdb_ptr->commit_transaction());
+    ASSERT_TRUE(backend_ptr->commit_transaction());
 
     r = dbb.close();
     ASSERT_TRUE(r);
 
 
-    r = dbb.open("test_lmdb");
+    r = dbb.open(get_db_decorated_name<db_backend_t>());
     ASSERT_TRUE(r);
-    r = lmdb_ptr->open_container("decapod", tid_decapod);
+    r = backend_ptr->open_container("decapod", tid_decapod);
     ASSERT_TRUE(r);
 
-    ASSERT_TRUE(lmdb_ptr->begin_transaction());
+    ASSERT_TRUE(backend_ptr->begin_transaction());
 
     std::string out_buffer;
-    r = lmdb_ptr->get(tid_decapod, (char*)&key, sizeof key, out_buffer);
+    r = backend_ptr->get(tid_decapod, (char*)&key, sizeof key, out_buffer);
     ASSERT_TRUE(r);
     ASSERT_EQ(buf, out_buffer);
 
-    ASSERT_TRUE(lmdb_ptr->commit_transaction());
+    ASSERT_TRUE(backend_ptr->commit_transaction());
 
     r = dbb.close();
     ASSERT_TRUE(r);
 
   }
 
+  TEST(lmdb, basic_test)
+  {
+    basic_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, basic_test)
+  {
+    basic_test<db::mdbx_db_backend>();
+  }
+
+
   //////////////////////////////////////////////////////////////////////////////
   // multithread_test_1
   //////////////////////////////////////////////////////////////////////////////
+  template<typename db_backend_t>
   struct multithread_test_1_t : public db::i_db_callback
   {
     enum { c_keys_count = 128 };
@@ -98,14 +118,14 @@ namespace lmdb_test
     size_t m_randomly_mixed_indexes_1[c_keys_count];
     size_t m_randomly_mixed_indexes_2[c_keys_count];
     epee::shared_recursive_mutex m_db_lock;
-    std::shared_ptr<db::lmdb_db_backend> m_lmdb_adapter;
+    std::shared_ptr<db_backend_t> m_backend;
     db::basic_db_accessor m_dbb;
     db::container_handle m_table_id;
     size_t m_counter;
 
     multithread_test_1_t()
-      : m_lmdb_adapter(std::make_shared<db::lmdb_db_backend>())
-      , m_dbb(m_lmdb_adapter, m_db_lock)
+      : m_backend(std::make_shared<db_backend_t>())
+      , m_dbb(m_backend, m_db_lock)
       , m_table_id(0)
       , m_counter(0)
     {
@@ -147,22 +167,22 @@ namespace lmdb_test
         i = (i + 1) % c_keys_count;
         const crypto::hash& key = m_keys[key_index];
 
-        bool r = m_lmdb_adapter->begin_transaction();
+        bool r = m_backend->begin_transaction();
         CHECK_AND_ASSERT_MES_NO_RET(r, "begin_transaction");
 
         // get a value by the given key
         std::string value;
-        if (!m_lmdb_adapter->get(m_table_id, (const char*)&key, sizeof key, value))
+        if (!m_backend->get(m_table_id, (const char*)&key, sizeof key, value))
         {
           // if such key does not exist -- add it
           char buffer[128];
           crypto::generate_random_bytes(sizeof buffer, buffer);
-          r = m_lmdb_adapter->set(m_table_id, (const char*)&key, sizeof key, buffer, sizeof buffer);
+          r = m_backend->set(m_table_id, (const char*)&key, sizeof key, buffer, sizeof buffer);
           CHECK_AND_ASSERT_MES_NO_RET(r, "set");
 
-          size_t table_size = m_lmdb_adapter->size(m_table_id);
+          size_t table_size = m_backend->size(m_table_id);
 
-          r = m_lmdb_adapter->commit_transaction();
+          r = m_backend->commit_transaction();
           CHECK_AND_ASSERT_MES_NO_RET(r, "commit_transaction");
 
           LOG_PRINT_L1("added key index " << key_index << ", table size: " << table_size);
@@ -170,7 +190,7 @@ namespace lmdb_test
         else
         {
           // if key exists in the table - do nothing
-          m_lmdb_adapter->abort_transaction();
+          m_backend->abort_transaction();
         }
         epee::misc_utils::sleep_no_w(1);
       }
@@ -190,20 +210,20 @@ namespace lmdb_test
         size_t key_index = m_randomly_mixed_indexes_2[i];
         i = (i + 1) % c_keys_count;
         const crypto::hash& key = m_keys[key_index];
-        bool r = m_lmdb_adapter->begin_transaction();
+        bool r = m_backend->begin_transaction();
         CHECK_AND_ASSERT_MES_NO_RET(r, "begin_transaction");
 
         // get a value by the given key
         std::string value;
-        if (m_lmdb_adapter->get(m_table_id, (const char*)&key, sizeof key, value))
+        if (m_backend->get(m_table_id, (const char*)&key, sizeof key, value))
         {
           // if key exists in the table -- remove it
-          r = m_lmdb_adapter->erase(m_table_id, (const char*)&key, sizeof key);
+          r = m_backend->erase(m_table_id, (const char*)&key, sizeof key);
           CHECK_AND_ASSERT_MES_NO_RET(r, "erase");
 
-          size_t table_size = m_lmdb_adapter->size(m_table_id);
+          size_t table_size = m_backend->size(m_table_id);
 
-          r = m_lmdb_adapter->commit_transaction();
+          r = m_backend->commit_transaction();
           CHECK_AND_ASSERT_MES_NO_RET(r, "commit_transaction");
 
           LOG_PRINT_L1("erased key index " << key_index << ", table size: " << table_size);
@@ -213,7 +233,7 @@ namespace lmdb_test
         else
         {
           // if no such key exists in the table - do nothing
-          m_lmdb_adapter->abort_transaction();
+          m_backend->abort_transaction();
         }
         epee::misc_utils::sleep_no_w(1);
       }
@@ -234,18 +254,18 @@ namespace lmdb_test
         size_t key_index = m_randomly_mixed_indexes_2[i];
         i = (i + 1) % c_keys_count;
         const crypto::hash& key = m_keys[key_index];
-        bool r = m_lmdb_adapter->begin_transaction(true); // request Read-Only transaction
+        bool r = m_backend->begin_transaction(true); // request Read-Only transaction
         CHECK_AND_ASSERT_MES_NO_RET(r, "begin_transaction(RO=true)");
 
         // get a value by the given key
         std::string value;
-        if (m_lmdb_adapter->get(m_table_id, (const char*)&key, sizeof key, value))
+        if (m_backend->get(m_table_id, (const char*)&key, sizeof key, value))
         {
           sum += *reinterpret_cast<const uint64_t*>(value.data());
 
-          size_t table_size = m_lmdb_adapter->size(m_table_id);
+          size_t table_size = m_backend->size(m_table_id);
 
-          r = m_lmdb_adapter->commit_transaction();
+          r = m_backend->commit_transaction();
           CHECK_AND_ASSERT_MES_NO_RET(r, "commit_transaction");
 
           if (table_size == 2)
@@ -254,7 +274,7 @@ namespace lmdb_test
         else
         {
           // if no such key exists in the table - do nothing
-          m_lmdb_adapter->abort_transaction();
+          m_backend->abort_transaction();
         }
         epee::misc_utils::sleep_no_w(1);
       }
@@ -263,16 +283,16 @@ namespace lmdb_test
 
     bool check()
     {
-      size_t table_size = m_lmdb_adapter->size(m_table_id);
+      size_t table_size = m_backend->size(m_table_id);
       CHECK_AND_ASSERT_MES(table_size == 2, false, "2 elements are expected to left");
 
       m_counter = 0;
-      bool r = m_lmdb_adapter->begin_transaction();
+      bool r = m_backend->begin_transaction();
       CHECK_AND_ASSERT_MES(r, false, "begin_transaction");
 
-      m_lmdb_adapter->enumerate(m_table_id, this);
+      m_backend->enumerate(m_table_id, this);
 
-      r = m_lmdb_adapter->commit_transaction();
+      r = m_backend->commit_transaction();
       CHECK_AND_ASSERT_MES(r, false, "commit_transaction");
       
       return m_counter == 2;
@@ -308,13 +328,13 @@ namespace lmdb_test
     {
       bool r = m_dbb.open("multithread_test_1_t");
       CHECK_AND_ASSERT_MES(r, false, "m_dbb.open");
-      r = m_lmdb_adapter->open_container("table1_", m_table_id);
+      r = m_backend->open_container("table1_", m_table_id);
       CHECK_AND_ASSERT_MES(r, false, "open_table");
-      r = m_lmdb_adapter->begin_transaction();
+      r = m_backend->begin_transaction();
       CHECK_AND_ASSERT_MES(r, false, "begin_transaction");
-      r = m_lmdb_adapter->clear(m_table_id);
+      r = m_backend->clear(m_table_id);
       CHECK_AND_ASSERT_MES(r, false, "clear_table");
-      r = m_lmdb_adapter->commit_transaction();
+      r = m_backend->commit_transaction();
       CHECK_AND_ASSERT_MES(r, false, "commit_transaction");
 
       std::atomic<bool> stop_adder(false), stop_deleter(false);
@@ -336,9 +356,10 @@ namespace lmdb_test
       m_dbb.close();
       return r;
     }
-  };
+  }; // multithread_test_1_t
 
-  TEST(lmdb, multithread_test_1)
+  template<typename db_backend_t>
+  void multithread_test_1()
   {
     char prng_state[200] = {};
     crypto::random_prng_get_state(prng_state, sizeof prng_state); // store current RPNG state
@@ -347,7 +368,7 @@ namespace lmdb_test
     bool result = false;
     try
     {
-      multithread_test_1_t t;
+      multithread_test_1_t<db_backend_t> t;
       result = t.run();
     }
     catch (std::exception& e)
@@ -361,8 +382,19 @@ namespace lmdb_test
     ASSERT_TRUE(result);
   }
 
+  TEST(lmdb, multithread_test_1)
+  {
+    multithread_test_1<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, multithread_test_1)
+  {
+    multithread_test_1<db::mdbx_db_backend>();
+  }
+
+
   //////////////////////////////////////////////////////////////////////////////
-  // bridge_basic_test
+  // basic_accessor_test
   //////////////////////////////////////////////////////////////////////////////
   struct simple_serializable_t
   {
@@ -393,11 +425,12 @@ namespace lmdb_test
     return std::memcmp(&_v1, &_v2, sizeof _v1) == 0;
   }
 
-  TEST(lmdb, bridge_basic_test)
+  template<typename db_backend_t>
+  void basic_accessor_test()
   {
-    std::shared_ptr<db::lmdb_db_backend> lmdb_ptr = std::make_shared<db::lmdb_db_backend>();
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
     epee::shared_recursive_mutex db_lock;
-    db::basic_db_accessor dbb(lmdb_ptr, db_lock);
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
 
     bool r = false;
     
@@ -405,7 +438,7 @@ namespace lmdb_test
     ASSERT_TRUE(r);
 
     db::container_handle tid_decapod;
-    r = lmdb_ptr->open_container("decapod", tid_decapod);
+    r = backend_ptr->open_container("decapod", tid_decapod);
     ASSERT_TRUE(r);
 
     ASSERT_TRUE(dbb.begin_transaction());
@@ -474,6 +507,16 @@ namespace lmdb_test
     ASSERT_TRUE(r);
   }
 
+  TEST(lmdb, basic_accessor_test)
+  {
+    basic_accessor_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, basic_accessor_test)
+  {
+    basic_accessor_test<db::mdbx_db_backend>();
+  }
+
   //////////////////////////////////////////////////////////////////////////////
   // single_value_test
   //////////////////////////////////////////////////////////////////////////////
@@ -489,13 +532,14 @@ namespace lmdb_test
     END_SERIALIZE()
   };
   
-  TEST(lmdb, single_value_test)
+  template<typename db_backend_t>
+  void single_value_test()
   {
     const std::string options_table_name("options");
     
-    std::shared_ptr<db::lmdb_db_backend> lmdb_ptr = std::make_shared<db::lmdb_db_backend>();
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
     epee::shared_recursive_mutex db_lock;
-    db::basic_db_accessor dbb(lmdb_ptr, db_lock);
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
     db::basic_key_value_accessor<uint64_t, uint64_t /* does not matter */, false /* does not matter */ > options_container(dbb);
 
     db::solo_db_value<uint64_t, uint64_t, decltype(options_container),            false>   option_uint64(0, options_container);
@@ -506,7 +550,7 @@ namespace lmdb_test
 
     // clear table
     db::container_handle options_tid;
-    ASSERT_TRUE(lmdb_ptr->open_container(options_table_name, options_tid));
+    ASSERT_TRUE(backend_ptr->open_container(options_table_name, options_tid));
     ASSERT_TRUE(dbb.begin_transaction());
     ASSERT_TRUE(dbb.clear(options_tid));
     dbb.commit_transaction();
@@ -560,19 +604,29 @@ namespace lmdb_test
     ASSERT_TRUE(dbb.close());
   }
 
+  TEST(lmdb, single_value_test)
+  {
+    single_value_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, single_value_test)
+  {
+    single_value_test<db::mdbx_db_backend>();
+  }
 
   //////////////////////////////////////////////////////////////////////////////
   // array_basic_test
   //////////////////////////////////////////////////////////////////////////////
-  TEST(lmdb, array_basic_test)
+  template<typename db_backend_t>
+  void array_basic_test()
   {
     bool r = false;
 
     const std::string array_table_name("test_array");
     
-    std::shared_ptr<db::lmdb_db_backend> lmdb_ptr = std::make_shared<db::lmdb_db_backend>();
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
     epee::shared_recursive_mutex db_lock;
-    db::basic_db_accessor dbb(lmdb_ptr, db_lock);
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
 
     db::basic_key_to_array_accessor<uint64_t, serializable_string, true> db_array(dbb);
 
@@ -580,7 +634,7 @@ namespace lmdb_test
 
     // clear table
     db::container_handle tid;
-    ASSERT_TRUE(lmdb_ptr->open_container(array_table_name, tid));
+    ASSERT_TRUE(backend_ptr->open_container(array_table_name, tid));
     ASSERT_TRUE(dbb.begin_transaction());
     ASSERT_TRUE(dbb.clear(tid));
     dbb.commit_transaction();
@@ -681,18 +735,30 @@ namespace lmdb_test
     ASSERT_TRUE(dbb.close());
   }
 
+  TEST(lmdb, array_basic_test)
+  {
+    array_basic_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, array_basic_test)
+  {
+    array_basic_test<db::mdbx_db_backend>();
+  }
+
+
   //////////////////////////////////////////////////////////////////////////////
   // array_accessor_test
   //////////////////////////////////////////////////////////////////////////////
-  TEST(lmdb, array_accessor_test)
+  template<typename db_backend_t>
+  void array_accessor_test()
   {
     bool r = false;
 
     const std::string array_table_name("array");
     
-    std::shared_ptr<db::lmdb_db_backend> lmdb_ptr = std::make_shared<db::lmdb_db_backend>();
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
     epee::shared_recursive_mutex db_lock;
-    db::basic_db_accessor dbb(lmdb_ptr, db_lock);
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
 
     db::array_accessor<serializable_string, true> db_array(dbb);
 
@@ -700,7 +766,7 @@ namespace lmdb_test
 
     // clear table
     db::container_handle tid;
-    ASSERT_TRUE(lmdb_ptr->open_container(array_table_name, tid));
+    ASSERT_TRUE(backend_ptr->open_container(array_table_name, tid));
     ASSERT_TRUE(dbb.begin_transaction());
     ASSERT_TRUE(dbb.clear(tid));
     dbb.commit_transaction();
@@ -787,18 +853,29 @@ namespace lmdb_test
     db_array.commit_transaction();
   }
 
+  TEST(lmdb, array_accessor_test)
+  {
+    array_accessor_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, array_accessor_test)
+  {
+    array_accessor_test<db::mdbx_db_backend>();
+  }
+
   //////////////////////////////////////////////////////////////////////////////
   // key_value_test
   //////////////////////////////////////////////////////////////////////////////
-  TEST(lmdb, key_value_test)
+  template<typename db_backend_t>
+  void key_value_test()
   {
     bool r = false;
 
     const std::string array_table_name("key-value");
     
-    std::shared_ptr<db::lmdb_db_backend> lmdb_ptr = std::make_shared<db::lmdb_db_backend>();
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
     epee::shared_recursive_mutex db_lock;
-    db::basic_db_accessor dbb(lmdb_ptr, db_lock);
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
 
     db::basic_key_value_accessor<uint64_t, serializable_string, true> db_key_value_map(dbb);
 
@@ -806,7 +883,7 @@ namespace lmdb_test
 
     // clear table
     db::container_handle tid;
-    ASSERT_TRUE(lmdb_ptr->open_container(array_table_name, tid));
+    ASSERT_TRUE(backend_ptr->open_container(array_table_name, tid));
     ASSERT_TRUE(dbb.begin_transaction());
     ASSERT_TRUE(dbb.clear(tid));
     dbb.commit_transaction();
@@ -889,6 +966,16 @@ namespace lmdb_test
     db_key_value_map.commit_transaction();
   }
 
+  TEST(lmdb, key_value_test)
+  {
+    key_value_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, key_value_test)
+  {
+    key_value_test<db::mdbx_db_backend>();
+  }
+
 
   //////////////////////////////////////////////////////////////////////////////
   // 2gb_test
@@ -903,10 +990,10 @@ namespace lmdb_test
 
     static const uint64_t buffer_size = 64 * 1024;                                         // 64 KB
     static const uint64_t db_total_size = static_cast<uint64_t>(2.1 * 1024 * 1024 * 1024); // 2.1 GB -- a bit more than 2GB to test 2GB boundary
-    static const std::string db_file_path = boost::algorithm::replace_all_copy(boost::algorithm::replace_all_copy(std::string("2gb_") + typeid(db_backend_t).name() + "_test", ":", "_"), " ", "_");
+    static const std::string db_file_path = std::string("2gb_") + get_db_decorated_name<db_backend_t>() + "_test";
 
-    std::shared_ptr<db_backend_t> lmdb_ptr = std::make_shared<db_backend_t>();
-    db::basic_db_accessor bdba(lmdb_ptr, rw_lock);
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
+    db::basic_db_accessor bdba(backend_ptr, rw_lock);
 
     //
     // write data
@@ -916,11 +1003,11 @@ namespace lmdb_test
     ASSERT_TRUE(r);
 
     db::container_handle h;
-    r = lmdb_ptr->open_container("c1", h);
+    r = backend_ptr->open_container("c1", h);
     ASSERT_TRUE(r);
 
-    ASSERT_TRUE(lmdb_ptr->begin_transaction());
-    ASSERT_TRUE(lmdb_ptr->clear(h));
+    ASSERT_TRUE(backend_ptr->begin_transaction());
+    ASSERT_TRUE(backend_ptr->clear(h));
 
     std::vector<uint8_t> buffer;
     buffer.resize(buffer_size);
@@ -950,20 +1037,20 @@ namespace lmdb_test
     uint64_t total_data = 0;
     for (uint64_t key = 0; key < db_total_size / buffer_size; ++key)
     {
-      r = lmdb_ptr->set(h, (char*)&key, sizeof key, reinterpret_cast<const char*>(buffer.data()), buffer_size);
+      r = backend_ptr->set(h, (char*)&key, sizeof key, reinterpret_cast<const char*>(buffer.data()), buffer_size);
       ASSERT_TRUE(r);
       total_data += buffer_size;
 
       if (key % 1024 == 0)
       {
-        ASSERT_TRUE(lmdb_ptr->commit_transaction());
-        //ASSERT_TRUE(lmdb_ptr->resize_if_needed());
-        ASSERT_TRUE(lmdb_ptr->begin_transaction());
+        ASSERT_TRUE(backend_ptr->commit_transaction());
+        //ASSERT_TRUE(backend_ptr->resize_if_needed());
+        ASSERT_TRUE(backend_ptr->begin_transaction());
         std::cout << total_data / 1024 / 1024 << " MB written to DB" << ENDL;
       }
     }
 
-    ASSERT_TRUE(lmdb_ptr->commit_transaction());
+    ASSERT_TRUE(backend_ptr->commit_transaction());
 
     r = bdba.close();
     ASSERT_TRUE(r);
@@ -975,16 +1062,16 @@ namespace lmdb_test
 
     r = bdba.open(db_file_path);
     ASSERT_TRUE(r);
-    r = lmdb_ptr->open_container("c1", h);
+    r = backend_ptr->open_container("c1", h);
     ASSERT_TRUE(r);
 
-    ASSERT_TRUE(lmdb_ptr->begin_transaction());
+    ASSERT_TRUE(backend_ptr->begin_transaction());
 
     std::string out_buffer;
     total_data = 0;
     for (uint64_t key = 0; key < db_total_size / buffer_size; ++key)
     {
-      r = lmdb_ptr->get(h, (char*)&key, sizeof key, out_buffer);
+      r = backend_ptr->get(h, (char*)&key, sizeof key, out_buffer);
       ASSERT_TRUE(r);
       ASSERT_EQ(buffer_size, out_buffer.size());
 
@@ -1046,7 +1133,7 @@ namespace lmdb_test
         std::cout << total_data / 1024 / 1024 << " MB read from DB" << ENDL;
     }
 
-    ASSERT_TRUE(lmdb_ptr->commit_transaction());
+    ASSERT_TRUE(backend_ptr->commit_transaction());
 
     r = bdba.close();
     ASSERT_TRUE(r);
@@ -1064,5 +1151,100 @@ namespace lmdb_test
   {
     db_2gb_test<db::mdbx_db_backend>();
   }
+
+
+  //////////////////////////////////////////////////////////////////////////////
+  // close_contaier_test
+  //////////////////////////////////////////////////////////////////////////////
+  template<typename db_backend_t>
+  void close_contaier_test()
+  {
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
+    epee::shared_recursive_mutex db_lock;
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
+
+    bool r = false;
+
+    r = dbb.open(get_db_decorated_name<db_backend_t>());
+    ASSERT_TRUE(r);
+
+
+    std::unordered_map<uint64_t, crypto::hash> map;
+    std::vector<size_t> container_ids;
+    static const size_t containers_total = 1000; // this number considered to be much higher than max opened containers limits
+    for (size_t i = 0; i < containers_total; ++i)
+    {
+      crypto::hash h;
+      crypto::generate_random_bytes(sizeof h, &h);
+      map.insert(std::make_pair(i, h));
+
+      container_ids.push_back(i);
+    }
+
+    std::shuffle(container_ids.begin(), container_ids.end(), crypto::uniform_random_bit_generator());
+
+    for (size_t i = 0; i < containers_total; ++i)
+    {
+      size_t container_id = container_ids[i];
+      db::container_handle cid;
+      r = backend_ptr->open_container("container_#" + epee::string_tools::num_to_string_fast(container_id), cid);
+      ASSERT_TRUE(r);
+
+      ASSERT_TRUE(backend_ptr->begin_transaction());
+      ASSERT_TRUE(backend_ptr->clear(cid));
+
+      const crypto::hash& h = map[container_id];
+      r = backend_ptr->set(cid, (char*)&container_id, sizeof container_id, (char*)&h, sizeof h);
+      ASSERT_TRUE(r);
+
+      ASSERT_TRUE(backend_ptr->commit_transaction());
+
+      r = backend_ptr->close_container(cid);
+      ASSERT_TRUE(r);
+    }
+
+
+    std::shuffle(container_ids.begin(), container_ids.end(), crypto::uniform_random_bit_generator());
+
+    for (size_t i = 0; i < containers_total; ++i)
+    {
+      size_t container_id = container_ids[i];
+      db::container_handle cid;
+
+      r = backend_ptr->open_container("container_#" + epee::string_tools::num_to_string_fast(container_id), cid);
+      ASSERT_TRUE(r);
+
+      ASSERT_TRUE(backend_ptr->begin_transaction());
+
+      std::string out_buffer;
+      r = backend_ptr->get(cid, (char*)&container_id, sizeof container_id, out_buffer);
+      ASSERT_TRUE(r);
+
+      const crypto::hash& h_buff = *reinterpret_cast<const crypto::hash*>(out_buffer.c_str());
+      const crypto::hash& h = map[container_id];
+      ASSERT_EQ(h, h_buff);
+
+      ASSERT_TRUE(backend_ptr->commit_transaction());
+
+      r = backend_ptr->close_container(cid);
+      ASSERT_TRUE(r);
+    }
+
+
+    r = dbb.close();
+    ASSERT_TRUE(r);
+
+  }
+
+  TEST(lmdb, close_contaier_test)
+  {
+    close_contaier_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, close_contaier_test)
+  {
+    close_contaier_test<db::mdbx_db_backend>();
+  }
+
 
 } // namespace lmdb_test
