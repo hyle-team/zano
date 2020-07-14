@@ -67,6 +67,7 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
+  m_pproxy_diganostic_info = m_rpc_proxy->get_proxy_diagnostic_info();
 #endif
 	//m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
 }
@@ -274,6 +275,7 @@ bool wallets_manager::init(view::i_view* pview_handler)
     proxy_ptr->set_connectivity(HTTP_PROXY_TIMEOUT,  HTTP_PROXY_ATTEMPTS_COUNT);
     m_rpc_proxy.reset(proxy_ptr);    
     m_rpc_proxy->set_connection_addr(command_line::get_arg(m_vm, arg_remote_node));
+    m_pproxy_diganostic_info = m_rpc_proxy->get_proxy_diagnostic_info();
   }
 
   if(!command_line::has_arg(m_vm, arg_disable_logs_init))
