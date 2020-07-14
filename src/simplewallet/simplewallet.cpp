@@ -52,7 +52,6 @@ namespace
   const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
   const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address = { "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" };
   const command_line::arg_descriptor<std::string> arg_restore_wallet = { "restore-wallet", "Restore wallet from the seed phrase and save it to <arg>", "" };
-  const command_line::arg_descriptor<std::string> arg_restore_awo_wallet = { "restore-awo-wallet", "Restore auditable watch-only wallet from address and view key. Use \"address:viewkey\" as argument", "" };
   const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
@@ -274,7 +273,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     return false;
   }
 
-  if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty() && m_restore_awo_wallet.empty() && m_generate_new_aw.empty())
+  if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty() && m_generate_new_aw.empty())
   {
     fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet, --generate-new-auditable-wallet, --restore-wallet or --restore-awo-wallet";
     return false;
@@ -332,31 +331,14 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     }
 
     tools::password_container restore_seed_container;
-    if (!restore_seed_container.read_password("please, enter wallet seed phrase:\n"))
-    {
-      fail_msg_writer() << "failed to read seed phrase";
-      return false;
-    }
-    
-    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), false);
-    CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
-  }
-  else if (!m_restore_awo_wallet.empty())
-  {
-    if (boost::filesystem::exists(m_restore_awo_wallet))
-    {
-      fail_msg_writer() << "file " << m_restore_awo_wallet << " already exists";
-      return false;
-    }
-
-    tools::password_container restore_addr_and_viewkey_container;
-    if (!restore_addr_and_viewkey_container.read_password("please, enter wallet auditable address, viewkey and timestamp, separated by a colon (\"address:viewkey:timestamp\"):\n"))
+    if (!restore_seed_container.read_password("please, enter wallet seed phrase or an auditable wallet tracking key:\n"))
     {
       fail_msg_writer() << "failed to read seed phrase";
       return false;
     }
 
-    bool r = restore_wallet(m_restore_awo_wallet, restore_addr_and_viewkey_container.password(), pwd_container.password(), true);
+    bool looks_like_tracking_seed = restore_seed_container.password().find(':') != std::string::npos;
+    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed);
     CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
   }
   else
@@ -387,7 +369,6 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_do_not_set_date = command_line::get_arg(vm, arg_dont_set_date);
   m_do_pos_mining   = command_line::get_arg(vm, arg_do_pos_mining);
   m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
-  m_restore_awo_wallet = command_line::get_arg(vm, arg_restore_awo_wallet);
 } 
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::try_connect_to_daemon()
@@ -1778,7 +1759,6 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_do_pos_mining);
   command_line::add_arg(desc_params, arg_pos_mining_reward_address);
   command_line::add_arg(desc_params, arg_restore_wallet);
-  command_line::add_arg(desc_params, arg_restore_awo_wallet);
   command_line::add_arg(desc_params, arg_offline_mode);
   command_line::add_arg(desc_params, command_line::arg_log_file);
   command_line::add_arg(desc_params, command_line::arg_log_level);

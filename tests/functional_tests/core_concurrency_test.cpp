@@ -26,7 +26,7 @@ std::atomic<int64_t> test_core_time::m_time_shift;
 #include "../core_tests/chaingen_helpers.h"
 #include "../core_tests/core_state_helper.h"
 
-#define TESTS_DEFAULT_FEE TX_DEFAULT_FEE
+//#define TESTS_DEFAULT_FEE TX_DEFAULT_FEE
 
 static std::atomic<uint64_t> s_generated_money_total(0); // TODO: consiger changing to boost::multiprecision::uint128_t
 static size_t s_wallets_total_count           = 10; // total number of wallet that will be randomly used to generate transactions
@@ -40,8 +40,8 @@ typedef std::vector<cct_event_t> cct_events_t;
 typedef std::vector<currency::account_base> cct_accounts_t;
 typedef std::vector<std::shared_ptr<tools::wallet2>> cct_wallets_t;
 
-static const std::vector<currency::extra_v> empty_extra;
-static const std::vector<currency::attachment_v> empty_attachment;
+//static const std::vector<currency::extra_v> empty_extra;
+//static const std::vector<currency::attachment_v> empty_attachment;
 
 bool create_block_template_manually(const currency::block& prev_block, boost::multiprecision::uint128_t already_generated_coins, const std::vector<const currency::transaction*>& txs, const currency::account_public_address& miner_addr, currency::block& result)
 {

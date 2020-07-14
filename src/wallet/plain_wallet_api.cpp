@@ -324,6 +324,31 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(sl);
   }
 
+  std::string get_export_private_info(const std::string& target_dir)
+  {
+    const std::string src_folder_path = get_bundle_working_dir();
+    boost::system::error_code ec;
+    const std::string full_target_path = target_dir + "/Zano_export" + std::to_string(epee::misc_utils::get_tick_count());
+    boost::filesystem::create_directory(full_target_path, ec);
+    if (ec)
+    {
+      LOG_ERROR("Failed to create target directory(" << full_target_path << "):" << ec.message());
+      epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+      ok_response.result.return_code = API_RETURN_CODE_FAIL;
+      return epee::serialization::store_t_to_json(ok_response);
+    }
+    if(!tools::copy_dir(src_folder_path, full_target_path))
+    {
+      LOG_ERROR("Failed to copy target directory");
+      epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+      ok_response.result.return_code = API_RETURN_CODE_FAIL;
+      return epee::serialization::store_t_to_json(ok_response);
+    }
+    epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
+    ok_response.result.return_code = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(ok_response);
+  }
+
   std::string delete_wallet(const std::string& file_name)
   {
     std::string wallet_files_path = get_wallets_folder();
