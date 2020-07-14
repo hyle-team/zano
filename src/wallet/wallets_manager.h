@@ -193,7 +193,7 @@ private:
   bool m_use_deffered_global_outputs;
   std::atomic<uint64_t> m_last_daemon_height;
   std::atomic<uint64_t> m_last_daemon_network_state;
-  std::shared_ptr<tools::proxy_diagnostic_info> m_pproxy_diganostic_info;
+  std::shared_ptr<const tools::proxy_diagnostic_info> m_pproxy_diganostic_info;
   //std::atomic<bool> m_last_daemon_is_disconnected;
 //  std::atomic<uint64_t> m_last_wallet_synch_height;
   std::atomic<uint64_t> m_wallet_id_counter;
