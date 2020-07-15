@@ -1339,6 +1339,8 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   req.minimum_height = get_wallet_minimum_height();
   if (is_auditable())
     req.need_global_indexes = true;
+  if (req.minimum_height > m_height_of_start_sync)
+    m_height_of_start_sync = req.minimum_height;
 
   m_chain.get_short_chain_history(req.block_ids);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
