@@ -2833,7 +2833,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AUDITABLE_WALLET_HELP_PAGE", function() { return AUDITABLE_WALLET_HELP_PAGE; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "RCV_ADDR_QR_SCALE", function() { return RCV_ADDR_QR_SCALE; });
 var MIXIN = 10;
-var AUDITABLE_WALLET_HELP_PAGE = 'zano.org';
+var AUDITABLE_WALLET_HELP_PAGE = 'docs.zano.org/docs/auditable-wallets';
 var RCV_ADDR_QR_SCALE = 2;
 
 
