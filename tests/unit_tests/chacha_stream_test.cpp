@@ -94,42 +94,46 @@ TEST(chacha_stream_test, diversity_test_on_different_stream_behaviour)
 
   out.flush();
   store_data_file.close();
+  for (size_t d = 0; d != 1000; d++)
+  {
+    boost::filesystem::ifstream data_file;
+    data_file.open("./test.bin", std::ios_base::binary | std::ios_base::in);
+    encrypt_chacha_in_filter decrypt_filter("pass", iv);
 
-  boost::filesystem::ifstream data_file;
-  data_file.open("./test.bin", std::ios_base::binary | std::ios_base::in);
-  encrypt_chacha_in_filter decrypt_filter("pass", iv);
+    boost::iostreams::filtering_istream in;
+    in.push(decrypt_filter);
+    in.push(data_file);
 
-  boost::iostreams::filtering_istream in;
-  in.push(decrypt_filter);
-  in.push(data_file);
+    std::string str(buff_size + 100, ' ');
+    try {
 
-  std::string str(buff_size + 100, ' ');
-  try {
-
-    size_t offset = 0;
-    while (offset < buff_size)
-    {
-      std::streamsize count = std::rand() % 100;
-//      if (count + offset > buff_size)
-//      {
-//        count = buff_size - offset;
-//      }
-      in.read((char*)&str.data()[offset], count);
-      //self check
-      size_t readed_sz = in.gcount();
-      if(!(count + offset > buff_size || readed_sz == count)) 
+      size_t offset = 0;
+      while (offset < buff_size)
       {
-        ASSERT_TRUE(count + offset > buff_size || readed_sz == count);      
+        std::streamsize count = std::rand() % 100;
+        //      if (count + offset > buff_size)
+        //      {
+        //        count = buff_size - offset;
+        //      }
+        in.read((char*)&str.data()[offset], count);
+        //self check
+        size_t readed_sz = in.gcount();
+        if (!(count + offset > buff_size || readed_sz == count))
+        {
+          ASSERT_TRUE(count + offset > buff_size || readed_sz == count);
+        }
+        offset += readed_sz;
       }
-      offset += readed_sz;
+      if (in) {
+        ASSERT_TRUE(false);
+      }
+      std::cout << "OK";
     }
-    if(in) {
+    catch (std::exception& err) {
+      std::cout << err.what();
       ASSERT_TRUE(false);
-    }    
-    std::cout << "OK";
+    }
   }
-  catch(std::exception& err) {
-    std::cout << err.what();
-    ASSERT_TRUE(false);
-  }
+  std::cout << "Finished OK!";
+
 }
