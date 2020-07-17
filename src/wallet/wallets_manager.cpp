@@ -56,8 +56,7 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_rpc_proxy(new tools::default_http_core_proxy()),
 #endif                            
                        
-                                 m_last_daemon_height(0),
-                                 m_last_daemon_is_disconnected(false),
+                                 m_last_daemon_height(0),                                 
                                  m_wallet_id_counter(0),
                                  m_ui_opt(AUTO_VAL_INIT(m_ui_opt)), 
                                  m_remote_node_mode(false),
@@ -68,6 +67,7 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
+  m_pproxy_diganostic_info = m_rpc_proxy->get_proxy_diagnostic_info();
 #endif
 	//m_ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&m_offers_service);
 }
@@ -272,10 +272,10 @@ bool wallets_manager::init(view::i_view* pview_handler)
   {
     m_remote_node_mode = true;
     auto proxy_ptr = new tools::default_http_core_proxy();
-    proxy_ptr->set_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected);
     proxy_ptr->set_connectivity(HTTP_PROXY_TIMEOUT,  HTTP_PROXY_ATTEMPTS_COUNT);
     m_rpc_proxy.reset(proxy_ptr);    
     m_rpc_proxy->set_connection_addr(command_line::get_arg(m_vm, arg_remote_node));
+    m_pproxy_diganostic_info = m_rpc_proxy->get_proxy_diagnostic_info();
   }
 
   if(!command_line::has_arg(m_vm, arg_disable_logs_init))
@@ -706,7 +706,8 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.stop_for_refresh = false;
   wo.plast_daemon_height = &m_last_daemon_height;
   wo.plast_daemon_network_state = &m_last_daemon_network_state;
-  wo.plast_daemon_is_disconnected = &m_last_daemon_is_disconnected;
+  //wo.plast_daemon_is_disconnected = &(m_rpc_proxy->get_proxy_diagnostic_info().last_daemon_is_disconnected;
+  wo.m_pproxy_diagnostig_info = m_rpc_proxy->get_proxy_diagnostic_info();
   wo.pview = m_pview;  
   wo.has_related_alias_in_unconfirmed = false;
   wo.rpc_wrapper.reset(new tools::wallet_rpc_server(*wo.w.unlocked_get().get()));
@@ -852,6 +853,13 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       w->load(path, password);
       if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
+#ifndef MOBILE_WALLET_BUILD
+      //disable auditable wallets for now in mobile wallet
+      if (w->is_auditable())
+      {
+        return API_RETURN_CODE_WALLET_AUDITABLE_NOT_SUPPORTED;
+      }
+#endif 
       w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history);
@@ -1055,6 +1063,13 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     bool auditable_watch_only = restore_key.find(':') != std::string::npos;
     w->restore(path, password, restore_key, auditable_watch_only);
+#ifndef MOBILE_WALLET_BUILD
+    //disable auditable wallets for now in mobile wallet
+    if (w->is_auditable())
+    {
+      return API_RETURN_CODE_WALLET_AUDITABLE_NOT_SUPPORTED;
+    }
+#endif 
     owr.seed = w->get_account().get_seed_phrase();
   }
   catch (const tools::error::file_exists&)
@@ -1361,7 +1376,9 @@ bool wallets_manager::get_is_remote_daemon_connected()
 {
   if (!m_remote_node_mode)
     return true;
-  if (m_last_daemon_is_disconnected)
+  if (m_pproxy_diganostic_info->last_daemon_is_disconnected)
+    return false;
+  if (m_pproxy_diganostic_info->is_busy)
     return false;
   if (time(nullptr) - m_rpc_proxy->get_last_success_interract_time() > DAEMON_IDLE_UPDATE_TIME_MS * 2)
     return false;
@@ -1372,7 +1389,8 @@ std::string wallets_manager::get_connectivity_status()
 {
   view::general_connectivity_info gci = AUTO_VAL_INIT(gci);
   gci.is_online = get_is_remote_daemon_connected();
-  gci.last_daemon_is_disconnected = m_last_daemon_is_disconnected;
+  gci.last_daemon_is_disconnected = m_pproxy_diganostic_info->last_daemon_is_disconnected;
+  gci.is_server_busy = m_pproxy_diganostic_info->is_busy;
   gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
   return epee::serialization::store_t_to_json(gci);
 }
@@ -1798,7 +1816,7 @@ void wallets_manager::wallet_vs_options::worker_func()
     try
     {
       wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
-      if (plast_daemon_is_disconnected && plast_daemon_is_disconnected->load())
+      if (m_pproxy_diagnostig_info->last_daemon_is_disconnected.load())
       {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         continue;

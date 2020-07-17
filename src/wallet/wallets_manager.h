@@ -69,7 +69,8 @@ public:
     std::atomic<uint64_t> last_wallet_synch_height;
     std::atomic<uint64_t>* plast_daemon_height;
     std::atomic<uint64_t>* plast_daemon_network_state;
-    std::atomic<bool>* plast_daemon_is_disconnected;
+    //std::atomic<bool>* plast_daemon_is_disconnected;
+    std::shared_ptr<const tools::proxy_diagnostic_info> m_pproxy_diagnostig_info;
     std::atomic<bool> has_related_alias_in_unconfirmed;
     std::atomic<bool> need_to_update_wallet_info;
     std::atomic<bool> long_refresh_in_progress;
@@ -192,7 +193,8 @@ private:
   bool m_use_deffered_global_outputs;
   std::atomic<uint64_t> m_last_daemon_height;
   std::atomic<uint64_t> m_last_daemon_network_state;
-  std::atomic<bool> m_last_daemon_is_disconnected;
+  std::shared_ptr<const tools::proxy_diagnostic_info> m_pproxy_diganostic_info;
+  //std::atomic<bool> m_last_daemon_is_disconnected;
 //  std::atomic<uint64_t> m_last_wallet_synch_height;
   std::atomic<uint64_t> m_wallet_id_counter;
   std::atomic<bool> m_dont_save_wallet_at_stop;
