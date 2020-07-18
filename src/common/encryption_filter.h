@@ -153,7 +153,7 @@ public:
   template<typename Source>
   std::streamsize read(Source& src, char* s, std::streamsize n)
   {
-    if(m_buff.size() >= n)
+    if(m_buff.size() >= static_cast<size_t>(n))
     {
       return withdraw_to_read_buff(s, n);
     }
@@ -228,7 +228,8 @@ private:
 
   std::streamsize withdraw_to_read_buff(char* s, std::streamsize n)
   {
-    size_t copy_size = m_buff.size() > n ? n : m_buff.size();
+
+    size_t copy_size = m_buff.size() > static_cast<size_t>(n) ? static_cast<size_t>(n) : m_buff.size();
     std::memcpy(s, m_buff.data(), copy_size);
     m_buff.erase(0, copy_size);
     return copy_size;

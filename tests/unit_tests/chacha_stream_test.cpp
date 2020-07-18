@@ -108,7 +108,7 @@ TEST(chacha_stream_test, diversity_test_on_different_stream_behaviour)
     try {
 
       size_t offset = 0;
-      while (offset < buff_size)
+      while (offset < buff_size+1)
       {
         std::streamsize count = std::rand() % 100;
         //      if (count + offset > buff_size)
@@ -123,6 +123,9 @@ TEST(chacha_stream_test, diversity_test_on_different_stream_behaviour)
           ASSERT_TRUE(count + offset > buff_size || readed_sz == count);
         }
         offset += readed_sz;
+        if (!in) {
+          break;
+        }
       }
       if (in) {
         ASSERT_TRUE(false);

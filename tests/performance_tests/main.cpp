@@ -17,6 +17,7 @@
 #include "is_out_to_acc.h"
 #include "core_market_performance_test.h"
 #include "serialization_performance_test.h"
+#include "chacha_stream_performance_test.h"
 #include "keccak_test.h"
 #include "blake2_test.h"
 #include "print_struct_to_json.h"
@@ -38,9 +39,10 @@ int main(int argc, char** argv)
   set_process_affinity(1);
   set_thread_high_priority();
 
+  do_chacha_stream_performance_test();
   //test_blake2();
 
-  free_space_check();
+  //free_space_check();
   
   //print_struct_to_json();
 
