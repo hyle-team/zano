@@ -20,7 +20,7 @@ bool perform_crypt_stream_iteration(const std::list<currency::block_extended_inf
   std::list<currency::block_extended_info> verification_list;
   boost::filesystem::ofstream store_data_file;
   store_data_file.open("./test.bin", std::ios_base::binary | std::ios_base::out | std::ios::trunc);
-  encrypt_chacha_out_filter encrypt_filter("pass", iv);
+  tools::encrypt_chacha_out_filter encrypt_filter("pass", iv);
   boost::iostreams::filtering_ostream out;
   out.push(encrypt_filter);
   out.push(store_data_file);
@@ -34,7 +34,7 @@ bool perform_crypt_stream_iteration(const std::list<currency::block_extended_inf
 
   boost::filesystem::ifstream data_file;
   data_file.open("./test.bin", std::ios_base::binary | std::ios_base::in);
-  encrypt_chacha_in_filter decrypt_filter("pass", iv);
+  tools::encrypt_chacha_in_filter decrypt_filter("pass", iv);
 
   boost::iostreams::filtering_istream in;
   in.push(decrypt_filter);

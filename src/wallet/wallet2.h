@@ -90,7 +90,9 @@ namespace tools
   {
     uint64_t m_signature;
     uint16_t m_cb_keys;
-    uint64_t m_cb_body;
+    //uint64_t m_cb_body; <-- this field never used, soo replace it with two other variables "m_ver" + and "m_reserved"
+    uint32_t m_ver;
+    uint32_t m_reserved; //for future use
   };
 #pragma pack (pop)
 
@@ -474,7 +476,7 @@ namespace tools
     void store(const std::wstring& path);
     void store(const std::wstring& path, const std::string& password);
     void store_watch_only(const std::wstring& path, const std::string& password) const;
-    bool store_keys(std::string& buff, const std::string& password, bool store_as_watch_only = false);
+    bool store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only = false);
     std::wstring get_wallet_path()const { return m_wallet_file; }
     std::string get_wallet_password()const { return m_password; }
     currency::account_base& get_account() { return m_account; }
@@ -805,7 +807,7 @@ private:
 
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
-    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature);
+    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes);
     void fetch_tx_global_indixes(const currency::transaction& tx, std::vector<uint64_t>& goutputs_indexes);
     void fetch_tx_global_indixes(const std::list<std::reference_wrapper<const currency::transaction>>& txs, std::vector<std::vector<uint64_t>>& goutputs_indexes);

@@ -7,6 +7,8 @@
 #include <numeric>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <iostream>
 #include <boost/utility/value_init.hpp>
@@ -26,6 +28,7 @@ using namespace epee;
 #include "serialization/binary_utils.h"
 #include "currency_core/bc_payments_id_service.h"
 #include "version.h"
+#include "common/encryption_filter.h"
 using namespace currency;
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
@@ -2123,7 +2126,7 @@ bool wallet2::reset_all()
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::store_keys(std::string& buff, const std::string& password, bool store_as_watch_only /* = false */)
+bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only /* = false */)
 {
   currency::account_base acc = m_account;
   if (store_as_watch_only)
@@ -2132,8 +2135,6 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, bool st
   std::string account_data;
   bool r = epee::serialization::store_t_to_binary(acc, account_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "failed to serialize wallet keys");
-
-  wallet2::keys_file_data keys_file_data = boost::value_initialized<wallet2::keys_file_data>();
 
   crypto::chacha8_key key;
   crypto::generate_chacha8_key(password, key);
@@ -2151,7 +2152,8 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, bool st
 bool wallet2::backup_keys(const std::string& path)
 {
   std::string buff;
-  bool r = store_keys(buff, m_password);
+  wallet2::keys_file_data keys_file_data = AUTO_VAL_INIT(keys_file_data);
+  bool r = store_keys(buff, m_password, keys_file_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to store keys");
 
   r = file_io_utils::save_string_to_file(path, buff);
@@ -2237,10 +2239,9 @@ bool wallet2::prepare_file_names(const std::wstring& file_path)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::load_keys(const std::string& buff, const std::string& password, uint64_t file_signature)
+void wallet2::load_keys(const std::string& buff, const std::string& password, uint64_t file_signature, keys_file_data& kf_data)
 {
   bool r = false;
-  wallet2::keys_file_data kf_data = AUTO_VAL_INIT(kf_data);
   if (file_signature == WALLET_FILE_SIGNATURE_OLD)
   {
     wallet2::keys_file_data_old kf_data_old;
@@ -2359,16 +2360,30 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   THROW_IF_TRUE_WALLET_EX(data_file.fail(), error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
   THROW_IF_TRUE_WALLET_EX(wbh.m_signature != WALLET_FILE_SIGNATURE_OLD && wbh.m_signature != WALLET_FILE_SIGNATURE_V2, error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
-  THROW_IF_TRUE_WALLET_EX(wbh.m_cb_body > WALLET_FILE_MAX_BODY_SIZE || 
+  THROW_IF_TRUE_WALLET_EX(
     wbh.m_cb_keys > WALLET_FILE_MAX_KEYS_SIZE, error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
 
   keys_buff.resize(wbh.m_cb_keys);
   data_file.read((char*)keys_buff.data(), wbh.m_cb_keys);
+  wallet2::keys_file_data kf_data = AUTO_VAL_INIT(kf_data);
+  load_keys(keys_buff, password, wbh.m_signature, kf_data);
 
-  load_keys(keys_buff, password, wbh.m_signature);
-
-  bool need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
+  bool need_to_resync = false;
+  if (wbh.m_ver == 1000)
+  {
+    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
+  }
+  else
+  {
+    tools::encrypt_chacha_in_filter decrypt_filter(password, kf_data.iv);
+    boost::iostreams::filtering_istream in;
+    in.push(decrypt_filter);
+    in.push(data_file);
+    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
+  }
+    
+    
 
   if (m_watch_only && !is_auditable())
     load_keys2ki(true, need_to_resync);
@@ -2408,7 +2423,8 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   //prepare data
   std::string keys_buff;
-  bool r = store_keys(keys_buff, password, m_watch_only);
+  wallet2::keys_file_data keys_file_data = AUTO_VAL_INIT(keys_file_data);
+  bool r = store_keys(keys_buff, password, keys_file_data, m_watch_only);
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store_keys for wallet " << ascii_path_to_save);
 
   //store data
@@ -2416,7 +2432,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   wbh.m_signature = WALLET_FILE_SIGNATURE_V2;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
-  wbh.m_cb_body = 1000;
+  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION;
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
   uint64_t ts = m_core_runtime_config.get_core_time();
@@ -2431,8 +2447,13 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   data_file << header_buff << keys_buff;
 
   WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
+  //creating encryption stream
+  tools::encrypt_chacha_out_filter decrypt_filter(m_password, keys_file_data.iv);
+  boost::iostreams::filtering_ostream out;
+  out.push(decrypt_filter);
+  out.push(data_file);
 
-  r = tools::portble_serialize_obj_to_stream(*this, data_file);
+  r = tools::portble_serialize_obj_to_stream(*this, out);
   if (!r)
   {
     data_file.close();
