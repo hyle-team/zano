@@ -543,7 +543,7 @@ namespace tools
       bool shuffle = true,
       uint8_t flags = 0,
       bool send_to_network = true,
-      std::string* p_signed_tx_blob_str = nullptr);
+      std::string* p_unsigned_filename_or_tx_blob_str = nullptr);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts, 
                   size_t fake_outputs_count, 
@@ -563,7 +563,7 @@ namespace tools
     void transfer(const construct_tx_param& ctp,
                   currency::transaction &tx,
                   bool send_to_network,
-                  std::string* p_signed_tx_blob_str);
+                  std::string* p_unsigned_filename_or_tx_blob_str);
 
     template<typename destination_split_strategy_t>
     void transfer_from_contract(

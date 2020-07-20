@@ -4662,7 +4662,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   bool shuffle,
   uint8_t flags,
   bool send_to_network,
-  std::string* p_signed_tx_blob_str)
+  std::string* p_unsigned_filename_or_tx_blob_str)
 {
   //TIME_MEASURE_START(precalculation_time);
   construct_tx_param ctp = AUTO_VAL_INIT(ctp);
@@ -4681,7 +4681,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   ctp.tx_outs_attr = tx_outs_attr;
   ctp.unlock_time = unlock_time;
   //TIME_MEASURE_FINISH(precalculation_time);
-  transfer(ctp, tx, send_to_network, p_signed_tx_blob_str);
+  transfer(ctp, tx, send_to_network, p_unsigned_filename_or_tx_blob_str);
 }
 //----------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------
@@ -4762,7 +4762,7 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
 void wallet2::transfer(const construct_tx_param& ctp,
   currency::transaction &tx,
   bool send_to_network,
-  std::string* p_signed_tx_blob_str)
+  std::string* p_unsigned_filename_or_tx_blob_str)
 {
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!is_auditable() || !is_watch_only(), "You can't initiate coins transfer using an auditable watch-only wallet."); // btw, watch-only wallets can call transfer() within cold-signing process
 
