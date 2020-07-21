@@ -426,7 +426,7 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
 
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(this->shared_from_this());
-  m_wallet->set_do_rise_transfer(false);
+  m_wallet->set_do_rise_transfer(true);
   try
   {
     if (auditable_watch_only)
