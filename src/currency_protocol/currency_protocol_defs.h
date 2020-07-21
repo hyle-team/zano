@@ -29,11 +29,13 @@ namespace currency
   {
     blobdata block;
     std::list<blobdata> txs;
+    std::vector<uint64_t> coinbase_global_outs;
     std::vector<struct_with_one_t_type<std::vector<uint64_t> > > tx_global_outs;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(block)
       KV_SERIALIZE(txs)
+      KV_SERIALIZE(coinbase_global_outs)
       KV_SERIALIZE(tx_global_outs)
     END_KV_SERIALIZE_MAP()
   };
