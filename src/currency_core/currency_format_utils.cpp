@@ -1739,7 +1739,12 @@ namespace currency
       {
         CHECK_AND_ASSERT_MES(bl_entry.tx_global_outs.size() == bl_entry.txs.size(), false, "tx_global_outs count " << bl_entry.tx_global_outs.size() << " count missmatch with bl_entry.txs count " << bl_entry.txs.size());
       }
-
+      if (bl_entry.coinbase_global_outs.size())
+      {
+        std::shared_ptr<currency::transaction_chain_entry> tche_ptr(new currency::transaction_chain_entry());
+        tche_ptr->m_global_output_indexes = bl_entry.coinbase_global_outs;
+        bdde.coinbase_ptr = tche_ptr;
+      }
       for (const auto& tx_blob : bl_entry.txs)
       {
         std::shared_ptr<currency::transaction_chain_entry> tche_ptr(new currency::transaction_chain_entry());
