@@ -51,7 +51,7 @@ namespace
   const command_line::arg_descriptor<uint32_t> arg_log_level = {"set-log", "", 0, true};
   const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
   const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address = { "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" };
-  const command_line::arg_descriptor<std::string> arg_restore_wallet = { "restore-wallet", "Restore wallet from the seed phrase and save it to <arg>", "" };
+  const command_line::arg_descriptor<std::string> arg_restore_wallet = { "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" };
   const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
@@ -220,7 +220,7 @@ simple_wallet::simple_wallet()
   
   m_cmd_binder.set_handler("get_tx_key", boost::bind(&simple_wallet::get_tx_key, this, _1), "Get transaction one-time secret key (r) for a given <txid>");
 
-  m_cmd_binder.set_handler("tracking_seed", boost::bind(&simple_wallet::tracking_seed, this, _1), "For auditable wallets: prints auditable watch-only blob for wallet's audit by a third party");
+  m_cmd_binder.set_handler("tracking_seed", boost::bind(&simple_wallet::tracking_seed, this, _1), "For auditable wallets: prints tracking seed for wallet's audit by a third party");
 
   m_cmd_binder.set_handler("save", boost::bind(&simple_wallet::save, this, _1), "Save wallet synchronized data");
   m_cmd_binder.set_handler("save_watch_only", boost::bind(&simple_wallet::save_watch_only, this, _1), "save_watch_only <filename> <password> - save as watch-only wallet file.");
@@ -275,7 +275,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 
   if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty() && m_generate_new_aw.empty())
   {
-    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet, --generate-new-auditable-wallet, --restore-wallet or --restore-awo-wallet";
+    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet, --generate-new-auditable-wallet, --restore-wallet";
     return false;
   }
 
@@ -331,7 +331,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     }
 
     tools::password_container restore_seed_container;
-    if (!restore_seed_container.read_password("please, enter wallet seed phrase or an auditable wallet tracking key:\n"))
+    if (!restore_seed_container.read_password("please, enter wallet seed phrase or an auditable wallet's tracking seed:\n"))
     {
       fail_msg_writer() << "failed to read seed phrase";
       return false;
@@ -420,7 +420,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool auditable_watch_only)
+bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet)
 {
   m_wallet_file = wallet_file;
 
@@ -429,24 +429,27 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
   m_wallet->set_do_rise_transfer(true);
   try
   {
-    if (auditable_watch_only)
+    if (tracking_wallet)
     {
+      // auditable watch-only aka tracking wallet
       m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true);
-      message_writer(epee::log_space::console_color_white, true) << "Auditable watch-only wallet restored: " << m_wallet->get_account().get_public_address_str();
+      message_writer(epee::log_space::console_color_white, true) << "Tracking wallet restored: " << m_wallet->get_account().get_public_address_str();
     }
     else
     {
-      // normal wallet
+      // normal or auditable wallet
       m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, false);
-      message_writer(epee::log_space::console_color_white, true) << "Wallet restored: " << m_wallet->get_account().get_public_address_str();
+      message_writer(epee::log_space::console_color_white, true) << (m_wallet->is_auditable() ? "Auditable wallet" : "Wallet") << " restored: " << m_wallet->get_account().get_public_address_str();
       std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
+      if (m_wallet->is_auditable())
+        std::cout << "tracking seed: " << std::endl << m_wallet->get_account().get_tracking_seed() << std::endl << std::flush;
     }
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
   }
   catch (const std::exception& e)
   {
-    fail_msg_writer() << "failed to restore wallet, check your " << (auditable_watch_only ? "awo blob!" : "seed phrase!") << ENDL << e.what();
+    fail_msg_writer() << "failed to restore wallet, check your " << (tracking_wallet ? "tracking seed!" : "seed phrase!") << ENDL << e.what();
     return false;
   }
 
@@ -459,7 +462,7 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
     "Use \"help\" command to see the list of available commands.\n" <<
     "Always use \"exit\" command when closing simplewallet to save\n" <<
     "current session's state. Otherwise, you will possibly need to synchronize \n" <<
-    "your wallet again. Your wallet key is NOT under risk anyway.\n" <<
+    "your wallet again. Your wallet keys is NOT under risk anyway.\n" <<
     "**********************************************************************";
   return true;
 }
@@ -1493,6 +1496,7 @@ bool simple_wallet::tracking_seed(const std::vector<std::string> &args_)
 
   success_msg_writer() << "Auditable watch-only tracking seed for this wallet is:";
   std::cout << m_wallet->get_account().get_tracking_seed() << ENDL;
+  success_msg_writer() << "Anyone having this tracking seed is able to watch your balance and transaction history, but unable to spend coins.";
   return true;
 }
 //----------------------------------------------------------------------------------------------------

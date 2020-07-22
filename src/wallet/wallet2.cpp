@@ -2298,18 +2298,18 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   store();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool auditable_watch_only)
+void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet)
 {
   bool r = false;
   clear();
   prepare_file_names(path);
   m_password = pass;
   
-  if (auditable_watch_only)
+  if (tracking_wallet)
   {
     r = m_account.restore_from_tracking_seed(seed_or_tracking_seed);
     init_log_prefix();
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load auditable watch-only wallet from a given blob: invalid awo blob");
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load tracking wallet from a given seed: invalid tracking seed");
     m_watch_only = true;
   }
   else
