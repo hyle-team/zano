@@ -1877,12 +1877,16 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
       if (++try_count > 3)
         return;
       WLT_LOG_L2("no connection to the daemon, wait and try pull_blocks again (try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ")");
+      if (m_wcallback)
+        m_wcallback->on_message(tools::i_wallet2_callback::ms_red, "no connection to daemon");
       std::this_thread::sleep_for(std::chrono::seconds(3));
     }
     catch (const std::exception& e)
     {
       blocks_fetched += added_blocks;
       WLT_LOG_ERROR("refresh->pull_blocks failed, try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ", exception: " << e.what());
+      if (m_wcallback)
+        m_wcallback->on_message(tools::i_wallet2_callback::ms_red, std::string("error on pulling blocks: ") + e.what());
       return;
     }
   }
