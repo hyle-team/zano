@@ -70,6 +70,8 @@ namespace currency
     int64_t get_net_time_delta_median();
     bool add_time_delta_and_check_time_sync(int64_t delta);
     bool get_last_time_sync_difference(int64_t& last_median2local_time_difference, int64_t& last_ntp2local_time_difference); // returns true if differences in allowed bounds
+                                                                                                                             //-----------------------------------------------------------------------------------
+    void set_to_debug_mode(uint32_t ip);
 
   private:
     //----------------- commands handlers ----------------------------------------------
@@ -114,6 +116,7 @@ namespace currency
     std::mutex m_time_deltas_lock;
     int64_t m_last_median2local_time_difference;
     int64_t m_last_ntp2local_time_difference;
+    uint32_t m_debug_ip_address;
 
     template<class t_parametr>
     bool post_notify(typename t_parametr::request& arg, currency_connection_context& context)

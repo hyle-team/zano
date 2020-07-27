@@ -11,9 +11,13 @@ namespace plain_wallet
 {
   typedef int64_t hwallet;
   std::string init(const std::string& ip, const std::string& port, const std::string& working_dir, int log_level);
+  std::string reset();
   std::string set_log_level(int log_level);
   std::string get_version();
   std::string get_wallet_files();
+  std::string get_export_private_info(const std::string& target_dir);
+  std::string delete_wallet(const std::string& file_name);
+  std::string get_address_info(const std::string& addr);
 
   std::string get_appconfig(const std::string& encryption_key);
   std::string set_appconfig(const std::string& conf_str, const std::string& encryption_key);
@@ -25,6 +29,7 @@ namespace plain_wallet
   std::string open(const std::string& path, const std::string& password);
   std::string restore(const std::string& seed, const std::string& path, const std::string& password);
   std::string generate(const std::string& path, const std::string& password);
+  std::string get_opened_wallets();  
 
   std::string get_wallet_status(hwallet h);
   std::string close_wallet(hwallet h);

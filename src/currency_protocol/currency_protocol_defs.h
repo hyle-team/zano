@@ -13,6 +13,7 @@
 #include "currency_core/connection_context.h"
 #include "currency_core/blockchain_storage_basic.h"
 #include "currency_protocol/blobdatatype.h"
+#include "currency_core/basic_kv_structs.h"
 
 namespace currency
 {
@@ -20,7 +21,7 @@ namespace currency
 
 #define BC_COMMANDS_POOL_BASE 2000
 
-
+  
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
@@ -28,15 +29,21 @@ namespace currency
   {
     blobdata block;
     std::list<blobdata> txs;
+    std::vector<uint64_t> coinbase_global_outs;
+    std::vector<struct_with_one_t_type<std::vector<uint64_t> > > tx_global_outs;
+
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(block)
       KV_SERIALIZE(txs)
+      KV_SERIALIZE(coinbase_global_outs)
+      KV_SERIALIZE(tx_global_outs)
     END_KV_SERIALIZE_MAP()
   };
 
   struct block_direct_data_entry
   {
     std::shared_ptr<const block_extended_info> block_ptr;
+    std::shared_ptr<const transaction_chain_entry> coinbase_ptr;
     std::list<std::shared_ptr<const transaction_chain_entry> > txs_ptr;
   };
 

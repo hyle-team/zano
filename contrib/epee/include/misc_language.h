@@ -77,6 +77,32 @@ namespace epee
 
 namespace misc_utils
 {
+  template<class _Ty1,
+    class _Ty2,
+    class _Ty3>
+    struct triple
+  {	// store a pair of values
+    typedef _Ty1 first_type;
+    typedef _Ty2 second_type;
+    typedef _Ty3 third_type;
+
+    triple()
+      : first(), second(), third()
+    {	// default construct
+    }
+
+    triple(const _Ty1& _Val1, const _Ty2& _Val2, const _Ty3& _Val3)
+      : first(_Val1), second(_Val2), third(_Val3)
+    {	// construct from specified values
+    }
+  
+    _Ty1 first;		// the first stored value
+    _Ty2 second;	// the second stored value
+    _Ty3 third;	// the second stored value
+  };
+
+
+
 	template<typename t_type>
 		t_type get_max_t_val(t_type t)
 		{

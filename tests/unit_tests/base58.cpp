@@ -439,7 +439,8 @@ namespace
     "\xf7\x24\xbc\x5c\x6c\xfb\xb9\xd9\x76\x02\xc3\x00\x42\x3a\x2f\x28"
     "\x64\x18\x74\x51\x3a\x03\x57\x78\xa0\xc1\x77\x8d\x83\x32\x01\xe9"
     "\x22\x09\x39\x68\x9e\xdf\x1a\xbd\x5b\xc1\xd0\x31\xf7\x3e\xcd\x6c"
-    "\x99\x3a\xdd\x66\xd6\x80\x88\x70\x45\x6a\xfe\xb8\xe7\xee\xb6\x8d");
+    "\x99\x3a\xdd\x66\xd6\x80\x88\x70\x45\x6a\xfe\xb8\xe7\xee\xb6\x8d"
+    "\x00");
   std::string test_keys_addr_str = "ZxDqHy6WnyYY5yQcdApjMb8tVPik5BC3LFdaevfbGq7X1KY5vdsWmUi5UQgse2GBZFbMsb47TFqBmPpdFHDDwDxR2ZuZ6zX4W"; // correct str address depends on CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX value
 }
 
@@ -499,7 +500,7 @@ TEST(get_account_address_from_str, fails_on_invalid_address_spend_key)
 TEST(get_account_address_from_str, fails_on_invalid_address_view_key)
 {
   std::string serialized_keys_copy = test_serialized_keys;
-  serialized_keys_copy.back() = '\x01';
+  serialized_keys_copy[serialized_keys_copy.size() - 2] = '\x01';
   std::string addr_str = base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, serialized_keys_copy);
 
   currency::account_public_address addr;
@@ -517,13 +518,13 @@ TEST(integ_address, payment_id_sizes)
     if (pid_size > 0)
       crypto::generate_random_bytes(pid_size, &payment_id.front());
 
-    currency::account_public_address addr;
-    addr.m_spend_public_key = currency::keypair::generate().pub;
-    addr.m_view_public_key = currency::keypair::generate().pub;
+    currency::account_public_address addr = AUTO_VAL_INIT_T(currency::account_public_address);
+    addr.spend_public_key = currency::keypair::generate().pub;
+    addr.view_public_key = currency::keypair::generate().pub;
 
     std::string addr_str = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
 
-    currency::account_public_address addr2;
+    currency::account_public_address addr2 = AUTO_VAL_INIT_T(currency::account_public_address);
     std::string integrated_payment_id;
     ASSERT_TRUE(currency::get_account_address_and_payment_id_from_str(addr2, integrated_payment_id, addr_str));
 
@@ -537,17 +538,114 @@ TEST(integ_address, payment_id_sizes)
   if (pid_size > 0)
     crypto::generate_random_bytes(pid_size, &payment_id.front());
 
-  currency::account_public_address addr;
-  addr.m_spend_public_key = currency::keypair::generate().pub;
-  addr.m_view_public_key = currency::keypair::generate().pub;
+  currency::account_public_address addr = AUTO_VAL_INIT_T(currency::account_public_address);
+  addr.spend_public_key = currency::keypair::generate().pub;
+  addr.view_public_key = currency::keypair::generate().pub;
 
   // the following line is expected to handle oversized payment id well
   std::string addr_str = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
 
-  currency::account_public_address addr2;
+  currency::account_public_address addr2 = AUTO_VAL_INIT_T(currency::account_public_address);
   std::string integrated_payment_id;
   ASSERT_FALSE(currency::get_account_address_and_payment_id_from_str(addr2, integrated_payment_id, addr_str));
+}
 
-  ASSERT_NE(addr2, addr);
-  ASSERT_NE(integrated_payment_id, payment_id);
+
+struct addr_entry_t
+{
+  std::string address;
+  std::string view_pub_key;
+  std::string spend_pub_key;
+  std::string payment_id_hex;
+  uint8_t flags;
+};
+
+addr_entry_t addr_entries[] = 
+  {
+    {
+      // classic normal address
+      "ZxD5aoLDPTdcaRx4uCpyW4XiLfEXejepAVz8cSY2fwHNEiJNu6NmpBBDLGTJzCsUvn3acCVDVDPMV8yQXdPooAp338Se7AxeH", // address
+      "a3f208c8f9ba49bab28eed62b35b0f6be0a297bcd85c2faa1eb1820527bcf7e3", // view_pub_key
+      "9f5e1fa93630d4b281b18bb67a3db79e9622fc703cc3ad4a453a82e0a36d51fa", // spend_pub_key
+      "", // payment_id_hex
+      0 // flags
+    },
+    {
+      // classic integrated address
+      "iZ2Zi6RmTWwcaRx4uCpyW4XiLfEXejepAVz8cSY2fwHNEiJNu6NmpBBDLGTJzCsUvn3acCVDVDPMV8yQXdPooAp3iTqEsjvJoco1aLSZXS6T", // address
+      "a3f208c8f9ba49bab28eed62b35b0f6be0a297bcd85c2faa1eb1820527bcf7e3", // view_pub_key
+      "9f5e1fa93630d4b281b18bb67a3db79e9622fc703cc3ad4a453a82e0a36d51fa", // spend_pub_key
+      "87440d0b9acc42f1", // payment_id_hex
+      0 // flags
+    },
+    {
+      // new format normal address with custom flags
+      "ZxD5aoLDPTdcaRx4uCpyW4XiLfEXejepAVz8cSY2fwHNEiJNu6NmpBBDLGTJzCsUvn3acCVDVDPMV8yQXdPooAp3APrDvRoL5C", // address
+      "a3f208c8f9ba49bab28eed62b35b0f6be0a297bcd85c2faa1eb1820527bcf7e3", // view_pub_key
+      "9f5e1fa93630d4b281b18bb67a3db79e9622fc703cc3ad4a453a82e0a36d51fa", // spend_pub_key
+      "", // payment_id_hex
+      0xfe // flags
+    },
+    {
+      // new format integrated address with custom flags
+      "iZ4mBxubNfqcaRx4uCpyW4XiLfEXejepAVz8cSY2fwHNEiJNu6NmpBBDLGTJzCsUvn3acCVDVDPMV8yQXdPooAp3iTrG7nU5rRCWmcozLaMoY95sAbo6", // address
+      "a3f208c8f9ba49bab28eed62b35b0f6be0a297bcd85c2faa1eb1820527bcf7e3", // view_pub_key
+      "9f5e1fa93630d4b281b18bb67a3db79e9622fc703cc3ad4a453a82e0a36d51fa", // spend_pub_key
+      "3ba0527bcfb1fa93630d28eed6", // payment_id
+      0xfe // flags
+    },
+    {
+      // normal auditable address
+      "aZxb9Et6FhP9AinRwcPqSqBKjckre7PgoZjK3q5YG2fUKHYWFZMWjB6YAEAdw4yDDUGEQ7CGEgbqhGRKeadGV1jLYcEJMEmqQFn", // address
+      "a3f208c8f9ba49bab28eed62b35b0f6be0a297bcd85c2faa1eb1820527bcf7e3", // view_pub_key
+      "9f5e1fa93630d4b281b18bb67a3db79e9622fc703cc3ad4a453a82e0a36d51fa", // spend_pub_key
+      "", // payment_id
+      ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE // flags
+    },
+    {
+      // auditable integrated address
+      "aiZXDondHWu9AinRwcPqSqBKjckre7PgoZjK3q5YG2fUKHYWFZMWjB6YAEAdw4yDDUGEQ7CGEgbqhGRKeadGV1jLYcEJM9xJH8EbjuRiMJgFmPRATsEV9", // address
+      "a3f208c8f9ba49bab28eed62b35b0f6be0a297bcd85c2faa1eb1820527bcf7e3", // view_pub_key
+      "9f5e1fa93630d4b281b18bb67a3db79e9622fc703cc3ad4a453a82e0a36d51fa", // spend_pub_key
+      "3ba0527bcfb1fa93630d28eed6", // payment_id
+      ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE // flags
+    }
+  };
+
+void check_add_entry(const addr_entry_t& ae)
+{
+  std::string payment_id, payment_id_hex;
+  currency::account_public_address addr = AUTO_VAL_INIT(addr);
+
+  ASSERT_TRUE(currency::get_account_address_and_payment_id_from_str(addr, payment_id, ae.address));
+  payment_id_hex = epee::string_tools::buff_to_hex_nodelimer(payment_id);
+
+  ASSERT_EQ(ae.flags, addr.flags);
+  ASSERT_EQ(ae.payment_id_hex, payment_id_hex);
+  ASSERT_EQ(ae.view_pub_key, epee::string_tools::pod_to_hex(addr.view_public_key));
+  ASSERT_EQ(ae.spend_pub_key, epee::string_tools::pod_to_hex(addr.spend_public_key));
+}
+
+TEST(auditable_addresses, basic)
+{
+  /*
+  currency::account_keys keys = AUTO_VAL_INIT(keys);
+  epee::string_tools::parse_tpod_from_hex_string("248b019d145d485576ecb0367d92b5a12e8aa15084b59ef15014a7a22d1f3b0c", keys.spend_secret_key);
+  dependent_key(keys.spend_secret_key, keys.view_secret_key);
+  crypto::secret_key_to_public_key(keys.view_secret_key, keys.account_address.view_public_key);
+  crypto::secret_key_to_public_key(keys.spend_secret_key, keys.account_address.spend_public_key);
+
+  keys.account_address.flags = 0xfe;
+
+  std::string payment_id;
+  epee::string_tools::parse_hexstr_to_binbuff(std::string("3ba0527bcfb1fa93630d28eed6"), payment_id);
+
+  std::cout << currency::get_account_address_as_str(keys.account_address) << " " << epee::string_tools::pod_to_hex(keys.account_address.view_public_key) << " " << epee::string_tools::pod_to_hex(keys.account_address.spend_public_key) << ENDL;
+  std::cout << currency::get_account_address_and_payment_id_as_str(keys.account_address,  payment_id) << " " << epee::string_tools::pod_to_hex(keys.account_address.view_public_key) << " " << epee::string_tools::pod_to_hex(keys.account_address.spend_public_key) << ENDL;
+  */
+
+
+  for (size_t i = 0; i < sizeof addr_entries / sizeof addr_entries[0]; ++i)
+    check_add_entry(addr_entries[i]);
+
 }

@@ -1,6 +1,7 @@
 <div class="chart-header">
   <div class="general">
-    <div>
+    <div *ngIf="(!variablesService.currentWallet.is_auditable && !variablesService.currentWallet.is_watch_only)
+                || (variablesService.currentWallet.is_auditable && !variablesService.currentWallet.is_watch_only)">
       <span class="label">{{ 'STAKING.TITLE' | translate }}</span>
       <span class="value">
         <app-staking-switch [wallet_id]="variablesService.currentWallet.wallet_id" [(staking)]="variablesService.currentWallet.staking"></app-staking-switch>

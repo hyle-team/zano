@@ -44,9 +44,9 @@ namespace currency
 
     bool run_console_handler();
 
-    bool new_wallet(const std::string &wallet_file, const std::string& password);
+    bool new_wallet(const std::string &wallet_file, const std::string& password, bool create_auditable_wallet);
     bool open_wallet(const std::string &wallet_file, const std::string& password);
-    bool restore_wallet(const std::string &wallet_file, const std::string &restore_seed, const std::string& password);
+    bool restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet);
     bool close_wallet();
 
     bool help(const std::vector<std::string> &args = std::vector<std::string>());
@@ -81,6 +81,7 @@ namespace currency
     bool enable_console_logger(const std::vector<std::string> &args);
     bool integrated_address(const std::vector<std::string> &args);
     bool get_tx_key(const std::vector<std::string> &args_);
+    bool tracking_seed(const std::vector<std::string> &args_);
     bool save_watch_only(const std::vector<std::string> &args);
     bool sign_transfer(const std::vector<std::string> &args);
     bool submit_transfer(const std::vector<std::string> &args);
@@ -93,9 +94,10 @@ namespace currency
     bool try_connect_to_daemon();
 
     //----------------- i_wallet2_callback ---------------------
-    virtual void on_new_block(uint64_t height, const currency::block& block);
-    virtual void on_money_received(uint64_t height, const currency::transaction& tx, size_t out_index);
-    virtual void on_money_spent(uint64_t height, const currency::transaction& in_tx, size_t out_index, const currency::transaction& spend_tx);
+    virtual void on_new_block(uint64_t height, const currency::block& block) override;
+    virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override;
+    virtual void on_message(i_wallet2_callback::message_severity severity, const std::string& m) override;
+
     //----------------------------------------------------------
 
     friend class refresh_progress_reporter_t;
@@ -153,6 +155,7 @@ namespace currency
   private:
     std::string m_wallet_file;
     std::string m_generate_new;
+    std::string m_generate_new_aw;
     std::string m_import_path;
 
     std::string m_daemon_address;

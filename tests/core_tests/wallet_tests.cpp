@@ -22,18 +22,6 @@ const std::string g_wallet_password = "dofatibmzibeziyekigo";
 const currency::account_base null_account = AUTO_VAL_INIT(null_account);
 
 
-struct wlt_lambda_on_transfer2_wrapper : public tools::i_wallet2_callback
-{
-  typedef std::function<bool(const tools::wallet_public::wallet_transfer_info&, uint64_t, uint64_t, uint64_t)> Func;
-  wlt_lambda_on_transfer2_wrapper(Func callback) : m_result(false), m_callback(callback) {}
-  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override
-  {
-    m_result = m_callback(wti, balance, unlocked_balance, total_mined);
-  }
-  bool m_result;
-  Func m_callback;
-};
-
 POD_MAKE_COMPARABLE(currency, tx_out);
 
 // Determines which output is real and actually spent in tx inputs, when there are fake outputs.
@@ -58,15 +46,15 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
 
       crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(validated_tx);
       crypto::key_derivation derivation;
-      bool r = generate_key_derivation(tx_pub_key, m_keys.m_view_secret_key, derivation);
+      bool r = generate_key_derivation(tx_pub_key, m_keys.view_secret_key, derivation);
       CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
       crypto::secret_key ephemeral_secret_key;
-      derive_secret_key(derivation, output_tx_index, m_keys.m_spend_secret_key, ephemeral_secret_key);
+      derive_secret_key(derivation, output_tx_index, m_keys.spend_secret_key, ephemeral_secret_key);
 
       crypto::public_key output_public_key = boost::get<txout_to_key>(out.target).key;
 
       /*crypto::public_key ephemeral_public_key;
-      derive_public_key(derivation, output_tx_index, m_keys.m_account_address.m_spend_public_key, ephemeral_public_key);*/
+      derive_public_key(derivation, output_tx_index, m_keys.account_address.spend_public_key, ephemeral_public_key);*/
 
       crypto::key_image ki;
       generate_key_image(output_public_key, ephemeral_secret_key, ki);
@@ -1434,9 +1422,9 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_0r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  // these attachments will be use across all the transactions in this test
+  // these attachments will be used across all the transactions in this test
   currency::tx_payer a_tx_payer = AUTO_VAL_INIT(a_tx_payer);
-  a_tx_payer.acc_addr = miner_acc.get_keys().m_account_address;
+  a_tx_payer.acc_addr = miner_acc.get_keys().account_address;
   currency::tx_comment a_tx_comment = AUTO_VAL_INIT(a_tx_comment);
   a_tx_comment.comment = "Comandante Che Guevara";
   std::string a_tx_message = AUTO_VAL_INIT(a_tx_message);
@@ -1622,7 +1610,7 @@ bool gen_wallet_alias_and_unconfirmed_txs::c1(currency::core& c, size_t ev_index
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = m_accounts[BOB_ACC_IDX].get_public_address();
-  ai.m_view_key.push_back(m_accounts[BOB_ACC_IDX].get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(m_accounts[BOB_ACC_IDX].get_keys().view_secret_key);
 
   uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
   bool r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", alias_reward * 2);
@@ -1659,7 +1647,7 @@ bool gen_wallet_alias_and_unconfirmed_txs::c2(currency::core& c, size_t ev_index
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'b');
   ai.m_address = someone.get_public_address();
-  ai.m_view_key.push_back(someone.get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(someone.get_keys().view_secret_key);
   
   uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
   bool r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", alias_reward * 2);
@@ -1694,9 +1682,9 @@ bool gen_wallet_alias_and_unconfirmed_txs::c3(currency::core& c, size_t ev_index
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "alicealice";
   ai.m_address = m_accounts[MINER_ACC_IDX].get_public_address();
-  ai.m_view_key.push_back(m_accounts[MINER_ACC_IDX].get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(m_accounts[MINER_ACC_IDX].get_keys().view_secret_key);
 
-  bool r = sign_extra_alias_entry(ai, m_accounts[ALICE_ACC_IDX].get_keys().m_account_address.m_spend_public_key, m_accounts[ALICE_ACC_IDX].get_keys().m_spend_secret_key);
+  bool r = sign_extra_alias_entry(ai, m_accounts[ALICE_ACC_IDX].get_keys().account_address.spend_public_key, m_accounts[ALICE_ACC_IDX].get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
 
   std::vector<test_event_entry> stub_events_vec;
@@ -3370,6 +3358,88 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
   miner_wlt->reset_password(g_wallet_password);
   miner_wlt->store(g_wallet_filename);
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+wallet_sending_to_integrated_address::wallet_sending_to_integrated_address()
+{
+  REGISTER_CALLBACK_METHOD(wallet_sending_to_integrated_address, c1);
+}
+
+bool wallet_sending_to_integrated_address::generate(std::vector<test_event_entry>& events) const
+{
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  miner_wlt->refresh();
+
+  std::string payment_id = "super-payment-id-1948503537205028248";
+  std::string alice_integrated_address = get_account_address_and_payment_id_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
+
+  bool callback_succeded = false;
+  std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
+    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+    LOG_PRINT_YELLOW("on_transfer: " << print_money_brief(wti.amount) << " pid len: " << wti.payment_id.size() << " remote addr: " << (wti.remote_addresses.size() > 0 ? wti.remote_addresses[0] : ""), LOG_LEVEL_0);
+    if (wti.payment_id.empty())
+      return true; // skip another outputs
+    CHECK_AND_ASSERT_MES(wti.payment_id == payment_id, false, "incorrect payment id");
+    CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 1, false, "remote_addressed.size() = " << wti.remote_addresses.size());
+    CHECK_AND_ASSERT_MES(wti.remote_addresses[0] == alice_integrated_address, false, "incorrect remote address");
+    callback_succeded = true;
+    return true;
+  }
+  ));
+  miner_wlt->callback(l);
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(2), m_accounts[ALICE_ACC_IDX].get_public_address()));
+
+  std::vector<payload_items_v> extra, attachments;
+  // add tx_receiver to show the recipient in wti
+  uint64_t top_block_height = 0;
+  crypto::hash stub_hash;
+  r = c.get_blockchain_top(top_block_height, stub_hash);
+  CHECK_AND_ASSERT_MES(r, false, "get_blockchain_top failed");
+  currency::create_and_add_tx_receiver_to_container_from_address(extra, m_accounts[ALICE_ACC_IDX].get_public_address(), top_block_height, miner_wlt->get_core_runtime_config());
+  // add payment_id
+  set_payment_id_to_tx(attachments, payment_id);
+
+  
+  callback_succeded = false;
+  miner_wlt->transfer(destinations, /* fake outs */ 0, /* unlock time */ 0, TESTS_DEFAULT_FEE, extra, attachments);
+  CHECK_AND_ASSERT_MES(callback_succeded, false, "callback was not succeded");
+
+  refresh_wallet_and_check_balance("", "alice", alice_wlt, MK_TEST_COINS(2));
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool has incorrect number of txs: " << c.get_pool_transactions_count());
+
+  // check one again with normal sync (callback should be called as well)
+  std::shared_ptr<tools::wallet2> miner_wlt_2 = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt_2->callback(l);
+
+  callback_succeded = false;
+  miner_wlt_2->refresh();
+  CHECK_AND_ASSERT_MES(callback_succeded, false, "callback was not succeded (2)");
 
   return true;
 }

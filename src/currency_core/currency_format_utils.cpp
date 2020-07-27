@@ -224,13 +224,13 @@ namespace currency
   bool derive_ephemeral_key_helper(const account_keys& ack, const crypto::public_key& tx_public_key, size_t real_output_index, keypair& in_ephemeral)
   {
     crypto::key_derivation recv_derivation = AUTO_VAL_INIT(recv_derivation);
-    bool r = crypto::generate_key_derivation(tx_public_key, ack.m_view_secret_key, recv_derivation);
-    CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to generate_key_derivation(" << tx_public_key << ", " << ack.m_view_secret_key << ")");
+    bool r = crypto::generate_key_derivation(tx_public_key, ack.view_secret_key, recv_derivation);
+    CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to generate_key_derivation(" << tx_public_key << ", " << ack.view_secret_key << ")");
 
-    r = crypto::derive_public_key(recv_derivation, real_output_index, ack.m_account_address.m_spend_public_key, in_ephemeral.pub);
-    CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to derive_public_key(" << recv_derivation << ", " << real_output_index << ", " << ack.m_account_address.m_spend_public_key << ")");
+    r = crypto::derive_public_key(recv_derivation, real_output_index, ack.account_address.spend_public_key, in_ephemeral.pub);
+    CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to derive_public_key(" << recv_derivation << ", " << real_output_index << ", " << ack.account_address.spend_public_key << ")");
 
-    crypto::derive_secret_key(recv_derivation, real_output_index, ack.m_spend_secret_key, in_ephemeral.sec);
+    crypto::derive_secret_key(recv_derivation, real_output_index, ack.spend_secret_key, in_ephemeral.sec);
     return true;
   }
   //---------------------------------------------------------------
@@ -313,6 +313,46 @@ namespace currency
     return string_tools::get_xtype_from_string(amount, str_amount);
   }
   //--------------------------------------------------------------------------------
+  bool parse_tracking_seed(const std::string& tracking_seed, account_public_address& address, crypto::secret_key& view_sec_key, uint64_t& creation_timestamp)
+  {
+    std::vector<std::string> parts;
+    boost::split(parts, tracking_seed, [](char x){ return x == ':'; } );
+    if (parts.size() != 2 && parts.size() != 3)
+      return false;
+
+    if (!get_account_address_from_str(address, parts[0]))
+      return false;
+
+    if (!address.is_auditable())
+      return false;
+
+    if (!epee::string_tools::parse_tpod_from_hex_string(parts[1], view_sec_key))
+      return false;
+
+    crypto::public_key view_pub_key = AUTO_VAL_INIT(view_pub_key);
+    if (!crypto::secret_key_to_public_key(view_sec_key, view_pub_key))
+      return false;
+
+    if (view_pub_key != address.view_public_key)
+      return false;
+
+    creation_timestamp = 0;
+    if (parts.size() == 3)
+    {
+      // parse timestamp
+      int64_t ts = 0;
+      if (!epee::string_tools::string_to_num_fast(parts[2], ts))
+        return false;
+
+      if (ts < WALLET_BRAIN_DATE_OFFSET)
+        return false;
+      
+      creation_timestamp = ts;
+    }
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
   std::string print_stake_kernel_info(const stake_kernel& sk)
   {
     std::stringstream ss;
@@ -379,15 +419,10 @@ namespace currency
   //---------------------------------------------------------------
   crypto::hash get_sign_buff_hash_for_alias_update(const extra_alias_entry& ai)
   {
-    const extra_alias_entry* pale = &ai;
-    extra_alias_entry eae_local = AUTO_VAL_INIT(eae_local);
-    if (ai.m_sign.size())
-    {
-      eae_local = ai;
-      eae_local.m_sign.clear();
-      pale = &eae_local;
-    }
-    return get_object_hash(*pale);
+    extra_alias_entry_old ai_old = ai.to_old();
+    if (ai_old.m_sign.size())
+      ai_old.m_sign.clear();
+    return get_object_hash(ai_old);
   }
   //---------------------------------------------------------------
   struct tx_extra_handler : public boost::static_visitor<bool>
@@ -421,12 +456,15 @@ namespace currency
       rei.m_attachment_info = ai;
       return true;
     }
-
     bool operator()(const extra_alias_entry& ae) const
     {
       ENSURE_ONETIME(was_alias, "alias");
       rei.m_alias = ae;
       return true;
+    }
+    bool operator()(const extra_alias_entry_old& ae) const
+    {
+      return operator()(static_cast<const extra_alias_entry&>(ae));
     }
     bool operator()(const extra_user_data& ud) const
     {
@@ -510,11 +548,11 @@ namespace currency
   //---------------------------------------------------------------
   bool derive_public_key_from_target_address(const account_public_address& destination_addr, const crypto::secret_key& tx_sec_key, size_t index, crypto::public_key& out_eph_public_key, crypto::key_derivation& derivation)
   {    
-    bool r = crypto::generate_key_derivation(destination_addr.m_view_public_key, tx_sec_key, derivation);
-    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to generate_key_derivation(" << destination_addr.m_view_public_key << ", " << tx_sec_key << ")");
+    bool r = crypto::generate_key_derivation(destination_addr.view_public_key, tx_sec_key, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to generate_key_derivation(" << destination_addr.view_public_key << ", " << tx_sec_key << ")");
 
-    r = crypto::derive_public_key(derivation, index, destination_addr.m_spend_public_key, out_eph_public_key);
-    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to derive_public_key(" << derivation << ", " << index << ", " << destination_addr.m_view_public_key << ")");
+    r = crypto::derive_public_key(derivation, index, destination_addr.spend_public_key, out_eph_public_key);
+    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to derive_public_key(" << derivation << ", " << index << ", " << destination_addr.view_public_key << ")");
     return r;
   }
   //---------------------------------------------------------------
@@ -561,7 +599,7 @@ namespace currency
     for (auto& apa : de.addr)
     {
       crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
-      if (apa.m_spend_public_key == null_pkey && apa.m_view_public_key == null_pkey)
+      if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
       {
         //burning money(for example alias reward)
         out_eph_public_key = null_pkey;
@@ -589,7 +627,12 @@ namespace currency
       //out to key
       txout_to_key tk;
       tk.key = target_keys.back();
-      tk.mix_attr = tx_outs_attr;
+
+      if (de.addr.front().is_auditable()) // check only the first address because there's only one in this branch
+        tk.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
+      else
+        tk.mix_attr = tx_outs_attr;
+      
       out.target = tk;
     }
     else
@@ -778,15 +821,15 @@ namespace currency
     {
       crypto::public_key tx_pub_key = currency::get_tx_pub_key_from_extra(tx);
 
-      bool r = crypto::generate_key_derivation(tx_pub_key, acc_keys.m_view_secret_key, derivation);
+      bool r = crypto::generate_key_derivation(tx_pub_key, acc_keys.view_secret_key, derivation);
       CHECK_AND_ASSERT_MES(r, null_derivation, "failed to generate_key_derivation");
-      LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key derived from destination addr: " << currency::get_account_address_as_str(acc_keys.m_account_address), LOG_LEVEL_0);
+      LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key derived from destination addr: " << currency::get_account_address_as_str(acc_keys.account_address), LOG_LEVEL_0);
     }
     else
     {
       derivation = crypto_info.encrypted_key_derivation;
-      crypto::chacha_crypt(derivation, acc_keys.m_spend_secret_key);
-      LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key decrypted from sender address: " << currency::get_account_address_as_str(acc_keys.m_account_address), LOG_LEVEL_0);
+      crypto::chacha_crypt(derivation, acc_keys.spend_secret_key);
+      LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key decrypted from sender address: " << currency::get_account_address_as_str(acc_keys.account_address), LOG_LEVEL_0);
     }
 
     //validate derivation we here. Yoda style
@@ -833,7 +876,7 @@ namespace currency
   void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key)
   {
     crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-    bool r = crypto::generate_key_derivation(destination_addr.m_view_public_key, tx_random_key.sec, derivation);
+    bool r = crypto::generate_key_derivation(destination_addr.view_public_key, tx_random_key.sec, derivation);
     CHECK_AND_ASSERT_MES(r, void(), "failed to generate_key_derivation");
     bool was_attachment_crypted_entries = false;
     bool was_extra_crypted_entries = false;
@@ -855,7 +898,7 @@ namespace currency
       chs.derivation_hash = *(uint32_t*)&hash_for_check_sum;
       //put encrypted derivation to let sender decrypt all this data from attachment/extra
       chs.encrypted_key_derivation = derivation;
-      crypto::chacha_crypt(chs.encrypted_key_derivation, sender_keys.m_spend_secret_key);
+      crypto::chacha_crypt(chs.encrypted_key_derivation, sender_keys.spend_secret_key);
       if (was_extra_crypted_entries)
         tx.extra.push_back(chs);
       else
@@ -976,7 +1019,7 @@ namespace currency
   {
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "Too many outs (" << destinations.size() << ")! Tx can't be constructed.");
 
-    bool watch_only_mode = sender_account_keys.m_spend_secret_key == null_skey;
+    bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
 
     bool append_mode = false;
     if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
@@ -1106,7 +1149,7 @@ namespace currency
     //fill outputs
     size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
     std::set<uint16_t> deriv_cache;
-    BOOST_FOREACH(const tx_destination_entry& dst_entr, shuffled_dsts)
+    for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
       bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, tx_outs_attr);
@@ -1138,7 +1181,7 @@ namespace currency
         {
           CHECK_AND_ASSERT_MES(tsa.security.size() == 1, false, "Wrong tsa.security.size() = " << tsa.security.size());
 
-          bool r = derive_public_key_from_target_address(sender_account_keys.m_account_address, one_time_secret_key, att_count, tsa.security.back());
+          bool r = derive_public_key_from_target_address(sender_account_keys.account_address, one_time_secret_key, att_count, tsa.security.back());
           CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_target_address");
         }
         att_count++;
@@ -1251,7 +1294,7 @@ namespace currency
   {
     uint64_t date_offset = timestamp > WALLET_BRAIN_DATE_OFFSET ? timestamp - WALLET_BRAIN_DATE_OFFSET : 0;
     uint64_t weeks_count = date_offset / WALLET_BRAIN_DATE_QUANTUM;
-    CHECK_AND_ASSERT_THROW_MES(weeks_count < std::numeric_limits<uint32_t>::max(), "internal error: unable to converto to uint32, val = " << weeks_count);
+    CHECK_AND_ASSERT_THROW_MES(weeks_count < std::numeric_limits<uint32_t>::max(), "internal error: unable to convert to uint32, val = " << weeks_count);
     uint32_t weeks_count_32 = static_cast<uint32_t>(weeks_count);
 
     return tools::mnemonic_encoding::word_by_num(weeks_count_32);
@@ -1524,7 +1567,7 @@ namespace currency
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+    if (!derive_public_key(derivation, output_index, acc.account_address.spend_public_key, pk))
       return false;
     return pk == out_key.key;
   }
@@ -1532,7 +1575,7 @@ namespace currency
   bool is_out_to_acc(const account_keys& acc, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    if (!derive_public_key(derivation, output_index, acc.m_account_address.m_spend_public_key, pk))
+    if (!derive_public_key(derivation, output_index, acc.account_address.spend_public_key, pk))
       return false;
     auto it = std::find(out_multisig.keys.begin(), out_multisig.keys.end(), pk);
     if (out_multisig.keys.end() == it)
@@ -1576,7 +1619,7 @@ namespace currency
   bool lookup_acc_outs_genesis(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     uint64_t offset = 0;
-    bool r = get_account_genesis_offset_by_address(get_account_address_as_str(acc.m_account_address), offset);
+    bool r = get_account_genesis_offset_by_address(get_account_address_as_str(acc.account_address), offset);
     if (!r)
       return true;
 
@@ -1594,7 +1637,7 @@ namespace currency
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     money_transfered = 0;
-    bool r = generate_key_derivation(tx_pub_key, acc.m_view_secret_key, derivation);
+    bool r = generate_key_derivation(tx_pub_key, acc.view_secret_key, derivation);
     CHECK_AND_ASSERT_MES(r, false, "unable to generate derivation from tx_pub = " << tx_pub_key << " * view_sec, invalid tx_pub?");
 
     if (is_coinbase(tx) && get_block_height(tx) == 0 &&  tx_pub_key == ggenesis_tx_pub_key)
@@ -1691,12 +1734,29 @@ namespace currency
       bool r = currency::parse_and_validate_block_from_blob(bl_entry.block, blextin_ptr->bl);
       bdde.block_ptr = blextin_ptr;
       CHECK_AND_ASSERT_MES(r, false, "failed to parse block from blob: " << string_tools::buff_to_hex_nodelimer(bl_entry.block));
+      size_t i = 0;
+      if (bl_entry.tx_global_outs.size())
+      {
+        CHECK_AND_ASSERT_MES(bl_entry.tx_global_outs.size() == bl_entry.txs.size(), false, "tx_global_outs count " << bl_entry.tx_global_outs.size() << " count missmatch with bl_entry.txs count " << bl_entry.txs.size());
+      }
+      if (bl_entry.coinbase_global_outs.size())
+      {
+        std::shared_ptr<currency::transaction_chain_entry> tche_ptr(new currency::transaction_chain_entry());
+        tche_ptr->m_global_output_indexes = bl_entry.coinbase_global_outs;
+        bdde.coinbase_ptr = tche_ptr;
+      }
       for (const auto& tx_blob : bl_entry.txs)
       {
         std::shared_ptr<currency::transaction_chain_entry> tche_ptr(new currency::transaction_chain_entry());
         r = parse_and_validate_tx_from_blob(tx_blob, tche_ptr->tx);
         CHECK_AND_ASSERT_MES(r, false, "failed to parse tx from blob: " << string_tools::buff_to_hex_nodelimer(tx_blob));
         bdde.txs_ptr.push_back(tche_ptr);
+        if (bl_entry.tx_global_outs.size())
+        {
+          CHECK_AND_ASSERT_MES(bl_entry.tx_global_outs[i].v.size() == tche_ptr->tx.vout.size(), false, "tx_global_outs for tx" << bl_entry.tx_global_outs[i].v.size() << " count missmatch with tche_ptr->tx.vout.size() count " << tche_ptr->tx.vout.size());
+          tche_ptr->m_global_output_indexes = bl_entry.tx_global_outs[i].v;
+        }
+        i++;
       }
     }
     return true;
@@ -2026,7 +2086,7 @@ namespace currency
   //---------------------------------------------------------------
   bool is_showing_sender_addres(const transaction& tx)
   {
-    return have_type_in_variant_container<tx_payer>(tx.attachment);
+    return have_type_in_variant_container<tx_payer>(tx.attachment) || have_type_in_variant_container<tx_payer_old>(tx.attachment);
   }
   //---------------------------------------------------------------
   bool is_mixin_tx(const transaction& tx)
@@ -2060,8 +2120,8 @@ namespace currency
   //---------------------------------------------------------------
   bool get_aliases_reward_account(account_public_address& acc)
   {
-    bool r = string_tools::parse_tpod_from_hex_string(ALIAS_REWARDS_ACCOUNT_SPEND_PUB_KEY, acc.m_spend_public_key);
-    r &= string_tools::parse_tpod_from_hex_string(ALIAS_REWARDS_ACCOUNT_VIEW_PUB_KEY, acc.m_view_public_key);
+    bool r = string_tools::parse_tpod_from_hex_string(ALIAS_REWARDS_ACCOUNT_SPEND_PUB_KEY, acc.spend_public_key);
+    r &= string_tools::parse_tpod_from_hex_string(ALIAS_REWARDS_ACCOUNT_VIEW_PUB_KEY, acc.view_public_key);
     return r;
   }
   //------------------------------------------------------------------
@@ -2181,6 +2241,10 @@ namespace currency
 
       return true;
     }
+    bool operator()(const extra_alias_entry_old& ee)
+    {
+      return operator()(static_cast<const extra_alias_entry&>(ee));
+    }
     bool operator()(const extra_user_data& ee)
     {
       tv.type = "user_data";
@@ -2214,11 +2278,24 @@ namespace currency
 
       return true;
     }
+    bool operator()(const tx_payer_old&)
+    {
+      tv.type = "payer_old";
+      tv.short_view = "(encrypted)";
 
+      return true;
+    }
     bool operator()(const tx_receiver& ee)
     {
       //const tx_payer& ee = boost::get<tx_payer>(extra);
       tv.type = "receiver";
+      tv.short_view = "(encrypted)";
+
+      return true;
+    }
+    bool operator()(const tx_receiver_old& ee)
+    {
+      tv.type = "receiver_old";
       tv.short_view = "(encrypted)";
 
       return true;
@@ -2511,12 +2588,24 @@ namespace currency
   //-----------------------------------------------------------------------
   std::string get_account_address_as_str(const account_public_address& addr)
   {
-    return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr));
+    if (addr.flags == 0)
+      return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr.to_old())); // classic Zano address
+
+    if (addr.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
+      return tools::base58::encode_addr(CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (auditable)
+    
+    return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (normal)
   }
   //-----------------------------------------------------------------------
   std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id)
   {
-    return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id);
+    if (addr.flags == 0)
+      return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr.to_old()) + payment_id); // classic integrated Zano address
+
+    if (addr.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
+      return tools::base58::encode_addr(CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id); // new format integrated Zano address (auditable)
+    
+    return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id); // new format integrated Zano address (normal)
   }
   //-----------------------------------------------------------------------
   bool get_account_address_from_str(account_public_address& addr, const std::string& str)
@@ -2527,7 +2616,7 @@ namespace currency
   //-----------------------------------------------------------------------
   bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str)
   {
-    static const size_t addr_blob_size = sizeof(account_public_address);
+    payment_id.clear();
     blobdata blob;
     uint64_t prefix;
     if (!tools::base58::decode_addr(str, prefix, blob))
@@ -2536,42 +2625,88 @@ namespace currency
       return false;
     }
 
-    if (blob.size() < addr_blob_size)
+    if (blob.size() < sizeof(account_public_address_old))
     {
-      LOG_PRINT_L1("Address " << str << " has invalid format: blob size is " << blob.size() << " which is less, than expected " << addr_blob_size);
+      LOG_PRINT_L1("Address " << str << " has invalid format: blob size is " << blob.size() << " which is less, than expected " << sizeof(account_public_address_old));
       return false;
     }
 
-    if (blob.size() > addr_blob_size + BC_PAYMENT_ID_SERVICE_SIZE_MAX)
+    if (blob.size() > sizeof(account_public_address) + BC_PAYMENT_ID_SERVICE_SIZE_MAX)
     {
-      LOG_PRINT_L1("Address " << str << " has invalid format: blob size is " << blob.size() << " which is more, than allowed " << addr_blob_size + BC_PAYMENT_ID_SERVICE_SIZE_MAX);
+      LOG_PRINT_L1("Address " << str << " has invalid format: blob size is " << blob.size() << " which is more, than allowed " << sizeof(account_public_address) + BC_PAYMENT_ID_SERVICE_SIZE_MAX);
       return false;
     }
+
+    bool parse_as_old_format = false;
 
     if (prefix == CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX)
     {
-      // nothing
+      // normal address
+      if (blob.size() == sizeof(account_public_address_old))
+      {
+        parse_as_old_format = true;
+      }
+      else if (blob.size() == sizeof(account_public_address))
+      {
+        parse_as_old_format = false;
+      }
+      else
+      {
+        LOG_PRINT_L1("Account public address cannot be parsed from \"" << str << "\", incorrect size");
+        return false;
+      }
+    }
+    else if (prefix == CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX)
+    {
+      // auditable, parse as new format
+        parse_as_old_format = false;
     }
     else if (prefix == CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX)
     {
-      payment_id = blob.substr(addr_blob_size);
-      blob = blob.substr(0, addr_blob_size);
+      payment_id = blob.substr(sizeof(account_public_address_old));
+      blob = blob.substr(0, sizeof(account_public_address_old));
+      parse_as_old_format = true;
+    }
+    else if (prefix == CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX || prefix == CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX)
+    {
+      payment_id = blob.substr(sizeof(account_public_address));
+      blob = blob.substr(0, sizeof(account_public_address));
+      parse_as_old_format = false;
     }
     else
     {
-      LOG_PRINT_L1("Address " << str << " has wrong prefix " << prefix << ", expected " << CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX << " or " << CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX);
+      LOG_PRINT_L1("Address " << str << " has wrong prefix " << prefix);
       return false;
     }
 
-    if (!::serialization::parse_binary(blob, addr))
+    if (parse_as_old_format)
     {
-      LOG_PRINT_L1("Account public address keys can't be parsed for address \"" << str << "\"");
+      account_public_address_old addr_old = AUTO_VAL_INIT(addr_old);
+      if (!::serialization::parse_binary(blob, addr_old))
+      {
+        LOG_PRINT_L1("Account public address (old) cannot be parsed from \"" << str << "\"");
+        return false;
+      }
+      addr = account_public_address::from_old(addr_old);
+    }
+    else
+    {
+      if (!::serialization::parse_binary(blob, addr))
+      {
+        LOG_PRINT_L1("Account public address cannot be parsed from \"" << str << "\"");
+        return false;
+      }
+    }
+
+    if (payment_id.size() > BC_PAYMENT_ID_SERVICE_SIZE_MAX)
+    {
+      LOG_PRINT_L1("Failed to parse address from \"" << str << "\": payment id size exceeded: " << payment_id.size());
       return false;
     }
 
-    if (!crypto::check_key(addr.m_spend_public_key) || !crypto::check_key(addr.m_view_public_key))
+    if (!crypto::check_key(addr.spend_public_key) || !crypto::check_key(addr.view_public_key))
     {
-      LOG_PRINT_L1("Failed to validate address keys for address \"" << str << "\"");
+      LOG_PRINT_L1("Failed to validate address keys for public address \"" << str << "\"");
       return false;
     }
 

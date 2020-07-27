@@ -41,20 +41,21 @@ namespace tools
       ~mdbx_db_backend();
 
       //----------------- i_db_backend -----------------------------------------------------
-      bool close();
-      bool begin_transaction(bool read_only = false);
-      bool commit_transaction();
-      void abort_transaction();
-      bool open(const std::string& path, uint64_t cache_sz = CACHE_SIZE);
-      bool open_container(const std::string& name, container_handle& h);
-      bool erase(container_handle h, const char* k, size_t s);
-      bool get(container_handle h, const char* k, size_t s, std::string& res_buff);
-      bool clear(container_handle h);
-      uint64_t size(container_handle h);
-      bool set(container_handle h, const char* k, size_t s, const char* v, size_t vs);
-      bool enumerate(container_handle h, i_db_callback* pcb);
-      bool get_stat_info(tools::db::stat_info& si);
-      const char* name();
+      bool close() override;
+      bool begin_transaction(bool read_only = false) override;
+      bool commit_transaction() override;
+      void abort_transaction() override;
+      bool open(const std::string& path, uint64_t cache_sz = CACHE_SIZE) override;
+      bool open_container(const std::string& name, container_handle& h) override;
+      bool close_container(container_handle& h) override;
+      bool erase(container_handle h, const char* k, size_t s) override;
+      bool get(container_handle h, const char* k, size_t s, std::string& res_buff) override;
+      bool clear(container_handle h) override;
+      uint64_t size(container_handle h) override;
+      bool set(container_handle h, const char* k, size_t s, const char* v, size_t vs) override;
+      bool enumerate(container_handle h, i_db_callback* pcb) override;
+      bool get_stat_info(tools::db::stat_info& si) override;
+      const char* name() override;
       //-------------------------------------------------------------------------------------
       bool have_tx();
       MDBX_txn* get_current_tx();

@@ -82,7 +82,6 @@ namespace nodetool
                                                         m_use_only_priority_peers(false),
                                                         m_peer_livetime{},
                                                         m_debug_requests_enabled(false)
-
     {}
 
     static void init_options(boost::program_options::options_description& desc);
@@ -247,6 +246,7 @@ namespace nodetool
     bool m_offline_mode;
     bool m_debug_requests_enabled;
     uint64_t m_startup_time;
+
 
     //critical_section m_connections_lock;
     //connections_indexed_container m_connections;

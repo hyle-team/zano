@@ -91,6 +91,9 @@ namespace bc_services
 }
 
 
+#define CURRENCY_CPD_ARCHIVE_VER 1
+BOOST_CLASS_VERSION(bc_services::contract_private_details, CURRENCY_CPD_ARCHIVE_VER)
+
 namespace boost
 {
   namespace serialization
@@ -100,8 +103,20 @@ namespace boost
     {
       ar & cpd.title;
       ar & cpd.comment;
-      ar & cpd.a_addr; // usually buyer
-      ar & cpd.b_addr; // usually seller
+      if (version == 0 && !archive_t::is_saving::value)
+      {
+        // loading from version 0 (pre-auditable address format)
+        currency::account_public_address_old old_addr = AUTO_VAL_INIT(old_addr);
+        ar & old_addr;
+        cpd.a_addr = currency::account_public_address::from_old(old_addr);
+        ar & old_addr;
+        cpd.b_addr = currency::account_public_address::from_old(old_addr);
+      }
+      else
+      {
+        ar & cpd.a_addr; // usually buyer
+        ar & cpd.b_addr; // usually seller
+      }
       ar & cpd.amount_to_pay;
       ar & cpd.amount_a_pledge;
       ar & cpd.amount_b_pledge;

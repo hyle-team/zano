@@ -91,11 +91,8 @@ echo '%version%'
 
 set build_zip_filename=%ACHIVE_NAME_PREFIX%%version%.zip
 set build_zip_path=%BUILDS_PATH%\builds\%build_zip_filename%
-set pdbs_zip_filename=%ACHIVE_NAME_PREFIX%%version%_pdbs.zip
-set pdbs_zip_path=%BUILDS_PATH%\builds\%pdbs_zip_filename%
 
 del /F /Q %build_zip_path%
-del /F /Q %pdbs_zip_path%
 
 cd src\release
 
@@ -109,12 +106,11 @@ mkdir bunch
 copy /Y Zano.exe bunch
 copy /Y zanod.exe bunch
 copy /Y simplewallet.exe bunch
+copy /Y *.pdb bunch
 
 %QT_PREFIX_PATH%\bin\windeployqt.exe bunch\Zano.exe
 
 cd bunch
-
-zip -9 %pdbs_zip_path% ..\*.pdb 
 
 zip -r %build_zip_path% *.*
 IF %ERRORLEVEL% NEQ 0 (
@@ -196,14 +192,7 @@ IF %ERRORLEVEL% NEQ 0 (
 )
 call :sha256 %build_zip_path% build_zip_checksum
 
-pscp -load zano_build_server %pdbs_zip_path% build.zano.org:/var/www/html/builds
-IF %ERRORLEVEL% NEQ 0 (
-  @echo "FAILED TO UPLOAD PDBS TO SERVER"
-  goto error
-)
-call :sha256 %pdbs_zip_path% pdbs_zip_path_checksum
-
-set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: http://build.zano.org:8081/builds/%installer_file% <br>sha256: %installer_checksum%<br><br>ZIP:  http://build.zano.org:8081/builds/%build_zip_filename% <br>sha256: %build_zip_checksum%<br>PDBs: http://build.zano.org:8081/builds/%pdbs_zip_filename% <br>sha256: %pdbs_zip_path_checksum%"
+set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: https://build.zano.org/builds/%installer_file% <br>sha256: %installer_checksum%<br><br>ZIP:  https://build.zano.org/builds/%build_zip_filename% <br>sha256: %build_zip_checksum%<br>"
 
 echo %mail_msg%
 

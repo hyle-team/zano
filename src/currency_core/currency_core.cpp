@@ -31,13 +31,14 @@ namespace currency
 {
 
   //-----------------------------------------------------------------------------------------------
-  core::core(i_currency_protocol* pprotocol):
-              m_mempool(m_blockchain_storage, pprotocol),
-              m_blockchain_storage(m_mempool),
-              m_miner(this, m_blockchain_storage),
-              m_miner_address(boost::value_initialized<account_public_address>()), 
-              m_starter_message_showed(false),
-              m_critical_error_handler(nullptr)
+  core::core(i_currency_protocol* pprotocol)
+    : m_mempool(m_blockchain_storage, pprotocol)
+    , m_blockchain_storage(m_mempool)
+    , m_miner(this, m_blockchain_storage)
+    , m_miner_address(boost::value_initialized<account_public_address>())
+    , m_starter_message_showed(false)
+    , m_critical_error_handler(nullptr)
+    , m_stop_after_height(0)
   {
     set_currency_protocol(pprotocol);
   }
@@ -75,6 +76,11 @@ namespace currency
   bool core::handle_command_line(const boost::program_options::variables_map& vm)
   {
     m_config_folder = command_line::get_arg(vm, command_line::arg_data_dir);
+    m_stop_after_height = static_cast<uint64_t>(command_line::get_arg(vm, command_line::arg_stop_after_height));
+    if (m_stop_after_height != 0)
+    {
+      LOG_PRINT_YELLOW("Daemon will STOP after block " << m_stop_after_height, LOG_LEVEL_0);
+    }
     return true;
   }
   //-----------------------------------------------------------------------------------------------
@@ -493,7 +499,25 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_block(const block& b, block_verification_context& bvc)
   {
-    return m_blockchain_storage.add_new_block(b, bvc);
+    bool r = m_blockchain_storage.add_new_block(b, bvc);
+    if (r && bvc.m_added_to_main_chain)
+    {
+      uint64_t h = get_block_height(b);
+      auto& crc = m_blockchain_storage.get_core_runtime_config();
+      if (h == crc.hard_fork_01_starts_after_height + 1)
+      { LOG_PRINT_GREEN("Hardfork 1 activated at height " << h, LOG_LEVEL_0); }
+      else if (h == crc.hard_fork_02_starts_after_height + 1)
+      { LOG_PRINT_GREEN("Hardfork 2 activated at height " << h, LOG_LEVEL_0); }
+
+      if (h == m_stop_after_height)
+      {
+        LOG_PRINT_YELLOW("Reached block " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
+        if (m_critical_error_handler)
+          return m_critical_error_handler->on_immediate_stop_requested();
+        return false;
+      }
+    }
+    return r;
   }
   //-----------------------------------------------------------------------------------------------
   bool core::parse_block(const blobdata& block_blob, block& b, block_verification_context& bvc)

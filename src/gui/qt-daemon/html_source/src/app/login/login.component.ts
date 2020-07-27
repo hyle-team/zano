@@ -60,7 +60,9 @@ export class LoginComponent implements OnInit, OnDestroy {
           this.backend.storeSecureAppData({pass: this.variablesService.appPass});
           this.variablesService.appLogin = true;
           this.variablesService.dataIsLoaded = true;
-          this.variablesService.startCountdown();
+          if (this.variablesService.settings.appLockTime) {
+            this.variablesService.startCountdown();
+          }
           this.ngZone.run(() => {
             this.router.navigate(['/']);
           });
@@ -95,7 +97,9 @@ export class LoginComponent implements OnInit, OnDestroy {
          this.backend.checkMasterPassword({pass: this.variablesService.appPass}, (status, data) => {
            if (status) {
               this.variablesService.appLogin = true;
-              this.variablesService.startCountdown();
+               if (this.variablesService.settings.appLockTime) {
+                 this.variablesService.startCountdown();
+               }
               this.ngZone.run(() => {
                 this.router.navigate(['/']);
               });
@@ -112,7 +116,9 @@ export class LoginComponent implements OnInit, OnDestroy {
       if (!data.error_code) {
         this.variablesService.appLogin = true;
         this.variablesService.dataIsLoaded = true;
-        this.variablesService.startCountdown();
+        if (this.variablesService.settings.appLockTime) {
+          this.variablesService.startCountdown();
+        }
         this.variablesService.appPass = appPass;
         const isEmptyObject = Object.keys(data).length === 0 && data.constructor === Object;
 
@@ -177,6 +183,8 @@ export class LoginComponent implements OnInit, OnDestroy {
             } else {
               new_wallet.staking = false;
             }
+            new_wallet.is_auditable = open_data['wi'].is_auditable;
+            new_wallet.is_watch_only = open_data['wi'].is_watch_only;
             new_wallet.currentPage = 1;
             if (open_data.recent_history && open_data.recent_history.history) {
               new_wallet.total_history_item = open_data.recent_history.total_history_items;

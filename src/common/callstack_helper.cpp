@@ -105,6 +105,11 @@ namespace tools
 
   std::string get_callstack_win_x64()
   {
+    // @TODO@
+    // static epee::static_helpers::wrapper<std::recursive_mutex> cs;
+    static std::recursive_mutex cs;
+    std::lock_guard<std::recursive_mutex> lock(cs);
+
     HANDLE h_process = GetCurrentProcess();
     HANDLE h_thread = GetCurrentThread();
 
@@ -118,9 +123,9 @@ namespace tools
 
     DWORD cb_needed;
     std::vector<HMODULE> module_handles(1);
-    EnumProcessModules(h_process, &module_handles[0], module_handles.size() * sizeof(HMODULE), &cb_needed);
+    EnumProcessModules(h_process, &module_handles[0], static_cast<DWORD>(module_handles.size() * sizeof(HMODULE)), &cb_needed);
     module_handles.resize(cb_needed / sizeof(HMODULE));
-    EnumProcessModules(h_process, &module_handles[0], module_handles.size() * sizeof(HMODULE), &cb_needed);
+    EnumProcessModules(h_process, &module_handles[0], static_cast<DWORD>(module_handles.size() * sizeof(HMODULE)), &cb_needed);
 
     std::vector<module_data> modules;
     std::transform(module_handles.begin(), module_handles.end(), std::back_inserter(modules), get_mod_info(h_process));

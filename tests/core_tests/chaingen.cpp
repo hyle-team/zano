@@ -48,17 +48,23 @@ crypto::signature create_invalid_signature()
 const crypto::signature invalid_signature = create_invalid_signature();
 
 test_generator::test_generator()
-  : m_wallet_test_core_proxy(new wallet_test_core_proxy()), 
-  m_do_pos_to_low_timestamp(false),
-  m_ignore_last_pow_in_wallets(false),
-  m_last_found_timestamp(0), 
-  m_hardfork_after_heigh(CURRENCY_MAX_BLOCK_NUMBER)
+  : m_wallet_test_core_proxy(new wallet_test_core_proxy())
+  , m_do_pos_to_low_timestamp(false)
+  , m_ignore_last_pow_in_wallets(false)
+  , m_last_found_timestamp(0)
+  , m_hardfork_01_after_heigh(CURRENCY_MAX_BLOCK_NUMBER)
+  , m_hardfork_02_after_heigh(CURRENCY_MAX_BLOCK_NUMBER)
 {
 }
 
-void test_generator::set_hardfork_height(uint64_t h)
+void test_generator::set_hardfork_height(size_t hardfork_id, uint64_t h)
 {
-  m_hardfork_after_heigh = h;
+  switch (hardfork_id)
+  {
+  case 1: m_hardfork_01_after_heigh = h; break;
+  case 2: m_hardfork_02_after_heigh = h; break;
+  default: CHECK_AND_ASSERT_THROW_MES(false, "invalid hardfork id: " << hardfork_id)
+  }
 }
 
 void test_generator::get_block_chain(std::vector<const block_info*>& blockchain, const crypto::hash& head, size_t n) const
@@ -203,7 +209,7 @@ bool test_generator::construct_block(currency::block& blk,
                                      const std::list<currency::transaction>& tx_list, 
                                      const std::list<currency::account_base>& coin_stake_sources)//in case of PoS block
 {
-  if (height > m_hardfork_after_heigh)
+  if (height > m_hardfork_01_after_heigh)
     blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
   else
     blk.major_version = BLOCK_MAJOR_VERSION_INITAL;
@@ -270,8 +276,8 @@ bool test_generator::construct_block(currency::block& blk,
                                     already_generated_coins,
                                     target_block_size, 
                                     total_fee, 
-                                    miner_acc.get_keys().m_account_address, 
-                                    miner_acc.get_keys().m_account_address,
+                                    miner_acc.get_keys().account_address, 
+                                    miner_acc.get_keys().account_address,
                                     blk.miner_tx, 
                                     blobdata(),
                                     test_generator::get_test_gentime_settings().miner_tx_max_outs,
@@ -378,10 +384,16 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
     {}
     virtual bool call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(const currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& rqt, currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& rsp)
     {
-      auto it = m_txs_outs.find(rqt.txid);
-      CHECK_AND_ASSERT_MES(it != m_txs_outs.end(), false, "tx " << rqt.txid << " was not found in tx global outout indexes");
-      rsp.status = CORE_RPC_STATUS_OK;
-      rsp.o_indexes = it->second;
+      rsp.tx_global_outs.resize(rqt.txids.size());
+      size_t i = 0;
+      for (auto& txid : rqt.txids)
+      {
+        auto it = m_txs_outs.find(txid);
+        CHECK_AND_ASSERT_MES(it != m_txs_outs.end(), false, "tx " << txid << " was not found in tx global outout indexes");
+        rsp.tx_global_outs[i].v = it->second;
+        i++;
+      }
+      rsp.status = API_RETURN_CODE_OK;
       return true; 
     }
   };
@@ -400,7 +412,8 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
     currency::core_runtime_config pc = cc;
     pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
     pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-    pc.hard_fork1_starts_after_height = m_hardfork_after_heigh;
+    pc.hard_fork_01_starts_after_height = m_hardfork_01_after_heigh;
+    pc.hard_fork_02_starts_after_height = m_hardfork_02_after_heigh;
     wallets.back()->set_core_runtime_config(pc);
   }
 
@@ -485,7 +498,7 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
   uint64_t& found_timestamp,
   crypto::hash& found_kh)
 {
-  bool is_after_hardfork = blck_chain.size() > m_hardfork_after_heigh ? true : false;
+  bool is_after_hardfork_01 = blck_chain.size() > m_hardfork_01_after_heigh ? true : false;
   uint64_t median_timestamp = get_timestamps_median(blck_chain);
   wide_difficulty_type basic_diff = 0;
 
@@ -916,6 +929,10 @@ bool test_generator::refresh_test_wallet(const std::vector<test_event_entry>& ev
   std::atomic<bool> atomic_false = ATOMIC_VAR_INIT(false);
   bool r = w->refresh(blocks_fetched, received_money, ok, atomic_false);
   CHECK_AND_ASSERT_MES(r, false, "test wallet refersh failed");
+  if (expected_blocks_to_be_fetched != blocks_fetched)
+  {
+    std::cout << "dd";
+  }
   CHECK_AND_ASSERT_MES(expected_blocks_to_be_fetched == std::numeric_limits<size_t>::max() || expected_blocks_to_be_fetched == blocks_fetched, false, "test wallet refresh fetched " << blocks_fetched << ", expected: " << expected_blocks_to_be_fetched);
 
   bool has_aliases;
@@ -1050,7 +1067,7 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
     {
       const transaction &tx = *vtx[i];
       crypto::key_derivation derivation;
-      bool r = generate_key_derivation(get_tx_pub_key_from_extra(tx), acc_keys.m_view_secret_key, derivation);
+      bool r = generate_key_derivation(get_tx_pub_key_from_extra(tx), acc_keys.view_secret_key, derivation);
       CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
 
       for (size_t j = 0; j < tx.vout.size(); ++j)
@@ -1329,13 +1346,13 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
     if (minimum_sigs != SIZE_MAX)
       destinations.back().minimum_sigs = minimum_sigs; // set custom minimum_sigs only if != SIZE_MAX, use default in tx_destination_entry::ctor() otherwise
     if (cache_back > 0)
-      destinations.push_back(tx_destination_entry(cache_back, from.m_account_address));
+      destinations.push_back(tx_destination_entry(cache_back, from.account_address));
   }
   else
   {
     tx_destination_entry change_dst = AUTO_VAL_INIT(change_dst);
     if (cache_back > 0)
-      change_dst = tx_destination_entry(cache_back, from.m_account_address);
+      change_dst = tx_destination_entry(cache_back, from.account_address);
     std::vector<tx_destination_entry> dsts(1, tx_destination_entry(amount, to.back()));
     uint64_t dust = 0;
     const test_gentime_settings& tgs = test_generator::get_test_gentime_settings();
@@ -1417,8 +1434,8 @@ bool construct_miner_tx_manually(size_t height, uint64_t already_generated_coins
 
   crypto::key_derivation derivation;
   crypto::public_key out_eph_public_key;
-  crypto::generate_key_derivation(miner_address.m_view_public_key, txkey.sec, derivation);
-  crypto::derive_public_key(derivation, 0, miner_address.m_spend_public_key, out_eph_public_key);
+  crypto::generate_key_derivation(miner_address.view_public_key, txkey.sec, derivation);
+  crypto::derive_public_key(derivation, 0, miner_address.spend_public_key, out_eph_public_key);
 
   tx_out out;
   out.amount = block_reward;
@@ -1544,7 +1561,7 @@ bool construct_tx_with_many_outputs(std::vector<test_event_entry>& events, const
 
   uint64_t sources_amount = get_sources_total_amount(sources);
   if (sources_amount > total_amount + fee)
-    destinations.push_back(tx_destination_entry(sources_amount - (total_amount + fee), keys_from.m_account_address)); // change
+    destinations.push_back(tx_destination_entry(sources_amount - (total_amount + fee), keys_from.account_address)); // change
 
   return construct_tx(keys_from, sources, destinations, empty_attachment, tx, 0);
 }

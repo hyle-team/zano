@@ -254,7 +254,7 @@ bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
   currency::blobdata extra_none(255, 'x');
   currency::extra_alias_entry alias = AUTO_VAL_INIT(alias);
   alias.m_alias = std::string(255, 'a');
-  alias.m_address = miner.get_keys().m_account_address;
+  alias.m_address = miner.get_keys().account_address;
   alias.m_text_comment = std::string(255, 'y');
   pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_none, CURRENCY_MINER_TX_MAX_OUTS, alias);
   pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner);

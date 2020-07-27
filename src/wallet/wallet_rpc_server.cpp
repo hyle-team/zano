@@ -196,7 +196,7 @@ namespace tools
       res.path = epee::string_encoding::convert_to_ansii(m_wallet.get_wallet_path());
       res.transfers_count = m_wallet.get_recent_transfers_total_count();
       res.transfer_entries_count = m_wallet.get_transfer_entries_count();
-      res.seed = m_wallet.get_account().get_restore_braindata();
+      res.seed = m_wallet.get_account().get_seed_phrase();
       std::map<uint64_t, uint64_t> distribution;
       m_wallet.get_utxo_distribution(distribution);
       for (const auto& ent : distribution)
@@ -239,6 +239,13 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
+    if (req.fee < m_wallet.get_core_runtime_config().tx_pool_min_fee)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = std::string("Given fee is too low: ") + epee::string_tools::num_to_string_fast(req.fee) + ", minimum is: " + epee::string_tools::num_to_string_fast(m_wallet.get_core_runtime_config().tx_pool_min_fee);
+      return false;
+    }
+
     std::string payment_id;
     if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
     {
@@ -275,6 +282,7 @@ namespace tools
     try
     {
       std::vector<currency::attachment_v> attachments; 
+      std::vector<currency::extra_v> extra;
       if (!payment_id.empty() && !currency::set_payment_id_to_tx(attachments, payment_id))
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
@@ -289,14 +297,28 @@ namespace tools
         attachments.push_back(comment);
       }
 
+      if (req.push_payer)
+      {
+        currency::create_and_add_tx_payer_to_container_from_address(extra, m_wallet.get_account().get_keys().account_address, m_wallet.get_top_block_height(), m_wallet.get_core_runtime_config());
+      }
+      
+      if (!req.hide_receiver)
+      {
+        for (auto& d : dsts)
+        {
+          for (auto& a : d.addr)
+            currency::create_and_add_tx_receiver_to_container_from_address(extra, a, m_wallet.get_top_block_height(), m_wallet.get_core_runtime_config());
+        }
+      }
+
       currency::transaction tx;
-      std::vector<currency::extra_v> extra;
-      std::string signed_tx_blob_str;
-      m_wallet.transfer(dsts, req.mixin, 0/*req.unlock_time*/, req.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, CURRENCY_TO_KEY_OUT_RELAXED, true, 0, true, &signed_tx_blob_str);
+      
+      std::string unsigned_tx_blob_str;
+      m_wallet.transfer(dsts, req.mixin, 0/*req.unlock_time*/, req.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, CURRENCY_TO_KEY_OUT_RELAXED, true, 0, true, &unsigned_tx_blob_str);
       if (m_wallet.is_watch_only())
       {
-        res.tx_unsigned_hex = epee::string_tools::buff_to_hex_nodelimer(signed_tx_blob_str); // watch-only wallets can't sign and relay transactions
-        // leave res.tx_hash empty, because tx has will change after signing
+        res.tx_unsigned_hex = epee::string_tools::buff_to_hex_nodelimer(unsigned_tx_blob_str); // watch-only wallets could not sign and relay transactions
+        // leave res.tx_hash empty, because tx hash will change after signing
       }
       else
       {
@@ -330,6 +352,8 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
     m_wallet.store();
+    boost::system::error_code ec = AUTO_VAL_INIT(ec);
+    res.wallet_file_size = m_wallet.get_wallet_file_size();
     WALLET_RPC_CATCH_TRY_ENTRY();
     return true;
   }

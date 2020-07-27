@@ -478,7 +478,7 @@ namespace epee
 
     bool run_handling(const std::string& prompt, const std::string& usage_string)
     {
-      return m_console_handler.run(boost::bind(&console_handlers_binder::process_command_str, this, _1), prompt, usage_string);
+      return m_console_handler.run(boost::bind(&console_handlers_binder::process_command_str, this, boost::placeholders::_1), prompt, usage_string);
     }
 
     bool help(const std::vector<std::string>& /*args*/)

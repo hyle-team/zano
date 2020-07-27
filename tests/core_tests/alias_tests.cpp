@@ -18,72 +18,20 @@ using namespace currency;
 #define FIFTH_NAME         "fifth--01234567890"
 #define SIX_NAME           "sixsix-double--01234567890"
 
-std::string gen_random_alias(size_t len)
-{
-  const char allowed_chars[] = "abcdefghijklmnopqrstuvwxyz0123456789";
-  char buffer[2048] = "";
-  if (len >= sizeof buffer)
-    return "";
-
-  crypto::generate_random_bytes(len, buffer);
-  buffer[len] = 0;
-  for(size_t i = 0; i < len; ++i)
-    buffer[i] = allowed_chars[buffer[i] % (sizeof allowed_chars - 1)];
-  return buffer;
-}
-
 bool put_alias_via_tx_to_list(std::vector<test_event_entry>& events,
-    std::list<currency::transaction>& tx_set,
-    const block& head_block,
-    const account_base& miner_acc,
-    currency::extra_alias_entry ai2,
-    test_generator& generator)
-  {
-
-  std::vector<currency::extra_v> ex;
-  ex.push_back(ai2);
-  account_base reward_acc;
-  account_keys& ak = const_cast<account_keys&>(reward_acc.get_keys());
-  currency::get_aliases_reward_account(ak.m_account_address, ak.m_view_secret_key);
-
-  uint64_t fee_median = generator.get_last_n_blocks_fee_median(get_block_hash(head_block));
-  uint64_t reward = currency::get_alias_coast_from_fee(ai2.m_alias, fee_median);
-
-  MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(events, 
-    tx_set,
-    miner_acc,
-    reward_acc,
-    reward,
-    0,
-    head_block,
-    CURRENCY_TO_KEY_OUT_RELAXED,
-    ex,
-    std::vector<currency::attachment_v>());
-  
-
-  uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx_set.back());
-  if (found_alias_reward != reward)
-  {
-    LOCAL_ASSERT(false);
-    CHECK_AND_ASSERT_MES(false, false, "wrong transaction constructed, first input value not match alias amount or account");
-    return false;
-  }
-  return true;
+  std::list<currency::transaction>& tx_set,
+  const block& head_block,
+  const std::string& alias_name,
+  const account_base& miner_acc,
+  const account_base& alias_acc,
+  test_generator& generator)
+{
+  currency::extra_alias_entry ai2 = AUTO_VAL_INIT(ai2);
+  ai2.m_alias = alias_name;
+  ai2.m_address = alias_acc.get_keys().account_address;
+  ai2.m_text_comment = "ssdss";
+  return put_alias_via_tx_to_list(events, tx_set, head_block, miner_acc, ai2, generator);
 }
-  bool put_alias_via_tx_to_list(std::vector<test_event_entry>& events,
-    std::list<currency::transaction>& tx_set,
-    const block& head_block,
-    const std::string& alias_name,
-    const account_base& miner_acc,
-    const account_base& alias_acc,
-    test_generator& generator)
-  {
-    currency::extra_alias_entry ai2 = AUTO_VAL_INIT(ai2);
-    ai2.m_alias = alias_name;
-    ai2.m_address = alias_acc.get_keys().m_account_address;
-    ai2.m_text_comment = "ssdss";
-    return put_alias_via_tx_to_list(events, tx_set, head_block, miner_acc, ai2, generator);
-  }
 
 bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events, 
                                      block& b, 
@@ -92,13 +40,13 @@ bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events,
                                      const currency::extra_alias_entry& ai,
                                      test_generator& generator)
 {
-    std::list<currency::transaction> txs_0;
-    if (!put_alias_via_tx_to_list(events, txs_0, head_block, miner_acc, ai, generator))
-      return false;
+  std::list<currency::transaction> txs_0;
+  if (!put_alias_via_tx_to_list(events, txs_0, head_block, miner_acc, ai, generator))
+    return false;
     
-    MAKE_NEXT_BLOCK_TX_LIST(events, blk, head_block, miner_acc, txs_0);
-    b = blk;
-    return true;
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk, head_block, miner_acc, txs_0);
+  b = blk;
+  return true;
 }
 
 
@@ -112,7 +60,7 @@ bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events,
 {
   currency::extra_alias_entry ai2 = AUTO_VAL_INIT(ai2);
   ai2.m_alias = alias_name;
-  ai2.m_address = alias_acc.get_keys().m_account_address;
+  ai2.m_address = alias_acc.get_keys().account_address;
   ai2.m_text_comment = "ssdss";
 
   return put_next_block_with_alias_in_tx(events, b, head_block, miner_acc, ai2, generator);
@@ -171,13 +119,13 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = FIRST_ALIAS_NAME;
   ai.m_text_comment = "first@first.com blablabla";
-  ai.m_address = first_acc.get_keys().m_account_address;
+  ai.m_address = first_acc.get_keys().account_address;
   MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_2, blk_1, miner_account, ai);                                           // 4N+7,4N+8
   DO_CALLBACK(events, "check_first_alias_added");                                                                      // 4N+9
 
   ai.m_alias = SECOND_ALIAS_NAME;
   ai.m_text_comment = "second@second.com blablabla";
-  ai.m_address = second_acc.get_keys().m_account_address;
+  ai.m_address = second_acc.get_keys().account_address;
   MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_3, blk_2, miner_account, ai);                                           // 4N+10,4N+11
   DO_CALLBACK(events, "check_second_alias_added");                                                                     // 4N+12
   
@@ -195,9 +143,9 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
 
   currency::extra_alias_entry ai_upd = AUTO_VAL_INIT(ai_upd);
   ai_upd.m_alias = FIRST_ALIAS_NAME;
-  ai_upd.m_address =third_acc.get_keys().m_account_address;
+  ai_upd.m_address =third_acc.get_keys().account_address;
   ai_upd.m_text_comment = "changed alias haha";
-  r = sign_extra_alias_entry(ai_upd, first_acc.get_keys().m_account_address.m_spend_public_key, first_acc.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai_upd, first_acc.get_keys().account_address.spend_public_key, first_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "failed to sign update_alias");
   MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_6, blk_5, miner_account, ai_upd);                                       // 4N+20,N+21
   DO_CALLBACK(events, "check_alias_changed");                                                                          // 4N+22
@@ -205,9 +153,9 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   //try to make fake alias change
   currency::extra_alias_entry ai_upd_fake = AUTO_VAL_INIT(ai_upd_fake);
   ai_upd_fake.m_alias = SECOND_ALIAS_NAME;
-  ai_upd_fake.m_address =third_acc.get_keys().m_account_address;
+  ai_upd_fake.m_address =third_acc.get_keys().account_address;
   ai_upd_fake.m_text_comment = "changed alias haha";
-  r = sign_extra_alias_entry(ai_upd_fake, second_acc.get_keys().m_account_address.m_spend_public_key, second_acc.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai_upd_fake, second_acc.get_keys().account_address.spend_public_key, second_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "failed to sign update_alias");
   ai_upd_fake.m_text_comment = "changed alias haha - fake"; // changed text, signature became wrong
   std::list<currency::transaction> tx_list;
@@ -283,8 +231,8 @@ bool gen_alias_tests::check_first_alias_added(currency::core& c, size_t ev_index
   currency::extra_alias_entry_base ai = AUTO_VAL_INIT(ai);
   bool r = c.get_blockchain_storage().get_alias_info(FIRST_ALIAS_NAME, ai);
   CHECK_AND_ASSERT_MES(r, false, "first alias name check failed");
-  CHECK_AND_ASSERT_MES(ai.m_address.m_spend_public_key == first_acc.get_keys().m_account_address.m_spend_public_key
-                    && ai.m_address.m_view_public_key == first_acc.get_keys().m_account_address.m_view_public_key, false, "first alias name check failed");  
+  CHECK_AND_ASSERT_MES(ai.m_address.spend_public_key == first_acc.get_keys().account_address.spend_public_key
+                    && ai.m_address.view_public_key == first_acc.get_keys().account_address.view_public_key, false, "first alias name check failed");  
   return true;
 }
 bool gen_alias_tests::check_second_alias_added(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
@@ -294,8 +242,8 @@ bool gen_alias_tests::check_second_alias_added(currency::core& c, size_t ev_inde
   currency::extra_alias_entry_base ai = AUTO_VAL_INIT(ai);
   bool r = c.get_blockchain_storage().get_alias_info(SECOND_ALIAS_NAME, ai);
   CHECK_AND_ASSERT_MES(r, false, "first alias name check failed");
-  CHECK_AND_ASSERT_MES(ai.m_address.m_spend_public_key == second_acc.get_keys().m_account_address.m_spend_public_key
-                    && ai.m_address.m_view_public_key == second_acc.get_keys().m_account_address.m_view_public_key, false, "second alias name check failed");  
+  CHECK_AND_ASSERT_MES(ai.m_address.spend_public_key == second_acc.get_keys().account_address.spend_public_key
+                    && ai.m_address.view_public_key == second_acc.get_keys().account_address.view_public_key, false, "second alias name check failed");  
 
   return true;
 }
@@ -352,8 +300,8 @@ bool gen_alias_tests::check_alias_changed(currency::core& c, size_t ev_index, co
   currency::extra_alias_entry_base ai = AUTO_VAL_INIT(ai);
   bool r = c.get_blockchain_storage().get_alias_info(FIRST_ALIAS_NAME, ai);
   CHECK_AND_ASSERT_MES(r, false, "first alias name check failed");
-  CHECK_AND_ASSERT_MES(ai.m_address.m_spend_public_key == third_acc.get_keys().m_account_address.m_spend_public_key
-                    && ai.m_address.m_view_public_key == third_acc.get_keys().m_account_address.m_view_public_key, false, "first alias update name check failed");  
+  CHECK_AND_ASSERT_MES(ai.m_address.spend_public_key == third_acc.get_keys().account_address.spend_public_key
+                    && ai.m_address.view_public_key == third_acc.get_keys().account_address.view_public_key, false, "first alias update name check failed");  
 
   return true;
 }
@@ -452,10 +400,10 @@ bool gen_alias_strange_data::generate(std::vector<test_event_entry>& events) con
   // empty comment
   currency::extra_alias_entry ai_upd = AUTO_VAL_INIT(ai_upd);
   ai_upd.m_alias = ai.m_alias;
-  ai_upd.m_address.m_spend_public_key = null_pkey;
-  ai_upd.m_address.m_view_public_key = null_pkey;
+  ai_upd.m_address.spend_public_key = null_pkey;
+  ai_upd.m_address.view_public_key = null_pkey;
   ai_upd.m_text_comment = "";
-  r = sign_extra_alias_entry(ai_upd, m_alice.get_public_address().m_spend_public_key, m_alice.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai_upd, m_alice.get_public_address().spend_public_key, m_alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "failed to sign update_alias");
 
   MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_2, blk_1, miner_acc, ai_upd);
@@ -468,14 +416,14 @@ bool gen_alias_strange_data::generate(std::vector<test_event_entry>& events) con
   ai.m_alias = std::string(255, 'x');
   ai.m_text_comment = std::string(255, 'c');
   ai.m_address = m_alice.get_public_address();
-  ai.m_view_key.push_back(m_alice.get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(m_alice.get_keys().view_secret_key);
   r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2, miner_acc, tx_list);
 
   tx_list.clear();
   ai.m_text_comment = std::string(255, '\0');
-  r = sign_extra_alias_entry(ai, m_alice.get_public_address().m_spend_public_key, m_alice.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai, m_alice.get_public_address().spend_public_key, m_alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
@@ -489,7 +437,7 @@ bool gen_alias_strange_data::check_alias_changed(currency::core& c, size_t ev_in
   currency::extra_alias_entry ai;
   bool r = c.get_blockchain_storage().get_alias_info(std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a'), ai);
   CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
-  CHECK_AND_ASSERT_MES(ai.m_address.m_spend_public_key == null_pkey && ai.m_address.m_view_public_key == null_pkey, false, "alias didn't change");
+  CHECK_AND_ASSERT_MES(ai.m_address.spend_public_key == null_pkey && ai.m_address.view_public_key == null_pkey, false, "alias didn't change");
 
   return true;
 }
@@ -519,13 +467,13 @@ bool gen_alias_concurrency_with_switch::generate(std::vector<test_event_entry>& 
   ai.m_text_comment = "";
   ai.m_address = miner_acc.get_public_address();
   //ai.m_address = *reinterpret_cast<currency::account_public_address*>(invalid_addr);
-  ai.m_view_key.push_back(miner_acc.get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(miner_acc.get_keys().view_secret_key);
   bool r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   // 2nd
   std::list<currency::transaction> tx_list2;
-  ai.m_address.m_spend_public_key = null_pkey, ai.m_address.m_view_public_key = null_pkey;
+  ai.m_address.spend_public_key = null_pkey, ai.m_address.view_public_key = null_pkey;
   DO_CALLBACK(events, "mark_invalid_tx"); // because tx with a duplicate alias request (?)
   r = put_alias_via_tx_to_list(events, tx_list2, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
@@ -557,7 +505,7 @@ bool gen_alias_concurrency_with_switch::check_alias(currency::core& c, size_t ev
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   bool r = c.get_blockchain_storage().get_alias_info(std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a'), ai);
   CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
-  CHECK_AND_ASSERT_MES(ai.m_address.m_spend_public_key == null_pkey && ai.m_address.m_view_public_key == null_pkey, false, "wrong alias");
+  CHECK_AND_ASSERT_MES(ai.m_address.spend_public_key == null_pkey && ai.m_address.view_public_key == null_pkey, false, "wrong alias");
   return true;
 }
 
@@ -579,12 +527,12 @@ bool gen_alias_same_alias_in_tx_pool::generate(std::vector<test_event_entry>& ev
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = miner_acc.get_public_address();
-  ai.m_view_key.push_back(miner_acc.get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(miner_acc.get_keys().view_secret_key);
   bool r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
-  ai.m_address.m_spend_public_key = null_pkey, ai.m_address.m_view_public_key = null_pkey;
-  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().m_spend_public_key, miner_acc.get_keys().m_spend_secret_key);
+  ai.m_address.spend_public_key = null_pkey, ai.m_address.view_public_key = null_pkey;
+  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   DO_CALLBACK(events, "mark_invalid_tx"); // because tx with a duplicate alias request
   r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
@@ -597,14 +545,14 @@ bool gen_alias_same_alias_in_tx_pool::generate(std::vector<test_event_entry>& ev
 
   // 2. add to the pool two txs: 1) update previously registered alias 2) update it once again
   tx_list.clear();
-  ai.m_address.m_spend_public_key = miner_acc.get_public_address().m_spend_public_key;
-  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().m_spend_public_key, miner_acc.get_keys().m_spend_secret_key);
+  ai.m_address.spend_public_key = miner_acc.get_public_address().spend_public_key;
+  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   ai.m_text_comment = "Oops, I forgot a comment!";
-  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().m_spend_public_key, miner_acc.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   DO_CALLBACK(events, "mark_invalid_tx"); // because tx with a duplicate alias request
   r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
@@ -653,7 +601,7 @@ bool gen_alias_switch_and_tx_pool::generate(std::vector<test_event_entry>& event
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = miner_acc.get_public_address();
-  ai.m_view_key.push_back(miner_acc.get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(miner_acc.get_keys().view_secret_key);
   bool r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
@@ -663,8 +611,8 @@ bool gen_alias_switch_and_tx_pool::generate(std::vector<test_event_entry>& event
 
   // 2. update the alias 
   tx_list.clear();
-  ai.m_address.m_spend_public_key = null_pkey, ai.m_address.m_view_public_key = null_pkey;
-  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().m_spend_public_key, miner_acc.get_keys().m_spend_secret_key);
+  ai.m_address.spend_public_key = null_pkey, ai.m_address.view_public_key = null_pkey;
+  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
@@ -682,7 +630,7 @@ bool gen_alias_switch_and_tx_pool::generate(std::vector<test_event_entry>& event
   ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = alice.get_public_address();
-  ai.m_view_key.push_back(alice.get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(alice.get_keys().view_secret_key);
   DO_CALLBACK(events, "mark_invalid_tx"); // tx is rejected, because tx pool already has tx with reg/upd this alias
   r = put_alias_via_tx_to_list(events, tx_list, blk_4, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
@@ -708,7 +656,7 @@ bool gen_alias_switch_and_tx_pool::check_alias(currency::core& c, size_t ev_inde
   currency::extra_alias_entry_base ai;
   bool r = c.get_blockchain_storage().get_alias_info(alias_name, ai);
   CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
-  CHECK_AND_ASSERT_MES(ai.m_address == alice.get_public_address() && !ai.m_view_key.empty() && ai.m_view_key.front() == alice.get_keys().m_view_secret_key, false, "wrong alias");
+  CHECK_AND_ASSERT_MES(ai.m_address == alice.get_public_address() && !ai.m_view_key.empty() && ai.m_view_key.front() == alice.get_keys().view_secret_key, false, "wrong alias");
 
   return true;
 }
@@ -740,7 +688,7 @@ bool gen_alias_update_after_addr_changed::generate(std::vector<test_event_entry>
   tx_list.clear();
   ai.m_text_comment = "upd1";
   ai.m_address = alice.get_public_address();
-  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().m_spend_public_key, miner_acc.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   r = put_alias_via_tx_to_list(events, tx_list, blk_1, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
@@ -750,7 +698,7 @@ bool gen_alias_update_after_addr_changed::generate(std::vector<test_event_entry>
   // try to update the alias on behalf of miner (should fail because it must be alice who can sign it)
   tx_list.clear();
   ai.m_text_comment = "upd2";
-  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().m_spend_public_key, miner_acc.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   r = put_alias_via_tx_to_list(events, tx_list, blk_2, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
@@ -765,7 +713,7 @@ bool gen_alias_update_after_addr_changed::generate(std::vector<test_event_entry>
   // try to update the alias on behalf of alice (should be ok)
   tx_list.clear();
   ai.m_address = miner_acc.get_public_address();
-  r = sign_extra_alias_entry(ai, alice.get_public_address().m_spend_public_key, alice.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   r = put_alias_via_tx_to_list(events, tx_list, blk_2, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
@@ -775,7 +723,7 @@ bool gen_alias_update_after_addr_changed::generate(std::vector<test_event_entry>
   // try to change the alias on behalf on alice again (should fail)
   tx_list.clear();
   ai.m_text_comment = "upd3";
-  r = sign_extra_alias_entry(ai, alice.get_public_address().m_spend_public_key, alice.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   r = put_alias_via_tx_to_list(events, tx_list, blk_3, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
@@ -887,7 +835,7 @@ bool gen_alias_blocking_update_by_invalid_tx::generate(std::vector<test_event_en
   ai.m_alias = "sweet.name";
   ai.m_address = alice.get_public_address();
   ai.m_text_comment = "alice@mail.com";
-  r = sign_extra_alias_entry(ai, alice.get_public_address().m_spend_public_key, alice.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   r = put_alias_via_tx_to_list(events, tx_list, blk_2, alice, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
@@ -973,7 +921,7 @@ bool gen_alias_too_much_reward::generate(std::vector<test_event_entry>& events) 
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = miner_acc.get_public_address();
-  ai.m_view_key.push_back(miner_acc.get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(miner_acc.get_keys().view_secret_key);
   std::vector<currency::extra_v> extra;
   extra.push_back(ai);
 
@@ -994,7 +942,7 @@ bool gen_alias_too_much_reward::check_alias(currency::core& c, size_t ev_index, 
   currency::extra_alias_entry_base ai;
   bool r = c.get_blockchain_storage().get_alias_info(std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a'), ai);
   CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
-  CHECK_AND_ASSERT_MES(ai.m_address == miner_acc.get_public_address() && ai.m_view_key.size() == 1 && ai.m_view_key.front() == miner_acc.get_keys().m_view_secret_key, false, "wrong alias");
+  CHECK_AND_ASSERT_MES(ai.m_address == miner_acc.get_public_address() && ai.m_view_key.size() == 1 && ai.m_view_key.front() == miner_acc.get_keys().view_secret_key, false, "wrong alias");
 
   return true;
 }
@@ -1111,7 +1059,7 @@ bool gen_alias_too_small_reward::make_tx_reg_alias(std::vector<test_event_entry>
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = alias;
   ai.m_address = alias_addr;
-  ai.m_view_key.push_back(miner_acc.get_keys().m_view_secret_key);
+  ai.m_view_key.push_back(miner_acc.get_keys().view_secret_key);
 
 
   if (alias.size() < ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED)
@@ -1168,7 +1116,7 @@ bool gen_alias_too_small_reward::check_alias(currency::core& c, size_t ev_index,
   r = c.get_blockchain_storage().get_alias_info(ae.name, ai);
   CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
 
-  CHECK_AND_ASSERT_MES(ai.m_address == ae.addr && ai.m_view_key.size() == 1 && ai.m_view_key.front() == miner_acc.get_keys().m_view_secret_key, false, "wrong alias registration: " << ae.name);
+  CHECK_AND_ASSERT_MES(ai.m_address == ae.addr && ai.m_view_key.size() == 1 && ai.m_view_key.front() == miner_acc.get_keys().view_secret_key, false, "wrong alias registration: " << ae.name);
 
   return true;
 }
@@ -1261,7 +1209,7 @@ bool gen_alias_switch_and_check_block_template::generate(std::vector<test_event_
 
   // Alice updates her alias (paid by miner in order not to confuse and mix the inputs)
   ai.m_text_comment = "alice@mail.com";
-  r = sign_extra_alias_entry(ai, alice.get_public_address().m_spend_public_key, alice.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   std::vector<currency::extra_v> extra(1, ai);
 
@@ -1443,7 +1391,7 @@ bool gen_alias_update_for_free::generate(std::vector<test_event_entry>& events) 
 
   // update the alias - pay nothing
   ai.m_text_comment = "miner@mail.com";
-  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().m_spend_public_key, miner_acc.get_keys().m_spend_secret_key);
+  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   std::vector<currency::extra_v> extra(1, ai);
 
@@ -1505,8 +1453,8 @@ bool gen_alias_in_coinbase::generate(std::vector<test_event_entry>& events) cons
   // update an alias using coinbase
 
   ai.m_text_comment = "A Party member is expected to have no private emotions and no respites from enthusiasm.";
-  ai.m_view_key.push_back(miner_acc.get_keys().m_view_secret_key);
-  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().m_spend_public_key, miner_acc.get_keys().m_spend_secret_key);
+  ai.m_view_key.push_back(miner_acc.get_keys().view_secret_key);
+  r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
 
   block blk_2 = AUTO_VAL_INIT(blk_2);

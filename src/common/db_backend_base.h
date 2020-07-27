@@ -38,6 +38,7 @@ namespace tools
       virtual void abort_transaction()=0;
       virtual bool open(const std::string& path, uint64_t cache_sz = CACHE_SIZE) = 0;
       virtual bool open_container(const std::string& name, container_handle& h)=0;
+      virtual bool close_container(container_handle& h) = 0;
       virtual bool erase(container_handle h, const char* k, size_t s) = 0;
       virtual uint64_t size(container_handle h) = 0;
       virtual bool get(container_handle h, const char* k, size_t s, std::string& res_buff) = 0;

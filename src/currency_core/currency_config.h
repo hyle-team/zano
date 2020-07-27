@@ -20,8 +20,11 @@
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
 #define CURRENCY_MAX_BLOCK_SIZE                         500000000  // block header blob limit, never used!
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
-#define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           197   // addresses start with 'Z'
+#define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5   // addresses start with 'Zx'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8 // integrated addresses start with 'iZ' (new format)
+#define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8 // auditable addresses start with 'aZx'
+#define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49 // auditable integrated addresses start with 'aiZX'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     1
 #define CURRENT_BLOCK_MAJOR_VERSION                     1
@@ -98,12 +101,14 @@
 #define RPC_DEFAULT_PORT                                11211
 #define STRATUM_DEFAULT_PORT                            11777
 #define P2P_NETWORK_ID_TESTNET_FLAG                     0
+#define P2P_MAINTAINERS_PUB_KEY                         "8f138bb73f6d663a3746a542770781a09579a7b84cb4125249e95530824ee607"
 #else 
 #define P2P_DEFAULT_PORT                                (11112 + CURRENCY_FORMATION_VERSION)
 #define RPC_DEFAULT_PORT                                12111
 #define STRATUM_DEFAULT_PORT                            11888
 #define STRARUM_DEFAULT_PORT                            51113
 #define P2P_NETWORK_ID_TESTNET_FLAG                     1
+#define P2P_MAINTAINERS_PUB_KEY                         "aaa2d7aabc8d383fd53a3ae898697b28f236ceade6bafc1eecff413a6a02272a"
 #endif
 
 #define P2P_NETWORK_ID_VER                              (CURRENCY_FORMATION_VERSION+0)
@@ -121,7 +126,6 @@
 #define P2P_DEFAULT_PING_CONNECTION_TIMEOUT             2000       //2 seconds
 #define P2P_DEFAULT_INVOKE_TIMEOUT                      60*2*1000  //2 minutes
 #define P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT            10000      //10 seconds
-#define P2P_MAINTAINERS_PUB_KEY                         "8f138bb73f6d663a3746a542770781a09579a7b84cb4125249e95530824ee607"
 #define P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT       70
 #define P2P_FAILED_ADDR_FORGET_SECONDS                  (60*5)     //5 minutes
 
@@ -140,7 +144,8 @@
 #define POS_MINIMUM_COINSTAKE_AGE                       10 // blocks count
 
 
-#define WALLET_FILE_SIGNATURE                           0x1111012101101011LL  //Bender's nightmare
+#define WALLET_FILE_SIGNATURE_OLD                       0x1111012101101011LL  // Bender's nightmare
+#define WALLET_FILE_SIGNATURE_V2                        0x1111011201101011LL  // another Bender's nightmare
 #define WALLET_FILE_MAX_BODY_SIZE                       0x88888888L //2GB
 #define WALLET_FILE_MAX_KEYS_SIZE                       10000 //
 #define WALLET_BRAIN_DATE_OFFSET                        1543622400
@@ -207,7 +212,7 @@
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3
 #define CURRENT_BLOCK_EXTENDED_INFO_ARCHIVE_VER         1
 
-#define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 10
+#define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 11
 #define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  1
 
 
@@ -215,7 +220,8 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+65)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+67)
+
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
@@ -224,10 +230,13 @@
 #define BLOCK_MINOR_VERSION_GENESIS                     0
 #define BLOCK_MAJOR_VERSION_INITAL                      0
 #ifndef TESTNET
-#define ZANO_HARDFORK_1_AFTER_HEIGHT                    194624
+#define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624
+#define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999
 #else
-#define ZANO_HARDFORK_1_AFTER_HEIGHT                    1440
+#define ZANO_HARDFORK_01_AFTER_HEIGHT                   1440
+#define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999
 #endif
+
 
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");

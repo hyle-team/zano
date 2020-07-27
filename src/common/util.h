@@ -30,6 +30,7 @@ namespace tools
   std::string get_default_user_dir();
   std::string get_current_username();
   std::string get_os_version_string();
+  bool copy_dir(boost::filesystem::path const & source, boost::filesystem::path const & destination);
   bool check_remote_client_version(const std::string& client_ver);
 
   bool create_directories_if_necessary(const std::string& path);
@@ -259,14 +260,14 @@ namespace tools
 
     static void handle_signal()
     {
-      static std::mutex m_mutex;
+      static epee::static_helpers::wrapper<std::mutex> m_mutex;
       std::unique_lock<std::mutex> lock(m_mutex);
       m_handler();
     }
 
     static void handle_fatal_signal(int sig_number, void* address)
     {
-      static std::mutex m_mutex_fatal;
+      static epee::static_helpers::wrapper<std::mutex> m_mutex_fatal;
       std::unique_lock<std::mutex> lock(m_mutex_fatal);
       m_fatal_handler(sig_number, address);
       uninstall_fatal();

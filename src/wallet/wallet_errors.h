@@ -68,6 +68,12 @@ namespace tools
         return ss.str();
       }
 
+      virtual const char* what() const noexcept
+      {
+        m_what = to_string();
+        return m_what.c_str();
+      }
+
     protected:
       wallet_error_base(std::string&& loc, const std::string& message)
         : Base(message)
@@ -77,6 +83,7 @@ namespace tools
 
     private:
       std::string m_loc;
+      mutable std::string m_what;
     };
     //----------------------------------------------------------------------------------------------------
     const char* const failed_rpc_request_messages[] = {
@@ -113,12 +120,21 @@ namespace tools
       std::string m_status;
     };
     //----------------------------------------------------------------------------------------------------
-    typedef wallet_error_base<std::logic_error> wallet_logic_error;
-    typedef wallet_error_base<std::runtime_error> wallet_runtime_error;
+    typedef wallet_error_base<std::runtime_error> wallet_error;
+    typedef wallet_error wallet_logic_error;
+    typedef wallet_error wallet_runtime_error;
     //----------------------------------------------------------------------------------------------------
     struct wallet_internal_error : public wallet_runtime_error
     {
       explicit wallet_internal_error(std::string&& loc, const std::string& message)
+        : wallet_runtime_error(std::move(loc), message)
+      {
+      }
+    };
+    //----------------------------------------------------------------------------------------------------
+    struct wallet_wrong_seed_error : public wallet_runtime_error
+    {
+      explicit wallet_wrong_seed_error(std::string&& loc, const std::string& message)
         : wallet_runtime_error(std::move(loc), message)
       {
       }

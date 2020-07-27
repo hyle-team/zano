@@ -789,7 +789,7 @@ bool gen_crypted_attachments::generate(std::vector<test_event_entry>& events) co
   REWIND_BLOCKS_N_WITH_TIME(events, blk_5, blk_4, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   DO_CALLBACK(events, "set_blockchain_height");
 
-  pr.acc_addr = miner_account.get_keys().m_account_address;
+  pr.acc_addr = miner_account.get_keys().account_address;
   cm.comment = "Comandante Che Guevara";
   //ms.msg = "Hasta Siempre, Comandante";
 

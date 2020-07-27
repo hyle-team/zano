@@ -38,16 +38,23 @@ namespace tools
   {
     currency::COMMAND_RPC_GET_BLOCKS_FAST::request req;
     req.block_ids = rqt.block_ids;
+    req.minimum_height = rqt.minimum_height;
+    req.need_global_indexes = rqt.need_global_indexes;
     currency::COMMAND_RPC_GET_BLOCKS_FAST::response res = AUTO_VAL_INIT(res);
     bool r = call_COMMAND_RPC_GET_BLOCKS_FAST(req, res);
     rsp.status = res.status;
-    if (rsp.status == CORE_RPC_STATUS_OK)
+    if (rsp.status == API_RETURN_CODE_OK)
     {
       rsp.current_height = res.current_height;
       rsp.start_height = res.start_height;
       r = unserialize_block_complete_entry(res, rsp);
     }
     return r;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool default_http_core_proxy::call_COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE(const currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& rqt, currency::COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& rsp)
+  {
+    return invoke_http_json_rpc_update_is_disconnect("get_est_height_from_date", rqt, rsp);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_GET_INFO(const currency::COMMAND_RPC_GET_INFO::request& req, currency::COMMAND_RPC_GET_INFO::response& res)

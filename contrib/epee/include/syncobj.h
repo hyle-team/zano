@@ -35,22 +35,10 @@
 #include <boost/thread/recursive_mutex.hpp>
 
 #include "singleton.h"
-#include "static_initializer.h"
+#include "static_helpers.h"
 #include "misc_helpers.h"
 
 //#define DISABLE_DEADLOCK_GUARD
-
-
-#define VALIDATE_MUTEX_IS_FREE(mutex_mame)    \
-  if (mutex_mame.try_lock()) \
-  { \
-    mutex_mame.unlock(); \
-    return; \
-  } \
-  else \
-  { \
-    LOG_ERROR("MUTEX IS NOT FREE ON DESTRUCTOR: " << #mutex_mame); \
-  }
 
 
 namespace epee
@@ -532,7 +520,7 @@ namespace epee
     }
   };
 
-  const static initializer<abstract_singleton<deadlock_guard> > singleton_initializer;
+  //const static initializer<abstract_singleton<deadlock_guard> > singleton_initializer;
 
   /************************************************************************/
   /*                                                                      */
@@ -640,13 +628,27 @@ namespace epee
 
 #define DEADLOCK_LOCATION __FILE__ ":" DEADLOCK_STRINGIFY(__LINE__)
 
-/*
+  /*
 
-  We do DEADLOCK_LOCATION and DEADLOCK_FUNCTION_DEF as separate variables passed into deadlock_guard
-  because in GCC __PRETTY_FUNCTION__ is not a literal (like __FILE__ macro) but const variable, and 
-  can't concatenate it with other macro like we did in DEADLOCK_LOCATION.
+    We do DEADLOCK_LOCATION and DEADLOCK_FUNCTION_DEF as separate variables passed into deadlock_guard
+    because in GCC __PRETTY_FUNCTION__ is not a literal (like __FILE__ macro) but const variable, and
+    can't concatenate it with other macro like we did in DEADLOCK_LOCATION.
 
-*/
+  */
+
+#define VALIDATE_MUTEX_IS_FREE(mutex_mame)    \
+  if (mutex_mame.try_lock()) \
+  { \
+    mutex_mame.unlock(); \
+    return; \
+  } \
+  else \
+  { \
+    auto state_str = epee::deadlock_guard_singleton::get_dlg_state(); \
+    LOG_ERROR("MUTEX IS NOT FREE ON DESTRUCTOR: " << #mutex_mame << ", address:" << (void*)&mutex_mame << ENDL << "DEAD LOCK GUARD state:" << ENDL << state_str); \
+  }
+
+
 
 #define DLG_CRITICAL_REGION_LOCAL_VAR(lock, varname)     epee::guarded_critical_region_t<decltype(lock)>   varname(lock, DEADLOCK_FUNCTION_DEF, DEADLOCK_LOCATION, #lock, epee::log_space::log_singletone::get_thread_log_prefix())
 #define DLG_CRITICAL_REGION_BEGIN_VAR(lock, varname)   { epee::guarded_critical_region_t<decltype(lock)>   varname(lock, DEADLOCK_FUNCTION_DEF, DEADLOCK_LOCATION, #lock, epee::log_space::log_singletone::get_thread_log_prefix())
@@ -705,7 +707,8 @@ namespace epee
 #define  EXCLUSIVE_CRITICAL_REGION_LOCAL(x) boost::unique_lock< boost::shared_mutex > critical_region_var(x)
 
 #define  SHARED_CRITICAL_REGION_BEGIN(x) { SHARED_CRITICAL_REGION_LOCAL(x)
+#define  SHARED_CRITICAL_REGION_END() }
 #define  EXCLUSIVE_CRITICAL_REGION_BEGIN(x) { EXCLUSIVE_CRITICAL_REGION_LOCAL(x)
-
+#define  EXCLUSIVE_CRITICAL_REGION_END() }
 
 }

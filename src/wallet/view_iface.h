@@ -19,7 +19,10 @@ DISABLE_VS_WARNINGS(4503)
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "wallet/wallet_public_structs_defs.h"
 #include "currency_core/offers_services_helpers.h"
+#include "currency_core/basic_kv_structs.h"
 #include "currency_core/basic_api_response_codes.h"
+#include "common/error_codes.h"
+
 POP_VS_WARNINGS
 
 //#endif
@@ -212,16 +215,20 @@ public:
     uint64_t balance;
 		uint64_t mined_total;
     std::string address;
-    std::string tracking_hey;
+    std::string view_sec_key;
     std::string path;
+    bool is_auditable;
+    bool is_watch_only;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(unlocked_balance)
       KV_SERIALIZE(balance)
 			KV_SERIALIZE(mined_total)			
       KV_SERIALIZE(address)
-      KV_SERIALIZE(tracking_hey)
+      KV_SERIALIZE(view_sec_key)
       KV_SERIALIZE(path)
+      KV_SERIALIZE(is_auditable);
+      KV_SERIALIZE(is_watch_only);
     END_KV_SERIALIZE_MAP()
   };
 
@@ -430,6 +437,10 @@ public:
     wallet_info wi;
     std::string seed;
     bool recovered;
+    uint64_t wallet_local_bc_size;
+    uint64_t wallet_file_size;
+    std::string name;
+    std::string pass;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -437,6 +448,10 @@ public:
       KV_SERIALIZE(wi)
       KV_SERIALIZE(seed)
       KV_SERIALIZE(recovered)
+      KV_SERIALIZE(wallet_local_bc_size)
+      KV_SERIALIZE(wallet_file_size)
+      KV_SERIALIZE(name)
+      KV_SERIALIZE(pass)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -754,46 +769,6 @@ public:
     END_KV_SERIALIZE_MAP()
   };
   
-  template<typename t_type>
-  struct struct_with_one_t_type
-  {
-    t_type v;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(v)
-    END_KV_SERIALIZE_MAP()
-  };
-
-
-
-
-#define API_RETURN_CODE_OK                                      BASIC_RESPONSE_STATUS_OK
-#define API_RETURN_CODE_FAIL                                    BASIC_RESPONSE_STATUS_FAILED
-#define API_RETURN_CODE_NOT_FOUND                               BASIC_RESPONSE_STATUS_NOT_FOUND
-#define API_RETURN_CODE_ACCESS_DENIED                           "ACCESS_DENIED"
-#define API_RETURN_CODE_INTERNAL_ERROR                          "INTERNAL_ERROR"
-#define API_RETURN_CODE_NOT_ENOUGH_MONEY                        "NOT_ENOUGH_MONEY"
-#define API_RETURN_CODE_INTERNAL_ERROR_QUE_FULL                 "INTERNAL_ERROR_QUE_FULL"
-#define API_RETURN_CODE_BAD_ARG                                 "BAD_ARG"
-#define API_RETURN_CODE_BAD_ARG_EMPTY_DESTINATIONS              "BAD_ARG_EMPTY_DESTINATIONS"
-#define API_RETURN_CODE_BAD_ARG_WRONG_FEE                       "BAD_ARG_WRONG_FEE"
-#define API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS                 "BAD_ARG_INVALID_ADDRESS"
-#define API_RETURN_CODE_BAD_ARG_WRONG_AMOUNT                    "BAD_ARG_WRONG_AMOUNT"
-#define API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID                "BAD_ARG_WRONG_PAYMENT_ID"
-#define API_RETURN_CODE_WRONG_PASSWORD                          "WRONG_PASSWORD"
-#define API_RETURN_CODE_WALLET_WRONG_ID                         "WALLET_WRONG_ID"
-#define API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED         "WALLET_WATCH_ONLY_NOT_SUPPORTED"
-#define API_RETURN_CODE_FILE_NOT_FOUND                          "FILE_NOT_FOUND"
-#define API_RETURN_CODE_ALREADY_EXISTS                          "ALREADY_EXISTS"
-#define API_RETURN_CODE_CANCELED                                "CANCELED"
-#define API_RETURN_CODE_FILE_RESTORED                           "FILE_RESTORED"
-#define API_RETURN_CODE_TRUE                                    "TRUE"
-#define API_RETURN_CODE_FALSE                                   "FALSE"
-#define API_RETURN_CODE_CORE_BUSY                               "CORE_BUSY"
-#define API_RETURN_CODE_OVERFLOW                                "OVERFLOW"
-#define API_RETURN_CODE_BUSY                                    "BUSY"
-#define API_RETURN_CODE_INVALID_FILE                            "INVALID_FILE"
-
 #define API_MAX_ALIASES_COUNT                                   10000
 
   struct i_view
