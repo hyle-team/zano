@@ -853,7 +853,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       w->load(path, password);
       if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
-#ifndef MOBILE_WALLET_BUILD
+#ifdef MOBILE_WALLET_BUILD
       //disable auditable wallets for now in mobile wallet
       if (w->is_auditable())
       {
@@ -1063,7 +1063,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     bool auditable_watch_only = restore_key.find(':') != std::string::npos;
     w->restore(path, password, restore_key, auditable_watch_only);
-#ifndef MOBILE_WALLET_BUILD
+#ifdef MOBILE_WALLET_BUILD
     //disable auditable wallets for now in mobile wallet
     if (w->is_auditable())
     {
