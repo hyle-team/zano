@@ -3867,7 +3867,7 @@ bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake
 bool wallet2::prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {
   found_money = select_transfers(needed_money, fake_outputs_count, dust_threshold, selected_indicies);
-  THROW_IF_FALSE_WALLET_EX_MES(found_money >= needed_money, error::not_enough_money, "wallet_dump: " << ENDL << dump_trunsfers(false), found_money, needed_money, 0);
+  WLT_THROW_IF_FALSE_WALLET_EX_MES(found_money >= needed_money, error::not_enough_money, "", found_money, needed_money, 0);
   return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
 }
 //----------------------------------------------------------------------------------------------------

@@ -78,6 +78,7 @@ const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64
 #define WLT_CHECK_AND_ASSERT_MES_NO_RET(expr, msg) CHECK_AND_ASSERT_MES_NO_RET(expr, "[W:" << m_log_prefix << "] " << msg)
 #define WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
 #define WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
+#define WLT_THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, msg, ...) THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, "[W:" << m_log_prefix << "] " << msg, ## __VA_ARGS__)
 
 class test_generator;
 
@@ -1257,7 +1258,9 @@ namespace tools
 #undef WLT_LOG_YELLOW
 #undef WLT_CHECK_AND_ASSERT_MES
 #undef WLT_CHECK_AND_ASSERT_MES_NO_RET
-// TODO update this list
+#undef WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX
+#undef WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX
+#undef WLT_THROW_IF_FALSE_WALLET_EX_MES
 #endif
 
 
