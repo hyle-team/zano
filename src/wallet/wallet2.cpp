@@ -522,7 +522,6 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         td.m_ptx_wallet_info = pwallet_info;
         td.m_internal_output_index = o;
         td.m_key_image = ki;
-        LOG_PRINT_L0("pglobal_indexes = " << pglobal_indexes);
         if (m_use_deffered_global_outputs)
         {
           if (pglobal_indexes && pglobal_indexes->size() > o)
@@ -1487,7 +1486,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
     }
   }
 
-  WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << get_blockchain_current_size());
+  WLT_LOG_L2("[PULL BLOCKS] " << res.start_height << " --> " << get_blockchain_current_size() - 1);
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_sync_progress()
@@ -1911,7 +1910,7 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
   }
   
 
-  WLT_LOG_L1("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money(balance()) << ", unlocked: " << print_money(unlocked_balance()));
+  WLT_LOG("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money(balance()) << ", unlocked: " << print_money(unlocked_balance()), blocks_fetched > 0 ? LOG_LEVEL_1 : LOG_LEVEL_2);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::handle_expiration_list(uint64_t tx_expiration_ts_median)

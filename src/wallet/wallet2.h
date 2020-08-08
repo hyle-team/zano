@@ -62,6 +62,7 @@ const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64
 #define LOG_DEFAULT_CHANNEL "wallet"
 
 // wallet-specific logging functions
+#define WLT_LOG(msg, level) LOG_PRINT("[W:" << m_log_prefix << "] " << msg, level)
 #define WLT_LOG_L0(msg) LOG_PRINT_L0("[W:" << m_log_prefix << "] " << msg)
 #define WLT_LOG_L1(msg) LOG_PRINT_L1("[W:" << m_log_prefix << "] " << msg)
 #define WLT_LOG_L2(msg) LOG_PRINT_L2("[W:" << m_log_prefix << "] " << msg)
@@ -1244,6 +1245,7 @@ namespace tools
 } // namespace tools
 
 #if !defined(KEEP_WALLET_LOG_MACROS)
+#undef WLT_LOG
 #undef WLT_LOG_L0
 #undef WLT_LOG_L1
 #undef WLT_LOG_L2
