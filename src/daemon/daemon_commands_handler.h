@@ -317,21 +317,24 @@ private:
       std::cout << "specified key_image parameter '" << args[0] << "' is wrong" << ENDL;
       return false;
     }
+
+    currency::blockchain_storage& bcs = m_srv.get_payload_object().get_core().get_blockchain_storage();
+
     std::list<std::string> res_list;
     crypto::hash tx_id = currency::null_hash;
-    auto tx_chain_entry = m_srv.get_payload_object().get_core().get_blockchain_storage().find_key_image_and_related_tx(ki, tx_id);
+    auto tx_chain_entry = bcs.find_key_image_and_related_tx(ki, tx_id);
 
     if (tx_chain_entry)
     {
-      LOG_PRINT_L0("Found tx: " << ENDL << obj_to_json_str(tx_chain_entry->tx) << ENDL << "height: " << tx_chain_entry->m_keeper_block_height);
-    }
-    if (tx_id == currency::null_hash)
-    {
-      LOG_PRINT_L0("Not found any related tx.");
+      currency::block_extended_info bei = AUTO_VAL_INIT(bei);
+      CHECK_AND_ASSERT_MES(bcs.get_block_extended_info_by_height(tx_chain_entry->m_keeper_block_height, bei), false, "cannot find block by height " << tx_chain_entry->m_keeper_block_height);
+
+      LOG_PRINT_L0("Key image found in tx: " << tx_id << " height " << tx_chain_entry->m_keeper_block_height << " (ts: " << epee::misc_utils::get_time_str_v2(currency::get_actual_timestamp(bei.bl)) << ")" << ENDL
+        << obj_to_json_str(tx_chain_entry->tx));
     }
     else
     {
-      LOG_PRINT_L0("TxID: " << tx_id);
+      LOG_PRINT_L0("Not found any related tx.");
     }
     return true;
   }
