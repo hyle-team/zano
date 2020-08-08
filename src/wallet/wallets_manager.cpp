@@ -1354,7 +1354,16 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
       }
     }
     w->get()->transfer(dsts, tp.mixin_count, unlock_time ? unlock_time + 1 : 0, fee, extra, attachments, res_tx);
-    //update_wallets_info();
+  }
+  catch (const tools::error::not_enough_money& e)
+  {
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "Transfer error: not enough money: " << e.what());
+    return API_RETURN_CODE_NOT_ENOUGH_MONEY;
+  }
+  catch (const tools::error::not_enough_outs_to_mix& e)
+  {
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "Transfer error: not outs to mix: " << e.what());
+    return API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_MIXING;
   }
   catch (const std::exception& e)
   {
