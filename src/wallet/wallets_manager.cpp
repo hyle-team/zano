@@ -1626,8 +1626,12 @@ std::string wallets_manager::get_mining_history(uint64_t wallet_id, tools::walle
 std::string wallets_manager::get_wallet_restore_info(uint64_t wallet_id, std::string& restore_key)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
+
+  if (wo.wallet_state != view::wallet_status_info::wallet_state_ready || wo.long_refresh_in_progress)
+    return API_RETURN_CODE_CORE_BUSY;
+
   restore_key = wo.w->get()->get_account().get_seed_phrase();
-//  restore_key = tools::base58::encode(rst_data);
+
   return API_RETURN_CODE_OK;
 }
 void wallets_manager::prepare_wallet_status_info(wallet_vs_options& wo, view::wallet_status_info& wsi)
