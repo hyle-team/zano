@@ -8,6 +8,7 @@
 #include <iosfwd> 
 #include <type_traits>
 #include <boost/iostreams/categories.hpp>  // sink_tag
+#include <boost/iostreams/operations.hpp>  // boost::iostreams::write, boost::iostreams::read
 #include "include_base_utils.h"
 #include "crypto/chacha8.h"
 #include "crypto/chacha8_stream.h"
