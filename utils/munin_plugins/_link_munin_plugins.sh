@@ -12,7 +12,7 @@ rm -f aliases
 rm -f alt_blocks_count
 rm -f block_size
 rm -f blockchain_lmdb_data_file_size
-#rm -f blockchain_mdbx_data_file_size
+rm -f blockchain_mdbx_data_file_size
 rm -f db_map_size
 rm -f db_transactions_count
 rm -f emission
@@ -29,7 +29,8 @@ rm -f performance_transaction
 rm -f performance_transaction_inp
 rm -f performance_transaction_inp_loop
 rm -f performance_transaction_inp_loop_scan_loop
-rm -f poolstate_data_file_size
+rm -f poolstate_lmdb_data_file_size
+rm -f poolstate_mdbx_data_file_size
 rm -f pos_block_ts_shift_vs_actual
 rm -f pos_dif_to_total_coins
 rm -f pos_difficulty
@@ -67,7 +68,8 @@ ln -s /home/project/zano_for_munin/utils/munin_plugins/performance_transaction
 ln -s /home/project/zano_for_munin/utils/munin_plugins/performance_transaction_inp
 ln -s /home/project/zano_for_munin/utils/munin_plugins/performance_transaction_inp_loop
 ln -s /home/project/zano_for_munin/utils/munin_plugins/performance_transaction_inp_loop_scan_loop
-ln -s /home/project/zano_for_munin/utils/munin_plugins/poolstate_data_file_size
+ln -s /home/project/zano_for_munin/utils/munin_plugins/poolstate_lmdb_data_file_size
+#ln -s /home/project/zano_for_munin/utils/munin_plugins/poolstate_mdbx_data_file_size
 ln -s /home/project/zano_for_munin/utils/munin_plugins/pos_block_ts_shift_vs_actual
 ln -s /home/project/zano_for_munin/utils/munin_plugins/pos_dif_to_total_coins
 ln -s /home/project/zano_for_munin/utils/munin_plugins/pos_difficulty
