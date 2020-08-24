@@ -8,42 +8,42 @@ set -x
 
 cd /etc/munin/plugins/
 
-rm aliases
-rm alt_blocks_count
-rm block_size
-rm blockchain_lmdb_data_file_size
-#rm blockchain_mdbx_data_file_size
-rm db_map_size
-rm db_transactions_count
-rm emission
-rm grey_peerlist_size
-rm hashrate
-rm height
-rm incoming_connections_count
-rm market
-rm outgoing_connections_count
-rm outs_stat
-rm performance_block
-rm performance_pool
-rm performance_transaction
-rm performance_transaction_inp
-rm performance_transaction_inp_loop
-rm performance_transaction_inp_loop_scan_loop
-rm poolstate_data_file_size
-rm pos_block_ts_shift_vs_actual
-rm pos_dif_to_total_coins
-rm pos_difficulty
-rm pow_difficulty
-rm reward
-rm seconds_per_blocks
-rm sequence_factor
-rm timestamps
-rm tx_count
-rm tx_daily_count
-rm tx_daily_volume
-rm tx_per_block
-rm tx_pool_size
-rm white_peerlist_size
+rm -f aliases
+rm -f alt_blocks_count
+rm -f block_size
+rm -f blockchain_lmdb_data_file_size
+#rm -f blockchain_mdbx_data_file_size
+rm -f db_map_size
+rm -f db_transactions_count
+rm -f emission
+rm -f grey_peerlist_size
+rm -f hashrate
+rm -f height
+rm -f incoming_connections_count
+rm -f market
+rm -f outgoing_connections_count
+rm -f outs_stat
+rm -f performance_block
+rm -f performance_pool
+rm -f performance_transaction
+rm -f performance_transaction_inp
+rm -f performance_transaction_inp_loop
+rm -f performance_transaction_inp_loop_scan_loop
+rm -f poolstate_data_file_size
+rm -f pos_block_ts_shift_vs_actual
+rm -f pos_dif_to_total_coins
+rm -f pos_difficulty
+rm -f pow_difficulty
+rm -f reward
+rm -f seconds_per_blocks
+rm -f sequence_factor
+rm -f timestamps
+rm -f tx_count
+rm -f tx_daily_count
+rm -f tx_daily_volume
+rm -f tx_per_block
+rm -f tx_pool_size
+rm -f white_peerlist_size
 
 
 ln -s /home/project/zano_for_munin/utils/munin_plugins/aliases
