@@ -146,7 +146,8 @@
 
 #define WALLET_FILE_SIGNATURE_OLD                       0x1111012101101011LL  // Bender's nightmare
 #define WALLET_FILE_SIGNATURE_V2                        0x1111011201101011LL  // another Bender's nightmare
-#define WALLET_FILE_MAX_BODY_SIZE                       0x88888888L //2GB
+#define WALLET_FILE_BINARY_HEADER_VERSION               1001
+
 #define WALLET_FILE_MAX_KEYS_SIZE                       10000 //
 #define WALLET_BRAIN_DATE_OFFSET                        1543622400
 #define WALLET_BRAIN_DATE_QUANTUM                       604800 //by last word we encode a number of week since launch of the project, 

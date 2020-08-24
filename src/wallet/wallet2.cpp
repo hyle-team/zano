@@ -7,6 +7,8 @@
 #include <numeric>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <iostream>
 #include <boost/utility/value_init.hpp>
@@ -26,6 +28,7 @@ using namespace epee;
 #include "serialization/binary_utils.h"
 #include "currency_core/bc_payments_id_service.h"
 #include "version.h"
+#include "common/encryption_filter.h"
 using namespace currency;
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
@@ -522,7 +525,6 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         td.m_ptx_wallet_info = pwallet_info;
         td.m_internal_output_index = o;
         td.m_key_image = ki;
-        LOG_PRINT_L0("pglobal_indexes = " << pglobal_indexes);
         if (m_use_deffered_global_outputs)
         {
           if (pglobal_indexes && pglobal_indexes->size() > o)
@@ -1487,7 +1489,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
     }
   }
 
-  WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << get_blockchain_current_size());
+  WLT_LOG_L2("[PULL BLOCKS] " << res.start_height << " --> " << get_blockchain_current_size() - 1);
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_sync_progress()
@@ -1882,12 +1884,16 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
       if (++try_count > 3)
         return;
       WLT_LOG_L2("no connection to the daemon, wait and try pull_blocks again (try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ")");
+      if (m_wcallback)
+        m_wcallback->on_message(tools::i_wallet2_callback::ms_red, "no connection to daemon");
       std::this_thread::sleep_for(std::chrono::seconds(3));
     }
     catch (const std::exception& e)
     {
       blocks_fetched += added_blocks;
       WLT_LOG_ERROR("refresh->pull_blocks failed, try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ", exception: " << e.what());
+      if (m_wcallback)
+        m_wcallback->on_message(tools::i_wallet2_callback::ms_red, std::string("error on pulling blocks: ") + e.what());
       return;
     }
   }
@@ -1907,7 +1913,7 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
   }
   
 
-  WLT_LOG_L1("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money(balance()) << ", unlocked: " << print_money(unlocked_balance()));
+  WLT_LOG("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money(balance()) << ", unlocked: " << print_money(unlocked_balance()), blocks_fetched > 0 ? LOG_LEVEL_1 : LOG_LEVEL_2);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::handle_expiration_list(uint64_t tx_expiration_ts_median)
@@ -2120,7 +2126,7 @@ bool wallet2::reset_all()
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::store_keys(std::string& buff, const std::string& password, bool store_as_watch_only /* = false */)
+bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only /* = false */)
 {
   currency::account_base acc = m_account;
   if (store_as_watch_only)
@@ -2129,8 +2135,6 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, bool st
   std::string account_data;
   bool r = epee::serialization::store_t_to_binary(acc, account_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "failed to serialize wallet keys");
-
-  wallet2::keys_file_data keys_file_data = boost::value_initialized<wallet2::keys_file_data>();
 
   crypto::chacha8_key key;
   crypto::generate_chacha8_key(password, key);
@@ -2148,7 +2152,8 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, bool st
 bool wallet2::backup_keys(const std::string& path)
 {
   std::string buff;
-  bool r = store_keys(buff, m_password);
+  wallet2::keys_file_data keys_file_data = AUTO_VAL_INIT(keys_file_data);
+  bool r = store_keys(buff, m_password, keys_file_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to store keys");
 
   r = file_io_utils::save_string_to_file(path, buff);
@@ -2234,10 +2239,9 @@ bool wallet2::prepare_file_names(const std::wstring& file_path)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::load_keys(const std::string& buff, const std::string& password, uint64_t file_signature)
+void wallet2::load_keys(const std::string& buff, const std::string& password, uint64_t file_signature, keys_file_data& kf_data)
 {
   bool r = false;
-  wallet2::keys_file_data kf_data = AUTO_VAL_INIT(kf_data);
   if (file_signature == WALLET_FILE_SIGNATURE_OLD)
   {
     wallet2::keys_file_data_old kf_data_old;
@@ -2299,18 +2303,18 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   store();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool auditable_watch_only)
+void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet)
 {
   bool r = false;
   clear();
   prepare_file_names(path);
   m_password = pass;
   
-  if (auditable_watch_only)
+  if (tracking_wallet)
   {
     r = m_account.restore_from_tracking_seed(seed_or_tracking_seed);
     init_log_prefix();
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load auditable watch-only wallet from a given blob: invalid awo blob");
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load tracking wallet from a given seed: invalid tracking seed");
     m_watch_only = true;
   }
   else
@@ -2356,16 +2360,30 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   THROW_IF_TRUE_WALLET_EX(data_file.fail(), error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
   THROW_IF_TRUE_WALLET_EX(wbh.m_signature != WALLET_FILE_SIGNATURE_OLD && wbh.m_signature != WALLET_FILE_SIGNATURE_V2, error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
-  THROW_IF_TRUE_WALLET_EX(wbh.m_cb_body > WALLET_FILE_MAX_BODY_SIZE || 
+  THROW_IF_TRUE_WALLET_EX(
     wbh.m_cb_keys > WALLET_FILE_MAX_KEYS_SIZE, error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
 
   keys_buff.resize(wbh.m_cb_keys);
   data_file.read((char*)keys_buff.data(), wbh.m_cb_keys);
+  wallet2::keys_file_data kf_data = AUTO_VAL_INIT(kf_data);
+  load_keys(keys_buff, password, wbh.m_signature, kf_data);
 
-  load_keys(keys_buff, password, wbh.m_signature);
-
-  bool need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
+  bool need_to_resync = false;
+  if (wbh.m_ver == 1000)
+  {
+    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
+  }
+  else
+  {
+    tools::encrypt_chacha_in_filter decrypt_filter(password, kf_data.iv);
+    boost::iostreams::filtering_istream in;
+    in.push(decrypt_filter);
+    in.push(data_file);
+    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
+  }
+    
+    
 
   if (m_watch_only && !is_auditable())
     load_keys2ki(true, need_to_resync);
@@ -2405,7 +2423,8 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   //prepare data
   std::string keys_buff;
-  bool r = store_keys(keys_buff, password, m_watch_only);
+  wallet2::keys_file_data keys_file_data = AUTO_VAL_INIT(keys_file_data);
+  bool r = store_keys(keys_buff, password, keys_file_data, m_watch_only);
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store_keys for wallet " << ascii_path_to_save);
 
   //store data
@@ -2413,7 +2432,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   wbh.m_signature = WALLET_FILE_SIGNATURE_V2;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
-  wbh.m_cb_body = 1000;
+  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION;
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
   uint64_t ts = m_core_runtime_config.get_core_time();
@@ -2428,8 +2447,13 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   data_file << header_buff << keys_buff;
 
   WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
+  //creating encryption stream
+  tools::encrypt_chacha_out_filter decrypt_filter(m_password, keys_file_data.iv);
+  boost::iostreams::filtering_ostream out;
+  out.push(decrypt_filter);
+  out.push(data_file);
 
-  r = tools::portble_serialize_obj_to_stream(*this, data_file);
+  r = tools::portble_serialize_obj_to_stream(*this, out);
   if (!r)
   {
     data_file.close();
@@ -3863,7 +3887,7 @@ bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake
 bool wallet2::prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {
   found_money = select_transfers(needed_money, fake_outputs_count, dust_threshold, selected_indicies);
-  THROW_IF_FALSE_WALLET_EX_MES(found_money >= needed_money, error::not_enough_money, "wallet_dump: " << ENDL << dump_trunsfers(false), found_money, needed_money, 0);
+  WLT_THROW_IF_FALSE_WALLET_EX_MES(found_money >= needed_money, error::not_enough_money, "", found_money, needed_money, 0);
   return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
 }
 //----------------------------------------------------------------------------------------------------
@@ -4667,7 +4691,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   bool shuffle,
   uint8_t flags,
   bool send_to_network,
-  std::string* p_signed_tx_blob_str)
+  std::string* p_unsigned_filename_or_tx_blob_str)
 {
   //TIME_MEASURE_START(precalculation_time);
   construct_tx_param ctp = AUTO_VAL_INIT(ctp);
@@ -4686,7 +4710,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   ctp.tx_outs_attr = tx_outs_attr;
   ctp.unlock_time = unlock_time;
   //TIME_MEASURE_FINISH(precalculation_time);
-  transfer(ctp, tx, send_to_network, p_signed_tx_blob_str);
+  transfer(ctp, tx, send_to_network, p_unsigned_filename_or_tx_blob_str);
 }
 //----------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------
@@ -4767,7 +4791,7 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
 void wallet2::transfer(const construct_tx_param& ctp,
   currency::transaction &tx,
   bool send_to_network,
-  std::string* p_signed_tx_blob_str)
+  std::string* p_unsigned_filename_or_tx_blob_str)
 {
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!is_auditable() || !is_watch_only(), "You can't initiate coins transfer using an auditable watch-only wallet."); // btw, watch-only wallets can call transfer() within cold-signing process
 
@@ -4780,7 +4804,7 @@ void wallet2::transfer(const construct_tx_param& ctp,
 
   if (m_watch_only)
   {
-    bool r = store_unsigned_tx_to_file_and_reserve_transfers(ftp, "zano_tx_unsigned", p_signed_tx_blob_str);
+    bool r = store_unsigned_tx_to_file_and_reserve_transfers(ftp, (p_unsigned_filename_or_tx_blob_str != nullptr ? *p_unsigned_filename_or_tx_blob_str : "zano_tx_unsigned"), p_unsigned_filename_or_tx_blob_str);
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store unsigned tx");
     WLT_LOG_GREEN("[wallet::transfer]" << " prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3), LOG_LEVEL_0);
     return;

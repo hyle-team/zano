@@ -55,7 +55,7 @@ if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10.5)          
 endif()
 
-set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers for MSVC")
+set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
 
 include_directories(src contrib/eos_portable_archive contrib contrib/epee/include "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
 

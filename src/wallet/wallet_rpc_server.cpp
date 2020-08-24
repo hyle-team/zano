@@ -239,6 +239,13 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
+    if (req.fee < m_wallet.get_core_runtime_config().tx_pool_min_fee)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = std::string("Given fee is too low: ") + epee::string_tools::num_to_string_fast(req.fee) + ", minimum is: " + epee::string_tools::num_to_string_fast(m_wallet.get_core_runtime_config().tx_pool_min_fee);
+      return false;
+    }
+
     std::string payment_id;
     if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
     {
@@ -306,12 +313,12 @@ namespace tools
 
       currency::transaction tx;
       
-      std::string signed_tx_blob_str;
-      m_wallet.transfer(dsts, req.mixin, 0/*req.unlock_time*/, req.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, CURRENCY_TO_KEY_OUT_RELAXED, true, 0, true, &signed_tx_blob_str);
+      std::string unsigned_tx_blob_str;
+      m_wallet.transfer(dsts, req.mixin, 0/*req.unlock_time*/, req.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, CURRENCY_TO_KEY_OUT_RELAXED, true, 0, true, &unsigned_tx_blob_str);
       if (m_wallet.is_watch_only())
       {
-        res.tx_unsigned_hex = epee::string_tools::buff_to_hex_nodelimer(signed_tx_blob_str); // watch-only wallets can't sign and relay transactions
-        // leave res.tx_hash empty, because tx has will change after signing
+        res.tx_unsigned_hex = epee::string_tools::buff_to_hex_nodelimer(unsigned_tx_blob_str); // watch-only wallets could not sign and relay transactions
+        // leave res.tx_hash empty, because tx hash will change after signing
       }
       else
       {

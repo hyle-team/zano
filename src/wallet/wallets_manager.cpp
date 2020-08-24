@@ -853,7 +853,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       w->load(path, password);
       if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
-#ifndef MOBILE_WALLET_BUILD
+#ifdef MOBILE_WALLET_BUILD
       //disable auditable wallets for now in mobile wallet
       if (w->is_auditable())
       {
@@ -1063,7 +1063,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     bool auditable_watch_only = restore_key.find(':') != std::string::npos;
     w->restore(path, password, restore_key, auditable_watch_only);
-#ifndef MOBILE_WALLET_BUILD
+#ifdef MOBILE_WALLET_BUILD
     //disable auditable wallets for now in mobile wallet
     if (w->is_auditable())
     {
@@ -1354,7 +1354,16 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
       }
     }
     w->get()->transfer(dsts, tp.mixin_count, unlock_time ? unlock_time + 1 : 0, fee, extra, attachments, res_tx);
-    //update_wallets_info();
+  }
+  catch (const tools::error::not_enough_money& e)
+  {
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "Transfer error: not enough money: " << e.what());
+    return API_RETURN_CODE_NOT_ENOUGH_MONEY;
+  }
+  catch (const tools::error::not_enough_outs_to_mix& e)
+  {
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "Transfer error: not outs to mix: " << e.what());
+    return API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_MIXING;
   }
   catch (const std::exception& e)
   {
@@ -1617,8 +1626,12 @@ std::string wallets_manager::get_mining_history(uint64_t wallet_id, tools::walle
 std::string wallets_manager::get_wallet_restore_info(uint64_t wallet_id, std::string& restore_key)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
+
+  if (wo.wallet_state != view::wallet_status_info::wallet_state_ready || wo.long_refresh_in_progress)
+    return API_RETURN_CODE_CORE_BUSY;
+
   restore_key = wo.w->get()->get_account().get_seed_phrase();
-//  restore_key = tools::base58::encode(rst_data);
+
   return API_RETURN_CODE_OK;
 }
 void wallets_manager::prepare_wallet_status_info(wallet_vs_options& wo, view::wallet_status_info& wsi)

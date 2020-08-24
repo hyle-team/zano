@@ -62,6 +62,7 @@ const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64
 #define LOG_DEFAULT_CHANNEL "wallet"
 
 // wallet-specific logging functions
+#define WLT_LOG(msg, level) LOG_PRINT("[W:" << m_log_prefix << "] " << msg, level)
 #define WLT_LOG_L0(msg) LOG_PRINT_L0("[W:" << m_log_prefix << "] " << msg)
 #define WLT_LOG_L1(msg) LOG_PRINT_L1("[W:" << m_log_prefix << "] " << msg)
 #define WLT_LOG_L2(msg) LOG_PRINT_L2("[W:" << m_log_prefix << "] " << msg)
@@ -78,6 +79,7 @@ const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64
 #define WLT_CHECK_AND_ASSERT_MES_NO_RET(expr, msg) CHECK_AND_ASSERT_MES_NO_RET(expr, "[W:" << m_log_prefix << "] " << msg)
 #define WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
 #define WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
+#define WLT_THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, msg, ...) THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, "[W:" << m_log_prefix << "] " << msg, ## __VA_ARGS__)
 
 class test_generator;
 
@@ -88,7 +90,9 @@ namespace tools
   {
     uint64_t m_signature;
     uint16_t m_cb_keys;
-    uint64_t m_cb_body;
+    //uint64_t m_cb_body; <-- this field never used, soo replace it with two other variables "m_ver" + and "m_reserved"
+    uint32_t m_ver;
+    uint32_t m_reserved; //for future use
   };
 #pragma pack (pop)
 
@@ -466,13 +470,13 @@ namespace tools
 
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
-    void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool auditable_watch_only);
+    void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet);
     void load(const std::wstring& path, const std::string& password);
     void store();
     void store(const std::wstring& path);
     void store(const std::wstring& path, const std::string& password);
     void store_watch_only(const std::wstring& path, const std::string& password) const;
-    bool store_keys(std::string& buff, const std::string& password, bool store_as_watch_only = false);
+    bool store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only = false);
     std::wstring get_wallet_path()const { return m_wallet_file; }
     std::string get_wallet_password()const { return m_password; }
     currency::account_base& get_account() { return m_account; }
@@ -543,7 +547,7 @@ namespace tools
       bool shuffle = true,
       uint8_t flags = 0,
       bool send_to_network = true,
-      std::string* p_signed_tx_blob_str = nullptr);
+      std::string* p_unsigned_filename_or_tx_blob_str = nullptr);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts, 
                   size_t fake_outputs_count, 
@@ -563,7 +567,7 @@ namespace tools
     void transfer(const construct_tx_param& ctp,
                   currency::transaction &tx,
                   bool send_to_network,
-                  std::string* p_signed_tx_blob_str);
+                  std::string* p_unsigned_filename_or_tx_blob_str);
 
     template<typename destination_split_strategy_t>
     void transfer_from_contract(
@@ -803,7 +807,7 @@ private:
 
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
-    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature);
+    void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes);
     void fetch_tx_global_indixes(const currency::transaction& tx, std::vector<uint64_t>& goutputs_indexes);
     void fetch_tx_global_indixes(const std::list<std::reference_wrapper<const currency::transaction>>& txs, std::vector<std::vector<uint64_t>>& goutputs_indexes);
@@ -1243,6 +1247,7 @@ namespace tools
 } // namespace tools
 
 #if !defined(KEEP_WALLET_LOG_MACROS)
+#undef WLT_LOG
 #undef WLT_LOG_L0
 #undef WLT_LOG_L1
 #undef WLT_LOG_L2
@@ -1257,7 +1262,9 @@ namespace tools
 #undef WLT_LOG_YELLOW
 #undef WLT_CHECK_AND_ASSERT_MES
 #undef WLT_CHECK_AND_ASSERT_MES_NO_RET
-// TODO update this list
+#undef WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX
+#undef WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX
+#undef WLT_THROW_IF_FALSE_WALLET_EX_MES
 #endif
 
 

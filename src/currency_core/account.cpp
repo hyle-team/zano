@@ -81,7 +81,7 @@ namespace currency
     if (m_keys.account_address.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
       auditable_flag = 1;
 
-    uint64_t auditable_flag_and_checksum = (auditable_flag & 1) | (checksum << 1);
+    uint32_t auditable_flag_and_checksum = (auditable_flag & 1) | (checksum << 1);
     std::string auditable_flag_and_checksum_word = tools::mnemonic_encoding::word_by_num(auditable_flag_and_checksum);
 
     return keys_seed_text + " " + timestamp_word + " " + auditable_flag_and_checksum_word;
@@ -148,7 +148,7 @@ namespace currency
     if (auditable_flag_and_checksum != UINT64_MAX)
     {
       auditable_flag = (auditable_flag_and_checksum & 1) != 0; // auditable flag is the lower 1 bit
-      uint16_t checksum = auditable_flag_and_checksum >> 1; // checksum -- everything else
+      uint16_t checksum = static_cast<uint16_t>(auditable_flag_and_checksum >> 1); // checksum -- everything else
       constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
       crypto::hash h = crypto::cn_fast_hash(keys_seed_binary.data(), keys_seed_binary.size());
       *reinterpret_cast<uint64_t*>(&h) = m_creation_timestamp;

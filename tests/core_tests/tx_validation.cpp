@@ -1379,7 +1379,7 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
   //  0 ... 20    21    22    23    24          <- height
   // (0 )- (0r)- (1 )-                          <- chain A
   //         |   tx_1
-  //          \
+  //          \ 
   //           \ (1b)- (2b)-                    <- chain B (became main after 2b)
   //                              
   MAKE_NEXT_BLOCK(events, blk_1b, blk_0r, miner_acc);
@@ -1393,7 +1393,7 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
   //  0 ... 20    21    22    23    24          <- height
   // (0 )- (0r)- (1 )-                          <- chain A
   //         |   tx_1
-  //          \
+  //          \ 
   //           \ (1b)- (2b)- !3b!-              <- chain B, block 3b is rejected because tx_1 is already expired
   //                         tx_1 
 
@@ -1411,7 +1411,7 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
   //  0 ... 20    21    22    23    24          <- height
   // (0 )- (0r)- (1 )-                          <- chain A
   //         |   tx_1
-  //         |\
+  //         |\ 
   //         | \ (1b)- (2b)-                    <- chain B
   //         |                    
   //          \- (1c)- (2c)- (3c)-              <- chain C
@@ -1432,7 +1432,7 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
   //  0 ... 20    21    22    23    24          <- height
   // (0 )- (0r)- (1 )-                          <- chain A
   //         |   tx_1
-  //         |\
+  //         |\ 
   //         | \ (1b)- (2b)- (3b)- (4b)-        <- chain B
   //         |                    
   //          \- (1c)- (2c)- (3c)-              <- chain C

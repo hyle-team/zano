@@ -405,8 +405,8 @@ bool MainWindow::init(const std::string& html_path)
   }
 
   //----
-  //this->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
-  //m_view->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
+  this->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
+  m_view->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
 
   return true;
   CATCH_ENTRY2(false);
