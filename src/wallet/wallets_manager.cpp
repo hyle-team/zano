@@ -853,13 +853,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       w->load(path, password);
       if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
-#ifdef MOBILE_WALLET_BUILD
-      //disable auditable wallets for now in mobile wallet
-      if (w->is_auditable())
-      {
-        return API_RETURN_CODE_WALLET_AUDITABLE_NOT_SUPPORTED;
-      }
-#endif 
+
       w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history);
@@ -1062,14 +1056,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   try
   {
     bool auditable_watch_only = restore_key.find(':') != std::string::npos;
-    w->restore(path, password, restore_key, auditable_watch_only);
-#ifdef MOBILE_WALLET_BUILD
-    //disable auditable wallets for now in mobile wallet
-    if (w->is_auditable())
-    {
-      return API_RETURN_CODE_WALLET_AUDITABLE_NOT_SUPPORTED;
-    }
-#endif 
+    w->restore(path, password, restore_key, auditable_watch_only); 
     owr.seed = w->get_account().get_seed_phrase();
   }
   catch (const tools::error::file_exists&)
