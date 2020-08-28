@@ -730,8 +730,14 @@ namespace tools
       a & m_tx_keys;
       a & m_last_pow_block_h;
 
+      //after processing
+      if (ver < 152)
+      {
+        wipeout_extra_if_needed(m_transfer_history);
+      }
     }
 
+    void wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history);
     bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count);

@@ -459,6 +459,35 @@ namespace currency
     }
     variant_container.push_back(v);
   }
+  //---------------------------------------------------------------
+  template<class variant_type_t, class variant_t>
+  bool has_field_of_type_in_extra(std::vector<variant_t>& variant_container)
+  {
+    for (auto& ev : variant_container)
+    {
+      if (ev.type() == typeid(variant_type_t))
+      {
+        return true;
+      }
+    }
+    return false;
+  }
+  //---------------------------------------------------------------
+  template<class variant_type_t, class variant_t>
+  void remove_field_of_type_from_extra(std::vector<variant_t>& variant_container)
+  {
+    for (size_t i = 0; i != variant_container.size();)
+    {
+      if (variant_container[i].type() == typeid(variant_type_t))
+      {
+        variant_container.erase(variant_container.begin()+i);
+      }
+      else
+      {
+        i++;
+      }
+    }
+  }
 
   //---------------------------------------------------------------
   template<typename t_container>

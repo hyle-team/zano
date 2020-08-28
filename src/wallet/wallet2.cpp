@@ -1184,6 +1184,15 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
 
 
   decrypt_payload_items(decrypt_attachment_as_income, tx, m_account.get_keys(), decrypted_att);
+  if (is_watch_only() || (height > 638000 && !has_field_of_type_in_extra<etc_tx_flags16_t>(decrypted_att)))
+  {
+    remove_field_of_type_from_extra<tx_receiver_old>(decrypted_att);
+    remove_field_of_type_from_extra<tx_payer_old>(decrypted_att);
+  }
+  if (is_watch_only())
+  {
+    remove_field_of_type_from_extra<tx_comment>(decrypted_att);
+  }
   prepare_wti_decrypted_attachments(wti, decrypted_att);
   process_contract_info(wti, decrypted_att);
 }
@@ -4300,6 +4309,19 @@ bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_
     return true;
   }
   return false;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history)
+{
+  WLT_LOG_L0("Processing [wipeout_extra_if_needed]...");
+  for (auto it = transfer_history.begin(); it != transfer_history.end(); )
+  {
+    if (it->height > 638000)
+    {
+      it->remote_addresses.clear();
+    }
+  }
+  WLT_LOG_L0("Processing [wipeout_extra_if_needed] DONE");
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count)
