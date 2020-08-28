@@ -1195,7 +1195,7 @@ void wallet2::handle_money_received2(const currency::block& b, const currency::t
   wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
   wti.is_income = true;
   prepare_wti(wti, get_block_height(b), get_actual_timestamp(b), tx, amount, td);
-
+  WLT_LOG_L1("[MONEY RECEIVED]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
 }
 //----------------------------------------------------------------------------------------------------
@@ -1225,6 +1225,7 @@ void wallet2::handle_money_spent2(const currency::block& b,
   wti.remote_addresses = recipients;
   wti.recipients_aliases = recipients_aliases;
   prepare_wti(wti, get_block_height(b), get_actual_timestamp(b), in_tx, amount, td);
+  WLT_LOG_L1("[MONEY SPENT]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
 }
 //----------------------------------------------------------------------------------------------------
