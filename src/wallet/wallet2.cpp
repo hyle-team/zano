@@ -1877,12 +1877,16 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
       if (++try_count > 3)
         return;
       WLT_LOG_L2("no connection to the daemon, wait and try pull_blocks again (try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ")");
+      if (m_wcallback)
+        m_wcallback->on_message(tools::i_wallet2_callback::ms_red, "no connection to daemon");
       std::this_thread::sleep_for(std::chrono::seconds(3));
     }
     catch (const std::exception& e)
     {
       blocks_fetched += added_blocks;
       WLT_LOG_ERROR("refresh->pull_blocks failed, try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ", exception: " << e.what());
+      if (m_wcallback)
+        m_wcallback->on_message(tools::i_wallet2_callback::ms_red, std::string("error on pulling blocks: ") + e.what());
       return;
     }
   }
@@ -2294,18 +2298,18 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   store();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool auditable_watch_only)
+void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet)
 {
   bool r = false;
   clear();
   prepare_file_names(path);
   m_password = pass;
   
-  if (auditable_watch_only)
+  if (tracking_wallet)
   {
     r = m_account.restore_from_tracking_seed(seed_or_tracking_seed);
     init_log_prefix();
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load auditable watch-only wallet from a given blob: invalid awo blob");
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load tracking wallet from a given seed: invalid tracking seed");
     m_watch_only = true;
   }
   else
@@ -4662,7 +4666,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   bool shuffle,
   uint8_t flags,
   bool send_to_network,
-  std::string* p_signed_tx_blob_str)
+  std::string* p_unsigned_filename_or_tx_blob_str)
 {
   //TIME_MEASURE_START(precalculation_time);
   construct_tx_param ctp = AUTO_VAL_INIT(ctp);
@@ -4681,7 +4685,7 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
   ctp.tx_outs_attr = tx_outs_attr;
   ctp.unlock_time = unlock_time;
   //TIME_MEASURE_FINISH(precalculation_time);
-  transfer(ctp, tx, send_to_network, p_signed_tx_blob_str);
+  transfer(ctp, tx, send_to_network, p_unsigned_filename_or_tx_blob_str);
 }
 //----------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------
@@ -4762,7 +4766,7 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
 void wallet2::transfer(const construct_tx_param& ctp,
   currency::transaction &tx,
   bool send_to_network,
-  std::string* p_signed_tx_blob_str)
+  std::string* p_unsigned_filename_or_tx_blob_str)
 {
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!is_auditable() || !is_watch_only(), "You can't initiate coins transfer using an auditable watch-only wallet."); // btw, watch-only wallets can call transfer() within cold-signing process
 
@@ -4775,7 +4779,7 @@ void wallet2::transfer(const construct_tx_param& ctp,
 
   if (m_watch_only)
   {
-    bool r = store_unsigned_tx_to_file_and_reserve_transfers(ftp, "zano_tx_unsigned", p_signed_tx_blob_str);
+    bool r = store_unsigned_tx_to_file_and_reserve_transfers(ftp, (p_unsigned_filename_or_tx_blob_str != nullptr ? *p_unsigned_filename_or_tx_blob_str : "zano_tx_unsigned"), p_unsigned_filename_or_tx_blob_str);
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store unsigned tx");
     WLT_LOG_GREEN("[wallet::transfer]" << " prepare_transaction_time: " << print_fixed_decimal_point(prepare_transaction_time, 3), LOG_LEVEL_0);
     return;

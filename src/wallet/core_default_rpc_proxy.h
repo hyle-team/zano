@@ -11,7 +11,11 @@
 #include "core_rpc_proxy.h"
 #include "storages/http_abstract_invoke.h"
 
-#define WALLET_RCP_CONNECTION_TIMEOUT                          3000
+#ifdef NDEBUG
+#define WALLET_RCP_CONNECTION_TIMEOUT                          5000
+#else 
+#define WALLET_RCP_CONNECTION_TIMEOUT                          100000
+#endif
 #define WALLET_RCP_COUNT_ATTEMNTS                              3
 
 
