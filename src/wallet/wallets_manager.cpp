@@ -815,7 +815,7 @@ std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter
 #endif
 }
 
-std::string wallets_manager::open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr)
+std::string wallets_manager::open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr, bool exclude_mining_txs)
 {
   // check if that file already opened
   SHARED_CRITICAL_REGION_BEGIN(m_wallets_lock);
@@ -854,9 +854,9 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
 
-      w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items);
+      w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items, owr.recent_history.last_item_index, exclude_mining_txs);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
-      w->get_unconfirmed_transfers(owr.recent_history.history);
+      w->get_unconfirmed_transfers(owr.recent_history.history, exclude_mining_txs);
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
       //workaround for missed fee
       owr.seed = w->get_account().get_seed_phrase();
@@ -912,7 +912,7 @@ bool wallets_manager::get_opened_wallets(std::list<view::open_wallet_response>& 
   return true;
 }
 
-std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist)
+std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist, bool exclude_mining_txs)
 {
   GET_WALLET_BY_ID(wallet_id, w);
   auto wallet_locked = w.try_lock();
@@ -921,8 +921,8 @@ std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t off
     return API_RETURN_CODE_CORE_BUSY;
   }
 
-  w->get()->get_unconfirmed_transfers(tr_hist.unconfirmed);
-  w->get()->get_recent_transfers_history(tr_hist.history, offset, count, tr_hist.total_history_items);
+  w->get()->get_unconfirmed_transfers(tr_hist.unconfirmed, exclude_mining_txs);
+  w->get()->get_recent_transfers_history(tr_hist.history, offset, count, tr_hist.total_history_items, tr_hist.last_item_index, exclude_mining_txs);
 
   auto fix_tx = [](tools::wallet_public::wallet_transfer_info& wti) -> void {
     wti.show_sender = currency::is_showing_sender_addres(wti.tx);
