@@ -433,8 +433,7 @@ namespace currency
     ai.m_alias = ard.alias;
     return true;
   }
-
-
+  //---------------------------------------------------------------
   template<class extra_t>
   extra_t& get_or_add_field_to_extra(std::vector<extra_v>& extra)
   {
@@ -446,6 +445,7 @@ namespace currency
     extra.push_back(extra_t());
     return boost::get<extra_t>(extra.back());
   }
+  //---------------------------------------------------------------
   template<class variant_t, class variant_type_t>
   void update_or_add_field_to_extra(std::vector<variant_t>& variant_container, const variant_type_t& v)
   {
@@ -458,19 +458,6 @@ namespace currency
       }
     }
     variant_container.push_back(v);
-  }
-  //---------------------------------------------------------------
-  template<class variant_type_t, class variant_t>
-  bool has_field_of_type_in_extra(std::vector<variant_t>& variant_container)
-  {
-    for (auto& ev : variant_container)
-    {
-      if (ev.type() == typeid(variant_type_t))
-      {
-        return true;
-      }
-    }
-    return false;
   }
   //---------------------------------------------------------------
   template<class variant_type_t, class variant_t>
@@ -488,7 +475,6 @@ namespace currency
       }
     }
   }
-
   //---------------------------------------------------------------
   template<typename t_container>
   bool get_payment_id_from_tx(const t_container& att, std::string& payment_id)

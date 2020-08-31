@@ -1184,7 +1184,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
 
 
   decrypt_payload_items(decrypt_attachment_as_income, tx, m_account.get_keys(), decrypted_att);
-  if ((is_watch_only() && !wti.is_income)|| (height > 638000 && !has_field_of_type_in_extra<etc_tx_flags16_t>(decrypted_att)))
+  if ((is_watch_only() && !wti.is_income)|| (height > 638000 && !have_type_in_variant_container<etc_tx_flags16_t>(decrypted_att)))
   {
     remove_field_of_type_from_extra<tx_receiver_old>(decrypted_att);
     remove_field_of_type_from_extra<tx_payer_old>(decrypted_att);
