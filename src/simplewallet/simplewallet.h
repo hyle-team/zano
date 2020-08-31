@@ -166,7 +166,6 @@ namespace currency
     bool m_print_brain_wallet;
     bool m_do_pos_mining;
     bool m_offline_mode;
-    bool m_free_space_check_enabled;
     std::string m_restore_wallet;
 
     epee::console_handlers_binder m_cmd_binder;

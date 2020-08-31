@@ -802,7 +802,6 @@ namespace tools
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
-    void set_free_space_check_enabled(bool value);
 
 private:
 
@@ -922,7 +921,6 @@ private:
     void exception_handler();
     void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
-    void check_for_free_space_and_throw_if_it_lacks(const std::wstring& path, uint64_t exact_size_needed_if_known = UINT64_MAX);
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
@@ -981,7 +979,6 @@ private:
 
     mutable uint64_t m_current_wallet_file_size;
     bool m_use_deffered_global_outputs;
-    bool m_do_free_space_check;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  

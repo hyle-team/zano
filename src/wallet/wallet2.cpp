@@ -52,8 +52,7 @@ namespace tools
                         m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
                         m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
                         m_current_wallet_file_size(0),
-                        m_use_deffered_global_outputs(false),
-                        m_do_free_space_check(true)
+                        m_use_deffered_global_outputs(false)
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
   }
@@ -2290,8 +2289,6 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   clear();
   prepare_file_names(path);
 
-  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
-
   m_password = pass;
   m_account.generate(auditable_wallet);
   init_log_prefix();
@@ -2340,8 +2337,6 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
 {
   clear();
   prepare_file_names(wallet_);
-
-  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
 
   m_password = password;
 
@@ -2418,8 +2413,6 @@ void wallet2::store(const std::wstring& path)
 void wallet2::store(const std::wstring& path_to_save, const std::string& password)
 {
   LOG_PRINT_L0("(before storing: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
-
-  // check_for_free_space_and_throw_if_it_lacks(path_to_save); temporary disabled, wallet saving implemented in two-stage scheme to avoid data loss due to lack of space
 
   std::string ascii_path_to_save = epee::string_encoding::convert_to_ansii(path_to_save);
 
@@ -2515,15 +2508,6 @@ void wallet2::set_use_deffered_global_outputs(bool use)
   m_use_deffered_global_outputs = use;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::set_free_space_check_enabled(bool value)
-{
-  if (value != m_do_free_space_check)
-  {
-    WLT_LOG_L0("free space check " << (value ? "enabled" : "disabled"));
-  }
-  m_do_free_space_check = value;
-}
-//----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
 {
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(path_to_save != m_wallet_file, "trying to save watch-only wallet to the same wallet file!");
@@ -2570,52 +2554,6 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
   // TODO additional clearing for watch-only wallet's data
 
   wo.store(path_to_save, password);
-}
-//----------------------------------------------------------------------------------------------------
-void wallet2::check_for_free_space_and_throw_if_it_lacks(const std::wstring& wallet_filename, uint64_t exact_size_needed_if_known /* = UINT64_MAX */)
-{
-  namespace fs = boost::filesystem;
-
-  if (!m_do_free_space_check)
-    return;
-
-  try
-  {
-    fs::path wallet_file_path(wallet_filename);
-    fs::path base_path = wallet_file_path.parent_path();
-    if (base_path.empty())
-      base_path = fs::path(".");
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(fs::is_directory(base_path), "directory does not exist: " << base_path.string());
-
-    uint64_t min_free_size = exact_size_needed_if_known;
-    if (min_free_size == UINT64_MAX)
-    {
-      // if exact size needed is unknown -- determine it as
-      // twice the original wallet file size or MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES, which one is bigger
-      min_free_size = MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES;
-      if (fs::is_regular_file(wallet_file_path))
-        min_free_size = std::max(min_free_size, 2 * static_cast<uint64_t>(fs::file_size(wallet_file_path)));
-    }
-    else
-    {
-      min_free_size += 1024 * 1024 * 10; // add a little for FS overhead and so
-    }
-
-    fs::space_info si = fs::space(base_path);
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(si.available > min_free_size, "free space at " << base_path.string() << " is too low: " << si.available << ", required minimum is: " << min_free_size);
-  }
-  catch (tools::error::wallet_common_error&)
-  {
-    throw;
-  }
-  catch (std::exception& e)
-  {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: " << e.what());
-  }
-  catch (...)
-  {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: unknown exception");
-  }
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::unlocked_balance() const

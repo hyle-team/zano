@@ -213,7 +213,6 @@ private:
 
   bool m_remote_node_mode;
   bool m_qt_logs_enbaled;
-  bool m_free_space_check_enabled;
   std::string m_qt_dev_tools;
   std::atomic<bool> m_is_pos_allowed;
 
