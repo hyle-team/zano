@@ -1184,12 +1184,12 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
 
 
   decrypt_payload_items(decrypt_attachment_as_income, tx, m_account.get_keys(), decrypted_att);
-  if (is_watch_only() || (height > 638000 && !has_field_of_type_in_extra<etc_tx_flags16_t>(decrypted_att)))
+  if ((is_watch_only() && !wti.is_income)|| (height > 638000 && !has_field_of_type_in_extra<etc_tx_flags16_t>(decrypted_att)))
   {
     remove_field_of_type_from_extra<tx_receiver_old>(decrypted_att);
     remove_field_of_type_from_extra<tx_payer_old>(decrypted_att);
   }
-  if (is_watch_only())
+  if (is_watch_only() && !wti.is_income)
   {
     remove_field_of_type_from_extra<tx_comment>(decrypted_att);
   }
@@ -4221,8 +4221,8 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
       auto it = offers_local.find(h);
       if (it == offers_local.end())
       {
-        WLT_LOG_L3("Unable to find original tx record " << h << " in cancel offer " << h);
-        break;
+      WLT_LOG_L3("Unable to find original tx record " << h << " in cancel offer " << h);
+      break;
       }
       offers_local.erase(it);
 
@@ -4278,7 +4278,7 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
   WLT_LOG_GREEN("Selecting indices for transfer of " << print_money_brief(needed_money) << " with " << fake_outputs_count << " fake outs, found_free_amounts.size()=" << found_free_amounts.size() << "...", LOG_LEVEL_0);
   uint64_t found_money = 0;
   std::string selected_amounts_str;
-  while(found_money < needed_money && found_free_amounts.size())
+  while (found_money < needed_money && found_free_amounts.size())
   {
     auto it = found_free_amounts.lower_bound(needed_money - found_money);
     if (!(it != found_free_amounts.end() && it->second.size()))
@@ -4319,6 +4319,10 @@ void wallet2::wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer
     if (it->height > 638000)
     {
       it->remote_addresses.clear();
+      if (is_watch_only() && !it->is_income)
+      {
+        it->comment.clear();
+      }
     }
   }
   WLT_LOG_L0("Processing [wipeout_extra_if_needed] DONE");
