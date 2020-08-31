@@ -183,7 +183,8 @@ simple_wallet::simple_wallet()
   m_do_not_set_date(false),
   m_do_pos_mining(false),
   m_refresh_progress_reporter(*this),
-  m_offline_mode(false)
+  m_offline_mode(false),
+  m_free_space_check_enabled(true)
 {
   m_cmd_binder.set_handler("start_mining", boost::bind(&simple_wallet::start_mining, this, _1), "start_mining <threads_count> - Start mining in daemon");
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, _1), "Stop mining in daemon");
@@ -369,6 +370,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_do_not_set_date = command_line::get_arg(vm, arg_dont_set_date);
   m_do_pos_mining   = command_line::get_arg(vm, arg_do_pos_mining);
   m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
+  m_free_space_check_enabled = !command_line::get_arg(vm, command_line::arg_disable_wallet_free_space_check);
 } 
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::try_connect_to_daemon()
@@ -390,6 +392,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(this->shared_from_this());
   m_wallet->set_do_rise_transfer(false);
+  m_wallet->set_free_space_check_enabled(m_free_space_check_enabled);
   try
   {
     m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, create_auditable_wallet);
@@ -429,6 +432,7 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(this->shared_from_this());
   m_wallet->set_do_rise_transfer(true);
+  m_wallet->set_free_space_check_enabled(m_free_space_check_enabled);
   try
   {
     if (tracking_wallet)
@@ -474,6 +478,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
   m_wallet_file = wallet_file;
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(shared_from_this());
+  m_wallet->set_free_space_check_enabled(m_free_space_check_enabled);
 
   while (true)
   {
@@ -1768,6 +1773,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_offline_mode);
   command_line::add_arg(desc_params, command_line::arg_log_file);
   command_line::add_arg(desc_params, command_line::arg_log_level);
+  command_line::add_arg(desc_params, command_line::arg_disable_wallet_free_space_check);
 
 
   tools::wallet_rpc_server::init_options(desc_params);

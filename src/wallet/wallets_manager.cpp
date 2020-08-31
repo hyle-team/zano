@@ -63,7 +63,8 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_is_pos_allowed(false),
                                  m_qt_logs_enbaled(false), 
                                  m_dont_save_wallet_at_stop(false), 
-                                 m_use_deffered_global_outputs(false)
+                                 m_use_deffered_global_outputs(false),
+                                 m_free_space_check_enabled(true)
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);

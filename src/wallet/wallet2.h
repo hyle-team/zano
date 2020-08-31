@@ -802,6 +802,7 @@ namespace tools
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
+    void set_free_space_check_enabled(bool value);
 
 private:
 
@@ -980,6 +981,7 @@ private:
 
     mutable uint64_t m_current_wallet_file_size;
     bool m_use_deffered_global_outputs;
+    bool m_do_free_space_check;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  

@@ -52,7 +52,8 @@ namespace tools
                         m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
                         m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
                         m_current_wallet_file_size(0),
-                        m_use_deffered_global_outputs(false)
+                        m_use_deffered_global_outputs(false),
+                        m_do_free_space_check(true)
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
   }
@@ -2514,6 +2515,15 @@ void wallet2::set_use_deffered_global_outputs(bool use)
   m_use_deffered_global_outputs = use;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::set_free_space_check_enabled(bool value)
+{
+  if (value != m_do_free_space_check)
+  {
+    WLT_LOG_L0("free space check " << (value ? "enabled" : "disabled"));
+  }
+  m_do_free_space_check = value;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
 {
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(path_to_save != m_wallet_file, "trying to save watch-only wallet to the same wallet file!");
@@ -2565,6 +2575,9 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
 void wallet2::check_for_free_space_and_throw_if_it_lacks(const std::wstring& wallet_filename, uint64_t exact_size_needed_if_known /* = UINT64_MAX */)
 {
   namespace fs = boost::filesystem;
+
+  if (!m_do_free_space_check)
+    return;
 
   try
   {

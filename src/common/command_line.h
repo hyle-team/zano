@@ -210,6 +210,7 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_disable_upnp;
   extern const arg_descriptor<bool>        arg_disable_stop_if_time_out_of_sync;
   extern const arg_descriptor<bool>        arg_disable_stop_on_low_free_space;
+  extern const arg_descriptor<bool>        arg_disable_wallet_free_space_check;
   extern const arg_descriptor<bool>        arg_enable_offers_service;
   extern const arg_descriptor<std::string> arg_db_engine;
   extern const arg_descriptor<bool>        arg_no_predownload;
