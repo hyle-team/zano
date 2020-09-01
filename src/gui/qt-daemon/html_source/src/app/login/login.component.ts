@@ -101,7 +101,7 @@ export class LoginComponent implements OnInit, OnDestroy {
                  this.variablesService.startCountdown();
                }
               this.ngZone.run(() => {
-                this.router.navigate(['/']);
+                this.router.navigate(['/'], {queryParams: {prevUrl: 'login'}});
               });
            }
          });
