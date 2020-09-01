@@ -147,6 +147,12 @@
       "TIME3": "1 Stunde",
       "TIME4": "Nie"
     },
+    "SCALE": {
+      "75": "75% Rahmen",
+      "100": "100% Rahmen",
+      "125": "125% Rahmen",
+      "150": "150% Rahmen"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Master-Passwort aktualisieren",
       "OLD": "Altes Passwort",
