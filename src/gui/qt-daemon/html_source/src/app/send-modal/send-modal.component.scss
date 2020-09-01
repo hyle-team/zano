@@ -34,7 +34,7 @@
       align-items: flex-start;
       justify-content: center;
       margin: 1.4rem 3rem 6.2rem 0;
-      
+
       .message-block {
         display: flex;
         margin-bottom: 1rem;
@@ -65,8 +65,15 @@
           width: 43.4rem;
           line-height: 2rem;
         }
-      }
 
+        &.confirm-master-pass {
+          width: 100%;
+          margin: 2rem 0;
+          .input-block {
+            width: 100%;
+          }
+        }
+      }
     }
   }
 

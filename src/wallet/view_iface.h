@@ -371,11 +371,13 @@ public:
     std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
     std::vector<tools::wallet_public::wallet_transfer_info> history;
     uint64_t total_history_items;
+    uint64_t last_item_index;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(unconfirmed)
       KV_SERIALIZE(history)
       KV_SERIALIZE(total_history_items)
+      KV_SERIALIZE(last_item_index)
     END_KV_SERIALIZE_MAP()
 
   };
@@ -385,11 +387,13 @@ public:
     std::string pass;
     std::string path;
     uint64_t txs_to_return;
+    bool exclude_mining_txs;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
       KV_SERIALIZE(txs_to_return)
+      KV_SERIALIZE(exclude_mining_txs)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -398,6 +402,7 @@ public:
     uint64_t wallet_id;
     uint64_t offset;
     uint64_t count;
+    bool exclude_mining_txs;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)

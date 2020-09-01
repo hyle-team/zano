@@ -147,6 +147,12 @@
       "TIME3": "1 ora",
       "TIME4": "Mai"
     },
+    "SCALE": {
+      "75": "75% scala",
+      "100": "100% scala",
+      "125": "125% scala",
+      "150": "150% scala"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Aggiorna password principale",
       "OLD": "Vecchia password",

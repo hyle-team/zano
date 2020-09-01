@@ -147,6 +147,12 @@
       "TIME3": "1 hour",
       "TIME4": "Never"
     },
+    "SCALE": {
+      "75": "75% scale",
+      "100": "100% scale",
+      "125": "125% scale",
+      "150": "150% scale"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Update master password",
       "OLD": "Old password",

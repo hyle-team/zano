@@ -1184,6 +1184,15 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
 
 
   decrypt_payload_items(decrypt_attachment_as_income, tx, m_account.get_keys(), decrypted_att);
+  if ((is_watch_only() && !wti.is_income)|| (height > 638000 && !have_type_in_variant_container<etc_tx_flags16_t>(decrypted_att)))
+  {
+    remove_field_of_type_from_extra<tx_receiver_old>(decrypted_att);
+    remove_field_of_type_from_extra<tx_payer_old>(decrypted_att);
+  }
+  if (is_watch_only() && !wti.is_income)
+  {
+    remove_field_of_type_from_extra<tx_comment>(decrypted_att);
+  }
   prepare_wti_decrypted_attachments(wti, decrypted_att);
   process_contract_info(wti, decrypted_att);
 }
@@ -2890,17 +2899,27 @@ uint64_t wallet2::get_transfer_entries_count()
   return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total)
+void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs)
 {
-  if (offset >= m_transfer_history.size())
+  if (!count || offset >= m_transfer_history.size())
     return;
 
   auto start = m_transfer_history.rbegin() + offset;
-  auto stop = m_transfer_history.size() - offset >= count ? start + count : m_transfer_history.rend();
-  if (!count) 
-    stop = m_transfer_history.rend();
-
-  trs.insert(trs.end(), start, stop);
+  for (auto it = m_transfer_history.rbegin() + offset; it != m_transfer_history.rend(); it++)
+  {
+    if (exclude_mining_txs)
+    {
+      if(it->is_mining)
+        continue;
+    }
+    trs.push_back(*it);
+    last_item_index = it - m_transfer_history.rbegin();
+    
+    if (trs.size() >= count)
+    {
+      break;
+    }
+  }
   total = m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
@@ -3223,10 +3242,16 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs)
+void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs)
 {
   for (auto& u : m_unconfirmed_txs)
+  {
+    if (exclude_mining_txs && u.second.is_mining)
+    {
+      continue;
+    }
     trs.push_back(u.second);
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::set_core_runtime_config(const currency::core_runtime_config& pc)
@@ -4163,8 +4188,8 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
       auto it = offers_local.find(h);
       if (it == offers_local.end())
       {
-        WLT_LOG_L3("Unable to find original tx record " << h << " in cancel offer " << h);
-        break;
+      WLT_LOG_L3("Unable to find original tx record " << h << " in cancel offer " << h);
+      break;
       }
       offers_local.erase(it);
 
@@ -4220,7 +4245,7 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
   WLT_LOG_GREEN("Selecting indices for transfer of " << print_money_brief(needed_money) << " with " << fake_outputs_count << " fake outs, found_free_amounts.size()=" << found_free_amounts.size() << "...", LOG_LEVEL_0);
   uint64_t found_money = 0;
   std::string selected_amounts_str;
-  while(found_money < needed_money && found_free_amounts.size())
+  while (found_money < needed_money && found_free_amounts.size())
   {
     auto it = found_free_amounts.lower_bound(needed_money - found_money);
     if (!(it != found_free_amounts.end() && it->second.size()))
@@ -4251,6 +4276,23 @@ bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_
     return true;
   }
   return false;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history)
+{
+  WLT_LOG_L0("Processing [wipeout_extra_if_needed]...");
+  for (auto it = transfer_history.begin(); it != transfer_history.end(); )
+  {
+    if (it->height > 638000)
+    {
+      it->remote_addresses.clear();
+      if (is_watch_only() && !it->is_income)
+      {
+        it->comment.clear();
+      }
+    }
+  }
+  WLT_LOG_L0("Processing [wipeout_extra_if_needed] DONE");
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count)

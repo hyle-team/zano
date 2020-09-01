@@ -147,6 +147,12 @@
       "TIME3": "1 heure",
       "TIME4": "Jamais"
     },
+    "SCALE": {
+      "75": "75% échelle",
+      "100": "100% échelle",
+      "125": "125% échelle",
+      "150": "150% échelle"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Mettre à jour le mot de passe principal",
       "OLD": "Ancien mot de passe",
