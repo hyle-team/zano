@@ -223,9 +223,9 @@ namespace tools
       }
 
       if (req.offset == 0)
-        m_wallet.get_unconfirmed_transfers(res.transfers);
+        m_wallet.get_unconfirmed_transfers(res.transfers, req.exclude_mining_txs);
       
-      m_wallet.get_recent_transfers_history(res.transfers, req.offset, req.count, res.total_transfers);
+      m_wallet.get_recent_transfers_history(res.transfers, req.offset, req.count, res.total_transfers, res.last_item_index, req.exclude_mining_txs);
 
       return true;
     }

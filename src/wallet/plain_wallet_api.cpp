@@ -187,7 +187,6 @@ namespace plain_wallet
 
     epee::static_helpers::set_or_call_on_destruct(true, static_destroy_handler);
 
-    std::cout << "[INIT PLAIN_WALLET_INSTANCE]" << ENDL;
     std::shared_ptr<plain_wallet_instance> ptr(new plain_wallet_instance());
 
     set_bundle_working_dir(working_dir);
@@ -208,12 +207,14 @@ namespace plain_wallet
     }
     
     ptr->gwm.set_use_deffered_global_outputs(true);
-    
+
     if(!ptr->gwm.start())
     {
       LOG_ERROR("Failed to start wallets_manager");
       return GENERAL_INTERNAL_ERRROR_INIT;
     }
+
+    LOG_PRINT_L0("[INIT PLAIN_WALLET_INSTANCE] Ver:" << PROJECT_VERSION_LONG << "(" << BUILD_TYPE << ")");
 
     std::string wallets_folder = get_wallets_folder();
     boost::system::error_code ec;
