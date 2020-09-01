@@ -81,6 +81,7 @@ export class BackendService {
           error_translate = 'ERRORS.NO_MONEY';
         }
         break;
+      case 'NOT_ENOUGH_OUTPUTS_FOR_MIXING':
       case 'INTERNAL_ERROR:not enough outputs to mix':
         error_translate = 'ERRORS.NOT_ENOUGH_OUTPUTS_TO_MIX';
         break;

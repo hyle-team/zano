@@ -73,19 +73,6 @@ namespace epee
 	gregexplock.get_lock().lock().unlock();\
 }
 
-// #define STATIC_REGEXP_EXPR_2(var_name, xpr_text, reg_exp_flags) \
-// 	static volatile uint32_t regexp_initialized_2 = 0;\
-// 	volatile uint32_t local_is_initialized_2 = regexp_initialized_2;\
-// 	if(!local_is_initialized_2)\
-// 	gregexplock.get_lock().lock().lock();\
-//   static const boost::regex	var_name(xpr_text , reg_exp_flags);\
-// 	if(!local_is_initialized_2)\
-// {\
-// 	boost::interprocess::ipcdetail::atomic_write32(&regexp_initialized_2, 1);\
-// 	gregexplock.get_lock().lock().unlock();\
-// }
-
-
 #define STATIC_REGEXP_EXPR_3(var_name, xpr_text, reg_exp_flags) \
 	static volatile uint32_t regexp_initialized_3 = 0;\
 	volatile uint32_t local_is_initialized_3 = regexp_initialized_3;\

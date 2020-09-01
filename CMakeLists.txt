@@ -55,7 +55,7 @@ if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10.5)          
 endif()
 
-set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers for MSVC")
+set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
 
 include_directories(src contrib/eos_portable_archive contrib contrib/epee/include "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
 
@@ -153,7 +153,8 @@ else()
     set(DEBUG_FLAGS "-g3 -O0")
   endif()
   set(RELEASE_FLAGS "-Ofast -DNDEBUG -Wno-unused-variable")
-  if(NOT APPLE)
+
+  if(NOT APPLE AND NOT (CMAKE_SYSTEM_NAME STREQUAL "Android"))
     set(RELEASE_FLAGS "${RELEASE_FLAGS} -flto")
   endif()
   #if(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT MINGW)

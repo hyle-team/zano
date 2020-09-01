@@ -923,7 +923,7 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   //          +-----------------------+
   //          |                      tx_0                                tx_0 spends all outputs in blk_1 (main chain)
   // (0 )-   (1 )-...(1r)-   (2 )-   (3 )-...(3r)-   (4 )-   (5 )-       <- main chain
-  //           |        \
+  //           |        \ 
   //           |         \-  (2a)-                                       <- alt chain
   //           +--------------+                                          PoS block 2a uses stake already spent in main chain
 
@@ -941,7 +941,7 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   //          +-----------------------+
   //          |                      tx_0                                tx_0 spends all outputs in blk_1 (main chain)
   // (0 )-   (1 )-...(1r)-   (2 )-   (3 )-...(3r)-   (4 )-   (5 )-       <- main chain
-  //          ||        \
+  //          ||        \ 
   //          ||         \-  (2a)-   #3a#-                               <- alt chain
   //          |+--------------+       |                                  PoS block 2a uses stake already spent in main chain (okay)
   //          +-----------------------+                                  PoS block 3a uses stake already spent in current alt chain (fail)
@@ -962,11 +962,11 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   //          +-----------------------+
   //          |                      tx_0                                        tx_0 spends all outputs in blk_1 (main chain)
   // (0 )-   (1 )-...(1r)-   (2 )-   (3 )- ........  (3r)-   (4 )-   (5 )-       <- main chain
-  //          ||        \
+  //          ||        \ 
   //          ||         \-  (2a)-   #3a#-                                       <- alt chain
   //          |+--------------+ \     |                                          PoS block 2a uses stake already spent in main chain (okay)
   //          +---------------|-------+                                          PoS block 3a uses stake already spent in current alt chain (fail)
-  //                          |   \
+  //                          |   \ 
   //                          |    \ ...... (2br)-   (3b)-                       <- alt chain
   //                          |                       |
   //                          +-----------------------+                          PoS block 3b uses as stake an output, created in current alt chain (2a)
@@ -989,7 +989,7 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   //          ||         \-  (2a)-   #3a#-                 |                     <- alt chain
   //          |+--------------+ \     |                    \                     PoS block 2a uses stake already spent in main chain (okay)
   //          +---------------|-------+                     \                    PoS block 3a uses stake already spent in current alt chain (fail)
-  //                          |   \                          \
+  //                          |   \                          \ 
   //                          |    \ ...... (2br)-   (3b)-   #4b#                <- alt chain
   //                          |                       |
   //                          +-----------------------+                          PoS block 3b uses as stake an output, created in current alt chain (2a)

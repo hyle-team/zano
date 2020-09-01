@@ -2,38 +2,52 @@
 #   cmake_policy(SET CMP0043 OLD)
 # endif()
 
-###########
-# using shared PCH -- this is unusual case for MSVC... so mystery, such hack, many wow. See also: https://stackoverflow.com/questions/645747/sharing-precompiled-headers-between-projects-in-visual-studio/4170902#4170902
+#####  Precompiled Headers  ######
 # define USE_PCH to YES for using precomiled headers
-
-MACRO(INIT_SHARED_PCH pch_cpp_file)
-  IF(MSVC AND USE_PCH)
-    set_property(SOURCE ${pch_cpp_file} APPEND_STRING PROPERTY COMPILE_FLAGS " /Fo$(OutDir) /Z7 /Fd$(OutDir)vc$(PlatformToolsetVersion).pdb /Ycstdafx.h /Fp$(TargetDir)pch.pch")
-  ENDIF(MSVC AND USE_PCH)
+# Windows: using custom-made shared PCH -- this is unusual case for MSVC... so mystery, such hack, many wow. See also: https://stackoverflow.com/questions/645747/sharing-precompiled-headers-between-projects-in-visual-studio/4170902#4170902
+# Linux: using CMake-enabled shared PCH (which appeared in CMake 3.16)
+MACRO(INIT_SHARED_PCH)
+  IF(USE_PCH)
+    MESSAGE( STATUS " ...... enabling precompiled headers, making new library: pch" )
+    add_library(pch ${PCH})
+    set(PCH_LIB_NAME pch)
+    IF(MSVC)
+      set_property(SOURCE "pch/stdafx.cpp" APPEND_STRING PROPERTY COMPILE_FLAGS " /Fo$(OutDir) /Z7 /Fd$(OutDir)vc$(PlatformToolsetVersion).pdb /Ycstdafx.h /Fp$(TargetDir)pch.pch")
+    ELSEIF(APPLE OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      target_precompile_headers(pch PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/pch/stdafx.h")
+    ENDIF()
+  ENDIF(USE_PCH)
 ENDMACRO(INIT_SHARED_PCH)
 
-MACRO(ENABLE_SHARED_PCH sources_var)
-  IF(MSVC AND USE_PCH)
-    MESSAGE( STATUS " ...... enabling precompiled headers for: " ${sources_var} )
-    SET(precompiled_binary "$(TargetDir)pch.pch")
-    SET(precompiled_header "${CMAKE_CURRENT_SOURCE_DIR}/pch/stdafx.h")
-    SET(sources ${${sources_var}})
-    foreach(src ${sources})
-      if(NOT ${src} MATCHES "\\.rc$") # skip *.rc files
-        SET_SOURCE_FILES_PROPERTIES(${src}
-                                PROPERTIES COMPILE_FLAGS "/Z7 /Fd$(OutDir)vc$(PlatformToolsetVersion).pdb /Yu\"${precompiled_header}\" /FI\"${precompiled_header}\" /Fp\"${precompiled_binary}\""
-                                           OBJECT_DEPENDS "${precompiled_binary}")
-      endif()
-    endforeach()
-  ENDIF(MSVC AND USE_PCH)
+MACRO(ENABLE_SHARED_PCH target sources_var)
+  IF(USE_PCH)
+    IF(MSVC)
+      MESSAGE( STATUS " ...... enabling precompiled headers for: " ${sources_var} )
+      SET(precompiled_binary "$(TargetDir)pch.pch")
+      SET(precompiled_header "${CMAKE_CURRENT_SOURCE_DIR}/pch/stdafx.h")
+      SET(sources ${${sources_var}})
+      foreach(src ${sources})
+        if(NOT ${src} MATCHES "\\.rc$") # skip *.rc files
+          SET_SOURCE_FILES_PROPERTIES(${src}
+                                  PROPERTIES COMPILE_FLAGS "/Z7 /Fd$(OutDir)vc$(PlatformToolsetVersion).pdb /Yu\"${precompiled_header}\" /FI\"${precompiled_header}\" /Fp\"${precompiled_binary}\""
+                                             OBJECT_DEPENDS "${precompiled_binary}")
+        endif()
+      endforeach()
+    ELSEIF(APPLE OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      MESSAGE( STATUS " ...... enabling precompiled headers for: " ${target} )
+      target_precompile_headers(${target} REUSE_FROM pch)
+    ENDIF()
+  ENDIF(USE_PCH)
 ENDMACRO(ENABLE_SHARED_PCH)
 
 MACRO(ENABLE_SHARED_PCH_EXECUTABLE target)
-  IF(MSVC AND USE_PCH)
-    SET_TARGET_PROPERTIES(${target} PROPERTIES LINK_FLAGS "$(OutDir)stdafx.obj")
-  ENDIF(MSVC AND USE_PCH)
+  IF(USE_PCH)
+    IF(MSVC)
+      SET_TARGET_PROPERTIES(${target} PROPERTIES LINK_FLAGS "$(OutDir)stdafx.obj")
+    ENDIF()
+  ENDIF(USE_PCH)
 ENDMACRO(ENABLE_SHARED_PCH_EXECUTABLE)
-###########
+#####  End of Precompiled Headers macros  ######
 
 
 
@@ -82,15 +96,11 @@ if(BUILD_GUI)
 endif()
 
 
-if (USE_PCH)
-  add_library(pch ${PCH})
-  set(PCH_LIB_NAME pch)
-endif()
-INIT_SHARED_PCH("pch/stdafx.cpp")
+INIT_SHARED_PCH()
 
 add_library(common ${COMMON})
 add_dependencies(common version ${PCH_LIB_NAME})
-ENABLE_SHARED_PCH(COMMON)
+ENABLE_SHARED_PCH(common COMMON)
 
 if(NOT MSVC AND NOT APPLE AND NOT CLANG)  # TODO(unassigned): do we really need the clang equivalent?
    target_compile_options(common PRIVATE -fno-var-tracking-assignments)
@@ -100,7 +110,7 @@ add_library(crypto ${CRYPTO})
 
 add_library(currency_core ${CURRENCY_CORE})
 add_dependencies(currency_core version  ${PCH_LIB_NAME})
-ENABLE_SHARED_PCH(CURRENCY_CORE)
+ENABLE_SHARED_PCH(currency_core CURRENCY_CORE)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Android" )
   add_library(wallet  ${WALLET})
@@ -109,7 +119,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Android" )
 else()
   add_library(wallet ${WALLET})
   add_dependencies(wallet version ${PCH_LIB_NAME})
-  ENABLE_SHARED_PCH(WALLET)
+  ENABLE_SHARED_PCH(wallet WALLET)
 endif()
 
 
@@ -129,11 +139,11 @@ endif()
 
 add_library(rpc ${RPC})
 add_dependencies(rpc version ${PCH_LIB_NAME})
-ENABLE_SHARED_PCH(RPC)
+ENABLE_SHARED_PCH(rpc RPC)
 
 add_library(stratum ${STRATUM})
 add_dependencies(stratum version ${PCH_LIB_NAME})
-ENABLE_SHARED_PCH(STRATUM)
+ENABLE_SHARED_PCH(stratum STRATUM)
 
 
 target_link_libraries(currency_core lmdb mdbx)
@@ -141,19 +151,19 @@ target_link_libraries(currency_core lmdb mdbx)
 add_executable(daemon ${DAEMON} ${P2P} ${CURRENCY_PROTOCOL})
 add_dependencies(daemon version)
   target_link_libraries(daemon rpc stratum currency_core crypto common libminiupnpc-static zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-ENABLE_SHARED_PCH(DAEMON)
+ENABLE_SHARED_PCH(daemon DAEMON)
 ENABLE_SHARED_PCH_EXECUTABLE(daemon)
                      
 add_executable(connectivity_tool ${CONN_TOOL})
 add_dependencies(connectivity_tool version)
 target_link_libraries(connectivity_tool currency_core crypto common zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-ENABLE_SHARED_PCH(CONN_TOOL)
+ENABLE_SHARED_PCH(connectivity_tool CONN_TOOL)
 ENABLE_SHARED_PCH_EXECUTABLE(connectivity_tool)
 
 add_executable(simplewallet ${SIMPLEWALLET})
 add_dependencies(simplewallet version)
 target_link_libraries(simplewallet wallet rpc currency_core crypto common zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-ENABLE_SHARED_PCH(SIMPLEWALLET)
+ENABLE_SHARED_PCH(simplewallet SIMPLEWALLET)
 ENABLE_SHARED_PCH_EXECUTABLE(simplewallet)
 
 set_property(TARGET common crypto currency_core rpc stratum wallet PROPERTY FOLDER "libs")
@@ -170,7 +180,7 @@ if(BUILD_GUI)
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
   SET(MACOSX_BUNDLE_ICON_FILE app.icns)
   add_executable(Zano WIN32 MACOSX_BUNDLE ${QTDAEMON} )
-  ENABLE_SHARED_PCH(QTDAEMON)
+  ENABLE_SHARED_PCH(Zano QTDAEMON)
   ENABLE_SHARED_PCH_EXECUTABLE(Zano)
 	  
   QT5_USE_MODULES(Zano WebEngineWidgets WebChannel)
