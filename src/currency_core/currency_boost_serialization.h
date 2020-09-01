@@ -252,7 +252,7 @@ namespace boost
     }
 
     template <class Archive>
-    inline void serialize(Archive &a, currency::etc_tx_uint16_t&at, const boost::serialization::version_type ver)
+    inline void serialize(Archive &a, currency::etc_tx_flags16_t&at, const boost::serialization::version_type ver)
     {
       a & at.v;
     }

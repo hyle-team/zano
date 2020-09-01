@@ -97,13 +97,13 @@ public:
   bool quick_clear_wallets_no_save();
   bool send_stop_signal();
   bool get_opened_wallets(std::list<view::open_wallet_response>& result);
-  std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr);
+  std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr, bool exclude_mining_txs = false);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr);
   std::string invoke(uint64_t wallet_id, std::string params);
   std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);
-  std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist);
+  std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist, bool exclude_mining_txs = false);
   std::string get_wallet_info(size_t wallet_id, view::wallet_info& wi);
   std::string get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts);
   std::string create_proposal(const view::create_proposal_param_gui& cpp);
