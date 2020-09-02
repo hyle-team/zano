@@ -113,26 +113,6 @@ export class AssignAliasComponent implements OnInit, OnDestroy {
   back() {
     this.location.back();
   }
-  //
-  // addTest() {
-  //   if (!this.assignForm.controls.name.value) {
-  //     const x = '@' + this.assignForm.controls.name.value
-  //     this.assignForm.controls.name.setValue(x);
-  //   }
-  // }
-  //
-  // aliasTest(e) {
-  //   console.log('aaaa', e);
-  //   console.log('assignForm.name', this.assignForm.controls.name.value);
-  //   console.log('assignForm.name length', this.assignForm.controls.name.value.length);
-  //   if(e.target.value[0] !== '@') {
-  //     e.preventDefault();
-  //   }
-  //   if (!this.assignForm.controls.name.value) {
-  //     this.addTest();
-  //   }
-  //   console.log('assignForm.name !!!!', this.assignForm.controls.name.value);
-  // }
 
   ngOnDestroy() {
     this.assignFormSubscription.unsubscribe();
