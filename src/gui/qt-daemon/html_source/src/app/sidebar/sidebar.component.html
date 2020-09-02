@@ -111,7 +111,7 @@
     </div>
   </ng-template>
 </div>
-<div class="sidebar-synchronization-status" [ngStyle]="{'align-items': variablesService.daemon_state === 1 || variablesService.daemon_state === 6 ? 'flex-start' : 'center'}">
+<div class="synchronization-status" [ngStyle]="{'align-items': variablesService.daemon_state === 1 || variablesService.daemon_state === 6 ? 'flex-start' : 'center'}">
   <div class="status-container">
     <span class="offline" *ngIf="variablesService.daemon_state === 0">
       {{ 'SIDEBAR.SYNCHRONIZATION.OFFLINE' | translate }}
