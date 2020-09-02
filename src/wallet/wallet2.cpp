@@ -4281,7 +4281,7 @@ bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_
 void wallet2::wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history)
 {
   WLT_LOG_L0("Processing [wipeout_extra_if_needed]...");
-  for (auto it = transfer_history.begin(); it != transfer_history.end(); )
+  for (auto it = transfer_history.begin(); it != transfer_history.end(); it++ )
   {
     if (it->height > 638000)
     {
