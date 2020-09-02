@@ -195,7 +195,7 @@
   "ASSIGN_ALIAS": {
     "NAME": {
       "LABEL": "Alias",
-      "PLACEHOLDER": "@ Enter alias",
+      "PLACEHOLDER": " Enter alias",
       "TOOLTIP": "An alias is a shortened form or your account. An alias can only include Latin letters, numbers and characters “.” and “-”. It must start with “@”."
     },
     "COMMENT": {
@@ -207,7 +207,7 @@
     "BUTTON_ASSIGN": "Assign",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
-      "NAME_WRONG": "Alias has wrong name",
+      "NAME_WRONG": "Invalid name: allowed symbols \"0-9\", \"a-z\", \"-\", \".\"",
       "NAME_LENGTH": "The alias must be 6-25 characters long",
       "NAME_EXISTS": "Alias name already exists",
       "NO_MONEY": "You do not have enough funds to assign this alias",
