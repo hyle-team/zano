@@ -8,7 +8,7 @@ description: |
   and flexibility a perfect option for P2P transactions.
   More info: http://zano.org
 grade: devel
-confinement: devmode
+confinement: strict
 
 architectures:
   - build-on: amd64
