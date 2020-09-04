@@ -32,6 +32,13 @@
     return API_RETURN_CODE_WALLET_WRONG_ID; \
   auto& name = it->second.w;
 
+#define GET_WALLET_OPTIONS_BY_ID_VOID_RET(wallet_id, name)       \
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    \
+  auto it = m_wallets.find(wallet_id);      \
+  if (it == m_wallets.end())                \
+    return; \
+  auto& name = it->second;
+
 #ifdef MOBILE_WALLET_BUILD
   #define DAEMON_IDLE_UPDATE_TIME_MS        10000
   #define TX_POOL_SCAN_INTERVAL             5
@@ -1763,12 +1770,15 @@ void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const 
 }
 
 void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
-{
+{  
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
   tei.balance = balance;
   tei.unlocked_balance = unlocked_balance;
   tei.wallet_id = wallet_id;
+
+  GET_WALLET_OPTIONS_BY_ID_VOID_RET(wallet_id, w);
+  tei.is_wallet_in_sync_process = w.long_refresh_in_progress;
   m_pview->money_transfer(tei);
 }
 void wallets_manager::on_pos_block_found(size_t wallet_id, const currency::block& b)
