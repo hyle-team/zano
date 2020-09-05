@@ -14,9 +14,6 @@ architectures:
   - build-on: amd64
   - build-on: i386
 
-environment:
-  LC_ALL: C
-
 parts:
   zano:
     source: https://github.com/hyle-team/zano.git
@@ -59,6 +56,11 @@ apps:
     plugs:
       - network
       - home
+      - desktop
+      - opengl #for QML support
+      - browser-support #for Qt WebEngine support
+      - audio-playback
+      - unity7 #for tray icon support
   simplewallet:
     command: opt/Zano/simplewallet
     plugs:
@@ -66,6 +68,8 @@ apps:
       - home
   zanod:
     command: opt/Zano/zanod --data-dir $SNAP_USER_COMMON
+    environment:
+      LC_ALL: C
     plugs:
       - network
       - network-bind
