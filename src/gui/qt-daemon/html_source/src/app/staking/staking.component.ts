@@ -91,7 +91,7 @@ export class StakingComponent implements OnInit, OnDestroy {
 
   constructor(
     private route: ActivatedRoute,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private backend: BackendService,
     private ngZone: NgZone,
     private intToMoneyPipe: IntToMoneyPipe,

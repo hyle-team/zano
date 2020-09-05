@@ -14,6 +14,7 @@ import { ActivatedRoute } from '@angular/router';
 export class AddContactsComponent implements OnInit, OnDestroy {
   id: number;
   queryRouting;
+  isModalDialogVisible;
   addContactForm = new FormGroup({
     address: new FormControl('', [
       Validators.required,

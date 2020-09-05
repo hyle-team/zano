@@ -33,7 +33,7 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone,
     private translate: TranslateService
