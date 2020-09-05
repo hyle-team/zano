@@ -14,7 +14,7 @@ export class ContactsComponent implements OnInit {
 
   constructor(
     private location: Location,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private backend: BackendService
   ) {}
 
