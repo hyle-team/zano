@@ -101,7 +101,7 @@ export class LoginComponent implements OnInit, OnDestroy {
                  this.variablesService.startCountdown();
                }
               this.ngZone.run(() => {
-                this.router.navigate(['/']);
+                this.router.navigate(['/'], {queryParams: {prevUrl: 'login'}});
               });
            }
          });
@@ -232,6 +232,9 @@ export class LoginComponent implements OnInit, OnDestroy {
     });
   }
 
+  getUpdate() {
+    this.backend.openUrlInBrowser('zano.org/downloads.html');
+  }
 
   ngOnDestroy() {
     this.queryRouting.unsubscribe();

@@ -24,6 +24,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
   isModalDialogVisible = false;
   closeWalletId: number;
 
+  menuItemHovered: boolean;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -60,6 +62,19 @@ export class SidebarComponent implements OnInit, OnDestroy {
       }
     });
   }
+
+  goMainPage() {
+    if (this.route.snapshot.queryParams && this.route.snapshot.queryParams.prevUrl === 'login') {
+      this.ngZone.run(() => {
+        this.router.navigate(['/'], {queryParams: {prevUrl: 'login'}});
+      });
+    } else {
+      this.ngZone.run(() => {
+        this.router.navigate(['/']);
+      });
+    }
+
+  };
 
   contactsRoute() {
     if (this.variablesService.appPass) {

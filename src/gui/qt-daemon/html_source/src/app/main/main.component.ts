@@ -2,7 +2,7 @@ import {Component, NgZone, OnInit} from '@angular/core';
 import {Location} from '@angular/common';
 import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
-import {Router} from '@angular/router';
+import {ActivatedRoute, Router} from '@angular/router';
 import {TranslateService} from '@ngx-translate/core';
 
 @Component({
@@ -12,17 +12,23 @@ import {TranslateService} from '@ngx-translate/core';
 })
 export class MainComponent implements OnInit {
 
+  public prevUrl: string = '';
+
   constructor(
+    private route: ActivatedRoute,
     private router: Router,
     private location: Location,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private ngZone: NgZone,
     private translate: TranslateService
   ) {
   }
 
   ngOnInit() {
+    if (this.route.snapshot.queryParams && this.route.snapshot.queryParams.prevUrl) {
+      this.prevUrl = this.route.snapshot.queryParams.prevUrl;
+    }
   }
 
   openWallet() {

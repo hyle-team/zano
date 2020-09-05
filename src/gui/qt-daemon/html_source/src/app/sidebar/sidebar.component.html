@@ -1,6 +1,6 @@
 <div class="sidebar-accounts">
   <div class="sidebar-accounts-header">
-    <h3>{{ 'SIDEBAR.TITLE' | translate }}</h3><button [routerLink]="['main']">{{ 'SIDEBAR.ADD_NEW' | translate }}</button>
+    <h3>{{ 'SIDEBAR.TITLE' | translate }}</h3><button (click)="goMainPage()">{{ 'SIDEBAR.ADD_NEW' | translate }}</button>
   </div>
   <div class="sidebar-accounts-list scrolled-content">
     <div class="sidebar-account" *ngFor="let wallet of variablesService.wallets" [class.active]="wallet?.wallet_id === walletActive" [routerLink]="['/wallet/' + wallet.wallet_id + '/history']">
@@ -12,7 +12,7 @@
             Watch-only
         </div>
         <div class="content auditable-watch-only" *ngIf="wallet.is_auditable && wallet.is_watch_only">
-            Tracking
+            Auditable Watch-Only
         </div>
       </div>
       <div class="close-wallet-wrapper">
@@ -28,7 +28,7 @@
         <div class="name">
           <span tooltip="{{wallet.alias['name']}}" placement="top-left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [showWhenNoOverflow]="false">{{wallet.alias['name']}}</span>
           <ng-container *ngIf="wallet.alias['comment'] && wallet.alias['comment'].length">
-            <i class="icon comment" tooltip="{{wallet.alias['comment']}}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500"></i>
+            <span class="icon comment" tooltip="{{wallet.alias['comment']}}" placement="top" tooltipClass="table-tooltip account-tooltip" [delay]="500">i</span>
           </ng-container>
         </div>
         <span class="price">$ {{wallet.getMoneyEquivalent(variablesService.moneyEquivalent) | intToMoney | number : '1.2-2'}}</span>
@@ -111,7 +111,7 @@
     </div>
   </ng-template>
 </div>
-<div class="sidebar-synchronization-status" [ngStyle]="{'align-items': variablesService.daemon_state === 1 || variablesService.daemon_state === 6 ? 'flex-start' : 'center'}">
+<div class="synchronization-status" [ngStyle]="{'align-items': variablesService.daemon_state === 1 || variablesService.daemon_state === 6 ? 'flex-start' : 'center'}">
   <div class="status-container">
     <span class="offline" *ngIf="variablesService.daemon_state === 0">
       {{ 'SIDEBAR.SYNCHRONIZATION.OFFLINE' | translate }}

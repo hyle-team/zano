@@ -147,6 +147,12 @@
       "TIME3": "1 heure",
       "TIME4": "Jamais"
     },
+    "SCALE": {
+      "75": "75% échelle",
+      "100": "100% échelle",
+      "125": "125% échelle",
+      "150": "150% échelle"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Mettre à jour le mot de passe principal",
       "OLD": "Ancien mot de passe",
@@ -194,7 +200,7 @@
   "ASSIGN_ALIAS": {
     "NAME": {
       "LABEL": "Alias",
-      "PLACEHOLDER": "@ Entrer l'alias",
+      "PLACEHOLDER": " Entrer l'alias",
       "TOOLTIP": "Un alias est une forme abréviée pour votre compte. Un alias ne peut inclure que des lettres, des chiffres et des caractères latins « » et « - ». Il doit commencer par « @ »."
     },
     "COMMENT": {
@@ -206,7 +212,7 @@
     "BUTTON_ASSIGN": "Assigner",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Le nom est requis",
-      "NAME_WRONG": "L'alias a un nom incorrect",
+      "NAME_WRONG": "Nom invalide: symboles autorisés \"0-9\", \"a-z\", \"-\", \".\"",
       "NAME_LENGTH": "L'alias doit contenir 6-25 caractères",
       "NAME_EXISTS": "Alias déjà existant",
       "NO_MONEY": "Vous n'avez pas assez de fonds pour assigner cet alias",
