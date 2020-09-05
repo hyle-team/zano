@@ -941,9 +941,9 @@ QString MainWindow::set_localization_strings(const QString param)
   else
   {
     m_localization = lr.strings;
-    m_quit_action->setText(QString().fromUtf8(m_localization[localization_id_quit].c_str()));
-    m_restore_action->setText(QString().fromUtf8(m_localization[localization_id_tray_menu_show].c_str()));
-    m_minimize_action->setText(QString().fromUtf8(m_localization[localization_id_tray_menu_minimize].c_str()));
+    m_quit_action->setText(QString::fromStdString(m_localization[localization_id_quit]));
+    m_restore_action->setText(QString::fromStdString(m_localization[localization_id_tray_menu_show]));
+    m_minimize_action->setText(QString::fromStdString(m_localization[localization_id_tray_menu_minimize]));
     resp.error_code = API_RETURN_CODE_OK;
     LOG_PRINT_L0("New localization set, language title: " << lr.language_title << ", strings " << lr.strings.size());
   }
