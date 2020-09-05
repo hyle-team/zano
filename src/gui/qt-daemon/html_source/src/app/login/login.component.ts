@@ -232,6 +232,9 @@ export class LoginComponent implements OnInit, OnDestroy {
     });
   }
 
+  getUpdate() {
+    this.backend.openUrlInBrowser('zano.org/downloads.html');
+  }
 
   ngOnDestroy() {
     this.queryRouting.unsubscribe();

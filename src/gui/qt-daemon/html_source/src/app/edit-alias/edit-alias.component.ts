@@ -23,7 +23,7 @@ export class EditAliasComponent implements OnInit {
     private location: Location,
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone
   ) {}

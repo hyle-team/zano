@@ -24,6 +24,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
   isModalDialogVisible = false;
   closeWalletId: number;
 
+  menuItemHovered: boolean;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
