@@ -155,6 +155,7 @@ void wallet2::init(const std::string& daemon_address)
 {
   m_miner_text_info = PROJECT_VERSION_LONG;
   m_core_proxy->set_connection_addr(daemon_address);
+  m_core_proxy->check_connection();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
