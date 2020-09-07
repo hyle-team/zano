@@ -7,8 +7,8 @@ description: |
   The technology behind our blockchain provides reliability, security,
   and flexibility a perfect option for P2P transactions.
   More info: http://zano.org
-grade: devel
-confinement: devmode
+grade: stable
+confinement: strict
 
 architectures:
   - build-on: amd64
