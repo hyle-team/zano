@@ -160,7 +160,9 @@
       cursor: pointer;
       padding: 0 1rem;
       height: 5rem;
-
+      &.hide {
+        display: none;
+      }
       .animated {
         display: flex;
         justify-content: center;

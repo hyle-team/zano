@@ -32,7 +32,7 @@
 <div class="tabs">
   <div class="tabs-header">
     <ng-container *ngFor="let tab of tabs; let index = index">
-      <div class="tab" [class.active]="tab.active"
+      <div class="tab" [class.active]="tab.active" [ngClass]="{ 'hide': ((tab.link === '/send' || tab.link === '/contracts') && variablesService.currentWallet.is_watch_only && variablesService.currentWallet.is_auditable) }"
            [class.disabled]="((tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && (variablesService.daemon_state !== 2 || !variablesService.currentWallet.loaded))
                 || ((tab.link === '/send' || tab.link === '/contracts') && variablesService.currentWallet.is_watch_only && variablesService.currentWallet.is_auditable)"
            (click)="changeTab(index)" (mouseover)="itemHovered(index, true)" (mouseleave)="itemHovered(index, false)">
