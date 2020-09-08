@@ -19,13 +19,13 @@ if [ -n "$build_prefix" ]; then
   build_prefix_label="$build_prefix "
 fi
 
-if [ -n "$testnet" ]; then
+if [ "$testnet" == true ]; then
   testnet_def="-D TESTNET=TRUE"
   testnet_label="testnet "
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
 fi
 
-if [ -n "$testnet" ] || [ -n "$qt_dev_tools" ]; then
+if [ "$testnet" == true ] || [ -n "$qt_dev_tools" ]; then
   copy_qt_dev_tools=true
   copy_qt_dev_tools_label="devtools "
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}devtools-
