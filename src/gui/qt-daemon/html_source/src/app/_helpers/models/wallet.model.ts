@@ -14,6 +14,7 @@ export class Wallet {
   tracking_hey: string;
   is_auditable: boolean;
   is_watch_only: boolean;
+  exclude_mining_txs: boolean;
   alias_available: boolean;
 
   alias?: object;

@@ -32,7 +32,7 @@
 <div class="tabs">
   <div class="tabs-header">
     <ng-container *ngFor="let tab of tabs; let index = index">
-      <div class="tab" [class.active]="tab.active"
+      <div class="tab" [class.active]="tab.active" [ngClass]="{ 'hide': ((tab.link === '/send' || tab.link === '/contracts') && variablesService.currentWallet.is_watch_only && variablesService.currentWallet.is_auditable) }"
            [class.disabled]="((tab.link === '/send' || tab.link === '/contracts' || tab.link === '/staking') && (variablesService.daemon_state !== 2 || !variablesService.currentWallet.loaded))
                 || ((tab.link === '/send' || tab.link === '/contracts') && variablesService.currentWallet.is_watch_only && variablesService.currentWallet.is_auditable)"
            (click)="changeTab(index)" (mouseover)="itemHovered(index, true)" (mouseleave)="itemHovered(index, false)">
@@ -50,12 +50,26 @@
   </div>
   <div *ngIf="activeTab === 'history'" class="pagination-wrapper">
     <div class="pagination">
+      <div>
         <button [disabled]="variablesService.currentWallet.currentPage === 1" (click)="setPage(variablesService.currentWallet.currentPage - 1)"><</button>
-        <ng-container *ngFor="let page of variablesService.currentWallet.pages">
-          <button [ngClass]="{ 'active': variablesService.currentWallet.currentPage === page }"
-          (click)="setPage(page)">{{page}}</button>
+        <ng-container *ngIf="!mining">
+          <button *ngFor="let page of variablesService.currentWallet.pages" [ngClass]="{ 'active': variablesService.currentWallet.currentPage === page }"
+                  (click)="setPage(page)">{{page}}</button>
+        </ng-container>
+        <ng-container *ngIf="mining">
+          <button [ngClass]="{ 'active': variablesService.currentWallet.currentPage }"
+                  (click)="setPage(variablesService.currentWallet.currentPage)">{{variablesService.currentWallet.currentPage}}</button>
         </ng-container>
         <button [disabled]="variablesService.currentWallet.currentPage === variablesService.currentWallet.totalPages" (click)="setPage(variablesService.currentWallet.currentPage + 1)">></button>
+      </div>
+      <div class="mining-transaction-switch">
+        <span class="switch-text">Hide mining transactions</span>
+        <div class="switch" (click)="toggleMiningTransactions(); $event.stopPropagation()">
+          <span class="option" *ngIf="mining">{{ 'STAKING.SWITCH.ON' | translate }}</span>
+          <span class="circle" [class.on]="mining" [class.off]="!mining"></span>
+          <span class="option" *ngIf="!mining">{{ 'STAKING.SWITCH.OFF' | translate }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
