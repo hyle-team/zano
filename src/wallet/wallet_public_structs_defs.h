@@ -275,11 +275,13 @@ namespace wallet_public
       of GET_RECENT_TXS_AND_INFO with offsets)
       */
       bool update_provision_info;  
+      bool exclude_mining_txs;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(offset)
         KV_SERIALIZE(count)
         KV_SERIALIZE(update_provision_info)
+        KV_SERIALIZE(exclude_mining_txs)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -288,11 +290,13 @@ namespace wallet_public
       wallet_provision_info pi;
       std::vector<wallet_transfer_info> transfers;
       uint64_t total_transfers;
+      uint64_t last_item_index;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(pi)
         KV_SERIALIZE(transfers)
         KV_SERIALIZE(total_transfers)
+        KV_SERIALIZE(last_item_index)
       END_KV_SERIALIZE_MAP()
     };
   };

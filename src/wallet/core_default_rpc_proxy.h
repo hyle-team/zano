@@ -73,11 +73,11 @@ namespace tools
 
       if (ret)
       {
-        m_last_success_interract_time = time(nullptr);
-        *m_plast_daemon_is_disconnected = false;
+        m_pdiganostic_info->last_success_interract_time = time(nullptr);
+        m_pdiganostic_info->last_daemon_is_disconnected = false;
       }
       else
-        *m_plast_daemon_is_disconnected = true;
+        m_pdiganostic_info->last_daemon_is_disconnected = true;
       return ret;
     }
 
@@ -128,15 +128,13 @@ namespace tools
     //------------------------------------------------------------------------------------------------------------------------------
     virtual time_t get_last_success_interract_time() override
     {
-      return m_last_success_interract_time;
+      return m_pdiganostic_info->last_success_interract_time;
     }
 
     epee::critical_section m_lock;
     epee::net_utils::http::http_simple_client m_http_client;
     std::string m_daemon_address;
-    std::atomic<time_t> m_last_success_interract_time;
-    std::atomic<bool> *m_plast_daemon_is_disconnected;
-    std::atomic<bool> m_last_daemon_is_disconnected_stub;
+
     unsigned int m_connection_timeout;
     size_t m_attempts_count;
 

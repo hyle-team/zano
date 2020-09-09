@@ -146,8 +146,8 @@ namespace tools
     bool r = m_http_client.connect(u.host, std::to_string(u.port), m_connection_timeout);
     if (r)
     {
-      *m_plast_daemon_is_disconnected = false;
-      m_last_success_interract_time = time(nullptr);
+      m_pdiganostic_info->last_daemon_is_disconnected = false;
+      m_pdiganostic_info->last_success_interract_time = time(nullptr);
     }
     return r;
   }
@@ -178,11 +178,11 @@ namespace tools
     return tools::get_transfer_address(adr_str, addr, payment_id, this);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  void default_http_core_proxy::set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected)
-  {
-    CRITICAL_REGION_LOCAL(m_lock);
-    m_plast_daemon_is_disconnected = plast_daemon_is_disconnected ? plast_daemon_is_disconnected : &m_last_daemon_is_disconnected_stub;
-  }
+//   void default_http_core_proxy::set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected)
+//   {
+//     CRITICAL_REGION_LOCAL(m_lock);
+//     m_plast_daemon_is_disconnected = plast_daemon_is_disconnected ? plast_daemon_is_disconnected : &m_last_daemon_is_disconnected_stub;
+//   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::set_connectivity(unsigned int connection_timeout, size_t repeats_count)
   {
@@ -191,8 +191,8 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  default_http_core_proxy::default_http_core_proxy() :m_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected_stub),
-    m_last_success_interract_time(0),
+  default_http_core_proxy::default_http_core_proxy(): //:m_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected_stub),
+    //m_last_success_interract_time(0),
     m_connection_timeout(WALLET_RCP_CONNECTION_TIMEOUT),
     m_attempts_count(WALLET_RCP_COUNT_ATTEMNTS)
   {

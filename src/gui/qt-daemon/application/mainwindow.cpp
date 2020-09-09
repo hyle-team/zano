@@ -405,8 +405,8 @@ bool MainWindow::init(const std::string& html_path)
   }
 
   //----
-  //this->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
-  //m_view->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
+  this->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
+  m_view->setContextMenuPolicy(Qt::ContextMenuPolicy::NoContextMenu);
 
   return true;
   CATCH_ENTRY2(false);
@@ -826,6 +826,11 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
 //don't show unconfirmed tx
   if (tei.ti.height == 0)
     return true;
+  if (tei.is_wallet_in_sync_process)
+  {
+    //don't show notification if it long sync process(mmight cause system freeze)
+    return true;
+  }
 
   auto amount_str = currency::print_money(tei.ti.amount);
   std::string title, msg;
@@ -1651,7 +1656,7 @@ QString MainWindow::open_wallet(const QString& param)
   //return que_call2<view::open_wallet_request>("open_wallet", param, [this](const view::open_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::open_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
-  ar.error_code = m_backend.open_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.txs_to_return, ar.response_data);
+  ar.error_code = m_backend.open_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.txs_to_return, ar.response_data, owd.exclude_mining_txs);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1795,7 +1800,7 @@ QString MainWindow::get_recent_transfers(const QString& param)
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::get_recent_transfers_request, a);
   PREPARE_RESPONSE(view::transfers_array, ar);
-  ar.error_code = m_backend.get_recent_transfers(a.wallet_id, a.offset, a.count, ar.response_data);
+  ar.error_code = m_backend.get_recent_transfers(a.wallet_id, a.offset, a.count, ar.response_data, a.exclude_mining_txs);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }

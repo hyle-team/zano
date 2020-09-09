@@ -670,7 +670,9 @@ namespace log_space
       boost::filesystem::create_directories(m_default_log_path_w, ec);
       boost::filesystem::ofstream* pstream = new boost::filesystem::ofstream;
       
-      std::wstring target_path = m_default_log_path_w + L"/" + epee::string_encoding::utf8_to_wstring(pstream_name);
+      std::wstring target_path = epee::string_encoding::utf8_to_wstring(pstream_name);
+      if (!m_default_log_path_w.empty())
+        target_path = m_default_log_path_w + L"/" + target_path;
       
       pstream->open( target_path.c_str(), std::ios_base::out | std::ios::app /*ios_base::trunc */);
       if(pstream->fail())

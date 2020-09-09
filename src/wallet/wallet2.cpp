@@ -7,6 +7,8 @@
 #include <numeric>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <iostream>
 #include <boost/utility/value_init.hpp>
@@ -26,6 +28,7 @@ using namespace epee;
 #include "serialization/binary_utils.h"
 #include "currency_core/bc_payments_id_service.h"
 #include "version.h"
+#include "common/encryption_filter.h"
 using namespace currency;
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
@@ -493,7 +496,6 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         td.m_ptx_wallet_info = pwallet_info;
         td.m_internal_output_index = o;
         td.m_key_image = ki;
-        LOG_PRINT_L0("pglobal_indexes = " << pglobal_indexes);
         if (m_use_deffered_global_outputs)
         {
           if (pglobal_indexes && pglobal_indexes->size() > o)
@@ -1153,6 +1155,15 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
 
 
   decrypt_payload_items(decrypt_attachment_as_income, tx, m_account.get_keys(), decrypted_att);
+  if ((is_watch_only() && !wti.is_income)|| (height > 638000 && !have_type_in_variant_container<etc_tx_flags16_t>(decrypted_att)))
+  {
+    remove_field_of_type_from_extra<tx_receiver_old>(decrypted_att);
+    remove_field_of_type_from_extra<tx_payer_old>(decrypted_att);
+  }
+  if (is_watch_only() && !wti.is_income)
+  {
+    remove_field_of_type_from_extra<tx_comment>(decrypted_att);
+  }
   prepare_wti_decrypted_attachments(wti, decrypted_att);
   process_contract_info(wti, decrypted_att);
 }
@@ -1164,7 +1175,7 @@ void wallet2::handle_money_received2(const currency::block& b, const currency::t
   wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
   wti.is_income = true;
   prepare_wti(wti, get_block_height(b), get_actual_timestamp(b), tx, amount, td);
-
+  WLT_LOG_L1("[MONEY RECEIVED]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
 }
 //----------------------------------------------------------------------------------------------------
@@ -1194,6 +1205,7 @@ void wallet2::handle_money_spent2(const currency::block& b,
   wti.remote_addresses = recipients;
   wti.recipients_aliases = recipients_aliases;
   prepare_wti(wti, get_block_height(b), get_actual_timestamp(b), in_tx, amount, td);
+  WLT_LOG_L1("[MONEY SPENT]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
 }
 //----------------------------------------------------------------------------------------------------
@@ -1310,6 +1322,8 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   req.minimum_height = get_wallet_minimum_height();
   if (is_auditable())
     req.need_global_indexes = true;
+  if (req.minimum_height > m_height_of_start_sync)
+    m_height_of_start_sync = req.minimum_height;
 
   m_chain.get_short_chain_history(req.block_ids);
   bool r = m_core_proxy->call_COMMAND_RPC_GET_BLOCKS_DIRECT(req, res);
@@ -1341,9 +1355,11 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
   if (res.status == API_RETURN_CODE_BUSY)
   {
     WLT_LOG_L1("Core is busy, pull cancelled");
+    m_core_proxy->get_editable_proxy_diagnostic_info()->is_busy = true;
     stop = true;
     return;
   }
+  m_core_proxy->get_editable_proxy_diagnostic_info()->is_busy = false;
   THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
   THROW_IF_TRUE_WALLET_EX(get_blockchain_current_size() && get_blockchain_current_size() <= res.start_height && res.start_height != m_minimum_height, error::wallet_internal_error,
     "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
@@ -1454,7 +1470,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
     }
   }
 
-  WLT_LOG_L1("[PULL BLOCKS] " << res.start_height << " --> " << get_blockchain_current_size());
+  WLT_LOG_L2("[PULL BLOCKS] " << res.start_height << " --> " << get_blockchain_current_size() - 1);
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_sync_progress()
@@ -1471,6 +1487,7 @@ void wallet2::refresh()
 void wallet2::refresh(size_t & blocks_fetched)
 {
   bool received_money = false;
+  m_stop = false;
   refresh(blocks_fetched, received_money, m_stop);
 }
 //----------------------------------------------------------------------------------------------------
@@ -1937,7 +1954,7 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
   }
   
 
-  WLT_LOG_L1("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money(balance()) << ", unlocked: " << print_money(unlocked_balance()));
+  WLT_LOG("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money(balance()) << ", unlocked: " << print_money(unlocked_balance()), blocks_fetched > 0 ? LOG_LEVEL_1 : LOG_LEVEL_2);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::handle_expiration_list(uint64_t tx_expiration_ts_median)
@@ -2150,7 +2167,7 @@ bool wallet2::reset_all()
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::store_keys(std::string& buff, const std::string& password, bool store_as_watch_only /* = false */)
+bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2::keys_file_data& keys_file_data, bool store_as_watch_only /* = false */)
 {
   currency::account_base acc = m_account;
   if (store_as_watch_only)
@@ -2159,8 +2176,6 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, bool st
   std::string account_data;
   bool r = epee::serialization::store_t_to_binary(acc, account_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "failed to serialize wallet keys");
-
-  wallet2::keys_file_data keys_file_data = boost::value_initialized<wallet2::keys_file_data>();
 
   crypto::chacha8_key key;
   crypto::generate_chacha8_key(password, key);
@@ -2178,7 +2193,8 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, bool st
 bool wallet2::backup_keys(const std::string& path)
 {
   std::string buff;
-  bool r = store_keys(buff, m_password);
+  wallet2::keys_file_data keys_file_data = AUTO_VAL_INIT(keys_file_data);
+  bool r = store_keys(buff, m_password, keys_file_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to store keys");
 
   r = file_io_utils::save_string_to_file(path, buff);
@@ -2264,10 +2280,9 @@ bool wallet2::prepare_file_names(const std::wstring& file_path)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::load_keys(const std::string& buff, const std::string& password, uint64_t file_signature)
+void wallet2::load_keys(const std::string& buff, const std::string& password, uint64_t file_signature, keys_file_data& kf_data)
 {
   bool r = false;
-  wallet2::keys_file_data kf_data = AUTO_VAL_INIT(kf_data);
   if (file_signature == WALLET_FILE_SIGNATURE_OLD)
   {
     wallet2::keys_file_data_old kf_data_old;
@@ -2313,8 +2328,6 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(validate_password(pass), "new wallet generation failed: password contains forbidden characters")
   clear();
   prepare_file_names(path);
-
-  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
 
   m_password = pass;
   m_account.generate(auditable_wallet);
@@ -2365,8 +2378,6 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   clear();
   prepare_file_names(wallet_);
 
-  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
-
   m_password = password;
 
   std::string keys_buff;
@@ -2386,16 +2397,30 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   THROW_IF_TRUE_WALLET_EX(data_file.fail(), error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
   THROW_IF_TRUE_WALLET_EX(wbh.m_signature != WALLET_FILE_SIGNATURE_OLD && wbh.m_signature != WALLET_FILE_SIGNATURE_V2, error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
-  THROW_IF_TRUE_WALLET_EX(wbh.m_cb_body > WALLET_FILE_MAX_BODY_SIZE || 
+  THROW_IF_TRUE_WALLET_EX(
     wbh.m_cb_keys > WALLET_FILE_MAX_KEYS_SIZE, error::file_read_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
 
 
   keys_buff.resize(wbh.m_cb_keys);
   data_file.read((char*)keys_buff.data(), wbh.m_cb_keys);
+  wallet2::keys_file_data kf_data = AUTO_VAL_INIT(kf_data);
+  load_keys(keys_buff, password, wbh.m_signature, kf_data);
 
-  load_keys(keys_buff, password, wbh.m_signature);
-
-  bool need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
+  bool need_to_resync = false;
+  if (wbh.m_ver == 1000)
+  {
+    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
+  }
+  else
+  {
+    tools::encrypt_chacha_in_filter decrypt_filter(password, kf_data.iv);
+    boost::iostreams::filtering_istream in;
+    in.push(decrypt_filter);
+    in.push(data_file);
+    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
+  }
+    
+    
 
   if (m_watch_only && !is_auditable())
     load_keys2ki(true, need_to_resync);
@@ -2429,13 +2454,12 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 {
   LOG_PRINT_L0("(before storing: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
-  // check_for_free_space_and_throw_if_it_lacks(path_to_save); temporary disabled, wallet saving implemented in two-stage scheme to avoid data loss due to lack of space
-
   std::string ascii_path_to_save = epee::string_encoding::convert_to_ansii(path_to_save);
 
   //prepare data
   std::string keys_buff;
-  bool r = store_keys(keys_buff, password, m_watch_only);
+  wallet2::keys_file_data keys_file_data = AUTO_VAL_INIT(keys_file_data);
+  bool r = store_keys(keys_buff, password, keys_file_data, m_watch_only);
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store_keys for wallet " << ascii_path_to_save);
 
   //store data
@@ -2443,7 +2467,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   wbh.m_signature = WALLET_FILE_SIGNATURE_V2;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
-  wbh.m_cb_body = 1000;
+  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION;
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
   uint64_t ts = m_core_runtime_config.get_core_time();
@@ -2458,8 +2482,13 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   data_file << header_buff << keys_buff;
 
   WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
+  //creating encryption stream
+  tools::encrypt_chacha_out_filter decrypt_filter(m_password, keys_file_data.iv);
+  boost::iostreams::filtering_ostream out;
+  out.push(decrypt_filter);
+  out.push(data_file);
 
-  r = tools::portble_serialize_obj_to_stream(*this, data_file);
+  r = tools::portble_serialize_obj_to_stream(*this, out);
   if (!r)
   {
     data_file.close();
@@ -2565,49 +2594,6 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
   // TODO additional clearing for watch-only wallet's data
 
   wo.store(path_to_save, password);
-}
-//----------------------------------------------------------------------------------------------------
-void wallet2::check_for_free_space_and_throw_if_it_lacks(const std::wstring& wallet_filename, uint64_t exact_size_needed_if_known /* = UINT64_MAX */)
-{
-  namespace fs = boost::filesystem;
-
-  try
-  {
-    fs::path wallet_file_path(wallet_filename);
-    fs::path base_path = wallet_file_path.parent_path();
-    if (base_path.empty())
-      base_path = fs::path(".");
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(fs::is_directory(base_path), "directory does not exist: " << base_path.string());
-
-    uint64_t min_free_size = exact_size_needed_if_known;
-    if (min_free_size == UINT64_MAX)
-    {
-      // if exact size needed is unknown -- determine it as
-      // twice the original wallet file size or MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES, which one is bigger
-      min_free_size = MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES;
-      if (fs::is_regular_file(wallet_file_path))
-        min_free_size = std::max(min_free_size, 2 * static_cast<uint64_t>(fs::file_size(wallet_file_path)));
-    }
-    else
-    {
-      min_free_size += 1024 * 1024 * 10; // add a little for FS overhead and so
-    }
-
-    fs::space_info si = fs::space(base_path);
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(si.available > min_free_size, "free space at " << base_path.string() << " is too low: " << si.available << ", required minimum is: " << min_free_size);
-  }
-  catch (tools::error::wallet_common_error&)
-  {
-    throw;
-  }
-  catch (std::exception& e)
-  {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: " << e.what());
-  }
-  catch (...)
-  {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: unknown exception");
-  }
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::unlocked_balance() const
@@ -2944,17 +2930,27 @@ uint64_t wallet2::get_transfer_entries_count()
   return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total)
+void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs)
 {
-  if (offset >= m_transfer_history.size())
+  if (!count || offset >= m_transfer_history.size())
     return;
 
   auto start = m_transfer_history.rbegin() + offset;
-  auto stop = m_transfer_history.size() - offset >= count ? start + count : m_transfer_history.rend();
-  if (!count) 
-    stop = m_transfer_history.rend();
-
-  trs.insert(trs.end(), start, stop);
+  for (auto it = m_transfer_history.rbegin() + offset; it != m_transfer_history.rend(); it++)
+  {
+    if (exclude_mining_txs)
+    {
+      if(it->is_mining)
+        continue;
+    }
+    trs.push_back(*it);
+    last_item_index = it - m_transfer_history.rbegin();
+    
+    if (trs.size() >= count)
+    {
+      break;
+    }
+  }
   total = m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
@@ -3277,10 +3273,16 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs)
+void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs)
 {
   for (auto& u : m_unconfirmed_txs)
+  {
+    if (exclude_mining_txs && u.second.is_mining)
+    {
+      continue;
+    }
     trs.push_back(u.second);
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::set_core_runtime_config(const currency::core_runtime_config& pc)
@@ -3893,7 +3895,7 @@ bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake
 bool wallet2::prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {
   found_money = select_transfers(needed_money, fake_outputs_count, dust_threshold, selected_indicies);
-  THROW_IF_FALSE_WALLET_EX_MES(found_money >= needed_money, error::not_enough_money, "wallet_dump: " << ENDL << dump_trunsfers(false), found_money, needed_money, 0);
+  WLT_THROW_IF_FALSE_WALLET_EX_MES(found_money >= needed_money, error::not_enough_money, "", found_money, needed_money, 0);
   return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
 }
 //----------------------------------------------------------------------------------------------------
@@ -4217,8 +4219,8 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
       auto it = offers_local.find(h);
       if (it == offers_local.end())
       {
-        WLT_LOG_L3("Unable to find original tx record " << h << " in cancel offer " << h);
-        break;
+      WLT_LOG_L3("Unable to find original tx record " << h << " in cancel offer " << h);
+      break;
       }
       offers_local.erase(it);
 
@@ -4274,7 +4276,7 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
   WLT_LOG_GREEN("Selecting indices for transfer of " << print_money_brief(needed_money) << " with " << fake_outputs_count << " fake outs, found_free_amounts.size()=" << found_free_amounts.size() << "...", LOG_LEVEL_0);
   uint64_t found_money = 0;
   std::string selected_amounts_str;
-  while(found_money < needed_money && found_free_amounts.size())
+  while (found_money < needed_money && found_free_amounts.size())
   {
     auto it = found_free_amounts.lower_bound(needed_money - found_money);
     if (!(it != found_free_amounts.end() && it->second.size()))
@@ -4305,6 +4307,23 @@ bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_
     return true;
   }
   return false;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history)
+{
+  WLT_LOG_L0("Processing [wipeout_extra_if_needed]...");
+  for (auto it = transfer_history.begin(); it != transfer_history.end(); it++ )
+  {
+    if (it->height > 638000)
+    {
+      it->remote_addresses.clear();
+      if (is_watch_only() && !it->is_income)
+      {
+        it->comment.clear();
+      }
+    }
+  }
+  WLT_LOG_L0("Processing [wipeout_extra_if_needed] DONE");
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count)

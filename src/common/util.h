@@ -23,6 +23,12 @@
 #include <dbghelp.h>
 #endif
 
+#ifdef NDEBUG
+  #define BUILD_TYPE "Release"
+#else
+  #define BUILD_TYPE "Debug"
+#endif
+
 namespace tools
 {
   std::string get_host_computer_name();

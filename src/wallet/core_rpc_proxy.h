@@ -11,6 +11,15 @@
 
 namespace tools
 {
+  struct proxy_diagnostic_info 
+  {
+    proxy_diagnostic_info():is_busy(false), last_success_interract_time(0), last_daemon_is_disconnected(0)
+    {}
+    std::atomic<bool> is_busy;
+    std::atomic<time_t> last_success_interract_time;
+    std::atomic<bool> last_daemon_is_disconnected;
+  };
+
   /*
   wrapper to core api (rpc/direct call)
   */
@@ -44,10 +53,18 @@ namespace tools
     virtual bool call_COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN(const currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::request& req, currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response& res){ return false; }
     virtual bool call_COMMAND_RPC_GET_POOL_INFO(const currency::COMMAND_RPC_GET_POOL_INFO::request& req, currency::COMMAND_RPC_GET_POOL_INFO::response& res) { return false; }
 
+    i_core_proxy()
+    {
+      m_pdiganostic_info.reset(new proxy_diagnostic_info());
+    }
 
     virtual bool check_connection(){ return false; }
     virtual time_t get_last_success_interract_time() { return 0; }
+    std::shared_ptr<const proxy_diagnostic_info> get_proxy_diagnostic_info() const { return m_pdiganostic_info; }
+    std::shared_ptr<proxy_diagnostic_info> get_editable_proxy_diagnostic_info() { return m_pdiganostic_info; }
     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id){ return false; }
+  protected: 
+    std::shared_ptr<proxy_diagnostic_info> m_pdiganostic_info;
   };
 }
 

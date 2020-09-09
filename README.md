@@ -15,7 +15,7 @@ Be sure to properly clone the repository:
 |--|--|--|--|
 | gcc (Linux) | 5.4.0 | 7.2.0 | 8.3.0 |
 | llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
-| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2015 (14.0 update 1) | 2015 (14.0 update 3) | 2017 (15.5.7) |
+| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2015 (14.0 update 1) | 2017 (15.5.7) | 2019 |
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 7.3.1 | 9.2 | 9.2 |
 | [CMake](https://cmake.org/download/) | 2.8.6 | 3.15.5 | 3.15.5 |
 | [Boost](https://www.boost.org/users/download/) | 1.56 | 1.68 | 1.68 |
