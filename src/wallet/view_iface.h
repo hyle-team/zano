@@ -356,6 +356,7 @@ public:
     uint64_t balance;
 		uint64_t total_mined;
     uint64_t wallet_id;
+    bool is_wallet_in_sync_process;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(ti)
@@ -363,6 +364,7 @@ public:
 			KV_SERIALIZE(balance)
 			KV_SERIALIZE(total_mined)
       KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(is_wallet_in_sync_process)
     END_KV_SERIALIZE_MAP()
   };
 
