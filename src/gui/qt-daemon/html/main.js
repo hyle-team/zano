@@ -3563,6 +3563,9 @@ var AppComponent = /** @class */ (function () {
                 var tr_info = data.ti;
                 var wallet = _this.variablesService.getWallet(wallet_id);
                 if (wallet) {
+                    if (wallet.history.length > 40) {
+                        wallet.history.splice(0, 1);
+                    }
                     _this.ngZone.run(function () {
                         if (!wallet.loaded) {
                             wallet.balance = data.balance;
