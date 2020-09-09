@@ -15,7 +15,7 @@ import {ModalService} from './_helpers/services/modal.service';
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit, OnDestroy {
-  
+
   intervalUpdatePriceState;
   intervalUpdateContractsState;
   expMedTsEvent;
@@ -248,6 +248,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
         const wallet = this.variablesService.getWallet(wallet_id);
         if (wallet) {
+          if(wallet.history.length > 40) {
+            wallet.history.splice(0, 1);
+          }
           this.ngZone.run(() => {
 
             if (!wallet.loaded) {
