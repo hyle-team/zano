@@ -826,6 +826,11 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
 //don't show unconfirmed tx
   if (tei.ti.height == 0)
     return true;
+  if (tei.is_wallet_in_sync_process)
+  {
+    //don't show notification if it long sync process(mmight cause system freeze)
+    return true;
+  }
 
   auto amount_str = currency::print_money(tei.ti.amount);
   std::string title, msg;
