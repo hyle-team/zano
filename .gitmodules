@@ -1,6 +1,6 @@
 [submodule "contrib/miniupnp"]
 	path = contrib/miniupnp
 	url = https://github.com/miniupnp/miniupnp
-[submodule "contrib\\db\\libmdbx"]
+[submodule "contrib/db/libmdbx"]
 	path = contrib/db/libmdbx
 	url = https://github.com/leo-yuriev/libmdbx.git
