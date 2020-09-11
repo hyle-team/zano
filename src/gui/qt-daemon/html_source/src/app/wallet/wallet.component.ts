@@ -23,6 +23,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   copyAnimationTimeout;
   balanceTooltip;
   activeTab = 'history';
+  public mining:boolean = false;
 
   public currentPage = 1;
 
@@ -104,6 +105,7 @@ export class WalletComponent implements OnInit, OnDestroy {
       this.scrolledContent.nativeElement.scrollTop = 0;
       clearTimeout(this.copyAnimationTimeout);
       this.copyAnimation = false;
+      this.mining = this.variablesService.currentWallet.exclude_mining_txs;
     });
     this.subRouting2 = this.router.events.subscribe(val => {
       if (val instanceof RoutesRecognized) {
@@ -194,10 +196,20 @@ export class WalletComponent implements OnInit, OnDestroy {
       return;
     }
     this.variablesService.currentWallet.currentPage = pageNumber;
+    this.getRecentTransfers();
+  }
+  toggleMiningTransactions() {
+    this.mining = !this.mining;
+    this.variablesService.currentWallet.exclude_mining_txs = this.mining;
+    this.variablesService.currentWallet.currentPage = 1;
+    this.getRecentTransfers();
+  }
+
+  getRecentTransfers () {
     this.backend.getRecentTransfers(
       this.walletID,
       (this.variablesService.currentWallet.currentPage - 1) * this.variablesService.count,
-      this.variablesService.count, (status, data) => {
+      this.variablesService.count, this.variablesService.currentWallet.exclude_mining_txs, (status, data) => {
         if (status && data.total_history_items) {
           this.variablesService.currentWallet.history.splice(0, this.variablesService.currentWallet.history.length);
           this.ngZone.run(() => {

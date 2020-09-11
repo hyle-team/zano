@@ -158,6 +158,7 @@ void wallet2::init(const std::string& daemon_address)
 {
   m_miner_text_info = PROJECT_VERSION_LONG;
   m_core_proxy->set_connection_addr(daemon_address);
+  m_core_proxy->check_connection();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
@@ -327,42 +328,12 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
       const currency::txin_to_key& intk = boost::get<currency::txin_to_key>(in);
 
       // check if this input spends our output
-      //transfer_details* p_td = nullptr;
       uint64_t tid = UINT64_MAX;
       
       if (is_auditable() && is_watch_only())
       {
-        // auditable wallet
-        // try to find a reference among own UTXOs
-        std::vector<txout_v> abs_key_offsets = relative_output_offsets_to_absolute(intk.key_offsets); // potential speed-up: don't convert to abs offsets as we interested only in direct spends for auditable wallets. Now it's kind a bit paranoid.
-        for(auto v : abs_key_offsets)
-        {
-          if (v.type() != typeid(uint64_t))
-            continue;
-          uint64_t gindex = boost::get<uint64_t>(v);
-          auto it = m_amount_gindex_to_transfer_id.find(std::make_pair(intk.amount, gindex));
-          if (it != m_amount_gindex_to_transfer_id.end())
-          {
-            tid = it->second;
-            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tid < m_transfers.size(), "invalid tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
-            auto& td = m_transfers[it->second];
-            if (intk.key_offsets.size() != 1)
-            {
-              // own output was used in non-direct transaction
-              // the core should not allow this to happen, the only way it may happen - mixing in own output that was sent without mix_attr == 1
-              // log strange situation
-              std::stringstream ss;
-              ss << "own transfer tid=" << tid << " tx=" << td.tx_hash() << " mix_attr=" << td.mix_attr() << ", is referenced by a transaction with mixins, ref from input with amount: " << intk.amount << ", gindex: " << gindex;
-              WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
-              if (m_wcallback)
-                m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
-              continue;
-            }
-            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!td.is_spent(), "transfer is spent, tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
-            // own output is spent, handle it
-            break;
-          }
-        }
+        // tracking wallet, assuming all outputs are spent directly because of mix_attr = 1
+        tid = get_directly_spent_transfer_id_by_input_in_tracking_wallet(intk);
       }
       else
       {
@@ -1584,6 +1555,49 @@ bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& t
   return false;
 }
 //----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_directly_spent_transfer_id_by_input_in_tracking_wallet(const currency::txin_to_key& intk)
+{
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(is_auditable() && is_watch_only(), "this is not an auditable-watch-only (tracking) wallet");
+  
+  uint64_t tid = UINT64_MAX;
+
+  // try to find a reference among own UTXOs
+  std::vector<txout_v> abs_key_offsets = relative_output_offsets_to_absolute(intk.key_offsets); // potential speed-up: don't convert to abs offsets as we interested only in direct spends for auditable wallets. Now it's kind a bit paranoid.
+  for (auto v : abs_key_offsets)
+  {
+    if (v.type() != typeid(uint64_t))
+      continue;
+    uint64_t gindex = boost::get<uint64_t>(v);
+    auto it = m_amount_gindex_to_transfer_id.find(std::make_pair(intk.amount, gindex));
+    if (it != m_amount_gindex_to_transfer_id.end())
+    {
+      tid = it->second;
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tid < m_transfers.size(), "invalid tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
+      auto& td = m_transfers[it->second];
+      if (intk.key_offsets.size() != 1)
+      {
+        // own output was used in non-direct transaction
+        // the core should not allow this to happen, the only way it may happen - mixing in own output that was sent without mix_attr == 1
+        // log strange situation
+        std::stringstream ss;
+        ss << "own transfer tid=" << tid << " tx=" << td.tx_hash() << " mix_attr=" << td.mix_attr() << ", is referenced by a transaction with mixins, ref from input with amount: " << intk.amount << ", gindex: " << gindex;
+        WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
+        if (m_wcallback)
+          m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.mix_attr() != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, ss.str()); // if mix_attr == 1 this should never happen (mixing in an output with mix_attr = 1) as the core must reject such txs
+        // our own output has mix_attr != 1 for some reason (a sender did not set correct mix_attr e.g.)
+        // but mixin count > 1 so we can't say it is spent for sure
+        tid = UINT64_MAX;
+        continue;
+      }
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_spent_height == 0, "transfer is spent in blockchain, tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
+      // okay, own output is being spent, return  it
+      break;
+    }
+  }
+  return tid;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
 {
   //get transaction pool content 
@@ -1663,12 +1677,29 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
       auto& in = tx.vin[i];
       if (in.type() == typeid(currency::txin_to_key))
       {
-        auto it = m_key_images.find(boost::get<currency::txin_to_key>(in).k_image);
-        if (it != m_key_images.end())
+        const currency::txin_to_key& intk = boost::get<currency::txin_to_key>(in);
+        uint64_t tid = UINT64_MAX;
+        if (is_auditable() && is_watch_only())
         {
-          tx_money_spent_in_ins += boost::get<currency::txin_to_key>(in).amount;
+          // tracking wallet, assuming all outputs are spent directly because of mix_attr = 1
+          tid = get_directly_spent_transfer_id_by_input_in_tracking_wallet(intk);
+        }
+        else
+        {
+          // wallet with spend secret key -- we can calculate own key images and then search among them
+          auto it = m_key_images.find(intk.k_image);
+          if (it != m_key_images.end())
+          {
+            tid = it->second;
+          }
+        }
+
+        if (tid != UINT64_MAX)
+        {
+          // own output is being spent by this input
+          tx_money_spent_in_ins += intk.amount;
           td.spent_indices.push_back(i);
-          spend_transfers.push_back(it->second);
+          spend_transfers.push_back(tid);
         }
       }
       else if (in.type() == typeid(currency::txin_multisig))
@@ -4281,7 +4312,7 @@ bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_
 void wallet2::wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history)
 {
   WLT_LOG_L0("Processing [wipeout_extra_if_needed]...");
-  for (auto it = transfer_history.begin(); it != transfer_history.end(); )
+  for (auto it = transfer_history.begin(); it != transfer_history.end(); it++ )
   {
     if (it->height > 638000)
     {

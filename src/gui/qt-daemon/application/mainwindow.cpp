@@ -826,6 +826,11 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
 //don't show unconfirmed tx
   if (tei.ti.height == 0)
     return true;
+  if (tei.is_wallet_in_sync_process)
+  {
+    //don't show notification if it long sync process(mmight cause system freeze)
+    return true;
+  }
 
   auto amount_str = currency::print_money(tei.ti.amount);
   std::string title, msg;
@@ -941,9 +946,12 @@ QString MainWindow::set_localization_strings(const QString param)
   else
   {
     m_localization = lr.strings;
-    m_quit_action->setText(QString().fromUtf8(m_localization[localization_id_quit].c_str()));
-    m_restore_action->setText(QString().fromUtf8(m_localization[localization_id_tray_menu_show].c_str()));
-    m_minimize_action->setText(QString().fromUtf8(m_localization[localization_id_tray_menu_minimize].c_str()));
+    if(m_quit_action)
+      m_quit_action->setText(QString::fromStdString(m_localization[localization_id_quit]));
+    if(m_restore_action)
+      m_restore_action->setText(QString::fromStdString(m_localization[localization_id_tray_menu_show]));
+    if(m_minimize_action)
+      m_minimize_action->setText(QString::fromStdString(m_localization[localization_id_tray_menu_minimize]));
     resp.error_code = API_RETURN_CODE_OK;
     LOG_PRINT_L0("New localization set, language title: " << lr.language_title << ", strings " << lr.strings.size());
   }
