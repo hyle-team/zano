@@ -75,6 +75,7 @@ if(BUILD_GUI)
   else()
     file(GLOB_RECURSE QTDAEMON gui/qt-daemon/*.cpp gui/qt-daemon/*.h)    
   endif()
+  list(FILTER QTDAEMON EXCLUDE REGEX "node_modules")
 endif()
 
 
