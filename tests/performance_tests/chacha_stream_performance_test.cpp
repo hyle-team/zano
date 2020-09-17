@@ -178,7 +178,7 @@ bool do_chacha_stream_performance_test()
   LOG_PRINT_L0("OK.time: " << non_crypted_version);
 
 
-
+  return true;
 }
 
 
