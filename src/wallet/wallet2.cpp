@@ -2935,7 +2935,6 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
   if (!count || offset >= m_transfer_history.size())
     return;
 
-  auto start = m_transfer_history.rbegin() + offset;
   for (auto it = m_transfer_history.rbegin() + offset; it != m_transfer_history.rend(); it++)
   {
     if (exclude_mining_txs)
