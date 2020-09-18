@@ -28,3 +28,19 @@
   padding: 1rem 1.5rem;
   max-width: 46rem;
 }
+
+.has-no-edit-symbol {
+  position: relative;
+  width: 100%;
+  input {
+    padding-left: 2.35rem;
+  }
+  &:after {
+    content: '@';
+    position: absolute;
+    display: inline-block;
+    top: 50%;
+    left: 1rem;
+    transform: translateY(-50%);
+  }
+}

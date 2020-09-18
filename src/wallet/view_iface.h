@@ -410,6 +410,7 @@ public:
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(offset)
       KV_SERIALIZE(count)
+      KV_SERIALIZE(exclude_mining_txs)
     END_KV_SERIALIZE_MAP()
   };
 
