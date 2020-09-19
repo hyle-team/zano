@@ -5,6 +5,7 @@ import { BackendService } from '../_helpers/services/backend.service';
 import { TranslateService } from '@ngx-translate/core';
 import { IntToMoneyPipe } from '../_helpers/pipes/int-to-money.pipe';
 import { Subscription } from 'rxjs';
+import { LOCKED_BALANCE_HELP_PAGE } from '../_shared/constants';
 
 import icons from '../../assets/icons/icons.json';
 import { PaginationService } from '../_helpers/services/pagination.service';
@@ -177,7 +178,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     link.setAttribute('class', 'link');
     link.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE_LINK');
     link.addEventListener('click', () => {
-      this.openInBrowser('docs.zano.org/docs/locked-balance');
+      this.openInBrowser(LOCKED_BALANCE_HELP_PAGE);
     });
     this.balanceTooltip.appendChild(link);
     return this.balanceTooltip;

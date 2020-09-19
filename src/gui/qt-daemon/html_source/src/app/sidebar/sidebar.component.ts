@@ -4,6 +4,7 @@ import {VariablesService} from '../_helpers/services/variables.service';
 import {BackendService} from '../_helpers/services/backend.service';
 import { ModalService } from '../_helpers/services/modal.service';
 import {AUDITABLE_WALLET_HELP_PAGE} from '../_shared/constants';
+import {DOWNLOADS_PAGE_URL} from '../_shared/constants';
 
 import icons from '../../assets/icons/icons.json';
 
@@ -121,7 +122,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   getUpdate() {
-    this.backend.openUrlInBrowser('zano.org/downloads.html');
+    this.backend.openUrlInBrowser(DOWNLOADS_PAGE_URL);
   }
   goToAuditableWalletHelpPage(e) {
     e.preventDefault();
