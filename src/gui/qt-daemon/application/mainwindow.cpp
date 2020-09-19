@@ -734,14 +734,7 @@ QString    MainWindow::is_remnotenode_mode_preconfigured()
 QString MainWindow::start_backend(const QString& params)
 {
   TRY_ENTRY();
-  view::start_backend_params sbp = AUTO_VAL_INIT(sbp);
   view::api_response ar = AUTO_VAL_INIT(ar);
-
-  if (!epee::serialization::load_t_from_json(sbp, params.toStdString()))
-  {
-    ar.error_code = API_RETURN_CODE_BAD_ARG;
-    return MAKE_RESPONSE(ar);
-  }
 
   bool r = m_backend.start();
   if (!r)
