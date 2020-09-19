@@ -913,6 +913,15 @@ QString MainWindow::get_os_version()
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
+QString MainWindow::get_network_type()
+{
+#if defined(TESTNET)
+  return "testnet";
+#else
+  return "mainnet";
+#endif
+}
+
 QString MainWindow::get_alias_coast(const QString& param)
 {
   TRY_ENTRY();
