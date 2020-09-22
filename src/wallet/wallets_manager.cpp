@@ -1029,6 +1029,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
+  wo.wallet_state = view::wallet_status_info::wallet_state_ready;
   init_wallet_entry(wo, owr.wallet_id);
   get_wallet_info(wo, owr.wi);
   return API_RETURN_CODE_OK;
