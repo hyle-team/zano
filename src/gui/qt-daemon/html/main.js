@@ -1037,7 +1037,7 @@ var Wallet = /** @class */ (function () {
     };
     Wallet.prototype.prepareHistory = function (items) {
         for (var i = 0; i < items.length; i++) {
-            if ((items[i].tx_type === 7 && items[i].is_income) || (items[i].tx_type === 11 && items[i].is_income) || (items[i].amount.eq(0) && items[i].fee.eq(0))) {
+            if ((items[i].tx_type === 7 && items[i].is_income) || (items[i].tx_type === 11 && items[i].is_income) || (items[i].amount.eq(0) && items[i].fee.eq(0) && !items[i].is_mining)) {
                 var exists = false;
                 for (var j = 0; j < this.excluded_history.length; j++) {
                     if (this.excluded_history[j].tx_hash === items[i].tx_hash) {
