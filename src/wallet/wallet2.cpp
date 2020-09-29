@@ -2056,10 +2056,13 @@ void wallet2::detach_blockchain(uint64_t including_height)
 
       for (size_t i = i_start; i != m_transfers.size(); i++)
       {
-        auto it_ki = m_key_images.find(m_transfers[i].m_key_image);
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
-        m_key_images.erase(it_ki);
+        if (!(m_transfers[i].m_key_image == null_ki && is_watch_only()))
+        {
+          auto it_ki = m_key_images.find(m_transfers[i].m_key_image);
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
+          m_key_images.erase(it_ki);
+        }
         remove_transfer_from_amount_gindex_map(i);
         ++transfers_detached;
       }
