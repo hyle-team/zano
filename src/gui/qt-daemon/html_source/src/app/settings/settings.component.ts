@@ -122,9 +122,16 @@ export class SettingsComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.backend.getVersion((version) => {
+    this.backend.getVersion((version, type) => {
       this.ngZone.run(() => {
         this.currentBuild = version;
+        this.variablesService.testnet = false;
+        if (type == 'testnet')
+        {
+          this.currentBuild += ' TESTNET';
+          this.variablesService.testnet = true;
+        }
+        this.variablesService.networkType = type;
       });
     });
   }

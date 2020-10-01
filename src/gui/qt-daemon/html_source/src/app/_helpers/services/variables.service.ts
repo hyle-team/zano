@@ -54,6 +54,9 @@ export class VariablesService {
   public count = 40;
   public maxPages = 5;
 
+  public testnet = false;
+  public networkType = '';  // testnet of mainnet
+
   public wallets: Array<Wallet> = [];
   public currentWallet: Wallet;
   public selectWallet: number;

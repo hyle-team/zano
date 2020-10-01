@@ -4,6 +4,7 @@ import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {TranslateService} from '@ngx-translate/core';
+import {CREATE_NEW_WALLET_HELP_PAGE} from '../_shared/constants';
 
 @Component({
   selector: 'app-main',
@@ -45,7 +46,7 @@ export class MainComponent implements OnInit {
   }
 
   openInBrowser() {
-    this.backend.openUrlInBrowser('docs.zano.org/docs/getting-started-1#section-create-new-wallet');
+    this.backend.openUrlInBrowser(CREATE_NEW_WALLET_HELP_PAGE);
   }
 
   back() {

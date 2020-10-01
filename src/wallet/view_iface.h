@@ -173,10 +173,22 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct wallet_status_info_base
+  {
+    uint64_t wallet_id;
+    uint64_t wallet_state;
+    bool is_mining;
+    bool is_alias_operations_available;
 
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(wallet_state)
+      KV_SERIALIZE(is_mining)
+      KV_SERIALIZE(is_alias_operations_available)
+    END_KV_SERIALIZE_MAP()
+  };  
 
-
-  struct wallet_status_info
+  struct wallet_status_info : public wallet_status_info_base
   {
     enum state
     {
@@ -185,11 +197,6 @@ public:
       wallet_state_error = 3
     };
 
-
-    uint64_t wallet_id;
-    uint64_t wallet_state;
-    bool is_mining;
-    bool is_alias_operations_available;
     uint64_t balance;
     uint64_t unlocked_balance;
     uint64_t awaiting_in;
@@ -197,10 +204,7 @@ public:
     uint64_t minied_total;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(wallet_id)
-      KV_SERIALIZE(wallet_state)
-      KV_SERIALIZE(is_mining)
-      KV_SERIALIZE(is_alias_operations_available)
+      KV_CHAIN_BASE(wallet_status_info_base)
       KV_SERIALIZE(balance)
       KV_SERIALIZE(unlocked_balance)
       KV_SERIALIZE(awaiting_in)
