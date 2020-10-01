@@ -482,10 +482,10 @@ namespace tools
     currency::account_base& get_account() { return m_account; }
     const currency::account_base& get_account() const { return m_account; }
 
-    void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total);
+    void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs = false);
     uint64_t get_recent_transfers_total_count();
     uint64_t get_transfer_entries_count();
-    void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs);
+    void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs = false);
     void init(const std::string& daemon_address = "http://localhost:8080");
     bool deinit();
 
@@ -730,8 +730,14 @@ namespace tools
       a & m_tx_keys;
       a & m_last_pow_block_h;
 
+      //after processing
+      if (ver < 152)
+      {
+        wipeout_extra_if_needed(m_transfer_history);
+      }
     }
 
+    void wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history);
     bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count);
@@ -921,7 +927,6 @@ private:
     void exception_handler();
     void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
-    void check_for_free_space_and_throw_if_it_lacks(const std::wstring& path, uint64_t exact_size_needed_if_known = UINT64_MAX);
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
@@ -931,6 +936,7 @@ private:
     //void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed);
     uint64_t detach_from_block_ids(uint64_t height);
     uint64_t get_wallet_minimum_height();
+    uint64_t get_directly_spent_transfer_id_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);

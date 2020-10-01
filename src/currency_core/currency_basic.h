@@ -508,7 +508,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-  struct etc_tx_uint16_t 
+  struct etc_tx_flags16_t 
   {
     uint16_t v;
     BEGIN_SERIALIZE()
@@ -518,7 +518,7 @@ namespace currency
 
   typedef boost::mpl::vector21<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
-    etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_uint16_t, etc_tx_details_unlock_time2,
+    etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
     tx_payer, tx_receiver, extra_alias_entry
   > all_payload_types;
   
@@ -749,7 +749,7 @@ SET_VARIANT_TAGS(currency::extra_user_data, 19, "user_data");
 SET_VARIANT_TAGS(currency::extra_alias_entry_old, 20, "alias_entry");
 SET_VARIANT_TAGS(currency::extra_padding, 21, "extra_padding");
 SET_VARIANT_TAGS(crypto::public_key, 22, "pub_key");
-SET_VARIANT_TAGS(currency::etc_tx_uint16_t, 23, "etc_tx_uint16");
+SET_VARIANT_TAGS(currency::etc_tx_flags16_t, 23, "etc_tx_flags16");
 SET_VARIANT_TAGS(uint16_t, 24, "derive_xor");
 //txout_v 
 SET_VARIANT_TAGS(currency::ref_by_id, 25, "ref_by_id");

@@ -12,7 +12,7 @@ IF NOT [%build_prefix%] == [] (
   SET ACHIVE_NAME_PREFIX=%ACHIVE_NAME_PREFIX%%build_prefix%-
 )
 
-IF NOT [%testnet%] == [] (
+IF "%testnet%" == "true" (
   SET TESTNET_DEF=-D TESTNET=TRUE
   SET TESTNET_LABEL=testnet 
   SET ACHIVE_NAME_PREFIX=%ACHIVE_NAME_PREFIX%testnet-
@@ -170,11 +170,11 @@ set installer_path=%BUILDS_PATH%\builds\%installer_file%
 
 @echo "   SIGNING ...."
 
-%ZANO_SIGN_CMD% %installer_path%
-IF %ERRORLEVEL% NEQ 0 (
-  @echo "failed to sign installer"
-  goto error
-)
+:: %ZANO_SIGN_CMD% %installer_path%
+:: IF %ERRORLEVEL% NEQ 0 (
+::  @echo "failed to sign installer"
+::   goto error
+:: )
 
 @echo "   UPLOADING TO SERVER ...."
 

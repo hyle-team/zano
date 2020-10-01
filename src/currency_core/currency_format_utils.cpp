@@ -710,6 +710,16 @@ namespace currency
       crypto::chacha_crypt(m.acc_addr, m_key);
       m_was_crypted_entries = true;
     }
+    void operator()(tx_payer_old& pr)
+    {
+      crypto::chacha_crypt(pr.acc_addr, m_key);
+      m_was_crypted_entries = true;
+    }
+    void operator()(tx_receiver_old& m)
+    {
+      crypto::chacha_crypt(m.acc_addr, m_key);
+      m_was_crypted_entries = true;
+    }
     void operator()(tx_service_attachment& sa)
     {
       if (sa.flags&TX_SERVICE_ATTACHMENT_DEFLATE_BODY)
@@ -772,7 +782,18 @@ namespace currency
       crypto::chacha_crypt(receiver_local.acc_addr, rkey);
       rdecrypted_att.push_back(receiver_local);
     }
-
+    void operator()(const tx_payer_old& pr)
+    {
+      tx_payer_old payer_local = pr;
+      crypto::chacha_crypt(payer_local.acc_addr, rkey);
+      rdecrypted_att.push_back(payer_local);
+    }
+    void operator()(const tx_receiver_old& pr)
+    {
+      tx_receiver_old receiver_local = pr;
+      crypto::chacha_crypt(receiver_local.acc_addr, rkey);
+      rdecrypted_att.push_back(receiver_local);
+    }
     template<typename attachment_t>
     void operator()(const attachment_t& att)
     {
@@ -1048,6 +1069,11 @@ namespace currency
       txkey = keypair::generate();
       add_tx_pub_key_to_extra(tx, txkey.pub);
       one_time_secret_key = txkey.sec;
+
+      //add flags
+      etc_tx_flags16_t e = AUTO_VAL_INIT(e);
+      //todo: add some flags here
+      update_or_add_field_to_extra(tx.extra, e);
 
       //include offers if need
       tx.attachment = attachments;
@@ -2316,18 +2342,15 @@ namespace currency
 
       return true;
     }
-    bool operator()(const etc_tx_uint16_t& dh)
+    bool operator()(const etc_tx_flags16_t& dh)
     {
-      tv.type = "XOR";
+      tv.type = "FLAGS16";
       tv.short_view = epee::string_tools::pod_to_hex(dh);
       tv.datails_view = epee::string_tools::pod_to_hex(dh);
 
       return true;
     }
-
   };
-
-
   //------------------------------------------------------------------
   template<class t_container>
   bool fill_tx_rpc_payload_items(std::vector<tx_extra_rpc_entry>& target_vector, const t_container& tc)

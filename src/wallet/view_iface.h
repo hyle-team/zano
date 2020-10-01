@@ -173,10 +173,22 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct wallet_status_info_base
+  {
+    uint64_t wallet_id;
+    uint64_t wallet_state;
+    bool is_mining;
+    bool is_alias_operations_available;
 
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(wallet_state)
+      KV_SERIALIZE(is_mining)
+      KV_SERIALIZE(is_alias_operations_available)
+    END_KV_SERIALIZE_MAP()
+  };  
 
-
-  struct wallet_status_info
+  struct wallet_status_info : public wallet_status_info_base
   {
     enum state
     {
@@ -185,11 +197,6 @@ public:
       wallet_state_error = 3
     };
 
-
-    uint64_t wallet_id;
-    uint64_t wallet_state;
-    bool is_mining;
-    bool is_alias_operations_available;
     uint64_t balance;
     uint64_t unlocked_balance;
     uint64_t awaiting_in;
@@ -197,10 +204,7 @@ public:
     uint64_t minied_total;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(wallet_id)
-      KV_SERIALIZE(wallet_state)
-      KV_SERIALIZE(is_mining)
-      KV_SERIALIZE(is_alias_operations_available)
+      KV_CHAIN_BASE(wallet_status_info_base)
       KV_SERIALIZE(balance)
       KV_SERIALIZE(unlocked_balance)
       KV_SERIALIZE(awaiting_in)
@@ -356,6 +360,7 @@ public:
     uint64_t balance;
 		uint64_t total_mined;
     uint64_t wallet_id;
+    bool is_wallet_in_sync_process;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(ti)
@@ -363,6 +368,7 @@ public:
 			KV_SERIALIZE(balance)
 			KV_SERIALIZE(total_mined)
       KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(is_wallet_in_sync_process)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -371,11 +377,13 @@ public:
     std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
     std::vector<tools::wallet_public::wallet_transfer_info> history;
     uint64_t total_history_items;
+    uint64_t last_item_index;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(unconfirmed)
       KV_SERIALIZE(history)
       KV_SERIALIZE(total_history_items)
+      KV_SERIALIZE(last_item_index)
     END_KV_SERIALIZE_MAP()
 
   };
@@ -385,11 +393,13 @@ public:
     std::string pass;
     std::string path;
     uint64_t txs_to_return;
+    bool exclude_mining_txs;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
       KV_SERIALIZE(txs_to_return)
+      KV_SERIALIZE(exclude_mining_txs)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -398,11 +408,13 @@ public:
     uint64_t wallet_id;
     uint64_t offset;
     uint64_t count;
+    bool exclude_mining_txs;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(offset)
       KV_SERIALIZE(count)
+      KV_SERIALIZE(exclude_mining_txs)
     END_KV_SERIALIZE_MAP()
   };
 

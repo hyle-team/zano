@@ -56,45 +56,38 @@ export class BackendService {
     switch (error) {
       case 'NOT_ENOUGH_MONEY':
         error_translate = 'ERRORS.NOT_ENOUGH_MONEY';
+        // error_translate = 'ERRORS.NO_MONEY'; maybe that one?
+        if (command === 'cancel_offer') {
+          error_translate = this.translate.instant('ERRORS.NO_MONEY_REMOVE_OFFER', {
+            'fee': this.variablesService.default_fee,
+            'currency': this.variablesService.defaultCurrency
+          });
+        }
         break;
       case 'CORE_BUSY':
-        if (command !== 'get_all_aliases') {
-          error_translate = 'ERRORS.CORE_BUSY';
-        }
+        error_translate = 'ERRORS.CORE_BUSY';
+        break;
+      case 'BUSY':
+        error_translate = 'ERRORS.DAEMON_BUSY';
         break;
       case 'OVERFLOW':
         if (command !== 'get_all_aliases') {
           error_translate = '';
         }
         break;
-      case 'INTERNAL_ERROR:daemon is busy':
-        error_translate = 'ERRORS.DAEMON_BUSY';
-        break;
-      case 'INTERNAL_ERROR:not enough money':
-      case 'INTERNAL_ERROR:NOT_ENOUGH_MONEY':
-        if (command === 'cancel_offer') {
-          error_translate = this.translate.instant('ERRORS.NO_MONEY_REMOVE_OFFER', {
-            'fee': this.variablesService.default_fee,
-            'currency': this.variablesService.defaultCurrency
-          });
-        } else {
-          error_translate = 'ERRORS.NO_MONEY';
-        }
-        break;
       case 'NOT_ENOUGH_OUTPUTS_FOR_MIXING':
-      case 'INTERNAL_ERROR:not enough outputs to mix':
         error_translate = 'ERRORS.NOT_ENOUGH_OUTPUTS_TO_MIX';
         break;
-      case 'INTERNAL_ERROR:transaction is too big':
+      case 'TX_IS_TOO_BIG':
         error_translate = 'ERRORS.TRANSACTION_IS_TO_BIG';
         break;
-      case 'INTERNAL_ERROR:Transfer attempt while daemon offline':
+      case 'DISCONNECTED':
         error_translate = 'ERRORS.TRANSFER_ATTEMPT';
         break;
       case 'ACCESS_DENIED':
         error_translate = 'ERRORS.ACCESS_DENIED';
         break;
-      case 'INTERNAL_ERROR:transaction was rejected by daemon':
+      case 'TX_REJECTED':
         // if (command === 'request_alias_registration') {
         // error_translate = 'INFORMER.ALIAS_IN_REGISTER';
         // } else {
@@ -114,7 +107,6 @@ export class BackendService {
         error_translate = 'ERRORS.WALLET_WATCH_ONLY_NOT_SUPPORTED';
         break;
       case 'WRONG_PASSWORD':
-      case 'WRONG_PASSWORD:invalid password':
         params = JSON.parse(params);
         if (!params.testEmpty) {
           error_translate = 'ERRORS.WRONG_PASSWORD';
@@ -163,6 +155,7 @@ export class BackendService {
     if (error.indexOf('FAILED:failed to open binary wallet file for saving') > -1 && command === 'generate_wallet') {
       error_translate = '';
     }
+
     if (error_translate !== '') {
       this.modalService.prepareModal('error', error_translate);
     }
@@ -636,11 +629,12 @@ export class BackendService {
     }
   }
 
-  getRecentTransfers( id, offset, count, callback) {
+  getRecentTransfers( id, offset, count,exclude_mining_txs, callback) {
     const params = {
       wallet_id: id,
       offset: offset,
-      count: count
+      count: count,
+      exclude_mining_txs: exclude_mining_txs
     };
     this.runCommand('get_recent_transfers', params, callback);
   }
@@ -651,7 +645,9 @@ export class BackendService {
 
   getVersion(callback) {
     this.runCommand('get_version', {}, (status, version) => {
-      callback(version);
+      this.runCommand('get_network_type', {}, (status, type) => {
+        callback(version, type);
+      });
     });
   }
 

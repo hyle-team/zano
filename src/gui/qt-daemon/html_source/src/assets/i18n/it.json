@@ -147,6 +147,12 @@
       "TIME3": "1 ora",
       "TIME4": "Mai"
     },
+    "SCALE": {
+      "75": "75% scala",
+      "100": "100% scala",
+      "125": "125% scala",
+      "150": "150% scala"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Aggiorna password principale",
       "OLD": "Vecchia password",
@@ -194,7 +200,7 @@
   "ASSIGN_ALIAS": {
     "NAME": {
       "LABEL": "Alias",
-      "PLACEHOLDER": "@ Inserisci alias",
+      "PLACEHOLDER": " Inserisci alias",
       "TOOLTIP": "Un alias è un modulo abbreviato o il tuo account. Un alias può solo includere lettere latine, numeri e caratteri “.” e “-”. Deve iniziare con “@”."
     },
     "COMMENT": {
@@ -206,7 +212,7 @@
     "BUTTON_ASSIGN": "Assegna",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Il nome è richiesto",
-      "NAME_WRONG": "L'Alias ha un nome errato",
+      "NAME_WRONG": "Nome Ungültiger: zulässige Symbole \"0-9\", \"a-z\", \"-\", \".\"",
       "NAME_LENGTH": "L'alias deve essere lungo 6-25 caratteri",
       "NAME_EXISTS": "Il nome dell'alias esiste già",
       "NO_MONEY": "Non hai fondi sufficienti per assegnare questo alias",

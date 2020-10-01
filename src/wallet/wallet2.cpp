@@ -158,6 +158,7 @@ void wallet2::init(const std::string& daemon_address)
 {
   m_miner_text_info = PROJECT_VERSION_LONG;
   m_core_proxy->set_connection_addr(daemon_address);
+  m_core_proxy->check_connection();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
@@ -327,42 +328,12 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
       const currency::txin_to_key& intk = boost::get<currency::txin_to_key>(in);
 
       // check if this input spends our output
-      //transfer_details* p_td = nullptr;
       uint64_t tid = UINT64_MAX;
       
       if (is_auditable() && is_watch_only())
       {
-        // auditable wallet
-        // try to find a reference among own UTXOs
-        std::vector<txout_v> abs_key_offsets = relative_output_offsets_to_absolute(intk.key_offsets); // potential speed-up: don't convert to abs offsets as we interested only in direct spends for auditable wallets. Now it's kind a bit paranoid.
-        for(auto v : abs_key_offsets)
-        {
-          if (v.type() != typeid(uint64_t))
-            continue;
-          uint64_t gindex = boost::get<uint64_t>(v);
-          auto it = m_amount_gindex_to_transfer_id.find(std::make_pair(intk.amount, gindex));
-          if (it != m_amount_gindex_to_transfer_id.end())
-          {
-            tid = it->second;
-            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tid < m_transfers.size(), "invalid tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
-            auto& td = m_transfers[it->second];
-            if (intk.key_offsets.size() != 1)
-            {
-              // own output was used in non-direct transaction
-              // the core should not allow this to happen, the only way it may happen - mixing in own output that was sent without mix_attr == 1
-              // log strange situation
-              std::stringstream ss;
-              ss << "own transfer tid=" << tid << " tx=" << td.tx_hash() << " mix_attr=" << td.mix_attr() << ", is referenced by a transaction with mixins, ref from input with amount: " << intk.amount << ", gindex: " << gindex;
-              WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
-              if (m_wcallback)
-                m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
-              continue;
-            }
-            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!td.is_spent(), "transfer is spent, tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
-            // own output is spent, handle it
-            break;
-          }
-        }
+        // tracking wallet, assuming all outputs are spent directly because of mix_attr = 1
+        tid = get_directly_spent_transfer_id_by_input_in_tracking_wallet(intk);
       }
       else
       {
@@ -1184,6 +1155,15 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
 
 
   decrypt_payload_items(decrypt_attachment_as_income, tx, m_account.get_keys(), decrypted_att);
+  if ((is_watch_only() && !wti.is_income)|| (height > 638000 && !have_type_in_variant_container<etc_tx_flags16_t>(decrypted_att)))
+  {
+    remove_field_of_type_from_extra<tx_receiver_old>(decrypted_att);
+    remove_field_of_type_from_extra<tx_payer_old>(decrypted_att);
+  }
+  if (is_watch_only() && !wti.is_income)
+  {
+    remove_field_of_type_from_extra<tx_comment>(decrypted_att);
+  }
   prepare_wti_decrypted_attachments(wti, decrypted_att);
   process_contract_info(wti, decrypted_att);
 }
@@ -1575,6 +1555,49 @@ bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& t
   return false;
 }
 //----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_directly_spent_transfer_id_by_input_in_tracking_wallet(const currency::txin_to_key& intk)
+{
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(is_auditable() && is_watch_only(), "this is not an auditable-watch-only (tracking) wallet");
+  
+  uint64_t tid = UINT64_MAX;
+
+  // try to find a reference among own UTXOs
+  std::vector<txout_v> abs_key_offsets = relative_output_offsets_to_absolute(intk.key_offsets); // potential speed-up: don't convert to abs offsets as we interested only in direct spends for auditable wallets. Now it's kind a bit paranoid.
+  for (auto v : abs_key_offsets)
+  {
+    if (v.type() != typeid(uint64_t))
+      continue;
+    uint64_t gindex = boost::get<uint64_t>(v);
+    auto it = m_amount_gindex_to_transfer_id.find(std::make_pair(intk.amount, gindex));
+    if (it != m_amount_gindex_to_transfer_id.end())
+    {
+      tid = it->second;
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tid < m_transfers.size(), "invalid tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
+      auto& td = m_transfers[it->second];
+      if (intk.key_offsets.size() != 1)
+      {
+        // own output was used in non-direct transaction
+        // the core should not allow this to happen, the only way it may happen - mixing in own output that was sent without mix_attr == 1
+        // log strange situation
+        std::stringstream ss;
+        ss << "own transfer tid=" << tid << " tx=" << td.tx_hash() << " mix_attr=" << td.mix_attr() << ", is referenced by a transaction with mixins, ref from input with amount: " << intk.amount << ", gindex: " << gindex;
+        WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
+        if (m_wcallback)
+          m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.mix_attr() != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, ss.str()); // if mix_attr == 1 this should never happen (mixing in an output with mix_attr = 1) as the core must reject such txs
+        // our own output has mix_attr != 1 for some reason (a sender did not set correct mix_attr e.g.)
+        // but mixin count > 1 so we can't say it is spent for sure
+        tid = UINT64_MAX;
+        continue;
+      }
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_spent_height == 0, "transfer is spent in blockchain, tid: " << tid << ", ref from input with amount: " << intk.amount << ", gindex: " << gindex);
+      // okay, own output is being spent, return  it
+      break;
+    }
+  }
+  return tid;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
 {
   //get transaction pool content 
@@ -1654,12 +1677,29 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
       auto& in = tx.vin[i];
       if (in.type() == typeid(currency::txin_to_key))
       {
-        auto it = m_key_images.find(boost::get<currency::txin_to_key>(in).k_image);
-        if (it != m_key_images.end())
+        const currency::txin_to_key& intk = boost::get<currency::txin_to_key>(in);
+        uint64_t tid = UINT64_MAX;
+        if (is_auditable() && is_watch_only())
         {
-          tx_money_spent_in_ins += boost::get<currency::txin_to_key>(in).amount;
+          // tracking wallet, assuming all outputs are spent directly because of mix_attr = 1
+          tid = get_directly_spent_transfer_id_by_input_in_tracking_wallet(intk);
+        }
+        else
+        {
+          // wallet with spend secret key -- we can calculate own key images and then search among them
+          auto it = m_key_images.find(intk.k_image);
+          if (it != m_key_images.end())
+          {
+            tid = it->second;
+          }
+        }
+
+        if (tid != UINT64_MAX)
+        {
+          // own output is being spent by this input
+          tx_money_spent_in_ins += intk.amount;
           td.spent_indices.push_back(i);
-          spend_transfers.push_back(it->second);
+          spend_transfers.push_back(tid);
         }
       }
       else if (in.type() == typeid(currency::txin_multisig))
@@ -2016,10 +2056,13 @@ void wallet2::detach_blockchain(uint64_t including_height)
 
       for (size_t i = i_start; i != m_transfers.size(); i++)
       {
-        auto it_ki = m_key_images.find(m_transfers[i].m_key_image);
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
-        m_key_images.erase(it_ki);
+        if (!(m_transfers[i].m_key_image == null_ki && is_watch_only()))
+        {
+          auto it_ki = m_key_images.find(m_transfers[i].m_key_image);
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
+          m_key_images.erase(it_ki);
+        }
         remove_transfer_from_amount_gindex_map(i);
         ++transfers_detached;
       }
@@ -2289,8 +2332,6 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   clear();
   prepare_file_names(path);
 
-  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
-
   m_password = pass;
   m_account.generate(auditable_wallet);
   init_log_prefix();
@@ -2339,8 +2380,6 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
 {
   clear();
   prepare_file_names(wallet_);
-
-  check_for_free_space_and_throw_if_it_lacks(m_wallet_file);
 
   m_password = password;
 
@@ -2417,8 +2456,6 @@ void wallet2::store(const std::wstring& path)
 void wallet2::store(const std::wstring& path_to_save, const std::string& password)
 {
   LOG_PRINT_L0("(before storing: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
-
-  // check_for_free_space_and_throw_if_it_lacks(path_to_save); temporary disabled, wallet saving implemented in two-stage scheme to avoid data loss due to lack of space
 
   std::string ascii_path_to_save = epee::string_encoding::convert_to_ansii(path_to_save);
 
@@ -2560,49 +2597,6 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
   // TODO additional clearing for watch-only wallet's data
 
   wo.store(path_to_save, password);
-}
-//----------------------------------------------------------------------------------------------------
-void wallet2::check_for_free_space_and_throw_if_it_lacks(const std::wstring& wallet_filename, uint64_t exact_size_needed_if_known /* = UINT64_MAX */)
-{
-  namespace fs = boost::filesystem;
-
-  try
-  {
-    fs::path wallet_file_path(wallet_filename);
-    fs::path base_path = wallet_file_path.parent_path();
-    if (base_path.empty())
-      base_path = fs::path(".");
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(fs::is_directory(base_path), "directory does not exist: " << base_path.string());
-
-    uint64_t min_free_size = exact_size_needed_if_known;
-    if (min_free_size == UINT64_MAX)
-    {
-      // if exact size needed is unknown -- determine it as
-      // twice the original wallet file size or MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES, which one is bigger
-      min_free_size = MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES;
-      if (fs::is_regular_file(wallet_file_path))
-        min_free_size = std::max(min_free_size, 2 * static_cast<uint64_t>(fs::file_size(wallet_file_path)));
-    }
-    else
-    {
-      min_free_size += 1024 * 1024 * 10; // add a little for FS overhead and so
-    }
-
-    fs::space_info si = fs::space(base_path);
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(si.available > min_free_size, "free space at " << base_path.string() << " is too low: " << si.available << ", required minimum is: " << min_free_size);
-  }
-  catch (tools::error::wallet_common_error&)
-  {
-    throw;
-  }
-  catch (std::exception& e)
-  {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: " << e.what());
-  }
-  catch (...)
-  {
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "failed to determine free space: unknown exception");
-  }
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::unlocked_balance() const
@@ -2939,17 +2933,26 @@ uint64_t wallet2::get_transfer_entries_count()
   return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total)
+void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs)
 {
-  if (offset >= m_transfer_history.size())
+  if (!count || offset >= m_transfer_history.size())
     return;
 
-  auto start = m_transfer_history.rbegin() + offset;
-  auto stop = m_transfer_history.size() - offset >= count ? start + count : m_transfer_history.rend();
-  if (!count) 
-    stop = m_transfer_history.rend();
-
-  trs.insert(trs.end(), start, stop);
+  for (auto it = m_transfer_history.rbegin() + offset; it != m_transfer_history.rend(); it++)
+  {
+    if (exclude_mining_txs)
+    {
+      if(it->is_mining)
+        continue;
+    }
+    trs.push_back(*it);
+    last_item_index = it - m_transfer_history.rbegin();
+    
+    if (trs.size() >= count)
+    {
+      break;
+    }
+  }
   total = m_transfer_history.size();
 }
 //----------------------------------------------------------------------------------------------------
@@ -3272,10 +3275,16 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs)
+void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs)
 {
   for (auto& u : m_unconfirmed_txs)
+  {
+    if (exclude_mining_txs && u.second.is_mining)
+    {
+      continue;
+    }
     trs.push_back(u.second);
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::set_core_runtime_config(const currency::core_runtime_config& pc)
@@ -4054,7 +4063,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
   bool r = m_core_proxy->call_COMMAND_RPC_SEND_RAW_TX(req, daemon_send_resp);
   THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "sendrawtransaction");
   THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_BUSY, error::daemon_busy, "sendrawtransaction");
-  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::wallet_internal_error, "Transfer attempt while daemon offline");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::no_connection_to_daemon, "Transfer attempt while daemon offline");
   THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, error::tx_rejected, tx, daemon_send_resp.status);
 
   WLT_LOG_L2("transaction " << get_transaction_hash(tx) << " generated ok and sent to daemon:" << ENDL << currency::obj_to_json_str(tx));
@@ -4212,8 +4221,8 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
       auto it = offers_local.find(h);
       if (it == offers_local.end())
       {
-        WLT_LOG_L3("Unable to find original tx record " << h << " in cancel offer " << h);
-        break;
+      WLT_LOG_L3("Unable to find original tx record " << h << " in cancel offer " << h);
+      break;
       }
       offers_local.erase(it);
 
@@ -4269,7 +4278,7 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
   WLT_LOG_GREEN("Selecting indices for transfer of " << print_money_brief(needed_money) << " with " << fake_outputs_count << " fake outs, found_free_amounts.size()=" << found_free_amounts.size() << "...", LOG_LEVEL_0);
   uint64_t found_money = 0;
   std::string selected_amounts_str;
-  while(found_money < needed_money && found_free_amounts.size())
+  while (found_money < needed_money && found_free_amounts.size())
   {
     auto it = found_free_amounts.lower_bound(needed_money - found_money);
     if (!(it != found_free_amounts.end() && it->second.size()))
@@ -4300,6 +4309,23 @@ bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_
     return true;
   }
   return false;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history)
+{
+  WLT_LOG_L0("Processing [wipeout_extra_if_needed]...");
+  for (auto it = transfer_history.begin(); it != transfer_history.end(); it++ )
+  {
+    if (it->height > 638000)
+    {
+      it->remote_addresses.clear();
+      if (is_watch_only() && !it->is_income)
+      {
+        it->comment.clear();
+      }
+    }
+  }
+  WLT_LOG_L0("Processing [wipeout_extra_if_needed] DONE");
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count)

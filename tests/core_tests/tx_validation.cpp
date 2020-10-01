@@ -934,7 +934,7 @@ bool gen_crypted_attachments::check_crypted_tx(currency::core& c, size_t ev_inde
   std::vector<payload_items_v> at;
   bool r = currency::decrypt_payload_items(true, *ptx_from_bc, bob_acc.get_keys(), at);
   CHECK_EQ(r, true);
-  CHECK_EQ(at.size(), 7); // custom attachments: 1) tx_payer, 2) tx_comment, 3) std::string; system attachments: 4) tx_crypto_checksum; system extra: 5) tx pub key, 6) extra_attachment_info
+  CHECK_EQ(at.size(), 8); // custom attachments: 1) tx_payer, 2) tx_comment, 3) std::string; system attachments: 4) tx_crypto_checksum; system extra: 5) tx pub key, 6) extra_attachment_info, 7) etc_tx_flags16_t 
 
   currency::tx_payer decrypted_pr = AUTO_VAL_INIT(decrypted_pr);
   r = get_type_in_variant_container(at, decrypted_pr);

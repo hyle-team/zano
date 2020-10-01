@@ -33,7 +33,7 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private backend: BackendService,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private modalService: ModalService,
     private ngZone: NgZone,
     private translate: TranslateService
@@ -98,6 +98,7 @@ export class OpenWalletComponent implements OnInit, OnDestroy {
               );
               new_wallet.alias = this.backend.getWalletAlias(new_wallet.address);
               new_wallet.currentPage = 1;
+              new_wallet.exclude_mining_txs = false;
               new_wallet.is_auditable = open_data['wi'].is_auditable;
               new_wallet.is_watch_only = open_data['wi'].is_watch_only;
               if (open_data.recent_history && open_data.recent_history.history) {

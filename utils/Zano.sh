@@ -1,19 +1,19 @@
-#!/bin/sh
+#!/bin/bash
+script_dir=$( dirname "$(readlink -f "$0")" )
 
-set LD_LIBRARY_PATH=${0%}
-set LD_LIBRARY_PATH=$LD_LIBRARY_PATH/lib
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/lib
-export QT_PLUGIN_PATH=$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$script_dir/lib
+export QT_PLUGIN_PATH=$script_dir/lib
 
 echo $LD_LIBRARY_PATH
 echo $QT_PLUGIN_PATH
 
 out_file_name=~/.local/share/applications/Zano.desktop
-script_dir=$( cd $(dirname $0) ; pwd -P )    
 
 call_app()
 {
+  pushd $script_dir
   ./Zano
+  popd
   exit
 }
 
@@ -39,7 +39,3 @@ create_desktop_icon()
 create_desktop_icon $out_file_name
 
 call_app
-
-
-
-

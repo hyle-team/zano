@@ -16,7 +16,7 @@ export class ContactSendComponent implements OnInit, OnDestroy {
 
   constructor(
     private location: Location,
-    private variablesService: VariablesService,
+    public variablesService: VariablesService,
     private route: ActivatedRoute
   ) { }
 

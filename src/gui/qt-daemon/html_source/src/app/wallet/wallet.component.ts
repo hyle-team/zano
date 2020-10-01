@@ -5,6 +5,7 @@ import { BackendService } from '../_helpers/services/backend.service';
 import { TranslateService } from '@ngx-translate/core';
 import { IntToMoneyPipe } from '../_helpers/pipes/int-to-money.pipe';
 import { Subscription } from 'rxjs';
+import { LOCKED_BALANCE_HELP_PAGE } from '../_shared/constants';
 
 import icons from '../../assets/icons/icons.json';
 import { PaginationService } from '../_helpers/services/pagination.service';
@@ -23,6 +24,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   copyAnimationTimeout;
   balanceTooltip;
   activeTab = 'history';
+  public mining:boolean = false;
 
   public currentPage = 1;
 
@@ -104,6 +106,7 @@ export class WalletComponent implements OnInit, OnDestroy {
       this.scrolledContent.nativeElement.scrollTop = 0;
       clearTimeout(this.copyAnimationTimeout);
       this.copyAnimation = false;
+      this.mining = this.variablesService.currentWallet.exclude_mining_txs;
     });
     this.subRouting2 = this.router.events.subscribe(val => {
       if (val instanceof RoutesRecognized) {
@@ -175,7 +178,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     link.setAttribute('class', 'link');
     link.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE_LINK');
     link.addEventListener('click', () => {
-      this.openInBrowser('docs.zano.org/docs/locked-balance');
+      this.openInBrowser(LOCKED_BALANCE_HELP_PAGE);
     });
     this.balanceTooltip.appendChild(link);
     return this.balanceTooltip;
@@ -194,10 +197,20 @@ export class WalletComponent implements OnInit, OnDestroy {
       return;
     }
     this.variablesService.currentWallet.currentPage = pageNumber;
+    this.getRecentTransfers();
+  }
+  toggleMiningTransactions() {
+    this.mining = !this.mining;
+    this.variablesService.currentWallet.exclude_mining_txs = this.mining;
+    this.variablesService.currentWallet.currentPage = 1;
+    this.getRecentTransfers();
+  }
+
+  getRecentTransfers () {
     this.backend.getRecentTransfers(
       this.walletID,
       (this.variablesService.currentWallet.currentPage - 1) * this.variablesService.count,
-      this.variablesService.count, (status, data) => {
+      this.variablesService.count, this.variablesService.currentWallet.exclude_mining_txs, (status, data) => {
         if (status && data.total_history_items) {
           this.variablesService.currentWallet.history.splice(0, this.variablesService.currentWallet.history.length);
           this.ngZone.run(() => {

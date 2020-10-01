@@ -734,14 +734,7 @@ QString    MainWindow::is_remnotenode_mode_preconfigured()
 QString MainWindow::start_backend(const QString& params)
 {
   TRY_ENTRY();
-  view::start_backend_params sbp = AUTO_VAL_INIT(sbp);
   view::api_response ar = AUTO_VAL_INIT(ar);
-
-  if (!epee::serialization::load_t_from_json(sbp, params.toStdString()))
-  {
-    ar.error_code = API_RETURN_CODE_BAD_ARG;
-    return MAKE_RESPONSE(ar);
-  }
 
   bool r = m_backend.start();
   if (!r)
@@ -758,13 +751,18 @@ bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
 {
   TRY_ENTRY();
   m_wallet_states->operator [](wsi.wallet_id) = wsi.wallet_state;
+  
+  std::string json_str_pub;
+  epee::serialization::store_t_to_json(static_cast<const view::wallet_status_info_base&>(wsi), json_str_pub, 0, epee::serialization::eol_lf);
+  LOG_PRINT_L0(get_wallet_log_prefix(wsi.wallet_id) + "SENDING SIGNAL -> [update_wallet_status]:" << std::endl << json_str_pub);
+  
   std::string json_str;
   epee::serialization::store_t_to_json(wsi, json_str, 0, epee::serialization::eol_lf);
-  LOG_PRINT_L0(get_wallet_log_prefix(wsi.wallet_id) + "SENDING SIGNAL -> [update_wallet_status]:" << std::endl << json_str );
   QMetaObject::invokeMethod(this, "update_wallet_status", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
   CATCH_ENTRY2(false);
 }
+
 bool MainWindow::set_options(const view::gui_options& opt)
 {
   TRY_ENTRY();
@@ -826,6 +824,11 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
 //don't show unconfirmed tx
   if (tei.ti.height == 0)
     return true;
+  if (tei.is_wallet_in_sync_process)
+  {
+    //don't show notification if it long sync process(mmight cause system freeze)
+    return true;
+  }
 
   auto amount_str = currency::print_money(tei.ti.amount);
   std::string title, msg;
@@ -915,6 +918,15 @@ QString MainWindow::get_os_version()
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
+QString MainWindow::get_network_type()
+{
+#if defined(TESTNET)
+  return "testnet";
+#else
+  return "mainnet";
+#endif
+}
+
 QString MainWindow::get_alias_coast(const QString& param)
 {
   TRY_ENTRY();
@@ -941,9 +953,12 @@ QString MainWindow::set_localization_strings(const QString param)
   else
   {
     m_localization = lr.strings;
-    m_quit_action->setText(QString().fromUtf8(m_localization[localization_id_quit].c_str()));
-    m_restore_action->setText(QString().fromUtf8(m_localization[localization_id_tray_menu_show].c_str()));
-    m_minimize_action->setText(QString().fromUtf8(m_localization[localization_id_tray_menu_minimize].c_str()));
+    if(m_quit_action)
+      m_quit_action->setText(QString::fromStdString(m_localization[localization_id_quit]));
+    if(m_restore_action)
+      m_restore_action->setText(QString::fromStdString(m_localization[localization_id_tray_menu_show]));
+    if(m_minimize_action)
+      m_minimize_action->setText(QString::fromStdString(m_localization[localization_id_tray_menu_minimize]));
     resp.error_code = API_RETURN_CODE_OK;
     LOG_PRINT_L0("New localization set, language title: " << lr.language_title << ", strings " << lr.strings.size());
   }
@@ -1651,7 +1666,7 @@ QString MainWindow::open_wallet(const QString& param)
   //return que_call2<view::open_wallet_request>("open_wallet", param, [this](const view::open_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::open_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
-  ar.error_code = m_backend.open_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.txs_to_return, ar.response_data);
+  ar.error_code = m_backend.open_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.txs_to_return, ar.response_data, owd.exclude_mining_txs);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1795,7 +1810,7 @@ QString MainWindow::get_recent_transfers(const QString& param)
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::get_recent_transfers_request, a);
   PREPARE_RESPONSE(view::transfers_array, ar);
-  ar.error_code = m_backend.get_recent_transfers(a.wallet_id, a.offset, a.count, ar.response_data);
+  ar.error_code = m_backend.get_recent_transfers(a.wallet_id, a.offset, a.count, ar.response_data, a.exclude_mining_txs);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
