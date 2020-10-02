@@ -3443,3 +3443,101 @@ bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+wallet_watch_only_and_chain_switch::wallet_watch_only_and_chain_switch()
+  : m_split_point_block_height(0)
+{
+  REGISTER_CALLBACK_METHOD(wallet_watch_only_and_chain_switch, c1);
+}
+
+bool wallet_watch_only_and_chain_switch::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.make_account_watch_only();
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); bob_acc.make_account_watch_only(); // Bob gonna have a tracking wallet
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+
+  //  0     10    11    12    13    23    15         <- blockchain height
+  // (0 )- (0r)- (1 )- (2 )- (3 )- (3r)-             <- main chain
+  //              |          tx_0
+  //              \          tx_1
+  //               \
+  //                \- (2a)- (3a)- (3ar)- 
+
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+
+  MAKE_TX_FEE(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(9), TESTS_DEFAULT_FEE, blk_2);
+  MAKE_TX_FEE(events, tx_1, miner_acc, bob_acc, MK_TEST_COINS(7), TESTS_DEFAULT_FEE, blk_2);
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2, miner_acc, std::list<transaction>({ tx_0, tx_1 }));
+
+  REWIND_BLOCKS_N(events, blk_3r, blk_3, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  m_split_point_block_id = get_block_hash(blk_1);
+  m_split_point_block_height = get_block_height(blk_1);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_watch_only_and_chain_switch::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+
+  // make sure Alice's wallet is watch-only but not a tracking wallet (not auditable)
+  CHECK_AND_ASSERT_MES(alice_wlt->is_watch_only() && !alice_wlt->is_auditable(), false, "incorrect type of Alice's wallet");
+  // make sure Bob's wallet is a tracking wallet
+  CHECK_AND_ASSERT_MES(bob_wlt->is_watch_only() && bob_wlt->is_auditable(), false, "incorrect type of Bob's wallet");
+
+  miner_wlt->refresh();
+  
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // check the balances
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(9), false, UINT64_MAX, MK_TEST_COINS(9), 0, 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt,     MK_TEST_COINS(7), false, UINT64_MAX, MK_TEST_COINS(7), 0, 0, 0), false, "");
+
+  // make a split
+  block out_block;
+  crypto::hash prev_id = m_split_point_block_id;
+  uint64_t current_height = m_split_point_block_height + 1;
+
+  for (size_t i = 0; i < CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3; ++i)
+  {
+    r = mine_next_pow_block_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), c, std::vector<transaction>(), prev_id, current_height, &out_block);
+    CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime_with_given_txs failed");
+    current_height++;
+    prev_id = get_block_hash(out_block);
+  }
+
+  // make sure the split has happened
+  uint64_t top_height = 0;
+  crypto::hash top_id;
+  c.get_blockchain_top(top_height, top_id);
+  CHECK_AND_ASSERT_MES(top_height == current_height - 1, false, "incorrect top_hegiht = " << top_height);
+  CHECK_AND_ASSERT_MES(top_id == prev_id, false, "incorrect top id = " << top_id);
+
+  // tx_0 and tx_1 should be moved back to the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  // check the balances, should be zero in actual and few coins in awaiting
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(9), false, UINT64_MAX, 0, 0, MK_TEST_COINS(9), 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(7), false, UINT64_MAX, 0, 0, MK_TEST_COINS(7), 0), false, "");
+
+
+  return true;
+}

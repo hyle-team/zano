@@ -863,6 +863,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
     GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
     GENERATE_AND_PLAY(packing_outputs_on_pos_minting_wallet);
+    GENERATE_AND_PLAY(wallet_watch_only_and_chain_switch);
 
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
     GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
