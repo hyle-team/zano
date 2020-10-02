@@ -5,6 +5,7 @@ import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {ModalService} from '../_helpers/services/modal.service';
 import {Wallet} from '../_helpers/models/wallet.model';
+import {DOWNLOADS_PAGE_URL} from '../_shared/constants'
 
 import icons from '../../assets/icons/icons.json';
 
@@ -234,7 +235,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   }
 
   getUpdate() {
-    this.backend.openUrlInBrowser('zano.org/downloads.html');
+    this.backend.openUrlInBrowser(DOWNLOADS_PAGE_URL);
   }
 
   ngOnDestroy() {

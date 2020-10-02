@@ -3,6 +3,8 @@ import {Transaction} from '../../models/transaction.model';
 import {VariablesService} from '../../services/variables.service';
 import {BackendService} from '../../services/backend.service';
 import {IntToMoneyPipe} from '../../pipes/int-to-money.pipe';
+import {BLOCK_EXPLORER_TX_URL_PREFIX} from '../../../_shared/constants';
+import {BLOCK_EXPLORER_TN_TX_URL_PREFIX} from '../../../_shared/constants';
 
 @Component({
   selector: 'app-transaction-details',
@@ -32,7 +34,7 @@ export class TransactionDetailsComponent implements OnInit, OnDestroy {
   }
 
   openInBrowser(tr) {
-    this.backendService.openUrlInBrowser('explorer.zano.org/transaction/' + tr);
+    this.backendService.openUrlInBrowser((this.variablesService.testnet ? BLOCK_EXPLORER_TN_TX_URL_PREFIX : BLOCK_EXPLORER_TX_URL_PREFIX)+ tr);
   }
 
   ngOnDestroy() {}
