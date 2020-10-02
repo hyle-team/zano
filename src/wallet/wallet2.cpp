@@ -2324,6 +2324,8 @@ void wallet2::assign_account(const currency::account_base& acc)
   clear();
   m_account = acc;
   init_log_prefix();
+  if (m_account.is_watch_only())
+    m_watch_only = true;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::generate(const std::wstring& path, const std::string& pass, bool auditable_wallet)
