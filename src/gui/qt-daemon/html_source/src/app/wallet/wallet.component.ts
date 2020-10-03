@@ -107,7 +107,6 @@ export class WalletComponent implements OnInit, OnDestroy {
       clearTimeout(this.copyAnimationTimeout);
       this.copyAnimation = false;
       this.mining = this.variablesService.currentWallet.exclude_mining_txs;
-      this.getRecentTransfers();
     });
     this.subRouting2 = this.router.events.subscribe(val => {
       if (val instanceof RoutesRecognized) {

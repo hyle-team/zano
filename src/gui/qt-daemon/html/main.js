@@ -3573,7 +3573,7 @@ var AppComponent = /** @class */ (function () {
                 var wallet = _this.variablesService.getWallet(wallet_id);
                 if (wallet) {
                     if (wallet.history.length > 40) {
-                        wallet.history.splice(0, 1);
+                        wallet.history.splice(40, 1);
                     }
                     _this.ngZone.run(function () {
                         if (!wallet.loaded) {
@@ -8896,7 +8896,6 @@ var WalletComponent = /** @class */ (function () {
             clearTimeout(_this.copyAnimationTimeout);
             _this.copyAnimation = false;
             _this.mining = _this.variablesService.currentWallet.exclude_mining_txs;
-            _this.getRecentTransfers();
         });
         this.subRouting2 = this.router.events.subscribe(function (val) {
             if (val instanceof _angular_router__WEBPACK_IMPORTED_MODULE_1__["RoutesRecognized"]) {
