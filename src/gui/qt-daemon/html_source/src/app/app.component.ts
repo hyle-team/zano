@@ -249,7 +249,7 @@ export class AppComponent implements OnInit, OnDestroy {
         const wallet = this.variablesService.getWallet(wallet_id);
         if (wallet) {
           if(wallet.history.length > 40) {
-            wallet.history.splice(0, 1);
+            wallet.history.splice(40, 1);
           }
           this.ngZone.run(() => {
 
