@@ -154,6 +154,9 @@ export class BackendService {
       case 'ALREADY_EXISTS':
         error_translate = 'ERRORS.FILE_EXIST';
         break;
+      case 'FAILED':
+        BackendService.Debug(0, `Error: (${error}) was triggered by command: ${command}`);
+        break;
       default:
         error_translate = error;
     }
