@@ -147,6 +147,12 @@
       "TIME3": "1 hora",
       "TIME4": "Nunca"
     },
+    "SCALE": {
+      "75": "75% escala",
+      "100": "100% escala",
+      "125": "125% escala",
+      "150": "150% escala"
+    },
     "MASTER_PASSWORD": {
       "TITLE": "Atualizar password mestra",
       "OLD": "Antiga password",
@@ -194,7 +200,7 @@
   "ASSIGN_ALIAS": {
     "NAME": {
       "LABEL": "Alias",
-      "PLACEHOLDER": "@ Introduzir alias",
+      "PLACEHOLDER": " Introduzir alias",
       "TOOLTIP": "Um alias é uma forma abreviada da sua conta. Um alias só pode incluir letras, números e caracteres latinos “.” e “-”. Deve começar com “@”."
     },
     "COMMENT": {
@@ -206,7 +212,7 @@
     "BUTTON_ASSIGN": "Atribuir",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Nome é necessário",
-      "NAME_WRONG": "Alias tem nome errado",
+      "NAME_WRONG": "Nome inválido: símbolos permitidos \"0-9\", \"a-z\", \"-\", \".\"",
       "NAME_LENGTH": "O alias deve ter entre 6 e 25 caracteres",
       "NAME_EXISTS": "Nome de alias já existe",
       "NO_MONEY": "Não tem fundos suficientes para atribuir esse alias",

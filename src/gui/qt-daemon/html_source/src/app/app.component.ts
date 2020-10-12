@@ -8,14 +8,16 @@ import {ContextMenuComponent} from 'ngx-contextmenu';
 import {IntToMoneyPipe} from './_helpers/pipes/int-to-money.pipe';
 import {BigNumber} from 'bignumber.js';
 import {ModalService} from './_helpers/services/modal.service';
+import {UtilsService} from './_helpers/services/utils.service';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+  styleUrls: ['./app.component.scss'],
+  providers: [UtilsService]
 })
 export class AppComponent implements OnInit, OnDestroy {
-  
+
   intervalUpdatePriceState;
   intervalUpdateContractsState;
   expMedTsEvent;
@@ -37,7 +39,8 @@ export class AppComponent implements OnInit, OnDestroy {
     public variablesService: VariablesService,
     private ngZone: NgZone,
     private intToMoneyPipe: IntToMoneyPipe,
-    private modalService: ModalService
+    private modalService: ModalService,
+    private utilsService: UtilsService
   ) {
     translate.addLangs(['en', 'fr', 'de', 'it', 'pt']);
     translate.setDefaultLang('en');
@@ -248,6 +251,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
         const wallet = this.variablesService.getWallet(wallet_id);
         if (wallet) {
+          if(wallet.history.length > 40) {
+            wallet.history.splice(40, 1);
+          }
           this.ngZone.run(() => {
 
             if (!wallet.loaded) {
@@ -550,6 +556,9 @@ export class AppComponent implements OnInit, OnDestroy {
             this.renderer.addClass(document.body, 'theme-' + this.variablesService.defaultTheme);
           }
           if (this.variablesService.settings.hasOwnProperty('scale') && [7.5, 10, 12.5, 15].indexOf(this.variablesService.settings.scale) !== -1) {
+            const width = this.utilsService.getMinWidthByScale(this.variablesService.settings.scale);
+            const app = document.documentElement.querySelector('app-root');
+            this.renderer.setStyle(app, 'min-width', width + 'px');
             this.renderer.setStyle(document.documentElement, 'font-size', this.variablesService.settings.scale + 'px');
           }
         } else {
