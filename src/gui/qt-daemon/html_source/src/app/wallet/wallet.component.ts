@@ -9,11 +9,12 @@ import { LOCKED_BALANCE_HELP_PAGE } from '../_shared/constants';
 
 import icons from '../../assets/icons/icons.json';
 import { PaginationService } from '../_helpers/services/pagination.service';
+import { PaginationStore } from '../_helpers/services/pagination.store';
 
 @Component({
   selector: 'app-wallet',
   templateUrl: './wallet.component.html',
-  styleUrls: ['./wallet.component.scss']
+  styleUrls: ['./wallet.component.scss'],
 })
 export class WalletComponent implements OnInit, OnDestroy {
   subRouting1;
@@ -96,7 +97,8 @@ export class WalletComponent implements OnInit, OnDestroy {
     private ngZone: NgZone,
     private translate: TranslateService,
     private intToMoneyPipe: IntToMoneyPipe,
-    private pagination: PaginationService
+    private pagination: PaginationService,
+    private paginationStore: PaginationStore
   ) { }
 
   ngOnInit() {
@@ -207,12 +209,23 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   getRecentTransfers () {
+    const offset = this.pagination.getOffset();
+    const pages = this.paginationStore.value;
+    if (!pages) {
+      this.paginationStore.setPage(1, 40); // add back page for the first page
+    }
+
     this.backend.getRecentTransfers(
       this.walletID,
-      (this.variablesService.currentWallet.currentPage - 1) * this.variablesService.count,
+      offset,
       this.variablesService.count, this.variablesService.currentWallet.exclude_mining_txs, (status, data) => {
+        const page = (this.variablesService.currentWallet.currentPage + 1);
+        this.paginationStore.setPage(page, data.last_item_index); // add back page for current page
+        if (data.history.length < this.variablesService.count) {
+          this.variablesService.currentWallet.totalPages = (page - 1); // stop paginate
+        }
         if (status && data.total_history_items) {
-          this.variablesService.currentWallet.history.splice(0, this.variablesService.currentWallet.history.length);
+            this.variablesService.currentWallet.history.splice(0, this.variablesService.currentWallet.history.length);
           this.ngZone.run(() => {
             this.pagination.paginate(this.variablesService.currentWallet.currentPage);
             if (data.history.length !== 0) {
