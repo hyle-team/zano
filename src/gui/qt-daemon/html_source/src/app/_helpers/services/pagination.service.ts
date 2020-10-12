@@ -1,14 +1,17 @@
 import { Injectable, NgZone } from '@angular/core';
 import { VariablesService } from './variables.service';
+import { PaginationStore } from './pagination.store';
+import * as _ from 'lodash';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class PaginationService {
 
   constructor(
     private variables: VariablesService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private paginationStore: PaginationStore
   ) { }
 
   paginate(currentPage = 1) {
@@ -43,5 +46,24 @@ export class PaginationService {
     this.ngZone.run(() => {
       this.variables.currentWallet.pages = Array.from(Array((endPage + 1) - startPage).keys()).map(i => startPage + i);
     });
+  }
+
+  getOffset() {
+    const mining = this.variables.currentWallet.exclude_mining_txs;
+    const currentPage = (this.variables.currentWallet.currentPage);
+    let offset = (currentPage * this.variables.count);
+    if (!mining) { return offset; }
+    const pages = this.paginationStore.value;
+    if (pages && pages.length) {
+      const max = _.maxBy(pages, 'page');
+      const isForward = this.paginationStore.isForward(pages, currentPage);
+      if (isForward) {
+        offset = max.offset;
+      } else {
+        const index = pages.findIndex(item => item.page === (currentPage));
+          offset = pages[index].offset;
+      }
+    }
+    return offset;
   }
 }

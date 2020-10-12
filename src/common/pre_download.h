@@ -188,7 +188,7 @@ namespace tools
       std::list<currency::block> blocks;
       std::list<currency::transaction> txs;
       bool r = source_core.get_blocks(i, 1, blocks, txs);
-      CHECK_AND_ASSERT_MES(r && blocks.size()==1, false, "Filed to get block " << i << " from core");
+      CHECK_AND_ASSERT_MES(r && blocks.size()==1, false, "Failed to get block " << i << " from core");
       currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
       crypto::hash tx_hash = AUTO_VAL_INIT(tx_hash);
       for (auto& tx : txs)

@@ -4,11 +4,13 @@ import {BackendService} from '../_helpers/services/backend.service';
 import {FormControl, FormGroup, Validators} from '@angular/forms';
 import {Location} from '@angular/common';
 import { TranslateService } from '@ngx-translate/core';
+import {UtilsService} from '../_helpers/services/utils.service';
 
 @Component({
   selector: 'app-settings',
   templateUrl: './settings.component.html',
-  styleUrls: ['./settings.component.scss']
+  styleUrls: ['./settings.component.scss'],
+  providers: [UtilsService]
 })
 export class SettingsComponent implements OnInit {
 
@@ -103,7 +105,8 @@ export class SettingsComponent implements OnInit {
     private backend: BackendService,
     private location: Location,
     public translate: TranslateService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private utilsService: UtilsService
   ) {
     this.theme = this.variablesService.settings.theme;
     this.scale = this.variablesService.settings.scale;
@@ -147,6 +150,9 @@ export class SettingsComponent implements OnInit {
   setScale(scale) {
     this.scale = scale;
     this.variablesService.settings.scale = this.scale;
+    const width = this.utilsService.getMinWidthByScale(this.scale);
+    const app = document.documentElement.querySelector('app-root');
+    this.renderer.setStyle(app, 'min-width', width + 'px');
     this.renderer.setStyle(document.documentElement, 'font-size', this.scale + 'px');
     this.backend.storeAppData();
   }
