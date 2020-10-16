@@ -159,6 +159,9 @@ public:
   QString is_remnotenode_mode_preconfigured();
   QString start_backend(const QString& params);
 
+  //for test purposes onlys
+  QString request_dummy();
+
 signals:
   void quit_requested(const QString str);
   void update_daemon_state(const QString str);
