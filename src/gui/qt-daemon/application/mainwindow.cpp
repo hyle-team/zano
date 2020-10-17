@@ -239,6 +239,28 @@ QString MainWindow::get_tx_pool_info()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::request_dummy()
+{
+  static int code_ = 0;
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_POOL_INFO::response, ar);
+  if (code_ == 2)
+  {
+    code_ = -1;
+    ar.error_code = API_RETURN_CODE_CORE_BUSY;
+  }
+  else
+  {
+    ar.error_code = API_RETURN_CODE_OK;
+  }
+
+  ++code_;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+
 QString MainWindow::get_default_fee()
 {
   TRY_ENTRY();
