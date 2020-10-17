@@ -248,7 +248,7 @@ QString MainWindow::request_dummy()
   if (code_ == 2)
   {
     code_ = -1;
-    ar.error_code = API_RETURN_CODE_OK;
+    ar.error_code = API_RETURN_CODE_CORE_BUSY;
   }
   else
   {
