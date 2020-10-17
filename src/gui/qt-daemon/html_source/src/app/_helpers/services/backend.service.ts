@@ -198,6 +198,7 @@ export class BackendService {
       };
     }
 
+    const core_busy = Result.error_code === 'CORE_BUSY';
     const Status = (Result.error_code === 'OK' || Result.error_code === 'TRUE');
 
     if (!Status && Status !== undefined && Result.error_code !== undefined) {
@@ -207,18 +208,26 @@ export class BackendService {
 
     let res_error_code = false;
     if (typeof Result === 'object' && 'error_code' in Result && Result.error_code !== 'OK' && Result.error_code !== 'TRUE' && Result.error_code !== 'FALSE') {
-      this.informerRun(Result.error_code, params, command);
-      res_error_code = Result.error_code;
+      if (core_busy) {
+        setTimeout( () => {
+          this.runCommand(command, params, callback);
+        }, 50);
+      } else {
+        this.informerRun(Result.error_code, params, command);
+        res_error_code = Result.error_code;
+      }
     }
 
     // if ( command === 'get_offers_ex' ){
     //   Service.printLog( "get_offers_ex offers count "+((data.offers)?data.offers.length:0) );
     // }
 
-    if (typeof callback === 'function') {
-      callback(Status, data, res_error_code);
-    } else {
-      return data;
+    if (!core_busy) {
+      if (typeof callback === 'function') {
+        callback(Status, data, res_error_code);
+      } else {
+        return data;
+      }
     }
   }
 
