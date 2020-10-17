@@ -32,9 +32,11 @@ import { TranslateLoader, TranslateModule } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
-
+// SERVICES
 import { BackendService } from './_helpers/services/backend.service';
 import { ModalService } from './_helpers/services/modal.service';
+import { PaginationStore } from './_helpers/services/pagination.store';
+// SERVICES
 import { MoneyToIntPipe } from './_helpers/pipes/money-to-int.pipe';
 import { IntToMoneyPipe } from './_helpers/pipes/int-to-money.pipe';
 import { HistoryTypeMessagesPipe } from './_helpers/pipes/history-type-messages.pipe';
@@ -146,6 +148,7 @@ export function highchartsFactory() {
   providers: [
     BackendService,
     ModalService,
+    PaginationStore,
     MoneyToIntPipe,
     IntToMoneyPipe,
     { provide: HIGHCHARTS_MODULES, useFactory: highchartsFactory }
