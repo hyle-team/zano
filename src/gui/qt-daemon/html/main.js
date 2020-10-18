@@ -1913,6 +1913,7 @@ var BackendService = /** @class */ (function () {
         }
     };
     BackendService.prototype.backendCallback = function (resultStr, params, callback, command) {
+        var _this = this;
         var Result = resultStr;
         if (command !== 'get_clipboard') {
             if (!resultStr || resultStr === '') {
@@ -1933,6 +1934,7 @@ var BackendService = /** @class */ (function () {
                 response_data: Result
             };
         }
+        var core_busy = Result.error_code === 'CORE_BUSY';
         var Status = (Result.error_code === 'OK' || Result.error_code === 'TRUE');
         if (!Status && Status !== undefined && Result.error_code !== undefined) {
             BackendService_1.Debug(1, 'API error for command: "' + command + '". Error code: ' + Result.error_code);
@@ -1940,17 +1942,27 @@ var BackendService = /** @class */ (function () {
         var data = ((typeof Result === 'object') && 'response_data' in Result) ? Result.response_data : Result;
         var res_error_code = false;
         if (typeof Result === 'object' && 'error_code' in Result && Result.error_code !== 'OK' && Result.error_code !== 'TRUE' && Result.error_code !== 'FALSE') {
-            this.informerRun(Result.error_code, params, command);
-            res_error_code = Result.error_code;
+            if (core_busy) {
+                console.log('CORE_BUSY_ERROR');
+                setTimeout(function () {
+                    _this.runCommand(command, params, callback);
+                }, 50);
+            }
+            else {
+                this.informerRun(Result.error_code, params, command);
+                res_error_code = Result.error_code;
+            }
         }
         // if ( command === 'get_offers_ex' ){
         //   Service.printLog( "get_offers_ex offers count "+((data.offers)?data.offers.length:0) );
         // }
-        if (typeof callback === 'function') {
-            callback(Status, data, res_error_code);
-        }
-        else {
-            return data;
+        if (!core_busy) {
+            if (typeof callback === 'function') {
+                callback(Status, data, res_error_code);
+            }
+            else {
+                return data;
+            }
         }
     };
     BackendService.prototype.runCommand = function (command, params, callback) {
@@ -2331,6 +2343,9 @@ var BackendService = /** @class */ (function () {
     };
     BackendService.prototype.getPoolInfo = function (callback) {
         this.runCommand('get_tx_pool_info', {}, callback);
+    };
+    BackendService.prototype.dummy = function (callback) {
+        this.runCommand('request_dummy', {}, callback);
     };
     BackendService.prototype.getVersion = function (callback) {
         var _this = this;
@@ -9053,6 +9068,10 @@ var WalletComponent = /** @class */ (function () {
     }
     WalletComponent.prototype.ngOnInit = function () {
         var _this = this;
+        this.backend.dummy(function (status, data) {
+            console.log('dummy_status', status);
+            console.log('dummy_data', data);
+        });
         this.subRouting1 = this.route.params.subscribe(function (params) {
             _this.walletID = +params['id'];
             _this.variablesService.setCurrentWallet(_this.walletID);
