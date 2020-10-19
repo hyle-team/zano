@@ -141,7 +141,7 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   changeTab(index) {
     if (((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts' || this.tabs[index].link === '/staking') && (this.variablesService.daemon_state !== 2 || !this.variablesService.currentWallet.loaded))
-    || ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts') && this.variablesService.currentWallet.is_watch_only && this.variablesService.currentWallet.is_auditable)) {
+      || ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts') && this.variablesService.currentWallet.is_watch_only && this.variablesService.currentWallet.is_auditable)) {
       return;
     }
     this.tabs.forEach((tab) => {
@@ -203,6 +203,9 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
   toggleMiningTransactions() {
     this.mining = !this.mining;
+    const total_history_item = this.variablesService.currentWallet.total_history_item;
+    const count = this.variablesService.count;
+    this.variablesService.currentWallet.totalPages = Math.ceil( total_history_item / count);
     this.variablesService.currentWallet.exclude_mining_txs = this.mining;
     this.variablesService.currentWallet.currentPage = 1;
     this.getRecentTransfers();
@@ -210,22 +213,29 @@ export class WalletComponent implements OnInit, OnDestroy {
 
   getRecentTransfers () {
     const offset = this.pagination.getOffset();
+    const mining = this.variablesService.currentWallet.exclude_mining_txs;
     const pages = this.paginationStore.value;
-    if (!pages) {
-      this.paginationStore.setPage(1, 40); // add back page for the first page
+    if (!pages && mining) {
+      this.paginationStore.setPage(1, 0); // add back page for the first page
     }
 
     this.backend.getRecentTransfers(
       this.walletID,
       offset,
       this.variablesService.count, this.variablesService.currentWallet.exclude_mining_txs, (status, data) => {
-        const page = (this.variablesService.currentWallet.currentPage + 1);
-        this.paginationStore.setPage(page, data.last_item_index); // add back page for current page
-        if (data.history.length < this.variablesService.count) {
-          this.variablesService.currentWallet.totalPages = (page - 1); // stop paginate
+        const isForward = this.paginationStore.isForward(pages, this.variablesService.currentWallet.currentPage);
+        if (mining && isForward && pages && pages.length === 1) {
+          this.variablesService.currentWallet.currentPage = 1; // set init page after navigation back
+        }
+        const page = this.variablesService.currentWallet.currentPage + 1;
+        if (isForward && mining && data.history.length === this.variablesService.count) {
+          this.paginationStore.setPage(page, data.last_item_index); // add back page for current page
+        }
+        if (mining && data.history.length < this.variablesService.count) {
+          this.variablesService.currentWallet.totalPages = this.variablesService.currentWallet.currentPage; // stop paginate
         }
         if (status && data.total_history_items) {
-            this.variablesService.currentWallet.history.splice(0, this.variablesService.currentWallet.history.length);
+          this.variablesService.currentWallet.history.splice(0, this.variablesService.currentWallet.history.length);
           this.ngZone.run(() => {
             this.pagination.paginate(this.variablesService.currentWallet.currentPage);
             if (data.history.length !== 0) {

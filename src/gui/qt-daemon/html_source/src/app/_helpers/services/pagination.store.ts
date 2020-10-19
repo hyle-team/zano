@@ -24,13 +24,11 @@ export class PaginationStore {
   }
   setPage(pageNumber: number, offset: number) {
     const pages = this.subject.getValue();
-    const current = (this.variablesService.currentWallet.currentPage);
-    const isForward = this.isForward(pages, current);
     let newPages: Pages[] = [];
     if (pages && pages.length) {
       newPages = pages.slice(0);
     }
-    isForward ? newPages.push({page: pageNumber, offset}) : newPages.pop();
+   newPages.push({page: pageNumber, offset});
     this.subject.next(newPages);
   }
 
