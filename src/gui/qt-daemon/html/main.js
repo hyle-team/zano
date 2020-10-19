@@ -2605,7 +2605,7 @@ var PaginationService = /** @class */ (function () {
     PaginationService.prototype.getOffset = function () {
         var mining = this.variables.currentWallet.exclude_mining_txs;
         var currentPage = (this.variables.currentWallet.currentPage);
-        var offset = (currentPage * this.variables.count);
+        var offset = ((currentPage - 1) * this.variables.count);
         if (!mining) {
             return offset;
         }
@@ -9172,7 +9172,7 @@ var WalletComponent = /** @class */ (function () {
         var mining = this.variablesService.currentWallet.exclude_mining_txs;
         var pages = this.paginationStore.value;
         if (!pages && mining) {
-            this.paginationStore.setPage(1, 40); // add back page for the first page
+            this.paginationStore.setPage(1, 0); // add back page for the first page
         }
         this.backend.getRecentTransfers(this.walletID, offset, this.variablesService.count, this.variablesService.currentWallet.exclude_mining_txs, function (status, data) {
             var isForward = _this.paginationStore.isForward(pages, _this.variablesService.currentWallet.currentPage);

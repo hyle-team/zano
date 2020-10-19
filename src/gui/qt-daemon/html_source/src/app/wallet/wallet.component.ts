@@ -216,7 +216,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     const mining = this.variablesService.currentWallet.exclude_mining_txs;
     const pages = this.paginationStore.value;
     if (!pages && mining) {
-      this.paginationStore.setPage(1, 40); // add back page for the first page
+      this.paginationStore.setPage(1, 0); // add back page for the first page
     }
 
     this.backend.getRecentTransfers(
