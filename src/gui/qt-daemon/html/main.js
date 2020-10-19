@@ -9161,6 +9161,9 @@ var WalletComponent = /** @class */ (function () {
     };
     WalletComponent.prototype.toggleMiningTransactions = function () {
         this.mining = !this.mining;
+        var total_history_item = this.variablesService.currentWallet.total_history_item;
+        var count = this.variablesService.count;
+        this.variablesService.currentWallet.totalPages = Math.ceil(total_history_item / count);
         this.variablesService.currentWallet.exclude_mining_txs = this.mining;
         this.variablesService.currentWallet.currentPage = 1;
         this.getRecentTransfers();
@@ -9168,15 +9171,22 @@ var WalletComponent = /** @class */ (function () {
     WalletComponent.prototype.getRecentTransfers = function () {
         var _this = this;
         var offset = this.pagination.getOffset();
+        var mining = this.variablesService.currentWallet.exclude_mining_txs;
         var pages = this.paginationStore.value;
-        if (!pages) {
+        if (!pages && mining) {
             this.paginationStore.setPage(1, 40); // add back page for the first page
         }
         this.backend.getRecentTransfers(this.walletID, offset, this.variablesService.count, this.variablesService.currentWallet.exclude_mining_txs, function (status, data) {
-            var page = (_this.variablesService.currentWallet.currentPage + 1);
-            _this.paginationStore.setPage(page, data.last_item_index); // add back page for current page
-            if (data.history.length < _this.variablesService.count) {
-                _this.variablesService.currentWallet.totalPages = (page - 1); // stop paginate
+            var isForward = _this.paginationStore.isForward(pages, _this.variablesService.currentWallet.currentPage);
+            if (mining && isForward && pages && pages.length === 1) {
+                _this.variablesService.currentWallet.currentPage = 1;
+            }
+            var page = _this.variablesService.currentWallet.currentPage + 1;
+            if (mining && data.history.length === _this.variablesService.count) {
+                _this.paginationStore.setPage(page, data.last_item_index); // add back page for current page
+            }
+            if (mining && data.history.length < _this.variablesService.count) {
+                _this.variablesService.currentWallet.totalPages = _this.variablesService.currentWallet.currentPage; // stop paginate
             }
             if (status && data.total_history_items) {
                 _this.variablesService.currentWallet.history.splice(0, _this.variablesService.currentWallet.history.length);
