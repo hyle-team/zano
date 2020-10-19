@@ -51,7 +51,7 @@ export class PaginationService {
   getOffset() {
     const mining = this.variables.currentWallet.exclude_mining_txs;
     const currentPage = (this.variables.currentWallet.currentPage);
-    let offset = (currentPage * this.variables.count);
+    let offset = ((currentPage - 1) * this.variables.count);
     if (!mining) { return offset; }
     const pages = this.paginationStore.value;
     if (pages && pages.length) {
