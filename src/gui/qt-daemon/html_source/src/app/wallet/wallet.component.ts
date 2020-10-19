@@ -228,7 +228,7 @@ export class WalletComponent implements OnInit, OnDestroy {
           this.variablesService.currentWallet.currentPage = 1; // set init page after navigation back
         }
         const page = this.variablesService.currentWallet.currentPage + 1;
-        if (mining && data.history.length === this.variablesService.count) {
+        if (isForward && mining && data.history.length === this.variablesService.count) {
           this.paginationStore.setPage(page, data.last_item_index); // add back page for current page
         }
         if (mining && data.history.length < this.variablesService.count) {

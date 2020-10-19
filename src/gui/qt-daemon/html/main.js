@@ -2678,13 +2678,11 @@ var PaginationStore = /** @class */ (function () {
     };
     PaginationStore.prototype.setPage = function (pageNumber, offset) {
         var pages = this.subject.getValue();
-        var current = (this.variablesService.currentWallet.currentPage);
-        var isForward = this.isForward(pages, current);
         var newPages = [];
         if (pages && pages.length) {
             newPages = pages.slice(0);
         }
-        isForward ? newPages.push({ page: pageNumber, offset: offset }) : newPages.pop();
+        newPages.push({ page: pageNumber, offset: offset });
         this.subject.next(newPages);
     };
     Object.defineProperty(PaginationStore.prototype, "value", {
@@ -9179,10 +9177,10 @@ var WalletComponent = /** @class */ (function () {
         this.backend.getRecentTransfers(this.walletID, offset, this.variablesService.count, this.variablesService.currentWallet.exclude_mining_txs, function (status, data) {
             var isForward = _this.paginationStore.isForward(pages, _this.variablesService.currentWallet.currentPage);
             if (mining && isForward && pages && pages.length === 1) {
-                _this.variablesService.currentWallet.currentPage = 1;
+                _this.variablesService.currentWallet.currentPage = 1; // set init page after navigation back
             }
             var page = _this.variablesService.currentWallet.currentPage + 1;
-            if (mining && data.history.length === _this.variablesService.count) {
+            if (isForward && mining && data.history.length === _this.variablesService.count) {
                 _this.paginationStore.setPage(page, data.last_item_index); // add back page for current page
             }
             if (mining && data.history.length < _this.variablesService.count) {
