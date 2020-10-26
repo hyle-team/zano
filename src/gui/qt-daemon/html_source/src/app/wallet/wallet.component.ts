@@ -28,6 +28,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   public mining:boolean = false;
 
   public currentPage = 1;
+  stopPaginate = false;
 
   @ViewChild('scrolledContent') private scrolledContent: ElementRef;
 
@@ -109,6 +110,10 @@ export class WalletComponent implements OnInit, OnDestroy {
       clearTimeout(this.copyAnimationTimeout);
       this.copyAnimation = false;
       this.mining = this.variablesService.currentWallet.exclude_mining_txs;
+      // reset pagination values on change wallet
+      this.variablesService.currentWallet.currentPage = 1;
+      this.paginationStore.setPage(0, 0, true);
+      this.getRecentTransfers();
     });
     this.subRouting2 = this.router.events.subscribe(val => {
       if (val instanceof RoutesRecognized) {
@@ -195,13 +200,18 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   public setPage(pageNumber: number) {
-    if (pageNumber === this.variablesService.currentWallet.currentPage) {
-      return;
+    const pages = this.paginationStore.value;
+    const isForward = this.paginationStore.isForward(pages, pageNumber);
+    if (!this.stopPaginate || !isForward || !this.mining) {
+      if (pageNumber === this.variablesService.currentWallet.currentPage) {
+        return;
+      }
+      this.variablesService.currentWallet.currentPage = pageNumber;
     }
-    this.variablesService.currentWallet.currentPage = pageNumber;
     this.getRecentTransfers();
   }
   toggleMiningTransactions() {
+    this.stopPaginate = false;
     this.mining = !this.mining;
     const total_history_item = this.variablesService.currentWallet.total_history_item;
     const count = this.variablesService.count;
@@ -216,7 +226,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     const mining = this.variablesService.currentWallet.exclude_mining_txs;
     const pages = this.paginationStore.value;
     if (!pages && mining) {
-      this.paginationStore.setPage(1, 0); // add back page for the first page
+      this.paginationStore.setPage(1, 0, false); // add back page for the first page
     }
 
     this.backend.getRecentTransfers(
@@ -228,12 +238,12 @@ export class WalletComponent implements OnInit, OnDestroy {
           this.variablesService.currentWallet.currentPage = 1; // set init page after navigation back
         }
         const page = this.variablesService.currentWallet.currentPage + 1;
-        if (isForward && mining && data.history.length === this.variablesService.count) {
-          this.paginationStore.setPage(page, data.last_item_index); // add back page for current page
+        const history = data.history;
+        if (isForward && mining && history && history.length === this.variablesService.count) {
+          this.paginationStore.setPage(page, data.last_item_index, false); // add back page for current page
         }
-        if (mining && data.history.length < this.variablesService.count) {
-          this.variablesService.currentWallet.totalPages = this.variablesService.currentWallet.currentPage; // stop paginate
-        }
+        this.stopPaginate = history && history.length < this.variablesService.count || !history;
+
         if (status && data.total_history_items) {
           this.variablesService.currentWallet.history.splice(0, this.variablesService.currentWallet.history.length);
           this.ngZone.run(() => {

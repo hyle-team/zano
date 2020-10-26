@@ -22,13 +22,17 @@ export class PaginationStore {
     const max = _.maxBy(pages, 'page');
     return !max || max.page < currentPage || max.page === currentPage;
   }
-  setPage(pageNumber: number, offset: number) {
-    const pages = this.subject.getValue();
+  setPage(pageNumber: number, offset: number, erase: boolean) {
     let newPages: Pages[] = [];
-    if (pages && pages.length) {
-      newPages = pages.slice(0);
+    if (!erase) {
+      const pages = this.subject.getValue();
+      if (pages && pages.length) {
+        newPages = pages.slice(0);
+      }
+      newPages.push({page: pageNumber, offset});
+    } else { // clean from values on change wallet
+      newPages = undefined;
     }
-   newPages.push({page: pageNumber, offset});
     this.subject.next(newPages);
   }
 

@@ -58,9 +58,10 @@
         </ng-container>
         <ng-container *ngIf="mining">
           <button [ngClass]="{ 'active': variablesService.currentWallet.currentPage }"
+                  [disabled]="stopPaginate"
                   (click)="setPage(variablesService.currentWallet.currentPage)">{{variablesService.currentWallet.currentPage}}</button>
         </ng-container>
-        <button [disabled]="variablesService.currentWallet.currentPage === variablesService.currentWallet.totalPages" (click)="setPage(variablesService.currentWallet.currentPage + 1)">></button>
+        <button [disabled]="stopPaginate" (click)="setPage(variablesService.currentWallet.currentPage + 1)">></button>
       </div>
       <div class="mining-transaction-switch">
         <span class="switch-text">Hide mining transactions</span>
