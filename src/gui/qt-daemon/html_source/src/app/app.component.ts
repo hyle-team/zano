@@ -9,6 +9,8 @@ import {IntToMoneyPipe} from './_helpers/pipes/int-to-money.pipe';
 import {BigNumber} from 'bignumber.js';
 import {ModalService} from './_helpers/services/modal.service';
 import {UtilsService} from './_helpers/services/utils.service';
+import {Store} from 'store';
+import {Wallet} from './_helpers/models/wallet.model';
 
 @Component({
   selector: 'app-root',
@@ -40,7 +42,8 @@ export class AppComponent implements OnInit, OnDestroy {
     private ngZone: NgZone,
     private intToMoneyPipe: IntToMoneyPipe,
     private modalService: ModalService,
-    private utilsService: UtilsService
+    private utilsService: UtilsService,
+    private store: Store
   ) {
     translate.addLangs(['en', 'fr', 'de', 'it', 'pt']);
     translate.setDefaultLang('en');
@@ -159,6 +162,7 @@ export class AppComponent implements OnInit, OnDestroy {
             wallet.progress = (data.progress < 0) ? 0 : ((data.progress > 100) ? 100 : data.progress);
             if (wallet.progress === 0) {
               wallet.loaded = false;
+              this.addToStore(wallet);
             } else if (wallet.progress === 100) {
               wallet.loaded = true;
               if (wallet.total_history_item) {
@@ -173,6 +177,7 @@ export class AppComponent implements OnInit, OnDestroy {
                   : wallet.pages = new Array(wallet.totalPages).fill(1).map((value, index) => value + index);
               }
             }
+            this.addToStore(wallet);
           });
         }
       });
@@ -720,6 +725,22 @@ export class AppComponent implements OnInit, OnDestroy {
         target['select']();
       });
     }
+  }
+
+  addToStore(wallet) {
+    const value = this.store.value.wallets;
+    let wallets = [];
+    if (value && value.length) {
+      wallets = value.map((item: Wallet) => {
+        if (wallet.wallet_id === item.wallet_id) {
+          return {...item, ...wallet};
+        }
+        return item;
+      });
+    } else {
+      wallets.push(wallet);
+    }
+    this.store.set('wallets', wallets);
   }
 
   ngOnDestroy() {

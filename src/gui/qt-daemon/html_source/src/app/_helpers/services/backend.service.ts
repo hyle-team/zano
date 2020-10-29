@@ -641,14 +641,19 @@ export class BackendService {
     }
   }
 
-  getRecentTransfers( id, offset, count,exclude_mining_txs, callback) {
+  getRecentTransfers( id, offset, count, exclude_mining_txs, callback) {
     const params = {
       wallet_id: id,
       offset: offset,
       count: count,
       exclude_mining_txs: exclude_mining_txs
     };
-    this.runCommand('get_recent_transfers', params, callback);
+  // avoid callback hell with repeated run function after CORE_BUSY
+  // data apply after some time - blinked data
+    const current_wallet_id = this.variablesService.currentWallet.wallet_id;
+    if (current_wallet_id === id) {
+      this.runCommand('get_recent_transfers', params, callback);
+    }
   }
 
   getPoolInfo(callback) {

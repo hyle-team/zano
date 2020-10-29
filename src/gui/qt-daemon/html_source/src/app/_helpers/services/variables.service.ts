@@ -162,6 +162,15 @@ export class VariablesService {
     return null;
   }
 
+  getNotLoadedWallet() {
+    for (let i = 0; i < this.wallets.length; i++) {
+      if (!this.wallets[i].loaded) {
+        return this.wallets[i];
+      }
+    }
+    return null;
+  }
+
   startCountdown() {
     this.idle.within(this.settings.appLockTime).start();
   }

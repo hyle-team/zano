@@ -254,6 +254,14 @@
         width: 2.5rem;
         height: 2.5rem;
         font-size: 1.2rem;
+        transition: all 0.3s;
+      }
+      .disabled {
+        background-color: #18202a;
+        color: #e0e0e0;
+        opacity: 0.3;
+        cursor: default;
+        transition: all 0.3s;
       }
     }
   }

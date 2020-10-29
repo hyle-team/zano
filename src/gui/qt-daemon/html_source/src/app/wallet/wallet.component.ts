@@ -10,6 +10,8 @@ import { LOCKED_BALANCE_HELP_PAGE } from '../_shared/constants';
 import icons from '../../assets/icons/icons.json';
 import { PaginationService } from '../_helpers/services/pagination.service';
 import { PaginationStore } from '../_helpers/services/pagination.store';
+import {Store} from 'store';
+import {Wallet} from '../_helpers/models/wallet.model';
 
 @Component({
   selector: 'app-wallet',
@@ -25,9 +27,10 @@ export class WalletComponent implements OnInit, OnDestroy {
   copyAnimationTimeout;
   balanceTooltip;
   activeTab = 'history';
-  public mining:boolean = false;
+  public mining = false;
 
   public currentPage = 1;
+  wallet: Wallet;
   stopPaginate = false;
 
   @ViewChild('scrolledContent') private scrolledContent: ElementRef;
@@ -89,6 +92,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     }
   ];
   aliasSubscription: Subscription;
+  walletsSubscription: Subscription;
 
   constructor(
     private route: ActivatedRoute,
@@ -99,25 +103,52 @@ export class WalletComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private intToMoneyPipe: IntToMoneyPipe,
     private pagination: PaginationService,
-    private paginationStore: PaginationStore
+    private paginationStore: PaginationStore,
+    private store: Store
   ) { }
 
   ngOnInit() {
     this.subRouting1 = this.route.params.subscribe(params => {
-      this.walletID = +params['id'];
-      this.variablesService.setCurrentWallet(this.walletID);
-      this.scrolledContent.nativeElement.scrollTop = 0;
-      clearTimeout(this.copyAnimationTimeout);
-      this.copyAnimation = false;
-      this.mining = this.variablesService.currentWallet.exclude_mining_txs;
-      // reset pagination values on change wallet
-      this.variablesService.currentWallet.currentPage = 1;
-      this.paginationStore.setPage(0, 0, true);
-      this.getRecentTransfers();
+      this.wallet = this.variablesService.getNotLoadedWallet();
+      // set current wallet only by user click to avoid after sync show synchronized data
+      // when user manipulate with other wallet
+      this.route.queryParams.subscribe(queryParam => {
+        if (queryParam.hasOwnProperty('sidenav')) {
+          this.walletID = +params['id'];
+          this.variablesService.setCurrentWallet(this.walletID);
+          this.scrolledContent.nativeElement.scrollTop = 0;
+          clearTimeout(this.copyAnimationTimeout);
+          this.copyAnimation = false;
+          this.mining = this.variablesService.currentWallet.exclude_mining_txs;
+          this.paginationStore.setPage(0, 0, true);
+          if (!this.wallet) {
+            this.getRecentTransfers();
+          }
+          this.walletsSubscription = this.store.select('wallets').subscribe((wallets: Wallet[]) => {
+            // make pagination be available again after sync
+              const wallet = this.variablesService.getNotLoadedWallet();
+              if (!wallet) {
+                setTimeout( () => {
+                  this.resetPaginationValues();
+                  this.getRecentTransfers();
+                  setTimeout(() => {
+                    this.wallet = wallet;
+                  }, 100);
+                }, 500);
+              } else {
+                this.wallet = wallet;
+              }
+          });
+        }
+      });
+      if (this.variablesService.wallets.length === 1) {
+        this.walletID = +params['id'];
+        this.variablesService.setCurrentWallet(this.walletID);
+      }
     });
     this.subRouting2 = this.router.events.subscribe(val => {
       if (val instanceof RoutesRecognized) {
-        this.activeTab = val.urlAfterRedirects.split('/').pop();
+        this.activeTab = val.urlAfterRedirects.replace('?sidenav=true', '').split('/').pop();
         if (val.state.root.firstChild && val.state.root.firstChild.firstChild) {
           for (let i = 0; i < this.tabs.length; i++) {
             this.tabs[i].active = (this.tabs[i].link === '/' + val.state.root.firstChild.firstChild.url[0].path);
@@ -142,6 +173,13 @@ export class WalletComponent implements OnInit, OnDestroy {
         this.variablesService.currentWallet.wakeAlias = false;
       }
     });
+  }
+  resetPaginationValues() {
+    const total_history_item = this.variablesService.currentWallet.total_history_item;
+    const count = this.variablesService.count;
+    this.variablesService.currentWallet.totalPages = Math.ceil( total_history_item / count);
+    this.variablesService.currentWallet.exclude_mining_txs = this.mining;
+    this.variablesService.currentWallet.currentPage = 1;
   }
 
   changeTab(index) {
@@ -211,14 +249,12 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.getRecentTransfers();
   }
   toggleMiningTransactions() {
-    this.stopPaginate = false;
-    this.mining = !this.mining;
-    const total_history_item = this.variablesService.currentWallet.total_history_item;
-    const count = this.variablesService.count;
-    this.variablesService.currentWallet.totalPages = Math.ceil( total_history_item / count);
-    this.variablesService.currentWallet.exclude_mining_txs = this.mining;
-    this.variablesService.currentWallet.currentPage = 1;
-    this.getRecentTransfers();
+    if (!this.wallet) {
+      this.stopPaginate = false;
+      this.mining = !this.mining;
+      this.resetPaginationValues();
+      this.getRecentTransfers();
+    }
   }
 
   getRecentTransfers () {
@@ -266,6 +302,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.subRouting2.unsubscribe();
     this.queryRouting.unsubscribe();
     this.aliasSubscription.unsubscribe();
+    this.walletsSubscription.unsubscribe();
     clearTimeout(this.copyAnimationTimeout);
   }
 
