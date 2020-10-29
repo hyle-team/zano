@@ -6195,10 +6195,13 @@ var OpenWalletModalComponent = /** @class */ (function () {
         });
     };
     OpenWalletModalComponent.prototype.skipWallet = function () {
-        if (this.wallets.length) {
-            this.wallets.splice(0, 1);
-            this.ngOnInit();
-        }
+        var _this = this;
+        this.ngZone.run(function () {
+            if (_this.wallets.length) {
+                _this.wallets.splice(0, 1);
+                _this.ngOnInit();
+            }
+        });
     };
     __decorate([
         Object(_angular_core__WEBPACK_IMPORTED_MODULE_0__["Input"])(),
