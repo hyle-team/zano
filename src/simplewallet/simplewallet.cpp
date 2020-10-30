@@ -1753,7 +1753,7 @@ bool check_if_file_looks_like_a_wallet(const std::wstring& wallet_)
     return false;
   }
 
-  std::cout << "\r                                                                           \r";
+  //std::cout << "\r                                                                           \r";
   LOG_PRINT_L0("Found wallet file: " << epee::string_encoding::convert_to_ansii(wallet_));
   return false;
 }
@@ -1784,7 +1784,7 @@ bool search_for_wallet_file(const std::wstring &search_here/*, const std::string
         if (get_tick_count__() - last_tick > 300)
         {
           last_tick = get_tick_count__();
-          std::cout << "\r                                                                                                                                        \r ->" << dir.path();
+          //std::cout << "\r                                                                                                                                        \r ->" << dir.path();
         }
         bool r = search_for_wallet_file(dir.path().wstring());
         if (r)
@@ -1811,7 +1811,7 @@ bool search_for_wallet_file(const std::wstring &search_here/*, const std::string
   }
   catch (std::exception& /* ex*/)
   {
-    std::cout << "\r                                                                           \r";
+    //std::cout << "\r                                                                           \r";
     LOG_PRINT_CYAN("Skip: " << search_here, LOG_LEVEL_0);
     return false;
   }
