@@ -210,7 +210,16 @@ export class BackendService {
     if (typeof Result === 'object' && 'error_code' in Result && Result.error_code !== 'OK' && Result.error_code !== 'TRUE' && Result.error_code !== 'FALSE') {
       if (core_busy) {
         setTimeout( () => {
-          this.runCommand(command, params, callback);
+          // this is will avoid update data when user
+          // on other wallet after CORE_BUSY (blink of data)
+          if (command !== 'get_recent_transfers') {
+            this.runCommand(command, params, callback);
+          } else {
+            const current_wallet_id = this.variablesService.currentWallet.wallet_id;
+            if (current_wallet_id === params.wallet_id) {
+              this.runCommand(command, params, callback);
+            }
+          }
         }, 50);
       } else {
         this.informerRun(Result.error_code, params, command);
@@ -234,6 +243,9 @@ export class BackendService {
 
   private runCommand(command, params?, callback?) {
     if (this.backendObject) {
+      if (command === 'get_recent_transfers') {
+        this.variablesService.get_recent_transfers = true;
+      }
       const Action = this.backendObject[command];
       if (!Action) {
         BackendService.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
@@ -241,6 +253,9 @@ export class BackendService {
         const that = this;
         params = (typeof params === 'string') ? params : JSONBigNumber.stringify(params);
         if (params === undefined || params === '{}') {
+          if (command === 'get_recent_transfers') {
+            this.variablesService.get_recent_transfers = false;
+          }
           Action(function (resultStr) {
             that.commandDebug(command, params, resultStr);
             return that.backendCallback(resultStr, params, callback, command);
@@ -648,12 +663,7 @@ export class BackendService {
       count: count,
       exclude_mining_txs: exclude_mining_txs
     };
-  // avoid callback hell with repeated run function after CORE_BUSY
-  // data apply after some time - blinked data
-    const current_wallet_id = this.variablesService.currentWallet.wallet_id;
-    if (current_wallet_id === id) {
       this.runCommand('get_recent_transfers', params, callback);
-    }
   }
 
   getPoolInfo(callback) {

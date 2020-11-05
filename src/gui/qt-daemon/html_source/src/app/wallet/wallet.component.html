@@ -52,30 +52,30 @@
     <div class="pagination">
       <div>
         <button
-          [ngClass]="{'disabled': wallet }"
-          [disabled]="variablesService.currentWallet.currentPage === 1 || wallet"
+          [ngClass]="{'disabled': sync_started || wallet}"
+          [disabled]="variablesService.currentWallet.currentPage === 1 || sync_started || wallet"
           (click)="setPage(variablesService.currentWallet.currentPage - 1)">
           <
         </button>
 
         <ng-container *ngIf="!mining">
-          <button [disabled]="wallet"
+          <button [disabled]="sync_started || wallet"
                   *ngFor="let page of variablesService.currentWallet.pages"
-                  [ngClass]="{ 'active': variablesService.currentWallet.currentPage === page,'disabled': wallet }"
+                  [ngClass]="{ 'active': variablesService.currentWallet.currentPage === page,'disabled': sync_started || wallet }"
                   (click)="setPage(page)">{{page}}</button>
         </ng-container>
 
         <ng-container *ngIf="mining">
-          <button [ngClass]="{ 'active': variablesService.currentWallet.currentPage, 'disabled': wallet }"
-                  [disabled]="stopPaginate || wallet"
+          <button [ngClass]="{ 'active': variablesService.currentWallet.currentPage, 'disabled': sync_started || wallet}"
+                  [disabled]="stop_paginate || sync_started || wallet"
                   (click)="setPage(variablesService.currentWallet.currentPage)">
             {{variablesService.currentWallet.currentPage}}
           </button>
         </ng-container>
 
         <button
-          [disabled]="stopPaginate || wallet"
-          [ngClass]="{'disabled': wallet }"
+          [disabled]="stop_paginate || sync_started || wallet"
+          [ngClass]="{'disabled': sync_started || wallet}"
           (click)="setPage(variablesService.currentWallet.currentPage + 1)">
           >
         </button>
@@ -83,7 +83,7 @@
       </div>
       <div class="mining-transaction-switch">
         <span class="switch-text">Hide mining transactions</span>
-        <div class="switch" [ngClass]="{'disabled': wallet }" (click)="toggleMiningTransactions(); $event.stopPropagation()">
+        <div class="switch" [ngClass]="{'disabled': sync_started || wallet}" (click)="toggleMiningTransactions(); $event.stopPropagation()">
           <span class="option" *ngIf="mining">{{ 'STAKING.SWITCH.ON' | translate }}</span>
           <span class="circle" [class.on]="mining" [class.off]="!mining"></span>
           <span class="option" *ngIf="!mining">{{ 'STAKING.SWITCH.OFF' | translate }}</span>

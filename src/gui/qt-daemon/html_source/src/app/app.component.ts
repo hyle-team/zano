@@ -10,7 +10,6 @@ import {BigNumber} from 'bignumber.js';
 import {ModalService} from './_helpers/services/modal.service';
 import {UtilsService} from './_helpers/services/utils.service';
 import {Store} from 'store';
-import {Wallet} from './_helpers/models/wallet.model';
 
 @Component({
   selector: 'app-root',
@@ -132,7 +131,6 @@ export class AppComponent implements OnInit, OnDestroy {
         const wallet_state = data.wallet_state;
         const is_mining = data.is_mining;
         const wallet = this.variablesService.getWallet(data.wallet_id);
-
         // 1-synch, 2-ready, 3 - error
         if (wallet) {
           this.ngZone.run(() => {
@@ -160,24 +158,16 @@ export class AppComponent implements OnInit, OnDestroy {
         if (wallet) {
           this.ngZone.run(() => {
             wallet.progress = (data.progress < 0) ? 0 : ((data.progress > 100) ? 100 : data.progress);
+            if (!this.variablesService.sync_started) {
+              this.variablesService.sync_started = true;
+            }
+            this.addToStore(wallet, true); // subscribe on data
             if (wallet.progress === 0) {
               wallet.loaded = false;
-              this.addToStore(wallet);
             } else if (wallet.progress === 100) {
               wallet.loaded = true;
-              if (wallet.total_history_item) {
-                wallet.totalPages = Math.ceil( wallet.total_history_item / this.variablesService.count);
-                wallet.totalPages > this.variablesService.maxPages
-                ? wallet.pages = new Array(5).fill(1).map((value, index) => value + index)
-                  : wallet.pages = new Array(wallet.totalPages).fill(1).map((value, index) => value + index);
-              } else if (wallet.restore) {
-                wallet.totalPages = Math.ceil( wallet.history.length / this.variablesService.count);
-                wallet.totalPages > this.variablesService.maxPages
-                ? wallet.pages = new Array(5).fill(1).map((value, index) => value + index)
-                  : wallet.pages = new Array(wallet.totalPages).fill(1).map((value, index) => value + index);
-              }
+              this.addToStore(wallet, false);
             }
-            this.addToStore(wallet);
           });
         }
       });
@@ -727,20 +717,26 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
-  addToStore(wallet) {
-    const value = this.store.value.wallets;
-    let wallets = [];
+  addToStore(wallet, boolean) {
+    const value = this.store.value.sync;
     if (value && value.length) {
-      wallets = value.map((item: Wallet) => {
-        if (wallet.wallet_id === item.wallet_id) {
-          return {...item, ...wallet};
-        }
-        return item;
-      });
+      const sync = value.filter(item => item.wallet_id === wallet.wallet_id);
+      if (sync && sync.length) {
+        const result = value.map(item => {
+          if (item.wallet_id === wallet.wallet_id) {
+            return {sync: boolean, wallet_id: wallet.wallet_id};
+          } else {
+            return item;
+          }
+        });
+        this.store.set('sync', result);
+      } else {
+        value.push({sync: boolean, wallet_id: wallet.wallet_id});
+        this.store.set('sync', value);
+      }
     } else {
-      wallets.push(wallet);
+      this.store.set('sync', [{sync: boolean, wallet_id: wallet.wallet_id}]);
     }
-    this.store.set('wallets', wallets);
   }
 
   ngOnDestroy() {
