@@ -53,6 +53,8 @@ namespace
   const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address = { "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" };
   const command_line::arg_descriptor<std::string> arg_restore_wallet = { "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" };
   const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
+  const command_line::arg_descriptor<std::string> arg_scan_for_wallet = { "scan-for-wallet", "", "", true };
+  const command_line::arg_descriptor<std::string> arg_addr_to_compare = { "addr-to-compare", "", "", true };
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
 
@@ -1712,6 +1714,109 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
 
   return true;
 }
+
+
+//----------------------------------------------------------------------------------------------------
+uint64_t
+get_tick_count__()
+{
+  using namespace std::chrono;
+  return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+//----------------------------------------------------------------------------------------------------
+bool check_if_file_looks_like_a_wallet(const std::wstring& wallet_)
+{
+  std::string keys_buff;
+
+
+  boost::system::error_code e;
+  bool exists = boost::filesystem::exists(wallet_, e);
+  if (e || !exists)
+    return false;
+
+  boost::filesystem::ifstream data_file;
+  data_file.open(wallet_, std::ios_base::binary | std::ios_base::in);
+  if (data_file.fail())
+    return false;
+
+  tools::wallet_file_binary_header wbh = AUTO_VAL_INIT(wbh);
+
+  data_file.read((char*)&wbh, sizeof(wbh));
+  if (data_file.fail())
+  {
+    return false;
+  }
+
+  if (wbh.m_signature != WALLET_FILE_SIGNATURE_OLD && wbh.m_signature != WALLET_FILE_SIGNATURE_V2)
+  {
+    return false;
+  }
+
+  //std::cout << "\r                                                                           \r";
+  LOG_PRINT_L0("Found wallet file: " << epee::string_encoding::convert_to_ansii(wallet_));
+  return false;
+}
+
+bool search_for_wallet_file(const std::wstring &search_here/*, const std::string &addr_to_compare*/)
+{
+  if (search_here == L"/proc" || search_here == L"/bin" || search_here == L"/dev" || search_here == L"/etc"
+    || search_here == L"/lib" || search_here == L"/lib64" || search_here == L"/proc" || search_here == L"/run"
+    || search_here == L"/sbin" || search_here == L"/srv" || search_here == L"/sys" || search_here == L"/usr"
+    || search_here == L"/var")
+  {
+    LOG_PRINT_L0("Skiping    " << epee::string_encoding::convert_to_ansii(search_here));
+    return false;
+  }
+
+  //LOG_PRINT_L0("FOLDER: " << epee::string_encoding::convert_to_ansii(search_here));
+  static uint64_t last_tick = 0;
+  using namespace boost::filesystem;
+  //recursive_directory_iterator dir(search_here), end;
+  try
+  {
+    for (auto& dir : boost::make_iterator_range(directory_iterator(search_here), {}))
+    {
+      boost::system::error_code ec = AUTO_VAL_INIT(ec);
+      bool r = boost::filesystem::is_directory(dir.path(), ec);
+      if (r)
+      {
+        if (get_tick_count__() - last_tick > 300)
+        {
+          last_tick = get_tick_count__();
+          //std::cout << "\r                                                                                                                                        \r ->" << dir.path();
+        }
+        bool r = search_for_wallet_file(dir.path().wstring());
+        if (r)
+          return true;
+      }
+      else
+      {
+        boost::system::error_code ec = AUTO_VAL_INIT(ec);
+        bool r = boost::filesystem::is_regular_file(dir.path(), ec);
+        if (!r)
+        {
+          //LOG_PRINT_L0("Skiping as not regular: " << epee::string_encoding::convert_to_ansii(dir.path().wstring()));
+          return false;
+
+        }
+        //LOG_PRINT_L0("FILE: " << dir.path().string());
+        std::wstring pa = dir.path().wstring();
+        r = check_if_file_looks_like_a_wallet(pa);
+        if (r)
+          return true;
+
+      }
+    }
+  }
+  catch (std::exception& /* ex*/)
+  {
+    //std::cout << "\r                                                                           \r";
+    LOG_PRINT_CYAN("Skip: " << search_here, LOG_LEVEL_0);
+    return false;
+  }
+  return false;
+}
 //----------------------------------------------------------------------------------------------------
 #ifdef WIN32
 int wmain( int argc, wchar_t* argv_w[ ], wchar_t* envp[ ] )
@@ -1770,7 +1875,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_offline_mode);
   command_line::add_arg(desc_params, command_line::arg_log_file);
   command_line::add_arg(desc_params, command_line::arg_log_level);
-
+  command_line::add_arg(desc_params, arg_scan_for_wallet);
+  command_line::add_arg(desc_params, arg_addr_to_compare);
 
   tools::wallet_rpc_server::init_options(desc_params);
 
@@ -1825,6 +1931,17 @@ int main(int argc, char* argv[])
   {
     LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
     log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, command_line::arg_log_level));
+  }
+
+
+  if (command_line::has_arg(vm, arg_scan_for_wallet))
+  {
+    log_space::log_singletone::add_logger(LOGGER_CONSOLE, nullptr, nullptr, LOG_LEVEL_4);
+    LOG_PRINT_L0("Searching from "
+      << epee::string_encoding::convert_to_ansii(command_line::get_arg(vm, arg_scan_for_wallet)));
+
+    search_for_wallet_file(epee::string_encoding::convert_to_unicode(command_line::get_arg(vm, arg_scan_for_wallet)));
+    return EXIT_SUCCESS;
   }
 
   bool offline_mode = command_line::get_arg(vm, arg_offline_mode);
