@@ -3,6 +3,9 @@ import {Transaction} from './transaction.model';
 import {BigNumber} from 'bignumber.js';
 
 export class Wallet {
+  stop_paginate: boolean;
+  open_from_exist: boolean;
+  updated = false;
   wallet_id: number;
   name: string;
   pass: string;
