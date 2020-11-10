@@ -11,7 +11,9 @@ import {BigNumber} from 'bignumber.js';
   providedIn: 'root'
 })
 export class VariablesService {
-
+  public request_on_in = {};
+  public stop_paginate = {};
+  public sync_started = false;
   public digits = 12;
   public appPass = '';
   public appLogin = false;
@@ -36,6 +38,7 @@ export class VariablesService {
     progress_value: 0,
     progress_value_text: '0'
   };
+  public get_recent_transfers = false; // avoid of execute function before collback complete
   public default_fee = '0.010000000000';
   public default_fee_big = new BigNumber('10000000000');
 
@@ -71,7 +74,7 @@ export class VariablesService {
   public newContact: Contact = {name: null, address: null, notes: null};
 
   public pattern = '^[a-zA-Z0-9_.\\\]\*\|\~\!\?\@\#\$\%\^\&\+\{\}\(\)\<\>\:\;\"\'\-\=\/\,\[\\\\]*$';
-
+  public after_sync_request: any = {};
   getExpMedTsEvent = new BehaviorSubject(null);
   getHeightAppEvent = new BehaviorSubject(null);
   getHeightMaxEvent = new BehaviorSubject(null);
@@ -156,6 +159,15 @@ export class VariablesService {
   getWallet(id): Wallet {
     for (let i = 0; i < this.wallets.length; i++) {
       if (this.wallets[i].wallet_id === id) {
+        return this.wallets[i];
+      }
+    }
+    return null;
+  }
+
+  getNotLoadedWallet() {
+    for (let i = 0; i < this.wallets.length; i++) {
+      if (!this.wallets[i].loaded) {
         return this.wallets[i];
       }
     }

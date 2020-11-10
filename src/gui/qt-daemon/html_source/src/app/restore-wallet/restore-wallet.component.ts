@@ -121,6 +121,8 @@ export class RestoreWalletComponent implements OnInit {
   }
 
   runWallet() {
+    // add flag when wallet was restored form seed
+    this.variablesService.after_sync_request[this.wallet.id] = true;
     let exists = false;
     this.variablesService.wallets.forEach((wallet) => {
       if (wallet.address === this.variablesService.opening_wallet.address) {
