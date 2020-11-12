@@ -85,7 +85,7 @@
     flex-direction: column;
     flex: 1 1 auto;
     margin: 0 -3rem;
-    overflow-y: overlay;
+    overflow-y: auto;
 
     .sidebar-account {
       position: relative;
@@ -112,14 +112,19 @@
           .icon {
             width: 1.3rem;
             height: 1.3rem;
-
             &.close-wallet {
-              mask: url(../../assets/icons/close-wallet.svg) no-repeat center;
+              background-color: transparent;
+            }
+            &.close-wallet::after {
+              display: block;
+              content:'';
+              background:url("../../assets/icons/close-wallet-blue.svg") no-repeat center;
+              width: 13px;
+              height: 13px;
             }
           }
         }
       }
-
 
       .sidebar-account-row {
         display: flex;
@@ -169,12 +174,17 @@
 
           .icon {
             margin-left: 0.5rem;
-            width: 1.2rem;
-            height: 1.2rem;
-
-            &.comment {
-              mask: url(../../assets/icons/alert.svg) no-repeat center;
-            }
+            width: 1.3rem;
+            height: 1.3rem;
+            border-radius: 50%;
+            color: #1a1a1a;
+            font-size: 9px;
+            font-weight: 700;
+            line-height: 9px;
+            padding-right: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           }
         }
 
@@ -300,7 +310,7 @@
   }
 }
 
-.sidebar-synchronization-status {
+.synchronization-status {
   display: flex;
   align-items: center;
   justify-content: flex-start;

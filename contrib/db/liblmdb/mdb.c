@@ -132,8 +132,10 @@ extern int cacheflush(char *addr, int nbytes, int cache);
 
 #ifdef _WIN32
 typedef int64_t off64_t;
+#elif __APPLE__
+typedef off_t off64_t;
 #else
-//typedef off_t off64_t;
+
 #endif
 
 

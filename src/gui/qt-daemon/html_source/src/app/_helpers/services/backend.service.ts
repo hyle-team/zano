@@ -56,45 +56,38 @@ export class BackendService {
     switch (error) {
       case 'NOT_ENOUGH_MONEY':
         error_translate = 'ERRORS.NOT_ENOUGH_MONEY';
+        // error_translate = 'ERRORS.NO_MONEY'; maybe that one?
+        if (command === 'cancel_offer') {
+          error_translate = this.translate.instant('ERRORS.NO_MONEY_REMOVE_OFFER', {
+            'fee': this.variablesService.default_fee,
+            'currency': this.variablesService.defaultCurrency
+          });
+        }
         break;
       case 'CORE_BUSY':
-        if (command !== 'get_all_aliases') {
-          error_translate = 'ERRORS.CORE_BUSY';
-        }
+        error_translate = 'ERRORS.CORE_BUSY';
+        break;
+      case 'BUSY':
+        error_translate = 'ERRORS.DAEMON_BUSY';
         break;
       case 'OVERFLOW':
         if (command !== 'get_all_aliases') {
           error_translate = '';
         }
         break;
-      case 'INTERNAL_ERROR:daemon is busy':
-        error_translate = 'ERRORS.DAEMON_BUSY';
-        break;
-      case 'INTERNAL_ERROR:not enough money':
-      case 'INTERNAL_ERROR:NOT_ENOUGH_MONEY':
-        if (command === 'cancel_offer') {
-          error_translate = this.translate.instant('ERRORS.NO_MONEY_REMOVE_OFFER', {
-            'fee': this.variablesService.default_fee,
-            'currency': this.variablesService.defaultCurrency
-          });
-        } else {
-          error_translate = 'ERRORS.NO_MONEY';
-        }
-        break;
       case 'NOT_ENOUGH_OUTPUTS_FOR_MIXING':
-      case 'INTERNAL_ERROR:not enough outputs to mix':
         error_translate = 'ERRORS.NOT_ENOUGH_OUTPUTS_TO_MIX';
         break;
-      case 'INTERNAL_ERROR:transaction is too big':
+      case 'TX_IS_TOO_BIG':
         error_translate = 'ERRORS.TRANSACTION_IS_TO_BIG';
         break;
-      case 'INTERNAL_ERROR:Transfer attempt while daemon offline':
+      case 'DISCONNECTED':
         error_translate = 'ERRORS.TRANSFER_ATTEMPT';
         break;
       case 'ACCESS_DENIED':
         error_translate = 'ERRORS.ACCESS_DENIED';
         break;
-      case 'INTERNAL_ERROR:transaction was rejected by daemon':
+      case 'TX_REJECTED':
         // if (command === 'request_alias_registration') {
         // error_translate = 'INFORMER.ALIAS_IN_REGISTER';
         // } else {
@@ -114,7 +107,6 @@ export class BackendService {
         error_translate = 'ERRORS.WALLET_WATCH_ONLY_NOT_SUPPORTED';
         break;
       case 'WRONG_PASSWORD':
-      case 'WRONG_PASSWORD:invalid password':
         params = JSON.parse(params);
         if (!params.testEmpty) {
           error_translate = 'ERRORS.WRONG_PASSWORD';
@@ -154,6 +146,9 @@ export class BackendService {
       case 'ALREADY_EXISTS':
         error_translate = 'ERRORS.FILE_EXIST';
         break;
+      case 'FAILED':
+        BackendService.Debug(0, `Error: (${error}) was triggered by command: ${command}`);
+        break;
       default:
         error_translate = error;
     }
@@ -163,6 +158,7 @@ export class BackendService {
     if (error.indexOf('FAILED:failed to open binary wallet file for saving') > -1 && command === 'generate_wallet') {
       error_translate = '';
     }
+
     if (error_translate !== '') {
       this.modalService.prepareModal('error', error_translate);
     }
@@ -202,6 +198,7 @@ export class BackendService {
       };
     }
 
+    const core_busy = Result.error_code === 'CORE_BUSY';
     const Status = (Result.error_code === 'OK' || Result.error_code === 'TRUE');
 
     if (!Status && Status !== undefined && Result.error_code !== undefined) {
@@ -211,24 +208,44 @@ export class BackendService {
 
     let res_error_code = false;
     if (typeof Result === 'object' && 'error_code' in Result && Result.error_code !== 'OK' && Result.error_code !== 'TRUE' && Result.error_code !== 'FALSE') {
-      this.informerRun(Result.error_code, params, command);
-      res_error_code = Result.error_code;
+      if (core_busy) {
+        setTimeout( () => {
+          // this is will avoid update data when user
+          // on other wallet after CORE_BUSY (blink of data)
+          if (command !== 'get_recent_transfers') {
+            this.runCommand(command, params, callback);
+          } else {
+            const current_wallet_id = this.variablesService.currentWallet.wallet_id;
+            if (current_wallet_id === params.wallet_id) {
+              this.runCommand(command, params, callback);
+            }
+          }
+        }, 50);
+      } else {
+        this.informerRun(Result.error_code, params, command);
+        res_error_code = Result.error_code;
+      }
     }
 
     // if ( command === 'get_offers_ex' ){
     //   Service.printLog( "get_offers_ex offers count "+((data.offers)?data.offers.length:0) );
     // }
 
-    if (typeof callback === 'function') {
-      callback(Status, data, res_error_code);
-    } else {
-      return data;
+    if (!core_busy) {
+      if (typeof callback === 'function') {
+        callback(Status, data, res_error_code);
+      } else {
+        return data;
+      }
     }
   }
 
 
   private runCommand(command, params?, callback?) {
     if (this.backendObject) {
+      if (command === 'get_recent_transfers') {
+        this.variablesService.get_recent_transfers = true;
+      }
       const Action = this.backendObject[command];
       if (!Action) {
         BackendService.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
@@ -236,6 +253,9 @@ export class BackendService {
         const that = this;
         params = (typeof params === 'string') ? params : JSONBigNumber.stringify(params);
         if (params === undefined || params === '{}') {
+          if (command === 'get_recent_transfers') {
+            this.variablesService.get_recent_transfers = false;
+          }
           Action(function (resultStr) {
             that.commandDebug(command, params, resultStr);
             return that.backendCallback(resultStr, params, callback, command);
@@ -636,13 +656,14 @@ export class BackendService {
     }
   }
 
-  getRecentTransfers( id, offset, count, callback) {
+  getRecentTransfers( id, offset, count, exclude_mining_txs, callback) {
     const params = {
       wallet_id: id,
       offset: offset,
-      count: count
+      count: count,
+      exclude_mining_txs: exclude_mining_txs
     };
-    this.runCommand('get_recent_transfers', params, callback);
+      this.runCommand('get_recent_transfers', params, callback);
   }
 
   getPoolInfo(callback) {
@@ -651,7 +672,9 @@ export class BackendService {
 
   getVersion(callback) {
     this.runCommand('get_version', {}, (status, version) => {
-      callback(version);
+      this.runCommand('get_network_type', {}, (status, type) => {
+        callback(version, type);
+      });
     });
   }
 

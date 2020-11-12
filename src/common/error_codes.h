@@ -37,5 +37,5 @@
 #define API_RETURN_CODE_GENESIS_MISMATCH                        "GENESIS_MISMATCH"
 #define API_RETURN_CODE_DISCONNECTED                            "DISCONNECTED"
 #define API_RETURN_CODE_UNINITIALIZED                           "UNINITIALIZED"
-
-
+#define API_RETURN_CODE_TX_IS_TOO_BIG                           "TX_IS_TOO_BIG"
+#define API_RETURN_CODE_TX_REJECTED                             "TX_REJECTED"

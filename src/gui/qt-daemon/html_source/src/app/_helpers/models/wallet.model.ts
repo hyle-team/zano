@@ -3,6 +3,9 @@ import {Transaction} from './transaction.model';
 import {BigNumber} from 'bignumber.js';
 
 export class Wallet {
+  stop_paginate: boolean;
+  open_from_exist: boolean;
+  updated = false;
   wallet_id: number;
   name: string;
   pass: string;
@@ -14,6 +17,7 @@ export class Wallet {
   tracking_hey: string;
   is_auditable: boolean;
   is_watch_only: boolean;
+  exclude_mining_txs: boolean;
   alias_available: boolean;
 
   alias?: object;
@@ -101,7 +105,7 @@ export class Wallet {
 
   prepareHistory(items: Transaction[]): void {
     for (let i = 0; i < items.length; i++) {
-      if ((items[i].tx_type === 7 && items[i].is_income) || (items[i].tx_type === 11 && items[i].is_income) || (items[i].amount.eq(0) && items[i].fee.eq(0))) {
+      if ((items[i].tx_type === 7 && items[i].is_income) || (items[i].tx_type === 11 && items[i].is_income) || (items[i].amount.eq(0) && items[i].fee.eq(0) && !items[i].is_mining)) {
         let exists = false;
         for (let j = 0; j < this.excluded_history.length; j++) {
           if (this.excluded_history[j].tx_hash === items[i].tx_hash) {

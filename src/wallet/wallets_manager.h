@@ -159,6 +159,7 @@ public:
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
   std::string get_qt_dev_tools_option() const { return m_qt_dev_tools; }
   void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
+
 private:
   void main_worker(const po::variables_map& vm);
   bool init_local_daemon();
@@ -172,6 +173,10 @@ private:
   void init_wallet_entry(wallet_vs_options& wo, uint64_t id);
   static void prepare_wallet_status_info(wallet_vs_options& wo, view::wallet_status_info& wsi);
   bool get_is_remote_daemon_connected();
+
+  template<typename guarded_code_t, typename error_prefix_maker_t>
+  bool do_exception_safe_call(guarded_code_t guarded_code, error_prefix_maker_t error_prefix_maker, std::string& api_return_code_result);
+
   //----- i_backend_wallet_callback ------
   virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block);
 	virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined);
@@ -223,8 +228,7 @@ private:
 
   std::vector<std::string> m_wallet_log_prefixes;
   mutable critical_section m_wallet_log_prefixes_lock;
-};
 
-
+}; // class wallets_manager
 
 

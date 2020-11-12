@@ -239,6 +239,28 @@ QString MainWindow::get_tx_pool_info()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::request_dummy()
+{
+  static int code_ = 0;
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_POOL_INFO::response, ar);
+  if (code_ == 2)
+  {
+    code_ = -1;
+    ar.error_code = API_RETURN_CODE_CORE_BUSY;
+  }
+  else
+  {
+    ar.error_code = API_RETURN_CODE_OK;
+  }
+
+  ++code_;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+
 QString MainWindow::get_default_fee()
 {
   TRY_ENTRY();
@@ -734,14 +756,7 @@ QString    MainWindow::is_remnotenode_mode_preconfigured()
 QString MainWindow::start_backend(const QString& params)
 {
   TRY_ENTRY();
-  view::start_backend_params sbp = AUTO_VAL_INIT(sbp);
   view::api_response ar = AUTO_VAL_INIT(ar);
-
-  if (!epee::serialization::load_t_from_json(sbp, params.toStdString()))
-  {
-    ar.error_code = API_RETURN_CODE_BAD_ARG;
-    return MAKE_RESPONSE(ar);
-  }
 
   bool r = m_backend.start();
   if (!r)
@@ -758,13 +773,18 @@ bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
 {
   TRY_ENTRY();
   m_wallet_states->operator [](wsi.wallet_id) = wsi.wallet_state;
+  
+  std::string json_str_pub;
+  epee::serialization::store_t_to_json(static_cast<const view::wallet_status_info_base&>(wsi), json_str_pub, 0, epee::serialization::eol_lf);
+  LOG_PRINT_L0(get_wallet_log_prefix(wsi.wallet_id) + "SENDING SIGNAL -> [update_wallet_status]:" << std::endl << json_str_pub);
+  
   std::string json_str;
   epee::serialization::store_t_to_json(wsi, json_str, 0, epee::serialization::eol_lf);
-  LOG_PRINT_L0(get_wallet_log_prefix(wsi.wallet_id) + "SENDING SIGNAL -> [update_wallet_status]:" << std::endl << json_str );
   QMetaObject::invokeMethod(this, "update_wallet_status", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
   CATCH_ENTRY2(false);
 }
+
 bool MainWindow::set_options(const view::gui_options& opt)
 {
   TRY_ENTRY();
@@ -920,6 +940,15 @@ QString MainWindow::get_os_version()
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
+QString MainWindow::get_network_type()
+{
+#if defined(TESTNET)
+  return "testnet";
+#else
+  return "mainnet";
+#endif
+}
+
 QString MainWindow::get_alias_coast(const QString& param)
 {
   TRY_ENTRY();
@@ -946,9 +975,12 @@ QString MainWindow::set_localization_strings(const QString param)
   else
   {
     m_localization = lr.strings;
-    m_quit_action->setText(QString().fromUtf8(m_localization[localization_id_quit].c_str()));
-    m_restore_action->setText(QString().fromUtf8(m_localization[localization_id_tray_menu_show].c_str()));
-    m_minimize_action->setText(QString().fromUtf8(m_localization[localization_id_tray_menu_minimize].c_str()));
+    if(m_quit_action)
+      m_quit_action->setText(QString::fromStdString(m_localization[localization_id_quit]));
+    if(m_restore_action)
+      m_restore_action->setText(QString::fromStdString(m_localization[localization_id_tray_menu_show]));
+    if(m_minimize_action)
+      m_minimize_action->setText(QString::fromStdString(m_localization[localization_id_tray_menu_minimize]));
     resp.error_code = API_RETURN_CODE_OK;
     LOG_PRINT_L0("New localization set, language title: " << lr.language_title << ", strings " << lr.strings.size());
   }

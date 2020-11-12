@@ -2056,10 +2056,13 @@ void wallet2::detach_blockchain(uint64_t including_height)
 
       for (size_t i = i_start; i != m_transfers.size(); i++)
       {
-        auto it_ki = m_key_images.find(m_transfers[i].m_key_image);
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
-        m_key_images.erase(it_ki);
+        if (!(m_transfers[i].m_key_image == null_ki && is_watch_only()))
+        {
+          auto it_ki = m_key_images.find(m_transfers[i].m_key_image);
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers[i].m_key_image << " not found");
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
+          m_key_images.erase(it_ki);
+        }
         remove_transfer_from_amount_gindex_map(i);
         ++transfers_detached;
       }
@@ -2321,6 +2324,8 @@ void wallet2::assign_account(const currency::account_base& acc)
   clear();
   m_account = acc;
   init_log_prefix();
+  if (m_account.is_watch_only())
+    m_watch_only = true;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::generate(const std::wstring& path, const std::string& pass, bool auditable_wallet)
@@ -2935,7 +2940,6 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
   if (!count || offset >= m_transfer_history.size())
     return;
 
-  auto start = m_transfer_history.rbegin() + offset;
   for (auto it = m_transfer_history.rbegin() + offset; it != m_transfer_history.rend(); it++)
   {
     if (exclude_mining_txs)
@@ -4061,7 +4065,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
   bool r = m_core_proxy->call_COMMAND_RPC_SEND_RAW_TX(req, daemon_send_resp);
   THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "sendrawtransaction");
   THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_BUSY, error::daemon_busy, "sendrawtransaction");
-  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::wallet_internal_error, "Transfer attempt while daemon offline");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::no_connection_to_daemon, "Transfer attempt while daemon offline");
   THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, error::tx_rejected, tx, daemon_send_resp.status);
 
   WLT_LOG_L2("transaction " << get_transaction_hash(tx) << " generated ok and sent to daemon:" << ENDL << currency::obj_to_json_str(tx));

@@ -64,16 +64,30 @@
           }
 
           &.send  {
-
             .status-transaction {
-              mask: url(../../assets/icons/send.svg) no-repeat center;
+              background-color: transparent;
+            }
+
+            .status-transaction::after {
+              display: block;
+              content:'';
+              background:url("../../assets/icons/send-red.svg") no-repeat center;
+              width: 13px;
+              height: 13px;
             }
           }
 
           &.received {
-
             .status-transaction {
-              mask: url(../../assets/icons/receive.svg) no-repeat center;
+              background-color: transparent;
+            }
+
+            .status-transaction::after {
+              display: block;
+              content:'';
+              background:url("../../assets/icons/receive-green.svg") no-repeat center;
+              width: 13px;
+              height: 13px;
             }
           }
         }

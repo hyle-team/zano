@@ -5,6 +5,7 @@ import {BackendService} from '../_helpers/services/backend.service';
 import {VariablesService} from '../_helpers/services/variables.service';
 import {ModalService} from '../_helpers/services/modal.service';
 import {Wallet} from '../_helpers/models/wallet.model';
+import {DOWNLOADS_PAGE_URL} from '../_shared/constants'
 
 import icons from '../../assets/icons/icons.json';
 
@@ -101,7 +102,7 @@ export class LoginComponent implements OnInit, OnDestroy {
                  this.variablesService.startCountdown();
                }
               this.ngZone.run(() => {
-                this.router.navigate(['/']);
+                this.router.navigate(['/'], {queryParams: {prevUrl: 'login'}});
               });
            }
          });
@@ -186,6 +187,7 @@ export class LoginComponent implements OnInit, OnDestroy {
             new_wallet.is_auditable = open_data['wi'].is_auditable;
             new_wallet.is_watch_only = open_data['wi'].is_watch_only;
             new_wallet.currentPage = 1;
+            new_wallet.exclude_mining_txs = false;
             if (open_data.recent_history && open_data.recent_history.history) {
               new_wallet.total_history_item = open_data.recent_history.total_history_items;
               new_wallet.totalPages = Math.ceil( open_data.recent_history.total_history_items / this.variablesService.count);
@@ -232,6 +234,9 @@ export class LoginComponent implements OnInit, OnDestroy {
     });
   }
 
+  getUpdate() {
+    this.backend.openUrlInBrowser(DOWNLOADS_PAGE_URL);
+  }
 
   ngOnDestroy() {
     this.queryRouting.unsubscribe();
