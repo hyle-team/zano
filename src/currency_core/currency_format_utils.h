@@ -291,8 +291,8 @@ namespace currency
   bool fill_tx_rpc_details(tx_rpc_extended_info& tei, const transaction& tx, const transaction_chain_entry* ptce, const crypto::hash& h, uint64_t timestamp, bool is_short = false);
   bool fill_block_rpc_details(block_rpc_extended_info& pei_rpc, const block_extended_info& bei_chain, const crypto::hash& h);
   void append_per_block_increments_for_tx(const transaction& tx, std::unordered_map<uint64_t, uint32_t>& gindices);
-  std::string get_word_from_timstamp(uint64_t timestamp);
-  uint64_t get_timstamp_from_word(std::string word);
+  std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
+  uint64_t get_timstamp_from_word(std::string word, bool& password_used);
 
   template<class t_txin_v>
   typename std::conditional<std::is_const<t_txin_v>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type& get_txin_etc_options(t_txin_v& in)

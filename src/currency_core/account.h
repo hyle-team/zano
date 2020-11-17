@@ -53,9 +53,9 @@ namespace currency
     const account_public_address& get_public_address() const { return m_keys.account_address; };
     std::string get_public_address_str() const;
     
-    std::string get_seed_phrase() const;
+    std::string get_seed_phrase(const std::string& seed_password) const;
     std::string get_tracking_seed() const;
-    bool restore_from_seed_phrase(const std::string& seed_phrase);
+    bool restore_from_seed_phrase(const std::string& seed_phrase, const std::string& seed_password);
     bool restore_from_tracking_seed(const std::string& tracking_seed);
 
     uint64_t get_createtime() const { return m_creation_timestamp; }
