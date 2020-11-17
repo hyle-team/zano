@@ -93,7 +93,7 @@ namespace currency
     CHECK_AND_ASSERT_THROW_MES(self_check_is_password_used == !password.empty(), "Account seed phrase internal error: password flag encoded wrong");
 
     constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
-    std::string binary_for_check_sum = m_keys_seed_binary;
+    std::string binary_for_check_sum((const char*)&m_keys_seed_binary[0], m_keys_seed_binary.size());
     binary_for_check_sum.append(password);
     crypto::hash h = crypto::cn_fast_hash(binary_for_check_sum.data(), binary_for_check_sum.size());
     *reinterpret_cast<uint64_t*>(&h) = creation_timestamp_rounded;
@@ -185,7 +185,7 @@ namespace currency
       auditable_flag = (auditable_flag_and_checksum & 1) != 0; // auditable flag is the lower 1 bit
       uint16_t checksum = static_cast<uint16_t>(auditable_flag_and_checksum >> 1); // checksum -- everything else
       constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
-      std::string binary_for_check_sum = keys_seed_processed_binary;
+      std::string binary_for_check_sum((const char*)&keys_seed_processed_binary[0], keys_seed_processed_binary.size());
       binary_for_check_sum.append(seed_password);
       crypto::hash h = crypto::cn_fast_hash(binary_for_check_sum.data(), binary_for_check_sum.size());
       *reinterpret_cast<uint64_t*>(&h) = m_creation_timestamp;
