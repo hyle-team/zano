@@ -1676,7 +1676,7 @@ QString MainWindow::restore_wallet(const QString& param)
   //return que_call2<view::restore_wallet_request>("restore_wallet", param, [this](const view::restore_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::restore_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
-  ar.error_code = m_backend.restore_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.restore_key, ar.response_data);
+  ar.error_code = m_backend.restore_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.seed_phrase, owd.seed_pass, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1877,9 +1877,9 @@ QString MainWindow::get_smart_wallet_info(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(view::wallet_id_obj, wo);
+  PREPARE_ARG_FROM_JSON(view::request_get_smart_wallet_info, wo);
   PREPARE_RESPONSE(view::get_restore_info_response, ar);
-  ar.error_code = m_backend.get_wallet_restore_info(wo.wallet_id, ar.response_data.restore_key);
+  ar.error_code = m_backend.get_wallet_restore_info(wo.wallet_id, ar.response_data.restore_key, wo.seed_password);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1978,9 +1978,10 @@ QString MainWindow::is_valid_restore_wallet_text(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  return m_backend.is_valid_brain_restore_data(param.toStdString()).c_str();
+  return m_backend.is_valid_brain_restore_data(param.toStdString(), ).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
+
 void MainWindow::contextMenuEvent(QContextMenuEvent * event)
 {
   TRY_ENTRY();

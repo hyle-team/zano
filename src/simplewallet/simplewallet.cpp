@@ -46,7 +46,6 @@ namespace
   const command_line::arg_descriptor<std::string> arg_password = {"password", "Wallet password", "", true};
   const command_line::arg_descriptor<bool> arg_dont_refresh = { "no-refresh", "Do not refresh after load", false, true };
   const command_line::arg_descriptor<bool> arg_dont_set_date = { "no-set-creation-date", "Do not set wallet creation date", false, false };
-  const command_line::arg_descriptor<bool> arg_print_brain_wallet = { "print-brain-wallet", "Print to conosole brain wallet", false, false };
   const command_line::arg_descriptor<int> arg_daemon_port = {"daemon-port", "Use daemon instance at port <arg> instead of default", 0};
   const command_line::arg_descriptor<uint32_t> arg_log_level = {"set-log", "", 0, true};
   const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
@@ -180,7 +179,6 @@ bool simple_wallet::help(const std::vector<std::string> &args/* = std::vector<st
 
 simple_wallet::simple_wallet()
   : m_daemon_port(0), 
-  m_print_brain_wallet(false), 
   m_do_refresh_after_load(false),
   m_do_not_set_date(false),
   m_do_pos_mining(false),
@@ -309,10 +307,6 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     m_do_refresh_after_load = false;
   }
 
-  if (command_line::has_arg(vm, arg_print_brain_wallet))
-  {
-    m_print_brain_wallet = true;
-  }
 
   if (!m_generate_new.empty())
   {
@@ -402,10 +396,6 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
 
-    if (m_print_brain_wallet)
-    {
-      std::cout << "Seed phrase (keep it in secret): " << m_wallet->get_account().get_seed_phrase() << std::endl << std::flush;
-    }
 
   }
   catch (const std::exception& e)
@@ -424,7 +414,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet)
+bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet, const std::string& seed_password)
 {
   m_wallet_file = wallet_file;
 
@@ -436,13 +426,13 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
     if (tracking_wallet)
     {
       // auditable watch-only aka tracking wallet
-      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true);
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true, "");
       message_writer(epee::log_space::console_color_white, true) << "Tracking wallet restored: " << m_wallet->get_account().get_public_address_str();
     }
     else
     {
       // normal or auditable wallet
-      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, false);
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, false, seed_password);
       message_writer(epee::log_space::console_color_white, true) << (m_wallet->is_auditable() ? "Auditable wallet" : "Wallet") << " restored: " << m_wallet->get_account().get_public_address_str();
       std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
       if (m_wallet->is_auditable())
@@ -483,9 +473,6 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     {
       m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
       message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
-
-      if (m_print_brain_wallet)
-        std::cout << "Seed phrase (keep it in secret): " << m_wallet->get_account().get_seed_phrase() << std::endl << std::flush;
 
       break;
     }
@@ -1361,9 +1348,16 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_seed(const std::vector<std::string> &args)
 {
-  success_msg_writer() << "Here's your wallet's seed phrase. Write it down and keep in a safe place.";
-  success_msg_writer(true) << "Anyone who knows the following 26 words can access your wallet:";
-  std::cout << m_wallet->get_account().get_seed_phrase() << std::endl << std::flush;
+  success_msg_writer() << "Please enter a password to secure this seed. Securing your seed is HIGHLY recommended. Leave password blank to stay unsecured.";
+  success_msg_writer(true) << "Remember, restoring a wallet from Secured Seed can only be done if you know its password.";
+
+  std::string pass_1 = get_password("Enter seed password: ");
+  std::string pass_2 = get_password("Confirm seed password: ");
+  if(pass_1 != pass_2)
+  {
+    std::cout << "Error: password mismatch. Please make sure you entered the correct password and confirmed it" << std::endl << std::flush;
+  }
+  std::cout << m_wallet->get_account().get_seed_phrase(pass_1) << std::endl << std::flush;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1868,7 +1862,6 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_log_level);
   command_line::add_arg(desc_params, arg_dont_refresh);
   command_line::add_arg(desc_params, arg_dont_set_date);
-  command_line::add_arg(desc_params, arg_print_brain_wallet);
   command_line::add_arg(desc_params, arg_do_pos_mining);
   command_line::add_arg(desc_params, arg_pos_mining_reward_address);
   command_line::add_arg(desc_params, arg_restore_wallet);

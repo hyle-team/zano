@@ -46,7 +46,7 @@ namespace currency
 
     bool new_wallet(const std::string &wallet_file, const std::string& password, bool create_auditable_wallet);
     bool open_wallet(const std::string &wallet_file, const std::string& password);
-    bool restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet);
+    bool restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet, const std::string& seed_password);
     bool close_wallet();
 
     bool help(const std::vector<std::string> &args = std::vector<std::string>());
@@ -163,7 +163,6 @@ namespace currency
     int m_daemon_port;
     bool m_do_refresh_after_load;
     bool m_do_not_set_date;
-    bool m_print_brain_wallet;
     bool m_do_pos_mining;
     bool m_offline_mode;
     std::string m_restore_wallet;

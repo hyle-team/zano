@@ -272,6 +272,20 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  get_smart_wallet_info
+
+  struct request_get_smart_wallet_info
+  {
+    uint64_t wallet_id;
+    uint64_t seed_password;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(seed_password)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   struct response_mining_estimate
   {
     uint64_t final_amount;
@@ -434,12 +448,12 @@ public:
     std::string pass;
     std::string seed_pass;
     std::string path;
-    std::string restore_key;
+    std::string seed_phrase;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
-      KV_SERIALIZE(restore_key)
+      KV_SERIALIZE(seed_phrase)
     END_KV_SERIALIZE_MAP()
   };
 
