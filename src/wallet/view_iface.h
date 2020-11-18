@@ -432,6 +432,7 @@ public:
   struct restore_wallet_request
   {
     std::string pass;
+    std::string seed_pass;
     std::string path;
     std::string restore_key;
 

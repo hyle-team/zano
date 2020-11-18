@@ -13,10 +13,10 @@ TEST(wallet_seed, store_restore_test)
   {
     currency::account_base acc;
     acc.generate();
-    auto seed_phrase = acc.get_seed_phrase();
+    auto seed_phrase = acc.get_seed_phrase("");
     
     currency::account_base acc2;
-    bool r = acc2.restore_from_seed_phrase(seed_phrase);
+    bool r = acc2.restore_from_seed_phrase(seed_phrase, "");
     ASSERT_TRUE(r);
 
     if (memcmp(&acc2.get_keys(), &acc.get_keys(), sizeof(currency::account_keys)))
@@ -29,10 +29,10 @@ TEST(wallet_seed, store_restore_test)
   {
     currency::account_base acc;
     acc.generate();
-    auto seed_phrase = acc.get_seed_phrase();
+    auto seed_phrase = acc.get_seed_phrase("");
 
     currency::account_base acc2;
-    bool r = acc2.restore_from_seed_phrase(seed_phrase);
+    bool r = acc2.restore_from_seed_phrase(seed_phrase, "");
     ASSERT_TRUE(r);
 
     if (memcmp(&acc2.get_keys(), &acc.get_keys(), sizeof(currency::account_keys)))
@@ -57,7 +57,7 @@ wallet_seed_entry wallet_seed_entries[] =
 {
   {
     // legacy 24-word seed phrase -- invalid
-    "dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew",
+    "dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew god",
     "",
     "",
     0,
@@ -66,7 +66,7 @@ wallet_seed_entry wallet_seed_entries[] =
   },
   {
     // old-style 25-word seed phrase -- valid
-    "dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew",
+    "dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew god",
     "5e051454d7226b5734ebd64f754b57db4c655ecda00bd324f1b241d0b6381c0f",
     "7dde5590fdf430568c00556ac2accf09da6cde9a29a4bc7d1cb6fd267130f006",
     0,
@@ -148,7 +148,7 @@ TEST(wallet_seed, basic_test)
     bool r = false;
     try
     {
-      r = acc.restore_from_seed_phrase(wse.seed_phrase);
+      r = acc.restore_from_seed_phrase(wse.seed_phrase, "");
     }
     catch (...)
     {

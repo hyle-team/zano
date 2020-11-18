@@ -470,7 +470,7 @@ namespace tools
 
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
-    void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet);
+    void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password);
     void load(const std::wstring& path, const std::string& password);
     void store();
     void store(const std::wstring& path);
