@@ -333,8 +333,15 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       return false;
     }
 
+    tools::password_container seed_password_container;
+    if (!seed_password_container.read_password("Please enter Secure Seed password(leave it blank for a non secured seed):\n"))
+    {
+      fail_msg_writer() << "failed to read seed phrase";
+      return false;
+    }
+
     bool looks_like_tracking_seed = restore_seed_container.password().find(':') != std::string::npos;
-    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed);
+    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed, seed_password_container.password());
     CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
   }
   else

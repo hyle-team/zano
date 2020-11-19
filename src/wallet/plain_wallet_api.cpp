@@ -526,7 +526,7 @@ namespace plain_wallet
       }
       async_callback = [job_id, rwr]()
       {
-        std::string res = restore(rwr.restore_key, rwr.path, rwr.pass, rwr.seed_pass);
+        std::string res = restore(rwr.seed_phrase, rwr.path, rwr.pass, rwr.seed_pass);
         put_result(job_id, res);
       };
     }

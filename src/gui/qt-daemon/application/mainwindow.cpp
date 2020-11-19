@@ -1978,7 +1978,8 @@ QString MainWindow::is_valid_restore_wallet_text(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  return m_backend.is_valid_brain_restore_data(param.toStdString(), ).c_str();
+  PREPARE_ARG_FROM_JSON(view::is_valid_restore_wallet_text_param, rwtp);
+  return m_backend.is_valid_brain_restore_data(rwtp.seed_phrase, rwtp.seed_password).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 

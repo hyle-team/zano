@@ -272,7 +272,6 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
-  get_smart_wallet_info
 
   struct request_get_smart_wallet_info
   {
@@ -442,6 +441,19 @@ public:
       KV_SERIALIZE(pass)
     END_KV_SERIALIZE_MAP()
   };
+
+  
+  struct is_valid_restore_wallet_text_param
+  {
+    uint64_t seed_phrase;
+    std::string seed_password;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(seed_phrase)
+      KV_SERIALIZE(seed_password)
+    END_KV_SERIALIZE_MAP()
+  };
+
 
   struct restore_wallet_request
   {
