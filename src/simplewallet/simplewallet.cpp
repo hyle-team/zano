@@ -1358,13 +1358,21 @@ bool simple_wallet::show_seed(const std::vector<std::string> &args)
   success_msg_writer() << "Please enter a password to secure this seed. Securing your seed is HIGHLY recommended. Leave password blank to stay unsecured.";
   success_msg_writer(true) << "Remember, restoring a wallet from Secured Seed can only be done if you know its password.";
 
-  std::string pass_1 = get_password("Enter seed password: ");
-  std::string pass_2 = get_password("Confirm seed password: ");
-  if(pass_1 != pass_2)
+  tools::password_container seed_password_container1;
+  if (!seed_password_container1.read_password("Enter seed password: "))
+  {
+    return false;
+  }
+  tools::password_container seed_password_container2;
+  if (!seed_password_container2.read_password("Confirm seed password: "))
+  {
+    return false;
+  }
+  if(seed_password_container1.password() != seed_password_container2.password())
   {
     std::cout << "Error: password mismatch. Please make sure you entered the correct password and confirmed it" << std::endl << std::flush;
   }
-  std::cout << m_wallet->get_account().get_seed_phrase(pass_1) << std::endl << std::flush;
+  std::cout << m_wallet->get_account().get_seed_phrase(seed_password_container2.password()) << std::endl << std::flush;
   return true;
 }
 //----------------------------------------------------------------------------------------------------

@@ -276,7 +276,7 @@ public:
   struct request_get_smart_wallet_info
   {
     uint64_t wallet_id;
-    uint64_t seed_password;
+    std::string seed_password;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -445,7 +445,7 @@ public:
   
   struct is_valid_restore_wallet_text_param
   {
-    uint64_t seed_phrase;
+    std::string seed_phrase;
     std::string seed_password;
 
     BEGIN_KV_SERIALIZE_MAP()
