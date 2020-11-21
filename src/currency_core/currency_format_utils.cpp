@@ -1334,7 +1334,7 @@ namespace currency
   uint64_t get_timstamp_from_word(std::string word, bool& password_used)
   {
     uint64_t count_of_weeks = tools::mnemonic_encoding::num_by_word(word);
-    if (count_of_weeks > WALLET_BRAIN_DATE_MAX_WEEKS_COUNT)
+    if (count_of_weeks >= WALLET_BRAIN_DATE_MAX_WEEKS_COUNT)
     {
       count_of_weeks -= WALLET_BRAIN_DATE_MAX_WEEKS_COUNT;
       password_used = true;

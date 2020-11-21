@@ -465,6 +465,7 @@ public:
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
+      KV_SERIALIZE(seed_pass)
       KV_SERIALIZE(seed_phrase)
     END_KV_SERIALIZE_MAP()
   };
