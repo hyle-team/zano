@@ -332,15 +332,25 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       fail_msg_writer() << "failed to read seed phrase";
       return false;
     }
-
-    tools::password_container seed_password_container;
-    if (!seed_password_container.read_password("Please enter Secure Seed password(leave it blank for a non secured seed):\n"))
-    {
-      fail_msg_writer() << "failed to read seed phrase";
-      return false;
-    }
-
     bool looks_like_tracking_seed = restore_seed_container.password().find(':') != std::string::npos;
+    tools::password_container seed_password_container;
+
+    if (!looks_like_tracking_seed)
+    {
+      bool is_password_protected = false;
+      bool sr = account_base::is_seed_password_protected(restore_seed_container.password(), is_password_protected);
+      if (!sr)
+      {
+        fail_msg_writer() << "failed to parse seed phrase";
+        return false;
+      }
+
+      if (is_password_protected && !seed_password_container.read_password("This seed is secured, to use it please enter the password:\n"))
+      {
+        fail_msg_writer() << "failed to read seed phrase";
+        return false;
+      }
+    }
     bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed, seed_password_container.password());
     CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
   }
@@ -453,7 +463,11 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
     fail_msg_writer() << "failed to restore wallet, check your " << (tracking_wallet ? "tracking seed!" : "seed phrase!") << ENDL << e.what();
     return false;
   }
-
+  catch (...)
+  {
+    fail_msg_writer() << "failed to restore wallet, check your " << (tracking_wallet ? "tracking seed!" : "seed phrase!") << ENDL;
+    return false;
+  }
   m_wallet->init(m_daemon_address);
 
   success_msg_writer() <<

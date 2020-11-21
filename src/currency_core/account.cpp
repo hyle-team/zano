@@ -206,6 +206,35 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
+  bool account_base::is_seed_password_protected(const std::string& seed_phrase, bool& is_password_protected)
+  {
+    //cut the last timestamp word from restore_dats
+    std::list<std::string> words;
+    boost::split(words, seed_phrase, boost::is_space());
+
+    std::string timestamp_word;
+    if (words.size() == SEED_PHRASE_V1_WORDS_COUNT)
+    {
+      // 24 seed words + one timestamp word = 25 total
+      timestamp_word = words.back();
+    }
+    else if (words.size() == SEED_PHRASE_V2_WORDS_COUNT)
+    {
+      // 24 seed words + one timestamp word + one flags & checksum = 26 total
+      words.erase(--words.end());
+      timestamp_word = words.back();
+    }
+    else
+    {
+      LOG_ERROR("Invalid seed words count: " << words.size());
+      return false;
+    }
+
+    get_timstamp_from_word(timestamp_word, is_password_protected);
+
+    return true;
+  }
+  //-----------------------------------------------------------------
   bool account_base::restore_from_tracking_seed(const std::string& tracking_seed)
   {
     set_null();
