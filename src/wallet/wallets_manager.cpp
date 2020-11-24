@@ -1081,6 +1081,20 @@ void wallets_manager::subscribe_to_core_events(currency::i_core_event_handler* p
 
 }
 #endif
+
+std::string wallets_manager::get_seed_phrase_info(const std::string& seed_phrase, const std::string& seed_password, view::seed_phrase_info& result)
+{
+  //cut the last timestamp word from restore_dats
+  result.syntax_correct = currency::account_base::is_seed_password_protected(seed_phrase, result.require_password);
+  if (result.syntax_correct)
+  {
+    currency::account_base acc;
+    result.hash_sum_matched = acc.restore_from_seed_phrase(seed_phrase, seed_password);
+  }
+  return API_RETURN_CODE_OK;
+}
+
+
 void wallets_manager::get_gui_options(view::gui_options& opt)
 {
   opt = m_ui_opt;

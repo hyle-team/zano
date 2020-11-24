@@ -226,7 +226,6 @@ namespace currency
     }
     else
     {
-      LOG_ERROR("Invalid seed words count: " << words.size());
       return false;
     }
 

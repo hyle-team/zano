@@ -454,6 +454,18 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct seed_phrase_info
+  {
+    bool syntax_correct;
+    bool require_password;
+    bool hash_sum_matched;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(syntax_correct)
+      KV_SERIALIZE(require_password)
+      KV_SERIALIZE(hash_sum_matched)
+    END_KV_SERIALIZE_MAP()
+  };
 
   struct restore_wallet_request
   {
@@ -615,12 +627,10 @@ public:
 
   struct get_restore_info_response
   {
-    std::string restore_key;
-    std::string error_code;
+    std::string seed_phrase;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(restore_key)
-      KV_SERIALIZE(error_code)
+      KV_SERIALIZE(seed_phrase)
     END_KV_SERIALIZE_MAP()
   };
 
