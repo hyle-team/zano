@@ -198,6 +198,7 @@ export class BackendService {
       };
     }
 
+    const core_busy = Result.error_code === 'CORE_BUSY';
     const Status = (Result.error_code === 'OK' || Result.error_code === 'TRUE');
 
     if (!Status && Status !== undefined && Result.error_code !== undefined) {
@@ -207,24 +208,44 @@ export class BackendService {
 
     let res_error_code = false;
     if (typeof Result === 'object' && 'error_code' in Result && Result.error_code !== 'OK' && Result.error_code !== 'TRUE' && Result.error_code !== 'FALSE') {
-      this.informerRun(Result.error_code, params, command);
-      res_error_code = Result.error_code;
+      if (core_busy) {
+        setTimeout( () => {
+          // this is will avoid update data when user
+          // on other wallet after CORE_BUSY (blink of data)
+          if (command !== 'get_recent_transfers') {
+            this.runCommand(command, params, callback);
+          } else {
+            const current_wallet_id = this.variablesService.currentWallet.wallet_id;
+            if (current_wallet_id === params.wallet_id) {
+              this.runCommand(command, params, callback);
+            }
+          }
+        }, 50);
+      } else {
+        this.informerRun(Result.error_code, params, command);
+        res_error_code = Result.error_code;
+      }
     }
 
     // if ( command === 'get_offers_ex' ){
     //   Service.printLog( "get_offers_ex offers count "+((data.offers)?data.offers.length:0) );
     // }
 
-    if (typeof callback === 'function') {
-      callback(Status, data, res_error_code);
-    } else {
-      return data;
+    if (!core_busy) {
+      if (typeof callback === 'function') {
+        callback(Status, data, res_error_code);
+      } else {
+        return data;
+      }
     }
   }
 
 
   private runCommand(command, params?, callback?) {
     if (this.backendObject) {
+      if (command === 'get_recent_transfers') {
+        this.variablesService.get_recent_transfers = true;
+      }
       const Action = this.backendObject[command];
       if (!Action) {
         BackendService.Debug(0, 'Run Command Error! Command "' + command + '" don\'t found in backendObject');
@@ -232,6 +253,9 @@ export class BackendService {
         const that = this;
         params = (typeof params === 'string') ? params : JSONBigNumber.stringify(params);
         if (params === undefined || params === '{}') {
+          if (command === 'get_recent_transfers') {
+            this.variablesService.get_recent_transfers = false;
+          }
           Action(function (resultStr) {
             that.commandDebug(command, params, resultStr);
             return that.backendCallback(resultStr, params, callback, command);
@@ -632,14 +656,14 @@ export class BackendService {
     }
   }
 
-  getRecentTransfers( id, offset, count,exclude_mining_txs, callback) {
+  getRecentTransfers( id, offset, count, exclude_mining_txs, callback) {
     const params = {
       wallet_id: id,
       offset: offset,
       count: count,
       exclude_mining_txs: exclude_mining_txs
     };
-    this.runCommand('get_recent_transfers', params, callback);
+      this.runCommand('get_recent_transfers', params, callback);
   }
 
   getPoolInfo(callback) {

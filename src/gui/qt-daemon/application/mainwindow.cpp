@@ -239,6 +239,28 @@ QString MainWindow::get_tx_pool_info()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::request_dummy()
+{
+  static int code_ = 0;
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_POOL_INFO::response, ar);
+  if (code_ == 2)
+  {
+    code_ = -1;
+    ar.error_code = API_RETURN_CODE_CORE_BUSY;
+  }
+  else
+  {
+    ar.error_code = API_RETURN_CODE_OK;
+  }
+
+  ++code_;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+
 QString MainWindow::get_default_fee()
 {
   TRY_ENTRY();
@@ -1654,7 +1676,7 @@ QString MainWindow::restore_wallet(const QString& param)
   //return que_call2<view::restore_wallet_request>("restore_wallet", param, [this](const view::restore_wallet_request& owd, view::api_response& ar){
   PREPARE_ARG_FROM_JSON(view::restore_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
-  ar.error_code = m_backend.restore_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.restore_key, ar.response_data);
+  ar.error_code = m_backend.restore_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.seed_phrase, owd.seed_pass, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1855,9 +1877,9 @@ QString MainWindow::get_smart_wallet_info(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(view::wallet_id_obj, wo);
+  PREPARE_ARG_FROM_JSON(view::request_get_smart_wallet_info, wo);
   PREPARE_RESPONSE(view::get_restore_info_response, ar);
-  ar.error_code = m_backend.get_wallet_restore_info(wo.wallet_id, ar.response_data.restore_key);
+  ar.error_code = m_backend.get_wallet_restore_info(wo.wallet_id, ar.response_data.seed_phrase, wo.seed_password);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1951,14 +1973,26 @@ QString MainWindow::open_url_in_browser(const QString& param)
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-
 QString MainWindow::is_valid_restore_wallet_text(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  return m_backend.is_valid_brain_restore_data(param.toStdString()).c_str();
+  PREPARE_ARG_FROM_JSON(view::is_valid_restore_wallet_text_param, rwtp);
+  return m_backend.is_valid_brain_restore_data(rwtp.seed_phrase, rwtp.seed_password).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
+
+QString MainWindow::get_seed_phrase_info(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::is_valid_restore_wallet_text_param, rwtp);
+  PREPARE_RESPONSE(view::seed_phrase_info, ar);
+  ar.error_code = m_backend.get_seed_phrase_info(rwtp.seed_phrase, rwtp.seed_password, ar.response_data).c_str();
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
 void MainWindow::contextMenuEvent(QContextMenuEvent * event)
 {
   TRY_ENTRY();

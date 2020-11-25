@@ -4,12 +4,15 @@ import { VariablesService } from '../_helpers/services/variables.service';
 import { BackendService } from '../_helpers/services/backend.service';
 import { TranslateService } from '@ngx-translate/core';
 import { IntToMoneyPipe } from '../_helpers/pipes/int-to-money.pipe';
-import { Subscription } from 'rxjs';
+import {Subscription} from 'rxjs';
 import { LOCKED_BALANCE_HELP_PAGE } from '../_shared/constants';
 
 import icons from '../../assets/icons/icons.json';
-import { PaginationService } from '../_helpers/services/pagination.service';
-import { PaginationStore } from '../_helpers/services/pagination.store';
+import {PaginationService} from '../_helpers/services/pagination.service';
+import {PaginationStore} from '../_helpers/services/pagination.store';
+import {Store, Sync} from 'store';
+import {Wallet} from '../_helpers/models/wallet.model';
+import {distinctUntilChanged, filter} from 'rxjs/operators';
 
 @Component({
   selector: 'app-wallet',
@@ -25,9 +28,11 @@ export class WalletComponent implements OnInit, OnDestroy {
   copyAnimationTimeout;
   balanceTooltip;
   activeTab = 'history';
-  public mining:boolean = false;
-
+  public mining = false;
   public currentPage = 1;
+  wallet: Wallet;
+  sync_started = false;
+  stop_paginate = false;
 
   @ViewChild('scrolledContent') private scrolledContent: ElementRef;
 
@@ -88,6 +93,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     }
   ];
   aliasSubscription: Subscription;
+  walletsSubscription: Subscription;
 
   constructor(
     private route: ActivatedRoute,
@@ -98,21 +104,81 @@ export class WalletComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private intToMoneyPipe: IntToMoneyPipe,
     private pagination: PaginationService,
-    private paginationStore: PaginationStore
+    private paginationStore: PaginationStore,
+    private store: Store,
   ) { }
 
   ngOnInit() {
     this.subRouting1 = this.route.params.subscribe(params => {
+      // set current wallet only by user click to avoid after sync show synchronized data
       this.walletID = +params['id'];
       this.variablesService.setCurrentWallet(this.walletID);
+      this.walletsSubscription = this.store.select('sync').pipe(
+        filter(Boolean),
+        distinctUntilChanged(),
+      ).subscribe(value => {
+        const data = value.filter((item: Sync) => item.wallet_id === this.walletID)[0];
+        if (data && !data.sync) {
+          let in_progress;
+          const values = this.store.value.sync;
+          if (values && values.length) {
+            in_progress = values.filter(item => item.sync);
+            this.variablesService.sync_started = !!(in_progress && in_progress.length);
+            if (!in_progress) {
+              this.variablesService.sync_started = false;
+            }
+          } else {
+            this.variablesService.sync_started = false;
+          }
+        }
+        let restore = false;
+        if (this.variablesService.after_sync_request.hasOwnProperty(this.walletID)) {
+          restore = this.variablesService.after_sync_request[this.walletID];
+        }
+        if (!this.variablesService.sync_started && restore && this.walletID === (data && data.wallet_id)) {
+          this.wallet = this.variablesService.getNotLoadedWallet();
+          if (this.wallet) {
+            this.tick();
+          }
+          // if this is was restore wallet and it was selected on moment when sync completed
+          this.getRecentTransfers();
+          this.variablesService.after_sync_request[this.walletID] = false;
+        }
+      });
+        let after_sync_request = false;
+        if (this.variablesService.after_sync_request.hasOwnProperty(this.walletID)) {
+          after_sync_request = this.variablesService.after_sync_request[this.walletID];
+        }
+          if (after_sync_request && !this.variablesService.sync_started) {
+            // if user click on the wallet at the first time after restore.
+            this.getRecentTransfers();
+          }
+
+      if (this.variablesService.stop_paginate.hasOwnProperty(this.walletID)) {
+        this.stop_paginate = this.variablesService.stop_paginate[this.walletID];
+      } else {
+        this.stop_paginate = false;
+      }
+      // this will hide pagination a bit earlier
+      this.wallet = this.variablesService.getNotLoadedWallet();
+      if (this.wallet) {
+        this.tick();
+      }
+
       this.scrolledContent.nativeElement.scrollTop = 0;
       clearTimeout(this.copyAnimationTimeout);
       this.copyAnimation = false;
       this.mining = this.variablesService.currentWallet.exclude_mining_txs;
+
+
+      if (this.variablesService.wallets.length === 1) {
+        this.walletID = +params['id'];
+        this.variablesService.setCurrentWallet(this.walletID);
+      }
     });
     this.subRouting2 = this.router.events.subscribe(val => {
       if (val instanceof RoutesRecognized) {
-        this.activeTab = val.urlAfterRedirects.split('/').pop();
+        this.activeTab = val.urlAfterRedirects.replace('?sidenav=true', '').split('/').pop();
         if (val.state.root.firstChild && val.state.root.firstChild.firstChild) {
           for (let i = 0; i < this.tabs.length; i++) {
             this.tabs[i].active = (this.tabs[i].link === '/' + val.state.root.firstChild.firstChild.url[0].path);
@@ -138,10 +204,26 @@ export class WalletComponent implements OnInit, OnDestroy {
       }
     });
   }
+  resetPaginationValues() {
+    this.ngZone.run(() => {
+      const total_history_item = this.variablesService.currentWallet.total_history_item;
+      const count = this.variablesService.count;
+      this.variablesService.currentWallet.totalPages = Math.ceil( total_history_item / count);
+      this.variablesService.currentWallet.exclude_mining_txs = this.mining;
+      this.variablesService.currentWallet.currentPage = 1;
+
+      if (!this.variablesService.currentWallet.totalPages) {
+        this.variablesService.currentWallet.totalPages = 1;
+      }
+      this.variablesService.currentWallet.totalPages > this.variablesService.maxPages
+        ? this.variablesService.currentWallet.pages = new Array(5).fill(1).map((value, index) => value + index)
+        : this.variablesService.currentWallet.pages = new Array(this.variablesService.currentWallet.totalPages).fill(1).map((value, index) => value + index);
+    })
+  }
 
   changeTab(index) {
     if (((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts' || this.tabs[index].link === '/staking') && (this.variablesService.daemon_state !== 2 || !this.variablesService.currentWallet.loaded))
-    || ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts') && this.variablesService.currentWallet.is_watch_only && this.variablesService.currentWallet.is_auditable)) {
+      || ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts') && this.variablesService.currentWallet.is_watch_only && this.variablesService.currentWallet.is_auditable)) {
       return;
     }
     this.tabs.forEach((tab) => {
@@ -195,49 +277,84 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   public setPage(pageNumber: number) {
+    // this is will allow pagination for wallets that was open from existed wallets'
+    if (this.variablesService.currentWallet.open_from_exist && !this.variablesService.currentWallet.updated) {
+      this.variablesService.get_recent_transfers = false;
+      this.variablesService.currentWallet.updated = true;
+    }
     if (pageNumber === this.variablesService.currentWallet.currentPage) {
       return;
     }
-    this.variablesService.currentWallet.currentPage = pageNumber;
-    this.getRecentTransfers();
+    // if not running get_recent_transfers callback
+    if (!this.variablesService.get_recent_transfers) {
+      this.variablesService.currentWallet.currentPage = pageNumber;
+    }
+    if (!this.variablesService.get_recent_transfers) {
+      this.getRecentTransfers();
+    }
   }
+
   toggleMiningTransactions() {
-    this.mining = !this.mining;
-    this.variablesService.currentWallet.exclude_mining_txs = this.mining;
-    this.variablesService.currentWallet.currentPage = 1;
-    this.getRecentTransfers();
+    if (!this.variablesService.sync_started && !this.wallet) {
+      const value = this.paginationStore.value;
+      if (!value) {
+        this.paginationStore.setPage(1, 0, this.walletID); // add back page for the first page
+      } else {
+        const pages = value.filter(item => item.walletID === this.walletID);
+        if (!pages.length) {
+          this.paginationStore.setPage(1, 0, this.walletID); // add back page for the first page
+        }
+      }
+      this.mining = !this.mining;
+      this.resetPaginationValues();
+      this.getRecentTransfers();
+    }
+  }
+
+  tick() {
+    const walletInterval = setInterval(() => {
+      this.wallet = this.variablesService.getNotLoadedWallet();
+      if (!this.wallet) {
+        clearInterval(walletInterval);
+      }
+    }, 1000);
   }
 
   getRecentTransfers () {
-    const offset = this.pagination.getOffset();
-    const pages = this.paginationStore.value;
-    if (!pages) {
-      this.paginationStore.setPage(1, 40); // add back page for the first page
-    }
+    const offset = this.pagination.getOffset(this.walletID);
+    const value = this.paginationStore.value;
+    const pages = value ? value.filter(item => item.walletID === this.walletID) : [];
 
     this.backend.getRecentTransfers(
       this.walletID,
       offset,
       this.variablesService.count, this.variablesService.currentWallet.exclude_mining_txs, (status, data) => {
-        const page = (this.variablesService.currentWallet.currentPage + 1);
-        this.paginationStore.setPage(page, data.last_item_index); // add back page for current page
-        if (data.history.length < this.variablesService.count) {
-          this.variablesService.currentWallet.totalPages = (page - 1); // stop paginate
+        const isForward = this.paginationStore.isForward(pages, this.variablesService.currentWallet.currentPage);
+        if (this.mining && isForward && pages && pages.length === 1) {
+          this.variablesService.currentWallet.currentPage = 1; // set init page after navigation back
         }
-        if (status && data.total_history_items) {
-            this.variablesService.currentWallet.history.splice(0, this.variablesService.currentWallet.history.length);
-          this.ngZone.run(() => {
-            this.pagination.paginate(this.variablesService.currentWallet.currentPage);
-            if (data.history.length !== 0) {
-              this.variablesService.currentWallet.restore = false;
-              this.variablesService.currentWallet.total_history_item = data.total_history_items;
-              this.variablesService.currentWallet.prepareHistory(data.history);
-              if (this.variablesService.currentWallet.currentPage === 1 && data.unconfirmed) {
-                this.variablesService.currentWallet.prepareHistory(data.unconfirmed);
-              }
-            }
-          });
+
+        const history = (data && data.history);
+        this.variablesService.stop_paginate[this.walletID] = history && history.length < this.variablesService.count || !history;
+        this.stop_paginate = this.variablesService.stop_paginate[this.walletID];
+        if (!this.variablesService.stop_paginate[this.walletID]) {
+          const page = this.variablesService.currentWallet.currentPage + 1;
+          if (isForward && this.mining && history && history.length === this.variablesService.count) {
+            this.paginationStore.setPage(page, data.last_item_index, this.walletID); // add back page for current page
+          }
         }
+
+        this.pagination.calcPages(data);
+        this.pagination.prepareHistory(data, status);
+
+        this.ngZone.run(() => {
+          this.variablesService.get_recent_transfers = false;
+          if (this.variablesService.after_sync_request.hasOwnProperty(this.walletID)) {
+            // this is will complete get_recent_transfers request
+            // this will switch of
+            this.variablesService.after_sync_request[this.walletID] = false;
+          }
+        });
       });
   }
 
@@ -246,6 +363,9 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.subRouting2.unsubscribe();
     this.queryRouting.unsubscribe();
     this.aliasSubscription.unsubscribe();
+    if (this.walletsSubscription) {
+      this.walletsSubscription.unsubscribe();
+    }
     clearTimeout(this.copyAnimationTimeout);
   }
 

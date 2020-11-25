@@ -125,10 +125,12 @@ export class OpenWalletModalComponent implements OnInit {
   }
 
   skipWallet() {
-    if (this.wallets.length) {
-      this.wallets.splice(0, 1);
-      this.ngOnInit();
-    }
+    this.ngZone.run(() => {
+      if (this.wallets.length) {
+        this.wallets.splice(0, 1);
+        this.ngOnInit();
+      }
+    });
   }
 
 }

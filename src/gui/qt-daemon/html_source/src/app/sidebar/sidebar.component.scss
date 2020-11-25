@@ -85,7 +85,7 @@
     flex-direction: column;
     flex: 1 1 auto;
     margin: 0 -3rem;
-    overflow-y: overlay;
+    overflow-y: auto;
 
     .sidebar-account {
       position: relative;
@@ -112,14 +112,19 @@
           .icon {
             width: 1.3rem;
             height: 1.3rem;
-
             &.close-wallet {
-              mask: url(../../assets/icons/close-wallet.svg) no-repeat center;
+              background-color: transparent;
+            }
+            &.close-wallet::after {
+              display: block;
+              content:'';
+              background:url("../../assets/icons/close-wallet-blue.svg") no-repeat center;
+              width: 13px;
+              height: 13px;
             }
           }
         }
       }
-
 
       .sidebar-account-row {
         display: flex;

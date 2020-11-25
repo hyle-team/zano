@@ -272,6 +272,19 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+
+  struct request_get_smart_wallet_info
+  {
+    uint64_t wallet_id;
+    std::string seed_password;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(seed_password)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   struct response_mining_estimate
   {
     uint64_t final_amount;
@@ -429,16 +442,43 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  
+  struct is_valid_restore_wallet_text_param
+  {
+    std::string seed_phrase;
+    std::string seed_password;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(seed_phrase)
+      KV_SERIALIZE(seed_password)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct seed_phrase_info
+  {
+    bool syntax_correct;
+    bool require_password;
+    bool hash_sum_matched;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(syntax_correct)
+      KV_SERIALIZE(require_password)
+      KV_SERIALIZE(hash_sum_matched)
+    END_KV_SERIALIZE_MAP()
+  };
+
   struct restore_wallet_request
   {
     std::string pass;
+    std::string seed_pass;
     std::string path;
-    std::string restore_key;
+    std::string seed_phrase;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(pass)
       KV_SERIALIZE(path)
-      KV_SERIALIZE(restore_key)
+      KV_SERIALIZE(seed_pass)
+      KV_SERIALIZE(seed_phrase)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -587,12 +627,10 @@ public:
 
   struct get_restore_info_response
   {
-    std::string restore_key;
-    std::string error_code;
+    std::string seed_phrase;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(restore_key)
-      KV_SERIALIZE(error_code)
+      KV_SERIALIZE(seed_phrase)
     END_KV_SERIALIZE_MAP()
   };
 
