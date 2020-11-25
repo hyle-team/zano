@@ -400,13 +400,13 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(err_result);
   }
 
-  std::string restore(const std::string& seed, const std::string& path, const std::string& password)
+  std::string restore(const std::string& seed, const std::string& path, const std::string& password, const std::string& seed_password)
   {
     GET_INSTANCE_PTR(inst_ptr);
 
     std::string full_path = get_wallets_folder() + path;
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    std::string rsp = inst_ptr->gwm.restore_wallet(epee::string_encoding::convert_to_unicode(full_path), password, seed, ok_response.result);
+    std::string rsp = inst_ptr->gwm.restore_wallet(epee::string_encoding::convert_to_unicode(full_path), password, seed, seed_password, ok_response.result);
     if (rsp == API_RETURN_CODE_OK || rsp == API_RETURN_CODE_FILE_RESTORED)
     {
       if (rsp == API_RETURN_CODE_FILE_RESTORED)
@@ -526,7 +526,7 @@ namespace plain_wallet
       }
       async_callback = [job_id, rwr]()
       {
-        std::string res = restore(rwr.restore_key, rwr.path, rwr.pass);
+        std::string res = restore(rwr.seed_phrase, rwr.path, rwr.pass, rwr.seed_pass);
         put_result(job_id, res);
       };
     }
