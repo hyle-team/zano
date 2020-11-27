@@ -215,7 +215,7 @@ namespace tools
   {
     try
     {
-      res.seed_phrase = m_wallet.get_account().get_seed_phrase(res.seed_phrase);
+      res.seed_phrase = m_wallet.get_account().get_seed_phrase(req.seed_password);
       return true;
     }
     catch (std::exception& e)
