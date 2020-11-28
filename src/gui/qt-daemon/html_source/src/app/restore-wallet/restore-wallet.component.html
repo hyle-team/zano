@@ -62,6 +62,17 @@
       </div>
     </div>
 
+    <div class="input-block half-block">
+      <label for="seed-password">{{ 'RESTORE_WALLET.SEED_PASSWORD' | translate }}</label>
+      <input type="password" id="seed-password" formControlName="seedPassword" [attr.readonly]="this.seedPhraseInfo?.syntax_correct && this.seedPhraseInfo?.require_password ? null : true">
+      <div class="error-block" *ngIf="(restoreForm.controls['seedPassword'].dirty || restoreForm.controls['seedPassword'].touched) && !this.seedPhraseInfo?.hash_sum_matched">
+        <span>{{ 'RESTORE_WALLET.FORM_ERRORS.INCORRECT_PASSWORD' | translate }}</span>
+      </div>
+      <div class="success-block" *ngIf="this.seedPhraseInfo?.hash_sum_matched">
+        <span>{{ 'RESTORE_WALLET.OK' | translate }}</span>
+      </div>
+    </div>
+
     <div class="wrap-buttons">
       <button type="button" class="transparent-button" *ngIf="walletSaved" disabled><i class="icon"></i>{{walletSavedName}}</button>
       <button type="button" class="blue-button select-button" (click)="saveWallet()" [disabled]="!restoreForm.valid" *ngIf="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_SELECT' | translate }}</button>
