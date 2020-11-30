@@ -104,16 +104,44 @@
     align-items: center;
     justify-content: space-between;
     width: 100%;
-
-    span {
-      color: #556576;
-      font-size: 1.3rem;
-      line-height: 2.4rem;
+    .right-part {
       display: inline-flex;
       align-items: center;
-
       .icon {
-        margin-left: 1.2rem;
+        cursor: pointer;
+        width: 1.7rem;
+        height: 1.7rem;
+    
+        &.copy {
+          background-color: #4caefb;
+          margin-right: 1.2rem;
+          mask: url(~src/assets/icons/copy.svg) no-repeat center;
+    
+          &:hover {
+            opacity: 0.75;
+          }
+        }
+    
+        &.copied {
+          margin-right: 1.2rem;
+          background-color: #4caefb;
+          mask: url(~src/assets/icons/complete-testwallet.svg) no-repeat center;
+        }
+        &.secured, &.unsecured {
+          margin-left: 1.2rem;
+        }
+      }
+  
+      span {
+        color: #556576;
+        font-size: 1.3rem;
+        line-height: 2.4rem;
+        display: inline-flex;
+        align-items: center;
+  
+        .icon {
+          margin-left: 1.2rem;
+        }
       }
     }
   }

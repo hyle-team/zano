@@ -38,7 +38,6 @@
   </form>
 
   <ng-container *ngIf="!showSeed else seedPhraseContent">
-
     <form class="form-seed mt-2" [formGroup]="seedPhraseForm" (ngSubmit)="onSubmitSeed()">
       <label>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>
       <div class="form-content">
@@ -68,10 +67,13 @@
     <div class="seed-phrase mt-2">
       <div class="seed-phrase-title">
         <span>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</span>
-        <span
+        <p class="right-part">
+          <i class="icon" [class.copy]="!copyAnimation" [class.copied]="copyAnimation" (click)="copySeedPhrase()"></i>
+          <span
           *ngIf="seedPhraseForm.controls.password.value.length == 0">{{ 'WALLET_DETAILS.SEED_IS_UNSECURED' | translate }} <i class="icon unsecured"></i></span>
-        <span
+          <span
           *ngIf="seedPhraseForm.controls.password.value.length > 0">{{ 'WALLET_DETAILS.SEED_IS_SECURED' | translate }} <i class="icon secured"></i></span>
+        </p>
       </div>
       <div class="seed-phrase-content">
         <ng-container *ngFor="let word of seedPhrase.split(' '); let index = index">

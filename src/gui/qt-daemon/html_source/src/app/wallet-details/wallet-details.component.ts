@@ -13,6 +13,8 @@ import { Location } from '@angular/common';
 export class WalletDetailsComponent implements OnInit, OnDestroy {
   seedPhrase = '';
   showSeed = false;
+  copyAnimation = false;
+  copyAnimationTimeout;
 
   detailsForm = new FormGroup({
     name: new FormControl('', [
@@ -143,5 +145,15 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
     this.location.back();
   }
 
-  ngOnDestroy() {}
+  copySeedPhrase() {
+    this.backend.setClipboard(this.seedPhrase);
+    this.copyAnimation = true;
+    this.copyAnimationTimeout = window.setTimeout(() => {
+      this.copyAnimation = false;
+    }, 2000);
+  }
+
+  ngOnDestroy() {
+    clearTimeout(this.copyAnimationTimeout);
+  }
 }

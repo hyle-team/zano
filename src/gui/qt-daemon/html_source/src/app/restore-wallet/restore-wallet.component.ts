@@ -7,7 +7,7 @@ import { ModalService } from '../_helpers/services/modal.service';
 import { Wallet } from '../_helpers/models/wallet.model';
 import { TranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs/internal/Subject';
-import { takeUntil } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-restore-wallet',
@@ -74,12 +74,12 @@ export class RestoreWalletComponent implements OnInit, OnDestroy {
 
   changeDetectionSeedPhrasePassword() {
     this.restoreForm.controls.seedPassword.valueChanges
-      .pipe(takeUntil(this.unsubscribeAll))
+      .pipe(debounceTime(0), distinctUntilChanged(), takeUntil(this.unsubscribeAll))
       .subscribe(() => {
         this.checkValidSeedPhrasePassword();
       });
     this.restoreForm.controls.key.valueChanges
-      .pipe(takeUntil(this.unsubscribeAll))
+      .pipe(debounceTime(0), distinctUntilChanged(), takeUntil(this.unsubscribeAll))
       .subscribe(() => {
         this.checkValidSeedPhrasePassword();
       });
@@ -90,7 +90,6 @@ export class RestoreWalletComponent implements OnInit, OnDestroy {
     const seed_phrase = this.restoreForm.controls.key.value;
     this.backend.getSeedPhraseInfo({seed_phrase, seed_password}, (status, data) => {
       this.seedPhraseInfo = data;
-      console.log('DATA GET SEED PHRASE INFO', this.seedPhraseInfo);
     });
   }
 
