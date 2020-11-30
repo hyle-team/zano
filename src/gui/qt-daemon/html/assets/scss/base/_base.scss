@@ -205,6 +205,16 @@ button {
       color: themed(redTextColor);
     }
   }
+  .success-block {
+    font-size: 1rem;
+    line-height: 1.4rem;
+    align-self: flex-end;
+    text-align: right;
+
+    @include themify($themes) {
+      color: themed(greenTextColor);
+    }
+  }
 }
 
 .error-text {
