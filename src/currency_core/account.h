@@ -53,9 +53,9 @@ namespace currency
     const account_public_address& get_public_address() const { return m_keys.account_address; };
     std::string get_public_address_str() const;
     
-    std::string get_seed_phrase() const;
+    std::string get_seed_phrase(const std::string& seed_password) const;
     std::string get_tracking_seed() const;
-    bool restore_from_seed_phrase(const std::string& seed_phrase);
+    bool restore_from_seed_phrase(const std::string& seed_phrase, const std::string& seed_password);
     bool restore_from_tracking_seed(const std::string& tracking_seed);
 
     uint64_t get_createtime() const { return m_creation_timestamp; }
@@ -65,6 +65,8 @@ namespace currency
     bool store(const std::string& file_path);
 
     void make_account_watch_only();
+    bool is_watch_only() const { return m_keys.spend_secret_key == currency::null_skey; }
+    bool is_auditable() const { return m_keys.account_address.is_auditable(); }
 
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int /*ver*/)
@@ -76,6 +78,7 @@ namespace currency
 
     static std::string vector_of_chars_to_string(const std::vector<unsigned char>& v) { return std::string(v.begin(), v.end()); }
     static std::vector<unsigned char> string_to_vector_of_chars(const std::string& v) { return std::vector<unsigned char>(v.begin(), v.end()); }
+    static bool is_seed_password_protected(const std::string& seed_phrase, bool& is_password_protected);
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_keys)

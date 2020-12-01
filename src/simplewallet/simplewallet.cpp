@@ -46,13 +46,14 @@ namespace
   const command_line::arg_descriptor<std::string> arg_password = {"password", "Wallet password", "", true};
   const command_line::arg_descriptor<bool> arg_dont_refresh = { "no-refresh", "Do not refresh after load", false, true };
   const command_line::arg_descriptor<bool> arg_dont_set_date = { "no-set-creation-date", "Do not set wallet creation date", false, false };
-  const command_line::arg_descriptor<bool> arg_print_brain_wallet = { "print-brain-wallet", "Print to conosole brain wallet", false, false };
   const command_line::arg_descriptor<int> arg_daemon_port = {"daemon-port", "Use daemon instance at port <arg> instead of default", 0};
   const command_line::arg_descriptor<uint32_t> arg_log_level = {"set-log", "", 0, true};
   const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
   const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address = { "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" };
   const command_line::arg_descriptor<std::string> arg_restore_wallet = { "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" };
   const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
+  const command_line::arg_descriptor<std::string> arg_scan_for_wallet = { "scan-for-wallet", "", "", true };
+  const command_line::arg_descriptor<std::string> arg_addr_to_compare = { "addr-to-compare", "", "", true };
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
 
@@ -178,7 +179,6 @@ bool simple_wallet::help(const std::vector<std::string> &args/* = std::vector<st
 
 simple_wallet::simple_wallet()
   : m_daemon_port(0), 
-  m_print_brain_wallet(false), 
   m_do_refresh_after_load(false),
   m_do_not_set_date(false),
   m_do_pos_mining(false),
@@ -307,10 +307,6 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     m_do_refresh_after_load = false;
   }
 
-  if (command_line::has_arg(vm, arg_print_brain_wallet))
-  {
-    m_print_brain_wallet = true;
-  }
 
   if (!m_generate_new.empty())
   {
@@ -336,9 +332,26 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       fail_msg_writer() << "failed to read seed phrase";
       return false;
     }
-
     bool looks_like_tracking_seed = restore_seed_container.password().find(':') != std::string::npos;
-    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed);
+    tools::password_container seed_password_container;
+
+    if (!looks_like_tracking_seed)
+    {
+      bool is_password_protected = false;
+      bool sr = account_base::is_seed_password_protected(restore_seed_container.password(), is_password_protected);
+      if (!sr)
+      {
+        fail_msg_writer() << "failed to parse seed phrase";
+        return false;
+      }
+
+      if (is_password_protected && !seed_password_container.read_password("This seed is secured, to use it please enter the password:\n"))
+      {
+        fail_msg_writer() << "failed to read seed phrase";
+        return false;
+      }
+    }
+    bool r = restore_wallet(m_restore_wallet, restore_seed_container.password(), pwd_container.password(), looks_like_tracking_seed, seed_password_container.password());
     CHECK_AND_ASSERT_MES(r, false, "wallet restoring failed");
   }
   else
@@ -400,10 +413,6 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
 
-    if (m_print_brain_wallet)
-    {
-      std::cout << "Seed phrase (keep it in secret): " << m_wallet->get_account().get_seed_phrase() << std::endl << std::flush;
-    }
 
   }
   catch (const std::exception& e)
@@ -422,7 +431,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet)
+bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::string& seed_or_tracking_seed, const std::string& password, bool tracking_wallet, const std::string& seed_password)
 {
   m_wallet_file = wallet_file;
 
@@ -434,13 +443,13 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
     if (tracking_wallet)
     {
       // auditable watch-only aka tracking wallet
-      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true);
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true, "");
       message_writer(epee::log_space::console_color_white, true) << "Tracking wallet restored: " << m_wallet->get_account().get_public_address_str();
     }
     else
     {
       // normal or auditable wallet
-      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, false);
+      m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, false, seed_password);
       message_writer(epee::log_space::console_color_white, true) << (m_wallet->is_auditable() ? "Auditable wallet" : "Wallet") << " restored: " << m_wallet->get_account().get_public_address_str();
       std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
       if (m_wallet->is_auditable())
@@ -454,7 +463,11 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
     fail_msg_writer() << "failed to restore wallet, check your " << (tracking_wallet ? "tracking seed!" : "seed phrase!") << ENDL << e.what();
     return false;
   }
-
+  catch (...)
+  {
+    fail_msg_writer() << "failed to restore wallet, check your " << (tracking_wallet ? "tracking seed!" : "seed phrase!") << ENDL;
+    return false;
+  }
   m_wallet->init(m_daemon_address);
 
   success_msg_writer() <<
@@ -481,9 +494,6 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     {
       m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
       message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
-
-      if (m_print_brain_wallet)
-        std::cout << "Seed phrase (keep it in secret): " << m_wallet->get_account().get_seed_phrase() << std::endl << std::flush;
 
       break;
     }
@@ -1359,9 +1369,24 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_seed(const std::vector<std::string> &args)
 {
-  success_msg_writer() << "Here's your wallet's seed phrase. Write it down and keep in a safe place.";
-  success_msg_writer(true) << "Anyone who knows the following 26 words can access your wallet:";
-  std::cout << m_wallet->get_account().get_seed_phrase() << std::endl << std::flush;
+  success_msg_writer() << "Please enter a password to secure this seed. Securing your seed is HIGHLY recommended. Leave password blank to stay unsecured.";
+  success_msg_writer(true) << "Remember, restoring a wallet from Secured Seed can only be done if you know its password.";
+
+  tools::password_container seed_password_container1;
+  if (!seed_password_container1.read_password("Enter seed password: "))
+  {
+    return false;
+  }
+  tools::password_container seed_password_container2;
+  if (!seed_password_container2.read_password("Confirm seed password: "))
+  {
+    return false;
+  }
+  if(seed_password_container1.password() != seed_password_container2.password())
+  {
+    std::cout << "Error: password mismatch. Please make sure you entered the correct password and confirmed it" << std::endl << std::flush;
+  }
+  std::cout << m_wallet->get_account().get_seed_phrase(seed_password_container2.password()) << std::endl << std::flush;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1712,6 +1737,109 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
 
   return true;
 }
+
+
+//----------------------------------------------------------------------------------------------------
+uint64_t
+get_tick_count__()
+{
+  using namespace std::chrono;
+  return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+//----------------------------------------------------------------------------------------------------
+bool check_if_file_looks_like_a_wallet(const std::wstring& wallet_)
+{
+  std::string keys_buff;
+
+
+  boost::system::error_code e;
+  bool exists = boost::filesystem::exists(wallet_, e);
+  if (e || !exists)
+    return false;
+
+  boost::filesystem::ifstream data_file;
+  data_file.open(wallet_, std::ios_base::binary | std::ios_base::in);
+  if (data_file.fail())
+    return false;
+
+  tools::wallet_file_binary_header wbh = AUTO_VAL_INIT(wbh);
+
+  data_file.read((char*)&wbh, sizeof(wbh));
+  if (data_file.fail())
+  {
+    return false;
+  }
+
+  if (wbh.m_signature != WALLET_FILE_SIGNATURE_OLD && wbh.m_signature != WALLET_FILE_SIGNATURE_V2)
+  {
+    return false;
+  }
+
+  //std::cout << "\r                                                                           \r";
+  LOG_PRINT_L0("Found wallet file: " << epee::string_encoding::convert_to_ansii(wallet_));
+  return false;
+}
+
+bool search_for_wallet_file(const std::wstring &search_here/*, const std::string &addr_to_compare*/)
+{
+  if (search_here == L"/proc" || search_here == L"/bin" || search_here == L"/dev" || search_here == L"/etc"
+    || search_here == L"/lib" || search_here == L"/lib64" || search_here == L"/proc" || search_here == L"/run"
+    || search_here == L"/sbin" || search_here == L"/srv" || search_here == L"/sys" || search_here == L"/usr"
+    || search_here == L"/var")
+  {
+    LOG_PRINT_L0("Skiping    " << epee::string_encoding::convert_to_ansii(search_here));
+    return false;
+  }
+
+  //LOG_PRINT_L0("FOLDER: " << epee::string_encoding::convert_to_ansii(search_here));
+  static uint64_t last_tick = 0;
+  using namespace boost::filesystem;
+  //recursive_directory_iterator dir(search_here), end;
+  try
+  {
+    for (auto& dir : boost::make_iterator_range(directory_iterator(search_here), {}))
+    {
+      boost::system::error_code ec = AUTO_VAL_INIT(ec);
+      bool r = boost::filesystem::is_directory(dir.path(), ec);
+      if (r)
+      {
+        if (get_tick_count__() - last_tick > 300)
+        {
+          last_tick = get_tick_count__();
+          //std::cout << "\r                                                                                                                                        \r ->" << dir.path();
+        }
+        bool r = search_for_wallet_file(dir.path().wstring());
+        if (r)
+          return true;
+      }
+      else
+      {
+        boost::system::error_code ec = AUTO_VAL_INIT(ec);
+        bool r = boost::filesystem::is_regular_file(dir.path(), ec);
+        if (!r)
+        {
+          //LOG_PRINT_L0("Skiping as not regular: " << epee::string_encoding::convert_to_ansii(dir.path().wstring()));
+          return false;
+
+        }
+        //LOG_PRINT_L0("FILE: " << dir.path().string());
+        std::wstring pa = dir.path().wstring();
+        r = check_if_file_looks_like_a_wallet(pa);
+        if (r)
+          return true;
+
+      }
+    }
+  }
+  catch (std::exception& /* ex*/)
+  {
+    //std::cout << "\r                                                                           \r";
+    LOG_PRINT_CYAN("Skip: " << search_here, LOG_LEVEL_0);
+    return false;
+  }
+  return false;
+}
 //----------------------------------------------------------------------------------------------------
 #ifdef WIN32
 int wmain( int argc, wchar_t* argv_w[ ], wchar_t* envp[ ] )
@@ -1763,14 +1891,14 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_log_level);
   command_line::add_arg(desc_params, arg_dont_refresh);
   command_line::add_arg(desc_params, arg_dont_set_date);
-  command_line::add_arg(desc_params, arg_print_brain_wallet);
   command_line::add_arg(desc_params, arg_do_pos_mining);
   command_line::add_arg(desc_params, arg_pos_mining_reward_address);
   command_line::add_arg(desc_params, arg_restore_wallet);
   command_line::add_arg(desc_params, arg_offline_mode);
   command_line::add_arg(desc_params, command_line::arg_log_file);
   command_line::add_arg(desc_params, command_line::arg_log_level);
-
+  command_line::add_arg(desc_params, arg_scan_for_wallet);
+  command_line::add_arg(desc_params, arg_addr_to_compare);
 
   tools::wallet_rpc_server::init_options(desc_params);
 
@@ -1825,6 +1953,17 @@ int main(int argc, char* argv[])
   {
     LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
     log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, command_line::arg_log_level));
+  }
+
+
+  if (command_line::has_arg(vm, arg_scan_for_wallet))
+  {
+    log_space::log_singletone::add_logger(LOGGER_CONSOLE, nullptr, nullptr, LOG_LEVEL_4);
+    LOG_PRINT_L0("Searching from "
+      << epee::string_encoding::convert_to_ansii(command_line::get_arg(vm, arg_scan_for_wallet)));
+
+    search_for_wallet_file(epee::string_encoding::convert_to_unicode(command_line::get_arg(vm, arg_scan_for_wallet)));
+    return EXIT_SUCCESS;
   }
 
   bool offline_mode = command_line::get_arg(vm, arg_offline_mode);

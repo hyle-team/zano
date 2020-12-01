@@ -150,9 +150,10 @@
 
 #define WALLET_FILE_MAX_KEYS_SIZE                       10000 //
 #define WALLET_BRAIN_DATE_OFFSET                        1543622400
-#define WALLET_BRAIN_DATE_QUANTUM                       604800 //by last word we encode a number of week since launch of the project, 
+#define WALLET_BRAIN_DATE_QUANTUM                       604800 //by last word we encode a number of week since launch of the project AND password flag, 
                                                                //which let us to address tools::mnemonic_encoding::NUMWORDS weeks after project launch
-                                                               //which is about 30 years
+                                                               //which is about 15 years
+#define WALLET_BRAIN_DATE_MAX_WEEKS_COUNT               800
 
 #define OFFER_MAXIMUM_LIFE_TIME                         (60*60*24*30)  // 30 days
 

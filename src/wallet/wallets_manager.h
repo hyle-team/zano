@@ -99,7 +99,7 @@ public:
   bool get_opened_wallets(std::list<view::open_wallet_response>& result);
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr, bool exclude_mining_txs = false);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
-  std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr);
+  std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& seed_phrase, const std::string& seed_password, view::open_wallet_response& owr);
   std::string invoke(uint64_t wallet_id, std::string params);
   std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);
@@ -132,7 +132,7 @@ public:
   std::string stop_pos_mining(uint64_t wallet_id);
   std::string check_available_sources(uint64_t wallet_id, std::list<uint64_t>& amounts);
   std::string get_mining_history(uint64_t wallet_id, tools::wallet_public::mining_history& wrpc);
-  std::string get_wallet_restore_info(uint64_t wallet_id, std::string& restore_key);
+  std::string get_wallet_restore_info(uint64_t wallet_id, std::string& seed_phrase, const std::string& seed_password);
   std::string backup_wallet(uint64_t wallet_id, const std::wstring& path);
   std::string reset_wallet_password(uint64_t wallet_id, const std::string& pass);
   std::string is_wallet_password_valid(uint64_t wallet_id, const std::string& pass);
@@ -149,7 +149,8 @@ public:
   void toggle_pos_mining();
   std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
-  std::string is_valid_brain_restore_data(const std::string& seed_phrase);
+  std::string is_valid_brain_restore_data(const std::string& seed_phrase, const std::string& seed_password);
+  std::string get_seed_phrase_info(const std::string& seed_phrase, const std::string& seed_password, view::seed_phrase_info& result);
 #ifndef MOBILE_WALLET_BUILD
   void subscribe_to_core_events(currency::i_core_event_handler* pevents_handler);
   //void unsubscribe_to_core_events();

@@ -137,6 +137,7 @@ public:
   QString is_autostart_enabled();
   QString toggle_autostart(const QString& param);
   QString is_valid_restore_wallet_text(const QString& param);
+  QString get_seed_phrase_info(const QString& param);
   QString print_text(const QString& param);
   QString print_log(const QString& param);
   QString set_clipboard(const QString& param);
@@ -158,6 +159,9 @@ public:
   void    on_menu_show();
   QString is_remnotenode_mode_preconfigured();
   QString start_backend(const QString& params);
+
+  //for test purposes onlys
+  QString request_dummy();
 
 signals:
   void quit_requested(const QString str);

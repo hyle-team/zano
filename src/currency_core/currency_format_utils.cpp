@@ -1316,21 +1316,34 @@ namespace currency
     return reward;
   }
   //---------------------------------------------------------------
-  std::string get_word_from_timstamp(uint64_t timestamp)
+  std::string get_word_from_timstamp(uint64_t timestamp, bool use_password)
   {
     uint64_t date_offset = timestamp > WALLET_BRAIN_DATE_OFFSET ? timestamp - WALLET_BRAIN_DATE_OFFSET : 0;
     uint64_t weeks_count = date_offset / WALLET_BRAIN_DATE_QUANTUM;
+    CHECK_AND_ASSERT_THROW_MES(weeks_count < WALLET_BRAIN_DATE_MAX_WEEKS_COUNT, "SEED PHRASE need to be extended or refactored");
+
+    if (use_password)
+      weeks_count += WALLET_BRAIN_DATE_MAX_WEEKS_COUNT;
+
     CHECK_AND_ASSERT_THROW_MES(weeks_count < std::numeric_limits<uint32_t>::max(), "internal error: unable to convert to uint32, val = " << weeks_count);
     uint32_t weeks_count_32 = static_cast<uint32_t>(weeks_count);
 
     return tools::mnemonic_encoding::word_by_num(weeks_count_32);
   }
   //---------------------------------------------------------------
-  uint64_t get_timstamp_from_word(std::string word)
+  uint64_t get_timstamp_from_word(std::string word, bool& password_used)
   {
     uint64_t count_of_weeks = tools::mnemonic_encoding::num_by_word(word);
+    if (count_of_weeks >= WALLET_BRAIN_DATE_MAX_WEEKS_COUNT)
+    {
+      count_of_weeks -= WALLET_BRAIN_DATE_MAX_WEEKS_COUNT;
+      password_used = true;
+    }
+    else {
+      password_used = false;
+    }
     uint64_t timestamp = count_of_weeks * WALLET_BRAIN_DATE_QUANTUM + WALLET_BRAIN_DATE_OFFSET;
-
+    
     return timestamp;
   }
   //---------------------------------------------------------------

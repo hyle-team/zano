@@ -15,6 +15,7 @@ using namespace epee;
 #include "misc_language.h"
 #include "crypto/hash.h"
 #include "wallet_rpc_server_error_codes.h"
+#include "wallet_helpers.h"
 
 #define WALLET_RPC_BEGIN_TRY_ENTRY()     try {
 #define WALLET_RPC_CATCH_TRY_ENTRY()     } \
@@ -196,7 +197,6 @@ namespace tools
       res.path = epee::string_encoding::convert_to_ansii(m_wallet.get_wallet_path());
       res.transfers_count = m_wallet.get_recent_transfers_total_count();
       res.transfer_entries_count = m_wallet.get_transfer_entries_count();
-      res.seed = m_wallet.get_account().get_seed_phrase();
       std::map<uint64_t, uint64_t> distribution;
       m_wallet.get_utxo_distribution(distribution);
       for (const auto& ent : distribution)
@@ -210,6 +210,25 @@ namespace tools
       er.message = e.what();
       return false;
     }
+  }
+  bool wallet_rpc_server::on_getwallet_restore_info(const wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::request& req, wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    try
+    {
+      res.seed_phrase = m_wallet.get_account().get_seed_phrase(res.seed_phrase);
+      return true;
+    }
+    catch (std::exception& e)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = e.what();
+      return false;
+    }
+  }
+  bool wallet_rpc_server::on_get_seed_phrase_info(const wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO::request& req, wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+     tools::get_seed_phrase_info(req.seed_phrase, req.seed_password, res);
+     return true;
   }
   bool wallet_rpc_server::on_get_recent_txs_and_info(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
