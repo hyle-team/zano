@@ -208,7 +208,11 @@ namespace currency
       h = crypto::cn_fast_hash(&h, sizeof h);
       uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
       uint16_t checksum_calculated = h_64 % (checksum_max + 1);
-      CHECK_AND_ASSERT_MES(checksum == checksum_calculated, false, "seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
+      if (checksum != checksum_calculated)
+      {
+        LOG_PRINT_L0("seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
+        return false;
+      }      
     }
 
     bool r = restore_keys(keys_seed_processed_binary);
