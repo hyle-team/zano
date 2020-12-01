@@ -27,7 +27,15 @@ namespace tools
   inline std::string get_seed_phrase_info(const std::string& seed_phrase, const std::string& seed_password, view::seed_phrase_info& result)
   {
     //cut the last timestamp word from restore_dats
-    result.syntax_correct = currency::account_base::is_seed_password_protected(seed_phrase, result.require_password);
+    try{
+      result.syntax_correct = currency::account_base::is_seed_password_protected(seed_phrase, result.require_password);
+    }
+    catch (...)
+    {
+      result.syntax_correct = false;
+      return API_RETURN_CODE_OK;
+    }
+
     if (result.syntax_correct)
     {
       currency::account_base acc;

@@ -159,14 +159,30 @@ namespace currency
     
     uint64_t auditable_flag_and_checksum = UINT64_MAX;
     if (!auditable_flag_and_checksum_word.empty())
-      auditable_flag_and_checksum = tools::mnemonic_encoding::num_by_word(auditable_flag_and_checksum_word);
+    {
+      try {
+        auditable_flag_and_checksum = tools::mnemonic_encoding::num_by_word(auditable_flag_and_checksum_word);
+      }
+      catch (...)
+      {
+        return false;
+      }
+      
+    }
+      
 
     std::vector<unsigned char> keys_seed_binary = tools::mnemonic_encoding::text2binary(keys_seed_text);
     std::vector<unsigned char> keys_seed_processed_binary = keys_seed_binary;
 
 
     bool has_password = false;
-    m_creation_timestamp = get_timstamp_from_word(timestamp_word, has_password);
+    try {
+      m_creation_timestamp = get_timstamp_from_word(timestamp_word, has_password);
+    }
+    catch (...)
+    {
+      return false;
+    }
     //double check is password setting from timestamp word match with passed parameters
     CHECK_AND_ASSERT_MES(has_password != seed_password.empty(), false, "Seed phrase password wrong interpretation");
     if (has_password)
