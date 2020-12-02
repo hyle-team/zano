@@ -62,9 +62,9 @@
       </div>
     </div>
 
-    <div class="input-block half-block">
+    <div class="input-block half-block" *ngIf="this.seedPhraseInfo?.syntax_correct && this.seedPhraseInfo?.require_password">
       <label for="seed-password">{{ 'RESTORE_WALLET.SEED_PASSWORD' | translate }}</label>
-      <input type="password" id="seed-password" formControlName="seedPassword" [attr.readonly]="this.seedPhraseInfo?.syntax_correct && this.seedPhraseInfo?.require_password ? null : true">
+      <input type="password" id="seed-password" formControlName="seedPassword">
       <div class="error-block" *ngIf="(restoreForm.controls['seedPassword'].dirty || restoreForm.controls['seedPassword'].touched) && !this.seedPhraseInfo?.hash_sum_matched">
         <span>{{ 'RESTORE_WALLET.FORM_ERRORS.INCORRECT_PASSWORD' | translate }}</span>
       </div>
