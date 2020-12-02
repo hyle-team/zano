@@ -75,7 +75,7 @@
 
     <div class="wrap-buttons">
       <button type="button" class="transparent-button" *ngIf="walletSaved" disabled><i class="icon"></i>{{walletSavedName}}</button>
-      <button type="button" class="blue-button select-button" (click)="saveWallet()" [disabled]="!restoreForm.valid" *ngIf="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_SELECT' | translate }}</button>
+      <button type="button" class="blue-button select-button" (click)="saveWallet()" [disabled]="(!this.seedPhraseInfo?.syntax_correct || !this.seedPhraseInfo?.require_password || !this.seedPhraseInfo?.hash_sum_matched) && (!this.seedPhraseInfo?.syntax_correct || this.seedPhraseInfo?.require_password)" *ngIf="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_SELECT' | translate }}</button>
       <button type="button" class="blue-button create-button" (click)="createWallet()" [disabled]="!walletSaved">{{ 'RESTORE_WALLET.BUTTON_CREATE' | translate }}</button>
     </div>
 
