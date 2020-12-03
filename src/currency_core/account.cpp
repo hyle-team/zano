@@ -232,6 +232,13 @@ namespace currency
     std::list<std::string> words;
     boost::split(words, seed_phrase, boost::is_space());
 
+    //let's validate each word 
+    for (const auto& w: words)
+    {
+      if (!tools::mnemonic_encoding::valid_word(words))
+        return false;
+    }
+
     std::string timestamp_word;
     if (words.size() == SEED_PHRASE_V1_WORDS_COUNT)
     {

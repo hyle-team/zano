@@ -3379,6 +3379,12 @@ namespace tools
       return wordsArray[n];
     }
 
+    bool valid_word(const std::string& w)
+    {
+      auto it = wordsMap.find(w);
+      return it != wordsMap.end();
+    }
+
     uint64_t num_by_word(const std::string& w)
     {
       auto it = wordsMap.find(w);
