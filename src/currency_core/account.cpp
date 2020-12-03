@@ -235,7 +235,7 @@ namespace currency
     //let's validate each word 
     for (const auto& w: words)
     {
-      if (!tools::mnemonic_encoding::valid_word(words))
+      if (!tools::mnemonic_encoding::valid_word(w))
         return false;
     }
 

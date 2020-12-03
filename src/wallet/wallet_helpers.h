@@ -36,10 +36,17 @@ namespace tools
       return API_RETURN_CODE_OK;
     }
 
-    if (result.syntax_correct)
+    if (result.syntax_correct && result.require_password)
     {
-      currency::account_base acc;
-      result.hash_sum_matched = acc.restore_from_seed_phrase(seed_phrase, seed_password);
+      if (seed_password.size())
+      {
+        currency::account_base acc;
+        result.hash_sum_matched = acc.restore_from_seed_phrase(seed_phrase, seed_password);
+      }
+      else 
+      {
+        result.hash_sum_matched = false;
+      }
     }
     return API_RETURN_CODE_OK;
   }
