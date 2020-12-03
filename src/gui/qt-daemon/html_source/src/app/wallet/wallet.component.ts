@@ -27,6 +27,7 @@ export class WalletComponent implements OnInit, OnDestroy {
   copyAnimation = false;
   copyAnimationTimeout;
   balanceTooltip;
+  walletLoaded;
   activeTab = 'history';
   public mining = false;
   public currentPage = 1;
@@ -203,6 +204,7 @@ export class WalletComponent implements OnInit, OnDestroy {
         this.variablesService.currentWallet.wakeAlias = false;
       }
     });
+    this.updateWalletStatus();
   }
   resetPaginationValues() {
     this.ngZone.run(() => {
@@ -369,4 +371,13 @@ export class WalletComponent implements OnInit, OnDestroy {
     clearTimeout(this.copyAnimationTimeout);
   }
 
+  updateWalletStatus() {
+    this.backend.eventSubscribe('update_wallet_status', (data) => {
+      const wallet_state = data.wallet_state;
+      this.walletLoaded = false;
+      if (wallet_state === 2) {
+        this.walletLoaded = true;
+      }
+    });
+  }
 }
