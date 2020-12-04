@@ -73,23 +73,27 @@ export class RestoreWalletComponent implements OnInit, OnDestroy {
   }
 
   changeDetectionSeedPhrasePassword() {
-    this.restoreForm.controls.seedPassword.valueChanges
-      .pipe(debounceTime(0), distinctUntilChanged(), takeUntil(this.unsubscribeAll))
+    this.ngZone.runOutsideAngular(() => {
+      this.restoreForm.controls.seedPassword.valueChanges
+      .pipe(takeUntil(this.unsubscribeAll))
       .subscribe(() => {
         this.checkValidSeedPhrasePassword();
       });
     this.restoreForm.controls.key.valueChanges
-      .pipe(debounceTime(0), distinctUntilChanged(), takeUntil(this.unsubscribeAll))
+      .pipe(takeUntil(this.unsubscribeAll))
       .subscribe(() => {
         this.checkValidSeedPhrasePassword();
       });
+    });
   }
 
   checkValidSeedPhrasePassword() {
-    const seed_password = this.restoreForm.controls.seedPassword.value;
-    const seed_phrase = this.restoreForm.controls.key.value;
-    this.backend.getSeedPhraseInfo({seed_phrase, seed_password}, (status, data) => {
-      this.seedPhraseInfo = data;
+    this.ngZone.runOutsideAngular(() => {
+      const seed_password = this.restoreForm.controls.seedPassword.value;
+      const seed_phrase = this.restoreForm.controls.key.value;
+      this.backend.getSeedPhraseInfo({seed_phrase, seed_password}, (status, data) => {
+        this.seedPhraseInfo = data;
+      });
     });
   }
 
