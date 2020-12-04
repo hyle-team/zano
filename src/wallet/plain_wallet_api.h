@@ -38,4 +38,5 @@ namespace plain_wallet
   //async api
   std::string async_call(const std::string& method_name, uint64_t instance_id, const std::string& params);
   std::string try_pull_result(uint64_t);
+  std::string sync_call(const std::string& method_name, uint64_t instance_id, const std::string& params);
 }
