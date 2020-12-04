@@ -1989,6 +1989,7 @@ QString MainWindow::get_seed_phrase_info(const QString& param)
   PREPARE_ARG_FROM_JSON(view::seed_info_param, rwtp);
   PREPARE_RESPONSE(view::seed_phrase_info, ar);
   ar.error_code = m_backend.get_seed_phrase_info(rwtp.seed_phrase, rwtp.seed_password, ar.response_data).c_str();
+  LOG_PRINT_CYAN("[get_seed_phrase_info]:" << epee::serialization::store_t_to_json(ar), LOG_LEVEL_0);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }

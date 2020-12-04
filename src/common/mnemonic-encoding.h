@@ -46,5 +46,6 @@ namespace tools
 		std::string binary2text(const std::vector<unsigned char>& binary);
     std::string word_by_num(uint32_t n);
     uint64_t num_by_word(const std::string& w);
+    bool valid_word(const std::string& w);
 	}
 }

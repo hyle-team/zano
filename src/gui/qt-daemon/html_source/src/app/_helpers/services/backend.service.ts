@@ -412,23 +412,28 @@ export class BackendService {
     this.runCommand('close_wallet', {wallet_id: +wallet_id}, callback);
   }
 
-  getSmartWalletInfo(wallet_id, callback) {
-    this.runCommand('get_smart_wallet_info', {wallet_id: +wallet_id}, callback);
+  getSmartWalletInfo({wallet_id, seed_password}, callback) {
+    this.runCommand('get_smart_wallet_info', {wallet_id: +wallet_id, seed_password}, callback);
+  }
+
+  getSeedPhraseInfo(param, callback) {
+    this.runCommand('get_seed_phrase_info', param, callback);
   }
 
   runWallet(wallet_id, callback?) {
     this.runCommand('run_wallet', {wallet_id: +wallet_id}, callback);
   }
 
-  isValidRestoreWalletText(text, callback) {
-    this.runCommand('is_valid_restore_wallet_text', text, callback);
+  isValidRestoreWalletText(param, callback) {
+    this.runCommand('is_valid_restore_wallet_text', param, callback);
   }
 
-  restoreWallet(path, pass, restore_key, callback) {
+  restoreWallet(path, pass, seed_phrase, seed_pass, callback) {
     const params = {
-      restore_key: restore_key,
+      seed_phrase: seed_phrase,
       path: path,
-      pass: pass
+      pass: pass,
+      seed_pass
     };
     this.runCommand('restore_wallet', params, callback);
   }

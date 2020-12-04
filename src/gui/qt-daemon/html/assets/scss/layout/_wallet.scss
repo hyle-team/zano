@@ -18,6 +18,14 @@ app-wallet {
           background-color: themed(blueTextColor);
         }
       }
+      &:disabled {
+        background-color: transparent !important;
+        .icon {
+          @include themify($themes) {
+            background-color: themed(accountOptionalTextColor);
+          }
+        }
+      }
     }
 
     .alias {

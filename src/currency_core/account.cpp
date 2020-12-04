@@ -159,14 +159,30 @@ namespace currency
     
     uint64_t auditable_flag_and_checksum = UINT64_MAX;
     if (!auditable_flag_and_checksum_word.empty())
-      auditable_flag_and_checksum = tools::mnemonic_encoding::num_by_word(auditable_flag_and_checksum_word);
+    {
+      try {
+        auditable_flag_and_checksum = tools::mnemonic_encoding::num_by_word(auditable_flag_and_checksum_word);
+      }
+      catch (...)
+      {
+        return false;
+      }
+      
+    }
+      
 
     std::vector<unsigned char> keys_seed_binary = tools::mnemonic_encoding::text2binary(keys_seed_text);
     std::vector<unsigned char> keys_seed_processed_binary = keys_seed_binary;
 
 
     bool has_password = false;
-    m_creation_timestamp = get_timstamp_from_word(timestamp_word, has_password);
+    try {
+      m_creation_timestamp = get_timstamp_from_word(timestamp_word, has_password);
+    }
+    catch (...)
+    {
+      return false;
+    }
     //double check is password setting from timestamp word match with passed parameters
     CHECK_AND_ASSERT_MES(has_password != seed_password.empty(), false, "Seed phrase password wrong interpretation");
     if (has_password)
@@ -192,7 +208,11 @@ namespace currency
       h = crypto::cn_fast_hash(&h, sizeof h);
       uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
       uint16_t checksum_calculated = h_64 % (checksum_max + 1);
-      CHECK_AND_ASSERT_MES(checksum == checksum_calculated, false, "seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
+      if (checksum != checksum_calculated)
+      {
+        LOG_PRINT_L0("seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
+        return false;
+      }      
     }
 
     bool r = restore_keys(keys_seed_processed_binary);
@@ -211,6 +231,13 @@ namespace currency
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
     boost::split(words, seed_phrase, boost::is_space());
+
+    //let's validate each word 
+    for (const auto& w: words)
+    {
+      if (!tools::mnemonic_encoding::valid_word(w))
+        return false;
+    }
 
     std::string timestamp_word;
     if (words.size() == SEED_PHRASE_V1_WORDS_COUNT)

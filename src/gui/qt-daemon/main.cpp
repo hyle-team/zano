@@ -8,16 +8,11 @@
 #include "application/mainwindow.h"
 #include "qdebug.h"
 #include <thread>
+#include <math.h>
 //#include "qtlogger.h"
 #include "include_base_utils.h"
 #include "currency_core/currency_config.h"
-#include <math.h>
 
-// class MyApplication : public QApplication
-// {
-// 
-// 
-// }
 
 int main(int argc, char *argv[])
 {

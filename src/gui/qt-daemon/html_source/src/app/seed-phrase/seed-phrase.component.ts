@@ -32,9 +32,9 @@ export class SeedPhraseComponent implements OnInit, OnDestroy {
       if (params.wallet_id) {
         this.wallet_id = params.wallet_id;
         this.backend.getSmartWalletInfo(params.wallet_id, (status, data) => {
-          if (data.hasOwnProperty('restore_key')) {
+          if (data.hasOwnProperty('seed_phrase')) {
             this.ngZone.run(() => {
-              this.seedPhrase = data['restore_key'].trim();
+              this.seedPhrase = data['seed_phrase'].trim();
             });
           }
         });
