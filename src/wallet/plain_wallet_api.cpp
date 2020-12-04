@@ -16,6 +16,7 @@
 #include "common/base58.h"
 #include "common/config_encrypt_helper.h"
 #include "static_helpers.h"
+#include "wallet_helpers.h"
 
 
 #define ANDROID_PACKAGE_NAME    "com.zano_mobile"
@@ -541,6 +542,22 @@ namespace plain_wallet
         res = restore(rwr.seed_phrase, rwr.path, rwr.pass, rwr.seed_pass);
       }
     }
+    else if (method_name == "get_seed_phrase_info")
+    {
+      view::seed_info_param sip = AUTO_VAL_INIT(sip);
+      if (!epee::serialization::load_t_from_json(sip, params))
+      {
+        view::api_response ar = AUTO_VAL_INIT(ar);
+        ar.error_code = "Wrong parameter";
+        res = epee::serialization::store_t_to_json(ar);
+      }
+      else
+      {
+        view::api_response_t<view::seed_phrase_info> rsp = AUTO_VAL_INIT(rsp);
+        rsp.error_code = tools::get_seed_phrase_info(sip.seed_phrase, sip.seed_password, rsp.response_data);
+        res = epee::serialization::store_t_to_json(rsp);
+      }
+    }    
     else if (method_name == "invoke")
     {
       res = invoke(instance_id, params);
