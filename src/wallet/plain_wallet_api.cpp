@@ -484,21 +484,35 @@ namespace plain_wallet
     LOG_PRINT_L2("[ASYNC_CALL]: Finished(result put), job id: " << job_id);
   }
 
+
   std::string async_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
   {
     GET_INSTANCE_PTR(inst_ptr);
     std::function<void()> async_callback;
 
     uint64_t job_id = inst_ptr->gjobs_counter++;
+    async_callback = [job_id, instance_id, method_name, params]()
+    {
+      std::string res_str = sync_call(method_name,  instance_id, params);
+      put_result(job_id, res_str);
+    };
+
+    std::thread t([async_callback]() {async_callback(); });
+    t.detach();
+    LOG_PRINT_L2("[ASYNC_CALL]: started " << method_name << ", job id: " << job_id);
+    return std::string("{ \"job_id\": ") + std::to_string(job_id) + "}";
+  }
+
+
+  std::string sync_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
+  {
+    std::string res;
     if (method_name == "close")
     {
-      async_callback = [job_id, instance_id]()
-      {
         close_wallet(instance_id);
         view::api_responce_return_code rc = AUTO_VAL_INIT(rc);
         rc.return_code = API_RETURN_CODE_OK;
-        put_result(job_id, epee::serialization::store_t_to_json(rc));        
-      };
+        res = epee::serialization::store_t_to_json(rc);
     }
     else if (method_name == "open")
     {
@@ -507,13 +521,11 @@ namespace plain_wallet
       {
         view::api_response ar = AUTO_VAL_INIT(ar);
         ar.error_code = "Wrong parameter";
-        put_result(job_id, epee::serialization::store_t_to_json(ar));
-      }
-      async_callback = [job_id, owr]()
+        res = epee::serialization::store_t_to_json(ar);
+      }else
       {
-        std::string res = open(owr.path, owr.pass);
-        put_result(job_id, res);
-      };
+        res = open(owr.path, owr.pass);
+      }
     }
     else if (method_name == "restore")
     {
@@ -522,45 +534,32 @@ namespace plain_wallet
       {
         view::api_response ar = AUTO_VAL_INIT(ar);
         ar.error_code = "Wrong parameter";
-        put_result(job_id, epee::serialization::store_t_to_json(ar));
+        res = epee::serialization::store_t_to_json(ar);
       }
-      async_callback = [job_id, rwr]()
+      else
       {
-        std::string res = restore(rwr.seed_phrase, rwr.path, rwr.pass, rwr.seed_pass);
-        put_result(job_id, res);
-      };
+        res = restore(rwr.seed_phrase, rwr.path, rwr.pass, rwr.seed_pass);
+      }
     }
     else if (method_name == "invoke")
     {
-      std::string local_params = params;
-      async_callback = [job_id, local_params, instance_id]()
-      {
-        std::string res = invoke(instance_id, local_params);
-        put_result(job_id, res);
-      };
+      res = invoke(instance_id, params);
     }
     else if (method_name == "get_wallet_status")
     {
-      std::string local_params = params;
-      async_callback = [job_id, local_params, instance_id]()
-      {
-        std::string res = get_wallet_status(instance_id);
-        put_result(job_id, res);
-      };
-    }else
+      res = get_wallet_status(instance_id);
+    }
+    else
     {
       view::api_response ar = AUTO_VAL_INIT(ar);
       ar.error_code = "UNKNOWN METHOD";
-      put_result(job_id, epee::serialization::store_t_to_json(ar));
-      return std::string("{ \"job_id\": ") + std::to_string(job_id) + "}";;
+      res = epee::serialization::store_t_to_json(ar);
     }
-
-
-    std::thread t([async_callback]() {async_callback(); });
-    t.detach();
-    LOG_PRINT_L2("[ASYNC_CALL]: started " << method_name << ", job id: " << job_id);
-    return std::string("{ \"job_id\": ") + std::to_string(job_id) + "}";
+    return res;
   }
+
+
+
 
   std::string try_pull_result(uint64_t job_id)
   {
