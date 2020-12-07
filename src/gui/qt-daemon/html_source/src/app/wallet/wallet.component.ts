@@ -458,15 +458,14 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   updateWalletStatus() {
-    this.ngZone.runOutsideAngular(() => {
-      this.backend.eventSubscribe('update_wallet_status', (data) => {
-        const wallet_state = data.wallet_state;
-        if (wallet_state === 2) {
-          this.walletLoaded =  this.variablesService.getWallet(this.walletID).loaded;
-        } else {
-          this.walletLoaded = false;
-        }
-      });
+    this.backend.eventSubscribe('update_wallet_status', (data) => {
+      const wallet_state = data.wallet_state;
+      const wallet_id = data.wallet_id;
+      if (wallet_state === 2 && wallet_id === this.walletID) {
+        this.walletLoaded =  this.variablesService.getWallet(this.walletID).loaded;
+      } else {
+        this.walletLoaded = false;
+      }
     });
   }
 }

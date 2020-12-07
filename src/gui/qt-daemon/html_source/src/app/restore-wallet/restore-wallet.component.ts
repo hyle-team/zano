@@ -7,7 +7,7 @@ import { ModalService } from '../_helpers/services/modal.service';
 import { Wallet } from '../_helpers/models/wallet.model';
 import { TranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs/internal/Subject';
-import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, pairwise, startWith, takeUntil } from 'rxjs/operators';
 
 @Component({
   selector: 'app-restore-wallet',
@@ -73,25 +73,23 @@ export class RestoreWalletComponent implements OnInit, OnDestroy {
   }
 
   changeDetectionSeedPhrasePassword() {
-    this.ngZone.runOutsideAngular(() => {
-      this.restoreForm.controls.seedPassword.valueChanges
-      .pipe(takeUntil(this.unsubscribeAll))
+    this.restoreForm.controls.seedPassword.valueChanges
+      .pipe(startWith(null), pairwise(), takeUntil(this.unsubscribeAll))
       .subscribe(() => {
         this.checkValidSeedPhrasePassword();
       });
     this.restoreForm.controls.key.valueChanges
-      .pipe(takeUntil(this.unsubscribeAll))
+      .pipe(startWith(null), pairwise(), takeUntil(this.unsubscribeAll))
       .subscribe(() => {
         this.checkValidSeedPhrasePassword();
       });
-    });
   }
 
   checkValidSeedPhrasePassword() {
-    this.ngZone.runOutsideAngular(() => {
-      const seed_password = this.restoreForm.controls.seedPassword.value;
-      const seed_phrase = this.restoreForm.controls.key.value;
-      this.backend.getSeedPhraseInfo({seed_phrase, seed_password}, (status, data) => {
+    const seed_password = this.restoreForm.controls.seedPassword.value;
+    const seed_phrase = this.restoreForm.controls.key.value;
+    this.backend.getSeedPhraseInfo({seed_phrase, seed_password}, (status, data) => {
+      this.ngZone.run(() => {
         this.seedPhraseInfo = data;
       });
     });
