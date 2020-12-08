@@ -68,14 +68,13 @@
       <div class="seed-phrase-title">
         <span>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</span>
         <p class="right-part">
-          <i class="icon" [class.copy]="!copyAnimation" [class.copied]="copyAnimation" (click)="copySeedPhrase()"></i>
           <span
           *ngIf="seedPhraseForm.controls.password.value.length == 0">{{ 'WALLET_DETAILS.SEED_IS_UNSECURED' | translate }} <i class="icon unsecured"></i></span>
           <span
           *ngIf="seedPhraseForm.controls.password.value.length > 0">{{ 'WALLET_DETAILS.SEED_IS_SECURED' | translate }} <i class="icon secured"></i></span>
         </p>
       </div>
-      <div class="seed-phrase-content">
+      <div class="seed-phrase-content" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, seedPhrase)">
         <ng-container *ngFor="let word of seedPhrase.split(' '); let index = index">
           <div class="item"
             [class.dark]="(index + 1) >= 1 && (index + 1) <= 7 || (index + 1) >= 15 && (index + 1) <= 21">

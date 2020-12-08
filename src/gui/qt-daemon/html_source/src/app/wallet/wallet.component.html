@@ -16,7 +16,7 @@
     </div>
   </div>
   <div>
-    <button [routerLink]="['/details']" routerLinkActive="active" tooltip="{{ 'WALLET.TOOLTIPS.SETTINGS' | translate }}" placement="left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500">
+    <button [routerLink]="['/details']" routerLinkActive="active" tooltip="{{ 'WALLET.TOOLTIPS.SETTINGS' | translate }}" placement="left" tooltipClass="table-tooltip account-tooltip" [delay]="500" [timeDelay]="500" [disabled]="variablesService.daemon_state !== 2 || !walletLoaded">
       <i class="icon details"></i>
     </button>
   </div>
