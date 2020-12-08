@@ -120,7 +120,7 @@ export class WalletComponent implements OnInit, OnDestroy {
     this.subRouting1 = this.route.params.subscribe((params) => {
       // set current wallet only by user click to avoid after sync show synchronized data
       this.walletID = +params['id'];
-      this.walletLoaded =  this.variablesService.getWallet(this.walletID).loaded;
+      this.walletLoaded = this.variablesService.getWallet(this.walletID).loaded;
       this.variablesService.setCurrentWallet(this.walletID);
       this.walletsSubscription = this.store
         .select('sync')
@@ -458,14 +458,28 @@ export class WalletComponent implements OnInit, OnDestroy {
   }
 
   updateWalletStatus() {
+    this.backend.eventSubscribe('wallet_sync_progress', (data) => {
+      const wallet_id = data.wallet_id;
+      if (wallet_id === this.walletID) {
+        this.ngZone.run(() => {
+          this.walletLoaded = false;
+        });
+      }
+    });
     this.backend.eventSubscribe('update_wallet_status', (data) => {
       const wallet_state = data.wallet_state;
       const wallet_id = data.wallet_id;
-      if (wallet_state === 2 && wallet_id === this.walletID) {
-        this.walletLoaded =  this.variablesService.getWallet(this.walletID).loaded;
-      } else {
-        this.walletLoaded = false;
-      }
+      this.ngZone.run(() => {
+        if (wallet_state === 2 && wallet_id === this.walletID) {
+          this.walletLoaded =
+            this.variablesService.getWallet(this.walletID) !== null &&
+            this.variablesService.getWallet(this.walletID).loaded
+              ? true
+              : false;
+        } else {
+          this.walletLoaded = false;
+        }
+      });
     });
   }
 }
