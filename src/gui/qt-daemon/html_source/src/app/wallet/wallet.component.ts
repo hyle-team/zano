@@ -233,7 +233,11 @@ export class WalletComponent implements OnInit, OnDestroy {
           this.variablesService.currentWallet.wakeAlias = false;
         }
       }
+<<<<<<< HEAD
     );
+=======
+    });
+>>>>>>> 1e0d0857272c2f370789362a078839561fb4acd9
     this.updateWalletStatus();
   }
   resetPaginationValues() {
