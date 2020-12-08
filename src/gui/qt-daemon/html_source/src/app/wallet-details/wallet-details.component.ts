@@ -145,14 +145,6 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
     this.location.back();
   }
 
-  copySeedPhrase() {
-    this.backend.setClipboard(this.seedPhrase);
-    this.copyAnimation = true;
-    this.copyAnimationTimeout = window.setTimeout(() => {
-      this.copyAnimation = false;
-    }, 2000);
-  }
-
   ngOnDestroy() {
     clearTimeout(this.copyAnimationTimeout);
   }

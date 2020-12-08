@@ -7119,12 +7119,12 @@ var RestoreWalletComponent = /** @class */ (function () {
     RestoreWalletComponent.prototype.changeDetectionSeedPhrasePassword = function () {
         var _this = this;
         this.restoreForm.controls.seedPassword.valueChanges
-            .pipe(Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["debounceTime"])(0), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["distinctUntilChanged"])(), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["takeUntil"])(this.unsubscribeAll))
+            .pipe(Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["startWith"])(null), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["pairwise"])(), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["takeUntil"])(this.unsubscribeAll))
             .subscribe(function () {
             _this.checkValidSeedPhrasePassword();
         });
         this.restoreForm.controls.key.valueChanges
-            .pipe(Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["debounceTime"])(0), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["distinctUntilChanged"])(), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["takeUntil"])(this.unsubscribeAll))
+            .pipe(Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["startWith"])(null), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["pairwise"])(), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_9__["takeUntil"])(this.unsubscribeAll))
             .subscribe(function () {
             _this.checkValidSeedPhrasePassword();
         });
@@ -7134,7 +7134,9 @@ var RestoreWalletComponent = /** @class */ (function () {
         var seed_password = this.restoreForm.controls.seedPassword.value;
         var seed_phrase = this.restoreForm.controls.key.value;
         this.backend.getSeedPhraseInfo({ seed_phrase: seed_phrase, seed_password: seed_password }, function (status, data) {
-            _this.seedPhraseInfo = data;
+            _this.ngZone.run(function () {
+                _this.seedPhraseInfo = data;
+            });
         });
     };
     RestoreWalletComponent.prototype.createWallet = function () {
@@ -8939,7 +8941,7 @@ var TypingMessageComponent = /** @class */ (function () {
 /*! no static exports found */
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"head\">\r\n    <div class=\"breadcrumbs\">\r\n      <span (click)=\"back()\">{{variablesService.currentWallet.name}}</span>\r\n      <span>{{ 'BREADCRUMBS.WALLET_DETAILS' | translate }}</span>\r\n    </div>\r\n    <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\r\n      <i class=\"icon back\"></i>\r\n      <span>{{ 'COMMON.BACK' | translate }}</span>\r\n    </button>\r\n  </div>\r\n\r\n  <form class=\"form-details\" [formGroup]=\"detailsForm\" (ngSubmit)=\"onSubmitEdit()\">\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"wallet-name\">{{ 'WALLET_DETAILS.LABEL_NAME' | translate }}</label>\r\n      <input type=\"text\" id=\"wallet-name\" formControlName=\"name\" [maxLength]=\"variablesService.maxWalletNameLength\"\r\n        (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      <div class=\"error-block\"\r\n        *ngIf=\"detailsForm.controls['name'].invalid && (detailsForm.controls['name'].dirty || detailsForm.controls['name'].touched)\">\r\n        <div *ngIf=\"detailsForm.controls['name'].errors['required']\">\r\n          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"detailsForm.controls['name'].errors['duplicate']\">\r\n          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_DUPLICATE' | translate }}\r\n        </div>\r\n      </div>\r\n      <div class=\"error-block\" *ngIf=\"detailsForm.get('name').value.length >= variablesService.maxWalletNameLength\">\r\n        {{ 'WALLET_DETAILS.FORM_ERRORS.MAX_LENGTH' | translate }}\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"wallet-location\">{{ 'WALLET_DETAILS.LABEL_FILE_LOCATION' | translate }}</label>\r\n      <input type=\"text\" id=\"wallet-location\" formControlName=\"path\" readonly>\r\n    </div>\r\n  </form>\r\n\r\n  <ng-container *ngIf=\"!showSeed else seedPhraseContent\">\r\n    <form class=\"form-seed mt-2\" [formGroup]=\"seedPhraseForm\" (ngSubmit)=\"onSubmitSeed()\">\r\n      <label>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>\r\n      <div class=\"form-content\">\r\n        <div class=\"seed-phrase-form\">\r\n          <div class=\"input-block\">\r\n            <label for=\"create-password\">{{ 'WALLET_DETAILS.CREATE_PASSWORD_SECURE' | translate }} (<a class=\"text-coral\">{{ 'WALLET_DETAILS.INFO' | translate }}</a>)</label>\r\n            <input type=\"password\" id=\"create-password\" formControlName=\"password\">\r\n          </div>\r\n          <div class=\"input-block\">\r\n            <label for=\"confirm-password\">{{ 'WALLET_DETAILS.FORM.CONFIRM_PASSWORD' | translate }}</label>\r\n            <input type=\"password\" id=\"confirm-password\" formControlName=\"confirmPassword\">\r\n          </div>\r\n          <span class=\"error-message\" *ngIf=\"!seedPhraseForm.valid\">\r\n            {{ 'WALLET_DETAILS.FORM_ERRORS.PASSWORDS_DONT_MATCH' | translate }}\r\n          </span>\r\n\r\n          <button type=\"submit\" class=\"blue-button\" [disabled]=\"!seedPhraseForm.valid\"><i class=\"icon safety\"></i>\r\n            {{ 'WALLET_DETAILS.FORM.GENERATE_SECURE_SEED' | translate }}</button>\r\n\r\n          <a class=\"secured-seed\"><i class=\"icon info\"></i>{{ 'WALLET_DETAILS.FORM.SECURED_SEED_WILL_REQUIRE' | translate }}</a>\r\n        </div>\r\n      </div>\r\n    </form>\r\n  </ng-container>\r\n\r\n  <ng-template #seedPhraseContent>\r\n    <div class=\"seed-phrase mt-2\">\r\n      <div class=\"seed-phrase-title\">\r\n        <span>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</span>\r\n        <p class=\"right-part\">\r\n          <i class=\"icon\" [class.copy]=\"!copyAnimation\" [class.copied]=\"copyAnimation\" (click)=\"copySeedPhrase()\"></i>\r\n          <span\r\n          *ngIf=\"seedPhraseForm.controls.password.value.length == 0\">{{ 'WALLET_DETAILS.SEED_IS_UNSECURED' | translate }} <i class=\"icon unsecured\"></i></span>\r\n          <span\r\n          *ngIf=\"seedPhraseForm.controls.password.value.length > 0\">{{ 'WALLET_DETAILS.SEED_IS_SECURED' | translate }} <i class=\"icon secured\"></i></span>\r\n        </p>\r\n      </div>\r\n      <div class=\"seed-phrase-content\">\r\n        <ng-container *ngFor=\"let word of seedPhrase.split(' '); let index = index\">\r\n          <div class=\"item\"\r\n            [class.dark]=\"(index + 1) >= 1 && (index + 1) <= 7 || (index + 1) >= 15 && (index + 1) <= 21\">\r\n            {{(index + 1) + '. ' + word}}</div>\r\n        </ng-container>\r\n      </div>\r\n      <div class=\"seed-phrase-footer\"\r\n        *ngIf=\"seedPhraseForm.controls.password.value.length > 0\">\r\n        <span class=\"title\">{{ 'WALLET_DETAILS.REMEMBER_YOU_WILL_REQUIRE' | translate }}</span>\r\n      </div>\r\n    </div>\r\n  </ng-template>\r\n</div>"
+module.exports = "<div class=\"content\">\r\n\r\n  <div class=\"head\">\r\n    <div class=\"breadcrumbs\">\r\n      <span (click)=\"back()\">{{variablesService.currentWallet.name}}</span>\r\n      <span>{{ 'BREADCRUMBS.WALLET_DETAILS' | translate }}</span>\r\n    </div>\r\n    <button type=\"button\" class=\"back-btn\" (click)=\"back()\">\r\n      <i class=\"icon back\"></i>\r\n      <span>{{ 'COMMON.BACK' | translate }}</span>\r\n    </button>\r\n  </div>\r\n\r\n  <form class=\"form-details\" [formGroup]=\"detailsForm\" (ngSubmit)=\"onSubmitEdit()\">\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"wallet-name\">{{ 'WALLET_DETAILS.LABEL_NAME' | translate }}</label>\r\n      <input type=\"text\" id=\"wallet-name\" formControlName=\"name\" [maxLength]=\"variablesService.maxWalletNameLength\"\r\n        (contextmenu)=\"variablesService.onContextMenu($event)\">\r\n      <div class=\"error-block\"\r\n        *ngIf=\"detailsForm.controls['name'].invalid && (detailsForm.controls['name'].dirty || detailsForm.controls['name'].touched)\">\r\n        <div *ngIf=\"detailsForm.controls['name'].errors['required']\">\r\n          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_REQUIRED' | translate }}\r\n        </div>\r\n        <div *ngIf=\"detailsForm.controls['name'].errors['duplicate']\">\r\n          {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_DUPLICATE' | translate }}\r\n        </div>\r\n      </div>\r\n      <div class=\"error-block\" *ngIf=\"detailsForm.get('name').value.length >= variablesService.maxWalletNameLength\">\r\n        {{ 'WALLET_DETAILS.FORM_ERRORS.MAX_LENGTH' | translate }}\r\n      </div>\r\n    </div>\r\n\r\n    <div class=\"input-block\">\r\n      <label for=\"wallet-location\">{{ 'WALLET_DETAILS.LABEL_FILE_LOCATION' | translate }}</label>\r\n      <input type=\"text\" id=\"wallet-location\" formControlName=\"path\" readonly>\r\n    </div>\r\n  </form>\r\n\r\n  <ng-container *ngIf=\"!showSeed else seedPhraseContent\">\r\n    <form class=\"form-seed mt-2\" [formGroup]=\"seedPhraseForm\" (ngSubmit)=\"onSubmitSeed()\">\r\n      <label>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>\r\n      <div class=\"form-content\">\r\n        <div class=\"seed-phrase-form\">\r\n          <div class=\"input-block\">\r\n            <label for=\"create-password\">{{ 'WALLET_DETAILS.CREATE_PASSWORD_SECURE' | translate }} (<a class=\"text-coral\">{{ 'WALLET_DETAILS.INFO' | translate }}</a>)</label>\r\n            <input type=\"password\" id=\"create-password\" formControlName=\"password\">\r\n          </div>\r\n          <div class=\"input-block\">\r\n            <label for=\"confirm-password\">{{ 'WALLET_DETAILS.FORM.CONFIRM_PASSWORD' | translate }}</label>\r\n            <input type=\"password\" id=\"confirm-password\" formControlName=\"confirmPassword\">\r\n          </div>\r\n          <span class=\"error-message\" *ngIf=\"!seedPhraseForm.valid\">\r\n            {{ 'WALLET_DETAILS.FORM_ERRORS.PASSWORDS_DONT_MATCH' | translate }}\r\n          </span>\r\n\r\n          <button type=\"submit\" class=\"blue-button\" [disabled]=\"!seedPhraseForm.valid\"><i class=\"icon safety\"></i>\r\n            {{ 'WALLET_DETAILS.FORM.GENERATE_SECURE_SEED' | translate }}</button>\r\n\r\n          <a class=\"secured-seed\"><i class=\"icon info\"></i>{{ 'WALLET_DETAILS.FORM.SECURED_SEED_WILL_REQUIRE' | translate }}</a>\r\n        </div>\r\n      </div>\r\n    </form>\r\n  </ng-container>\r\n\r\n  <ng-template #seedPhraseContent>\r\n    <div class=\"seed-phrase mt-2\">\r\n      <div class=\"seed-phrase-title\">\r\n        <span>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</span>\r\n        <p class=\"right-part\">\r\n          <span\r\n          *ngIf=\"seedPhraseForm.controls.password.value.length == 0\">{{ 'WALLET_DETAILS.SEED_IS_UNSECURED' | translate }} <i class=\"icon unsecured\"></i></span>\r\n          <span\r\n          *ngIf=\"seedPhraseForm.controls.password.value.length > 0\">{{ 'WALLET_DETAILS.SEED_IS_SECURED' | translate }} <i class=\"icon secured\"></i></span>\r\n        </p>\r\n      </div>\r\n      <div class=\"seed-phrase-content\" (contextmenu)=\"variablesService.onContextMenuOnlyCopy($event, seedPhrase)\">\r\n        <ng-container *ngFor=\"let word of seedPhrase.split(' '); let index = index\">\r\n          <div class=\"item\"\r\n            [class.dark]=\"(index + 1) >= 1 && (index + 1) <= 7 || (index + 1) >= 15 && (index + 1) <= 21\">\r\n            {{(index + 1) + '. ' + word}}</div>\r\n        </ng-container>\r\n      </div>\r\n      <div class=\"seed-phrase-footer\"\r\n        *ngIf=\"seedPhraseForm.controls.password.value.length > 0\">\r\n        <span class=\"title\">{{ 'WALLET_DETAILS.REMEMBER_YOU_WILL_REQUIRE' | translate }}</span>\r\n      </div>\r\n    </div>\r\n  </ng-template>\r\n</div>"
 
 /***/ }),
 
@@ -9092,14 +9094,6 @@ var WalletDetailsComponent = /** @class */ (function () {
     WalletDetailsComponent.prototype.back = function () {
         this.location.back();
     };
-    WalletDetailsComponent.prototype.copySeedPhrase = function () {
-        var _this = this;
-        this.backend.setClipboard(this.seedPhrase);
-        this.copyAnimation = true;
-        this.copyAnimationTimeout = window.setTimeout(function () {
-            _this.copyAnimation = false;
-        }, 2000);
-    };
     WalletDetailsComponent.prototype.ngOnDestroy = function () {
         clearTimeout(this.copyAnimationTimeout);
     };
@@ -9214,7 +9208,7 @@ var WalletComponent = /** @class */ (function () {
                 indicator: false,
                 active: true,
                 animated: _assets_icons_icons_json__WEBPACK_IMPORTED_MODULE_7__.history,
-                itemHovered: false
+                itemHovered: false,
             },
             {
                 title: 'WALLET.TABS.SEND',
@@ -9223,7 +9217,7 @@ var WalletComponent = /** @class */ (function () {
                 indicator: false,
                 active: false,
                 animated: _assets_icons_icons_json__WEBPACK_IMPORTED_MODULE_7__.send,
-                itemHovered: false
+                itemHovered: false,
             },
             {
                 title: 'WALLET.TABS.RECEIVE',
@@ -9232,7 +9226,7 @@ var WalletComponent = /** @class */ (function () {
                 indicator: false,
                 active: false,
                 animated: _assets_icons_icons_json__WEBPACK_IMPORTED_MODULE_7__.receive,
-                itemHovered: false
+                itemHovered: false,
             },
             {
                 title: 'WALLET.TABS.CONTRACTS',
@@ -9241,7 +9235,7 @@ var WalletComponent = /** @class */ (function () {
                 indicator: 1,
                 active: false,
                 animated: _assets_icons_icons_json__WEBPACK_IMPORTED_MODULE_7__.contracts,
-                itemHovered: false
+                itemHovered: false,
             },
             /*{
               title: 'WALLET.TABS.MESSAGES',
@@ -9259,8 +9253,8 @@ var WalletComponent = /** @class */ (function () {
                 indicator: false,
                 active: false,
                 animated: _assets_icons_icons_json__WEBPACK_IMPORTED_MODULE_7__.staking,
-                itemHovered: false
-            }
+                itemHovered: false,
+            },
         ];
     }
     WalletComponent.prototype.ngOnInit = function () {
@@ -9268,8 +9262,12 @@ var WalletComponent = /** @class */ (function () {
         this.subRouting1 = this.route.params.subscribe(function (params) {
             // set current wallet only by user click to avoid after sync show synchronized data
             _this.walletID = +params['id'];
+            _this.walletLoaded = _this.variablesService.getWallet(_this.walletID).loaded;
             _this.variablesService.setCurrentWallet(_this.walletID);
-            _this.walletsSubscription = _this.store.select('sync').pipe(Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_11__["filter"])(Boolean), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_11__["distinctUntilChanged"])()).subscribe(function (value) {
+            _this.walletsSubscription = _this.store
+                .select('sync')
+                .pipe(Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_11__["filter"])(Boolean), Object(rxjs_operators__WEBPACK_IMPORTED_MODULE_11__["distinctUntilChanged"])())
+                .subscribe(function (value) {
                 var data = value.filter(function (item) { return item.wallet_id === _this.walletID; })[0];
                 if (data && !data.sync) {
                     var in_progress = void 0;
@@ -9289,7 +9287,9 @@ var WalletComponent = /** @class */ (function () {
                 if (_this.variablesService.after_sync_request.hasOwnProperty(_this.walletID)) {
                     restore = _this.variablesService.after_sync_request[_this.walletID];
                 }
-                if (!_this.variablesService.sync_started && restore && _this.walletID === (data && data.wallet_id)) {
+                if (!_this.variablesService.sync_started &&
+                    restore &&
+                    _this.walletID === (data && data.wallet_id)) {
                     _this.wallet = _this.variablesService.getNotLoadedWallet();
                     if (_this.wallet) {
                         _this.tick();
@@ -9329,10 +9329,15 @@ var WalletComponent = /** @class */ (function () {
         });
         this.subRouting2 = this.router.events.subscribe(function (val) {
             if (val instanceof _angular_router__WEBPACK_IMPORTED_MODULE_1__["RoutesRecognized"]) {
-                _this.activeTab = val.urlAfterRedirects.replace('?sidenav=true', '').split('/').pop();
+                _this.activeTab = val.urlAfterRedirects
+                    .replace('?sidenav=true', '')
+                    .split('/')
+                    .pop();
                 if (val.state.root.firstChild && val.state.root.firstChild.firstChild) {
                     for (var i = 0; i < _this.tabs.length; i++) {
-                        _this.tabs[i].active = (_this.tabs[i].link === '/' + val.state.root.firstChild.firstChild.url[0].path);
+                        _this.tabs[i].active =
+                            _this.tabs[i].link ===
+                                '/' + val.state.root.firstChild.firstChild.url[0].path;
                     }
                 }
             }
@@ -9359,7 +9364,8 @@ var WalletComponent = /** @class */ (function () {
     WalletComponent.prototype.resetPaginationValues = function () {
         var _this = this;
         this.ngZone.run(function () {
-            var total_history_item = _this.variablesService.currentWallet.total_history_item;
+            var total_history_item = _this.variablesService.currentWallet
+                .total_history_item;
             var count = _this.variablesService.count;
             _this.variablesService.currentWallet.totalPages = Math.ceil(total_history_item / count);
             _this.variablesService.currentWallet.exclude_mining_txs = _this.mining;
@@ -9367,15 +9373,27 @@ var WalletComponent = /** @class */ (function () {
             if (!_this.variablesService.currentWallet.totalPages) {
                 _this.variablesService.currentWallet.totalPages = 1;
             }
-            _this.variablesService.currentWallet.totalPages > _this.variablesService.maxPages
-                ? _this.variablesService.currentWallet.pages = new Array(5).fill(1).map(function (value, index) { return value + index; })
-                : _this.variablesService.currentWallet.pages = new Array(_this.variablesService.currentWallet.totalPages).fill(1).map(function (value, index) { return value + index; });
+            _this.variablesService.currentWallet.totalPages >
+                _this.variablesService.maxPages
+                ? (_this.variablesService.currentWallet.pages = new Array(5)
+                    .fill(1)
+                    .map(function (value, index) { return value + index; }))
+                : (_this.variablesService.currentWallet.pages = new Array(_this.variablesService.currentWallet.totalPages)
+                    .fill(1)
+                    .map(function (value, index) { return value + index; }));
         });
     };
     WalletComponent.prototype.changeTab = function (index) {
         var _this = this;
-        if (((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts' || this.tabs[index].link === '/staking') && (this.variablesService.daemon_state !== 2 || !this.variablesService.currentWallet.loaded))
-            || ((this.tabs[index].link === '/send' || this.tabs[index].link === '/contracts') && this.variablesService.currentWallet.is_watch_only && this.variablesService.currentWallet.is_auditable)) {
+        if (((this.tabs[index].link === '/send' ||
+            this.tabs[index].link === '/contracts' ||
+            this.tabs[index].link === '/staking') &&
+            (this.variablesService.daemon_state !== 2 ||
+                !this.variablesService.currentWallet.loaded)) ||
+            ((this.tabs[index].link === '/send' ||
+                this.tabs[index].link === '/contracts') &&
+                this.variablesService.currentWallet.is_watch_only &&
+                this.variablesService.currentWallet.is_auditable)) {
             return;
         }
         this.tabs.forEach(function (tab) {
@@ -9403,11 +9421,17 @@ var WalletComponent = /** @class */ (function () {
         this.balanceTooltip = document.createElement('div');
         var available = document.createElement('span');
         available.setAttribute('class', 'available');
-        available.innerHTML = this.translate.instant('WALLET.AVAILABLE_BALANCE', { available: this.intToMoneyPipe.transform(this.variablesService.currentWallet.unlocked_balance), currency: this.variablesService.defaultCurrency });
+        available.innerHTML = this.translate.instant('WALLET.AVAILABLE_BALANCE', {
+            available: this.intToMoneyPipe.transform(this.variablesService.currentWallet.unlocked_balance),
+            currency: this.variablesService.defaultCurrency,
+        });
         this.balanceTooltip.appendChild(available);
         var locked = document.createElement('span');
         locked.setAttribute('class', 'locked');
-        locked.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE', { locked: this.intToMoneyPipe.transform(this.variablesService.currentWallet.balance.minus(this.variablesService.currentWallet.unlocked_balance)), currency: this.variablesService.defaultCurrency });
+        locked.innerHTML = this.translate.instant('WALLET.LOCKED_BALANCE', {
+            locked: this.intToMoneyPipe.transform(this.variablesService.currentWallet.balance.minus(this.variablesService.currentWallet.unlocked_balance)),
+            currency: this.variablesService.defaultCurrency,
+        });
         this.balanceTooltip.appendChild(locked);
         var link = document.createElement('span');
         link.setAttribute('class', 'link');
@@ -9426,7 +9450,8 @@ var WalletComponent = /** @class */ (function () {
     };
     WalletComponent.prototype.setPage = function (pageNumber) {
         // this is will allow pagination for wallets that was open from existed wallets'
-        if (this.variablesService.currentWallet.open_from_exist && !this.variablesService.currentWallet.updated) {
+        if (this.variablesService.currentWallet.open_from_exist &&
+            !this.variablesService.currentWallet.updated) {
             this.variablesService.get_recent_transfers = false;
             this.variablesService.currentWallet.updated = true;
         }
@@ -9472,18 +9497,24 @@ var WalletComponent = /** @class */ (function () {
         var _this = this;
         var offset = this.pagination.getOffset(this.walletID);
         var value = this.paginationStore.value;
-        var pages = value ? value.filter(function (item) { return item.walletID === _this.walletID; }) : [];
+        var pages = value
+            ? value.filter(function (item) { return item.walletID === _this.walletID; })
+            : [];
         this.backend.getRecentTransfers(this.walletID, offset, this.variablesService.count, this.variablesService.currentWallet.exclude_mining_txs, function (status, data) {
             var isForward = _this.paginationStore.isForward(pages, _this.variablesService.currentWallet.currentPage);
             if (_this.mining && isForward && pages && pages.length === 1) {
                 _this.variablesService.currentWallet.currentPage = 1; // set init page after navigation back
             }
-            var history = (data && data.history);
-            _this.variablesService.stop_paginate[_this.walletID] = history && history.length < _this.variablesService.count || !history;
+            var history = data && data.history;
+            _this.variablesService.stop_paginate[_this.walletID] =
+                (history && history.length < _this.variablesService.count) || !history;
             _this.stop_paginate = _this.variablesService.stop_paginate[_this.walletID];
             if (!_this.variablesService.stop_paginate[_this.walletID]) {
                 var page = _this.variablesService.currentWallet.currentPage + 1;
-                if (isForward && _this.mining && history && history.length === _this.variablesService.count) {
+                if (isForward &&
+                    _this.mining &&
+                    history &&
+                    history.length === _this.variablesService.count) {
                     _this.paginationStore.setPage(page, data.last_item_index, _this.walletID); // add back page for current page
                 }
             }
@@ -9511,12 +9542,29 @@ var WalletComponent = /** @class */ (function () {
     };
     WalletComponent.prototype.updateWalletStatus = function () {
         var _this = this;
+        this.backend.eventSubscribe('wallet_sync_progress', function (data) {
+            var wallet_id = data.wallet_id;
+            if (wallet_id === _this.walletID) {
+                _this.ngZone.run(function () {
+                    _this.walletLoaded = false;
+                });
+            }
+        });
         this.backend.eventSubscribe('update_wallet_status', function (data) {
             var wallet_state = data.wallet_state;
-            _this.walletLoaded = false;
-            if (wallet_state === 2) {
-                _this.walletLoaded = true;
-            }
+            var wallet_id = data.wallet_id;
+            _this.ngZone.run(function () {
+                if (wallet_state === 2 && wallet_id === _this.walletID) {
+                    _this.walletLoaded =
+                        _this.variablesService.getWallet(_this.walletID) !== null &&
+                            _this.variablesService.getWallet(_this.walletID).loaded
+                            ? true
+                            : false;
+                }
+                else {
+                    _this.walletLoaded = false;
+                }
+            });
         });
     };
     __decorate([
