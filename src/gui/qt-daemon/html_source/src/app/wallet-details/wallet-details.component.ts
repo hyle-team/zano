@@ -14,7 +14,6 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
   seedPhrase = '';
   showSeed = false;
   copyAnimation = false;
-  copyAnimationTimeout;
 
   detailsForm = new FormGroup({
     name: new FormControl('', [
@@ -146,6 +145,6 @@ export class WalletDetailsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    clearTimeout(this.copyAnimationTimeout);
+
   }
 }
