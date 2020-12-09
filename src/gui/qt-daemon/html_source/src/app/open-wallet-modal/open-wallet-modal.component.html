@@ -3,7 +3,7 @@
   <form class="open-form" (ngSubmit)="openWallet()">
     <div class="wallet-path">{{ wallet.name }}</div>
     <div class="wallet-path">{{ wallet.path }}</div>
-    <div class="input-block" *ngIf="!wallet.notFound && !wallet.emptyPass">
+    <div class="input-block" *ngIf="!wallet.notFound">
       <label for="password">{{ 'OPEN_WALLET.MODAL.LABEL' | translate }}</label>
       <input type="password" id="password" name="password" [(ngModel)]="wallet.pass" (contextmenu)="variablesService.onContextMenuPasteSelect($event)"/>
     </div>
