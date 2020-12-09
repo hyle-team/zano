@@ -27,7 +27,7 @@ namespace plain_wallet
   std::string get_connectivity_status();
 
   std::string open(const std::string& path, const std::string& password);
-  std::string restore(const std::string& seed, const std::string& path, const std::string& password);
+  std::string restore(const std::string& seed, const std::string& path, const std::string& password, const std::string& seed_password);
   std::string generate(const std::string& path, const std::string& password);
   std::string get_opened_wallets();  
 
@@ -38,4 +38,5 @@ namespace plain_wallet
   //async api
   std::string async_call(const std::string& method_name, uint64_t instance_id, const std::string& params);
   std::string try_pull_result(uint64_t);
+  std::string sync_call(const std::string& method_name, uint64_t instance_id, const std::string& params);
 }

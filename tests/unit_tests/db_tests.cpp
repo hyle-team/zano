@@ -842,7 +842,7 @@ namespace db_test
     ptr = db_array[4];
     ASSERT_EQ(ptr->v, "X");
 
-    ASSERT_TRUE(db_array.clear());
+    ASSERT_TRUE((db_array.clear()? true: false));
 
     db_array.commit_transaction();
 
