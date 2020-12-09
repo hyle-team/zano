@@ -35,18 +35,6 @@ export class OpenWalletModalComponent implements OnInit {
     if (this.wallets.length) {
       this.wallet = this.wallets[0];
       this.wallet.pass = '';
-
-      this.backend.openWallet(this.wallet.path, '', this.variablesService.count, true, (status, data, error) => {
-        if (error === 'FILE_NOT_FOUND') {
-          this.wallet.notFound = true;
-        }
-        if (status) {
-          this.wallet.pass = '';
-          this.wallet.emptyPass = true;
-          this.backend.closeWallet(data.wallet_id);
-          this.openWallet();
-        }
-      });
     }
   }
 
@@ -56,6 +44,9 @@ export class OpenWalletModalComponent implements OnInit {
     }
     this.backend.openWallet(this.wallet.path, this.wallet.pass, this.variablesService.count, false, (open_status, open_data, open_error) => {
       if (open_error && open_error === 'FILE_NOT_FOUND') {
+        this.ngZone.run(() => {
+          this.wallet.notFound = true;
+        });
         let error_translate = this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND1');
         error_translate += ':<br>' + this.wallet.path;
         error_translate += this.translate.instant('OPEN_WALLET.FILE_NOT_FOUND2');

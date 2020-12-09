@@ -1,0 +1,258 @@
+.form-details {
+    margin-top: 1.8rem;
+
+    .input-block {
+
+        &:first-child {
+            width: 50%;
+        }
+    }
+
+    .wallet-buttons {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        button {
+            margin: 2.9rem 0;
+            width: 100%;
+            max-width: 15rem;
+        }
+    }
+}
+
+.form-seed {
+
+    label {
+        @include themify($themes) {
+            color: themed(optionalTextColor);
+        }
+
+        font-size: 1.3rem;
+        line-height: 2.4rem;
+    }
+
+    .form-content {
+        @include themify($themes) {
+            border: 2px solid themed(transparentButtonBorderColor);
+        }
+
+        display: flex;
+        justify-content: center;
+        padding: 3rem;
+        width: 100%;
+    }
+
+    .text-coral {
+        @include themify($themes) {
+            color: themed(blueTextColor);
+        }
+        text-decoration: none;
+    }
+
+    .seed-phrase-form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        max-width: 38rem;
+        width: 100%;
+
+        .input-block,
+        button {
+            width: 100%;
+        }
+
+        .error-message {
+            margin-top: 1rem;
+            @include themify($themes) {
+                color: themed(orangeTextColor);
+            }
+        }
+
+        .secured-seed {
+            @include themify($themes) {
+                color: themed(securedSeed);
+            }
+            font-size: 1.2rem;
+            line-height: 2.4rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+
+            .icon {
+                margin-right: 1.2rem;
+            }
+        }
+
+        button {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 3rem;
+            margin-bottom: 2rem;
+
+            .icon {
+                margin-right: 1.2rem;
+            }
+        }
+
+    }
+}
+
+.seed-phrase {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    background-color: transparent !important;
+
+    &-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        @include themify($themes) {
+            color: themed(optionalTextColor);
+        }
+        .right-part {
+            display: inline-flex;
+            align-items: center;
+
+            .icon {
+                cursor: pointer;
+                width: 1.7rem;
+                height: 1.7rem;
+
+                &.copy {
+                    @include themify($themes) {
+                        background-color: themed(blueTextColor);
+                    }
+                    margin-right: 1.2rem;
+                    mask: url(~src/assets/icons/copy.svg) no-repeat center;
+
+                    &:hover {
+                        opacity: 0.75;
+                    }
+                }
+
+                &.copied {
+                    @include themify($themes) {
+                        background-color: themed(blueTextColor);
+                    }
+                    margin-right: 1.2rem;
+                    mask: url(~src/assets/icons/complete-testwallet.svg) no-repeat center;
+                }
+
+                &.secured,
+                &.unsecured {
+                    margin-left: 1.2rem;
+                }
+            }
+
+            span {
+                font-size: 1.3rem;
+                line-height: 2.4rem;
+                display: inline-flex;
+                align-items: center;
+
+                .icon {
+                    margin-left: 1.2rem;
+                }
+            }
+        }
+    }
+
+    &-content {
+        @include themify($themes) {
+            border-top: 2px solid themed(transparentButtonBorderColor);
+            border-bottom: 2px solid themed(transparentButtonBorderColor);
+        }
+        padding: 1rem 0 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+
+        .item {
+            @include themify($themes) {
+                color: themed(seedItemText);
+            }
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            width: calc(100% / 7);
+            min-height: 35px;
+            font-size: 1.3rem;
+
+            &.dark {
+                @include themify($themes) {
+                    background-color: themed(seedItemBackgroundColor);
+                }
+            }
+        }
+    }
+
+    &-footer {
+        text-align: center;
+
+        .title {
+            @include themify($themes) {
+                color: themed(seedItemText);
+            }
+            font-size: 1.3rem;
+            line-height: 2.4rem;
+        }
+    }
+}
+
+.icon {
+    display: inline-flex;
+    width: 1.6rem;
+    height: 1.6rem;
+
+    &.secured {
+        @include themify($themes) {
+            background-color: themed(greenTextColor);
+        }
+        mask: url(~src/assets/icons/secured.svg) no-repeat center;
+    }
+
+    &.info {
+        @include themify($themes) {
+            background-color: themed(blueTextColor);
+        }
+        mask: url(~src/assets/icons/info.svg) no-repeat center;
+    }
+
+    &.unsecured {
+        @include themify($themes) {
+            background-color: themed(orangeTextColor);
+        }
+        mask: url(~src/assets/icons/unsecured.svg) no-repeat center;
+    }
+
+    &.safety {
+        @include themify($themes) {
+            background-color: themed(alternativeTextColor);
+        }
+        mask: url(~src/assets/icons/safety.svg) no-repeat center;
+    }
+}
+
+.wrap-buttons {
+    display: flex;
+
+    .seed-phrase-button {
+        margin: 2.8rem 0;
+        width: 25%;
+        min-width: 1.5rem;
+    }
+
+    .copy-button {
+        margin: 2.8rem 1rem;
+        width: 25%;
+        min-width: 1.5rem;
+    }
+}
