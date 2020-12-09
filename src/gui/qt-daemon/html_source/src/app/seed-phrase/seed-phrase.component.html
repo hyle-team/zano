@@ -1,5 +1,5 @@
 <div class="content">
-
+  <!-- breadcrumbs -->
   <div class="head">
     <div class="breadcrumbs">
       <span [routerLink]="['/main']">{{ 'BREADCRUMBS.ADD_WALLET' | translate }}</span>
@@ -10,19 +10,103 @@
       <span>{{ 'COMMON.BACK' | translate }}</span>
     </button>
   </div>
+  <!-- /breadcrumbs -->
 
-  <h3 class="seed-phrase-title">{{ 'SEED_PHRASE.TITLE' | translate }}</h3>
+  <div class="scrolled-content">
+    <!-- form detail -->
+    <form class="form-details" [formGroup]="detailsForm">
+      <div class="input-block">
+        <label for="wallet-name">{{ 'WALLET_DETAILS.LABEL_NAME' | translate }}</label>
+        <input type="text" id="wallet-name" formControlName="name" [maxLength]="variablesService.maxWalletNameLength"
+          (contextmenu)="variablesService.onContextMenu($event)" readonly>
+        <div class="error-block"
+          *ngIf="detailsForm.controls['name'].invalid && (detailsForm.controls['name'].dirty || detailsForm.controls['name'].touched)">
+          <div *ngIf="detailsForm.controls['name'].errors['required']">
+            {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_REQUIRED' | translate }}
+          </div>
+          <div *ngIf="detailsForm.controls['name'].errors['duplicate']">
+            {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_DUPLICATE' | translate }}
+          </div>
+        </div>
+        <div class="error-block" *ngIf="detailsForm.get('name').value.length >= variablesService.maxWalletNameLength">
+          {{ 'WALLET_DETAILS.FORM_ERRORS.MAX_LENGTH' | translate }}
+        </div>
+      </div>
 
-  <div class="seed-phrase-content" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, seedPhrase)">
-    <ng-container *ngFor="let word of seedPhrase.split(' '); let index = index">
-      <div class="word">{{(index + 1) + '. ' + word}}</div>
+      <div class="input-block">
+        <label for="wallet-location">{{ 'WALLET_DETAILS.LABEL_FILE_LOCATION' | translate }}</label>
+        <input type="text" id="wallet-location" formControlName="path" readonly>
+      </div>
+    </form>
+    <!-- /from detail -->
+
+    <!-- form seed pasword -->
+    <ng-container *ngIf="!showSeed else seedPhraseContent">
+      <form class="form-seed mt-2" [formGroup]="seedPhraseForm" (ngSubmit)="onSubmitSeed()">
+        <label>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>
+        <div class="form-content">
+          <div class="seed-phrase-form">
+            <div class="input-block">
+              <label for="create-password">{{ 'WALLET_DETAILS.CREATE_PASSWORD_SECURE' | translate }} (<a
+                  class="text-coral">{{ 'WALLET_DETAILS.INFO' | translate }}</a>)</label>
+              <input type="password" id="create-password" formControlName="password">
+            </div>
+            <div class="input-block">
+              <label for="confirm-password">{{ 'WALLET_DETAILS.FORM.CONFIRM_PASSWORD' | translate }}</label>
+              <input type="password" id="confirm-password" formControlName="confirmPassword">
+            </div>
+            <span class="error-message" *ngIf="!seedPhraseForm.valid">
+              {{ 'WALLET_DETAILS.FORM_ERRORS.PASSWORDS_DONT_MATCH' | translate }}
+            </span>
+
+            <button type="submit" class="blue-button" [disabled]="!seedPhraseForm.valid"><i class="icon safety"></i>
+              {{ 'WALLET_DETAILS.FORM.GENERATE_SECURE_SEED' | translate }}</button>
+
+            <a class="secured-seed"><i
+                class="icon info"></i>{{ 'WALLET_DETAILS.FORM.SECURED_SEED_WILL_REQUIRE' | translate }}</a>
+          </div>
+        </div>
+      </form>
     </ng-container>
-  </div>
+    <!-- /form seed pasword -->
 
-  <div class="wrap-buttons">
-    <button type="button" class="blue-button seed-phrase-button" (click)="runWallet()">{{ 'SEED_PHRASE.BUTTON_CREATE_ACCOUNT' | translate }}</button>
-    <button type="button" class="blue-button copy-button" (click)="copySeedPhrase()">{{ 'SEED_PHRASE.BUTTON_COPY' | translate }}</button>
+    <!-- seed phrase -->
+    <ng-template #seedPhraseContent>
+      <div class="seed-phrase mt-2">
+        <div class="seed-phrase-title">
+          <span>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</span>
+          <p class="right-part">
+            <span
+              *ngIf="seedPhraseForm.controls.password.value.length == 0">{{ 'WALLET_DETAILS.SEED_IS_UNSECURED' | translate }}
+              <i class="icon unsecured"></i></span>
+            <span
+              *ngIf="seedPhraseForm.controls.password.value.length > 0">{{ 'WALLET_DETAILS.SEED_IS_SECURED' | translate }}
+              <i class="icon secured"></i></span>
+          </p>
+        </div>
+        <div class="seed-phrase-content" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, seedPhrase)">
+          <ng-container *ngFor="let word of seedPhrase.split(' '); let index = index">
+            <div class="item"
+              [class.dark]="(index + 1) >= 1 && (index + 1) <= 7 || (index + 1) >= 15 && (index + 1) <= 21">
+              {{(index + 1) + '. ' + word}}</div>
+          </ng-container>
+        </div>
+        <div class="seed-phrase-footer" *ngIf="seedPhraseForm.controls.password.value.length > 0">
+          <span class="title">{{ 'WALLET_DETAILS.REMEMBER_YOU_WILL_REQUIRE' | translate }}</span>
+        </div>
+      </div>
+    </ng-template>
+    <!-- /seed phrase -->
+
+    <div class="wrap-buttons" *ngIf="showSeed">
+      <button type="button" class="blue-button seed-phrase-button"
+        (click)="runWallet()">{{ 'SEED_PHRASE.BUTTON_CREATE_ACCOUNT' | translate }}</button>
+      <button type="button" class="blue-button copy-button"
+        (click)="copySeedPhrase()">{{ 'SEED_PHRASE.BUTTON_COPY' | translate }}</button>
+    </div>
   </div>
 </div>
 
-<app-progress-container [width]="'100%'" [labels]="['PROGRESS.ADD_WALLET', 'PROGRESS.SELECT_LOCATION', 'PROGRESS.CREATE_WALLET']"></app-progress-container>
+<app-progress-container [width]="progressWidth"
+  [labels]="['PROGRESS.ADD_WALLET', 'PROGRESS.SELECT_LOCATION', 'Seed Phrase', 'PROGRESS.CREATE_WALLET']">
+</app-progress-container>
