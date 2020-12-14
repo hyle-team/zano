@@ -12,14 +12,14 @@ DISABLE_VS_WARNINGS(4146 4244)
 
 /* Predeclarations */
 
-static void fe_mul(fe, const fe, const fe);
-static void fe_sq(fe, const fe);
-static void fe_tobytes(unsigned char *, const fe);
+void fe_mul(fe, const fe, const fe);
+void fe_sq(fe, const fe);
+void fe_tobytes(unsigned char *, const fe);
 static void ge_madd(ge_p1p1 *, const ge_p3 *, const ge_precomp *);
 static void ge_msub(ge_p1p1 *, const ge_p3 *, const ge_precomp *);
 static void ge_p2_0(ge_p2 *);
 static void ge_p3_dbl(ge_p1p1 *, const ge_p3 *);
-static void ge_sub(ge_p1p1 *, const ge_p3 *, const ge_cached *);
+void ge_sub(ge_p1p1 *, const ge_p3 *, const ge_cached *);
 static void fe_divpowm1(fe, const fe, const fe);
 
 /* Common functions */
@@ -48,7 +48,7 @@ static uint64_t load_4(const unsigned char *in)
 h = 0
 */
 
-static void fe_0(fe h) {
+void fe_0(fe h) {
   h[0] = 0;
   h[1] = 0;
   h[2] = 0;
@@ -232,7 +232,7 @@ static void fe_copy(fe h, const fe f) {
 
 /* From fe_invert.c */
 
-static void fe_invert(fe out, const fe z) {
+void fe_invert(fe out, const fe z) {
   fe t0;
   fe t1;
   fe t2;
@@ -351,7 +351,7 @@ Can get away with 11 carries, but then data flow is much deeper.
 With tighter constraints on inputs can squeeze carries into int32.
 */
 
-static void fe_mul(fe h, const fe f, const fe g) {
+void fe_mul(fe h, const fe f, const fe g) {
   int32_t f0 = f[0];
   int32_t f1 = f[1];
   int32_t f2 = f[2];
@@ -631,7 +631,7 @@ Postconditions:
 See fe_mul.c for discussion of implementation strategy.
 */
 
-static void fe_sq(fe h, const fe f) {
+void fe_sq(fe h, const fe f) {
   int32_t f0 = f[0];
   int32_t f1 = f[1];
   int32_t f2 = f[2];
@@ -1005,7 +1005,7 @@ Proof:
   so floor(2^(-255)(h + 19 2^(-25) h9 + 2^(-1))) = q.
 */
 
-static void fe_tobytes(unsigned char *s, const fe h) {
+void fe_tobytes(unsigned char *s, const fe h) {
   int32_t h0 = h[0];
   int32_t h1 = h[1];
   int32_t h2 = h[2];
@@ -1398,7 +1398,7 @@ void ge_p2_dbl(ge_p1p1 *r, const ge_p2 *p) {
 
 /* From ge_p3_0.c */
 
-static void ge_p3_0(ge_p3 *h) {
+void ge_p3_0(ge_p3 *h) {
   fe_0(h->X);
   fe_1(h->Y);
   fe_1(h->Z);
@@ -1565,7 +1565,7 @@ void ge_scalarmult_base(ge_p3 *h, const unsigned char *a) {
 r = p - q
 */
 
-static void ge_sub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q) {
+void ge_sub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q) {
   fe t0;
   fe_add(r->X, p->Y, p->X);
   fe_sub(r->Y, p->Y, p->X);
@@ -2962,4 +2962,54 @@ int sc_isnonzero(const unsigned char *s) {
     s[9] | s[10] | s[11] | s[12] | s[13] | s[14] | s[15] | s[16] | s[17] |
     s[18] | s[19] | s[20] | s[21] | s[22] | s[23] | s[24] | s[25] | s[26] |
     s[27] | s[28] | s[29] | s[30] | s[31]) - 1) >> 8) + 1;
+}
+
+// see implmentation of ge_frombytes_vartime above
+void fe_frombytes(fe h, const unsigned char *s)
+{
+  /* From fe_frombytes.c */
+
+  int64_t h0 = load_4(s);
+  int64_t h1 = load_3(s + 4) << 6;
+  int64_t h2 = load_3(s + 7) << 5;
+  int64_t h3 = load_3(s + 10) << 3;
+  int64_t h4 = load_3(s + 13) << 2;
+  int64_t h5 = load_4(s + 16);
+  int64_t h6 = load_3(s + 20) << 7;
+  int64_t h7 = load_3(s + 23) << 5;
+  int64_t h8 = load_3(s + 26) << 4;
+  int64_t h9 = (load_3(s + 29) & 8388607) << 2;
+  int64_t carry0;
+  int64_t carry1;
+  int64_t carry2;
+  int64_t carry3;
+  int64_t carry4;
+  int64_t carry5;
+  int64_t carry6;
+  int64_t carry7;
+  int64_t carry8;
+  int64_t carry9;
+
+  carry9 = (h9 + (int64_t)(1 << 24)) >> 25; h0 += carry9 * 19; h9 -= carry9 << 25;
+  carry1 = (h1 + (int64_t)(1 << 24)) >> 25; h2 += carry1; h1 -= carry1 << 25;
+  carry3 = (h3 + (int64_t)(1 << 24)) >> 25; h4 += carry3; h3 -= carry3 << 25;
+  carry5 = (h5 + (int64_t)(1 << 24)) >> 25; h6 += carry5; h5 -= carry5 << 25;
+  carry7 = (h7 + (int64_t)(1 << 24)) >> 25; h8 += carry7; h7 -= carry7 << 25;
+
+  carry0 = (h0 + (int64_t)(1 << 25)) >> 26; h1 += carry0; h0 -= carry0 << 26;
+  carry2 = (h2 + (int64_t)(1 << 25)) >> 26; h3 += carry2; h2 -= carry2 << 26;
+  carry4 = (h4 + (int64_t)(1 << 25)) >> 26; h5 += carry4; h4 -= carry4 << 26;
+  carry6 = (h6 + (int64_t)(1 << 25)) >> 26; h7 += carry6; h6 -= carry6 << 26;
+  carry8 = (h8 + (int64_t)(1 << 25)) >> 26; h9 += carry8; h8 -= carry8 << 26;
+
+  h[0] = h0;
+  h[1] = h1;
+  h[2] = h2;
+  h[3] = h3;
+  h[4] = h4;
+  h[5] = h5;
+  h[6] = h6;
+  h[7] = h7;
+  h[8] = h8;
+  h[9] = h9;
 }
