@@ -1060,16 +1060,22 @@ std::string wallets_manager::is_pos_allowed()
 }
 std::string wallets_manager::is_valid_brain_restore_data(const std::string& seed_phrase, const std::string& seed_password)
 {
+  
   currency::account_base acc;
-  if (acc.restore_from_seed_phrase(seed_phrase, seed_password))
-    return API_RETURN_CODE_TRUE;
+  if (!currency::account_base::is_seed_tracking(seed_phrase))
+  {
+    if (acc.restore_from_seed_phrase(seed_phrase, seed_password))
+      return API_RETURN_CODE_TRUE;
+  }
+  else
+  {
+    currency::account_public_address addr = AUTO_VAL_INIT(addr);
+    crypto::secret_key view_sec_key = AUTO_VAL_INIT(view_sec_key);
+    uint64_t ts = 0;
+    if (currency::parse_tracking_seed(seed_phrase, addr, view_sec_key, ts))
+      return API_RETURN_CODE_TRUE;
 
-  currency::account_public_address addr;
-  crypto::secret_key view_sec_key;
-  uint64_t ts;
-  if (currency::parse_tracking_seed(seed_phrase, addr, view_sec_key, ts))
-    return API_RETURN_CODE_TRUE;
-
+  }
   return API_RETURN_CODE_FALSE;
 }
 #ifndef MOBILE_WALLET_BUILD
@@ -1115,8 +1121,8 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   currency::account_base acc;
   try
   {
-    bool auditable_watch_only = seed_phrase.find(':') != std::string::npos;
-    w->restore(path, password, seed_phrase, auditable_watch_only, seed_password); 
+    bool is_tracking = currency::account_base::is_seed_tracking(seed_phrase);
+    w->restore(path, password, seed_phrase, is_tracking, seed_password);
     //owr.seed = w->get_account().get_seed_phrase();
   }
   catch (const tools::error::file_exists&)

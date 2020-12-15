@@ -226,6 +226,11 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
+  bool account_base::is_seed_tracking(const std::string& seed_phrase)
+  {
+    return seed_phrase.find(':') != std::string::npos;
+  }
+  //-----------------------------------------------------------------
   bool account_base::is_seed_password_protected(const std::string& seed_phrase, bool& is_password_protected)
   {
     //cut the last timestamp word from restore_dats
