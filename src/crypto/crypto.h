@@ -288,7 +288,7 @@ namespace crypto {
     uint8_t* const  m_p_data;
     size_t          m_data_used;
     bool            m_ready;
-  };
+  }; // class stream_cn_hash
 
 } // namespace crypto
 
