@@ -15,8 +15,10 @@
 
     <div class="input-block">
       <label for="wallet-name">{{ 'WALLET_DETAILS.LABEL_NAME' | translate }}</label>
-      <input type="text" id="wallet-name" formControlName="name" [maxLength]="variablesService.maxWalletNameLength" (contextmenu)="variablesService.onContextMenu($event)">
-      <div class="error-block" *ngIf="detailsForm.controls['name'].invalid && (detailsForm.controls['name'].dirty || detailsForm.controls['name'].touched)">
+      <input type="text" id="wallet-name" formControlName="name" [maxLength]="variablesService.maxWalletNameLength"
+        (contextmenu)="variablesService.onContextMenu($event)">
+      <div class="error-block"
+        *ngIf="detailsForm.controls['name'].invalid && (detailsForm.controls['name'].dirty || detailsForm.controls['name'].touched)">
         <div *ngIf="detailsForm.controls['name'].errors['required']">
           {{ 'WALLET_DETAILS.FORM_ERRORS.NAME_REQUIRED' | translate }}
         </div>
@@ -33,24 +35,56 @@
       <label for="wallet-location">{{ 'WALLET_DETAILS.LABEL_FILE_LOCATION' | translate }}</label>
       <input type="text" id="wallet-location" formControlName="path" readonly>
     </div>
-
-    <div class="input-block textarea">
-      <label for="seed-phrase">{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>
-      <div class="seed-phrase" id="seed-phrase">
-        <div class="seed-phrase-hint" (click)="showSeedPhrase()" *ngIf="!showSeed">{{ 'WALLET_DETAILS.SEED_PHRASE_HINT' | translate }}</div>
-        <div class="seed-phrase-content" *ngIf="showSeed" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, seedPhrase)">
-          <ng-container *ngFor="let word of seedPhrase.split(' '); let index = index">
-            <div class="word">{{(index + 1) + '. ' + word}}</div>
-          </ng-container>
-        </div>
-      </div>
-    </div>
-
-    <div class="wallet-buttons">
-      <button type="submit" class="blue-button" [disabled]="!detailsForm.valid">{{ 'WALLET_DETAILS.BUTTON_SAVE' | translate }}</button>
-      <button type="button" class="blue-button" (click)="closeWallet()">{{ 'WALLET_DETAILS.BUTTON_REMOVE' | translate }}</button>
-    </div>
-
   </form>
 
+  <ng-container *ngIf="!showSeed else seedPhraseContent">
+    <form class="form-seed mt-2" [formGroup]="seedPhraseForm" (ngSubmit)="onSubmitSeed()">
+      <label>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</label>
+      <div class="form-content">
+        <div class="seed-phrase-form">
+          <div class="input-block">
+            <label for="create-password">{{ 'WALLET_DETAILS.CREATE_PASSWORD_SECURE' | translate }} (<a class="text-coral">{{ 'WALLET_DETAILS.INFO' | translate }}</a>)</label>
+            <input type="password" id="create-password" formControlName="password">
+          </div>
+          <div class="input-block">
+            <label for="confirm-password">{{ 'WALLET_DETAILS.FORM.CONFIRM_PASSWORD' | translate }}</label>
+            <input type="password" id="confirm-password" formControlName="confirmPassword">
+          </div>
+          <span class="error-message" *ngIf="!seedPhraseForm.valid">
+            {{ 'WALLET_DETAILS.FORM_ERRORS.PASSWORDS_DONT_MATCH' | translate }}
+          </span>
+
+          <button type="submit" class="blue-button" [disabled]="!seedPhraseForm.valid"><i class="icon safety"></i>
+            {{ 'WALLET_DETAILS.FORM.GENERATE_SECURE_SEED' | translate }}</button>
+
+          <a class="secured-seed"><i class="icon info"></i>{{ 'WALLET_DETAILS.FORM.SECURED_SEED_WILL_REQUIRE' | translate }}</a>
+        </div>
+      </div>
+    </form>
+  </ng-container>
+
+  <ng-template #seedPhraseContent>
+    <div class="seed-phrase mt-2">
+      <div class="seed-phrase-title">
+        <span>{{ 'WALLET_DETAILS.LABEL_SEED_PHRASE' | translate }}</span>
+        <p class="right-part">
+          <span
+          *ngIf="seedPhraseForm.controls.password.value.length == 0">{{ 'WALLET_DETAILS.SEED_IS_UNSECURED' | translate }} <i class="icon unsecured"></i></span>
+          <span
+          *ngIf="seedPhraseForm.controls.password.value.length > 0">{{ 'WALLET_DETAILS.SEED_IS_SECURED' | translate }} <i class="icon secured"></i></span>
+        </p>
+      </div>
+      <div class="seed-phrase-content" (contextmenu)="variablesService.onContextMenuOnlyCopy($event, seedPhrase)">
+        <ng-container *ngFor="let word of seedPhrase.split(' '); let index = index">
+          <div class="item"
+            [class.dark]="(index + 1) >= 1 && (index + 1) <= 7 || (index + 1) >= 15 && (index + 1) <= 21">
+            {{(index + 1) + '. ' + word}}</div>
+        </ng-container>
+      </div>
+      <div class="seed-phrase-footer"
+        *ngIf="seedPhraseForm.controls.password.value.length > 0">
+        <span class="title">{{ 'WALLET_DETAILS.REMEMBER_YOU_WILL_REQUIRE' | translate }}</span>
+      </div>
+    </div>
+  </ng-template>
 </div>

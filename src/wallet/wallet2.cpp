@@ -2347,7 +2347,7 @@ void wallet2::generate(const std::wstring& path, const std::string& pass, bool a
   store();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet)
+void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password)
 {
   bool r = false;
   clear();
@@ -2363,7 +2363,7 @@ void wallet2::restore(const std::wstring& path, const std::string& pass, const s
   }
   else
   {
-    r = m_account.restore_from_seed_phrase(seed_or_tracking_seed);
+    r = m_account.restore_from_seed_phrase(seed_or_tracking_seed, seed_password);
     init_log_prefix();
     THROW_IF_FALSE_WALLET_EX(r, error::wallet_wrong_seed_error, epee::string_encoding::convert_to_ansii(m_wallet_file));
   }

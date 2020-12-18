@@ -60,18 +60,42 @@ namespace currency
     return m_keys;
   }
   //-----------------------------------------------------------------
-  std::string account_base::get_seed_phrase() const 
+  void crypt_with_pass(const void* scr_data, std::size_t src_length, void* dst_data, const std::string& password)
+  {
+    crypto::chacha8_key key = AUTO_VAL_INIT(key);
+    crypto::generate_chacha8_key(password, key);
+    crypto::hash pass_hash = crypto::cn_fast_hash(password.data(), password.size());
+    crypto::chacha8_iv  iv = AUTO_VAL_INIT(iv);
+    CHECK_AND_ASSERT_THROW_MES(sizeof(pass_hash) >= sizeof(iv), "Invalid configuration: hash size is less than keys_file_data.iv");
+    iv = *((crypto::chacha8_iv*)&pass_hash);
+    crypto::chacha8(scr_data, src_length, key, iv, (char*)dst_data);
+  }
+
+
+  std::string account_base::get_seed_phrase(const std::string& password) const 
   {
     if (m_keys_seed_binary.empty())
       return "";
-    std::string keys_seed_text = tools::mnemonic_encoding::binary2text(m_keys_seed_binary);
-    std::string timestamp_word = currency::get_word_from_timstamp(m_creation_timestamp);
+
+    std::vector<unsigned char> processed_seed_binary = m_keys_seed_binary;
+    if (!password.empty())
+    {
+      //encrypt seed phrase binary data
+      crypt_with_pass(&m_keys_seed_binary[0], m_keys_seed_binary.size(), &processed_seed_binary[0], password);      
+    }
+
+    std::string keys_seed_text = tools::mnemonic_encoding::binary2text(processed_seed_binary);
+    std::string timestamp_word = currency::get_word_from_timstamp(m_creation_timestamp, !password.empty());
 
     // floor creation time to WALLET_BRAIN_DATE_QUANTUM to make checksum calculation stable
-    uint64_t creation_timestamp_rounded = get_timstamp_from_word(timestamp_word);
+    bool self_check_is_password_used = false;
+    uint64_t creation_timestamp_rounded = get_timstamp_from_word(timestamp_word, self_check_is_password_used);
+    CHECK_AND_ASSERT_THROW_MES(self_check_is_password_used == !password.empty(), "Account seed phrase internal error: password flag encoded wrong");
 
     constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
-    crypto::hash h = crypto::cn_fast_hash(m_keys_seed_binary.data(), m_keys_seed_binary.size());
+    std::string binary_for_check_sum((const char*)&m_keys_seed_binary[0], m_keys_seed_binary.size());
+    binary_for_check_sum.append(password);
+    crypto::hash h = crypto::cn_fast_hash(binary_for_check_sum.data(), binary_for_check_sum.size());
     *reinterpret_cast<uint64_t*>(&h) = creation_timestamp_rounded;
     h = crypto::cn_fast_hash(&h, sizeof h);
     uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
@@ -104,7 +128,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
-  bool account_base::restore_from_seed_phrase(const std::string& seed_phrase)
+  bool account_base::restore_from_seed_phrase(const std::string& seed_phrase, const std::string& seed_password)
   {
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
@@ -135,12 +159,39 @@ namespace currency
     
     uint64_t auditable_flag_and_checksum = UINT64_MAX;
     if (!auditable_flag_and_checksum_word.empty())
-      auditable_flag_and_checksum = tools::mnemonic_encoding::num_by_word(auditable_flag_and_checksum_word);
+    {
+      try {
+        auditable_flag_and_checksum = tools::mnemonic_encoding::num_by_word(auditable_flag_and_checksum_word);
+      }
+      catch (...)
+      {
+        return false;
+      }
+      
+    }
+      
 
     std::vector<unsigned char> keys_seed_binary = tools::mnemonic_encoding::text2binary(keys_seed_text);
-    CHECK_AND_ASSERT_MES(keys_seed_binary.size(), false, "text2binary failed to convert the given text"); // don't prints event incorrect seed into the log for security
+    std::vector<unsigned char> keys_seed_processed_binary = keys_seed_binary;
 
-    m_creation_timestamp = get_timstamp_from_word(timestamp_word);
+
+    bool has_password = false;
+    try {
+      m_creation_timestamp = get_timstamp_from_word(timestamp_word, has_password);
+    }
+    catch (...)
+    {
+      return false;
+    }
+    //double check is password setting from timestamp word match with passed parameters
+    CHECK_AND_ASSERT_MES(has_password != seed_password.empty(), false, "Seed phrase password wrong interpretation");
+    if (has_password)
+    {
+      CHECK_AND_ASSERT_MES(!seed_password.empty(), false, "Seed phrase password wrong interpretation: internal error");
+      crypt_with_pass(&keys_seed_binary[0], keys_seed_binary.size(), &keys_seed_processed_binary[0], seed_password);
+    }
+
+    CHECK_AND_ASSERT_MES(keys_seed_processed_binary.size(), false, "text2binary failed to convert the given text"); // don't prints event incorrect seed into the log for security
 
     bool auditable_flag = false;
 
@@ -150,21 +201,67 @@ namespace currency
       auditable_flag = (auditable_flag_and_checksum & 1) != 0; // auditable flag is the lower 1 bit
       uint16_t checksum = static_cast<uint16_t>(auditable_flag_and_checksum >> 1); // checksum -- everything else
       constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
-      crypto::hash h = crypto::cn_fast_hash(keys_seed_binary.data(), keys_seed_binary.size());
+      std::string binary_for_check_sum((const char*)&keys_seed_processed_binary[0], keys_seed_processed_binary.size());
+      binary_for_check_sum.append(seed_password);
+      crypto::hash h = crypto::cn_fast_hash(binary_for_check_sum.data(), binary_for_check_sum.size());
       *reinterpret_cast<uint64_t*>(&h) = m_creation_timestamp;
       h = crypto::cn_fast_hash(&h, sizeof h);
       uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
       uint16_t checksum_calculated = h_64 % (checksum_max + 1);
-      CHECK_AND_ASSERT_MES(checksum == checksum_calculated, false, "seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
+      if (checksum != checksum_calculated)
+      {
+        LOG_PRINT_L0("seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
+        return false;
+      }      
     }
 
-    bool r = restore_keys(keys_seed_binary);
+    bool r = restore_keys(keys_seed_processed_binary);
     CHECK_AND_ASSERT_MES(r, false, "restore_keys failed");
 
-    m_keys_seed_binary = keys_seed_binary;
+    m_keys_seed_binary = keys_seed_processed_binary;
 
     if (auditable_flag)
       m_keys.account_address.flags |= ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
+
+    return true;
+  }
+  //-----------------------------------------------------------------
+  bool account_base::is_seed_tracking(const std::string& seed_phrase)
+  {
+    return seed_phrase.find(':') != std::string::npos;
+  }
+  //-----------------------------------------------------------------
+  bool account_base::is_seed_password_protected(const std::string& seed_phrase, bool& is_password_protected)
+  {
+    //cut the last timestamp word from restore_dats
+    std::list<std::string> words;
+    boost::split(words, seed_phrase, boost::is_space());
+
+    //let's validate each word 
+    for (const auto& w: words)
+    {
+      if (!tools::mnemonic_encoding::valid_word(w))
+        return false;
+    }
+
+    std::string timestamp_word;
+    if (words.size() == SEED_PHRASE_V1_WORDS_COUNT)
+    {
+      // 24 seed words + one timestamp word = 25 total
+      timestamp_word = words.back();
+    }
+    else if (words.size() == SEED_PHRASE_V2_WORDS_COUNT)
+    {
+      // 24 seed words + one timestamp word + one flags & checksum = 26 total
+      words.erase(--words.end());
+      timestamp_word = words.back();
+    }
+    else
+    {
+      return false;
+    }
+
+    get_timstamp_from_word(timestamp_word, is_password_protected);
 
     return true;
   }

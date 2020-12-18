@@ -13,10 +13,10 @@ TEST(wallet_seed, store_restore_test)
   {
     currency::account_base acc;
     acc.generate();
-    auto seed_phrase = acc.get_seed_phrase();
+    auto seed_phrase = acc.get_seed_phrase("");
     
     currency::account_base acc2;
-    bool r = acc2.restore_from_seed_phrase(seed_phrase);
+    bool r = acc2.restore_from_seed_phrase(seed_phrase, "");
     ASSERT_TRUE(r);
 
     if (memcmp(&acc2.get_keys(), &acc.get_keys(), sizeof(currency::account_keys)))
@@ -29,10 +29,10 @@ TEST(wallet_seed, store_restore_test)
   {
     currency::account_base acc;
     acc.generate();
-    auto seed_phrase = acc.get_seed_phrase();
+    auto seed_phrase = acc.get_seed_phrase("");
 
     currency::account_base acc2;
-    bool r = acc2.restore_from_seed_phrase(seed_phrase);
+    bool r = acc2.restore_from_seed_phrase(seed_phrase, "");
     ASSERT_TRUE(r);
 
     if (memcmp(&acc2.get_keys(), &acc.get_keys(), sizeof(currency::account_keys)))
@@ -57,7 +57,7 @@ wallet_seed_entry wallet_seed_entries[] =
 {
   {
     // legacy 24-word seed phrase -- invalid
-    "dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew",
+    "dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew god",
     "",
     "",
     0,
@@ -66,7 +66,7 @@ wallet_seed_entry wallet_seed_entries[] =
   },
   {
     // old-style 25-word seed phrase -- valid
-    "dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew",
+    "dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew dew god",
     "5e051454d7226b5734ebd64f754b57db4c655ecda00bd324f1b241d0b6381c0f",
     "7dde5590fdf430568c00556ac2accf09da6cde9a29a4bc7d1cb6fd267130f006",
     0,
@@ -148,7 +148,41 @@ TEST(wallet_seed, basic_test)
     bool r = false;
     try
     {
-      r = acc.restore_from_seed_phrase(wse.seed_phrase);
+      r = acc.restore_from_seed_phrase(wse.seed_phrase, "");
+      if (r)
+      {
+        for (size_t j = 0; j != 100; j++)
+        {
+          //generate random password
+          std::string pass = epee::string_tools::pod_to_hex(crypto::cn_fast_hash(&j, sizeof(j)));          
+          if (j!= 0 && j < 64)
+          {
+            pass.resize(j);
+          }
+          //get secured seed
+          std::string secured_seed = acc.get_seed_phrase(pass);
+
+          //try to restore it without password(should fail)
+          currency::account_base acc2;
+          bool r_fail = acc2.restore_from_seed_phrase(secured_seed, "");
+          ASSERT_EQ(r_fail, false);
+
+          //try to restore it with wrong password
+          bool r_fake_pass = acc2.restore_from_seed_phrase(secured_seed, "fake_password");
+          if (r_fake_pass)
+          {
+            //accidentally checksumm matched(quite possible)
+            ASSERT_EQ(false, acc2.get_keys() == acc.get_keys());
+          }
+
+          //try to restore it from right password
+          currency::account_base acc3;
+          bool r_true_res = acc3.restore_from_seed_phrase(secured_seed, pass);
+          ASSERT_EQ(true, r_true_res);
+          ASSERT_EQ(true, acc3.get_keys() == acc.get_keys());
+
+        }
+      }
     }
     catch (...)
     {

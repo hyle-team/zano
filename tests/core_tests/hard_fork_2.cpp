@@ -1042,7 +1042,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
 
   boost::filesystem::remove(bob_wo_restored_filename, ec);
 
-  bob_wlt_awo_restored->restore(bob_wo_restored_filename, "", bob_tracking_seed, true);
+  bob_wlt_awo_restored->restore(bob_wo_restored_filename, "", bob_tracking_seed, true, "");
   bob_wlt_awo_restored->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
   bob_wlt_awo_restored->set_core_proxy(m_core_proxy);
 
@@ -1073,14 +1073,14 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
   // Restore Bob wallet as non-auditable and spend mix_attr!=1 output => make sure other auditable Bob's wallets remain intact
   //
 
-  std::string bob_seed = bob_wlt->get_account().get_seed_phrase();
+  std::string bob_seed = bob_wlt->get_account().get_seed_phrase("");
   bob_seed.erase(bob_seed.find_last_of(" ")); // remove the last word (with flags and checksum) to make seed old-format 25-words non-auditable with the same keys
 
   std::shared_ptr<tools::wallet2> bob_wlt_non_auditable = std::make_shared<tools::wallet2>();
 
   boost::filesystem::remove(bob_non_auditable_filename, ec);
 
-  bob_wlt_non_auditable->restore(bob_non_auditable_filename, "", bob_seed, false);
+  bob_wlt_non_auditable->restore(bob_non_auditable_filename, "", bob_seed, false, "");
   bob_wlt_non_auditable->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
   bob_wlt_non_auditable->set_core_proxy(m_core_proxy);
 

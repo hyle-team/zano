@@ -120,13 +120,16 @@
     "BUTTON_CREATE": "Create wallet",
     "NOT_CORRECT_FILE_OR_PASSWORD": "Invalid wallet file or password does not match",
     "CHOOSE_PATH": "Please choose a path",
+    "SEED_PASSWORD": "Seed password",
+    "OK": "OK",
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
       "NAME_DUPLICATE": "Name is duplicate",
       "MAX_LENGTH": "Maximum name length reached",
       "CONFIRM_NOT_MATCH": "Confirm password not match",
       "KEY_REQUIRED": "Key is required",
-      "KEY_NOT_VALID": "Key not valid"
+      "KEY_NOT_VALID": "Key not valid",
+      "INCORRECT_PASSWORD": "Incorrect password"
     }
   },
   "SEED_PHRASE": {
@@ -214,10 +217,21 @@
     "SEED_PHRASE_HINT": "Click to reveal the seed phrase",
     "BUTTON_SAVE": "Save",
     "BUTTON_REMOVE": "Close wallet",
+    "CREATE_PASSWORD_SECURE": "Create a password to secure your seed",
+    "INFO": "info",
+    "SEED_IS_UNSECURED": "Seed is unsecured",
+    "SEED_IS_SECURED": "Seed is secured",
+    "REMEMBER_YOU_WILL_REQUIRE": "Remember, you will require the password to restore it.",
+    "FORM": {
+      "CONFIRM_PASSWORD": "Confirm password",
+      "GENERATE_SECURE_SEED": "Generate Secure Seed",
+      "SECURED_SEED_WILL_REQUIRE": "Secured seed will require this password to restore."
+    },
     "FORM_ERRORS": {
       "NAME_REQUIRED": "Name is required",
       "NAME_DUPLICATE": "Name is duplicate",
-      "MAX_LENGTH": "Maximum name length reached"
+      "MAX_LENGTH": "Maximum name length reached",
+      "PASSWORDS_DONT_MATCH": "Passwords don't match"
     }
   },
   "ASSIGN_ALIAS": {

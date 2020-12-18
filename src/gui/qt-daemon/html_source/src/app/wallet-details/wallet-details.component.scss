@@ -8,32 +8,6 @@
     }
   }
 
-  .seed-phrase {
-    display: flex;
-    font-size: 1.4rem;
-    line-height: 1.5rem;
-    padding: 1.4rem;
-    width: 100%;
-    height: 8.8rem;
-
-    .seed-phrase-hint {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      width: 100%;
-      height: 100%;
-    }
-
-    .seed-phrase-content {
-      display: flex;
-      flex-direction: column;
-      flex-wrap: wrap;
-      width: 100%;
-      height: 100%;
-    }
-  }
-
   .wallet-buttons {
     display: flex;
     align-items: center;
@@ -45,5 +19,8 @@
       max-width: 15rem;
     }
   }
+}
 
+.mt-2 {
+  margin-top: 2rem;
 }

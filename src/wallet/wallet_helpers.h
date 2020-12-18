@@ -23,4 +23,43 @@ namespace tools
     wi.is_watch_only = w.is_watch_only();
     return true;
   }
+
+  inline std::string get_seed_phrase_info(const std::string& seed_phrase, const std::string& seed_password, view::seed_phrase_info& result)
+  {
+    //cut the last timestamp word from restore_dats
+    try
+    {
+      //restore_from_tracking_seed
+      bool is_tracking = currency::account_base::is_seed_tracking(seed_phrase);
+      if (is_tracking)
+      {
+        currency::account_base acc;
+        result.require_password = false;
+        result.hash_sum_matched = false;
+        result.syntax_correct = acc.restore_from_tracking_seed(seed_phrase);
+      }
+      else
+      {
+        result.syntax_correct = currency::account_base::is_seed_password_protected(seed_phrase, result.require_password);
+        if (result.syntax_correct && result.require_password)
+        {
+          if (seed_password.size())
+          {
+            currency::account_base acc;
+            result.hash_sum_matched = acc.restore_from_seed_phrase(seed_phrase, seed_password);
+          }
+          else
+          {
+            result.hash_sum_matched = false;
+          }
+        }
+      }
+      return API_RETURN_CODE_OK;
+    }
+    catch (...)
+    {
+      result.syntax_correct = false;
+      return API_RETURN_CODE_OK;
+    }
+  }
 }

@@ -2,38 +2,15 @@
   position: relative;
 }
 
-.seed-phrase-title {
-  line-height: 2.2rem;
-  padding: 2.2rem 0;
+.content {
+  padding: 3.2rem 3rem 3rem;
+}
+.scrolled-content, .content {
+  height: 100%;
+  overflow-y: auto;
 }
 
-.seed-phrase-content {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap;
-  padding: 1.4rem;
-  width: 100%;
-  height: 12rem;
-
-  .word {
-    line-height: 2.2rem;
-    max-width: 13rem;
-  }
-}
-
-.wrap-buttons {
-  display: flex;
-
-  .seed-phrase-button {
-    margin: 2.8rem 0;
-    width: 25%;
-    min-width: 1.5rem;
-  }
-
-  .copy-button {
-    margin: 2.8rem 1rem;
-    width: 25%;
-    min-width: 1.5rem;
-  }
+.mt-2 {
+  margin-top: 2rem;
 }
 

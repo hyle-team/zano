@@ -911,7 +911,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       w->get_unconfirmed_transfers(owr.recent_history.history, exclude_mining_txs);
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
       //workaround for missed fee
-      owr.seed = w->get_account().get_seed_phrase();
+      //owr.seed = w->get_account().get_seed_phrase();
       break;
     }
     catch (const tools::error::file_not_found& /**/)
@@ -1015,7 +1015,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   {
     w->generate(path, password, false);
     w->set_minimum_height(m_last_daemon_height);
-    owr.seed = w->get_account().get_seed_phrase();
+    //owr.seed = w->get_account().get_seed_phrase();
   }
   catch (const tools::error::file_exists&)
   {
@@ -1058,18 +1058,24 @@ std::string wallets_manager::is_pos_allowed()
   else 
     return API_RETURN_CODE_FALSE;
 }
-std::string wallets_manager::is_valid_brain_restore_data(const std::string& seed_phrase)
+std::string wallets_manager::is_valid_brain_restore_data(const std::string& seed_phrase, const std::string& seed_password)
 {
+  
   currency::account_base acc;
-  if (acc.restore_from_seed_phrase(seed_phrase))
-    return API_RETURN_CODE_TRUE;
+  if (!currency::account_base::is_seed_tracking(seed_phrase))
+  {
+    if (acc.restore_from_seed_phrase(seed_phrase, seed_password))
+      return API_RETURN_CODE_TRUE;
+  }
+  else
+  {
+    currency::account_public_address addr = AUTO_VAL_INIT(addr);
+    crypto::secret_key view_sec_key = AUTO_VAL_INIT(view_sec_key);
+    uint64_t ts = 0;
+    if (currency::parse_tracking_seed(seed_phrase, addr, view_sec_key, ts))
+      return API_RETURN_CODE_TRUE;
 
-  currency::account_public_address addr;
-  crypto::secret_key view_sec_key;
-  uint64_t ts;
-  if (currency::parse_tracking_seed(seed_phrase, addr, view_sec_key, ts))
-    return API_RETURN_CODE_TRUE;
-
+  }
   return API_RETURN_CODE_FALSE;
 }
 #ifndef MOBILE_WALLET_BUILD
@@ -1081,11 +1087,18 @@ void wallets_manager::subscribe_to_core_events(currency::i_core_event_handler* p
 
 }
 #endif
+
+std::string wallets_manager::get_seed_phrase_info(const std::string& seed_phrase, const std::string& seed_password, view::seed_phrase_info& result)
+{
+  return tools::get_seed_phrase_info(seed_phrase, seed_password, result);
+}
+
+
 void wallets_manager::get_gui_options(view::gui_options& opt)
 {
   opt = m_ui_opt;
 }
-std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& restore_key, view::open_wallet_response& owr)
+std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& seed_phrase, const std::string& seed_password, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
@@ -1108,9 +1121,9 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   currency::account_base acc;
   try
   {
-    bool auditable_watch_only = restore_key.find(':') != std::string::npos;
-    w->restore(path, password, restore_key, auditable_watch_only); 
-    owr.seed = w->get_account().get_seed_phrase();
+    bool is_tracking = currency::account_base::is_seed_tracking(seed_phrase);
+    w->restore(path, password, seed_phrase, is_tracking, seed_password);
+    //owr.seed = w->get_account().get_seed_phrase();
   }
   catch (const tools::error::file_exists&)
   {
@@ -1625,14 +1638,14 @@ std::string wallets_manager::get_mining_history(uint64_t wallet_id, tools::walle
   wo.w->get()->get_mining_history(mh);
   return API_RETURN_CODE_OK;
 }
-std::string wallets_manager::get_wallet_restore_info(uint64_t wallet_id, std::string& restore_key)
+std::string wallets_manager::get_wallet_restore_info(uint64_t wallet_id, std::string& seed_phrase, const std::string& seed_password)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
   if (wo.wallet_state != view::wallet_status_info::wallet_state_ready || wo.long_refresh_in_progress)
     return API_RETURN_CODE_CORE_BUSY;
 
-  restore_key = wo.w->get()->get_account().get_seed_phrase();
+  seed_phrase = wo.w->get()->get_account().get_seed_phrase(seed_password);
 
   return API_RETURN_CODE_OK;
 }
