@@ -3013,3 +3013,15 @@ void fe_frombytes(fe h, const unsigned char *s)
   h[8] = h8;
   h[9] = h9;
 }
+
+// Implemented using sc_mulsub
+// TODO: make more efficient implementation
+void sc_mul(unsigned char *s, const unsigned char *a, const unsigned char *b)
+{
+  unsigned char c[32];
+  unsigned char neg_a[32];
+  sc_0(c);
+  sc_sub(neg_a, c, a);
+  // s = c - ab
+  sc_mulsub(s, neg_a, b, c);
+}
