@@ -19,6 +19,7 @@ using namespace epee;
 #include "deadlock_guard_test.h"
 #include "difficulty_analysis.h"
 #include "plain_wallet_tests.h"
+#include "crypto_tests.h"
 
 namespace po = boost::program_options;
 
@@ -55,6 +56,7 @@ namespace
   const command_line::arg_descriptor<bool>   arg_deadlock_guard    = { "test-deadlock-guard",            "Do deadlock guard test", false, true };
   const command_line::arg_descriptor<std::string>   arg_difficulty_analysis = { "difficulty-analysis", "Do difficulty analysis", "", true };
   const command_line::arg_descriptor<bool>   arg_test_plain_wallet = { "test-plainwallet", "Do testing of plain wallet interface", false, true };
+  const command_line::arg_descriptor<bool>   arg_crypto_tests      = { "crypto-tests", "Run experimental crypto tests", false, true };
 
 }
 
@@ -106,7 +108,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_max_tx_in_pool);
   command_line::add_arg(desc_options, arg_deadlock_guard);
   command_line::add_arg(desc_options, arg_difficulty_analysis);
-  command_line::add_arg(desc_options, arg_test_plain_wallet);  
+  command_line::add_arg(desc_options, arg_test_plain_wallet);
+  command_line::add_arg(desc_options, arg_crypto_tests);
   
   
   test_serialization();
@@ -208,6 +211,10 @@ int main(int argc, char* argv[])
         break;
     }
     return 0;
+  }
+  else if (command_line::get_arg(vm, arg_crypto_tests))
+  {
+    return crypto_tests();
   }
   else
   {
