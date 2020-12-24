@@ -123,6 +123,7 @@ void sc_mulsub(unsigned char *, const unsigned char *, const unsigned char *, co
 void sc_mul(unsigned char *, const unsigned char *, const unsigned char *);
 int sc_check(const unsigned char *);
 int sc_isnonzero(const unsigned char *); /* Doesn't normalize */
+void sc_invert(unsigned char*, const unsigned char*);
 
 void fe_sq(fe h, const fe f);
 void fe_mul(fe, const fe, const fe);
