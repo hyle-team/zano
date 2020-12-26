@@ -26,7 +26,8 @@
 
 #include <assert.h>
 #include <stdint.h>
-
+#include <string.h>
+#include <stddef.h>
 #include "warnings.h"
 #include "crypto-ops.h"
 
