@@ -223,6 +223,21 @@ namespace currency
     END_SERIALIZE()
   };
 
+  struct txin_to_htlc
+  {
+    crypto::hash hltc_origin;
+    txout_v key_offset;
+    crypto::key_image k_image;                    // double spending protection
+    std::vector<txin_etc_details_v> etc_details;  //this flag used when TX_FLAG_SIGNATURE_MODE_SEPARATE flag is set, point to which amount of outputs(starting from zero) used in signature
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(hltc_origin)
+      FIELD(key_offset)
+      VARINT_FIELD(k_image)
+      FIELD(etc_details)
+      END_SERIALIZE()
+  };
+
   struct txin_multisig
   {
     uint64_t amount;
@@ -246,6 +261,21 @@ namespace currency
     BEGIN_SERIALIZE_OBJECT()
       VARINT_FIELD(minimum_sigs)
       FIELD(keys)
+    END_SERIALIZE()
+  };
+
+  struct txout_htlc
+  {
+    crypto::hash htlc_hash;
+    uint8_t flags;      //select type of the hash, may be some extra info in future
+    uint64_t expiration; 
+    crypto::public_key pkey;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(htlc_hash)
+      FIELD(flags)
+      VARINT_FIELD(expiration)
+      FIELD(pkey)
     END_SERIALIZE()
   };
 
