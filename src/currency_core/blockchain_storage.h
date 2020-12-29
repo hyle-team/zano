@@ -133,6 +133,11 @@ namespace currency
       }
     };
 
+    struct scan_for_keys_context
+    {
+      std::list<txout_htlc> htlc_outs;
+    };
+
     // == Output indexes local lookup table conception ==
     // Main chain gindex table (outputs_container) contains data which is valid only for the most recent block.
     // Thus it can't be used to get output's global index for any arbitrary height because there's no height data.
@@ -232,7 +237,7 @@ namespace currency
     template<class visitor_t>
     bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis) { uint64_t stub = 0; return scan_outputkeys_for_indexes(validated_tx, tx_in_to_key, vis, stub); }
     template<class visitor_t>
-    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t& max_related_block_height) const ;
+    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& scan_context) const ;
 
     uint64_t get_current_blockchain_size() const;
     uint64_t get_top_block_height() const;
@@ -273,12 +278,14 @@ namespace currency
     bool validate_tx_service_attachmens_in_services(const tx_service_attachment& a, size_t i, const transaction& tx)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_htlc& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const transaction& source_tx, size_t out_n) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
-    bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_to_key& txin, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
+    bool get_output_keys_for_input_with_checks(const transaction& tx, uint64_t amount, const std::vector<txout_v>& key_offsets, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
+    bool get_output_keys_for_input_with_checks(const transaction& tx, uint64_t amount, const std::vector<txout_v>& key_offsets, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
     bool check_tokey_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
     uint64_t get_current_comulative_blocksize_limit()const;
     uint64_t get_current_hashrate(size_t aprox_count)const;
@@ -664,17 +671,17 @@ namespace currency
   //------------------------------------------------------------------
   //------------------------------------------------------------------
   template<class visitor_t>
-  bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis, uint64_t& max_related_block_height) const
+  bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, uint64_t amount, const std::vector<txout_v>& key_offsets, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& /*scan_context*/) const
   {
     CRITICAL_REGION_LOCAL(m_read_lock);
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_get_item_size);
 
-    uint64_t outs_count_for_amount = m_db_outputs.get_item_size(tx_in_to_key.amount);
+    uint64_t outs_count_for_amount = m_db_outputs.get_item_size(amount);
     TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_get_item_size);
     if (!outs_count_for_amount)
       return false;
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_relative_to_absolute);
-    std::vector<txout_v> absolute_offsets = relative_output_offsets_to_absolute(tx_in_to_key.key_offsets);
+    std::vector<txout_v> absolute_offsets = relative_output_offsets_to_absolute(key_offsets);
     TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_relative_to_absolute);
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop);
     size_t output_index = 0;
@@ -696,7 +703,7 @@ namespace currency
           LOG_ERROR("Wrong index in transaction inputs: " << i << ", expected maximum " << outs_count_for_amount - 1);
           return false;
         }
-        auto out_ptr = m_db_outputs.get_subitem(tx_in_to_key.amount, i);
+        auto out_ptr = m_db_outputs.get_subitem(amount, i);
         tx_id = out_ptr->tx_id;
         n = out_ptr->out_no;
         TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_get_subitem);
@@ -715,9 +722,9 @@ namespace currency
       
 
 
-      CHECK_AND_ASSERT_MES(tx_in_to_key.key_offsets.size() >= 1, false, "internal error: tx input has empty key_offsets"); // should never happen as input correctness must be handled by the caller
-      bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, tx_in_to_key.key_offsets.size() - 1);
-      CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << tx_in_to_key.key_offsets.size());
+      CHECK_AND_ASSERT_MES(key_offsets.size() >= 1, false, "internal error: tx input has empty key_offsets"); // should never happen as input correctness must be handled by the caller
+      bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, key_offsets.size() - 1);
+      CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
       
       TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       if (!vis.handle_output(tx_ptr->tx, validated_tx, tx_ptr->tx.vout[n], n))

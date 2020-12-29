@@ -4210,7 +4210,15 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
         LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << in_ms.multisig_out_id << ") in tx: " << tx_prefix_hash);
         return false;
       }
-
+    }
+    else if (txin.type() == typeid(txin_to_htlc))
+    {
+      const txin_to_htlc& in_ms_htlc = boost::get<txin_to_htlc>(txin);
+      if (!check_tx_input(tx, sig_index, in_ms, tx_prefix_hash, *psig, max_used_block_height))
+      {
+        LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << in_ms.multisig_out_id << ") in tx: " << tx_prefix_hash);
+        return false;
+      }
     }
     sig_index++;
   }
@@ -4243,6 +4251,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   //TIME_MEASURE_START_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
 
   std::vector<crypto::public_key> output_keys;
+  scan_for_keys_context scan_context = AUTO_VAL_INIT(scan_context);
   if(!get_output_keys_for_input_with_checks(tx, txin, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase))
   {
     LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << ")");
@@ -4257,61 +4266,77 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   return check_tokey_input(tx, in_index, txin, tx_prefix_hash, sig, output_keys_ptrs);
 }
+//----------------------------------------------------------------
+struct outputs_visitor
+{
+  std::vector<crypto::public_key >&  m_results_collector;
+  blockchain_storage::scan_for_keys_context& m_scan_context;
+  const blockchain_storage& m_bch;
+  uint64_t& m_source_max_unlock_time_for_pos_coinbase;
+  outputs_visitor(std::vector<crypto::public_key>& results_collector,
+    const blockchain_storage& bch,
+    uint64_t& source_max_unlock_time_for_pos_coinbase, 
+    blockchain_storage::scan_for_keys_context& scan_context)
+    : m_results_collector(results_collector)
+    , m_bch(bch)
+    , m_source_max_unlock_time_for_pos_coinbase(source_max_unlock_time_for_pos_coinbase),
+    , m_scan_context(scan_context)
+  {}
+  bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out& out, uint64_t out_i)
+  {
+    //check tx unlock time
+    uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
+    //let coinbase sources for PoS block to have locked inputs, the outputs supposed to be locked same way, except the reward 
+    if (is_coinbase(validated_tx) && is_pos_block(validated_tx))
+    {
+      CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(source_out_unlock_time), false, "source output #" << out_i << " is locked by time, not by height, which is not allowed for PoS coinbase");
+      if (source_out_unlock_time > m_source_max_unlock_time_for_pos_coinbase)
+        m_source_max_unlock_time_for_pos_coinbase = source_out_unlock_time;
+    }
+    else
+    {
+      if (!m_bch.is_tx_spendtime_unlocked(source_out_unlock_time))
+      {
+        LOG_PRINT_L0("One of outputs for one of inputs have wrong tx.unlock_time = " << get_tx_unlock_time(source_tx, out_i));
+        return false;
+      }
+    }
+
+    if (out.target.type() == typeid(txout_htlc))
+    {
+      m_scan_context.htlc_outs.push_back(boost::get<txout_htlc>(out.target));
+
+    }else if (out.target.type() != typeid(txout_to_key))
+    {
+      LOG_PRINT_L0("Output have wrong type id, which=" << out.target.which());
+      return false;
+    }   
+
+    crypto::public_key pk = boost::get<txout_to_key>(out.target).key;
+    m_results_collector.push_back(pk);
+    return true;
+  }
+};
+
 //------------------------------------------------------------------
 // Checks each referenced output for:
 // 1) source tx unlock time validity
 // 2) mixin restrictions
 // 3) general gindex/ref_by_id corectness
-bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, const txin_to_key& txin, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
+bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, uint64_t amount, const std::vector<txout_v>& key_offsets, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  struct outputs_visitor
-  {
-    std::vector<crypto::public_key >&  m_results_collector;
-    const blockchain_storage& m_bch;
-    uint64_t& m_source_max_unlock_time_for_pos_coinbase;
-    outputs_visitor(std::vector<crypto::public_key>& results_collector,
-                    const blockchain_storage& bch, 
-                    uint64_t& source_max_unlock_time_for_pos_coinbase)
-      : m_results_collector(results_collector)
-      , m_bch(bch)
-      , m_source_max_unlock_time_for_pos_coinbase(source_max_unlock_time_for_pos_coinbase)
-    {}
-    bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out& out, uint64_t out_i)
-    {
-      //check tx unlock time
-      uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
-      //let coinbase sources for PoS block to have locked inputs, the outputs supposed to be locked same way, except the reward 
-      if (is_coinbase(validated_tx) && is_pos_block(validated_tx))
-      {
-        CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(source_out_unlock_time), false, "source output #" << out_i << " is locked by time, not by height, which is not allowed for PoS coinbase");
-        if (source_out_unlock_time > m_source_max_unlock_time_for_pos_coinbase)
-          m_source_max_unlock_time_for_pos_coinbase = source_out_unlock_time;
-      }
-      else
-      {
-        if (!m_bch.is_tx_spendtime_unlocked(source_out_unlock_time))
-        {
-          LOG_PRINT_L0("One of outputs for one of inputs have wrong tx.unlock_time = " << get_tx_unlock_time(source_tx, out_i));
-          return false;
-        }
-      }
-
-      if(out.target.type() != typeid(txout_to_key))
-      {
-        LOG_PRINT_L0("Output have wrong type id, which=" << out.target.which());
-        return false;
-      }
-      crypto::public_key pk = boost::get<txout_to_key>(out.target).key;
-      m_results_collector.push_back(pk);
-      return true;
-    }
-  };
-
   outputs_visitor vi(output_keys, *this, source_max_unlock_time_for_pos_coinbase);
-  return scan_outputkeys_for_indexes(tx, txin, vi, max_related_block_height);
+  return scan_outputkeys_for_indexes(tx, amount, key_offsets, vi, max_related_block_height, scan_context);
 }
+//------------------------------------------------------------------
+bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, uint64_t amount, const std::vector<txout_v>& key_offsets, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
+{
+  scan_for_keys_context scan_context_dummy = AUTO_VAL_INIT();
+  return get_output_keys_for_input_with_checks(tx, amount, key_offsets, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase, scan_context_dummy);
+}
+
 //------------------------------------------------------------------
 // Note: this function can be used for checking to_key inputs against either main chain or alt chain, that's why it has output_keys_ptrs parameter
 // Doesn't check spent flags, the caller must check it.
@@ -4491,6 +4516,32 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   return true;
 #undef LOC_CHK
+} 
+//------------------------------------------------------------------
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_htlc& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  //TIME_MEASURE_START_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
+
+  std::vector<crypto::public_key> output_keys;
+  std::vector<txout_v> key_offsets(txin.key_offset, 1);
+  scan_for_keys_context scan_contex = AUTO_VAL_INIT();
+  if (!get_output_keys_for_input_with_checks(tx, txin.amount, key_offsets, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase, scan_contex))
+  {
+    LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << ")");
+    return false;
+  }
+  //TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
+
+  //TODO: add caludating hash
+
+  std::vector<const crypto::public_key *> output_keys_ptrs;
+  output_keys_ptrs.reserve(output_keys.size());
+  for (auto& ptr : output_keys)
+    output_keys_ptrs.push_back(&ptr);
+
+  return check_tokey_input(tx, in_index, txin, tx_prefix_hash, sig, output_keys_ptrs);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_adjusted_time() const

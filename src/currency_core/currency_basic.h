@@ -225,6 +225,7 @@ namespace currency
 
   struct txin_to_htlc
   {
+    uint64_t amount;
     crypto::hash hltc_origin;
     txout_v key_offset;
     crypto::key_image k_image;                    // double spending protection
@@ -279,9 +280,9 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::variant<txin_gen, txin_to_key, txin_multisig> txin_v;
+  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_to_htlc> txin_v;
 
-  typedef boost::variant<txout_to_key, txout_multisig> txout_target_v;
+  typedef boost::variant<txout_to_key, txout_multisig, txout_htlc> txout_target_v;
 
   //typedef std::pair<uint64_t, txout> out_t;
   struct tx_out
@@ -796,6 +797,10 @@ SET_VARIANT_TAGS(currency::tx_receiver, 32, "receiver2");
 
 // @#@ TODO @#@
 SET_VARIANT_TAGS(currency::extra_alias_entry, 33, "alias_entry2");
+
+//htlc
+SET_VARIANT_TAGS(currency::txin_to_htlc, 34, "txin_to_htlc");
+SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 
 
 
