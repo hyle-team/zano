@@ -177,7 +177,6 @@ static const fe scalar_L_fe = { 16110573, 10012311, -6632702, 16062397, 5471207,
 __declspec(align(32))
 struct scalar_t
 {
-  //fe m_fe; // 40 bytes, array 10 * 4, optimized form
   union
   {
     uint64_t      m_u64[4];
@@ -201,10 +200,8 @@ struct scalar_t
   {
     zero();
     if (v == 0)
-    {
       return;
-    }
-    reinterpret_cast<uint64_t&>(m_s) = v;
+    m_u64[0] = v;
     // do not need to call reduce as 2^64 < L
   }
 
@@ -222,24 +219,32 @@ struct scalar_t
   {
     crypto::secret_key result;
     memcpy(result.data, &m_s, sizeof result.data);
-    //fe_tobytes(reinterpret_cast<unsigned char*>(&result), m_fe);
     return result;
   }
 
   bool from_secret_key(const crypto::secret_key& sk)
   {
+    // TODO
     //fe_frombytes(m_fe, reinterpret_cast<const unsigned char*>(&sk));
     return false;
   }
 
   void zero()
   {
-    //fe_0(m_fe);
     m_u64[0] = 0;
     m_u64[1] = 0;
     m_u64[2] = 0;
     m_u64[3] = 0;
-    //memset(&m_s, 0, sizeof m_s);
+  }
+
+  static scalar_t random()
+  {
+    unsigned char tmp[64];
+    crypto::generate_random_bytes(64, tmp);
+    sc_reduce(tmp);
+    scalar_t result;
+    memcpy(&result.m_s, tmp, sizeof result.m_s);
+    return result;
   }
 
   void make_random()
@@ -247,7 +252,7 @@ struct scalar_t
     unsigned char tmp[64];
     crypto::generate_random_bytes(64, tmp);
     sc_reduce(tmp);
-    memcpy(&m_s, tmp, 32);
+    memcpy(&m_s, tmp, sizeof m_s);
   }
 
   bool is_zero() const
@@ -486,13 +491,26 @@ struct point_g_t : public point_t
 
 }; // struct point_g_t
 
-static const point_g_t point_G;
+static const point_g_t c_point_G;
 
-static const scalar_t scalar_L      = { 0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
-static const scalar_t scalar_Lm1    = { 0x5812631a5cf5d3ec, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
-static const scalar_t scalar_P      = { 0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
-static const scalar_t scalar_Pm1    = { 0xffffffffffffffec, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
-static const scalar_t scalar_256m1  = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff };
+static const scalar_t c_scalar_L      = { 0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
+static const scalar_t c_scalar_Lm1    = { 0x5812631a5cf5d3ec, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
+static const scalar_t c_scalar_P      = { 0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
+static const scalar_t c_scalar_Pm1    = { 0xffffffffffffffec, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
+static const scalar_t c_scalar_256m1  = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff };
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+#include "L2S.h"
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
 
 
 /*
@@ -676,31 +694,31 @@ TEST(crypto, scalar_basics)
     ASSERT_TRUE(z < z + 1);
   }
 
-  ASSERT_TRUE(scalar_L > 0 && !(scalar_L < 0));
-  ASSERT_TRUE(scalar_Lm1 > 0 && !(scalar_Lm1 < 0));
-  ASSERT_TRUE(scalar_Lm1 < scalar_L);
-  ASSERT_FALSE(scalar_Lm1 > scalar_L);
-  ASSERT_TRUE(scalar_P > scalar_Pm1);
-  ASSERT_FALSE(scalar_P < scalar_Pm1);
+  ASSERT_TRUE(c_scalar_L > 0 && !(c_scalar_L < 0));
+  ASSERT_TRUE(c_scalar_Lm1 > 0 && !(c_scalar_Lm1 < 0));
+  ASSERT_TRUE(c_scalar_Lm1 < c_scalar_L);
+  ASSERT_FALSE(c_scalar_Lm1 > c_scalar_L);
+  ASSERT_TRUE(c_scalar_P > c_scalar_Pm1);
+  ASSERT_FALSE(c_scalar_P < c_scalar_Pm1);
 
   std::cout << "0   = " << zero << std::endl;
   std::cout << "1   = " << one << std::endl;
-  std::cout << "L   = " << scalar_L << std::endl;
-  std::cout << "L-1 = " << scalar_Lm1 << std::endl;
-  std::cout << "P   = " << scalar_P << std::endl;
-  std::cout << "P-1 = " << scalar_Pm1 << std::endl;
+  std::cout << "L   = " << c_scalar_L << std::endl;
+  std::cout << "L-1 = " << c_scalar_Lm1 << std::endl;
+  std::cout << "P   = " << c_scalar_P << std::endl;
+  std::cout << "P-1 = " << c_scalar_Pm1 << std::endl;
   std::cout << std::endl;
 
   // check rolling over L for scalars arithmetics
-  ASSERT_EQ(scalar_Lm1 + 1, 0);
-  ASSERT_EQ(scalar_t(0) - 1, scalar_Lm1);
-  ASSERT_EQ(scalar_Lm1 * 2, scalar_Lm1 - 1); // (L - 1) * 2 = L + L - 2 = (L - 1) - 1  (mod L)
-  ASSERT_EQ(scalar_Lm1 * 100, scalar_Lm1 - 99);
-  ASSERT_EQ(scalar_Lm1 * scalar_Lm1, 1);     // (L - 1) * (L - 1) = L*L - 2L + 1 = 1 (mod L)
-  ASSERT_EQ(scalar_Lm1 * (scalar_Lm1 - 1) * scalar_Lm1, scalar_Lm1 - 1);
-  ASSERT_EQ(scalar_L   * scalar_L, 0);
+  ASSERT_EQ(c_scalar_Lm1 + 1, 0);
+  ASSERT_EQ(scalar_t(0) - 1, c_scalar_Lm1);
+  ASSERT_EQ(c_scalar_Lm1 * 2, c_scalar_Lm1 - 1); // (L - 1) * 2 = L + L - 2 = (L - 1) - 1  (mod L)
+  ASSERT_EQ(c_scalar_Lm1 * 100, c_scalar_Lm1 - 99);
+  ASSERT_EQ(c_scalar_Lm1 * c_scalar_Lm1, 1);     // (L - 1) * (L - 1) = L*L - 2L + 1 = 1 (mod L)
+  ASSERT_EQ(c_scalar_Lm1 * (c_scalar_Lm1 - 1) * c_scalar_Lm1, c_scalar_Lm1 - 1);
+  ASSERT_EQ(c_scalar_L   * c_scalar_L, 0);
 
-  ASSERT_EQ(scalar_t(3) / scalar_Lm1, scalar_t(3) * scalar_Lm1);  // because (L - 1) ^ 2 = 1
+  ASSERT_EQ(scalar_t(3) / c_scalar_Lm1, scalar_t(3) * c_scalar_Lm1);  // because (L - 1) ^ 2 = 1
 
   return true;
 }
@@ -795,24 +813,24 @@ TEST(crypto, scalar_arithmetic_assignment)
 TEST(crypto, point_basics)
 {
   scalar_t s = 4;
-  point_t E = s * point_G;
+  point_t E = s * c_point_G;
   point_t X = 4 * E;
-  point_t K = 193847 * point_G;
+  point_t K = 193847 * c_point_G;
   point_t C = E + K;
 
-  ASSERT_EQ(X, 16 * point_G);
+  ASSERT_EQ(X, 16 * c_point_G);
   ASSERT_EQ(C - K, E);
   ASSERT_EQ(C - E, K);
-  ASSERT_EQ(C, (193847 + 4) * point_G);
+  ASSERT_EQ(C, (193847 + 4) * c_point_G);
 
-  ASSERT_EQ(point_G / 1, 1 * point_G);
+  ASSERT_EQ(c_point_G / 1, 1 * c_point_G);
   ASSERT_EQ(C / 3, E / 3 + K / 3);
   //ASSERT_EQ(K, 61 * (K / (61)));
   //ASSERT_EQ(K, 192847 * (K / scalar_t(192847)));
   ASSERT_EQ(K, 61 * (283 * (192847 * (K / (192847ull * 283 * 61)))));
 
-  ASSERT_EQ(E, point_G + point_G + point_G + point_G);
-  ASSERT_EQ(E - point_G, 3 * point_G);
+  ASSERT_EQ(E, c_point_G + c_point_G + c_point_G + c_point_G);
+  ASSERT_EQ(E - c_point_G, 3 * c_point_G);
 
   return true;
 }
@@ -847,6 +865,25 @@ TEST(crypto, scalars)
   scalar_t m = e * d;
 
   ASSERT_TRUE(m == s);
+
+  return true;
+}
+
+//
+// ML2S tests
+//
+
+TEST(ml2s, rsum)
+{
+  // Ref: Rsum(3, 8, [1, 2, 3, 4, 5, 6, 7, 8], { 1: 1, 2 : 2, 3 : 3 }, { 1: 4, 2 : 5 }) == 659
+  
+  point_t A = scalar_t::random() * c_point_G;
+  point_t result;
+
+  bool r = ml2s_rsum(3, std::vector<point_t>{ A, 2 * A, 3 * A, 4 * A, 5 * A, 6 * A, 7 * A, 8 * A },
+    std::vector<scalar_t>{ 1, 2, 3 }, std::vector<scalar_t>{ 4, 5 }, result);
+  ASSERT_TRUE(r);
+  ASSERT_EQ(result, 659 * A);
 
   return true;
 }
