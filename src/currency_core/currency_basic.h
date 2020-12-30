@@ -226,7 +226,7 @@ namespace currency
   struct txin_to_htlc
   {
     uint64_t amount;
-    crypto::hash hltc_origin;
+    std::string hltc_origin;
     txout_v key_offset;
     crypto::key_image k_image;                    // double spending protection
     std::vector<txin_etc_details_v> etc_details;  //this flag used when TX_FLAG_SIGNATURE_MODE_SEPARATE flag is set, point to which amount of outputs(starting from zero) used in signature
@@ -264,6 +264,8 @@ namespace currency
       FIELD(keys)
     END_SERIALIZE()
   };
+
+#define CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK   0x01 // 0 - SHA256, 1 - RIPEMD160
 
   struct txout_htlc
   {

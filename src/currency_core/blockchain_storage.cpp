@@ -4532,9 +4532,28 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
     LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << ")");
     return false;
   }
+
+  CHECK_AND_ASSERT_THROW_MES(scan_contex.htlc_outs.size() == 1, "htlc output not found for input, tx: " << get_transaction_hash(tx));
+  const txout_htlc& related_out = *scan_contex.htlc_outs.begin();
+  bool use_sha256 = !(related_out.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK);
+  if (use_sha256)
+  {
+    //doing sha256 hash
+    crypto::hash sha256 = sha256_hash(txin.hltc_origin.data(), txin.hltc_origin.size());
+    CHECK_AND_ASSERT_THROW_MES(sha256 == related_out.htlc_hash, "htlc hash missmatched for tx: " << get_transaction_hash(tx) 
+      << " calculated hash: " << sha256 << " expected hash(related_out.htlc_hash): " << related_out.htlc_hash);
+  }
+  else
+  {
+    //doing RIPEMD160
+
+
+  }
+
+
   //TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
 
-  //TODO: add caludating hash
+  
 
   std::vector<const crypto::public_key *> output_keys_ptrs;
   output_keys_ptrs.reserve(output_keys.size());
