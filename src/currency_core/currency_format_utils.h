@@ -570,6 +570,7 @@ namespace currency
       size_t operator()(const txin_gen& /*txin*/) const   { return 0; }
       size_t operator()(const txin_to_key& txin) const    { return txin.key_offsets.size(); }
       size_t operator()(const txin_multisig& txin) const  { return txin.sigs_count; }
+      size_t operator()(const txin_htlc& txin) const      { return 1; }
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(), tx_in);

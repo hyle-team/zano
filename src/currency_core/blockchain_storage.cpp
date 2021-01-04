@@ -33,6 +33,8 @@
 #include "basic_pow_helpers.h"
 #include "version.h"
 #include "tx_semantic_validation.h"
+#include "crypto/RIPEMD160_helper.h"
+#include "crypto/bitcoin/sha256_helper.h"
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "core"
@@ -736,6 +738,11 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
         LOG_PRINT_L0("update_spent_tx_flags_for_input failed for multisig id " << inp.multisig_out_id << " amount: " << inp.amount);
         return false;
       }
+      return true;
+    }
+    bool operator()(const txin_htlc& inp) const
+    {
+      //HTLC TODO
       return true;
     }
   };
@@ -3808,6 +3815,11 @@ namespace currency
       }
       return true;
     }
+    bool operator()(const txin_htlc& in) const 
+    {
+      //HTLC TODO
+      return true; 
+    }
   };
 }
 
@@ -4211,12 +4223,12 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
         return false;
       }
     }
-    else if (txin.type() == typeid(txin_to_htlc))
+    else if (txin.type() == typeid(txin_htlc))
     {
-      const txin_to_htlc& in_ms_htlc = boost::get<txin_to_htlc>(txin);
-      if (!check_tx_input(tx, sig_index, in_ms, tx_prefix_hash, *psig, max_used_block_height))
+      const txin_htlc& in_htlc = boost::get<txin_htlc>(txin);
+      if (!check_tx_input(tx, sig_index, in_htlc, tx_prefix_hash, *psig, max_used_block_height))
       {
-        LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << in_ms.multisig_out_id << ") in tx: " << tx_prefix_hash);
+        LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << obj_to_json_str(in_htlc) << ") in tx: " << tx_prefix_hash);
         return false;
       }
     }
@@ -4252,7 +4264,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   std::vector<crypto::public_key> output_keys;
   scan_for_keys_context scan_context = AUTO_VAL_INIT(scan_context);
-  if(!get_output_keys_for_input_with_checks(tx, txin, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase))
+  if(!get_output_keys_for_input_with_checks(tx, txin.amount, txin.key_offsets, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase))
   {
     LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << ")");
     return false;
@@ -4279,7 +4291,7 @@ struct outputs_visitor
     blockchain_storage::scan_for_keys_context& scan_context)
     : m_results_collector(results_collector)
     , m_bch(bch)
-    , m_source_max_unlock_time_for_pos_coinbase(source_max_unlock_time_for_pos_coinbase),
+    , m_source_max_unlock_time_for_pos_coinbase(source_max_unlock_time_for_pos_coinbase)
     , m_scan_context(scan_context)
   {}
   bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out& out, uint64_t out_i)
@@ -4327,13 +4339,13 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  outputs_visitor vi(output_keys, *this, source_max_unlock_time_for_pos_coinbase);
+  outputs_visitor vi(output_keys, *this, source_max_unlock_time_for_pos_coinbase, scan_context);
   return scan_outputkeys_for_indexes(tx, amount, key_offsets, vi, max_related_block_height, scan_context);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, uint64_t amount, const std::vector<txout_v>& key_offsets, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
 {
-  scan_for_keys_context scan_context_dummy = AUTO_VAL_INIT();
+  scan_for_keys_context scan_context_dummy = AUTO_VAL_INIT(scan_context_dummy);
   return get_output_keys_for_input_with_checks(tx, amount, key_offsets, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase, scan_context_dummy);
 }
 
@@ -4342,13 +4354,26 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction
 // Doesn't check spent flags, the caller must check it.
 bool blockchain_storage::check_tokey_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const
 {
+  return check_tokey_input(tx, in_index, txin.key_offsets, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, sig, output_keys_ptrs);
+}
+//------------------------------------------------------------------
+bool blockchain_storage::check_tokey_input(const transaction& tx,
+  size_t in_index,
+  const std::vector<txout_v>& in_key_offsets,
+  uint64_t in_amount,
+  const crypto::key_image& in_k_image,
+  const std::vector<txin_etc_details_v>& in_etc_details,
+  const crypto::hash& tx_prefix_hash,
+  const std::vector<crypto::signature>& sig,
+  const std::vector<const crypto::public_key*>& output_keys_ptrs) const
+{
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   TIME_MEASURE_START_PD(tx_check_inputs_loop_ch_in_val_sig);
 
-  if (txin.key_offsets.size() != output_keys_ptrs.size())
+  if (in_key_offsets.size() != output_keys_ptrs.size())
   {
-    LOG_PRINT_L0("Output keys for tx with amount = " << txin.amount << " and count indexes " << txin.key_offsets.size() << " returned wrong keys count " << output_keys_ptrs.size());
+    LOG_PRINT_L0("Output keys for tx with amount = " << in_amount << " and count indexes " << in_key_offsets.size() << " returned wrong keys count " << output_keys_ptrs.size());
     return false;
   }
   
@@ -4358,13 +4383,13 @@ bool blockchain_storage::check_tokey_input(const transaction& tx, size_t in_inde
   if (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE)
   {
     // check attachments, mentioned directly in this input
-    bool r = validate_attachment_info(txin.etc_details, tx.attachment, in_index != tx.vin.size() - 1); // attachment info can be omitted for all inputs, except the last one
+    bool r = validate_attachment_info(in_etc_details, tx.attachment, in_index != tx.vin.size() - 1); // attachment info can be omitted for all inputs, except the last one
     CHECK_AND_ASSERT_MES(r, false, "Failed to validate attachments in tx " << tx_prefix_hash << ": incorrect extra_attachment_info in etc_details in input #" << in_index);
   }
   else
   {
     // make sure normal tx does not have extra_attachment_info in etc_details
-    CHECK_AND_ASSERT_MES(!have_type_in_variant_container<extra_attachment_info>(txin.etc_details), false, "Incorrect using of extra_attachment_info in etc_details in input #" << in_index << " for tx " << tx_prefix_hash);
+    CHECK_AND_ASSERT_MES(!have_type_in_variant_container<extra_attachment_info>(in_etc_details), false, "Incorrect using of extra_attachment_info in etc_details in input #" << in_index << " for tx " << tx_prefix_hash);
   }
 
   // check signatures
@@ -4382,14 +4407,14 @@ bool blockchain_storage::check_tokey_input(const transaction& tx, size_t in_inde
 
   LOG_PRINT_L4("CHECK RING SIGNATURE: tx_prefix_hash " << tx_prefix_hash
     << "tx_hash_for_signature" << tx_hash_for_signature
-    << "txin.k_image" << txin.k_image
+    << "in_k_image" << in_k_image
     << "key_ptr:" << *output_keys_ptrs[0]
     << "signature:" << sig[0]);
-  bool r = crypto::validate_key_image(txin.k_image);
-  CHECK_AND_ASSERT_MES(r, false, "key image for input #" << in_index << " is invalid: " << txin.k_image);
+  bool r = crypto::validate_key_image(in_k_image);
+  CHECK_AND_ASSERT_MES(r, false, "key image for input #" << in_index << " is invalid: " << in_k_image);
 
-  r = crypto::check_ring_signature(tx_hash_for_signature, txin.k_image, output_keys_ptrs, sig.data());
-  CHECK_AND_ASSERT_MES(r, false, "failed to check ring signature for input #" << in_index << ENDL << dump_ring_sig_data(tx_hash_for_signature, txin.k_image, output_keys_ptrs, sig));
+  r = crypto::check_ring_signature(tx_hash_for_signature, in_k_image, output_keys_ptrs, sig.data());
+  CHECK_AND_ASSERT_MES(r, false, "failed to check ring signature for input #" << in_index << ENDL << dump_ring_sig_data(tx_hash_for_signature, in_k_image, output_keys_ptrs, sig));
   if (need_to_check_extra_sign)
   {
     //here we check extra signature to validate that transaction was finalized by authorized subject
@@ -4518,18 +4543,19 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 #undef LOC_CHK
 } 
 //------------------------------------------------------------------
-bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_htlc& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   //TIME_MEASURE_START_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
 
   std::vector<crypto::public_key> output_keys;
-  std::vector<txout_v> key_offsets(txin.key_offset, 1);
-  scan_for_keys_context scan_contex = AUTO_VAL_INIT();
-  if (!get_output_keys_for_input_with_checks(tx, txin.amount, key_offsets, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase, scan_contex))
+  std::vector<txout_v> key_offsets(1, txin.key_offset);
+  scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
+  uint64_t source_max_unlock_time_for_pos_coinbase_dummy = AUTO_VAL_INIT(source_max_unlock_time_for_pos_coinbase_dummy);
+  if (!get_output_keys_for_input_with_checks(tx, txin.amount, key_offsets, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
   {
-    LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << ")");
+    LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << key_offsets.size() << ")");
     return false;
   }
 
@@ -4539,15 +4565,17 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   if (use_sha256)
   {
     //doing sha256 hash
-    crypto::hash sha256 = sha256_hash(txin.hltc_origin.data(), txin.hltc_origin.size());
+    crypto::hash sha256 = crypto::sha256_hash(txin.hltc_origin.data(), txin.hltc_origin.size());
     CHECK_AND_ASSERT_THROW_MES(sha256 == related_out.htlc_hash, "htlc hash missmatched for tx: " << get_transaction_hash(tx) 
       << " calculated hash: " << sha256 << " expected hash(related_out.htlc_hash): " << related_out.htlc_hash);
   }
   else
   {
     //doing RIPEMD160
-
-
+    crypto::hash160 ripemd160 = crypto::RIPEMD160_hash(txin.hltc_origin.data(), txin.hltc_origin.size());
+    crypto::hash160 expected_ripemd160 = *(crypto::hash160*)&related_out.htlc_hash;
+    CHECK_AND_ASSERT_THROW_MES(ripemd160 == expected_ripemd160, "htlc hash missmatched for tx: " << get_transaction_hash(tx)
+      << " calculated hash: " << ripemd160 << " expected hash(related_out.htlc_hash): " << expected_ripemd160);
   }
 
 
@@ -4560,7 +4588,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   for (auto& ptr : output_keys)
     output_keys_ptrs.push_back(&ptr);
 
-  return check_tokey_input(tx, in_index, txin, tx_prefix_hash, sig, output_keys_ptrs);
+  return check_tokey_input(tx, in_index, key_offsets, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, sig, output_keys_ptrs);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_adjusted_time() const

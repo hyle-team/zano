@@ -22,6 +22,7 @@
 #include "blake2_test.h"
 #include "print_struct_to_json.h"
 #include "free_space_check.h"
+#include "htlc_hash_tests.h"
 
 int main(int argc, char** argv)
 {
@@ -32,14 +33,17 @@ int main(int argc, char** argv)
     epee::log_space::log_singletone::get_default_log_file().c_str(),
     epee::log_space::log_singletone::get_default_log_folder().c_str());
 
+
+
+  do_htlc_hash_tests();
   //run_serialization_performance_test();
   //return 1;
   //run_core_market_performance_tests(100000);
 
-  set_process_affinity(1);
-  set_thread_high_priority();
+  //set_process_affinity(1);
+  //set_thread_high_priority();
 
-  do_chacha_stream_performance_test();
+  //do_chacha_stream_performance_test();
   //test_blake2();
 
   //free_space_check();

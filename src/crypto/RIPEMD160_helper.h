@@ -5,10 +5,6 @@
 #pragma once
 
 #include "hash.h"
-extern "C" {
-#include "RIPEMD160.h"
-}
-
 
 
 namespace crypto {
@@ -19,20 +15,12 @@ namespace crypto {
   };
 #pragma pack(pop)
 
-  inline void RIPEMD160_hash(const void *data, std::size_t length, hash &h)
-  {
-    void MDinit(dword *MDbuf);
-    void compress(dword *MDbuf, dword *X);
-    void MDfinish(dword *MDbuf, byte *strptr, dword lswlen, dword mswlen);
-  }
-
-  inline hash RIPEMD160_hash(const void *data, std::size_t length)
-  {
-    hash h;
-    RIPEMD160_hash(data, length, reinterpret_cast<char *>(&h));
-    return h;
-  }
+  void RIPEMD160_hash(const void *data, size_t length, hash160 &h);
+  hash160 RIPEMD160_hash(const void *data, size_t length);
 
 }
 
-POD_MAKE_HASHABLE(crypto, hash)
+POD_MAKE_HASHABLE(crypto, hash160)
+
+
+

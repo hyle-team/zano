@@ -223,7 +223,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-  struct txin_to_htlc
+  struct txin_htlc
   {
     uint64_t amount;
     std::string hltc_origin;
@@ -232,9 +232,10 @@ namespace currency
     std::vector<txin_etc_details_v> etc_details;  //this flag used when TX_FLAG_SIGNATURE_MODE_SEPARATE flag is set, point to which amount of outputs(starting from zero) used in signature
 
     BEGIN_SERIALIZE_OBJECT()
+      VARINT_FIELD(amount)
       FIELD(hltc_origin)
       FIELD(key_offset)
-      VARINT_FIELD(k_image)
+      FIELD(k_image)
       FIELD(etc_details)
       END_SERIALIZE()
   };
@@ -282,7 +283,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_to_htlc> txin_v;
+  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_htlc> txin_v;
 
   typedef boost::variant<txout_to_key, txout_multisig, txout_htlc> txout_target_v;
 
@@ -801,7 +802,7 @@ SET_VARIANT_TAGS(currency::tx_receiver, 32, "receiver2");
 SET_VARIANT_TAGS(currency::extra_alias_entry, 33, "alias_entry2");
 
 //htlc
-SET_VARIANT_TAGS(currency::txin_to_htlc, 34, "txin_to_htlc");
+SET_VARIANT_TAGS(currency::txin_htlc, 34, "txin_to_htlc");
 SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 
 
