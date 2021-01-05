@@ -255,8 +255,8 @@ namespace currency
   bool check_inputs_overflow(const transaction& tx);
   uint64_t get_block_height(const transaction& coinbase);
   uint64_t get_block_height(const block& b);
-  std::vector<txout_v> relative_output_offsets_to_absolute(const std::vector<txout_v>& off);
-  std::vector<txout_v> absolute_output_offsets_to_relative(const std::vector<txout_v>& off);
+  std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);
+  std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off);
 
   // prints amount in format "3.14", "0.0"
   std::string print_money_brief(uint64_t amount);

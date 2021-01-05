@@ -1562,7 +1562,7 @@ uint64_t wallet2::get_directly_spent_transfer_id_by_input_in_tracking_wallet(con
   uint64_t tid = UINT64_MAX;
 
   // try to find a reference among own UTXOs
-  std::vector<txout_v> abs_key_offsets = relative_output_offsets_to_absolute(intk.key_offsets); // potential speed-up: don't convert to abs offsets as we interested only in direct spends for auditable wallets. Now it's kind a bit paranoid.
+  std::vector<txout_ref_v> abs_key_offsets = relative_output_offsets_to_absolute(intk.key_offsets); // potential speed-up: don't convert to abs offsets as we interested only in direct spends for auditable wallets. Now it's kind a bit paranoid.
   for (auto v : abs_key_offsets)
   {
     if (v.type() != typeid(uint64_t))

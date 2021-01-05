@@ -2049,11 +2049,11 @@ namespace currency
     return genesis_id;
   }
   //---------------------------------------------------------------
-  std::vector<txout_v> relative_output_offsets_to_absolute(const std::vector<txout_v>& off)
+  std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off)
   {
     //if array has both types of outs, then global index (uint64_t) should be first, and then the rest could be out_by_id
 
-    std::vector<txout_v> res = off;
+    std::vector<txout_ref_v> res = off;
     for (size_t i = 1; i < res.size(); i++)
     {
       if (res[i].type() == typeid(ref_by_id))
@@ -2064,13 +2064,13 @@ namespace currency
     return res;
   }
   //---------------------------------------------------------------
-  std::vector<txout_v> absolute_output_offsets_to_relative(const std::vector<txout_v>& off)
+  std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off)
   {
-    std::vector<txout_v> res = off;
+    std::vector<txout_ref_v> res = off;
     if (off.size() < 2)
       return res;
 
-    std::sort(res.begin(), res.end(), [](const txout_v& lft, const txout_v& rght)
+    std::sort(res.begin(), res.end(), [](const txout_ref_v& lft, const txout_ref_v& rght)
     {
       if (lft.type() == typeid(uint64_t))
       {
@@ -2429,7 +2429,7 @@ namespace currency
         txin_to_key& tk = boost::get<txin_to_key>(in);
         tei.ins.back().amount = tk.amount;
         tei.ins.back().kimage_or_ms_id = epee::string_tools::pod_to_hex(tk.k_image);
-        std::vector<txout_v> absolute_offsets = relative_output_offsets_to_absolute(tk.key_offsets);
+        std::vector<txout_ref_v> absolute_offsets = relative_output_offsets_to_absolute(tk.key_offsets);
         for (auto& ao : absolute_offsets)
         {
           tei.ins.back().global_indexes.push_back(0);

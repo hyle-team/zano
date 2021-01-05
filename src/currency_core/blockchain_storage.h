@@ -237,10 +237,11 @@ namespace currency
     template<class visitor_t>
     bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis) 
     { 
-      uint64_t stub = 0; return scan_outputkeys_for_indexes(validated_tx, tx_in_to_key.amount, tx_in_to_key.key_offsets, vis, stub); 
+      uint64_t stub = 0; 
+      return scan_outputkeys_for_indexes(validated_tx, tx_in_to_key, vis, stub); 
     }
     template<class visitor_t>
-    bool scan_outputkeys_for_indexes(const transaction &validated_tx, uint64_t amount, const std::vector<txout_v>& key_offsets, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& /*scan_context*/) const;
+    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& /*scan_context*/) const;
                                      
 
     uint64_t get_current_blockchain_size() const;
@@ -288,12 +289,11 @@ namespace currency
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const transaction& source_tx, size_t out_n) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
-    bool get_output_keys_for_input_with_checks(const transaction& tx, uint64_t amount, const std::vector<txout_v>& key_offsets, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
-    bool get_output_keys_for_input_with_checks(const transaction& tx, uint64_t amount, const std::vector<txout_v>& key_offsets, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
-    bool check_tokey_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
-    bool check_tokey_input(const transaction& tx, 
+    bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
+    bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
+    bool check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
+    bool check_input_signature(const transaction& tx, 
       size_t in_index, 
-      const std::vector<txout_v>& in_key_offsets, 
       uint64_t in_amount, 
       const crypto::key_image& k_image,
       const std::vector<txin_etc_details_v>& in_etc_details,
@@ -628,7 +628,7 @@ namespace currency
     //    bool build_stake_modifier_for_alt(const alt_chain_type& alt_chain, stake_modifier_type& sm);
     template<class visitor_t>
     bool enum_blockchain(visitor_t& v, const alt_chain_type& alt_chain = alt_chain_type(), uint64_t split_height = 0) const;
-    bool update_spent_tx_flags_for_input(uint64_t amount, const txout_v& o, bool spent);
+    bool update_spent_tx_flags_for_input(uint64_t amount, const txout_ref_v& o, bool spent);
     bool update_spent_tx_flags_for_input(uint64_t amount, uint64_t global_index, bool spent);
     bool update_spent_tx_flags_for_input(const crypto::hash& multisig_id, uint64_t spent_height);
     bool update_spent_tx_flags_for_input(const crypto::hash& tx_id, size_t n, bool spent);
@@ -681,12 +681,31 @@ namespace currency
 
     return !keep_going;
   }
-
-  //------------------------------------------------------------------
   //------------------------------------------------------------------
   template<class visitor_t>
-  bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, uint64_t amount, const std::vector<txout_v>& key_offsets, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& /*scan_context*/) const
+  bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& /*scan_context*/) const
   {
+    std::vector<txout_ref_v> key_offsets_dummy;
+    uint64_t amount = 0;
+    const std::vector<txout_ref_v>& key_offsets = [&] -> const std::vector<txout_ref_v>&
+    {
+      if (verified_input.type() == typeid(txin_htlc))
+      {
+        //hltc
+        const txin_htlc& htlc = boost::get<txin_htlc>(verified_input);
+        key_offsets_dummy.push_back(htlc.key_offset);
+        amount = htlc.amount;
+        return key_offsets_dummy;
+      }
+      else if (verified_input.type() == typeid(txin_to_key))
+      {
+        //regular to key output
+        const txin_to_key& to_key = boost::get<txin_to_key>(verified_input);
+        amount = to_key.amount;
+        return to_key.key_offsets;
+      }
+    };
+
     CRITICAL_REGION_LOCAL(m_read_lock);
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_get_item_size);
 
@@ -695,11 +714,11 @@ namespace currency
     if (!outs_count_for_amount)
       return false;
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_relative_to_absolute);
-    std::vector<txout_v> absolute_offsets = relative_output_offsets_to_absolute(key_offsets);
+    std::vector<txout_ref_v> absolute_offsets = relative_output_offsets_to_absolute(key_offsets);
     TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_relative_to_absolute);
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop);
     size_t output_index = 0;
-    for(const txout_v& o : absolute_offsets)
+    for(const txout_ref_v& o : absolute_offsets)
     {
       crypto::hash tx_id = null_hash;
       size_t n = 0;

@@ -2560,7 +2560,7 @@ bool blockchain_storage::is_pos_allowed() const
   return get_top_block_height() >= m_core_runtime_config.pos_minimum_heigh;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::update_spent_tx_flags_for_input(uint64_t amount, const txout_v& o, bool spent)
+bool blockchain_storage::update_spent_tx_flags_for_input(uint64_t amount, const txout_ref_v& o, bool spent)
 {
   if (o.type() == typeid(ref_by_id))
     return update_spent_tx_flags_for_input(boost::get<ref_by_id>(o).tx_id, boost::get<ref_by_id>(o).n, spent);
@@ -3802,7 +3802,11 @@ namespace currency
 
       return true;
     }
-
+    bool operator()(const txin_htlc& in) const
+    {
+      //HTLC TODO
+      return true;
+    }
     bool operator()(const txin_gen& in) const { return true; }
     bool operator()(const txin_multisig& in) const
     {
@@ -3814,11 +3818,6 @@ namespace currency
         return false;
       }
       return true;
-    }
-    bool operator()(const txin_htlc& in) const 
-    {
-      //HTLC TODO
-      return true; 
     }
   };
 }
@@ -4110,7 +4109,7 @@ bool blockchain_storage::print_tx_outputs_lookup(const crypto::hash& tx_id)const
         if(amount_it == usage_stat.end())
           continue;
 
-        for (txout_v& off : txi_in_tokey.key_offsets)
+        for (txout_ref_v& off : txi_in_tokey.key_offsets)
         {
           if(off.type() != typeid(uint64_t))
             continue;
@@ -4276,7 +4275,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   for (auto& ptr : output_keys)
     output_keys_ptrs.push_back(&ptr);
 
-  return check_tokey_input(tx, in_index, txin, tx_prefix_hash, sig, output_keys_ptrs);
+  return check_input_signature(tx, in_index, txin, tx_prefix_hash, sig, output_keys_ptrs);
 }
 //----------------------------------------------------------------
 struct outputs_visitor
@@ -4335,31 +4334,37 @@ struct outputs_visitor
 // 1) source tx unlock time validity
 // 2) mixin restrictions
 // 3) general gindex/ref_by_id corectness
-bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, uint64_t amount, const std::vector<txout_v>& key_offsets, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const
+bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verifying_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   outputs_visitor vi(output_keys, *this, source_max_unlock_time_for_pos_coinbase, scan_context);
-  return scan_outputkeys_for_indexes(tx, amount, key_offsets, vi, max_related_block_height, scan_context);
+  return scan_outputkeys_for_indexes(tx, verifying_input, vi, max_related_block_height, scan_context);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, uint64_t amount, const std::vector<txout_v>& key_offsets, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
+bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verifying_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
 {
   scan_for_keys_context scan_context_dummy = AUTO_VAL_INIT(scan_context_dummy);
-  return get_output_keys_for_input_with_checks(tx, amount, key_offsets, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase, scan_context_dummy);
+  return get_output_keys_for_input_with_checks(tx, verifying_input, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase, scan_context_dummy);
 }
 
 //------------------------------------------------------------------
 // Note: this function can be used for checking to_key inputs against either main chain or alt chain, that's why it has output_keys_ptrs parameter
 // Doesn't check spent flags, the caller must check it.
-bool blockchain_storage::check_tokey_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const
+bool blockchain_storage::check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const
 {
-  return check_tokey_input(tx, in_index, txin.key_offsets, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, sig, output_keys_ptrs);
+  if (txin.key_offsets.size() != output_keys_ptrs.size())
+  {
+    LOG_PRINT_L0("Output keys for tx with amount = " << txin.amount << " and count indexes " << txin.key_offsets.size() << " returned wrong keys count " << output_keys_ptrs.size());
+    return false;
+  }
+
+  return check_input_signature(tx, in_index, /*txin.key_offsets,*/ txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, sig, output_keys_ptrs);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::check_tokey_input(const transaction& tx,
+bool blockchain_storage::check_input_signature(const transaction& tx,
   size_t in_index,
-  const std::vector<txout_v>& in_key_offsets,
+//  const std::vector<txout_ref_v>& in_key_offsets,
   uint64_t in_amount,
   const crypto::key_image& in_k_image,
   const std::vector<txin_etc_details_v>& in_etc_details,
@@ -4370,12 +4375,6 @@ bool blockchain_storage::check_tokey_input(const transaction& tx,
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   TIME_MEASURE_START_PD(tx_check_inputs_loop_ch_in_val_sig);
-
-  if (in_key_offsets.size() != output_keys_ptrs.size())
-  {
-    LOG_PRINT_L0("Output keys for tx with amount = " << in_amount << " and count indexes " << in_key_offsets.size() << " returned wrong keys count " << output_keys_ptrs.size());
-    return false;
-  }
   
   if(m_is_in_checkpoint_zone)
     return true;
@@ -4550,10 +4549,10 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   //TIME_MEASURE_START_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
 
   std::vector<crypto::public_key> output_keys;
-  std::vector<txout_v> key_offsets(1, txin.key_offset);
+  std::vector<txout_ref_v> key_offsets(1, txin.key_offset);
   scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
   uint64_t source_max_unlock_time_for_pos_coinbase_dummy = AUTO_VAL_INIT(source_max_unlock_time_for_pos_coinbase_dummy);
-  if (!get_output_keys_for_input_with_checks(tx, txin.amount, key_offsets, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
+  if (!get_output_keys_for_input_with_checks(tx, txin, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
   {
     LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << key_offsets.size() << ")");
     return false;
@@ -4588,7 +4587,9 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   for (auto& ptr : output_keys)
     output_keys_ptrs.push_back(&ptr);
 
-  return check_tokey_input(tx, in_index, key_offsets, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, sig, output_keys_ptrs);
+  CHECK_AND_ASSERT_THROW_MES(output_keys_ptrs.size() == 1, "Internal error: output_keys_ptrs.size() is not equal 1  for HTLC");
+
+  return check_input_signature(tx, in_index, key_offsets, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, sig, output_keys_ptrs);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_adjusted_time() const
@@ -6125,7 +6126,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx, s
   TIME_MEASURE_FINISH(ki_lookup_time);
   ki_lookuptime = ki_lookup_time;
 
-  std::vector<txout_v> abs_key_offsets = relative_output_offsets_to_absolute(input.key_offsets);
+  std::vector<txout_ref_v> abs_key_offsets = relative_output_offsets_to_absolute(input.key_offsets);
   CHECK_AND_ASSERT_MES(abs_key_offsets.size() > 0 && abs_key_offsets.size() == input.key_offsets.size(), false, "internal error: abs_key_offsets.size()==" << abs_key_offsets.size() << ", input.key_offsets.size()==" << input.key_offsets.size());
   // eventually we should found all public keys for all outputs this input refers to, for checking ring signature
   std::vector<crypto::public_key> pub_keys(abs_key_offsets.size(), null_pkey); 
@@ -6243,7 +6244,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx, s
   }
 
   // do input checks (attachment_info, ring signature and extra signature, etc.)
-  r = check_tokey_input(input_tx, input_index, input, input_tx_hash, input_sigs, pub_key_pointers);
+  r = check_input_signature(input_tx, input_index, input, input_tx_hash, input_sigs, pub_key_pointers);
   CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
 
   // TODO: consider checking input_tx for valid extra attachment info as it's checked in check_tx_inputs()
