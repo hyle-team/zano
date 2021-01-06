@@ -129,6 +129,22 @@ namespace currency
     }
     return found;
   }
+
+  const txin_to_key& get_to_key_input_from_txin_v(const txin_v& in_v)
+  {
+    if (in_v.type() == typeid(txin_to_key))
+    {
+      return boost::get<txin_to_key>(in_v);
+    }
+    else if (in_v.type() == typeid(txin_htlc))
+    {
+      const txin_htlc& in = boost::get<txin_htlc>(in_v);
+      return static_cast<const txin_to_key&>(in);
+    }
+    else {
+      ASSERT_MES_AND_THROW("[get_to_key_input_from_txin_v] Wrong type " << in_v.type().name());
+    }
+  }
   //---------------------------------------------------------------
   template<typename variant_container_t>
   bool check_allowed_types_in_variant_container(const variant_container_t& container, const std::unordered_set<std::type_index>& allowed_types, bool elements_must_be_unique = true)

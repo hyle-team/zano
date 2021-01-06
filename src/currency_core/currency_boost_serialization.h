@@ -100,7 +100,7 @@ namespace boost
       a & x.etc_details;
       a & x.hltc_origin;
       a & x.k_image;
-      a & x.key_offset;
+      a & x.key_offsets;
     }
 
     template <class Archive>

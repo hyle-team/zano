@@ -686,26 +686,10 @@ namespace currency
   template<class visitor_t>
   bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& scan_context) const
   {
-    std::vector<txout_ref_v> key_offsets_dummy;
-    uint64_t amount = 0;
-    const std::vector<txout_ref_v>& key_offsets = [&] -> const std::vector<txout_ref_v>&
-    {
-      if (verified_input.type() == typeid(txin_htlc))
-      {
-        //hltc
-        const txin_htlc& htlc = boost::get<txin_htlc>(verified_input);
-        key_offsets_dummy.push_back(htlc.key_offset);
-        amount = htlc.amount;
-        return key_offsets_dummy;
-      }
-      else if (verified_input.type() == typeid(txin_to_key))
-      {
-        //regular to key output
-        const txin_to_key& to_key = boost::get<txin_to_key>(verified_input);
-        amount = to_key.amount;
-        return to_key.key_offsets;
-      }
-    };
+    const txin_to_key& input_to_key = get_to_key_input_from_txin_v(verified_input);
+
+    uint64_t amount = input_to_key.amount;
+    const std::vector<txout_ref_v>& key_offsets = input_to_key.key_offsets;
 
     CRITICAL_REGION_LOCAL(m_read_lock);
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_get_item_size);
@@ -757,6 +741,8 @@ namespace currency
       {
         //HTLC input CAN'T refer to regular to_key output
         CHECK_AND_ASSERT_MES(verified_input.type() != typeid(txin_htlc), false, "[TXOUT_TO_KEY]: Unexpected output type of HTLC input");
+
+        CHECKED_GET_SPECIFIC_VARIANT(tx_ptr->tx.vout[n].target, const txout_to_key, outtk, false);
         //fix for burned money
         patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
 
