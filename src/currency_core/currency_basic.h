@@ -273,13 +273,15 @@ namespace currency
     crypto::hash htlc_hash;
     uint8_t flags;      //select type of the hash, may be some extra info in future
     uint64_t expiration; 
-    crypto::public_key pkey;
+    crypto::public_key pkey_before_expiration;
+    crypto::public_key pkey_after_expiration;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(htlc_hash)
       FIELD(flags)
       VARINT_FIELD(expiration)
-      FIELD(pkey)
+      FIELD(pkey_before_expiration)
+      FIELD(pkey_after_expiration)
     END_SERIALIZE()
   };
 
@@ -802,7 +804,7 @@ SET_VARIANT_TAGS(currency::tx_receiver, 32, "receiver2");
 SET_VARIANT_TAGS(currency::extra_alias_entry, 33, "alias_entry2");
 
 //htlc
-SET_VARIANT_TAGS(currency::txin_htlc, 34, "txin_to_htlc");
+SET_VARIANT_TAGS(currency::txin_htlc, 34, "txin_htlc");
 SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 
 

@@ -135,6 +135,7 @@ namespace currency
 
     struct scan_for_keys_context
     {
+      bool htlc_is_expired;
       std::list<txout_htlc> htlc_outs;
     };
 
@@ -683,7 +684,7 @@ namespace currency
   }
   //------------------------------------------------------------------
   template<class visitor_t>
-  bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& /*scan_context*/) const
+  bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& scan_context) const
   {
     std::vector<txout_ref_v> key_offsets_dummy;
     uint64_t amount = 0;
@@ -749,15 +750,40 @@ namespace currency
       //check mix_attr
       TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_find_tx);
 
-      CHECKED_GET_SPECIFIC_VARIANT(tx_ptr->tx.vout[n].target, const txout_to_key, outtk, false);
-      //explanation of this code will be provided later with public announce
-      patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
-      
-
-
+      //CHECKED_GET_SPECIFIC_VARIANT(tx_ptr->tx.vout[n].target, const txout_to_key, outtk, false);
       CHECK_AND_ASSERT_MES(key_offsets.size() >= 1, false, "internal error: tx input has empty key_offsets"); // should never happen as input correctness must be handled by the caller
-      bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, key_offsets.size() - 1);
-      CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+
+      if (tx_ptr->tx.vout[n].target.type() == typeid(txout_to_key))
+      {
+        //HTLC input CAN'T refer to regular to_key output
+        CHECK_AND_ASSERT_MES(verified_input.type() != typeid(txin_htlc), false, "[TXOUT_TO_KEY]: Unexpected output type of HTLC input");
+        //fix for burned money
+        patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
+
+        bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, key_offsets.size() - 1);
+        CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+      }
+      else if (tx_ptr->tx.vout[n].target.type() == typeid(txout_htlc))
+      {
+        const txout_htlc& htlc_out = boost::get<txout_htlc>(tx_ptr->tx.vout[n].target);
+        if (htlc_out.expiration > get_current_blockchain_size() - tx_ptr->m_keeper_block_height)
+        {
+          //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
+          CHECK_AND_ASSERT_MES(verified_input.type() == typeid(txin_htlc), false, "[TXOUT_HTLC]: Unexpected output type of non-HTLC input");
+          scan_context.htlc_is_expired = false;
+        }
+        else 
+        {
+          //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
+          CHECK_AND_ASSERT_MES(verified_input.type() == typeid(txin_to_key), false, "[TXOUT_HTLC]: Unexpected output type of HTLC input");
+          scan_context.htlc_is_expired = true; 
+        }
+      }else
+      {
+        LOG_ERROR("[scan_outputkeys_for_indexes]: Wrong output type in : " << tx_ptr->tx.vout[n].target.type().name());
+        return false;
+      }
+
       
       TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       if (!vis.handle_output(tx_ptr->tx, validated_tx, tx_ptr->tx.vout[n], n))

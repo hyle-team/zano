@@ -4312,19 +4312,30 @@ struct outputs_visitor
         return false;
       }
     }
-
-    if (out.target.type() == typeid(txout_htlc))
+    if (out.target.type() == typeid(txout_to_key))
+    {
+      crypto::public_key pk = boost::get<txout_to_key>(out.target).key;
+      m_results_collector.push_back(pk);
+    }
+    else if (out.target.type() == typeid(txout_htlc))
     {
       m_scan_context.htlc_outs.push_back(boost::get<txout_htlc>(out.target));
-
-    }else if (out.target.type() != typeid(txout_to_key))
+      crypto::public_key pk = null_pkey;
+      if (m_scan_context.htlc_is_expired)
+      {
+        pk = boost::get<txout_htlc>(out.target).pkey_after_expiration;
+      }
+      else
+      {
+        pk = boost::get<txout_htlc>(out.target).pkey_before_expiration;
+      }
+      m_results_collector.push_back(pk);
+    }else 
     {
       LOG_PRINT_L0("Output have wrong type id, which=" << out.target.which());
       return false;
     }   
 
-    crypto::public_key pk = boost::get<txout_to_key>(out.target).key;
-    m_results_collector.push_back(pk);
     return true;
   }
 };
@@ -4364,7 +4375,6 @@ bool blockchain_storage::check_input_signature(const transaction& tx, size_t in_
 //------------------------------------------------------------------
 bool blockchain_storage::check_input_signature(const transaction& tx,
   size_t in_index,
-//  const std::vector<txout_ref_v>& in_key_offsets,
   uint64_t in_amount,
   const crypto::key_image& in_k_image,
   const std::vector<txin_etc_details_v>& in_etc_details,
