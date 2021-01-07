@@ -6105,7 +6105,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx, s
           }
         }
         if (found_the_key)
-          break;
+          continue;
         //otherwise lookup in main chain index
       }
       auto p = m_db_outputs.get_subitem(input.amount, offset_gindex);
