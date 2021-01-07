@@ -6047,9 +6047,8 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx, s
     if (abg_it != alt_chain.back()->second.gindex_lookup_table.end())
     {
       amount_touched_altchain = true;
-      //Notice: since transactions is not allowed to refer to each other in one block, then we can consider that index in 
-      //tx input would be always less then top for previous block, so just take it 
-      global_outs_for_amount = abg_it->second;
+      // local gindex lookup table contains last used gindex, so we can't get total number of outs
+      // just skip setting global_outs_for_amount
     }
     else
     {
@@ -6074,7 +6073,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx, s
     if (off.type() == typeid(uint64_t))
     {
       uint64_t offset_gindex = boost::get<uint64_t>(off);
-      CHECK_AND_ASSERT_MES(offset_gindex < global_outs_for_amount, false, 
+      CHECK_AND_ASSERT_MES(amount_touched_altchain || (offset_gindex < global_outs_for_amount), false,
         "invalid global output index " << offset_gindex << " for amount=" << input.amount << 
         ", max is " << global_outs_for_amount << 
         ", referred to by offset #" << pk_n << 
