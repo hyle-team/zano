@@ -916,6 +916,26 @@ inline uint64_t get_sources_total_amount(const std::vector<currency::tx_source_e
   return result;
 }
 
+inline void count_ref_by_id_and_gindex_refs_for_tx_inputs(const currency::transaction& tx, size_t& refs_by_id, size_t& refs_by_gindex)
+{
+  refs_by_id = 0;
+  refs_by_gindex = 0;
+  for (auto& in : tx.vin)
+  {
+    if (in.type() != typeid(currency::txin_to_key))
+      continue;
+
+    const currency::txin_to_key& in2key = boost::get<currency::txin_to_key>(in);
+    for (auto& ko : in2key.key_offsets)
+    {
+      if (ko.type() == typeid(currency::ref_by_id))
+        ++refs_by_id;
+      else if (ko.type() == typeid(uint64_t))
+        ++refs_by_gindex;
+    }
+  }
+}
+
 template<typename U, typename V>
 void append_vector_by_another_vector(U& dst, const V& src)
 {
