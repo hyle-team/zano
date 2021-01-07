@@ -622,3 +622,59 @@ bool alt_blocks_with_the_same_txs::check_tx_not_related_to_altblock(currency::co
   return true;
 }
 
+//-----------------------------------------------------------------------------------------------------
+
+bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: 
+  bool r = false;
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  GENERATE_ACCOUNT(bob_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  //  0      1       11      12      13      14   
+  // (0 )-  (1 )-...(1r)-   (2 )-   (3 )- 
+  //                  \     
+  //                   \ 
+  //                    \-  (2a)-   (3a)-   (4a)-
+  //                        tx_0 <- tx_1             // tx_1 spends output from tx_0
+
+  // send batch of 10 x 5 test coins to Alice for easier tx_0 construction
+  transaction tx_0;
+  r = construct_tx_with_many_outputs(events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
+    TESTS_DEFAULT_FEE, tx_0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
+  events.push_back(tx_0);
+
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1r, miner_acc, tx_0);
+
+  // make sure Alice received exactly 50 test coins
+  CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2a, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(50));
+
+  // Alice spends her 5 test coint received by tx_0
+  MAKE_TX_FEE_MIX(events, tx_1, alice_acc, bob_acc, MK_TEST_COINS(4), TESTS_DEFAULT_FEE, 3 /* nmix */, blk_2a);
+  events.pop_back(); // pop back tx_1 as it won't go into the tx pool normally because of alt chain
+
+  // simulate handling a block with that tx: handle tx like going with the block...
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(tx_1);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_3a, blk_2a, miner_acc, tx_1);
+  MAKE_NEXT_BLOCK(events, blk_4a, blk_3a, miner_acc);
+
+  // make sure Alice has correct balance
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_4a, 2);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(45));
+
+
+  return true;
+}
