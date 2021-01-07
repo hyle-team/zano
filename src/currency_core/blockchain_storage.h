@@ -238,8 +238,9 @@ namespace currency
     template<class visitor_t>
     bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis) 
     { 
+      scan_for_keys_context cntx_stub = AUTO_VAL_INIT(cntx_stub);
       uint64_t stub = 0; 
-      return scan_outputkeys_for_indexes(validated_tx, tx_in_to_key, vis, stub); 
+      return scan_outputkeys_for_indexes(validated_tx, tx_in_to_key, vis, stub, cntx_stub);
     }
     template<class visitor_t>
     bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& /*scan_context*/) const;

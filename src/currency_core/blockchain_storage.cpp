@@ -6425,6 +6425,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
   uint64_t height = abei.height;
   bool r = false;
   std::set<crypto::hash> alt_chain_block_ids;
+
   
   alt_chain_block_ids.insert(id);
   // prepare data structure for output global indexes tracking within current alt chain
