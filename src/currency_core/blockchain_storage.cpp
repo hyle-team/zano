@@ -6,6 +6,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <set>
+#include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
 #include <cstdio>
 #include <boost/archive/binary_oarchive.hpp>
@@ -1577,7 +1579,7 @@ std::string blockchain_storage::print_alt_chain(alt_chain_type alt_chain)
   return ss.str();
 }
 //------------------------------------------------------------------
-bool blockchain_storage::append_altblock_keyimages_to_big_heap(const crypto::hash& block_id, const std::set<crypto::key_image>& alt_block_keyimages)
+bool blockchain_storage::append_altblock_keyimages_to_big_heap(const crypto::hash& block_id, const std::unordered_set<crypto::key_image>& alt_block_keyimages)
 {
   for (auto& ki : alt_block_keyimages)
     m_altblocks_keyimages[ki].push_back(block_id);
@@ -1781,7 +1783,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
       bvc.m_verification_failed = true;
       return false;
     }
-    std::set<crypto::key_image> alt_block_keyimages;
+    std::unordered_set<crypto::key_image> alt_block_keyimages;
     uint64_t ki_lookup_total = 0;
     if (!validate_alt_block_txs(b, id, alt_block_keyimages, abei, alt_chain, connection_height, ki_lookup_total))
     {
@@ -6064,8 +6066,17 @@ void blockchain_storage::calculate_local_gindex_lookup_table_for_height(uint64_t
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_alt_block_input(const transaction& input_tx, std::set<crypto::key_image>& collected_keyimages, const crypto::hash& bl_id, const crypto::hash& input_tx_hash, size_t input_index,
-  const std::vector<crypto::signature>& input_sigs, uint64_t split_height, const alt_chain_type& alt_chain, const std::set<crypto::hash>& alt_chain_block_ids, uint64_t& ki_lookuptime,
+bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
+  const std::unordered_set<crypto::key_image>& collected_keyimages, 
+  const txs_by_id_and_height_altchain& alt_chain_tx_ids,
+  const crypto::hash& bl_id, 
+  const crypto::hash& input_tx_hash, 
+  size_t input_index,
+  const std::vector<crypto::signature>& input_sigs, 
+  uint64_t split_height, 
+  const alt_chain_type& alt_chain, 
+  const std::unordered_set<crypto::hash>& alt_chain_block_ids, 
+  uint64_t& ki_lookuptime,
   uint64_t* p_max_related_block_height /* = nullptr */) const
 {
   // Main and alt chain outline:
@@ -6202,6 +6213,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx, s
           }
           if (offset_gindex >= it_aag->second)
           {
+            //source tx found in altchain
             //GOT IT!!
             //TODO: At the moment we ignore check of mix_attr against mixing to simplify alt chain check, but in future consider it for stronger validation
             uint64_t local_offset = offset_gindex - it_aag->second;
@@ -6227,6 +6239,57 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx, s
       auto &rbi = boost::get<ref_by_id>(off);
       tx_id = rbi.tx_id;
       out_n = rbi.n;
+      //look up in alt-chain transactions fist
+      auto it = alt_chain_tx_ids.find(tx_id);
+      if (it != alt_chain_tx_ids.end())
+      {
+        //source tx found in altchain
+        CHECK_AND_ASSERT_MES(it->second.first.vout.size() > out_n, false, "Internal error: out_n(" << out_n << ") >= it->second.vout.size()(" << it->second.first.vout.size() << ")");
+        txout_target_v out_target_v = it->second.first.vout[out_n].target;
+        if (out_target_v.type() == typeid(txout_htlc))
+        {
+          //source is hltc out
+          const txout_htlc& htlc = boost::get<txout_to_key>(out_target_v);
+          uint64_t height_of_source_block = it->second.second;
+          uint64_t height_of_current_alt_block = alt_chain.size() ? alt_chain.back()->second.height + 1 : split_height + 1;
+          CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
+          if (htlc.expiration > height_of_current_alt_block - height_of_source_block)
+          {
+            //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
+            CHECK_AND_ASSERT_MES(input_v.type() == typeid(txin_htlc), false, "[TXOUT_HTLC]: Unexpected output type of non-HTLC input");
+            pk = htlc.pkey_before_expiration;
+          }
+          else
+          {
+            //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
+            CHECK_AND_ASSERT_MES(input_v.type() == typeid(txin_to_key), false, "[TXOUT_HTLC]: Unexpected output type of HTLC input");
+            pk = htlc.pkey_after_expiration;
+          }
+          pub_key_pointers.push_back(&pk);
+          continue;
+        }
+        else if (out_target_v.type() == typeid(txout_to_key))
+        {
+          CHECK_AND_ASSERT_MES(input_v.type() != typeid(txin_htlc), false, "Forbidden output type referenced by in tx ( input txin_htlc refered to txout_to_key )");
+          //source is to_key out
+          pk = boost::get<txout_to_key>(out_target_v).key;
+          pub_key_pointers.push_back(&pk);
+          continue;
+        }
+        else
+        {
+          ASSERT_MES_AND_THROW("Unexpected out type for tx_in in altblock: " << out_target_v.type().name());
+        }
+
+        
+        //let's validate against htlc&to_key
+        pk = alt_keys[input_to_key.amount][local_offset];
+        pub_key_pointers.push_back(&pk);
+        found_the_key = true;
+
+
+      }
+
     }
 
     auto p = m_db_transactions.get(tx_id);
@@ -6420,11 +6483,12 @@ bool blockchain_storage::update_alt_out_indexes_for_tx_in_block(const transactio
   return true;
 }
 
-bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::hash& id, std::set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const
+bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::hash& id, std::unordered_set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const
 {
   uint64_t height = abei.height;
   bool r = false;
-  std::set<crypto::hash> alt_chain_block_ids;
+  std::unordered_set<crypto::hash> alt_chain_block_ids;
+  txs_by_id_and_height_altchain alt_chain_tx_ids;
 
   
   alt_chain_block_ids.insert(id);
@@ -6447,8 +6511,13 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     for (auto& ch : alt_chain)
     {
       alt_chain_block_ids.insert(get_block_hash(ch->second.bl));
+      for (auto & on_board_tx : ch->second.onboard_transactions)
+      {
+        alt_chain_tx_ids.insert(txs_by_id_and_height_altchain::value_type(on_board_tx.first, txs_by_id_and_height_altchain::value_type::second_type(on_board_tx.second, ch->second.height)));
+      }
+      //TODO: consider performance optimization (get_transaction_hash might slow down deep reorganizations )
+      alt_chain_tx_ids.insert(txs_by_id_and_height_altchain::value_type(get_transaction_hash(ch->second.bl.miner_tx), txs_by_id_and_height_altchain::value_type::second_type(ch->second.bl.miner_tx, ch->second.height)));
     }
-
   }
   else
   {
@@ -6462,7 +6531,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 && b.miner_tx.vin.size() == 2, false, "invalid PoS block's miner_tx, signatures size = " << b.miner_tx.signatures.size() << ", miner_tx.vin.size() = " << b.miner_tx.vin.size());
     uint64_t max_related_block_height = 0;
     uint64_t ki_lookup = 0;
-    r = validate_alt_block_input(b.miner_tx, collected_keyimages, id, get_block_hash(b), 1, b.miner_tx.signatures[0], split_height, alt_chain, alt_chain_block_ids, ki_lookup, &max_related_block_height);
+    r = validate_alt_block_input(b.miner_tx, collected_keyimages, alt_chain_tx_ids, id, get_block_hash(b), 1, b.miner_tx.signatures[0], split_height, alt_chain, alt_chain_block_ids, ki_lookup, &max_related_block_height);
     CHECK_AND_ASSERT_MES(r, false, "miner tx " << get_transaction_hash(b.miner_tx) << ": validation failed");
     ki_lookup_time_total += ki_lookup;
     // check stake age
@@ -6489,7 +6558,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
       if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
       {
         uint64_t ki_lookup = 0;
-        r = validate_alt_block_input(tx, collected_keyimages, id, tx_id, n, tx.signatures[n], split_height, alt_chain, alt_chain_block_ids, ki_lookup);
+        r = validate_alt_block_input(tx, collected_keyimages, alt_chain_tx_ids, id, tx_id, n, tx.signatures[n], split_height, alt_chain, alt_chain_block_ids, ki_lookup);
         CHECK_AND_ASSERT_MES(r, false, "tx " << tx_id << ", input #" << n << ": validation failed");
         ki_lookup_time_total += ki_lookup;
       }

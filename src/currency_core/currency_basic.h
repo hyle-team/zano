@@ -559,7 +559,7 @@ namespace currency
   {
   public:
     // tx version information
-    size_t   version{};
+    uint64_t   version{};
     //extra
     std::vector<extra_v> extra;  
     std::vector<txin_v> vin;

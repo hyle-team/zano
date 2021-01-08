@@ -167,8 +167,7 @@ namespace currency
       transactions_map onboard_transactions;
     };
     typedef std::unordered_map<crypto::hash, alt_block_extended_info> alt_chain_container;
-    //typedef std::list<alt_chain_container::iterator> alt_chain_type;
-    typedef std::vector<alt_chain_container::iterator> alt_chain_type;
+    typedef std::vector<alt_chain_container::iterator> alt_chain_type; // alternative subchain, front -> mainchain(split point), back -> alternative head
 
     typedef std::unordered_map<crypto::hash, block_extended_info> blocks_ext_by_hash;
 
@@ -484,6 +483,8 @@ namespace currency
     typedef tools::db::basic_key_value_accessor<uint32_t, block_gindex_increments, true> per_block_gindex_increments_container; // height => [(amount, gindex_increment), ...]
 
     //-----------------------------------------
+
+    typedef std::unordered_map<crypto::hash, std::pair<const transaction&, uint64_t> > txs_by_id_and_height_altchain;
     
     tx_memory_pool& m_tx_pool;
     mutable bc_attachment_services_manager m_services_mgr;
@@ -584,10 +585,10 @@ namespace currency
     wide_difficulty_type get_x_difficulty_after_height(uint64_t height, bool is_pos);
     bool purge_keyimage_from_big_heap(const crypto::key_image& ki, const crypto::hash& id);
     bool purge_altblock_keyimages_from_big_heap(const block& b, const crypto::hash& id);
-    bool append_altblock_keyimages_to_big_heap(const crypto::hash& block_id, const std::set<crypto::key_image>& alt_block_keyimages);
-    bool validate_alt_block_input(const transaction& input_tx, std::set<crypto::key_image>& collected_keyimages, const crypto::hash& bl_id, const crypto::hash& input_tx_hash, size_t input_index, const std::vector<crypto::signature>& input_sigs, uint64_t split_height, const alt_chain_type& alt_chain, const std::set<crypto::hash>& alt_chain_block_ids, uint64_t& ki_lookuptime, uint64_t* p_max_related_block_height = nullptr) const;
+    bool append_altblock_keyimages_to_big_heap(const crypto::hash& block_id, const std::unordered_set<crypto::key_image>& alt_block_keyimages);
+    bool validate_alt_block_input(const transaction& input_tx, std::unordered_set<crypto::key_image>& collected_keyimages, const txs_by_id_and_height_altchain& alt_chain_tx_ids, const crypto::hash& bl_id, const crypto::hash& input_tx_hash, size_t input_index, const std::vector<crypto::signature>& input_sigs, uint64_t split_height, const alt_chain_type& alt_chain, const std::unordered_set<crypto::hash>& alt_chain_block_ids, uint64_t& ki_lookuptime, uint64_t* p_max_related_block_height = nullptr) const;
     bool validate_alt_block_ms_input(const transaction& input_tx, const crypto::hash& input_tx_hash, size_t input_index, const std::vector<crypto::signature>& input_sigs, uint64_t split_height, const alt_chain_type& alt_chain) const;
-    bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
+    bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::unordered_set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
     void get_last_n_x_blocks(uint64_t n, bool pos_blocks, std::list<std::shared_ptr<const block_extended_info>>& blocks) const;
