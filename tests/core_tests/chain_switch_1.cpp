@@ -626,7 +626,7 @@ bool alt_blocks_with_the_same_txs::check_tx_not_related_to_altblock(currency::co
 
 bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<test_event_entry>& events) const
 {
-  // Test idea: 
+  // Test idea: make sure a tx can spend an output with mixins from another tx when both txs are in an altchain.
   bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
@@ -636,7 +636,7 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   //  0      1       11      12      13      14   
-  // (0 )-  (1 )-...(1r)-   (2 )-   (3 )- 
+  // (0 )-  (1 )-...(1r)-   (2 )-   (3 )-            <-- main chain
   //                  \     
   //                   \ 
   //                    \-  (2a)-   (3a)-   (4a)-
@@ -675,6 +675,8 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_4a, 2);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(45));
 
+  // make sure chain successfully switched
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_4a), get_block_hash(blk_4a)));
 
   return true;
 }
@@ -683,7 +685,7 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
 
 bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<test_event_entry>& events) const
 {
-  // Test idea: 
+  // Test idea: make sure tx can spend (using ref_by_id) an output from another tx when both txs are in an altchain.
   bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
@@ -693,22 +695,17 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   //  0      1       11      12      13      14   
-  // (0 )-  (1 )-...(1r)-   (2 )-   (3 )- 
+  // (0 )-  (1 )-...(1r)-   (2 )-   (3 )-            <- main chain
   //                  \     
   //                   \ 
   //                    \-  (2a)-   (3a)-   (4a)-
-  //                        tx_0 <- tx_1             // tx_1 spends an output from tx_0
+  //                        tx_0 <- tx_1             // tx_1 spends an output from tx_0 using ref_by_id and mixins
 
   // send batch of 10 x 5 test coins to Alice for easier tx_0 construction
   transaction tx_0;
-  /*r = construct_tx_with_many_outputs(events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
-    TESTS_DEFAULT_FEE, tx_0);*/
-  size_t nmix = 0;
-  std::vector<tx_destination_entry> destinations;
-  for (size_t i = 0; i < 10; ++i)
-    destinations.push_back(tx_destination_entry(MK_TEST_COINS(5), alice_acc.get_public_address()));
-  r = construct_tx_to_key(events, tx_0, blk_1r, miner_acc, destinations, TESTS_DEFAULT_FEE, nmix, 0, empty_extra, empty_attachment, true, true, true);
-  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  r = construct_tx_with_many_outputs(events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
+    TESTS_DEFAULT_FEE, tx_0, true);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
 
   // make sure tx_0 really use ref_by_id
   size_t refs_count = 0, gindex_count = 0;
@@ -729,14 +726,16 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
 
   // Alice spends her 5 test coins received by tx_0
   transaction tx_1;
-  destinations.clear();
+  std::vector<tx_destination_entry> destinations;
   destinations.push_back(tx_destination_entry(MK_TEST_COINS(4), bob_acc.get_public_address()));
-  nmix = 3;
+  size_t nmix = 3;
   r = construct_tx_to_key(events, tx_1, blk_2a, alice_acc, destinations, TESTS_DEFAULT_FEE, nmix, 0, empty_extra, empty_attachment, true, true, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
-  //MAKE_TX_FEE_MIX(events, tx_1, alice_acc, bob_acc, MK_TEST_COINS(4), TESTS_DEFAULT_FEE, 3, blk_2a);
-  //events.pop_back(); // pop back tx_1 as it won't go into the tx pool normally because of alt chain
+  // make sure tx_1 really use ref_by_id
+  refs_count = 0, gindex_count = 0;
+  count_ref_by_id_and_gindex_refs_for_tx_inputs(tx_1, refs_count, gindex_count);
+  CHECK_AND_ASSERT_MES(refs_count == nmix + 1 && gindex_count == 0, false, "incorrect input references: " << refs_count << ", " << gindex_count);
 
   // simulate handling a block with that tx: handle tx like going with the block...
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
@@ -749,8 +748,9 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
   // make sure Alice has correct balance
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_4a, 2);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(45));
-  
 
+  // make sure chain successfully switched
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_4a), get_block_hash(blk_4a)));
 
   return true;
 }
