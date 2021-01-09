@@ -30,6 +30,7 @@
 #include <stddef.h>
 #include "warnings.h"
 #include "crypto-ops.h"
+#include "hash-ops.h" // for cn_fast_hash
 
 DISABLE_VS_WARNINGS(4146 4244)
 
@@ -3723,4 +3724,19 @@ void sc_invert(unsigned char* out, const unsigned char* z)
   sc_mul(out, out, z);
   sc_mul(out, out, out);
   sc_mul(out, out, z);
+}
+
+// res = Hp(ge_bytes)
+// where Hp = 8 * ge_fromfe_frombytes_vartime(cn_fast_hash(ge_bytes))
+// In: ge_bytes -- points to 32 bytes data
+void ge_bytes_hash_to_ec(ge_p3 *res, const unsigned char *ge_bytes)
+{
+  unsigned char h[HASH_SIZE];
+  ge_p2 point;
+  ge_p1p1 point2;
+
+  cn_fast_hash(ge_bytes, 32, h);
+  ge_fromfe_frombytes_vartime(&point, &h[0]);
+  ge_mul8(&point2, &point);
+  ge_p1p1_to_p3(res, &point2);
 }

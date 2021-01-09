@@ -105,6 +105,8 @@ void ge_scalarmult_p3(ge_p3 *, const unsigned char *, const ge_p3 *);
 void ge_double_scalarmult_precomp_vartime(ge_p2 *, const unsigned char *, const ge_p3 *, const unsigned char *, const ge_dsmp);
 void ge_mul8(ge_p1p1 *, const ge_p2 *);
 void ge_fromfe_frombytes_vartime(ge_p2 *, const unsigned char *);
+void ge_bytes_hash_to_ec(ge_p3 *, const unsigned char *);
+
 void ge_p3_0(ge_p3 *h);
 void ge_sub(ge_p1p1 *, const ge_p3 *, const ge_cached *);
 
