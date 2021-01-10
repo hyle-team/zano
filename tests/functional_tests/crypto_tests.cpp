@@ -130,6 +130,7 @@ void sc_invert2(unsigned char* recip, const unsigned char* s)
   sc_sqmul(recip, 8, _11101011);
 }
 
+extern void *sha3(const void *in, size_t inlen, void *md, int mdlen);
 
 
 //
