@@ -189,12 +189,29 @@ struct scalar_t
   scalar_t()
   {}
 
+  // won't check scalar range validity (< L)
   scalar_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
   {
     m_u64[0] = a0;
     m_u64[1] = a1;
     m_u64[2] = a2;
     m_u64[3] = a3;
+  }
+
+  // won't check secret key validity (sk < L)
+  scalar_t(const crypto::secret_key& sk)
+  {
+    from_secret_key(sk);
+  }
+
+  // copy data and reduce
+  scalar_t(const crypto::hash& hash)
+  {
+    m_u64[0] = ((uint64_t*)&hash)[0];
+    m_u64[1] = ((uint64_t*)&hash)[1];
+    m_u64[2] = ((uint64_t*)&hash)[2];
+    m_u64[3] = ((uint64_t*)&hash)[3];
+    sc_reduce32(&m_s[0]);
   }
 
   scalar_t(uint64_t v)
@@ -216,6 +233,16 @@ struct scalar_t
     return &m_s[0];
   }
 
+  crypto::secret_key &as_secret_key()
+  {
+    return *(crypto::secret_key*)&m_s[0];
+  }
+
+  const crypto::secret_key& as_secret_key() const
+  {
+    return *(const crypto::secret_key*)&m_s[0];
+  }
+
   operator crypto::secret_key() const
   {
     crypto::secret_key result;
@@ -223,11 +250,14 @@ struct scalar_t
     return result;
   }
 
-  bool from_secret_key(const crypto::secret_key& sk)
+  void from_secret_key(const crypto::secret_key& sk)
   {
-    // TODO
-    //fe_frombytes(m_fe, reinterpret_cast<const unsigned char*>(&sk));
-    return false;
+    uint64_t *p_sk64 = (uint64_t*)&sk;
+    m_u64[0] = p_sk64[0];
+    m_u64[1] = p_sk64[1];
+    m_u64[2] = p_sk64[2];
+    m_u64[3] = p_sk64[3];
+    // assuming secret key is correct (< L), so we don't need to call reduce here
   }
 
   void zero()
@@ -459,6 +489,13 @@ struct point_t
 
     return true;
   };
+
+  friend std::ostream& operator<<(std::ostream& ss, const point_t &v)
+  {
+    crypto::public_key pk;
+    ge_p3_tobytes((unsigned char*)&pk, &v.m_p3);
+    return ss << epee::string_tools::pod_to_hex(pk);
+  }
 }; // struct point_t
 
 struct point_g_t : public point_t
