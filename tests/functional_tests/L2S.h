@@ -52,12 +52,12 @@ struct ml2s_signature
   std::vector<ml2s_signature_element> elements;
 };
 
-/* WIP
 // reference: mL2SLnkSig_Verif()
 bool ml2s_lnk_sig_verif(const scalar_t& m, const std::vector<point_t>& B_array, const ml2s_signature& signature, uint8_t* p_err = nullptr)
 {
 #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-  if (!(cond)) { LOG_PRINT_RED("ml2s_lnk_sig_verif: \"" << #cond << "\" is false at " << LOCATION_SS, LOG_LEVEL_3); if (p_err) *p_err = err_code; return false; }
+  if (!(cond)) { LOG_PRINT_RED("ml2s_lnk_sig_verif: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
+  if (p_err) *p_err = err_code; return false; }
 
   auto hash_point_lambda = [&signature](const point_t& point) { return point + signature.z * hash_helper_t::hp(point); };
 
@@ -108,5 +108,3 @@ bool ml2s_lnk_sig_verif(const scalar_t& m, const std::vector<point_t>& B_array, 
   return false;
 #undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
 }
-
-*/

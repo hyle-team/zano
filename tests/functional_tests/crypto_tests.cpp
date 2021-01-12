@@ -538,6 +538,48 @@ static const scalar_t c_scalar_Pm1    = { 0xffffffffffffffec, 0xffffffffffffffff
 static const scalar_t c_scalar_256m1  = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff };
 
 
+// H_s hash function
+struct hash_helper_t
+{
+  static scalar_t hs(const scalar_t& s)
+  {
+    scalar_t result = 0;
+
+    crypto::cn_fast_hash(s.data(), sizeof s, (char*)result.data());
+
+    return result;
+  }
+
+  static scalar_t hs(const scalar_t& s, const std::vector<scalar_t>& ss, const std::vector<point_t>& ps)
+  {
+    scalar_t result = 0;
+    return result;
+  }
+
+  static scalar_t hs(const scalar_t& s, const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
+  {
+    scalar_t result = 0;
+    return result;
+  }
+
+  static scalar_t hs(const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
+  {
+    scalar_t result = 0;
+    return result;
+  }
+
+  static point_t hp(const point_t& p)
+  {
+    point_t result;
+    crypto::public_key pk = p;
+
+    ge_bytes_hash_to_ec(&result.m_p3, (const unsigned char*)&pk);
+
+    //result = 2 * result;
+
+    return result;
+  }
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 #include "L2S.h"
@@ -926,6 +968,40 @@ TEST(ml2s, rsum)
   return true;
 }
 
+TEST(ml2s, hs)
+{
+  scalar_t x = 2, p = 250;
+  //sc_exp(r.data(), x.data(), p.data());
+
+  x = 0;
+
+  crypto::hash h;
+  scalar_t r;
+
+  sha3(0, 0, &h, sizeof h);
+  LOG_PRINT("SHA3 0 -> " << h, LOG_LEVEL_0);
+  LOG_PRINT("SHA3 0 -> " << (scalar_t&)h, LOG_LEVEL_0);
+
+  h = crypto::cn_fast_hash(0, 0);
+  LOG_PRINT("CN 0 -> " << h, LOG_LEVEL_0);
+  LOG_PRINT("CN 0 -> " << (scalar_t&)h, LOG_LEVEL_0);
+
+  std::string abc("abc");
+  sha3(abc.c_str(), abc.size(), &h, sizeof h);
+  LOG_PRINT(abc << " -> " << h, LOG_LEVEL_0);
+  LOG_PRINT(abc << " -> " << (scalar_t&)h, LOG_LEVEL_0);
+
+  h = crypto::cn_fast_hash(abc.c_str(), abc.size());
+  LOG_PRINT(abc << " -> " << h, LOG_LEVEL_0);
+  LOG_PRINT(abc << " -> " << (scalar_t&)h, LOG_LEVEL_0);
+
+
+  return true;
+}
+
+//
+// test's runner
+//
 
 int crypto_tests()
 {
