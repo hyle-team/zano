@@ -575,11 +575,49 @@ struct hash_helper_t
 
     ge_bytes_hash_to_ec(&result.m_p3, (const unsigned char*)&pk);
 
-    //result = 2 * result;
-
     return result;
   }
 };
+
+//
+// test helpers
+//
+
+inline std::ostream& operator<<(std::ostream& ss, const fe &f)
+{
+  constexpr size_t fe_index_max = (sizeof f / sizeof f[0]) - 1;
+  ss << "{";
+  for (size_t i = 0; i <= fe_index_max; ++i)
+    ss << f[i] << ", ";
+  return ss << f[fe_index_max] << "}";
+}
+
+point_t point_from_str(const std::string& str)
+{
+  crypto::public_key pk;
+  if (!epee::string_tools::parse_tpod_from_hex_string(str, pk))
+    throw std::runtime_error("couldn't parse pub key");
+
+  point_t result;
+  if (!result.from_public_key(pk))
+    throw std::runtime_error("invalid pub key");
+
+  return result;
+}
+
+scalar_t scalar_from_str(const std::string& str)
+{
+  crypto::secret_key sk;
+  if (!epee::string_tools::parse_tpod_from_hex_string(str, sk))
+    throw std::runtime_error("couldn't parse sec key");
+
+  scalar_t result;
+  result.from_secret_key(sk);
+  if (result > c_scalar_Lm1)
+    throw std::runtime_error("sec key scalar >= L");
+
+  return result;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 #include "L2S.h"
@@ -1018,7 +1056,19 @@ int crypto_tests()
   {
     auto& test = g_tests[i];
     TIME_MEASURE_START(runtime);
-    bool r = test.second();
+    bool r = false;
+    try
+    {
+      r = test.second();
+    }
+    catch (std::exception& e)
+    {
+      LOG_PRINT_RED("EXCEPTION: " << e.what(), LOG_LEVEL_0);
+    }
+    catch (...)
+    {
+      LOG_PRINT_RED("EXCEPTION: unknown", LOG_LEVEL_0);
+    }
     TIME_MEASURE_FINISH(runtime);
     uint64_t runtime_ms = runtime / 1000;
     uint64_t runtime_mcs = runtime % 1000;
