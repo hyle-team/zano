@@ -30,6 +30,7 @@
 #include <stddef.h>
 #include "warnings.h"
 #include "crypto-ops.h"
+#include "hash-ops.h" // for cn_fast_hash
 
 DISABLE_VS_WARNINGS(4146 4244)
 
@@ -3723,4 +3724,39 @@ void sc_invert(unsigned char* out, const unsigned char* z)
   sc_mul(out, out, z);
   sc_mul(out, out, out);
   sc_mul(out, out, z);
+}
+
+/*
+  In:  t (x, y, z)
+  Out: r (x, t, z, t)
+
+  Note: expensive conversion because of fe_invert
+*/
+void ge_p2_to_p3(ge_p3 *r, const ge_p2 *t)
+{
+  fe_copy(r->X, t->X);
+  fe_copy(r->Y, t->Y);
+  fe_copy(r->Z, t->Z);
+  fe_invert(r->T, t->Z);
+  fe_mul(r->T, r->T, t->Y);
+  fe_mul(r->T, r->T, t->X);
+}
+
+
+/*
+  In:  ge_bytes -- points to 32 bytes of data
+  Out: res = Hp(ge_bytes)
+    where Hp = 8 * ge_fromfe_frombytes_vartime(cn_fast_hash(ge_bytes))
+*/
+void ge_bytes_hash_to_ec(ge_p3 *res, const unsigned char *ge_bytes)
+{
+  unsigned char h[HASH_SIZE];
+  ge_p2 point;
+  ge_p1p1 point2;
+
+  cn_fast_hash(ge_bytes, 32, h);
+  ge_fromfe_frombytes_vartime(&point, &h[0]);
+  /*ge_p2_to_p3(res, &point); /* -- can be used to avoid multiplication by 8 for debugging */
+  ge_mul8(&point2, &point);
+  ge_p1p1_to_p3(res, &point2);
 }

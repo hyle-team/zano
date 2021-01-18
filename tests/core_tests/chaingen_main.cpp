@@ -899,6 +899,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_simple_chain_split_1);
     GENERATE_AND_PLAY(alt_blocks_validation_and_same_new_amount_in_two_txs);
     GENERATE_AND_PLAY(alt_blocks_with_the_same_txs);
+    GENERATE_AND_PLAY(chain_switching_when_out_spent_in_alt_chain_mixin);
+    // GENERATE_AND_PLAY(chain_switching_when_out_spent_in_alt_chain_ref_id);
+
 
     // miscellaneous tests
     GENERATE_AND_PLAY(test_blockchain_vs_spent_keyimges);

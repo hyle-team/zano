@@ -599,7 +599,7 @@ currency::transaction construct_tx_with_fee(std::vector<test_event_entry>& event
 
 bool construct_tx_with_many_outputs(std::vector<test_event_entry>& events, const currency::block& blk_head,
                                             const currency::account_keys& keys_from, const currency::account_public_address& addr_to,
-                                            uint64_t total_amount, size_t outputs_count, uint64_t fee, currency::transaction& tx);
+                                            uint64_t total_amount, size_t outputs_count, uint64_t fee, currency::transaction& tx, bool use_ref_by_id = false);
 
 void get_confirmed_txs(const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, map_hash2tx_t& confirmed_txs);
 bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head);
@@ -914,6 +914,26 @@ inline uint64_t get_sources_total_amount(const std::vector<currency::tx_source_e
   for (auto& e : s)
     result += e.amount;
   return result;
+}
+
+inline void count_ref_by_id_and_gindex_refs_for_tx_inputs(const currency::transaction& tx, size_t& refs_by_id, size_t& refs_by_gindex)
+{
+  refs_by_id = 0;
+  refs_by_gindex = 0;
+  for (auto& in : tx.vin)
+  {
+    if (in.type() != typeid(currency::txin_to_key))
+      continue;
+
+    const currency::txin_to_key& in2key = boost::get<currency::txin_to_key>(in);
+    for (auto& ko : in2key.key_offsets)
+    {
+      if (ko.type() == typeid(currency::ref_by_id))
+        ++refs_by_id;
+      else if (ko.type() == typeid(uint64_t))
+        ++refs_by_gindex;
+    }
+  }
 }
 
 template<typename U, typename V>

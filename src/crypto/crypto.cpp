@@ -303,11 +303,13 @@ namespace crypto {
 
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4200)
-struct rs_comm_entry
-{
-  ec_point a, b;
-};
-  struct rs_comm {
+  struct rs_comm_entry
+  {
+    ec_point a, b;
+  };
+  
+  struct rs_comm
+  {
     hash h;
     struct rs_comm_entry ab[];
   };
@@ -422,4 +424,5 @@ POP_VS_WARNINGS
     sc_sub(&h, &h, &sum);
     return sc_isnonzero(&h) == 0;
   }
-}
+
+} // namespace crypto
