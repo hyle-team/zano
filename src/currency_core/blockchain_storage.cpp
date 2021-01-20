@@ -6184,6 +6184,9 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   
   CHECK_AND_ASSERT_MES(pub_keys.size() == abs_key_offsets.size(), false, "pub_keys.size()==" << pub_keys.size() << "  !=  abs_key_offsets.size()==" << abs_key_offsets.size()); // just a little bit of paranoia
   std::vector<const crypto::public_key*> pub_key_pointers;
+
+  uint64_t height_of_current_alt_block = alt_chain.size() ? alt_chain.back()->second.height + 1 : split_height + 1;
+
   for (size_t pk_n = 0; pk_n < pub_keys.size(); ++pk_n)
   {
     crypto::public_key& pk = pub_keys[pk_n];
@@ -6218,7 +6221,34 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
             uint64_t local_offset = offset_gindex - it_aag->second;
             auto& alt_keys = (*alt_it)->second.outputs_pub_keys;            
             CHECK_AND_ASSERT_MES(local_offset < alt_keys[input_to_key.amount].size(), false, "Internal error: local_offset=" << local_offset << " while alt_keys[" << input_to_key.amount << " ].size()=" << alt_keys.size());
-            pk = alt_keys[input_to_key.amount][local_offset];
+            const output_key_or_htlc_v& out_in_alt = alt_keys[input_to_key.amount][local_offset];
+            
+            /*
+            here we do validation against compatibility of input and output type
+
+            TxOutput | TxInput | Allowed
+            ----------------------------
+            HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
+            HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
+            TO_KEY   |  HTLC   | NOT
+            TO_KEY   |  TO_KEY | YES
+            */
+            uint64_t height_of_source_block = (*alt_it)->second.height;
+            CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
+            bool r = is_output_allowed_for_input(out_in_alt, input_v, height_of_current_alt_block - height_of_source_block);
+            CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+            
+            if (out_in_alt.type() == typeid(crypto::public_key))
+            {
+              pk = boost::get<crypto::public_key>(out_in_alt);
+            }
+            else
+            {
+              const txout_htlc& out_htlc = boost::get<txout_htlc>(out_in_alt);
+              bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false:true;
+              pk = htlc_expired ? out_htlc.pkey_after_expiration : out_htlc.pkey_before_expiration;
+              //input_v
+            }
             pub_key_pointers.push_back(&pk);
             found_the_key = true;
             break;
@@ -6242,34 +6272,37 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       auto it = alt_chain_tx_ids.find(tx_id);
       if (it != alt_chain_tx_ids.end())
       {
+        uint64_t height_of_source_block = it->second.second;
+        CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
+        
+        /*
+        here we do validation against compatibility of input and output type
+
+        TxOutput | TxInput | Allowed
+        ----------------------------
+        HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
+        HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
+        TO_KEY   |  HTLC   | NOT
+        TO_KEY   |  TO_KEY | YES
+        */
+
+        bool r = is_output_allowed_for_input(out_target_v, input_v, height_of_current_alt_block - height_of_source_block);
+        CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+
         //source tx found in altchain
         CHECK_AND_ASSERT_MES(it->second.first.vout.size() > out_n, false, "Internal error: out_n(" << out_n << ") >= it->second.vout.size()(" << it->second.first.vout.size() << ")");
         txout_target_v out_target_v = it->second.first.vout[out_n].target;
         if (out_target_v.type() == typeid(txout_htlc))
         {
           //source is hltc out
-          const txout_htlc& htlc = boost::get<txout_to_key>(out_target_v);
-          uint64_t height_of_source_block = it->second.second;
-          uint64_t height_of_current_alt_block = alt_chain.size() ? alt_chain.back()->second.height + 1 : split_height + 1;
-          CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
-          if (htlc.expiration > height_of_current_alt_block - height_of_source_block)
-          {
-            //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
-            CHECK_AND_ASSERT_MES(input_v.type() == typeid(txin_htlc), false, "[TXOUT_HTLC]: Unexpected output type of non-HTLC input");
-            pk = htlc.pkey_before_expiration;
-          }
-          else
-          {
-            //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
-            CHECK_AND_ASSERT_MES(input_v.type() == typeid(txin_to_key), false, "[TXOUT_HTLC]: Unexpected output type of HTLC input");
-            pk = htlc.pkey_after_expiration;
-          }
+          const txout_htlc& htlc = boost::get<txout_htlc>(out_target_v);          
+          bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
+          pk = htlc_expired ? htlc.pkey_after_expiration : htlc.pkey_before_expiration;
           pub_key_pointers.push_back(&pk);
           continue;
         }
         else if (out_target_v.type() == typeid(txout_to_key))
         {
-          CHECK_AND_ASSERT_MES(input_v.type() != typeid(txin_htlc), false, "Forbidden output type referenced by in tx ( input txin_htlc refered to txout_to_key )");
           //source is to_key out
           pk = boost::get<txout_to_key>(out_target_v).key;
           pub_key_pointers.push_back(&pk);
@@ -6279,14 +6312,6 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
         {
           ASSERT_MES_AND_THROW("Unexpected out type for tx_in in altblock: " << out_target_v.type().name());
         }
-
-        
-        //let's validate against htlc&to_key
-        pk = alt_keys[input_to_key.amount][local_offset];
-        pub_key_pointers.push_back(&pk);
-        found_the_key = true;
-
-
       }
 
     }
@@ -6294,11 +6319,36 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     auto p = m_db_transactions.get(tx_id);
     CHECK_AND_ASSERT_MES(p != nullptr && out_n < p->tx.vout.size(), false, "can't find output #" << out_n << " for tx " << tx_id << " referred by offset #" << pk_n);
     auto &t = p->tx.vout[out_n].target;
-    CHECK_AND_ASSERT_MES(t.type() == typeid(txout_to_key), false, "txin_to_key input offset #" << pk_n << " refers to incorrect output type " << t.type().name());
-    auto& out_tk = boost::get<txout_to_key>(t);
-    pk = out_tk.key;
-    bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(out_tk.mix_attr, abs_key_offsets.size() - 1);
-    CHECK_AND_ASSERT_MES(mixattr_ok, false, "input offset #" << pk_n << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(out_tk.mix_attr) << ", input's key_offsets.size = " << abs_key_offsets.size());
+    
+    /*
+    here we do validation against compatibility of input and output type
+
+    TxOutput | TxInput | Allowed
+    ----------------------------
+    HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
+    HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
+    TO_KEY   |  HTLC   | NOT
+    TO_KEY   |  TO_KEY | YES
+    */
+    uint64_t height_of_source_block = p->m_keeper_block_height;
+    bool r = is_output_allowed_for_input(t, input_v,   height_of_current_alt_block - height_of_source_block);
+    CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+
+    if (t.type() == typeid(txout_to_key))
+    {
+      const txout_to_key& out_tk = boost::get<txout_to_key>(t);
+      pk = out_tk.key;
+
+      bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(out_tk.mix_attr, abs_key_offsets.size() - 1);
+      CHECK_AND_ASSERT_MES(mixattr_ok, false, "input offset #" << pk_n << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(out_tk.mix_attr) << ", input's key_offsets.size = " << abs_key_offsets.size());
+
+    }
+    else if (t.type() == typeid(txout_htlc))
+    {
+      const txout_htlc& htlc = boost::get<txout_htlc>(t);
+      bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
+      pk = htlc_expired ? htlc.pkey_after_expiration : htlc.pkey_before_expiration;
+    }
 
     // case b4 (make sure source tx in the main chain is preceding split point, otherwise this referece is invalid)
     CHECK_AND_ASSERT_MES(p->m_keeper_block_height < split_height, false, "input offset #" << pk_n << " refers to main chain tx " << tx_id << " at height " << p->m_keeper_block_height << " while split height is " << split_height);
@@ -6321,6 +6371,58 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
 
   // TODO: consider checking input_tx for valid extra attachment info as it's checked in check_tx_inputs()
 
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)
+{
+
+  /*
+  TxOutput | TxInput | Allowed
+  ----------------------------
+  HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
+  HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
+  TO_KEY   |  HTLC   | NOT
+  TO_KEY   |  TO_KEY | YES
+  */
+
+
+  if (out_v.type() == typeid(txout_to_key))
+  {
+    return is_output_allowed_for_input(boost::get<txout_to_key>(out_v), in_v);
+  }
+  else if (out_v.type() == typeid(txout_htlc))
+  {
+    return is_output_allowed_for_input(boost::get<txout_htlc>(out_v), in_v, top_minus_source_height);
+  }
+  else
+  {
+    LOG_ERROR("[scan_outputkeys_for_indexes]: Wrong output type in : " << out_v.type().name());
+    return false;
+  }
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)
+{
+  bool htlc_expired = out_v.expiration > (top_minus_source_height) ? false : true;
+  if (!hltc_expired)
+  {
+    //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
+    CHECK_AND_ASSERT_MES(in_v.type() == typeid(txin_htlc), false, "[TXOUT_HTLC]: Unexpected output type of non-HTLC input");
+  }
+  else
+  {
+    //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
+    CHECK_AND_ASSERT_MES(in_v.type() == typeid(txin_to_key), false, "[TXOUT_HTLC]: Unexpected output type of HTLC input");
+  }
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)
+{
+  //HTLC input CAN'T refer to regular to_key output
+  CHECK_AND_ASSERT_MES(in_v.type() != typeid(txin_htlc), false, "[TXOUT_TO_KEY]: Unexpected output type of HTLC input");
   return true;
 }
 //------------------------------------------------------------------
@@ -6465,7 +6567,7 @@ bool blockchain_storage::update_alt_out_indexes_for_tx_in_block(const transactio
   //add tx outputs to gindex_lookup_table
   for (auto o : tx.vout)
   {
-    if (o.target.type() == typeid(txout_to_key))
+    if (o.target.type() == typeid(txout_to_key) || o.target.type() == typeid(txout_htlc))
     {
       //LOG_PRINT_MAGENTA("ALT_OUT KEY ON H[" << abei.height << "] AMOUNT: " << o.amount, LOG_LEVEL_0);
       // first, look at local gindexes tables
@@ -6475,7 +6577,15 @@ bool blockchain_storage::update_alt_out_indexes_for_tx_in_block(const transactio
         abei.gindex_lookup_table[o.amount] = m_db_outputs.get_item_size(o.amount);
         //LOG_PRINT_MAGENTA("FIRST TOUCH: size=" << abei.gindex_lookup_table[o.amount], LOG_LEVEL_0);
       }
-      abei.outputs_pub_keys[o.amount].push_back(boost::get<txout_to_key>(o.target).key);
+      if (o.target.type() == typeid(txout_to_key))
+      {
+        abei.outputs_pub_keys[o.amount].push_back(boost::get<txout_to_key>(o.target).key);
+      }
+      else
+      {
+        abei.outputs_pub_keys[o.amount].push_back(boost::get<txout_htlc>(o.target));
+      }
+      
       //TODO: At the moment we ignore check of mix_attr again mixing to simplify alt chain check, but in future consider it for stronger validation
     }
   }

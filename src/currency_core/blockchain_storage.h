@@ -150,7 +150,9 @@ namespace currency
     //   retrieve gindex from local_gindex_lookup_table   # there are outputs having given amount after the given height
     // else:
     //   retrieve gindex from main chain gindex table     # not outputs having given amount are present after the given height
-    // 
+    //
+
+    typedef boost::variant<crypto::public_key, txout_htlc> output_key_or_htlc_v;
 
     struct alt_block_extended_info: public block_extended_info
     {
@@ -158,7 +160,7 @@ namespace currency
       std::map<uint64_t, uint64_t> gindex_lookup_table; 
       
       // {amount -> pub_keys} map of outputs' pub_keys appeared in this alt block ( index_in_vector == output_gindex - gindex_lookup_table[output_amount] )
-      std::map<uint64_t, std::vector<crypto::public_key> > outputs_pub_keys;
+      std::map<uint64_t, std::vector<output_key_or_htlc_v> > outputs_pub_keys;
       
       //date added to alt chain storage
       uint64_t timestamp; 
@@ -641,6 +643,9 @@ namespace currency
     void calculate_local_gindex_lookup_table_for_height(uint64_t split_height, std::map<uint64_t, uint64_t>& increments) const;
     void do_erase_altblock(alt_chain_container::iterator it);
     uint64_t get_blockchain_launch_timestamp()const;
+    bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height);
+    bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v);
+    bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height);
 
 
 
@@ -739,11 +744,20 @@ namespace currency
       //CHECKED_GET_SPECIFIC_VARIANT(tx_ptr->tx.vout[n].target, const txout_to_key, outtk, false);
       CHECK_AND_ASSERT_MES(key_offsets.size() >= 1, false, "internal error: tx input has empty key_offsets"); // should never happen as input correctness must be handled by the caller
 
+      /*
+      TxOutput | TxInput | Allowed
+      ----------------------------
+      HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
+      HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
+      TO_KEY   |  HTLC   | NOT
+      TO_KEY   |  TO_KEY | YES
+      */
+
+      bool r = is_output_allowed_for_input(tx_ptr->tx.vout[n].target, verified_input, get_current_blockchain_size() - tx_ptr->m_keeper_block_height);
+      CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+
       if (tx_ptr->tx.vout[n].target.type() == typeid(txout_to_key))
       {
-        //HTLC input CAN'T refer to regular to_key output
-        CHECK_AND_ASSERT_MES(verified_input.type() != typeid(txin_htlc), false, "[TXOUT_TO_KEY]: Unexpected output type of HTLC input");
-
         CHECKED_GET_SPECIFIC_VARIANT(tx_ptr->tx.vout[n].target, const txout_to_key, outtk, false);
         //fix for burned money
         patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
@@ -757,13 +771,11 @@ namespace currency
         if (htlc_out.expiration > get_current_blockchain_size() - tx_ptr->m_keeper_block_height)
         {
           //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
-          CHECK_AND_ASSERT_MES(verified_input.type() == typeid(txin_htlc), false, "[TXOUT_HTLC]: Unexpected output type of non-HTLC input");
           scan_context.htlc_is_expired = false;
         }
         else 
         {
           //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
-          CHECK_AND_ASSERT_MES(verified_input.type() == typeid(txin_to_key), false, "[TXOUT_HTLC]: Unexpected output type of HTLC input");
           scan_context.htlc_is_expired = true; 
         }
       }else
