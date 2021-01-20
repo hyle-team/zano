@@ -6067,7 +6067,7 @@ void blockchain_storage::calculate_local_gindex_lookup_table_for_height(uint64_t
 }
 //------------------------------------------------------------------
 bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
-  const std::unordered_set<crypto::key_image>& collected_keyimages, 
+  std::unordered_set<crypto::key_image>& collected_keyimages, 
   const txs_by_id_and_height_altchain& alt_chain_tx_ids,
   const crypto::hash& bl_id, 
   const crypto::hash& input_tx_hash, 
@@ -6245,7 +6245,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
             else
             {
               const txout_htlc& out_htlc = boost::get<txout_htlc>(out_in_alt);
-              bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false:true;
+              bool htlc_expired = out_htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false:true;
               pk = htlc_expired ? out_htlc.pkey_after_expiration : out_htlc.pkey_before_expiration;
               //input_v
             }
@@ -6286,12 +6286,14 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
         TO_KEY   |  TO_KEY | YES
         */
 
-        bool r = is_output_allowed_for_input(out_target_v, input_v, height_of_current_alt_block - height_of_source_block);
-        CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
-
         //source tx found in altchain
         CHECK_AND_ASSERT_MES(it->second.first.vout.size() > out_n, false, "Internal error: out_n(" << out_n << ") >= it->second.vout.size()(" << it->second.first.vout.size() << ")");
         txout_target_v out_target_v = it->second.first.vout[out_n].target;
+
+        bool r = is_output_allowed_for_input(out_target_v, input_v, height_of_current_alt_block - height_of_source_block);
+        CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+
+
         if (out_target_v.type() == typeid(txout_htlc))
         {
           //source is hltc out
@@ -6331,6 +6333,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     TO_KEY   |  TO_KEY | YES
     */
     uint64_t height_of_source_block = p->m_keeper_block_height;
+    CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
     bool r = is_output_allowed_for_input(t, input_v,   height_of_current_alt_block - height_of_source_block);
     CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
 
@@ -6374,7 +6377,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)
+bool blockchain_storage::is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const
 {
 
   /*
@@ -6403,10 +6406,10 @@ bool blockchain_storage::is_output_allowed_for_input(const txout_target_v& out_v
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)
+bool blockchain_storage::is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const 
 {
   bool htlc_expired = out_v.expiration > (top_minus_source_height) ? false : true;
-  if (!hltc_expired)
+  if (!htlc_expired)
   {
     //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
     CHECK_AND_ASSERT_MES(in_v.type() == typeid(txin_htlc), false, "[TXOUT_HTLC]: Unexpected output type of non-HTLC input");
@@ -6419,11 +6422,26 @@ bool blockchain_storage::is_output_allowed_for_input(const txout_htlc& out_v, co
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)
+bool blockchain_storage::is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const
 {
   //HTLC input CAN'T refer to regular to_key output
   CHECK_AND_ASSERT_MES(in_v.type() != typeid(txin_htlc), false, "[TXOUT_TO_KEY]: Unexpected output type of HTLC input");
   return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_output_allowed_for_input(const output_key_or_htlc_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const
+{
+  if (out_v.type() == typeid(crypto::public_key))
+  {
+    return is_output_allowed_for_input(txout_to_key(), in_v);
+  }
+  else if (out_v.type() == typeid(txout_htlc))
+  {
+    return is_output_allowed_for_input(boost::get<txout_htlc>(out_v), in_v, top_minus_source_height);
+  }
+  else {
+    ASSERT_MES_AND_THROW("Unexpected type in output_key_or_htlc_v: " << out_v.type().name());
+  }
 }
 //------------------------------------------------------------------
 bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx, const crypto::hash& input_tx_hash, size_t input_index, const std::vector<crypto::signature>& input_sigs, uint64_t split_height, const alt_chain_type& alt_chain) const

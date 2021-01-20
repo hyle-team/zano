@@ -588,7 +588,18 @@ namespace currency
     bool purge_keyimage_from_big_heap(const crypto::key_image& ki, const crypto::hash& id);
     bool purge_altblock_keyimages_from_big_heap(const block& b, const crypto::hash& id);
     bool append_altblock_keyimages_to_big_heap(const crypto::hash& block_id, const std::unordered_set<crypto::key_image>& alt_block_keyimages);
-    bool validate_alt_block_input(const transaction& input_tx, std::unordered_set<crypto::key_image>& collected_keyimages, const txs_by_id_and_height_altchain& alt_chain_tx_ids, const crypto::hash& bl_id, const crypto::hash& input_tx_hash, size_t input_index, const std::vector<crypto::signature>& input_sigs, uint64_t split_height, const alt_chain_type& alt_chain, const std::unordered_set<crypto::hash>& alt_chain_block_ids, uint64_t& ki_lookuptime, uint64_t* p_max_related_block_height = nullptr) const;
+    bool validate_alt_block_input(const transaction& input_tx, 
+      std::unordered_set<crypto::key_image>& collected_keyimages, 
+      const txs_by_id_and_height_altchain& alt_chain_tx_ids,
+      const crypto::hash& bl_id, 
+      const crypto::hash& input_tx_hash, 
+      size_t input_index, 
+      const std::vector<crypto::signature>& input_sigs, 
+      uint64_t split_height, 
+      const alt_chain_type& alt_chain, 
+      const std::unordered_set<crypto::hash>& alt_chain_block_ids, 
+      uint64_t& ki_lookuptime, 
+      uint64_t* p_max_related_block_height = nullptr) const;
     bool validate_alt_block_ms_input(const transaction& input_tx, const crypto::hash& input_tx_hash, size_t input_index, const std::vector<crypto::signature>& input_sigs, uint64_t split_height, const alt_chain_type& alt_chain) const;
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::unordered_set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
@@ -643,9 +654,10 @@ namespace currency
     void calculate_local_gindex_lookup_table_for_height(uint64_t split_height, std::map<uint64_t, uint64_t>& increments) const;
     void do_erase_altblock(alt_chain_container::iterator it);
     uint64_t get_blockchain_launch_timestamp()const;
-    bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height);
-    bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v);
-    bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height);
+    bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
+    bool is_output_allowed_for_input(const output_key_or_htlc_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
+    bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const;
+    bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
 
 
 
