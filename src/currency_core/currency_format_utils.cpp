@@ -1675,6 +1675,12 @@ namespace currency
   //---------------------------------------------------------------
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
+    std::list<htlc_info> htlc_info_list;
+    return lookup_acc_outs(acc, tx, tx_pub_key, outs, money_transfered, derivation, htlc_info_list);
+  }
+  //---------------------------------------------------------------
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list)
+  {
     money_transfered = 0;
     bool r = generate_key_derivation(tx_pub_key, acc.view_secret_key, derivation);
     CHECK_AND_ASSERT_MES(r, false, "unable to generate derivation from tx_pub = " << tx_pub_key << " * view_sec, invalid tx_pub?");
@@ -1685,7 +1691,6 @@ namespace currency
       return lookup_acc_outs_genesis(acc, tx, tx_pub_key, outs, money_transfered, derivation);
     }
 
-    
     if (!check_tx_derivation_hint(tx, derivation))
       return true;
 
@@ -1706,6 +1711,23 @@ namespace currency
         {
           outs.push_back(i);
           //don't count this money
+        }
+      }
+      else if (o.target.type() == typeid(txout_htlc))
+      {
+        htlc_info hi = AUTO_VAL_INIT(hi);
+        const txout_htlc& htlc = boost::get<txout_htlc>(o.target);
+        if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, i))
+        {
+          hi.hltc_our_out_is_before_expiration = true;
+          htlc_info_list.push_back(hi);
+          outs.push_back(i);
+        }
+        else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, i))
+        {
+          hi.hltc_our_out_is_before_expiration = false;
+          htlc_info_list.push_back(hi);
+          outs.push_back(i);
         }
       }
       else

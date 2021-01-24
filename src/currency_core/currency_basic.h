@@ -265,15 +265,15 @@ namespace currency
     crypto::hash htlc_hash;
     uint8_t flags;      //select type of the hash, may be some extra info in future
     uint64_t expiration; 
-    crypto::public_key pkey_before_expiration;
-    crypto::public_key pkey_after_expiration;
+    crypto::public_key pkey_redeem; //works before expiration
+    crypto::public_key pkey_refund; //works after expiration
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(htlc_hash)
       FIELD(flags)
       VARINT_FIELD(expiration)
-      FIELD(pkey_before_expiration)
-      FIELD(pkey_after_expiration)
+      FIELD(pkey_redeem)
+      FIELD(pkey_refund)
     END_SERIALIZE()
   };
 

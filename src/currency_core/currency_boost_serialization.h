@@ -62,8 +62,8 @@ namespace boost
       a & x.expiration;
       a & x.flags;
       a & x.htlc_hash;
-      a & x.pkey_before_expiration;
-      a & x.pkey_after_expiration;
+      a & x.pkey_redeem;
+      a & x.pkey_refund;
     }
 
     template <class Archive>

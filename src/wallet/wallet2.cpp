@@ -374,6 +374,31 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         mtd.spent_indices.push_back(i);
       }
     }
+    else if (in.type() == typeid(currency::txin_htlc))
+    {
+      const currency::txin_htlc& in_htlc = boost::get<currency::txin_htlc>(in);
+      if (in_htlc.key_offsets.size() != 1)
+      {
+        LOG_ERROR("in_htlc.key_offsets.size() != 1, skip inout");
+        continue;
+      }
+
+      if (in_htlc.key_offsets[0].type() != typeid(uint64_t))
+      {
+        LOG_ERROR("HTLC with ref_by_id is not supported by wallet yet");
+        continue;
+      }
+
+      auto it = m_active_htlcs.find(std::make_pair(in_htlc.amount, boost::get<>(in_htlc.key_offsets[0])));
+      if (it != m_active_htlcs.end())
+      {
+        transfer_details& td = m_transfers[it->second];
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td->m_ptx_wallet_info->m_tx.vout.size() > td.m_internal_output_index, "Internal error: wrong  index in m_transfers");
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td->m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target.type() > typeid(), "Internal error: wrong  index in m_transfers");
+        //input spend active htlc
+        m_transfers[it->second].m_spent_height = height;        
+      }
+    }
     i++;
   }
 
@@ -386,7 +411,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
   //check for transaction income
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-  r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, tx_money_got_in_outs, derivation);
+  std::list<htlc_info> htlc_info_list;
+  r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, tx_money_got_in_outs, derivation, htlc_info_list);
   THROW_IF_TRUE_WALLET_EX(!r, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
 
   if(!outs.empty() /*&& tx_money_got_in_outs*/)
@@ -408,7 +434,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
     if (!pglobal_indexes || (pglobal_indexes->size() == 0 && tx.vout.size() != 0))
     {
-      if (m_use_deffered_global_outputs)
+      //if tx contain htlc_out, then we would need global_indexes anyway, to be able later detect redeem of htlc 
+      if (m_use_deffered_global_outputs && htlc_info_list.size() == 0)
       {
         pglobal_indexes = nullptr;
       }
@@ -423,9 +450,32 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     {
       size_t o = outs[i_in_outs];
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(o < tx.vout.size(), "wrong out in transaction: internal index=" << o << ", total_outs=" << tx.vout.size());
-      if (tx.vout[o].target.type() == typeid(txout_to_key))
+      if (tx.vout[o].target.type() == typeid(txout_to_key) || tx.vout[o].target.type() == typeid(txout_htlc))
       {
-        const currency::txout_to_key& otk = boost::get<currency::txout_to_key>(tx.vout[o].target);
+        bool hltc_our_out_is_before_expiration = false;
+        crypto::public_key out_key = null_pkey;
+        if (tx.vout[o].target.type() == typeid(txout_to_key))
+        {
+          out_key = boost::get<currency::txout_to_key>(tx.vout[o].target).key;
+        }
+        else if (tx.vout[o].target.type() == typeid(txout_htlc))
+        {
+          THROW_IF_FALSE_WALLET_EX(htlc_info_list.size() > 0, "Found txout_htlc out but htlc_info_list is empty");
+          if (htlc_info_list.front().hltc_our_out_is_before_expiration)
+          {
+            out_key = boost::get<currency::txout_htlc>(tx.vout[o].target).pkey_redeem;
+          }
+          else
+          {
+            out_key = boost::get<currency::txout_htlc>(tx.vout[o].target).pkey_refund;
+          }          
+          htlc_info_list.pop_front();
+        }
+        else
+        {
+          THROW_IF_FALSE_WALLET_EX(false, "Unexpected out type im wallet: " << tx.vout[o].target.type().name());
+        }
+        //const currency::txout_to_key& otk = boost::get<currency::txout_to_key>(tx.vout[o].target);
 
         // obtain key image for this output
         crypto::key_image ki = currency::null_ki;
@@ -435,16 +485,16 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           {
             // don't have spend secret key, so we unable to calculate key image for an output
             // look it up in special container instead
-            auto it = m_pending_key_images.find(otk.key);
+            auto it = m_pending_key_images.find(out_key);
             if (it != m_pending_key_images.end())
             {
               ki = it->second;
-              WLT_LOG_L1("pending key image " << ki << " was found by out pub key " << otk.key);
+              WLT_LOG_L1("pending key image " << ki << " was found by out pub key " << out_key);
             }
             else
             {
               ki = currency::null_ki;
-              WLT_LOG_L1("can't find pending key image by out pub key: " << otk.key << ", key image temporarily set to null");
+              WLT_LOG_L1("can't find pending key image by out pub key: " << out_key << ", key image temporarily set to null");
             }
           }
         }
@@ -453,7 +503,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           // normal wallet, calculate and store key images for own outs
           currency::keypair in_ephemeral;
           currency::generate_key_image_helper(m_account.get_keys(), tx_pub_key, o, in_ephemeral, ki);
-          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(in_ephemeral.pub == otk.key, "key_image generated ephemeral public key that does not match with output_key");
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(in_ephemeral.pub == out_key, "key_image generated ephemeral public key that does not match with output_key");
         }
         
         if (ki != currency::null_ki)
@@ -477,11 +527,12 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           }
         }
 
-        if (is_auditable() && otk.mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+        if (is_auditable() && tx.vout[o].target.type() == typeid(txout_to_key) &&
+                  boost::get<txout_to_key>(tx.vout[o].target).mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
         {
           std::stringstream ss;
           ss << "output #" << o << " from tx " << get_transaction_hash(tx) << " with amount " << print_money_brief(tx.vout[o].amount)
-            << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)otk.mix_attr << ". Output IGNORED.";
+            << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)boost::get<txout_to_key>(tx.vout[o].target).mix_attr << ". Output IGNORED.";
           WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
           if (m_wcallback)
             m_wcallback->on_message(i_wallet2_callback::ms_red, ss.str());
@@ -517,11 +568,28 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER;
           }
         }
+        uint64_t amount = tx.vout[o].amount;
+        if (tx.vout[o].target.type() == typeid(txout_htlc))
+        {
+          const txout_htlc& hltc = boost::get<currency::txout_htlc>(tx.vout[o].target);
+          //mark this as spent
+          td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT;
+          //create entry for htlc input
+          htlc_expiration_trigger het = AUTO_VAL_INIT(het);
+          het.is_wallet_owns_redeem = (out_key == hltc.pkey_redeem) ? true:false;
+          het.transfer_index = m_transfers.size() - 1;
+          uint64_t expired_if_more_then = td.m_ptx_wallet_info->m_block_height + hltc.expiration;
+          m_htlcs[expired_if_more_then] = het;
+
+          //active htlc
+          auto amount_gindex_pair = std::make_pair(amount, td.m_global_output_index);
+          m_active_htlcs[amount_gindex_pair] = transfer_index;
+        }
         size_t transfer_index = m_transfers.size()-1;
         if (td.m_key_image != currency::null_ki)
           m_key_images[td.m_key_image] = transfer_index;
-        add_transfer_to_transfers_cache(tx.vout[o].amount, transfer_index);
-        uint64_t amount = tx.vout[o].amount;
+
+        add_transfer_to_transfers_cache(amount, transfer_index);
 
         if (is_watch_only() && is_auditable())
         {
@@ -544,6 +612,10 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         tdb.m_ptx_wallet_info = pwallet_info;
         tdb.m_internal_output_index = o;
         WLT_LOG_L0("Received multisig, multisig out id: " << multisig_id << ", amount: " << tdb.amount() << ", with tx: " << get_transaction_hash(tx));
+      }
+      else if (tx.vout[o].target.type() == typeid(txout_htlc))
+      {
+
       }
     }
   }
@@ -1222,12 +1294,58 @@ void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<s
   }
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::process_htlc_triggers_on_block_added(uint64_t height)
+{
+  if (!m_htlcs.size())
+    return;
+
+  if (height > m_htlcs.rbegin()->first)
+  {
+    //there is no active htlc that at this height
+    CHECK_AND_ASSERT_MES(m_active_htlcs.size() == 0, void(), "Self check failed: m_active_htlcs.size() = " << m_active_htlcs.size());
+    return;
+  }
+  //we have to check if there is a htlc that has to become deactivated
+  auto pair_of_it = m_htlcs.equal_range(height);
+  for (auto it = pair_of_it.first; it != pair_of_it.second; it++)
+  {
+    auto tr = m_transfers[it->second.transfer_index];
+    //found contract that supposed to be deactivated and set to innactive
+    if (it->second.is_wallet_owns_redeem)
+    {
+      // this means that wallet received atomic as proposal but never activated it, money returned to initiator
+      tr.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT; //re assure that it has spent flag
+      tr.m_spent_height = height;
+    }
+    else
+    {
+      // this means that wallet created atomic by itself, and second part didn't redeem it, so refund money should become available
+      tr.m_flags &= ~(WALLET_TRANSFER_DETAIL_FLAG_SPENT); //reset spent flag
+      m_found_free_amounts.clear(); //reset free amounts cache 
+      tr.m_spent_height = 0;
+    }
+    //remove it from active contracts
+    auto it_active_htlc = m_active_htlcs.find(std::make_pair(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].amount, tr.m_global_output_index));
+    if (it_active_htlc == m_active_htlcs.end())
+    {
+      LOG_ERROR("Erasing htlc, but it seems to be already erased");
+    }
+    else
+    {
+      m_active_htlcs.erase(it);
+    }
+  }
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::process_new_blockchain_entry(const currency::block& b, const currency::block_direct_data_entry& bche, const crypto::hash& bl_id, uint64_t height)
 {
   //handle transactions from new block
   THROW_IF_TRUE_WALLET_EX(height != get_blockchain_current_size() &&
     !(height == m_minimum_height || get_blockchain_current_size() <= 1), error::wallet_internal_error,
     "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_size()));
+
+  process_htlc_triggers_on_block_added(height)
+
 
   //optimization: seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
   const std::vector<uint64_t>* pglobal_index = nullptr;
@@ -2082,6 +2200,13 @@ void wallet2::detach_blockchain(uint64_t including_height)
     {
       WLT_LOG_BLUE("Transfer [" << i << "] spent height: " << tr.m_spent_height << " -> 0, reason: detaching blockchain", LOG_LEVEL_1);
       tr.m_spent_height = 0;
+      //check if it's hltc contract
+      if (tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].target == typeid(txout_htlc))
+      {
+        const txout_htlc& htlc = boost::get<txout_htlc>(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].target);
+        auto amount_gindex_pair = std::make_pair(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].amount, tr.m_global_output_index);
+        m_active_htlcs[amount_gindex_pair] = i;
+      }
     }
   }
 

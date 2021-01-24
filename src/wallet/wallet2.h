@@ -735,6 +735,12 @@ namespace tools
       {
         wipeout_extra_if_needed(m_transfer_history);
       }
+      
+      if (ver < 153)
+        return;
+      
+      a & m_htlcs;
+
     }
 
     void wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history);
@@ -761,6 +767,7 @@ namespace tools
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
       uint64_t height);
+    void process_htlc_triggers_on_block_added(uint64_t height);
     bool get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, uint64_t new_block_expected_height = UINT64_MAX);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, const currency::account_public_address& miner_address, uint64_t new_block_expected_height = UINT64_MAX);
@@ -968,6 +975,15 @@ private:
     std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> m_unconfirmed_txs;
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
     std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
+
+    //used in wallet 
+    struct htlc_expiration_trigger
+    {
+      bool is_wallet_owns_redeem; //specify if this HTLC belong to this wallet by pkey_redeem or by pkey_refund
+      uint64_t transfer_index;
+    };
+    std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //uint64_t -> height of expiration
+    amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> tid
 
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;

@@ -6246,7 +6246,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
             {
               const txout_htlc& out_htlc = boost::get<txout_htlc>(out_in_alt);
               bool htlc_expired = out_htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false:true;
-              pk = htlc_expired ? out_htlc.pkey_after_expiration : out_htlc.pkey_before_expiration;
+              pk = htlc_expired ? out_htlc.pkey_refund : out_htlc.pkey_redeem;
               //input_v
             }
             pub_key_pointers.push_back(&pk);
@@ -6299,7 +6299,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
           //source is hltc out
           const txout_htlc& htlc = boost::get<txout_htlc>(out_target_v);          
           bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
-          pk = htlc_expired ? htlc.pkey_after_expiration : htlc.pkey_before_expiration;
+          pk = htlc_expired ? htlc.pkey_refund : htlc.pkey_redeem;
           pub_key_pointers.push_back(&pk);
           continue;
         }
@@ -6350,7 +6350,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     {
       const txout_htlc& htlc = boost::get<txout_htlc>(t);
       bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
-      pk = htlc_expired ? htlc.pkey_after_expiration : htlc.pkey_before_expiration;
+      pk = htlc_expired ? htlc.pkey_refund : htlc.pkey_redeem;
     }
 
     // case b4 (make sure source tx in the main chain is preceding split point, otherwise this referece is invalid)

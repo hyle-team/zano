@@ -132,6 +132,11 @@ namespace currency
 	  END_KV_SERIALIZE_MAP()
   };
 
+  struct htlc_info
+  {
+    bool hltc_our_out_is_before_expiration;
+  };
+
 
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
