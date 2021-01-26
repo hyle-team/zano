@@ -332,7 +332,7 @@ static int fe_isnegative(const fe f) {
 
 /* From fe_isnonzero.c, modified */
 
-static int fe_isnonzero(const fe f) {
+int fe_isnonzero(const fe f) {
   unsigned char s[32];
   fe_tobytes(s, f);
   return (((int) (s[0] | s[1] | s[2] | s[3] | s[4] | s[5] | s[6] | s[7] | s[8] |

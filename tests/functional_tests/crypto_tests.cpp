@@ -418,6 +418,12 @@ struct point_t
     ge_p3_0(&m_p3);
   }
 
+  bool is_zero() const
+  {
+    // (0, 1) ~ (0, z, z, 0)
+    return fe_isnonzero(m_p3.X) * fe_cmp(m_p3.Y, m_p3.Z) == 0;
+  }
+
   bool from_public_key(const crypto::public_key& pk)
   {
     return ge_frombytes_vartime(&m_p3, reinterpret_cast<const unsigned char*>(&pk)) == 0;

@@ -128,6 +128,7 @@ int sc_isnonzero(const unsigned char *); /* Doesn't normalize */
 void sc_invert(unsigned char*, const unsigned char*);
 
 void fe_sq(fe h, const fe f);
+int fe_isnonzero(const fe f);
 void fe_mul(fe, const fe, const fe);
 void fe_frombytes(fe h, const unsigned char *s);
 void fe_invert(fe out, const fe z);
