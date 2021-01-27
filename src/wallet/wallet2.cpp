@@ -584,6 +584,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           //active htlc
           auto amount_gindex_pair = std::make_pair(amount, td.m_global_output_index);
           m_active_htlcs[amount_gindex_pair] = transfer_index;
+          m_active_htlcs_txid[get_transaction_hash(tx)] = transfer_index;
         }
         size_t transfer_index = m_transfers.size()-1;
         if (td.m_key_image != currency::null_ki)
@@ -1328,11 +1329,21 @@ void wallet2::process_htlc_triggers_on_block_added(uint64_t height)
     auto it_active_htlc = m_active_htlcs.find(std::make_pair(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].amount, tr.m_global_output_index));
     if (it_active_htlc == m_active_htlcs.end())
     {
-      LOG_ERROR("Erasing htlc, but it seems to be already erased");
+      LOG_ERROR("Erasing active htlc(m_active_htlcs), but it seems to be already erased");
     }
     else
     {
+      const transfer_details& td = m_transfers[it->second];
       m_active_htlcs.erase(it);
+      auto it_tx = m_active_htlcs_txid.find(td.tx_hash());
+      if (it_tx == m_active_htlcs_txid.end())
+      {
+        LOG_ERROR("Erasing active htlc(;), but it seems to be already erased");
+      }
+      else
+      {
+        m_active_htlcs_txid.erase(it_tx);
+      }
     }
   }
 }
@@ -2206,6 +2217,7 @@ void wallet2::detach_blockchain(uint64_t including_height)
         const txout_htlc& htlc = boost::get<txout_htlc>(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].target);
         auto amount_gindex_pair = std::make_pair(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].amount, tr.m_global_output_index);
         m_active_htlcs[amount_gindex_pair] = i;
+        m_active_htlcs_txid[tr.tx_hash()] = i;
       }
     }
   }
@@ -3993,6 +4005,43 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   add_sent_tx_detailed_info(tx, ftp.prepared_destinations, ftp.selected_transfers);
 
   print_tx_sent_message(tx, "(from multisig)", fee);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::create_htlc_proposal(uint64_t amount, account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx)
+{
+  std::vector<currency::extra_v> extra;
+  std::vector<currency::attachment_v> attachments;
+
+  std::vector<tx_destination_entry> dst;
+  dst.resize(1);
+  dst.back().addr.push_back(addr);
+  dst.back().amount = amount;
+  dst.back().htlc = true;
+  dst.back().unlock_time = 740; //about 12 hours
+
+  transaction result_tx = AUTO_VAL_INIT(result_tx);
+  this->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::get_list_of_active_htlc(bool only_redeem_txs, std::list<htlc_entry_info>& htlcs)
+{
+  for (auto htlc_entry : m_active_htlcs_txid)
+  {
+    htlc_entry_info entry = AUTO_VAL_INIT(entry);
+    entry.tx_id = htlc_entry.first;
+    const transfer_details& td = m_transfers[htlc_entry.second];
+    entry.amount = td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].amount;
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target.type() == typeid(txout_htlc),
+      "[get_list_of_active_htlc]Internal error: unexpected type of out");
+    const txout_htlc& htlc = boost::get<txout_htlc>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target);
+    entry.sha256_hash = htlc.htlc_hash;
+    htlcs.push_back(entry);
+  }
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin)
+{
+
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)

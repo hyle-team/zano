@@ -52,11 +52,12 @@ namespace currency
     size_t   minimum_sigs;                           // if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
     uint64_t amount_to_provide;                      //amount money that provided by initial creator of tx, used with partially created transactions
     uint64_t unlock_time;
+    bool htlc;                                       //if this flag is set, then creating htlc out, unlock_time -> number of blocks that htlc proposal is active
 
-    tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0), unlock_time(0){}
-    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(0){}
-    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(ut) {}
-    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0), unlock_time(0){}
+    tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc(false){}
+    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc(false){}
+    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(ut), htlc(false){}
+    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0), unlock_time(0), htlc(false){}
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(amount)
@@ -64,6 +65,7 @@ namespace currency
       FIELD(minimum_sigs)
       FIELD(amount_to_provide)
       FIELD(unlock_time)
+      FIELD(htlc)
     END_SERIALIZE()
   };
 

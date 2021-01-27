@@ -590,7 +590,19 @@ namespace currency
 //     return true;
 //   }  
   //---------------------------------------------------------------
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr)
+  std::string generate_origin_for_htlc(cons crypto::public_key& redeem, cons crypto::public_key& refund, const account_keys& acc_keys)
+  {
+    std::string blob;
+    string_tools::apped_pod_to_strbuff(blob, redeem);
+    string_tools::apped_pod_to_strbuff(blob, refund);
+    string_tools::apped_pod_to_strbuff(blob, acc_keys.spend_secret_key);
+    crypto::hash origin_hs = cn_fast_hash(blob.data(), blob.size());
+    std::string origin_blob;
+    string_tools::apped_pod_to_strbuff(origin_blob, origin_hs);
+    return origin_hs;
+  }
+  //---------------------------------------------------------------
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr, const account_keys& self)
   {
     CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
 
@@ -622,10 +634,38 @@ namespace currency
 
     tx_out out;
     out.amount = de.amount;
-    if (target_keys.size() == 1)
+    if (de.htlc)
+    {
+      //out htlc
+      CHECK_AND_ASSERT_MES(target_keys.size() == 1, false, "Unexpected htl keys count = " << target_keys.size() << ", expected ==1");
+      txout_htlc htlc = AUTO_VAL_INIT(htlc);
+      htlc.expiration = de.unlock_time;
+      htlc.flags = 0; //0 - SHA256, 1 - RIPEMD160, by default leave SHA256
+      //receiver key
+      htlc.pkey_redeem = *target_keys.begin();
+      //generate refund key
+      crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+      bool r = derive_public_key_from_target_address(self.account_address, tx_sec_key, output_index, out_eph_public_key, derivation);
+      CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
+      htlc.pkey_refund = out_eph_public_key;
+      //we use deterministic origin, to make possible access origin on different wallets copies
+      std::string hltc_origin = generate_origin_for_htlc(htlc.pkey_redeem, htlc.pkey_refund, self);
+      //calculate hash
+
+      if (htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
+      {
+        htlc.htlc_hash = crypto::sha256_hash(hltc_origin.data(), hltc_origin.size());
+      }
+      else
+      {
+        crypto::hash160 h160 = crypto::RIPEMD160_hash(hltc_origin.data(), hltc_origin.size());        
+        std::memcpy(&htlc.htlc_hash, &h160, sizeof(h160));
+      }
+    }
+    else if (target_keys.size() == 1)
     {
       //out to key
-      txout_to_key tk;
+      txout_to_key tk = AUTO_VAL_INIT(tk);
       tk.key = target_keys.back();
 
       if (de.addr.front().is_auditable()) // check only the first address because there's only one in this branch
@@ -1178,7 +1218,7 @@ namespace currency
     for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
-      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, tx_outs_attr);
+      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, tx_outs_attr, sender_account_keys.account_address);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construc tx out");
       output_index++;
       summary_outs_money += dst_entr.amount;

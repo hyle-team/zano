@@ -163,7 +163,7 @@ namespace currency
 
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, const account_public_address& self = account_public_address());
   bool validate_alias_name(const std::string& al);
   bool validate_password(const std::string& password);
   void get_attachment_extra_info_details(const std::vector<attachment_v>& attachment, extra_attachment_info& eai);
@@ -298,7 +298,7 @@ namespace currency
   void append_per_block_increments_for_tx(const transaction& tx, std::unordered_map<uint64_t, uint32_t>& gindices);
   std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
   uint64_t get_timstamp_from_word(std::string word, bool& password_used);
-
+  std::string generate_origin_for_htlc(cons crypto::public_key& redeem, cons crypto::public_key& refund, const account_keys& acc_keys);
   template<class t_txin_v>
   typename std::conditional<std::is_const<t_txin_v>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type& get_txin_etc_options(t_txin_v& in)
   {

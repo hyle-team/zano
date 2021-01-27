@@ -974,6 +974,20 @@ namespace wallet_public
     };
   };
 
+  struct htlc_entry_info
+  {
+    crypto::hash sha256_hash;
+    crypto::hash tx_id;
+    uint64_t amount;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE(sha256_hash)
+      KV_SERIALIZE(tx_id)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
 
 
   inline std::string get_escrow_contract_state_name(uint32_t state)

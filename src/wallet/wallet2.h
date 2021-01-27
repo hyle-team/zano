@@ -740,6 +740,7 @@ namespace tools
         return;
       
       a & m_htlcs;
+      a & m_active_htlcs;
 
     }
 
@@ -815,6 +816,10 @@ namespace tools
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
+    void create_htlc_proposal(uint64_t amount, account_public_address& addr, uint64_t lock_blocks_count, 
+      account_public_address& addr, currency::transaction &tx);
+    void get_list_of_active_htlc(bool only_redeem_txs, std::list<htlc_entry_info>& htlcs);
+    void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
 
 private:
 
@@ -983,7 +988,8 @@ private:
       uint64_t transfer_index;
     };
     std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //uint64_t -> height of expiration
-    amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> tid
+    amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
+    std::unordered_map<crypto::hash, uint64_t> m_active_htlcs_txid; // map [txid] -> transfer index, limitation: 1 transactiom -> 1 htlc
 
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
