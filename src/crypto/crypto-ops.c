@@ -3754,9 +3754,9 @@ void ge_bytes_hash_to_ec(ge_p3 *res, const unsigned char *ge_bytes)
   ge_p2 point;
   ge_p1p1 point2;
 
-  cn_fast_hash(ge_bytes, 32, h);
+  cn_fast_hash(ge_bytes, 32, (char*)h);
   ge_fromfe_frombytes_vartime(&point, &h[0]);
-  /*ge_p2_to_p3(res, &point); /* -- can be used to avoid multiplication by 8 for debugging */
+  /*ge_p2_to_p3(res, &point); -- can be used to avoid multiplication by 8 for debugging */
   ge_mul8(&point2, &point);
   ge_p1p1_to_p3(res, &point2);
 }
