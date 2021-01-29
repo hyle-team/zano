@@ -21,11 +21,11 @@ namespace tools
   };
 
 #ifndef TESTNET
-  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.43.225/pre-download/zano_lmdb_94_599999.pak", "6ab4f17cb9252f5cb576e8b212b5b95ad4b3e801a9612de574d7d01204777830", 1023060357, 1491427328 };
-  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.43.225/pre-download/zano_mdbx_94_599999.pak", "7cf41d2881fa4002a159974d988a0c605ccb801888b18f0352c9a94586c9f935", 795428926, 1610588160 };
+  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.43.225/pre-download/zano_mdbx_95_900000.pak", "1c748d0f90fb1ed0af0ffe59d4b8f6046b2d0f92a8b8fe21932208829733f053", 1097493715, 2147450880 };
+  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.43.225/pre-download/zano_lmdb_95_900000.pak", "f2d498ed7abf641824eca4ce584c756d6138d670980c1abdddcdf07343f10bfc", 1406827811, 2079617024 };
 #else
-  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.43.225/pre-download/zano_testnet_lmdb_97_449999.pak", "923b5c59359807b7e375e34cdf9327216c34ab71550669f9535a552c441b285a", 427062309, 641089536 };
-  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.43.225/pre-download/zano_testnet_mdbx_97_449999.pak", "ab8b9e9fdedbf47dcbc01c7816191951f3b154b1eb7e5dd0da3df0872e0cd80a", 308152196, 805294080 };
+  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.43.225/pre-download/zano_testnet_mdbx_97_700000.pak", "499b4294bbfedccea98bebd369c1fb7c676de0226e9f52657daab45dac908050", 491920310, 1073725440 };
+  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.43.225/pre-download/zano_testnet_lmdb_97_700000.pak", "a8d5fc57a69576fdd9d538f37af7f1abe3a33c721a597d4a86aa198dcc1d1e0e", 669535639, 1020039168 };
 #endif
 
   static constexpr uint64_t pre_download_min_size_difference = 512 * 1024 * 1024; // minimum difference in size between local DB and the downloadable one to start downloading

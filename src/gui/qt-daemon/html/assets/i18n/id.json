@@ -1,0 +1,587 @@
+{
+  "LOGIN": {
+    "SETUP_MASTER_PASS": "Atur Kata Sandi Utama",
+    "SETUP_CONFIRM_PASS": "Konfirmasi kata sandi",
+    "MASTER_PASS": "Kata Sandi Utama",
+    "BUTTON_NEXT": "Selanjutnya",
+    "BUTTON_SKIP": "Lewati",
+    "BUTTON_RESET": "Atur Ulang",
+    "INCORRECT_PASSWORD": "Kata sandi salah",
+    "FORM_ERRORS": {
+      "PASS_REQUIRED": "Kata sandi dibutuhkan\n",
+      "CONFIRM_REQUIRED": "Diperlukan konfirmasi",
+      "MISMATCH": "Tidak cocok"
+    }
+  },
+  "COMMON": {
+    "BACK": "Kembali"
+  },
+  "BREADCRUMBS": {
+    "ADD_WALLET": "Tambahkan dompet",
+    "CREATE_WALLET": "Buat dompet baru",
+    "SAVE_PHRASE": "Simpan kalimat/kata kata anda",
+    "OPEN_WALLET": "Buka dompet yang telah ada",
+    "RESTORE_WALLET": "Mengembalikan dari cadangan",
+    "WALLET_DETAILS": "Detail Dompet",
+    "ASSIGN_ALIAS": "Tetapkan nama alias",
+    "EDIT_ALIAS": "Edit nama alias",
+    "TRANSFER_ALIAS": "Pindahkan nama alias",
+    "CONTRACTS": "Kontrak",
+    "NEW_PURCHASE": "Pembelian Baru",
+    "OLD_PURCHASE": "Pembelian"
+  },
+  "SIDEBAR": {
+    "TITLE": "Dompet",
+    "ADD_NEW": "+ Tambahkan",
+    "ACCOUNT": {
+      "STAKING": "Staking",
+      "MESSAGES": "Pesan baru/tawaran",
+      "SYNCING": "Sinkronisasi dompet"
+    },
+    "CONTACTS": "Kontak",
+    "SETTINGS": "Pengaturan",
+    "LOG_OUT": "Keluar",
+    "SYNCHRONIZATION": {
+      "OFFLINE": "Offline",
+      "ONLINE": "Online",
+      "ERROR": "Sistem error",
+      "COMPLETE": "Penyelesaian",
+      "SYNCING": "Sinkronisasi blockchain",
+      "LOADING": "Memuat data blockchain"
+    },
+    "UPDATE": {
+      "STANDARD": "Pembaruan tersedia",
+      "STANDARD_TOOLTIP": "<span class=\"standard-update\">Dapatkan pembaruan baru.</span><br><span>Pembaruan direkomendasikan!</span>",
+      "IMPORTANT": "Pembaruan tersedia",
+      "IMPORTANT_HINT": "Pembaruang penting!",
+      "IMPORTANT_TOOLTIP": "<span class=\"important-update\">Dapatkan pembaruan terbaru.</span><br><span>Pembaruan penting!</span>",
+      "CRITICAL": "Pembaruan tersedia",
+      "CRITICAL_HINT": "Pembaruan penting!",
+      "CRITICAL_TOOLTIP": "<span class=\"critical-update\">Tersedia pembaruan penting.</span><i class=\"icon\"></i><span>Direkomendasikan untuk segera di update!</span>",
+      "TIME": "Waktu sistem berbeda dengan jaringan",
+      "TIME_TOOLTIP": "<span class=\"wrong-time\">Waktu sistem salah!</span><br><span>Mohon dicek dan perbaiki sistem waktunya.</span>"
+    }
+  },
+  "MAIN": {
+    "TITLE": "Buat atau buka dompet untuk mulai menggunakan Zano",
+    "BUTTON_NEW_WALLET": "Buat dompet baru",
+    "BUTTON_OPEN_WALLET": "Buka dompet yang telah dibuat",
+    "BUTTON_RESTORE_BACKUP": "Pulihkan dari cadangan",
+    "HELP": "Bagaimana cara membuat dompet?",
+    "CHOOSE_PATH": "Pilih path untuk menyimpan"
+  },
+  "CREATE_WALLET": {
+    "NAME": "Nama Dompet",
+    "PASS": "Buat kata sandi dompet",
+    "CONFIRM": "Konfirmasi kata sandi dompet",
+    "BUTTON_SELECT": "Pilih lokasi dompet",
+    "BUTTON_CREATE": "Buat Dompet\n",
+    "TITLE_SAVE": "Simpan file dompet",
+    "ERROR_CANNOT_SAVE_TOP": "Dompet yang telah ada tidak bisa di tulis ulang atau di ganti",
+    "ERROR_CANNOT_SAVE_SYSTEM": "File dompet tidak dapat di simpan di partisi OS",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Nama di butuhkan",
+      "NAME_DUPLICATE": "Nama sama/duplikat",
+      "MAX_LENGTH": "Maksimum panjang nama tecapai",
+      "CONFIRM_NOT_MATCH": "Konfirmasi katasandi tidak sama"
+    }
+  },
+  "OPEN_WALLET": {
+    "NAME": "Nama dompet",
+    "PASS": "Katasandi dompet",
+    "BUTTON": "Buka dompet",
+    "WITH_ADDRESS_ALREADY_OPEN": "Dompet dengan alamat ini sudah terbuka",
+    "FILE_NOT_FOUND1": "File Dompet tidak ditemukan",
+    "FILE_NOT_FOUND2": "<br/><br/> Kemungkinan sudah di ganti atau dipindahkan <br/>Untuk Membuka, gunakan tombol \"Buka Dompet\".\n",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Nama diperlukan",
+      "NAME_DUPLICATE": "Nama sama/duplikat",
+      "MAX_LENGTH": "Maksimum panjang nama tecapai"
+    },
+    "MODAL": {
+      "TITLE": "Tulis kata sandi dompet",
+      "LABEL": "Katasandi untuk dompet ini",
+      "OPEN": "Buka dompet",
+      "SKIP": "Lewati",
+      "NOT_FOUND": "Tidak ditemukan"
+    }
+  },
+  "RESTORE_WALLET": {
+    "LABEL_NAME": "Nama dompet",
+    "LABEL_PHRASE_KEY": "Seed phrase/ kunci pribadi",
+    "PASS": "Katasandi dompet",
+    "CONFIRM": "Konfirmasi kata sandi dompet",
+    "BUTTON_SELECT": "Pilih lokasi dompet",
+    "BUTTON_CREATE": "Buat Dompet\n",
+    "NOT_CORRECT_FILE_OR_PASSWORD": "File dompet tidak valid atau kata sandi tidak sama",
+    "CHOOSE_PATH": "Pilih path untuk menyimpan",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Nama diperlukan",
+      "NAME_DUPLICATE": "Nama sama/duplikat",
+      "MAX_LENGTH": "Maksimum panjang nama tecapai",
+      "CONFIRM_NOT_MATCH": "Konfirmasi katasandi tidak sama",
+      "KEY_REQUIRED": "Kunci di butuhkan",
+      "KEY_NOT_VALID": "Kunci tidak valid"
+    }
+  },
+  "SEED_PHRASE": {
+    "TITLE": "Pastikan untuk menyimpan seed phrase di tempat yang aman. Jika kamu lupa seed phrasenya, kamu tidak bisa menggunakanya untuk memulihkan/recover dompetmu.",
+    "BUTTON_CREATE_ACCOUNT": "Buat Dompet\n",
+    "BUTTON_COPY": "Salin"
+  },
+  "PROGRESS": {
+    "ADD_WALLET": "Tambahkan dompet",
+    "SELECT_LOCATION": "Pilih lokasi dompet",
+    "CREATE_WALLET": "Buat dompet baru",
+    "RESTORE_WALLET": "Pulihkan dari cadangan"
+  },
+  "SETTINGS": {
+    "TITLE": "Pengaturan",
+    "DARK_THEME": "Tema Gelap",
+    "WHITE_THEME": "Tema Biasa/Putih",
+    "GRAY_THEME": "Tema Abu-abu",
+    "APP_LOCK": {
+      "TITLE": "Kunci aplikasi setelah:",
+      "TIME1": "5 Menit",
+      "TIME2": "15 Menit",
+      "TIME3": "1 Jam",
+      "TIME4": "Tidak pernah"
+    },
+    "MASTER_PASSWORD": {
+      "TITLE": "Atur Kata Sandi Utama",
+      "OLD": "Katasandi lama",
+      "NEW": "Katasandi baru",
+      "CONFIRM": "Konfirmasi katasandi baru",
+      "BUTTON": "Simpan"
+    },
+    "FORM_ERRORS": {
+      "PASS_REQUIRED": "Kata sandi dibutuhkan\n",
+      "PASS_NOT_MATCH": "Katasandi lama tidak sama",
+      "CONFIRM_NOT_MATCH": "Konfirmasi katasandi tidak sama"
+    },
+    "LAST_BUILD": "Versi sekarang: {{value}}",
+    "APP_LOG_TITLE": "Tingkat log:"
+  },
+  "WALLET": {
+    "REGISTER_ALIAS": "Daftarkan alias",
+    "DETAILS": "Detail",
+    "LOCK": "Kunci",
+    "AVAILABLE_BALANCE": "Tersedia <b>{{available}} {{currency}}<b/>",
+    "LOCKED_BALANCE": "Terkunci <b>{{locked}} {{currency}}<b/>",
+    "LOCKED_BALANCE_LINK": "Apa yang dimaksudkan?\n",
+    "TABS": {
+      "SEND": "Kirim",
+      "RECEIVE": "Terima",
+      "HISTORY": "Riwayat",
+      "CONTRACTS": "Kontrak",
+      "MESSAGES": "Pesan",
+      "STAKING": "Staking"
+    }
+  },
+  "WALLET_DETAILS": {
+    "LABEL_NAME": "Nama dompet",
+    "LABEL_FILE_LOCATION": "Lokasi file dompet",
+    "LABEL_SEED_PHRASE": "Seed Phrase",
+    "SEED_PHRASE_HINT": "Klik untuk membuka frasa kunci",
+    "BUTTON_SAVE": "Simpan",
+    "BUTTON_REMOVE": "Tutup dompet",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Nama diperlukan",
+      "NAME_DUPLICATE": "Nama sama/duplikat",
+      "MAX_LENGTH": "Maksimum panjang nama tecapai"
+    }
+  },
+  "ASSIGN_ALIAS": {
+    "NAME": {
+      "LABEL": "Alias",
+      "PLACEHOLDER": "@ Masukan alias",
+      "TOOLTIP": "Alias adalah formulir singkat atau akun Anda. Alias hanya dapat menyertakan huruf Latin, angka, dan karakter “.” dan \"-\". Itu harus dimulai dengan \"@\"."
+    },
+    "COMMENT": {
+      "LABEL": "Komentar",
+      "PLACEHOLDER": "",
+      "TOOLTIP": "Komentar akan terlihat oleh siapa saja yang ingin melakukan pembayaran ke alias Anda. Anda dapat memberikan detail tentang bisnis Anda, kontak, atau memasukkan teks apa pun. Komentar dapat diedit nanti."
+    },
+    "COST": "Biaya Alias {{value}} {{currency}}",
+    "BUTTON_ASSIGN": "Menetapkan",
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Nama di butuhkan",
+      "NAME_WRONG": "Alias memiliki nama yang salah",
+      "NAME_LENGTH": "Alias harus 6-25 karakter",
+      "NAME_EXISTS": "Nama alias sudah ada",
+      "NO_MONEY": "Anda tidak memiliki cukup dana untuk menetapkan alias ini",
+      "MAX_LENGTH": "Maksimum panjang komentar tecapai"
+    },
+    "ONE_ALIAS": "Anda hanya dapat membuat satu alias per dompet",
+    "REQUEST_ADD_REG": "Alias akan di pindahkan dalam 10 menit"
+  },
+  "EDIT_ALIAS": {
+    "NAME": {
+      "LABEL": "Alias",
+      "PLACEHOLDER": "@ Masukan alias"
+    },
+    "COMMENT": {
+      "LABEL": "Komentar",
+      "PLACEHOLDER": ""
+    },
+    "FORM_ERRORS": {
+      "NO_MONEY": "Anda tidak memiliki cukup dana untuk mengganti alias ini",
+      "MAX_LENGTH": "Maksimum panjang komentar tecapai"
+    },
+    "COST": "Biaya Alias {{value}} {{currency}}",
+    "BUTTON_EDIT": "Edit/ubah"
+  },
+  "TRANSFER_ALIAS": {
+    "NAME": {
+      "LABEL": "Alias",
+      "PLACEHOLDER": "@ Masukan alias"
+    },
+    "COMMENT": {
+      "LABEL": "Komentar",
+      "PLACEHOLDER": ""
+    },
+    "ADDRESS": {
+      "LABEL": "Pindahkan ke",
+      "PLACEHOLDER": ""
+    },
+    "FORM_ERRORS": {
+      "WRONG_ADDRESS": "Tidak ada domet di akun ini",
+      "ALIAS_EXISTS": "Akun ini sudah memiliki alias",
+      "NO_MONEY": "Anda tidak memiliki cukup dana untuk memindahkan alias ini"
+    },
+    "COST": "Biaya Alias {{value}} {{currency}}",
+    "BUTTON_TRANSFER": "Pindahkan",
+    "BUTTON_CANCEL": "Batal",
+    "REQUEST_SEND_REG": "Alias akan di pindahkan dalam 10 menit"
+  },
+  "SEND": {
+    "ADDRESS": "Alamat",
+    "AMOUNT": "Jumlah",
+    "COMMENT": "Komentar",
+    "DETAILS": "Detail tambahan\n",
+    "MIXIN": "Mixin",
+    "FEE": "Biaya",
+    "HIDE": "Sembunyikan alamat dompet kamu dari penerima",
+    "BUTTON": "Kirim",
+    "SUCCESS_SENT": "Transaksi dikirim",
+    "FORM_ERRORS": {
+      "ADDRESS_REQUIRED": "Alamat di perlukan",
+      "ADDRESS_NOT_VALID": "Alamat tidak valid",
+      "ALIAS_NOT_VALID": "Alias tidak valid",
+      "AMOUNT_REQUIRED": "Jumlah di perlukan",
+      "AMOUNT_ZERO": "Jumlah 0",
+      "FEE_REQUIRED": "Biaya dibutuhkan",
+      "FEE_MINIMUM": "Biaya minimal : {{fee}}",
+      "MAX_LENGTH": "Maksimum panjang komentar tecapai"
+    }
+  },
+  "HISTORY": {
+    "STATUS": "Status",
+    "STATUS_TOOLTIP": "Konfirmasi {{current}}/{{total}}",
+    "LOCK_TOOLTIP": "Dikunci sampai {{date}}",
+    "SEND": "Dikirim",
+    "RECEIVED": "Diterima",
+    "DATE": "Tanggal",
+    "AMOUNT": "Jumlah",
+    "FEE": "Biaya",
+    "ADDRESS": "Alamat",
+    "DETAILS": {
+      "PAYMENT_ID": "ID Pembayaran",
+      "ID": "ID Transaksi",
+      "SIZE": "Ukuran transaksi",
+      "SIZE_VALUE": "{{value}} bytes",
+      "HEIGHT": "Tinggi",
+      "CONFIRMATION": "Konfirmasi",
+      "INPUTS": "Input",
+      "OUTPUTS": "Output/Keluaran",
+      "COMMENT": "Komentar"
+    },
+    "TYPE_MESSAGES": {
+      "HIDDEN": "tersembunyi",
+      "UNDEFINED": "Tidak terdefinisi",
+      "COMPLETE_BUYER": "Kontrak selesai",
+      "COMPLETE_SELLER": "Kontrak selesai",
+      "CREATE_ALIAS": "Biaya untuk menetapkan alias",
+      "UPDATE_ALIAS": "Biaya untuk mengubah alias",
+      "POW_REWARD": "Hadiah POW",
+      "POS_REWARD": "Hadiah POS",
+      "CREATE_CONTRACT": "Proposal Kontrak",
+      "PLEDGE_CONTRACT": "Kontrak Deposit",
+      "NULLIFY_CONTRACT": "Setoran yang dibakar/hangus",
+      "PROPOSAL_CANCEL_CONTRACT": "Permintaan pembatalan",
+      "CANCEL_CONTRACT": "Batalkan dan kembalikan setoran/deposit"
+    }
+  },
+  "CONTRACTS": {
+    "EMPTY": "Tidak ada kontrak yang aktif",
+    "CONTRACTS": "Kontrak",
+    "PURCHASE": "Pembelian",
+    "SELL": "Jual",
+    "DATE": "Tanggal",
+    "AMOUNT": "Jumlah",
+    "STATUS": "Status",
+    "COMMENTS": "Komentar",
+    "PURCHASE_BUTTON": "Pembelian Baru",
+    "LISTING_BUTTON": "Buat daftar",
+    "TIME_LEFT": {
+      "REMAINING_LESS_ONE": "Kurang dari satu jam untuk merespon",
+      "REMAINING_ONE": "kurang {{time}} jam",
+      "REMAINING_MANY": "kurang {{time}} jam",
+      "REMAINING_MANY_ALT": "kurang {{time}} jam",
+      "REMAINING_ONE_RESPONSE": "kurang {{time}} jam",
+      "REMAINING_MANY_RESPONSE": "kurang {{time}} jam",
+      "REMAINING_MANY_ALT_RESPONSE": "kurang {{time}} jam",
+      "REMAINING_ONE_WAITING": "Menunggu dari {{time}} jam",
+      "REMAINING_MANY_WAITING": "Menunggu dari {{time}} jam",
+      "REMAINING_MANY_ALT_WAITING": "Menunggu dari {{time}} jam"
+    },
+    "STATUS_MESSAGES": {
+      "SELLER": {
+        "NEW_CONTRACT": "Proposal kontrak baru",
+        "IGNORED": "Kamu mengabaikan kontrak proposal",
+        "ACCEPTED": "Kontrak dimulai",
+        "WAIT": "Menunggu konfirmasi kontrak\n",
+        "WAITING_BUYER": "menunggu untuk dikirim",
+        "COMPLETED": "Kontrak selesai",
+        "NOT_RECEIVED": "Pengiriman gagal",
+        "NULLIFIED": "Semua deposit/setoran hangus",
+        "PROPOSAL_CANCEL": "Proposal baru untuk membatalkan kontrak dan mengembalikan deposit",
+        "BEING_CANCELLED": "Pembatalan dalam proses",
+        "CANCELLED": "Kontrak dibatalkan",
+        "IGNORED_CANCEL": "Kamu mengabaikan kontrak proposal",
+        "EXPIRED": "Kontrak proposal telah kadaluarsa"
+      },
+      "BUYER": {
+        "WAITING": "Menunggu untuk respon",
+        "IGNORED": "Penjual mengabaikan kontrak proposal",
+        "ACCEPTED": "Penjual menerima kontrak proposal kamu",
+        "WAIT": "Menunggu konfirmasi deposit",
+        "WAITING_SELLER": "menunggu untuk dikirim",
+        "COMPLETED": "Kontrak selesai",
+        "NOT_RECEIVED": "Pengiriman gagal",
+        "NULLIFIED": "Semua deposit/setoran hangus",
+        "WAITING_CANCEL": "Menunggu pembatalan kontrak",
+        "BEING_CANCELLED": "Pembatalan dalam proses",
+        "CANCELLED": "Kontrak dibatalkan",
+        "IGNORED_CANCEL": "Penjual mengabaikan proposal anda untuk pembatalan kontrak",
+        "EXPIRED": "Kontrak proposal telah kadaluwarsa"
+      }
+    }
+  },
+  "PURCHASE": {
+    "DESCRIPTION": "Deskripsi",
+    "SELLER": "Penjual",
+    "AMOUNT": "Jumlah",
+    "YOUR_DEPOSIT": "Setoran/deposit kamu",
+    "SELLER_DEPOSIT": "Setoran/Depost Penjual",
+    "BUYER_DEPOSIT": "Setoran pembeli",
+    "SAME_AMOUNT": "Jumlah yang sama",
+    "COMMENT": "Komentar",
+    "DETAILS": "Detail tambahan\n",
+    "SEND_BUTTON": "Kirim",
+    "FORM_ERRORS": {
+      "DESC_REQUIRED": "Deskripsi dibutuhkan",
+      "DESC_MAXIMUM": "Maksimum panjang bidang tecapai",
+      "SELLER_REQUIRED": "Alamat di perlukan",
+      "SELLER_NOT_VALID": "alamat tidak valid",
+      "ALIAS_NOT_VALID": "alias tidak valid",
+      "AMOUNT_REQUIRED": "Jumlah di perlukan",
+      "AMOUNT_ZERO": "Jumlah tidak bisa 0",
+      "YOUR_DEPOSIT_REQUIRED": "Deposit/setoran dibutuhkan",
+      "SELLER_DEPOSIT_REQUIRED": "Setoran penjual dibuthkan",
+      "SELLER_SAME": "Gunakan akun terpisah",
+      "COMMENT_MAXIMUM": "Maksimum panjang bidang tecapai"
+    },
+    "PROGRESS_NEW": "Pembelian Baru",
+    "PROGRESS_WAIT": "Menunggu balasan",
+    "PROGRESS_RECEIVE": "Balasan diterima",
+    "PROGRESS_COMPLETE": "Selesai",
+    "FEE": "Biaya",
+    "PAYMENT": "ID Pembayaran",
+    "STATUS_MESSAGES": {
+      "NEW_PURCHASE": "Pembelian Baru",
+      "WAITING_SELLER": "Menunggu untuk respon",
+      "WAITING_BUYER": "Kontrak proposal telah diterima",
+      "WAITING_CONFIRMATION": "Menunggu konfirmasi deposit",
+      "WAITING_DELIVERY": "menunggu untuk dikirim",
+      "COMPLETED": "Kontrak selesai",
+      "IGNORED_BUYER": "Kontrak proposal diabaikan",
+      "IGNORED_SELLER": "Penjual mengabaikan kontrak proposal",
+      "PROPOSAL_CANCEL_SELLER": "Permintaan pembatalan dikirimkan",
+      "PROPOSAL_CANCEL_BUYER": "Permintaan pembatalan diterima",
+      "BEING_CANCELLED": "Pembatalan dalam proses",
+      "IGNORED_CANCEL_SELLER": "Penjual mengabaikan proposal anda untuk pembatalan kontrak",
+      "IGNORED_CANCEL_BUYER": "Proposal pembatalan kontrak diabaikan",
+      "CANCELLED": "Kontrak dibatalkan",
+      "EXPIRED": "Kontrak proposal telah kadaluarsa",
+      "NOT_RECEIVED": "Pengiriman gagal",
+      "NULLIFIED": "Semua deposit/setoran hangus"
+    },
+    "ACCEPT_STATE_WAIT_BIG": "Kontrak dimulai",
+    "IGNORED_ACCEPT": "Kontrak proposal diabaikan",
+    "BURN_PROPOSAL": "Semua deposit/setoran hangus",
+    "SUCCESS_FINISH_PROPOSAL": "Kontrak selesai",
+    "SEND_CANCEL_PROPOSAL": "Permintaan pembatalan dikirimkan",
+    "IGNORED_CANCEL": "Proposal pembatalan kontrak diabaikan",
+    "DEALS_CANCELED_WAIT": "Pembatalan dalam proses",
+    "WAITING_TIME": "Waktu Respon",
+    "NEED_MONEY": "Dana tidak cukup",
+    "BUTTON_MAKE_PLEDGE": "Terima dan buat deposit",
+    "BUTTON_IGNORE": "Abaikan dan sembunyikan penawaran",
+    "BUTTON_NULLIFY": "Matikan dan bakar setoran ",
+    "BUTTON_RECEIVED": "Selesai dan lepaskan setoran/deposit",
+    "BUTTON_CANCEL_BUYER": "Batalkan dan kembalikan setoran/deposit",
+    "BUTTON_NOT_CANCEL": "Abaikan permintaan ",
+    "BUTTON_CANCEL_SELLER": "Konfirmasi dan kembalikan deposit",
+    "HOUR": "Jam",
+    "HOURS": "Jam",
+    "CANCEL": "Batal",
+    "NULLIFY_QUESTION": "Apakah kamu yakin untuk membakar/menghanguskan kedua deposit/setoran?",
+    "BUTTON_NULLIFY_SHORT": "Hangus",
+    "WAITING_TIME_QUESTION": "Apakah kamu yakin untuk membatalkan kontrak?"
+  },
+  "MESSAGES": {
+    "ADDRESS": "Alamat",
+    "MESSAGE": "Pesan",
+    "SEND_PLACEHOLDER": "Ketik sebuah pesan...",
+    "SEND_BUTTON": "Kirim"
+  },
+  "MODALS": {
+    "ERROR": "Error",
+    "SUCCESS": "Berhasil",
+    "INFO": "Informasi",
+    "OK": "Ok"
+  },
+  "CONFIRM": {
+    "BUTTON_CONFIRM": "Kirim",
+    "BUTTON_CANCEL": "Batal",
+    "TITLE": "Konfirmasi transaksi",
+    "MESSAGE": {
+      "SEND": "Kirim",
+      "FROM": "Dari\n",
+      "TO": "Untuk",
+      "COMMENT": "Komentar"
+    }
+  },
+  "STAKING": {
+    "TITLE": "Staking",
+    "TITLE_PENDING": "Tertunda",
+    "TITLE_TOTAL": "Total",
+    "TITLE_PERIOD": "Periode waktu:",
+    "PERIOD": {
+      "WEEK1": "1 minggu",
+      "WEEK2": "2 minggu",
+      "MONTH1": "1 bulan",
+      "MONTH3": "3 bulan",
+      "MONTH6": "6 bulan",
+      "YEAR": "1 tahun",
+      "ALL": "Semua"
+    },
+    "TITLE_GROUP": "Kelompok:",
+    "GROUP": {
+      "DAY": "hari",
+      "WEEK": "minggu",
+      "MONTH": "bulan"
+    },
+    "SWITCH": {
+      "ON": "On",
+      "OFF": "Off"
+    }
+  },
+  "CONTACTS": {
+    "TITLE": "Daftar kontak",
+    "IMPORT_EXPORT": "Import atau ekspor kontak",
+    "IMPORT": "Import",
+    "EXPORT": "Ekspor",
+    "ADD": "Tambahkan/edit kontak",
+    "SEND": "Kirim",
+    "SEND_FROM": "Kirim dari",
+    "SEND_TO": "Untuk",
+    "OPEN_ADD_WALLET": "Buka/tambahkan dompet",
+    "COPY": "- Salin",
+    "TABLE": {
+      "NAME": "Nama",
+      "ALIAS": "Alias",
+      "ADDRESS": "Alamat",
+      "NOTES": "Catatan",
+      "EMPTY": "Daftar kontrak masih kosong"
+    },
+    "FORM": {
+      "NAME": "Nama",
+      "ADDRESS": "Alamat",
+      "NOTES": "Catatan"
+    },
+    "FORM_ERRORS": {
+      "NAME_REQUIRED": "Nama diperlukan",
+      "NAME_DUBLICATED": "Nama sama/duplikat",
+      "ADDRESS_REQUIRED": "Alamat di perlukan",
+      "ADDRESS_NOT_VALID": "Alamat tidak valid",
+      "SET_MASTER_PASSWORD": "Atur Kata Sandi Utama",
+      "ADDRESS_DUBLICATED": "Alamat sama/duplikat",
+      "MAX_LENGTH": "Maksimum panjang catatan tecapai",
+      "NAME_LENGTH": "Nama harus 4-25 karakter"
+    },
+    "BUTTON": {
+      "SEND": "Kirim",
+      "EDIT": "Edit/ubah",
+      "DELETE": "Hapus",
+      "ADD": "Tambahkan kontak",
+      "ADD_EDIT": "Tambahkan/Simpan",
+      "GO_TO_WALLET": "Pergi ke dompet",
+      "IMPORT_EXPORT": "Impor/Ekspor"
+    },
+    "SUCCESS_SENT": "Kontak ditambahkan",
+    "SUCCESS_SAVE": "Kontak telah di ubah",
+    "SUCCESS_IMPORT": "Kontak telah di impor",
+    "SUCCESS_EXPORT": "Kontak telah di ekspor",
+    "ERROR_IMPORT": "Kesalahan terjadi ketika membaca file!",
+    "ERROR_TYPE_FILE": "Tolong mengimpor file .csv yang valid",
+    "ERROR_EXPORT": "Tipe file tidak valid. Simpan file dalam .csv",
+    "ERROR_EMPTY_LIST": "Daftar kontak masih kosong",
+    "ERROR_IMPORT_EMPTY": "File masih kosong "
+  },
+  "ERRORS": {
+    "NO_MONEY": "Tidak cukup uang",
+    "NOT_ENOUGH_MONEY": "Dana di akun tidak cukup",
+    "CORE_BUSY": "Kesalahan intenal: inti sedang sibuk",
+    "DAEMON_BUSY": "Kesalahan intenal: daemon sedang sibuk",
+    "NO_MONEY_REMOVE_OFFER": "Tidak ada biaya untuk menghapus penawaran, tetapi untuk melindungi jaringan terhadap transaksi banjir/banyak, Anda harus memiliki setidaknya {{fee}} {{currency}} di dompet Anda",
+    "NOT_ENOUGH_OUTPUTS_TO_MIX": "Mixin terlalu besar untuk keadaan blockchain saat ini. Tidak ada cukup keluaran yang tidak terpakai untuk digabungkan",
+    "TRANSACTION_IS_TO_BIG": "Transaksi melebihi batas jaringan, mengirim jumlah yang diperlukan dengan banyak transaksi",
+    "TRANSFER_ATTEMPT": "Tidak ada koneksi ke jaringan Zano",
+    "ACCESS_DENIED": "Akses ditolak",
+    "TRANSACTION_ERROR": "Kesalahan. Transaksi tidak selesai.",
+    "BAD_ARG": "Argumen tidak valid",
+    "WALLET_WRONG_ID": "ID dompet tidak valid",
+    "WRONG_PASSWORD": "Katasandi tidak valid",
+    "FILE_RESTORED": "File dompet rusak. Kami telah memulihkan kunci dan dompet dari blockchain",
+    "FILE_NOT_FOUND": "File tidak ditemukan",
+    "FILE_EXIST": "Sebuah file dengan nama tersebut sudah ada. Coba menggunakan nama lain untuk menyimpannya",
+    "FILE_NOT_SAVED": "Anda tidak dapat menyimpan file dompet di folder ini. Tolong pilih folder yang lain.",
+    "TX_TYPE_NORMAL": "Error. Pembayaran dari dompet",
+    "TX_TYPE_NORMAL_TO": "untuk",
+    "TX_TYPE_NORMAL_END": "tidak selesai",
+    "TX_TYPE_NEW_ALIAS": "Error. Gagal untuk mendaftarkan alias ",
+    "TX_TYPE_NEW_ALIAS_END": "Silakan coba lagi",
+    "TX_TYPE_UPDATE_ALIAS": "Error. Gagal mengubah komentar menjadi alias dengan aman",
+    "TX_TYPE_COIN_BASE": "Error. Pembayaran tidak selesai."
+  },
+  "CONTEXT_MENU": {
+    "COPY": "Salin",
+    "PASTE": "tempel/paste",
+    "SELECT": "pilih semua"
+  },
+  "BACKEND_LOCALIZATION": {
+    "QUIT": "Keluar",
+    "IS_RECEIVED": "",
+    "IS_CONFIRMED": "",
+    "INCOME_TRANSFER_UNCONFIRMED": "Pembayaran masuk (belum terkonfirmasi)",
+    "INCOME_TRANSFER_CONFIRMED": "Pembayaran diterima",
+    "MINED": "Ditambang",
+    "LOCKED": "Diblokir",
+    "IS_MINIMIZE": "Aplikasi Zano di minimalkan ke dalam sistem tray.",
+    "RESTORE": "Kamu dapat mengembalikannya dengan cara mengklik ke dalam menu konteks.",
+    "TRAY_MENU_SHOW": "Ubah ukuran",
+    "TRAY_MENU_MINIMIZE": "Minimalkan"
+  }
+}
