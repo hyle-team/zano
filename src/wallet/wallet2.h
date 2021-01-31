@@ -53,6 +53,7 @@
 #define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
 #define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
 #define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
+#define   WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM                      uint32_t(1 << 5) // for htlc keeps info if this htlc belong as redeem or as refund
 
 
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
@@ -741,6 +742,7 @@ namespace tools
       
       a & m_htlcs;
       a & m_active_htlcs;
+      a & m_active_htlcs_txid;
 
     }
 
@@ -987,7 +989,7 @@ private:
       bool is_wallet_owns_redeem; //specify if this HTLC belong to this wallet by pkey_redeem or by pkey_refund
       uint64_t transfer_index;
     };
-    std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //uint64_t -> height of expiration
+    std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
     amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
     std::unordered_map<crypto::hash, uint64_t> m_active_htlcs_txid; // map [txid] -> transfer index, limitation: 1 transactiom -> 1 htlc
 

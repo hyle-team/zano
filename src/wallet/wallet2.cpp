@@ -581,6 +581,11 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           uint64_t expired_if_more_then = td.m_ptx_wallet_info->m_block_height + hltc.expiration;
           m_htlcs[expired_if_more_then] = het;
 
+          if (het.is_wallet_owns_redeem)
+          {
+            td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM;
+          }          
+
           //active htlc
           auto amount_gindex_pair = std::make_pair(amount, td.m_global_output_index);
           m_active_htlcs[amount_gindex_pair] = transfer_index;
@@ -2212,8 +2217,9 @@ void wallet2::detach_blockchain(uint64_t including_height)
       WLT_LOG_BLUE("Transfer [" << i << "] spent height: " << tr.m_spent_height << " -> 0, reason: detaching blockchain", LOG_LEVEL_1);
       tr.m_spent_height = 0;
       //check if it's hltc contract
-      if (tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].target == typeid(txout_htlc))
+      if (tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].target == typeid(txout_htlc) && tr.m_flags & WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM)
       {
+        //only if htlc was spent as a redeem, then we put htlc back as active
         const txout_htlc& htlc = boost::get<txout_htlc>(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].target);
         auto amount_gindex_pair = std::make_pair(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].amount, tr.m_global_output_index);
         m_active_htlcs[amount_gindex_pair] = i;
@@ -4027,6 +4033,10 @@ void wallet2::get_list_of_active_htlc(bool only_redeem_txs, std::list<htlc_entry
 {
   for (auto htlc_entry : m_active_htlcs_txid)
   {
+    if (only_redeem_txs && !(td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM))
+    {
+      continue;
+    }
     htlc_entry_info entry = AUTO_VAL_INIT(entry);
     entry.tx_id = htlc_entry.first;
     const transfer_details& td = m_transfers[htlc_entry.second];
@@ -4035,6 +4045,7 @@ void wallet2::get_list_of_active_htlc(bool only_redeem_txs, std::list<htlc_entry
       "[get_list_of_active_htlc]Internal error: unexpected type of out");
     const txout_htlc& htlc = boost::get<txout_htlc>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target);
     entry.sha256_hash = htlc.htlc_hash;
+    entry.is_redeem = td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM ? true : false;
     htlcs.push_back(entry);
   }
 }

@@ -979,11 +979,13 @@ namespace wallet_public
     crypto::hash sha256_hash;
     crypto::hash tx_id;
     uint64_t amount;
+    bool is_redeem;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
       KV_SERIALIZE(sha256_hash)
       KV_SERIALIZE(tx_id)
+      KV_SERIALIZE(is_redeem)
     END_KV_SERIALIZE_MAP()
   };
 
