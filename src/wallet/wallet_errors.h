@@ -64,7 +64,7 @@ namespace tools
       std::string to_string() const
       {
         std::ostringstream ss;
-        ss << m_loc << ':' << typeid(*this).name() << ": " << Base::what();
+        ss << m_loc << ':' << typeid(*this).name() << "[" << m_error_code << "]: " << Base::what();
         return ss.str();
       }
 
@@ -74,6 +74,13 @@ namespace tools
         return m_what.c_str();
       }
 
+      wallet_error_base(std::string&& loc, const std::string& message, const std::string& error_code)
+        : Base(message)
+        , m_loc(loc)
+        , m_error_code(error_code)
+      {
+      }
+
     protected:
       wallet_error_base(std::string&& loc, const std::string& message)
         : Base(message)
@@ -81,8 +88,10 @@ namespace tools
       {
       }
 
+
     private:
       std::string m_loc;
+      std::string m_error_code;
       mutable std::string m_what;
     };
     //----------------------------------------------------------------------------------------------------
@@ -661,6 +670,20 @@ if (!(cond))                                                                    
   LOG_ERROR(#cond << ". THROW EXCEPTION: " << #err_type);                                                  \
   tools::error::throw_wallet_ex<err_type>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ## __VA_ARGS__);  \
 }
+
+
+
+//#define THROW_IF_FALSE_WALLET_EX_MES(cond, err_type, mess, ...)                                            
+#define WLT_THROW_IF_FALSE_WITH_CODE(cond, mess, error_code)                                                \
+if (!(cond))                                                                                               \
+{                                                                                                          \
+  exception_handler();                                                                                     \
+  std::stringstream ss;                                                                                    \
+  ss << std::endl << mess;                                                                                 \
+  LOG_ERROR(#cond << ". THROW EXCEPTION: " << error_code << ss.str());                                                  \
+  tools::error::throw_wallet_ex<tools::error::wallet_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str(), error_code); \
+}
+
 
 #define THROW_IF_FALSE_WALLET_EX_MES(cond, err_type, mess, ...)                                            \
 if (!(cond))                                                                                               \

@@ -53,11 +53,12 @@ namespace currency
     uint64_t amount_to_provide;                      //amount money that provided by initial creator of tx, used with partially created transactions
     uint64_t unlock_time;
     bool htlc;                                       //if this flag is set, then creating htlc out, unlock_time -> number of blocks that htlc proposal is active
+    crypto::hash htlc_hash;
 
-    tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc(false){}
-    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc(false){}
-    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(ut), htlc(false){}
-    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0), unlock_time(0), htlc(false){}
+    tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc(false), htlc_hash(null_hash){}
+    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc(false), htlc_hash(null_hash) {}
+    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(ut), htlc(false), htlc_hash(null_hash) {}
+    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0), unlock_time(0), htlc(false), htlc_hash(null_hash) {}
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(amount)
@@ -66,6 +67,7 @@ namespace currency
       FIELD(amount_to_provide)
       FIELD(unlock_time)
       FIELD(htlc)
+      FIELD(htlc_hash)
     END_SERIALIZE()
   };
 

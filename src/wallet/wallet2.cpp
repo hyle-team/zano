@@ -4012,7 +4012,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   print_tx_sent_message(tx, "(from multisig)", fee);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx)
+void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, const crypto::hash& htlc_hash)
 {
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
@@ -4022,6 +4022,7 @@ void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_publ
   dst.back().addr.push_back(addr);
   dst.back().amount = amount;
   dst.back().htlc = true;
+  dst.back().htlc_hash = htlc_hash;
   dst.back().unlock_time = 740; //about 12 hours
 
   transaction result_tx = AUTO_VAL_INIT(result_tx);
@@ -4051,7 +4052,13 @@ void wallet2::get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_pub
 //----------------------------------------------------------------------------------------------------
 void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin)
 {
-
+  //lets figure out, if we have active htlc for this htlc
+  auto it = m_active_htlcs_txid.find(htlc_tx_id);
+  if (it == m_active_htlcs_txid.end())
+  {
+    WLT_THROW_IF_FALSE_WITH_CODE(false,
+      "htlc not found with tx_id = " << htlc_tx_id, API_RETURN_CODE_NOT_FOUND); 
+  }
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)

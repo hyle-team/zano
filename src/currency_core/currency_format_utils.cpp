@@ -650,19 +650,28 @@ namespace currency
       bool r = derive_public_key_from_target_address(self.account_address, tx_sec_key, output_index, out_eph_public_key, derivation);
       CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
       htlc.pkey_refund = out_eph_public_key;
-      //we use deterministic origin, to make possible access origin on different wallets copies
-      std::string hltc_origin = generate_origin_for_htlc(htlc.pkey_redeem, htlc.pkey_refund, self);
-      //calculate hash
 
-      if (htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
+      if (de.htlc_hash == null_hash)
       {
-        htlc.htlc_hash = crypto::sha256_hash(hltc_origin.data(), hltc_origin.size());
+        //we use deterministic origin, to make possible access origin on different wallets copies
+        std::string hltc_origin = generate_origin_for_htlc(htlc.pkey_redeem, htlc.pkey_refund, self);
+
+        //calculate hash
+        if (htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
+        {
+          htlc.htlc_hash = crypto::sha256_hash(hltc_origin.data(), hltc_origin.size());
+        }
+        else
+        {
+          crypto::hash160 h160 = crypto::RIPEMD160_hash(hltc_origin.data(), hltc_origin.size());
+          std::memcpy(&htlc.htlc_hash, &h160, sizeof(h160));
+        }
       }
       else
       {
-        crypto::hash160 h160 = crypto::RIPEMD160_hash(hltc_origin.data(), hltc_origin.size());        
-        std::memcpy(&htlc.htlc_hash, &h160, sizeof(h160));
+        htlc.htlc_hash = de.htlc_hash;
       }
+
     }
     else if (target_keys.size() == 1)
     {

@@ -82,6 +82,9 @@ const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64
 #define WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
 #define WLT_THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, msg, ...) THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, "[W:" << m_log_prefix << "] " << msg, ## __VA_ARGS__)
 
+
+
+
 class test_generator;
 
 namespace tools
@@ -823,8 +826,14 @@ namespace tools
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
+    
+    /*
+    create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
+    we use deterministic origin, if given some particular htlc_hash, then we use this hash, and this means that 
+    opener-hash will be given by other side
+    */
     void create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count,
-      currency::transaction &tx);
+      currency::transaction &tx, const crypto::hash& htlc_hash = currency::null_hash);
     void get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_public::htlc_entry_info>& htlcs);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
 
