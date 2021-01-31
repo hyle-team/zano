@@ -398,7 +398,12 @@ namespace tools
       END_KV_SERIALIZE_MAP()
     };
 
-
+    //used in wallet 
+    struct htlc_expiration_trigger
+    {
+      bool is_wallet_owns_redeem; //specify if this HTLC belong to this wallet by pkey_redeem or by pkey_refund
+      uint64_t transfer_index;
+    };
 
 
     struct payment_details
@@ -818,9 +823,9 @@ namespace tools
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
-    void create_htlc_proposal(uint64_t amount, account_public_address& addr, uint64_t lock_blocks_count, 
-      account_public_address& addr, currency::transaction &tx);
-    void get_list_of_active_htlc(bool only_redeem_txs, std::list<htlc_entry_info>& htlcs);
+    void create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count,
+      currency::transaction &tx);
+    void get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_public::htlc_entry_info>& htlcs);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
 
 private:
@@ -983,12 +988,6 @@ private:
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
     std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
 
-    //used in wallet 
-    struct htlc_expiration_trigger
-    {
-      bool is_wallet_owns_redeem; //specify if this HTLC belong to this wallet by pkey_redeem or by pkey_refund
-      uint64_t transfer_index;
-    };
     std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
     amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
     std::unordered_map<crypto::hash, uint64_t> m_active_htlcs_txid; // map [txid] -> transfer index, limitation: 1 transactiom -> 1 htlc
@@ -1051,7 +1050,12 @@ namespace boost
       a & static_cast<tools::wallet2::transfer_details_base&>(x);
     }
 
-
+    template <class Archive>
+    inline void serialize(Archive &a, tools::wallet2::htlc_expiration_trigger &x, const boost::serialization::version_type ver)
+    {
+      a & x.is_wallet_owns_redeem;
+      a & x.transfer_index;
+    }
 
     template <class Archive>
     inline void serialize(Archive& a, tools::wallet2::payment_details& x, const boost::serialization::version_type ver)

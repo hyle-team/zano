@@ -29,6 +29,7 @@ using namespace epee;
 #include "genesis.h"
 #include "genesis_acc.h"
 #include "common/mnemonic-encoding.h"
+#include "crypto/bitcoin/sha256_helper.h"
 
 namespace currency
 {
@@ -590,16 +591,16 @@ namespace currency
 //     return true;
 //   }  
   //---------------------------------------------------------------
-  std::string generate_origin_for_htlc(cons crypto::public_key& redeem, cons crypto::public_key& refund, const account_keys& acc_keys)
+  std::string generate_origin_for_htlc(const crypto::public_key& redeem, const crypto::public_key& refund, const account_keys& acc_keys)
   {
     std::string blob;
     string_tools::apped_pod_to_strbuff(blob, redeem);
     string_tools::apped_pod_to_strbuff(blob, refund);
     string_tools::apped_pod_to_strbuff(blob, acc_keys.spend_secret_key);
-    crypto::hash origin_hs = cn_fast_hash(blob.data(), blob.size());
+    crypto::hash origin_hs = crypto::cn_fast_hash(blob.data(), blob.size());
     std::string origin_blob;
     string_tools::apped_pod_to_strbuff(origin_blob, origin_hs);
-    return origin_hs;
+    return origin_blob;
   }
   //---------------------------------------------------------------
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr, const account_keys& self)
@@ -645,6 +646,7 @@ namespace currency
       htlc.pkey_redeem = *target_keys.begin();
       //generate refund key
       crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+      crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
       bool r = derive_public_key_from_target_address(self.account_address, tx_sec_key, output_index, out_eph_public_key, derivation);
       CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
       htlc.pkey_refund = out_eph_public_key;
