@@ -4301,13 +4301,15 @@ bool wallet2::prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string
 
   sources.push_back(AUTO_VAL_INIT(currency::tx_source_entry()));
   currency::tx_source_entry& src = sources.back();
+  currency::tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
+  real_oe.first = td.m_global_output_index; // TODO: use ref_by_id when necessary
+  real_oe.second = htlc_out.pkey_redeem;
+  src.outputs.push_back(real_oe); //m_global_output_index should be prefetched
   src.amount = found_money = td.amount();
   src.real_output_in_tx_index = td.m_internal_output_index;
+  src.real_output = 0;//no mixins supposed to be in htlc
   src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
   src.htlc_origin = origin;
-  //src.multisig_id = multisig_id;
-  //src.ms_sigs_count = ms_out.minimum_sigs;
-  //src.ms_keys_count = ms_out.keys.size();
   return true;
 
 }
@@ -4880,7 +4882,7 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
   else if (ctp.htlc_tx_id != currency::null_hash)
   {
     //htlc
-    bool prepare_tx_sources_htlc(htlc_tx_id, ctp.htlc_origin, sources, found_money);
+    prepare_tx_sources_htlc(htlc_tx_id, ctp.htlc_origin, sources, found_money);
   }
   else if (ctp.multisig_id != currency::null_hash)
   {

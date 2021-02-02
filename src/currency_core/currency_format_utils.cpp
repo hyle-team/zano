@@ -1171,8 +1171,56 @@ namespace currency
     for (const tx_source_entry& src_entr : sources)
     {
       in_contexts.push_back(input_generation_context_data());
-      if (!src_entr.is_multisig())
+      if(src_entr.is_multisig())
+      {//multisig input
+        txin_multisig input_multisig = AUTO_VAL_INIT(input_multisig);
+        summary_inputs_money += input_multisig.amount = src_entr.amount;
+        input_multisig.multisig_out_id = src_entr.multisig_id;
+        input_multisig.sigs_count = src_entr.ms_sigs_count;
+        tx.vin.push_back(input_multisig);
+      }
+      else if (src_entr.htlc_origin.size())
       {
+        //htlc redeem
+        keypair& in_ephemeral = in_contexts.back().in_ephemeral;
+        //txin_to_key
+        if(src_entr.outputs.size() != 1)
+        {
+          LOG_ERROR("htlc in: wrong output src_entr.outputs.size() = " << src_entr.outputs.size());
+          return false;
+        }
+        summary_inputs_money += src_entr.amount;
+
+        //key_derivation recv_derivation;
+        crypto::key_image img;
+        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
+          return false;
+
+        //check that derivated key is equal with real output key
+        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].second))
+        {
+          LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
+            << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
+            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
+          return false;
+        }
+
+        //put key image into tx input
+        txin_htlc input_to_key;
+        input_to_key.amount = src_entr.amount;
+        input_to_key.k_image = img;
+        input_to_key.hltc_origin = src_entr.htlc_origin;
+
+        //fill outputs array and use relative offsets
+        BOOST_FOREACH(const tx_source_entry::output_entry& out_entry, src_entr.outputs)
+          input_to_key.key_offsets.push_back(out_entry.first);
+
+        input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
+        tx.vin.push_back(input_to_key);
+      }
+      else
+      {
+        //regular to key out
         keypair& in_ephemeral = in_contexts.back().in_ephemeral;
         //txin_to_key
         if (src_entr.real_output >= src_entr.outputs.size())
@@ -1197,7 +1245,26 @@ namespace currency
         }
 
         //put key image into tx input
-        txin_to_key input_to_key;
+        txin_v in_v;
+        txin_to_key* ptokey = nullptr;
+        if (src_entr.htlc_origin.size())
+        {
+          //add txin_htlc
+          txin_htlc in_htlc = AUTO_VAL_INIT(inp_htlc);
+          in_htlc.hltc_origin = src_entr.htlc_origin;
+          in_v = in_htlc;
+          txin_htlc& in_v_ref = boost::get<txin_htlc>(in_v);
+          ptokey = static_cast<txin_to_key*>(&in_v_ref);
+        }
+        else
+        {
+          in_v = txin_to_key();
+          txin_to_key& in_v_ref = boost::get<txin_to_key>(in_v);
+          ptokey = &in_v_ref;
+        }
+        txin_to_key& input_to_key = *ptokey;
+
+        
         input_to_key.amount = src_entr.amount;
         input_to_key.k_image = img;
 
@@ -1206,16 +1273,9 @@ namespace currency
           input_to_key.key_offsets.push_back(out_entry.first);
 
         input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
-        tx.vin.push_back(input_to_key);
+        tx.vin.push_back(in_v);
       }
-      else
-      {//multisig input
-        txin_multisig input_multisig = AUTO_VAL_INIT(input_multisig);
-        summary_inputs_money += input_multisig.amount = src_entr.amount;
-        input_multisig.multisig_out_id = src_entr.multisig_id;
-        input_multisig.sigs_count = src_entr.ms_sigs_count;
-        tx.vin.push_back(input_multisig);
-      }
+
     }
 
     // "Shuffle" outs
@@ -1302,9 +1362,14 @@ namespace currency
       tx.signatures.push_back(std::vector<crypto::signature>());
       std::vector<crypto::signature>& sigs = tx.signatures.back();
 
-      if (!src_entr.is_multisig())
+      if(src_entr.is_multisig())
       {
-        // txin_to_key
+        // txin_multisig -- don't sign anything here (see also sign_multisig_input_in_tx())
+        sigs.resize(src_entr.ms_keys_count, null_sig); // just reserve keys.size() null signatures (NOTE: not minimum_sigs!)
+      }
+      else
+      {
+        // regular txin_to_key or htlc
         ss_ring_s << "input #" << input_index << ", pub_keys:" << ENDL;
         std::vector<const crypto::public_key*> keys_ptrs;
         BOOST_FOREACH(const tx_source_entry::output_entry& o, src_entr.outputs)
@@ -1320,11 +1385,6 @@ namespace currency
         ss_ring_s << "signatures:" << ENDL;
         std::for_each(sigs.begin(), sigs.end(), [&ss_ring_s](const crypto::signature& s) { ss_ring_s << s << ENDL; });
         ss_ring_s << "prefix_hash: " << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_contexts[in_context_index].in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output << ENDL;
-      }
-      else
-      {
-        // txin_multisig -- don't sign anything here (see also sign_multisig_input_in_tx())
-        sigs.resize(src_entr.ms_keys_count, null_sig); // just reserve keys.size() null signatures (NOTE: not minimum_sigs!)
       }
       if (src_entr.separately_signed_tx_complete)
       {
