@@ -129,7 +129,7 @@ namespace currency
     }
     return found;
   }
-
+  inline
   const txin_to_key& get_to_key_input_from_txin_v(const txin_v& in_v)
   {
     if (in_v.type() == typeid(txin_to_key))

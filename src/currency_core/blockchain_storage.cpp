@@ -4325,11 +4325,11 @@ struct outputs_visitor
       crypto::public_key pk = null_pkey;
       if (m_scan_context.htlc_is_expired)
       {
-        pk = boost::get<txout_htlc>(out.target).pkey_after_expiration;
+        pk = boost::get<txout_htlc>(out.target).pkey_refund;
       }
       else
       {
-        pk = boost::get<txout_htlc>(out.target).pkey_before_expiration;
+        pk = boost::get<txout_htlc>(out.target).pkey_redeem;
       }
       m_results_collector.push_back(pk);
     }else 

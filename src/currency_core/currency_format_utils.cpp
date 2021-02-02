@@ -635,9 +635,9 @@ namespace currency
 
     tx_out out;
     out.amount = de.amount;
-    if (de.additional_options.type() == typeid(destination_option_htlc_out))
+    if (de.htlc_options.htlc_hash != null_hash)
     {
-      const destination_option_htlc_out& htlc_dest = boost::get<destination_option_htlc_out>(de.additional_options);
+      const destination_option_htlc_out& htlc_dest = de.htlc_options;
       //out htlc
       CHECK_AND_ASSERT_MES(target_keys.size() == 1, false, "Unexpected htl keys count = " << target_keys.size() << ", expected ==1");
       txout_htlc htlc = AUTO_VAL_INIT(htlc);
@@ -1250,7 +1250,7 @@ namespace currency
         if (src_entr.htlc_origin.size())
         {
           //add txin_htlc
-          txin_htlc in_htlc = AUTO_VAL_INIT(inp_htlc);
+          txin_htlc in_htlc = AUTO_VAL_INIT(in_htlc);
           in_htlc.hltc_origin = src_entr.htlc_origin;
           in_v = in_htlc;
           txin_htlc& in_v_ref = boost::get<txin_htlc>(in_v);

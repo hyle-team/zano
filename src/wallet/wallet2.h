@@ -576,7 +576,7 @@ namespace tools
                   const std::vector<currency::attachment_v>& attachments, 
                   currency::transaction& tx);
 
-    void transfer(const construct_tx_param& ctp,
+    void transfer(construct_tx_param& ctp,
                   currency::transaction &tx,
                   bool send_to_network,
                   std::string* p_unsigned_filename_or_tx_blob_str);
@@ -820,7 +820,7 @@ namespace tools
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
-    void prepare_transaction(const construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
+    void prepare_transaction(construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
     void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
 
     std::string get_log_prefix() const { return m_log_prefix; }

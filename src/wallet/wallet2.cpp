@@ -29,6 +29,7 @@ using namespace epee;
 #include "currency_core/bc_payments_id_service.h"
 #include "version.h"
 #include "common/encryption_filter.h"
+#include "crypto/bitcoin/sha256_helper.h"
 using namespace currency;
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
@@ -4021,10 +4022,10 @@ void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_publ
   dst.resize(1);
   dst.back().addr.push_back(addr);
   dst.back().amount = amount;
-  destination_option_htlc_out htlc_option = AUTO_VAL_INIT(htlc_option);
+  destination_option_htlc_out& htlc_option = dst.back().htlc_options;
   htlc_option.expiration = 740; //about 12 hours
   htlc_option.htlc_hash = htlc_hash;
-  dst.back().additional_options = htlc_option;
+  
 
   transaction result_tx = AUTO_VAL_INIT(result_tx);
   this->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
@@ -4053,39 +4054,16 @@ void wallet2::get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_pub
 //----------------------------------------------------------------------------------------------------
 void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin)
 {
-  //have correct origin, let's create transaction
-  std::vector<tx_destination_entry> dst;
-  dst.resize(1);
-  dst.back().addr.push_back(m_account.get_keys().account_address);
-  dst.back().amount = 0;
-  
 
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.fee = TX_DEFAULT_FEE;
   ctp.htlc_tx_id = htlc_tx_id;
   ctp.htlc_origin = origin;
+  ctp.dsts.resize(1);
+  ctp.dsts.back().addr.push_back(m_account.get_keys().account_address);
+  ctp.dsts.back().amount = 0;
 
-  /*
-  struct destination_option_htlc_in
-  {
-  uint64_t transfer;
-  std::string origin;
-  BEGIN_SERIALIZE_OBJECT()
-  FIELD(transfer)
-  FIELD(origin)
-  END_SERIALIZE()
-  };
-  transfer(const construct_tx_param& ctp,
-  currency::transaction &tx,
-  bool send_to_network,
-  std::string* p_unsigned_filename_or_tx_blob_str);
-
-
-  */
-
-
-  currency::transaction result_tx = AUTO_VAL_INIT(tx);
-  transaction result_tx = AUTO_VAL_INIT(result_tx);
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
   this->transfer(ctp, result_tx, true, nullptr);
 
 
@@ -4265,6 +4243,7 @@ bool wallet2::prepare_tx_sources(crypto::hash multisig_id, std::vector<currency:
 //----------------------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money)
 {
+  typedef currency::tx_source_entry::output_entry tx_output_entry;
   //lets figure out, if we have active htlc for this htlc
   auto it = m_active_htlcs_txid.find(htlc_tx_id);
   if (it == m_active_htlcs_txid.end())
@@ -4301,7 +4280,7 @@ bool wallet2::prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string
 
   sources.push_back(AUTO_VAL_INIT(currency::tx_source_entry()));
   currency::tx_source_entry& src = sources.back();
-  currency::tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
+  tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
   real_oe.first = td.m_global_output_index; // TODO: use ref_by_id when necessary
   real_oe.second = htlc_out.pkey_redeem;
   src.outputs.push_back(real_oe); //m_global_output_index should be prefetched
@@ -4861,7 +4840,7 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate /* = currency::transaction() */)
+void wallet2::prepare_transaction(construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate /* = currency::transaction() */)
 {
   TIME_MEASURE_START_MS(get_needed_money_time);
   uint64_t needed_money = get_needed_money(ctp.fee, ctp.dsts);
@@ -4882,7 +4861,16 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
   else if (ctp.htlc_tx_id != currency::null_hash)
   {
     //htlc
-    prepare_tx_sources_htlc(htlc_tx_id, ctp.htlc_origin, sources, found_money);
+    prepare_tx_sources_htlc(ctp.htlc_tx_id, ctp.htlc_origin, ftp.sources, found_money);
+    WLT_THROW_IF_FALSE_WITH_CODE(ctp.dsts.size() == 1,
+      "htlc: unexpected ctp.dsts.size() =" << ctp.dsts.size(), API_RETURN_CODE_INTERNAL_ERROR);
+
+    WLT_THROW_IF_FALSE_WITH_CODE(found_money > ctp.fee,
+      "htlc: found money less then fee", API_RETURN_CODE_INTERNAL_ERROR);
+
+    //fill amount
+    ctp.dsts.begin()->amount = found_money - ctp.fee;
+    
   }
   else if (ctp.multisig_id != currency::null_hash)
   {
@@ -5104,7 +5092,7 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_payment_id, "sending funds to yourself with payment id is not allowed");
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::transfer(const construct_tx_param& ctp,
+void wallet2::transfer(construct_tx_param& ctp,
   currency::transaction &tx,
   bool send_to_network,
   std::string* p_unsigned_filename_or_tx_blob_str)
