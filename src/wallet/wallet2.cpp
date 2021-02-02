@@ -4021,9 +4021,10 @@ void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_publ
   dst.resize(1);
   dst.back().addr.push_back(addr);
   dst.back().amount = amount;
-  dst.back().htlc = true;
-  dst.back().htlc_hash = htlc_hash;
-  dst.back().unlock_time = 740; //about 12 hours
+  destination_option_htlc_out htlc_option = AUTO_VAL_INIT(htlc_option);
+  htlc_option.expiration = 740; //about 12 hours
+  htlc_option.htlc_hash = htlc_hash;
+  dst.back().additional_options = htlc_option;
 
   transaction result_tx = AUTO_VAL_INIT(result_tx);
   this->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
@@ -4050,15 +4051,45 @@ void wallet2::get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_pub
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin)
+void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin)
 {
-  //lets figure out, if we have active htlc for this htlc
-  auto it = m_active_htlcs_txid.find(htlc_tx_id);
-  if (it == m_active_htlcs_txid.end())
+  //have correct origin, let's create transaction
+  std::vector<tx_destination_entry> dst;
+  dst.resize(1);
+  dst.back().addr.push_back(m_account.get_keys().account_address);
+  dst.back().amount = 0;
+  
+
+  construct_tx_param ctp = get_default_construct_tx_param();
+  ctp.fee = TX_DEFAULT_FEE;
+  ctp.htlc_tx_id = htlc_tx_id;
+  ctp.htlc_origin = origin;
+
+  /*
+  struct destination_option_htlc_in
   {
-    WLT_THROW_IF_FALSE_WITH_CODE(false,
-      "htlc not found with tx_id = " << htlc_tx_id, API_RETURN_CODE_NOT_FOUND); 
-  }
+  uint64_t transfer;
+  std::string origin;
+  BEGIN_SERIALIZE_OBJECT()
+  FIELD(transfer)
+  FIELD(origin)
+  END_SERIALIZE()
+  };
+  transfer(const construct_tx_param& ctp,
+  currency::transaction &tx,
+  bool send_to_network,
+  std::string* p_unsigned_filename_or_tx_blob_str);
+
+
+  */
+
+
+  currency::transaction result_tx = AUTO_VAL_INIT(tx);
+  transaction result_tx = AUTO_VAL_INIT(result_tx);
+  this->transfer(ctp, result_tx, true, nullptr);
+
+
+
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
@@ -4232,6 +4263,55 @@ bool wallet2::prepare_tx_sources(crypto::hash multisig_id, std::vector<currency:
   return true;
 }
 //----------------------------------------------------------------------------------------------------------------
+bool wallet2::prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money)
+{
+  //lets figure out, if we have active htlc for this htlc
+  auto it = m_active_htlcs_txid.find(htlc_tx_id);
+  if (it == m_active_htlcs_txid.end())
+  {
+    WLT_THROW_IF_FALSE_WITH_CODE(false,
+      "htlc not found with tx_id = " << htlc_tx_id, API_RETURN_CODE_NOT_FOUND);
+  }
+
+  WLT_THROW_IF_FALSE_WITH_CODE(m_transfers.size() > it->second,
+    "Internal error: index in m_active_htlcs_txid <" << it->second << "> is bigger then size of m_transfers <" << m_transfers.size() << ">", API_RETURN_CODE_INTERNAL_ERROR);
+
+  const transfer_details& td = m_transfers[it->second];
+  WLT_THROW_IF_FALSE_WITH_CODE(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target.type() == typeid(txout_htlc),
+    "Unexpected type in active htlc", API_RETURN_CODE_INTERNAL_ERROR);
+
+  const txout_htlc& htlc_out = boost::get<txout_htlc>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target);
+  bool use_sha256 = !(htlc_out.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK);
+
+  //check origin
+  WLT_THROW_IF_FALSE_WITH_CODE(origin.size() != 0,
+    "Origin for htlc is empty", API_RETURN_CODE_BAD_ARG);
+
+  crypto::hash htlc_calculated_hash = currency::null_hash;
+  if (use_sha256)
+  {
+    htlc_calculated_hash = crypto::sha256_hash(origin.data(), origin.size());
+  }
+  else
+  {
+    htlc_calculated_hash = crypto::RIPEMD160_hash_256(origin.data(), origin.size());
+  }
+  WLT_THROW_IF_FALSE_WITH_CODE(htlc_calculated_hash == htlc_out.htlc_hash,
+    "Origin hash is missmatched with txout_htlc", API_RETURN_CODE_HTLC_ORIGIN_HASH_MISSMATCHED);
+
+  sources.push_back(AUTO_VAL_INIT(currency::tx_source_entry()));
+  currency::tx_source_entry& src = sources.back();
+  src.amount = found_money = td.amount();
+  src.real_output_in_tx_index = td.m_internal_output_index;
+  src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
+  src.htlc_origin = origin;
+  //src.multisig_id = multisig_id;
+  //src.ms_sigs_count = ms_out.minimum_sigs;
+  //src.ms_keys_count = ms_out.keys.size();
+  return true;
+
+}
+//----------------------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts)
 {
   uint64_t needed_money = fee;
@@ -4247,6 +4327,7 @@ uint64_t wallet2::get_needed_money(uint64_t fee, const std::vector<currency::tx_
   }
   return needed_money;
 }
+
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::send_transaction_to_network(const transaction& tx)
 {
@@ -4793,11 +4874,24 @@ void wallet2::prepare_transaction(const construct_tx_param& ctp, finalize_tx_par
 
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
   if (ctp.perform_packing)
+  {
     prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, found_money);
-  else if (ctp.multisig_id == currency::null_hash)
-    prepare_tx_sources(needed_money, ctp.fake_outputs_count, ctp.dust_policy.dust_threshold, ftp.sources, ftp.selected_transfers, found_money);
-  else
+  }
+  else if (ctp.htlc_tx_id != currency::null_hash)
+  {
+    //htlc
+    bool prepare_tx_sources_htlc(htlc_tx_id, ctp.htlc_origin, sources, found_money);
+  }
+  else if (ctp.multisig_id != currency::null_hash)
+  {
+    //multisig
     prepare_tx_sources(ctp.multisig_id, ftp.sources, found_money);
+  }
+  else
+  {
+    //regular tx
+    prepare_tx_sources(needed_money, ctp.fake_outputs_count, ctp.dust_policy.dust_threshold, ftp.sources, ftp.selected_transfers, found_money);
+  }
   TIME_MEASURE_FINISH_MS(prepare_tx_sources_time);
 
   TIME_MEASURE_START_MS(prepare_tx_destinations_time);

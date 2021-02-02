@@ -299,7 +299,7 @@ namespace currency
   void append_per_block_increments_for_tx(const transaction& tx, std::unordered_map<uint64_t, uint32_t>& gindices);
   std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
   uint64_t get_timstamp_from_word(std::string word, bool& password_used);
-  std::string generate_origin_for_htlc(const crypto::public_key& redeem, const crypto::public_key& refund, const account_keys& acc_keys);
+  std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
   template<class t_txin_v>
   typename std::conditional<std::is_const<t_txin_v>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type& get_txin_etc_options(t_txin_v& in)
   {

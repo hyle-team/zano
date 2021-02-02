@@ -56,4 +56,12 @@ namespace crypto {
     return h;
   }
 
+  hash RIPEMD160_hash_256(const void *data, size_t length)
+  {
+    hash160 h = RIPEMD160_hash(data, length);
+    hash h256 = AUTO_VAL_INIT(h256);
+    memcpy(&h256, &h, sizeof(h));
+    return h256;
+  }
+
 }

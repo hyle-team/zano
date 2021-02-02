@@ -17,6 +17,7 @@ namespace crypto {
 
   void RIPEMD160_hash(const void *data, size_t length, hash160 &h);
   hash160 RIPEMD160_hash(const void *data, size_t length);
+  hash RIPEMD160_hash_256(const void *data, size_t length);
 
 }
 

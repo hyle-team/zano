@@ -273,6 +273,9 @@ namespace tools
     uint8_t split_strategy_id;
     bool mark_tx_as_complete;
 
+    crypto::hash htlc_tx_id;
+    std::string htlc_origin;
+
     // constructing tx
     uint64_t unlock_time;
     std::vector<currency::extra_v> extra;
@@ -835,7 +838,7 @@ namespace tools
     void create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count,
       currency::transaction &tx, const crypto::hash& htlc_hash = currency::null_hash);
     void get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_public::htlc_entry_info>& htlcs);
-    void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
+    void redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin);
 
 private:
 
@@ -895,6 +898,7 @@ private:
     bool prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
+    bool prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     void prefetch_global_indicies_if_needed(std::vector<uint64_t>& selected_indicies);
     uint64_t get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
