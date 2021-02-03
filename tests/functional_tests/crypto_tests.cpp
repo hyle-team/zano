@@ -418,6 +418,12 @@ struct point_t
     ge_p3_0(&m_p3);
   }
 
+  bool is_zero() const
+  {
+    // (0, 1) ~ (0, z, z, 0)
+    return fe_isnonzero(m_p3.X) * fe_cmp(m_p3.Y, m_p3.Z) == 0;
+  }
+
   bool from_public_key(const crypto::public_key& pk)
   {
     return ge_frombytes_vartime(&m_p3, reinterpret_cast<const unsigned char*>(&pk)) == 0;
@@ -531,6 +537,7 @@ struct point_g_t : public point_t
 
 static const point_g_t c_point_G;
 
+static const scalar_t c_scalar_1      = { 1 };
 static const scalar_t c_scalar_L      = { 0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
 static const scalar_t c_scalar_Lm1    = { 0x5812631a5cf5d3ec, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
 static const scalar_t c_scalar_P      = { 0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
@@ -543,35 +550,92 @@ struct hash_helper_t
 {
   static scalar_t hs(const scalar_t& s)
   {
-    scalar_t result = 0;
-
-    crypto::cn_fast_hash(s.data(), sizeof s, (char*)result.data());
-
-    return result;
+    crypto::hash hash;
+    crypto::cn_fast_hash(s.data(), sizeof s, hash);
+    return scalar_t(hash); // will reduce mod L
   }
 
-  static scalar_t hs(const scalar_t& s, const std::vector<scalar_t>& ss, const std::vector<point_t>& ps)
+  struct hs_t
+  {
+    hs_t()
+    {
+      static_assert(sizeof(scalar_t) == sizeof(crypto::public_key), "unexpected size of data");
+    }
+
+    void reserve(size_t elements_count)
+    {
+      m_elements.reserve(elements_count);
+    }
+
+    void clear()
+    {
+      m_elements.clear();
+    }
+
+    void add_scalar(const scalar_t& scalar)
+    {
+      m_elements.emplace_back(scalar);
+    }
+
+    void add_point(const point_t& point)
+    {
+      m_elements.emplace_back(point.to_public_key());
+    }
+
+    void add_points_array(const std::vector<point_t>& points_array)
+    {
+      for (size_t i = 0, size = points_array.size(); i < size; ++i)
+        m_elements.emplace_back(points_array[i].to_public_key());
+    }
+
+    scalar_t calc_hash(bool clear = true)
+    {
+      size_t data_size_bytes = m_elements.size() * sizeof(item_t);
+      crypto::hash hash;
+      crypto::cn_fast_hash(m_elements.data(), data_size_bytes, hash);
+      if (clear)
+        this->clear();
+      return scalar_t(hash); // this will reduce to L
+    }
+
+    union item_t
+    {
+      item_t(const crypto::public_key& pk) : pk(pk) {}
+      item_t(const scalar_t& scalar) : scalar(scalar) {}
+      scalar_t scalar;
+      crypto::public_key pk;
+    };
+
+    std::vector<item_t> m_elements;
+  };
+
+  /*static scalar_t hs(const scalar_t& s, const std::vector<scalar_t>& ss, const std::vector<point_t>& ps)
   {
     scalar_t result = 0;
     return result;
-  }
+  }*/
 
   static scalar_t hs(const scalar_t& s, const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
   {
-    scalar_t result = 0;
-    return result;
+    hs_t hs_calculator;
+    hs_calculator.add_scalar(s);
+    hs_calculator.add_points_array(ps0);
+    hs_calculator.add_points_array(ps1);
+    return hs_calculator.calc_hash();
   }
 
   static scalar_t hs(const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
   {
-    scalar_t result = 0;
-    return result;
+    hs_t hs_calculator;
+    hs_calculator.add_points_array(ps0);
+    hs_calculator.add_points_array(ps1);
+    return hs_calculator.calc_hash();
   }
 
   static point_t hp(const point_t& p)
   {
     point_t result;
-    crypto::public_key pk = p;
+    crypto::public_key pk = p.to_public_key();
 
     ge_bytes_hash_to_ec(&result.m_p3, (const unsigned char*)&pk);
 

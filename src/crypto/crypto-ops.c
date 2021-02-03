@@ -332,7 +332,7 @@ static int fe_isnegative(const fe f) {
 
 /* From fe_isnonzero.c, modified */
 
-static int fe_isnonzero(const fe f) {
+int fe_isnonzero(const fe f) {
   unsigned char s[32];
   fe_tobytes(s, f);
   return (((int) (s[0] | s[1] | s[2] | s[3] | s[4] | s[5] | s[6] | s[7] | s[8] |
@@ -3754,9 +3754,9 @@ void ge_bytes_hash_to_ec(ge_p3 *res, const unsigned char *ge_bytes)
   ge_p2 point;
   ge_p1p1 point2;
 
-  cn_fast_hash(ge_bytes, 32, h);
+  cn_fast_hash(ge_bytes, 32, (char*)h);
   ge_fromfe_frombytes_vartime(&point, &h[0]);
-  /*ge_p2_to_p3(res, &point); /* -- can be used to avoid multiplication by 8 for debugging */
+  /*ge_p2_to_p3(res, &point); -- can be used to avoid multiplication by 8 for debugging */
   ge_mul8(&point2, &point);
   ge_p1p1_to_p3(res, &point2);
 }
