@@ -206,7 +206,7 @@ namespace currency
     std::set<uint16_t> deriv_cache;
     for (auto& d : destinations)
     {
-      bool r = construct_tx_out(d, txkey.sec, no, tx, deriv_cache);
+      bool r = construct_tx_out(d, txkey.sec, no, tx, deriv_cache, account_keys());
       CHECK_AND_ASSERT_MES(r, false, "Failed to contruct miner tx out");
       no++;
     }
@@ -603,7 +603,7 @@ namespace currency
     return origin_blob;
   }
   //---------------------------------------------------------------
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr, const account_keys& self)
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr)
   {
     CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
 
@@ -1290,7 +1290,7 @@ namespace currency
     for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
-      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, tx_outs_attr, sender_account_keys.account_address);
+      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construc tx out");
       output_index++;
       summary_outs_money += dst_entr.amount;
