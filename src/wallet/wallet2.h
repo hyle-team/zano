@@ -286,52 +286,52 @@ namespace tools
     bool perform_packing;
   };
 
-  struct finalize_tx_param
-  {
-    uint64_t unlock_time;
-    std::vector<currency::extra_v> extra;
-    std::vector<currency::attachment_v> attachments;
-    currency::account_public_address crypt_address;
-    uint8_t tx_outs_attr;
-    bool shuffle;
-    uint8_t flags;
-    crypto::hash multisig_id;
-    std::vector<currency::tx_source_entry> sources;
-    std::vector<uint64_t> selected_transfers;
-    std::vector<currency::tx_destination_entry> prepared_destinations;
-
-    crypto::public_key spend_pub_key;  // only for validations
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(unlock_time)
-      FIELD(extra)
-      FIELD(attachments)
-      FIELD(crypt_address)
-      FIELD(tx_outs_attr)
-      FIELD(shuffle)
-      FIELD(flags)
-      FIELD(multisig_id)
-      FIELD(sources)
-      FIELD(selected_transfers)
-      FIELD(prepared_destinations)
-      FIELD(spend_pub_key)
-    END_SERIALIZE()
-  };
-
-  struct finalized_tx
-  {
-    currency::transaction tx;
-    crypto::secret_key    one_time_key;
-    finalize_tx_param     ftp;
-    std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(tx)
-      FIELD(one_time_key)
-      FIELD(ftp)
-      FIELD(outs_key_images)
-    END_SERIALIZE()
-  };
+//   struct currency::finalize_tx_param
+//   {
+//     uint64_t unlock_time;
+//     std::vector<currency::extra_v> extra;
+//     std::vector<currency::attachment_v> attachments;
+//     currency::account_public_address crypt_address;
+//     uint8_t tx_outs_attr;
+//     bool shuffle;
+//     uint8_t flags;
+//     crypto::hash multisig_id;
+//     std::vector<currency::tx_source_entry> sources;
+//     std::vector<uint64_t> selected_transfers;
+//     std::vector<currency::tx_destination_entry> prepared_destinations;
+// 
+//     crypto::public_key spend_pub_key;  // only for validations
+// 
+//     BEGIN_SERIALIZE_OBJECT()
+//       FIELD(unlock_time)
+//       FIELD(extra)
+//       FIELD(attachments)
+//       FIELD(crypt_address)
+//       FIELD(tx_outs_attr)
+//       FIELD(shuffle)
+//       FIELD(flags)
+//       FIELD(multisig_id)
+//       FIELD(sources)
+//       FIELD(selected_transfers)
+//       FIELD(prepared_destinations)
+//       FIELD(spend_pub_key)
+//     END_SERIALIZE()
+//   };
+// 
+//   struct currency::finalized_tx
+//   {
+//     currency::transaction tx;
+//     crypto::secret_key    one_time_key;
+//     currency::finalize_tx_param     ftp;
+//     std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
+// 
+//     BEGIN_SERIALIZE_OBJECT()
+//       FIELD(tx)
+//       FIELD(one_time_key)
+//       FIELD(ftp)
+//       FIELD(outs_key_images)
+//     END_SERIALIZE()
+//   };
 
   class wallet2
   {
@@ -580,6 +580,12 @@ namespace tools
                   currency::transaction &tx,
                   bool send_to_network,
                   std::string* p_unsigned_filename_or_tx_blob_str);
+    
+    void transfer(construct_tx_param& ctp,
+                  currency::finalized_tx& result,
+                  bool send_to_network,
+                  std::string* p_unsigned_filename_or_tx_blob_str);
+
 
     template<typename destination_split_strategy_t>
     void transfer_from_contract(
@@ -820,8 +826,10 @@ namespace tools
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
-    void prepare_transaction(construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
-    void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
+    void prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
+
+    void finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
+    void finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
 
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
@@ -836,7 +844,7 @@ namespace tools
     opener-hash will be given by other side
     */
     void create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count,
-      currency::transaction &tx, const crypto::hash& htlc_hash = currency::null_hash);
+      currency::transaction &tx, std::string &origin);
     void get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_public::htlc_entry_info>& htlcs);
     void redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin);
 
@@ -960,7 +968,7 @@ private:
     void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
-    bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
+    bool store_unsigned_tx_to_file_and_reserve_transfers(const currency::finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
     void push_new_block_id(const crypto::hash& id, uint64_t height);
     bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);

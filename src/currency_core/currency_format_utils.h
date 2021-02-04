@@ -132,9 +132,60 @@ namespace currency
 	  END_KV_SERIALIZE_MAP()
   };
 
-  struct htlc_info
+   struct htlc_info
+   {
+     bool hltc_our_out_is_before_expiration;
+   };
+
+
+  struct finalize_tx_param
   {
-    bool hltc_our_out_is_before_expiration;
+    uint64_t unlock_time;
+    std::vector<currency::extra_v> extra;
+    std::vector<currency::attachment_v> attachments;
+    currency::account_public_address crypt_address;
+    uint8_t tx_outs_attr;
+    bool shuffle;
+    uint8_t flags;
+    crypto::hash multisig_id;
+    std::vector<currency::tx_source_entry> sources;
+    std::vector<uint64_t> selected_transfers;
+    std::vector<currency::tx_destination_entry> prepared_destinations;
+    uint64_t expiration_time;
+    crypto::public_key spend_pub_key;  // only for validations
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(unlock_time)
+      FIELD(extra)
+      FIELD(attachments)
+      FIELD(crypt_address)
+      FIELD(tx_outs_attr)
+      FIELD(shuffle)
+      FIELD(flags)
+      FIELD(multisig_id)
+      FIELD(sources)
+      FIELD(selected_transfers)
+      FIELD(prepared_destinations)
+      FIELD(expiration_time)
+      FIELD(spend_pub_key)
+    END_SERIALIZE()
+  };
+
+  struct finalized_tx
+  {
+    currency::transaction tx;
+    crypto::secret_key    one_time_key;
+    finalize_tx_param     ftp;
+    std::string           htlc_origin;
+    std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(tx)
+      FIELD(one_time_key)
+      FIELD(ftp)
+      FIELD(htlc_origin)
+      FIELD(outs_key_images)
+    END_SERIALIZE()
   };
 
 
@@ -163,6 +214,7 @@ namespace currency
 
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
   bool validate_alias_name(const std::string& al);
   bool validate_password(const std::string& password);
@@ -186,6 +238,7 @@ namespace currency
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
     bool shuffle = true,
     uint64_t flags = 0);
+
   bool construct_tx(const account_keys& sender_account_keys,
     const std::vector<tx_source_entry>& sources,
     const std::vector<tx_destination_entry>& destinations,
@@ -199,6 +252,9 @@ namespace currency
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED,
     bool shuffle = true,
     uint64_t flags = 0);
+
+  bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
+
 
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed = nullptr);
 

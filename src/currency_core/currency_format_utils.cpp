@@ -605,6 +605,12 @@ namespace currency
   //---------------------------------------------------------------
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr)
   {
+    finalized_tx result = AUTO_VAL_INIT(result);
+    return construct_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, result, tx_outs_attr);
+  }
+  //---------------------------------------------------------------
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, finalized_tx& result, uint8_t tx_outs_attr)
+  {
     CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
 
     std::vector<crypto::public_key> target_keys;
@@ -655,16 +661,17 @@ namespace currency
       if (htlc_dest.htlc_hash == null_hash)
       {
         //we use deterministic origin, to make possible access origin on different wallets copies
-        std::string hltc_origin = generate_origin_for_htlc(htlc, self);
+        
+        result.htlc_origin = generate_origin_for_htlc(htlc, self);
 
         //calculate hash
         if (htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
         {
-          htlc.htlc_hash = crypto::sha256_hash(hltc_origin.data(), hltc_origin.size());
+          htlc.htlc_hash = crypto::sha256_hash(result.htlc_origin.data(), result.htlc_origin.size());
         }
         else
         {
-          crypto::hash160 h160 = crypto::RIPEMD160_hash(hltc_origin.data(), hltc_origin.size());
+          crypto::hash160 h160 = crypto::RIPEMD160_hash(result.htlc_origin.data(), result.htlc_origin.size());
           std::memcpy(&htlc.htlc_hash, &h160, sizeof(h160));
         }
       }
@@ -1076,7 +1083,7 @@ namespace currency
       shuffle,
       flags);
   }
-
+  //---------------------------------------------------------------
   bool construct_tx(const account_keys& sender_account_keys, const std::vector<tx_source_entry>& sources,
     const std::vector<tx_destination_entry>& destinations,
     const std::vector<extra_v>& extra,
@@ -1090,6 +1097,43 @@ namespace currency
     bool shuffle,
     uint64_t flags)
   {
+    //extra copy operation, but creating transaction is not sensitive to this
+    finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    ftp.sources = sources;
+    ftp.prepared_destinations = destinations;
+    ftp.extra = extra;
+    ftp.attachments = attachments;
+    ftp.unlock_time = unlock_time;
+    ftp.crypt_address = crypt_destination_addr;
+    ftp.expiration_time = 0;
+    ftp.tx_outs_attr = tx_outs_attr;
+    ftp.shuffle = shuffle;
+    ftp.flags = flags;
+
+    finalized_tx ft = AUTO_VAL_INIT(ft);
+    bool r = construct_tx(sender_account_keys, ftp, ft);
+    tx = ft.tx;
+    one_time_secret_key = ft.one_time_key;
+    return r;
+  }
+  //---------------------------------------------------------------
+  bool construct_tx(const account_keys& sender_account_keys, const finalize_tx_param& ftp, finalized_tx& result)
+  {
+    const std::vector<tx_source_entry>& sources = ftp.sources;
+    const std::vector<tx_destination_entry>& destinations = ftp.prepared_destinations;
+    const std::vector<extra_v>& extra = ftp.extra;
+    const std::vector<attachment_v>& attachments = ftp.attachments;
+    const uint64_t& unlock_time = ftp.unlock_time;
+    const account_public_address& crypt_destination_addr = ftp.crypt_address;
+    const uint64_t& expiration_time = ftp.expiration_time;
+    const uint8_t& tx_outs_attr = ftp.tx_outs_attr;
+    const bool& shuffle = ftp.shuffle;
+    const uint64_t& flags = ftp.flags;
+                
+    transaction& tx = result.tx;
+    crypto::secret_key& one_time_secret_key = result.one_time_key;
+
+    result.ftp = ftp;
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "Too many outs (" << destinations.size() << ")! Tx can't be constructed.");
 
     bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
@@ -1290,7 +1334,7 @@ namespace currency
     for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
-      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, tx_outs_attr);
+      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construc tx out");
       output_index++;
       summary_outs_money += dst_entr.amount;

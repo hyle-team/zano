@@ -800,7 +800,7 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
   construct_param.extra.push_back(tsa);
 
   //build transaction
-  finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(construct_param, ftp, tx);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
 
@@ -930,7 +930,7 @@ void wallet2::request_cancel_contract(const crypto::hash& contract_id, uint64_t 
   construct_param.crypt_address = contr_it->second.private_detailes.b_addr;
   construct_param.split_strategy_id = detail::ssi_digit;
 
-  finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(construct_param, ftp);
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::secret_key sk = AUTO_VAL_INIT(sk);
@@ -2891,7 +2891,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
   std::string decrypted_src_blob = crypto::chacha_crypt(tx_sources_blob, m_account.get_keys().view_secret_key);
 
   // deserialize args
-  finalized_tx ft = AUTO_VAL_INIT(ft);
+  currency::finalized_tx ft = AUTO_VAL_INIT(ft);
   bool r = t_unserializable_object_from_blob(ft.ftp, decrypted_src_blob);
   THROW_IF_FALSE_WALLET_EX(r, error::wallet_common_error, "Failed to decrypt tx sources blob");
 
@@ -2973,7 +2973,7 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   std::string decrypted_src_blob = crypto::chacha_crypt(signed_tx_blob, m_account.get_keys().view_secret_key);
 
   // deserialize tx data
-  finalized_tx ft = AUTO_VAL_INIT(ft);
+  currency::finalized_tx ft = AUTO_VAL_INIT(ft);
   bool r = t_unserializable_object_from_blob(ft, decrypted_src_blob);
   THROW_IF_FALSE_WALLET_EX(r, error::wallet_common_error, "Failed to decrypt signed tx data");
   tx = ft.tx;
@@ -3741,7 +3741,7 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   tsa.instruction = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_NORMAL;
   construct_params.extra.push_back(tsa);
   {
-    finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
     prepare_transaction(construct_params, ftp);
     crypto::secret_key sk = AUTO_VAL_INIT(sk);
     finalize_transaction(ftp, tx_release_template, sk, false);
@@ -3757,7 +3757,7 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   tsa.instruction = BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_BURN;
   construct_params.extra.push_back(tsa);
   {
-    finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
     prepare_transaction(construct_params, ftp);
     crypto::secret_key sk = AUTO_VAL_INIT(sk);
     finalize_transaction(ftp, tx_burn_template, sk, false);
@@ -3777,7 +3777,7 @@ void wallet2::build_escrow_cancel_template(crypto::hash multisig_id,
     "multisig id out amount no more than escrow total amount");
 
   construct_tx_param construct_params = AUTO_VAL_INIT(construct_params);
-  finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   construct_params.fee = it->second.amount() - (ecrow_details.amount_a_pledge + ecrow_details.amount_to_pay + ecrow_details.amount_b_pledge);
   construct_params.multisig_id = multisig_id;
   construct_params.split_strategy_id = detail::ssi_digit;
@@ -3859,7 +3859,7 @@ void wallet2::build_escrow_template(const bc_services::contract_private_details&
     ctp.attachments.push_back(att);
   }
 
-  finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(ctp, ftp, tx);
 
   selected_transfers = ftp.selected_transfers;
@@ -3991,7 +3991,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   ctp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
   ctp.unlock_time = unlock_time;
 
-  finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   try
   {
       prepare_transaction(ctp, ftp);
@@ -4013,22 +4013,20 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   print_tx_sent_message(tx, "(from multisig)", fee);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, const crypto::hash& htlc_hash)
+void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, std::string &origin)
 {
-  std::vector<currency::extra_v> extra;
-  std::vector<currency::attachment_v> attachments;
-
-  std::vector<tx_destination_entry> dst;
-  dst.resize(1);
-  dst.back().addr.push_back(addr);
-  dst.back().amount = amount;
-  destination_option_htlc_out& htlc_option = dst.back().htlc_options;
+  construct_tx_param ctp = get_default_construct_tx_param();
+  ctp.fee = TX_DEFAULT_FEE;
+  ctp.dsts.resize(1);
+  ctp.dsts.back().addr.push_back(addr);
+  ctp.dsts.back().amount = amount;
+  destination_option_htlc_out& htlc_option = ctp.dsts.back().htlc_options;
   htlc_option.expiration = 740; //about 12 hours
-  htlc_option.htlc_hash = htlc_hash;
-  
+  htlc_option.htlc_hash = null_hash;
 
-  transaction result_tx = AUTO_VAL_INIT(result_tx);
-  this->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
+  finalized_tx ft = AUTO_VAL_INIT(ft);
+  this->transfer(ctp, ft, true, nullptr);
+  origin = ft.htlc_origin;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_public::htlc_entry_info>& htlcs)
@@ -4840,7 +4838,7 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::prepare_transaction(construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate /* = currency::transaction() */)
+void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate /* = currency::transaction() */)
 {
   TIME_MEASURE_START_MS(get_needed_money_time);
   uint64_t needed_money = get_needed_money(ctp.fee, ctp.dsts);
@@ -4911,7 +4909,15 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, finalize_tx_param& ft
     LOG_LEVEL_0);*/
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key /* = true */)
+void wallet2::finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key /* = true */)
+{
+  currency::finalized_tx result = AUTO_VAL_INIT(result);
+  finalize_transaction(ftp, result, broadcast_tx, store_tx_secret_key);
+  tx = result.tx;
+  tx_key = result.one_time_key;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key /* = true */)
 {
   // NOTE: if broadcast_tx == true callback rise_on_transfer2() may be called at the end of this function.
   // That callback may call balance(), so it's important to have all used/spending transfers
@@ -4922,18 +4928,7 @@ void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::trans
 
   //TIME_MEASURE_START_MS(construct_tx_time);
   bool r = currency::construct_tx(m_account.get_keys(),
-    ftp.sources,
-    ftp.prepared_destinations,
-    ftp.extra,
-    ftp.attachments,
-    tx,
-    tx_key,
-    ftp.unlock_time, 
-    ftp.crypt_address,
-    0, // expiration time
-    ftp.tx_outs_attr,
-    ftp.shuffle,
-    ftp.flags);
+    ftp, result);
   //TIME_MEASURE_FINISH_MS(construct_tx_time);
   THROW_IF_FALSE_WALLET_EX(r, error::tx_not_constructed, ftp.sources, ftp.prepared_destinations, ftp.unlock_time);
 
@@ -4946,24 +4941,24 @@ void wallet2::finalize_transaction(const finalize_tx_param& ftp, currency::trans
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_multisig_transfers.end(), "can't find multisig_id: " << ftp.multisig_id);
     const currency::transaction& ms_source_tx = it->second.m_ptx_wallet_info->m_tx;
     bool is_tx_input_fully_signed = false;
-    r = sign_multisig_input_in_tx(tx, 0, m_account.get_keys(), ms_source_tx, &is_tx_input_fully_signed); // it's assumed that ms input is the first one (index 0)
+    r = sign_multisig_input_in_tx(result.tx, 0, m_account.get_keys(), ms_source_tx, &is_tx_input_fully_signed); // it's assumed that ms input is the first one (index 0)
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r && !is_tx_input_fully_signed, "sign_multisig_input_in_tx failed: r = " << r << ", is_tx_input_fully_signed = " << is_tx_input_fully_signed);
   }
   //TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
-  THROW_IF_FALSE_WALLET_EX(get_object_blobsize(tx) < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, tx, m_upper_transaction_size_limit);
+  THROW_IF_FALSE_WALLET_EX(get_object_blobsize(result.tx) < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, result.tx, m_upper_transaction_size_limit);
 
   if (store_tx_secret_key)
-    m_tx_keys.insert(std::make_pair(get_transaction_hash(tx), tx_key));
+    m_tx_keys.insert(std::make_pair(get_transaction_hash(result.tx), result.one_time_key));
 
   //TIME_MEASURE_START(send_transaction_to_network_time);
   if (broadcast_tx)
-    send_transaction_to_network(tx);
+    send_transaction_to_network(result.tx);
   //TIME_MEASURE_FINISH(send_transaction_to_network_time);
 
   //TIME_MEASURE_START(add_sent_tx_detailed_info_time);
   if (broadcast_tx)
-    add_sent_tx_detailed_info(tx, ftp.prepared_destinations, ftp.selected_transfers);
+    add_sent_tx_detailed_info(result.tx, ftp.prepared_destinations, ftp.selected_transfers);
   //TIME_MEASURE_FINISH(add_sent_tx_detailed_info_time);
 
   /* TODO
@@ -5035,7 +5030,7 @@ const construct_tx_param& wallet2::get_default_construct_tx_param()
   return ctp;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str /* = nullptr */)
+bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const currency::finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str /* = nullptr */)
 {
   TIME_MEASURE_START(store_unsigned_tx_time);
   blobdata bl = t_serializable_object_to_blob(ftp);
@@ -5097,12 +5092,22 @@ void wallet2::transfer(construct_tx_param& ctp,
   bool send_to_network,
   std::string* p_unsigned_filename_or_tx_blob_str)
 {
+  currency::finalized_tx result = AUTO_VAL_INIT(result);
+  transfer(ctp, result, send_to_network, p_unsigned_filename_or_tx_blob_str);
+  tx = result.tx;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::transfer(construct_tx_param& ctp,
+  currency::finalized_tx& result,
+  bool send_to_network,
+  std::string* p_unsigned_filename_or_tx_blob_str)
+{
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!is_auditable() || !is_watch_only(), "You can't initiate coins transfer using an auditable watch-only wallet."); // btw, watch-only wallets can call transfer() within cold-signing process
 
   check_and_throw_if_self_directed_tx_with_payment_id_requested(ctp);
 
   TIME_MEASURE_START(prepare_transaction_time);
-  finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   prepare_transaction(ctp, ftp);
   TIME_MEASURE_FINISH(prepare_transaction_time);
 
@@ -5115,18 +5120,17 @@ void wallet2::transfer(construct_tx_param& ctp,
   }
 
   TIME_MEASURE_START(mark_transfers_as_spent_time);
-  mark_transfers_as_spent(ftp.selected_transfers, std::string("money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
+  mark_transfers_as_spent(ftp.selected_transfers, std::string("money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(result.tx)));
   TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
 
   TIME_MEASURE_START(finalize_transaction_time);
   try
   {
-    crypto::secret_key sk = AUTO_VAL_INIT(sk);
-    finalize_transaction(ftp, tx, sk, send_to_network);
+    finalize_transaction(ftp, result, send_to_network);
   }
   catch (...)
   {
-    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception on money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)));
+    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception on money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(result.tx)));
     throw;
   }
   TIME_MEASURE_FINISH(finalize_transaction_time);
@@ -5139,7 +5143,7 @@ void wallet2::transfer(construct_tx_param& ctp,
     << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
     , LOG_LEVEL_0);
 
-  print_tx_sent_message(tx, std::string() + "(transfer)", ctp.fee);
+  print_tx_sent_message(result.tx, std::string() + "(transfer)", ctp.fee);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
@@ -5209,7 +5213,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     THROW_IF_FALSE_WALLET_EX(scanty_outs.empty(), error::not_enough_outs_to_mix, scanty_outs, fake_outs_count);
   }
 
-  finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   if (!payment_id.empty())
     set_payment_id_to_tx(ftp.attachments, payment_id);
   // put encrypted payer info into the extra
@@ -5232,7 +5236,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   { return t == rc_ok ? "rc_ok" : t == rc_too_few_outputs ? "rc_too_few_outputs" : t == rc_too_many_outputs ? "rc_too_many_outputs" : t == rc_create_tx_failed ? "rc_create_tx_failed" : "unknown"; };
 
   auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_count, &fee, &destination_addr]
-    (size_t st_index_upper_boundary, finalize_tx_param& ftp, uint64_t& amount_swept) -> try_construct_result_t
+    (size_t st_index_upper_boundary, currency::finalize_tx_param& ftp, uint64_t& amount_swept) -> try_construct_result_t
   {
     // prepare inputs
     amount_swept = 0;
@@ -5319,7 +5323,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     WLT_LOG_L1("sweep_below: first try of try_construct_tx(" << st_index_upper_boundary << ") returned " << get_result_t_str(res));
     size_t low_bound = 0;
     size_t high_bound = st_index_upper_boundary;
-    finalize_tx_param ftp_ok = ftp;
+    currency::finalize_tx_param ftp_ok = ftp;
     for (;;)
     {
       if (low_bound + 1 >= high_bound)

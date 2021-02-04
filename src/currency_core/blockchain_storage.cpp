@@ -3121,7 +3121,7 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
 
   uint64_t iteration_coun = 0;
   uint64_t current_low_boundary = 0;
-  uint64_t current_hight_boundary = m_db_blocks.size() - 1;
+  uint64_t current_height_boundary = m_db_blocks.size() - 1;
   while (true)
   {
     iteration_coun++;
@@ -3135,10 +3135,10 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
     {
       //we moved too much forward
       
-      current_hight_boundary = calculated_estimated_height;
-      CHECK_AND_ASSERT_MES(current_hight_boundary > current_low_boundary, true, 
-        "Internal error: current_hight_boundary(" << current_hight_boundary << ") > current_low_boundary("<< current_low_boundary << ")");
-      uint64_t offset = (current_hight_boundary - current_low_boundary)/2;
+      current_height_boundary = calculated_estimated_height;
+      CHECK_AND_ASSERT_MES(current_height_boundary > current_low_boundary, true, 
+        "Internal error: current_hight_boundary(" << current_height_boundary << ") > current_low_boundary("<< current_low_boundary << ")");
+      uint64_t offset = (current_height_boundary - current_low_boundary)/2;
       if (offset <= 2)
       {
         //something really wrong with distribution of blocks, just use current_low_boundary to be sure that we didn't mess any transactions 
@@ -3154,9 +3154,9 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
     {
       //we too much in past
       current_low_boundary = calculated_estimated_height;
-      CHECK_AND_ASSERT_MES(current_hight_boundary > current_low_boundary, true,
-        "Internal error: current_hight_boundary(" << current_hight_boundary << ") > current_low_boundary(" << current_low_boundary << ")");
-      uint64_t offset = (current_hight_boundary - current_low_boundary) / 2;
+      CHECK_AND_ASSERT_MES(current_height_boundary > current_low_boundary, true,
+        "Internal error: current_hight_boundary(" << current_height_boundary << ") > current_low_boundary(" << current_low_boundary << ")");
+      uint64_t offset = (current_height_boundary - current_low_boundary) / 2;
       if (offset <= 2)
       {
         //something really wrong with distribution of blocks, just use current_low_boundary to be sure that we didn't mess any transactions 
