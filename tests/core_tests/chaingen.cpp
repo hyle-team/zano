@@ -159,7 +159,15 @@ void test_generator::add_block(const currency::block& blk,
   get_block_reward(is_pos_block(blk), misc_utils::median(block_sizes), block_size, already_generated_coins, block_reward, currency::get_block_height(blk));
 
   m_blocks_info[get_block_hash(blk)] = block_info(blk, already_generated_coins + block_reward, block_size, cum_diff, tx_list, ks_hash);
-  LOG_PRINT_MAGENTA("ADDED_BLOCK[" << get_block_hash(blk) << "][" << (is_pos_block(blk)? "PoS":"PoW") <<"][" << get_block_height(blk) << "][cumul_diff:" << cum_diff << "]", LOG_LEVEL_0);
+ 
+  
+  std::stringstream ss_tx_hashes;
+  for (auto& h : blk.tx_hashes)
+  {
+    ss_tx_hashes << "    [tx]: " << h << ENDL;
+  }
+
+  LOG_PRINT_MAGENTA("ADDED_BLOCK[" << get_block_hash(blk) << "][" << (is_pos_block(blk)? "PoS":"PoW") <<"][" << get_block_height(blk) << "][cumul_diff:" << cum_diff << "]" << ENDL << ss_tx_hashes.str(), LOG_LEVEL_0);
 }
 
 void test_generator::add_block_info(const block_info& bi)

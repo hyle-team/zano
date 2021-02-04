@@ -685,11 +685,19 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
 
 bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<test_event_entry>& events) const
 {
+  random_state_test_restorer::reset_random(0); // to make the test deterministic
+  uint64_t ts = 1450000000;
+  test_core_time::adjust(ts);
+
   // Test idea: make sure tx can spend (using ref_by_id) an output from another tx when both txs are in an altchain.
   bool r = false;
-  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(miner_acc);  
   GENERATE_ACCOUNT(alice_acc);
   GENERATE_ACCOUNT(bob_acc);
+  miner_acc.set_createtime(ts);
+  alice_acc.set_createtime(ts);
+  bob_acc.set_createtime(ts);
+
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);

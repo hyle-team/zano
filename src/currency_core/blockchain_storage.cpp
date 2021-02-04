@@ -1720,6 +1720,34 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     alt_block_extended_info abei = AUTO_VAL_INIT(abei);
     abei.bl = b;
     abei.onboard_transactions.swap(bvc.m_onboard_transactions);
+    //for altblocks we should be sure that all transactions kept in onboard_transactions
+    for (auto& h: abei.bl.tx_hashes)
+    {
+      if (abei.onboard_transactions.count(h) == 0)
+      {
+        //need to take if from pool
+        transaction tx = AUTO_VAL_INIT(tx);
+        bool r = m_tx_pool.get_transaction(h, tx);
+        if (!r)
+        {
+          //transaction could be in main chain 
+          auto tx_ptr = m_db_transactions.find(h);
+          if (!tx_ptr)
+          {
+            LOG_ERROR("Transaction " << h  << " for altblock " << get_block_hash(abei.bl) << " not found");
+          }
+          else
+          {
+            abei.onboard_transactions[h] = tx_ptr->tx;
+          }
+        }
+        else
+        {
+          abei.onboard_transactions[h] = tx;
+        }
+      }
+    }
+
     abei.timestamp = m_core_runtime_config.get_core_time();
     abei.height = alt_chain.size() ? it_prev->second.height + 1 : *ptr_main_prev + 1;
     CHECK_AND_ASSERT_MES_CUSTOM(coinbase_height == abei.height, false, bvc.m_verification_failed = true, "block coinbase height doesn't match with altchain height, declined");
