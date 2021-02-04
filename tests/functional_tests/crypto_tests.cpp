@@ -268,6 +268,7 @@ struct scalar_t
     m_u64[3] = 0;
   }
 
+  // genrate 0 <= x < L
   static scalar_t random()
   {
     unsigned char tmp[64];
@@ -278,6 +279,7 @@ struct scalar_t
     return result;
   }
 
+  // genrate 0 <= x < L
   void make_random()
   {
     unsigned char tmp[64];
@@ -399,6 +401,16 @@ struct scalar_t
     return ss << "0x" << pod_to_hex_big_endian(v);
   }
 
+  std::string to_string_as_hex_number() const
+  {
+    return pod_to_hex_big_endian(*this);
+  }
+
+  std::string to_string_as_secret_key() const
+  {
+    return epee::string_tools::pod_to_hex(*this);
+  }
+
 }; // struct scalar_t
 
 
@@ -429,7 +441,7 @@ struct point_t
     return ge_frombytes_vartime(&m_p3, reinterpret_cast<const unsigned char*>(&pk)) == 0;
   }
 
-  operator crypto::public_key() const
+  crypto::public_key to_public_key() const
   {
     crypto::public_key result;
     ge_p3_tobytes((unsigned char*)&result, &m_p3);
@@ -498,9 +510,20 @@ struct point_t
 
   friend std::ostream& operator<<(std::ostream& ss, const point_t &v)
   {
-    crypto::public_key pk;
-    ge_p3_tobytes((unsigned char*)&pk, &v.m_p3);
+    crypto::public_key pk = v.to_public_key();
     return ss << epee::string_tools::pod_to_hex(pk);
+  }
+
+  operator std::string() const
+  {
+    crypto::public_key pk = to_public_key();
+    return epee::string_tools::pod_to_hex(pk);
+  }
+
+  std::string to_string() const
+  {
+    crypto::public_key pk = to_public_key();
+    return epee::string_tools::pod_to_hex(pk);
   }
 }; // struct point_t
 
