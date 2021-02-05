@@ -172,6 +172,11 @@ namespace tools
           //for multisig we don't split
           splitted_dsts.push_back(de);
         }
+        else if (de.htlc_options.expiration != 0)
+        {
+          //for htlc we don't do split
+          splitted_dsts.push_back(de);
+        }
         else
         {
           currency::decompose_amount_into_digits(de.amount, dust_threshold,

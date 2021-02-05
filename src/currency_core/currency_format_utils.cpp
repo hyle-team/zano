@@ -641,7 +641,7 @@ namespace currency
 
     tx_out out;
     out.amount = de.amount;
-    if (de.htlc_options.htlc_hash != null_hash)
+    if (de.htlc_options.expiration != 0)
     {
       const destination_option_htlc_out& htlc_dest = de.htlc_options;
       //out htlc
@@ -665,7 +665,7 @@ namespace currency
         result.htlc_origin = generate_origin_for_htlc(htlc, self);
 
         //calculate hash
-        if (htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
+        if (!htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
         {
           htlc.htlc_hash = crypto::sha256_hash(result.htlc_origin.data(), result.htlc_origin.size());
         }
@@ -679,7 +679,7 @@ namespace currency
       {
         htlc.htlc_hash = htlc_dest.htlc_hash;
       }
-
+      out.target = htlc;
     }
     else if (target_keys.size() == 1)
     {
@@ -1677,6 +1677,14 @@ namespace currency
       if (out.target.type() == typeid(txout_to_key))
       {
         if (!check_key(boost::get<txout_to_key>(out.target).key))
+          return false;
+      }
+      else if (out.target.type() == typeid(txout_htlc))
+      {
+        const txout_htlc& htlc = boost::get<txout_htlc>(out.target);
+        if (!check_key(htlc.pkey_redeem))
+          return false;
+        if (!check_key(htlc.pkey_refund))
           return false;
       }
       else if (out.target.type() == typeid(txout_multisig))

@@ -2475,6 +2475,11 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
     << out_ptr->out_no << " more than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
   
   const transaction& tx = tx_ptr->tx;
+  if (tx.vout[out_ptr->out_no].target.type() == typeid(txout_htlc))
+  {
+    //silently return false, it's ok
+    return false;
+  }
   CHECK_AND_ASSERT_MES(tx.vout[out_ptr->out_no].target.type() == typeid(txout_to_key), false, "unknown tx out type");
   const txout_to_key& otk = boost::get<txout_to_key>(tx.vout[out_ptr->out_no].target);
 
@@ -3323,7 +3328,7 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
   size_t i = 0;
   BOOST_FOREACH(const auto& ot, tx.vout)
   {
-    if (ot.target.type() == typeid(txout_to_key))
+    if (ot.target.type() == typeid(txout_to_key) || ot.target.type() == typeid(txout_htlc))
     {
       m_db_outputs.push_back_item(ot.amount, global_output_entry::construct(tx_id, i));
       global_indexes.push_back(m_db_outputs.get_item_size(ot.amount) - 1);
@@ -3364,8 +3369,14 @@ bool blockchain_storage::get_outs(uint64_t amount, std::list<crypto::public_key>
     auto tx_ptr = m_db_transactions.find(out_entry_ptr->tx_id);
     CHECK_AND_ASSERT_MES(tx_ptr, false, "transactions outs global index consistency broken: can't find tx " << out_entry_ptr->tx_id << " in DB, for amount: " << amount << ", gindex: " << i);
     CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() > out_entry_ptr->out_no, false, "transactions outs global index consistency broken: index in tx_outx == " << out_entry_ptr->out_no << " is greather than tx.vout size == " << tx_ptr->tx.vout.size() << ", for amount: " << amount << ", gindex: " << i);
-    CHECK_AND_ASSERT_MES(tx_ptr->tx.vout[out_entry_ptr->out_no].target.type() == typeid(txout_to_key), false, "transactions outs global index consistency broken: out #" << out_entry_ptr->out_no << " in tx " << out_entry_ptr->tx_id << " has wrong type, for amount: " << amount << ", gindex: " << i);
-    pkeys.push_back(boost::get<txout_to_key>(tx_ptr->tx.vout[out_entry_ptr->out_no].target).key);
+    //CHECK_AND_ASSERT_MES(tx_ptr->tx.vout[out_entry_ptr->out_no].target.type() == typeid(txout_to_key), false, "transactions outs global index consistency broken: out #" << out_entry_ptr->out_no << " in tx " << out_entry_ptr->tx_id << " has wrong type, for amount: " << amount << ", gindex: " << i);
+    if (tx_ptr->tx.vout[out_entry_ptr->out_no].target.type() == typeid(txout_to_key))
+    {
+      pkeys.push_back(boost::get<txout_to_key>(tx_ptr->tx.vout[out_entry_ptr->out_no].target).key);
+    }else if(tx_ptr->tx.vout[out_entry_ptr->out_no].target.type() == typeid(txout_htlc))
+    {
+      pkeys.push_back(boost::get<txout_htlc>(tx_ptr->tx.vout[out_entry_ptr->out_no].target).pkey_redeem);
+    }
   }
 
   return true;
@@ -3377,7 +3388,7 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
   size_t i = tx.vout.size()-1;
   BOOST_REVERSE_FOREACH(const auto& ot, tx.vout)
   {
-    if (ot.target.type() == typeid(txout_to_key))
+    if (ot.target.type() == typeid(txout_to_key) || ot.target.type() == typeid(txout_htlc))
     {
       uint64_t sz= m_db_outputs.get_item_size(ot.amount);
       CHECK_AND_ASSERT_MES(sz, false, "transactions outs global index: empty index for amount: " << ot.amount);
