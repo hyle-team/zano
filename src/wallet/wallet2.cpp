@@ -461,7 +461,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         }
         else if (tx.vout[o].target.type() == typeid(txout_htlc))
         {
-          THROW_IF_TRUE_WALLET_INT_ERR_EX(htlc_info_list.size() > 0, "Found txout_htlc out but htlc_info_list is empty");
+          THROW_IF_FALSE_WALLET_INT_ERR_EX(htlc_info_list.size() > 0, "Found txout_htlc out but htlc_info_list is empty");
           if (htlc_info_list.front().hltc_our_out_is_before_expiration)
           {
             out_key = boost::get<currency::txout_htlc>(tx.vout[o].target).pkey_redeem;
@@ -502,7 +502,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         else
         {
           // normal wallet, calculate and store key images for own outs
-          currency::keypair in_ephemeral;
+          currency::keypair in_ephemeral = AUTO_VAL_INIT(in_ephemeral);
           currency::generate_key_image_helper(m_account.get_keys(), tx_pub_key, o, in_ephemeral, ki);
           WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(in_ephemeral.pub == out_key, "key_image generated ephemeral public key that does not match with output_key");
         }
@@ -609,7 +609,14 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         if (max_out_unlock_time < get_tx_unlock_time(tx, o))
           max_out_unlock_time = get_tx_unlock_time(tx, o);
 
-        WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
+        if (tx.vout[o].target.type() == typeid(txout_to_key))
+        {
+          WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
+        }
+        else if (tx.vout[o].target.type() == typeid(txout_htlc))
+        {
+          WLT_LOG_L0("Detected HTLC[" << (td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM ? "REDEEM":"REFUND") << "], transfer #" << transfer_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
+        }
       }
       else if (tx.vout[o].target.type() == typeid(txout_multisig))
       {
@@ -619,10 +626,6 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         tdb.m_ptx_wallet_info = pwallet_info;
         tdb.m_internal_output_index = o;
         WLT_LOG_L0("Received multisig, multisig out id: " << multisig_id << ", amount: " << tdb.amount() << ", with tx: " << get_transaction_hash(tx));
-      }
-      else if (tx.vout[o].target.type() == typeid(txout_htlc))
-      {
-
       }
     }
   }

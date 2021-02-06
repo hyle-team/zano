@@ -657,6 +657,14 @@ namespace currency
       bool r = derive_public_key_from_target_address(self.account_address, tx_sec_key, output_index, out_eph_public_key, derivation);
       CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
       htlc.pkey_refund = out_eph_public_key;
+      //add derivation hint for refund address
+      uint16_t hint = get_derivation_hint(derivation);
+      if (deriv_cache.count(hint) == 0)
+      {
+        tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
+        deriv_cache.insert(hint);
+      }
+
 
       if (htlc_dest.htlc_hash == null_hash)
       {
@@ -2594,6 +2602,12 @@ namespace currency
         }
         tei.outs.back().minimum_sigs = otm.minimum_sigs;
       }
+      else if (out.target.type() == typeid(txout_htlc))
+      {
+        const txout_htlc& otk = boost::get<txout_htlc>(out.target);
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_redeem) + "(htlc_pkey_redeem)");
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_refund) + "(htlc_pkey_refund)");
+      }
 
       ++i;
     }
@@ -2697,7 +2711,7 @@ namespace currency
   {
     for (size_t n = 0; n < tx.vout.size(); ++n)
     {
-      if (tx.vout[n].target.type() == typeid(txout_to_key))
+      if (tx.vout[n].target.type() == typeid(txout_to_key) || tx.vout[n].target.type() == typeid(txout_htlc))
       {
         uint64_t amount = tx.vout[n].amount;
         gindices[amount] += 1;

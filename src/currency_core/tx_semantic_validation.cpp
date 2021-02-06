@@ -30,6 +30,12 @@ namespace currency
         if (!ki.insert(tokey_in.k_image).second)
           return false;
       }
+      else if (in.type() == typeid(txin_htlc))
+      {
+        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_htlc, htlc_in, false);
+        if (!ki.insert(htlc_in.k_image).second)
+          return false;
+      }
     }
     return true;
   }
