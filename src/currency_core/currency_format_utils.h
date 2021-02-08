@@ -28,6 +28,7 @@
 #include "currency_format_utils_blocks.h"
 #include "currency_format_utils_transactions.h"
 #include "core_runtime_config.h"
+#include "wallet/wallet_public_structs_defs.h"
 
 
 // ------ get_tx_type_definition -------------
@@ -44,6 +45,8 @@
 #define       GUI_TX_TYPE_ESCROW_RELEASE_BURN     10
 #define       GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL  11
 #define       GUI_TX_TYPE_ESCROW_RELEASE_CANCEL   12
+#define       GUI_TX_TYPE_HTLC_DEPOSIT            13
+#define       GUI_TX_TYPE_HTLC_REDEEM             14
 
 
 
@@ -285,7 +288,9 @@ namespace currency
   bool decrypt_payload_items(bool is_income, const transaction& tx, const account_keys& acc_keys, std::vector<payload_items_v>& decrypted_items);
   void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key);
   bool is_derivation_used_to_encrypt(const transaction& tx, const crypto::key_derivation& derivation);
+  void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x);
   uint64_t get_tx_type(const transaction& tx);
+  uint64_t get_tx_type_ex(const transaction& tx, tx_out& htlc_out, txin_htlc& htlc_in);
   size_t get_multisig_out_index(const std::vector<tx_out>& outs);
   size_t get_multisig_in_index(const std::vector<txin_v>& inputs);
 

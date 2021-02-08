@@ -1215,13 +1215,9 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
   fill_transfer_details(tx, td, wti.td);
   wti.unlock_time = get_max_unlock_time_from_receive_indices(tx, td);
   wti.timestamp = timestamp;
-  wti.fee = currency::is_coinbase(tx) ? 0:currency::get_tx_fee(tx);
   wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
   wti.tx_hash = currency::get_transaction_hash(tx);
-  wti.is_service = currency::is_service_tx(tx);
-  wti.is_mixing = currency::is_mixin_tx(tx);
-  wti.is_mining = currency::is_coinbase(tx);
-  wti.tx_type = get_tx_type(tx);
+  load_wallet_transfer_info_flags(wti);
   bc_services::extract_market_instructions(wti.srv_attachments, tx.attachment);
 
   // escrow transactions, which are built with TX_FLAG_SIGNATURE_MODE_SEPARATE flag actually encrypt attachments 
@@ -3090,10 +3086,11 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
   {
     if (exclude_mining_txs)
     {
-      if(it->is_mining)
+      if(is_mixin_tx(it->tx))
         continue;
     }
     trs.push_back(*it);
+    load_wallet_transfer_info_flags(trs.back());
     last_item_index = it - m_transfer_history.rbegin();
     
     if (trs.size() >= count)
@@ -4410,6 +4407,7 @@ void wallet2::mark_transfers_as_spent(const std::vector<uint64_t>& selected_tran
 bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<crypto::hash, bc_services::offer_details_ex>& offers_local)
 {
   //TODO: this code supports only one market(offer) instruction per transaction
+  load_wallet_transfer_info_flags(m_transfer_history[i]);
   switch (m_transfer_history[i].tx_type)
   {
     case GUI_TX_TYPE_PUSH_OFFER:

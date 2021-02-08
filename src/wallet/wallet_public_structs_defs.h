@@ -84,6 +84,9 @@ namespace wallet_public
   };
 
 
+#define WALLET_TRANSFER_INFO_FLAGS_HTLC_DEPOSIT   static_cast<uint16_t>(1 << 0)
+
+
   struct wallet_transfer_info
   {
     uint64_t      amount;
@@ -106,6 +109,7 @@ namespace wallet_public
     uint64_t      fee;
     bool          show_sender;
     std::vector<escrow_contract_details> contract;
+    uint16_t      extra_flags; 
     
     //not included in kv serialization map
     currency::transaction tx;

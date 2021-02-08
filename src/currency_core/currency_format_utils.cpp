@@ -994,7 +994,29 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
-  uint64_t get_tx_type(const transaction& tx)
+  void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x)
+  {
+    x.is_service = currency::is_service_tx(x.tx);
+    x.is_mixing = currency::is_mixin_tx(x.tx);
+    x.is_mining = currency::is_coinbase(x.tx);
+    if (!x.is_mining)
+      x.fee = currency::get_tx_fee(x.tx);
+    else
+      x.fee = 0;
+    x.show_sender = currency::is_showing_sender_addres(x.tx);
+    tx_out htlc_out = AUTO_VAL_INIT(htlc_out);
+    txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
+
+    x.tx_type = get_tx_type_ex(x.tx, htlc_out, htlc_in);
+    if(x.tx_type == GUI_TX_TYPE_HTLC_DEPOSIT && x.is_income == true)
+    {
+      //need to correct amount
+      x.amount = htlc_out.amount;
+    }
+  }
+
+  //---------------------------------------------------------------
+  uint64_t get_tx_type_ex(const transaction& tx, tx_out& htlc_out, txin_htlc& htlc_in)
   {
     if (is_coinbase(tx))
       return GUI_TX_TYPE_COIN_BASE;
@@ -1009,7 +1031,7 @@ namespace currency
       else
         return GUI_TX_TYPE_NEW_ALIAS;
     }
-    
+
     // offers
     tx_service_attachment a = AUTO_VAL_INIT(a);
     if (get_type_in_variant_container(tx.attachment, a))
@@ -1024,7 +1046,7 @@ namespace currency
           return GUI_TX_TYPE_CANCEL_OFFER;
       }
     }
-    
+
     // escrow
     tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
     if (bc_services::get_first_service_attachment_by_id(tx, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_TEMPLATES, tsa))
@@ -1040,7 +1062,29 @@ namespace currency
     if (bc_services::get_first_service_attachment_by_id(tx, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_CANCEL_PROPOSAL, tsa))
       return GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL;
 
+    for (auto o : tx.vout)
+    {
+      if (o.target.type() == typeid(txout_htlc))
+      {
+        htlc_out = o;
+        return GUI_TX_TYPE_HTLC_DEPOSIT;
+      }
+    }
+
+    if (get_type_in_variant_container(tx.vin, htlc_in))
+    {
+      return GUI_TX_TYPE_HTLC_REDEEM;
+    }
+
+
     return GUI_TX_TYPE_NORMAL;
+  }
+  //---------------------------------------------------------------
+  uint64_t get_tx_type(const transaction& tx)
+  {
+    tx_out htlc_out = AUTO_VAL_INIT(htlc_out);
+    txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
+    return get_tx_type_ex(tx, htlc_out, htlc_in);
   }
   //---------------------------------------------------------------
   size_t get_multisig_out_index(const std::vector<tx_out>& outs)

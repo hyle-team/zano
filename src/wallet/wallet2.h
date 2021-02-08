@@ -1119,20 +1119,6 @@ namespace boost
       a & x.selected_indicies;
       a & x.srv_attachments;
       a & x.unlock_time;
-      //do not store this items in the file since it's quite easy to restore it from original tx 
-      if (Archive::is_loading::value)
-      {
-
-        x.is_service = currency::is_service_tx(x.tx);
-        x.is_mixing = currency::is_mixin_tx(x.tx);
-        x.is_mining = currency::is_coinbase(x.tx);
-        if (!x.is_mining)
-          x.fee = currency::get_tx_fee(x.tx);
-        else
-          x.fee = 0;
-        x.show_sender = currency::is_showing_sender_addres(x.tx);
-        x.tx_type = get_tx_type(x.tx);
-      }
     }
 
     template <class Archive>
