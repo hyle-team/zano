@@ -2245,8 +2245,6 @@ void wallet2::detach_blockchain(uint64_t including_height)
       // skip coinbase txs as they are not expected to go into the pool
       if (is_coinbase(it->tx))
       {
-        if (!it->is_mining)
-          WLT_LOG_ERROR("is_mining flag is not consistent for tx " << it ->tx_hash);
         continue;
       }
 
@@ -3086,7 +3084,7 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
   {
     if (exclude_mining_txs)
     {
-      if(is_mixin_tx(it->tx))
+      if(currency::is_coinbase(it->tx))
         continue;
     }
     trs.push_back(*it);
@@ -3424,7 +3422,7 @@ void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transf
 {
   for (auto& u : m_unconfirmed_txs)
   {
-    if (exclude_mining_txs && u.second.is_mining)
+    if (exclude_mining_txs && currency::is_coinbase(u.second.tx))
     {
       continue;
     }
@@ -4013,7 +4011,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   print_tx_sent_message(tx, "(from multisig)", fee);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, std::string &origin)
+void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, const crypto::hash& htlc_hash,  std::string &origin)
 {
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.fee = TX_DEFAULT_FEE;
@@ -4021,8 +4019,8 @@ void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_publ
   ctp.dsts.back().addr.push_back(addr);
   ctp.dsts.back().amount = amount;
   destination_option_htlc_out& htlc_option = ctp.dsts.back().htlc_options;
-  htlc_option.expiration = 740; //about 12 hours
-  htlc_option.htlc_hash = null_hash;
+  htlc_option.expiration = lock_blocks_count; //about 12 hours
+  htlc_option.htlc_hash = htlc_hash;
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);

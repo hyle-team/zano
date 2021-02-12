@@ -779,6 +779,11 @@ namespace currency
       }
       else if (tx_ptr->tx.vout[n].target.type() == typeid(txout_htlc))
       {
+        //check for spend flags
+        CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() > n, false, 
+          "Internal error: tx_ptr->m_spent_flags.size(){" << tx_ptr->m_spent_flags.size() << "} > n{" << n << "}");
+        CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags[n] == false, false, "HTLC out already spent, double spent attempt detected");
+
         const txout_htlc& htlc_out = boost::get<txout_htlc>(tx_ptr->tx.vout[n].target);
         if (htlc_out.expiration > get_current_blockchain_size() - tx_ptr->m_keeper_block_height)
         {

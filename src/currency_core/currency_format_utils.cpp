@@ -997,7 +997,7 @@ namespace currency
   void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x)
   {
     x.is_service = currency::is_service_tx(x.tx);
-    x.is_mixing = currency::is_mixin_tx(x.tx);
+    x.is_mixing = currency::does_tx_have_only_mixin_inputs(x.tx);
     x.is_mining = currency::is_coinbase(x.tx);
     if (!x.is_mining)
       x.fee = currency::get_tx_fee(x.tx);
@@ -1010,7 +1010,7 @@ namespace currency
     x.tx_type = get_tx_type_ex(x.tx, htlc_out, htlc_in);
     if(x.tx_type == GUI_TX_TYPE_HTLC_DEPOSIT && x.is_income == true)
     {
-      //need to correct amount
+      //need to override amount
       x.amount = htlc_out.amount;
     }
   }
@@ -2366,7 +2366,7 @@ namespace currency
     return have_type_in_variant_container<tx_payer>(tx.attachment) || have_type_in_variant_container<tx_payer_old>(tx.attachment);
   }
   //---------------------------------------------------------------
-  bool is_mixin_tx(const transaction& tx)
+  bool does_tx_have_only_mixin_inputs(const transaction& tx)
   {
     for (const auto& e : tx.vin)
     {

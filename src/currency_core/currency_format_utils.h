@@ -334,7 +334,7 @@ namespace currency
   bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id);
   bool add_padding_to_tx(transaction& tx, size_t count);
   bool is_service_tx(const transaction& tx);
-  bool is_mixin_tx(const transaction& tx);
+  bool does_tx_have_only_mixin_inputs(const transaction& tx);
   bool is_showing_sender_addres(const transaction& tx);
   uint64_t get_amount_for_zero_pubkeys(const transaction& tx);
   //std::string get_comment_from_tx(const transaction& tx);

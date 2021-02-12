@@ -744,8 +744,7 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
     }
     bool operator()(const txin_htlc& inp) const
     {
-      //HTLC TODO
-      return true;
+      return this->operator()(static_cast<const txin_to_key&>(inp));
     }
   };
 
@@ -3845,8 +3844,7 @@ namespace currency
     }
     bool operator()(const txin_htlc& in) const
     {
-      //HTLC TODO
-      return true;
+      return this->operator()(static_cast<const txin_to_key&>(in));
     }
     bool operator()(const txin_gen& in) const { return true; }
     bool operator()(const txin_multisig& in) const
