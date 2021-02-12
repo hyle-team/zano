@@ -2061,8 +2061,10 @@ int main(int argc, char* argv[])
       std::string arg_pos_mining_reward_address_str = command_line::get_arg(vm, arg_pos_mining_reward_address);
       if (!arg_pos_mining_reward_address_str.empty())
       {
-        r = get_account_address_from_str(miner_address, arg_pos_mining_reward_address_str);
+        std::string payment_id;
+        r = wal.get_transfer_address(arg_pos_mining_reward_address_str, miner_address, payment_id);
         CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to parse miner address from string: " << arg_pos_mining_reward_address_str);
+        CHECK_AND_ASSERT_MES(payment_id.size() == 0, EXIT_FAILURE, "Address for rewards should not be integrated address: " << arg_pos_mining_reward_address_str);
         LOG_PRINT_YELLOW("PoS reward will be sent to another address: " << arg_pos_mining_reward_address_str, LOG_LEVEL_0);
       }
     }
