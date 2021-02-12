@@ -15,8 +15,6 @@ extern "C" {
 #include "crypto/crypto-ops.h"
 } // extern "C"
 
-unsigned char Lm2[32] = { 0xeb, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x10 };
-
 // out = z ^ s (mod l)
 void sc_exp(unsigned char* out, const unsigned char* z, const unsigned char* s)
 {
@@ -425,6 +423,11 @@ struct point_t
   {
   }
 
+  explicit point_t(const crypto::public_key& pk)
+  {
+    from_public_key(pk); // TODO: what if it fails?
+  }
+
   void zero()
   {
     ge_p3_0(&m_p3);
@@ -441,9 +444,21 @@ struct point_t
     return ge_frombytes_vartime(&m_p3, reinterpret_cast<const unsigned char*>(&pk)) == 0;
   }
 
+  bool from_key_image(const crypto::key_image& ki)
+  {
+    return ge_frombytes_vartime(&m_p3, reinterpret_cast<const unsigned char*>(&ki)) == 0;
+  }
+
   crypto::public_key to_public_key() const
   {
     crypto::public_key result;
+    ge_p3_tobytes((unsigned char*)&result, &m_p3);
+    return result;
+  }
+
+  crypto::key_image to_key_image() const
+  {
+    crypto::key_image result;
     ge_p3_tobytes((unsigned char*)&result, &m_p3);
     return result;
   }
@@ -483,6 +498,20 @@ struct point_t
     scalar_t reciprocal;
     sc_invert(&reciprocal.m_s[0], &rhs.m_s[0]);
     ge_scalarmult_p3(&result.m_p3, &reciprocal.m_s[0], &lhs.m_p3);
+    return result;
+  }
+
+  // returns a * this + G
+  point_t mul_plus_G(const scalar_t& a) const
+  {
+    static const unsigned char one[32] = { 1 };
+    static_assert(sizeof one == sizeof(crypto::ec_scalar), "size missmatch");
+
+    point_t result;
+    ge_p2 p2;
+    ge_double_scalarmult_base_vartime(&p2, &a.m_s[0], &m_p3, &one[0]);
+    ge_p2_to_p3(&result.m_p3, &p2);
+
     return result;
   }
 
@@ -603,12 +632,38 @@ struct hash_helper_t
     void add_point(const point_t& point)
     {
       m_elements.emplace_back(point.to_public_key());
+
+      // faster?
+      /* static_assert(sizeof point.m_p3 == 5 * sizeof(item_t), "size missmatch");
+      const item_t *p = (item_t*)&point.m_p3;
+      m_elements.emplace_back(p[0]);
+      m_elements.emplace_back(p[1]);
+      m_elements.emplace_back(p[2]);
+      m_elements.emplace_back(p[3]);
+      m_elements.emplace_back(p[4]); */
+    }
+
+    void add_pub_key(const crypto::public_key& pk)
+    {
+      m_elements.emplace_back(pk);
     }
 
     void add_points_array(const std::vector<point_t>& points_array)
     {
       for (size_t i = 0, size = points_array.size(); i < size; ++i)
-        m_elements.emplace_back(points_array[i].to_public_key());
+        add_point(points_array[i]);
+    }
+
+    void add_pub_keys_array(const std::vector<crypto::public_key>& pub_keys_array)
+    {
+      for (size_t i = 0, size = pub_keys_array.size(); i < size; ++i)
+        m_elements.emplace_back(pub_keys_array[i]);
+    }
+
+    void add_key_images_array(const std::vector<crypto::key_image>& key_image_array)
+    {
+      for (size_t i = 0, size = key_image_array.size(); i < size; ++i)
+        m_elements.emplace_back(key_image_array[i]);
     }
 
     scalar_t calc_hash(bool clear = true)
@@ -623,10 +678,12 @@ struct hash_helper_t
 
     union item_t
     {
-      item_t(const crypto::public_key& pk) : pk(pk) {}
       item_t(const scalar_t& scalar) : scalar(scalar) {}
+      item_t(const crypto::public_key& pk) : pk(pk) {}
+      item_t(const crypto::key_image& ki) : ki(ki) {}
       scalar_t scalar;
       crypto::public_key pk;
+      crypto::key_image ki;
     };
 
     std::vector<item_t> m_elements;
@@ -647,6 +704,16 @@ struct hash_helper_t
     return hs_calculator.calc_hash();
   }
 
+  static scalar_t hs(const crypto::hash& s, const std::vector<crypto::public_key>& ps0, const std::vector<crypto::key_image>& ps1)
+  {
+    static_assert(sizeof(crypto::hash) == sizeof(scalar_t), "size missmatch");
+    hs_t hs_calculator;
+    hs_calculator.add_scalar(*reinterpret_cast<const scalar_t*>(&s));
+    hs_calculator.add_pub_keys_array(ps0);
+    hs_calculator.add_key_images_array(ps1);
+    return hs_calculator.calc_hash();
+  }
+
   static scalar_t hs(const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
   {
     hs_t hs_calculator;
@@ -662,6 +729,13 @@ struct hash_helper_t
 
     ge_bytes_hash_to_ec(&result.m_p3, (const unsigned char*)&pk);
 
+    return result;
+  }
+
+  static point_t hp(const crypto::public_key& p)
+  {
+    point_t result;
+    ge_bytes_hash_to_ec(&result.m_p3, (const unsigned char*)&p);
     return result;
   }
 };
