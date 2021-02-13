@@ -397,10 +397,18 @@ namespace tools
     };
 
 
+    struct transfer_details_extra_option_htlc_info
+    {
+      std::string origin;  //this field filled only if htlc had been redeemed
+    }
+
+    typedef boost::variant<transfer_details_extra_option_htlc_info> transfer_details_extra_options_v;
+
     struct transfer_details : public transfer_details_base
     {
       uint64_t m_global_output_index;
       crypto::key_image m_key_image; //TODO: key_image stored twice :(
+      transfer_details_extra_options_v varian_options;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(m_global_output_index)
@@ -852,6 +860,7 @@ namespace tools
       currency::transaction &tx, std::string &origin);
     void get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_public::htlc_entry_info>& htlcs);
     void redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin);
+    bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin);
 
 private:
 
@@ -1044,7 +1053,7 @@ private:
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
 BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 9)
-BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 2)
+BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 3)
 
 
 namespace boost
@@ -1074,6 +1083,9 @@ namespace boost
       a & x.m_global_output_index;
       a & x.m_key_image;
       a & static_cast<tools::wallet2::transfer_details_base&>(x);
+      if (ver < 3)
+        return;
+      a & x.varian_options;
     }
 
     template <class Archive>

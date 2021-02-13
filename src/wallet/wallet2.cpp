@@ -397,7 +397,9 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_ptx_wallet_info->m_tx.vout.size() > td.m_internal_output_index, "Internal error: wrong  index in m_transfers");
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target.type() == typeid(txout_htlc), "Internal error: wrong  index in m_transfers");
         //input spend active htlc
-        m_transfers[it->second].m_spent_height = height;        
+        m_transfers[it->second].m_spent_height = height;
+        transfer_details_extra_option_htlc_info& tdeohi = get_or_add_field_to_variant_vector<transfer_details_extra_option_htlc_info>();
+        tdeohi.origin = in_htlc.hltc_origin;
       }
     }
     i++;
@@ -4061,9 +4063,26 @@ void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin)
 
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
   this->transfer(ctp, result_tx, true, nullptr);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin)
+{
+  auto it = m_active_htlcs_txid.find(htlc_tx_id);
 
+  WLT_THROW_IF_FALSE_WITH_CODE(it != m_active_htlcs_txid.end(),
+    "htlc not found with tx_id = " << htlc_tx_id, API_RETURN_CODE_NOT_FOUND);
 
-
+  transfer_details_extra_option_htlc_info htlc_options = AUTO_VAL_INIT(htlc_options);
+  if (!currency::get_type_in_variant_container(m_transfers[it->second].varian_options, htlc_options))
+  {
+    return false;
+  }
+  if (htlc_options.origin.size())
+  {
+    origin = htlc_options.origin;
+    return true;
+  }
+  return false;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)

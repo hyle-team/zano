@@ -501,16 +501,29 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  template<class add_type_t, class container_type>
+  extra_t& get_or_add_field_to_variant_vector(container_type& container)
+  {
+    for (auto& ev : container)
+    {
+      if (ev.type() == typeid(exadd_type_ttra_t))
+        return boost::get<add_type_t>(ev);
+    }
+    container.push_back(add_type_t());
+    return boost::get<add_type_t>(container.back());
+  }
+  //---------------------------------------------------------------
   template<class extra_t>
   extra_t& get_or_add_field_to_extra(std::vector<extra_v>& extra)
   {
-    for (auto& ev : extra)
-    {
-      if (ev.type() == typeid(extra_t))
-        return boost::get<extra_t>(ev);
-    }
-    extra.push_back(extra_t());
-    return boost::get<extra_t>(extra.back());
+//     for (auto& ev : extra)
+//     {
+//       if (ev.type() == typeid(extra_t))
+//         return boost::get<extra_t>(ev);
+//     }
+//     extra.push_back(extra_t());
+//     return boost::get<extra_t>(extra.back());
+    return get_or_add_field_to_variant_vector<extra_t>(extra);
   }
   //---------------------------------------------------------------
   template<class variant_t, class variant_type_t>

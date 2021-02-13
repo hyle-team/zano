@@ -173,19 +173,51 @@ bool atomic_simple_test::c1(currency::core& c, size_t ev_index, const std::vecto
   CHECK_AND_ASSERT_MES(htlcs_alice_b.size() == 1, false, "htlcs_alice_b.size() == 1 failed");
 
   std::list<wallet_public::htlc_entry_info> htlcs_bob_b;
-  bob_a_wlt_instance->get_list_of_active_htlc(htlcs_bob_b, false);
+  bob_b_wlt_instance->get_list_of_active_htlc(htlcs_bob_b, false);
   CHECK_AND_ASSERT_MES(htlcs_bob_b.size() == 1, false, "htlcs_bob_b.size() == 1  failed");
 
   const wallet_public::htlc_entry_info& hei_bob_b = *htlcs_bob_b.begin();
-  CHECK_AND_ASSERT_MES(hei_bob_b.is_redeem == true, false, "hei_bob.is_redeem == true failed");
+  CHECK_AND_ASSERT_MES(hei_bob_b.is_redeem == true, false, "hei_bob_b.is_redeem == true failed");
 
 
   const wallet_public::htlc_entry_info& hei_alice_b = *htlcs_alice_b.begin();
-  CHECK_AND_ASSERT_MES(hei_alice_b.is_redeem == false, false, "hei_alice.is_redeem == false failed");
+  CHECK_AND_ASSERT_MES(hei_alice_b.is_redeem == false, false, "hei_alice_b.is_redeem == false failed");
 
   CHECK_AND_ASSERT_MES(hei_alice_b.amount == hei_bob_b.amount
     && hei_alice_b.sha256_hash == hei_bob_b.sha256_hash
     && hei_alice_b.tx_id == hei_bob_b.tx_id, false, "hei_alice !=hei_bob ");
+
+  //now alice redeem her contract in blockchain B
+  alice_b_wlt_instance->redeem_htlc(hei_alice_b.tx_id, alice_origin);
+
+  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+  alice_a_wlt_instance->refresh();
+  alice_b_wlt_instance->refresh();
+  bob_a_wlt_instance->refresh();
+  bob_b_wlt_instance->refresh();
+
+  //htlcs_alice_b.clear();
+  //alice_b_wlt_instance->get_list_of_active_htlc(htlcs_alice_b, false);
+  //CHECK_AND_ASSERT_MES(htlcs_alice_b.size() == 0, false, "htlcs_alice_b.size() == 1 failed");
+
+  //htlcs_bob_b.clear();
+  //bob_b_wlt_instance->get_list_of_active_htlc(htlcs_bob_b, false);
+  //CHECK_AND_ASSERT_MES(htlcs_bob_b.size() == 0, false, "htlcs_bob_b.size() == 1  failed");
+  std::string bob_detected_origin;
+  r = bob_b_wlt_instance->check_htlc_redeemed(hei_bob_b.tx_id, bob_detected_origin);
+  CHECK_AND_ASSERT_MES(r, false, "bob_a_wlt_instance->check_htlc_redeemed(hei_bob_b.tx_id, bob_detected_origin); returned false");
+
+  CHECK_AND_ASSERT_MES(bob_detected_origin == alice_origin, false, "bob_detected_origin == alice_origin failed");
+  bob_b_wlt_instance->redeem_htlc(hei_bob.tx_id, bob_detected_origin);
+
+
+  r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+  alice_a_wlt_instance->refresh();
+  alice_b_wlt_instance->refresh();
+  bob_a_wlt_instance->refresh();
+  bob_b_wlt_instance->refresh();
 
   return r;
 }
