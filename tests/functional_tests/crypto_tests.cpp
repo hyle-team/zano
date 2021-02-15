@@ -1394,10 +1394,38 @@ TEST(ml2s, hs)
 // test's runner
 //
 
-int crypto_tests()
+bool wildcard_match(const std::string& needle, const std::string& haystack)
 {
-  epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_1);
-  epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+  size_t h = 0;
+  for (size_t n = 0; n < needle.size(); ++n)
+  {
+    switch (needle[n])
+    {
+    case '?':
+      if (h == haystack.size())
+        return false;
+      ++h;
+      break;
+    case '*':
+      if (n + 1 == needle.size())
+        return true;
+      for (size_t i = 0; i + h < haystack.size(); i++)
+        if (wildcard_match(needle.substr(n + 1), haystack.substr(h + i)))
+          return true;
+      return false;
+    default:
+      if (haystack[h] != needle[n])
+        return false;
+      ++h;
+    }
+  }
+  return h == haystack.size();
+}
+
+int crypto_tests(const std::string& cmd_line_param)
+{
+  epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_3);
+  epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_3);
   epee::log_space::log_singletone::add_logger(LOGGER_FILE,
     epee::log_space::log_singletone::get_default_log_file().c_str(),
     epee::log_space::log_singletone::get_default_log_folder().c_str());
@@ -1408,6 +1436,11 @@ int crypto_tests()
   for (size_t i = 0; i < g_tests.size(); ++i)
   {
     auto& test = g_tests[i];
+
+    if (!wildcard_match(cmd_line_param.c_str(), test.first.c_str()))
+      continue;
+
+    LOG_PRINT("   " << std::setw(40) << std::left << test.first << " >", LOG_LEVEL_0);
     TIME_MEASURE_START(runtime);
     bool r = false;
     try
@@ -1427,11 +1460,11 @@ int crypto_tests()
     uint64_t runtime_mcs = runtime % 1000;
     if (r)
     {
-      LOG_PRINT_GREEN("  " << std::setw(40) << std::left << test.first << "OK [" << runtime_ms << "." << std::setw(3) << std::setfill('0') << runtime_mcs << " ms]", LOG_LEVEL_0);
+      LOG_PRINT_GREEN("   " << std::setw(40) << std::left << test.first << "OK [" << runtime_ms << "." << std::setw(3) << std::setfill('0') << runtime_mcs << " ms]", LOG_LEVEL_0);
     }
     else
     {
-      LOG_PRINT_RED(ENDL << "  " << std::setw(40) << std::left << test.first << "FAILED" << ENDL, LOG_LEVEL_0);
+      LOG_PRINT_RED(ENDL << "   " << std::setw(40) << std::left << test.first << "FAILED" << ENDL, LOG_LEVEL_0);
       failed_tests.push_back(i);
     }
   }

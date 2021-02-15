@@ -56,7 +56,7 @@ namespace
   const command_line::arg_descriptor<bool>   arg_deadlock_guard    = { "test-deadlock-guard",            "Do deadlock guard test", false, true };
   const command_line::arg_descriptor<std::string>   arg_difficulty_analysis = { "difficulty-analysis", "Do difficulty analysis", "", true };
   const command_line::arg_descriptor<bool>   arg_test_plain_wallet = { "test-plainwallet", "Do testing of plain wallet interface", false, true };
-  const command_line::arg_descriptor<bool>   arg_crypto_tests      = { "crypto-tests", "Run experimental crypto tests", false, true };
+  const command_line::arg_descriptor<std::string> arg_crypto_tests = { "crypto-tests", "Run experimental crypto tests", "", true };
 
 }
 
@@ -212,9 +212,9 @@ int main(int argc, char* argv[])
     }
     return 0;
   }
-  else if (command_line::get_arg(vm, arg_crypto_tests))
+  else if (command_line::has_arg(vm, arg_crypto_tests))
   {
-    return crypto_tests();
+    return crypto_tests(command_line::get_arg(vm, arg_crypto_tests));
   }
   else
   {
