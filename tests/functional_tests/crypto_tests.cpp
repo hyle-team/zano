@@ -515,6 +515,17 @@ struct point_t
     return result;
   }
 
+  // returns a * this + b * G
+  point_t mul_plus_G(const scalar_t& a, const scalar_t& b) const
+  {
+    point_t result;
+    ge_p2 p2;
+    ge_double_scalarmult_base_vartime(&p2, &a.m_s[0], &m_p3, &b.m_s[0]);
+    ge_p2_to_p3(&result.m_p3, &p2);
+
+    return result;
+  }
+
   friend bool operator==(const point_t& lhs, const point_t& rhs)
   {
     // convert to xy form, then compare components (because (z, y, z, t) representation is not unique)
@@ -780,6 +791,109 @@ scalar_t scalar_from_str(const std::string& str)
   return result;
 }
 
+crypto::hash hash_from_str(const std::string& str)
+{
+  crypto::hash hash;
+  if (!epee::string_tools::parse_tpod_from_hex_string(str, hash))
+    throw std::runtime_error("couldn't parse hash");
+
+  return hash;
+}
+
+std::string point_to_str(const point_t& point)
+{
+  crypto::public_key pk = point.to_public_key();
+  return epee::string_tools::pod_to_hex(pk);
+}
+
+std::string scalar_to_str(const scalar_t& scalar)
+{
+  return epee::string_tools::pod_to_hex(scalar);
+}
+
+bool generate_test_ring_and_sec_keys(size_t N, size_t L, std::vector<point_t>& ring, std::vector<scalar_t>& secret_keys,
+  std::vector<size_t>& ring_mapping, std::vector<point_t>& key_images)
+{
+  secret_keys.resize(L);
+  for (size_t i = 0; i < L; ++i)
+    secret_keys[i].make_random();
+
+  std::vector<point_t> fake_pub_keys(N / 2 - L);
+  for (size_t i = 0; i < fake_pub_keys.size(); ++i)
+    fake_pub_keys[i] = hash_helper_t::hp(i * c_point_G);
+
+  ring_mapping.resize(N / 2);
+  for (size_t i = 0; i < N / 2; ++i)
+    ring_mapping[i] = i;
+
+  std::shuffle(ring_mapping.begin(), ring_mapping.end(), crypto::uniform_random_bit_generator());
+
+  ring.resize(N / 2);
+  for (size_t i = 0; i < ring.size(); ++i)
+  {
+    if (i < L)
+    {
+      // own keys
+      ring[ring_mapping[i]] = secret_keys[i] * c_point_G;
+    }
+    else
+    {
+      // fake keys
+      ring[ring_mapping[i]] = fake_pub_keys[i - L];
+    }
+  }
+
+  ring_mapping.resize(L);
+
+  key_images.resize(L);
+  for (size_t i = 0; i < L; ++i)
+    key_images[i] = hash_helper_t::hp(ring[ring_mapping[i]]) / secret_keys[i];
+
+  return true;
+}
+
+bool generate_test_ring_and_sec_keys(size_t N, size_t L, std::vector<crypto::public_key>& ring, std::vector<crypto::secret_key>& secret_keys,
+  std::vector<size_t>& ring_mapping, std::vector<crypto::key_image> & key_images)
+{
+  secret_keys.resize(L);
+  for (size_t i = 0; i < L; ++i)
+    secret_keys[i] = scalar_t::random().as_secret_key();
+
+  std::vector<point_t> fake_pub_keys(N / 2 - L);
+  for (size_t i = 0; i < fake_pub_keys.size(); ++i)
+    fake_pub_keys[i] = hash_helper_t::hp(i * c_point_G);
+
+  ring_mapping.resize(N / 2);
+  for (size_t i = 0; i < N / 2; ++i)
+    ring_mapping[i] = i;
+
+  std::shuffle(ring_mapping.begin(), ring_mapping.end(), crypto::uniform_random_bit_generator());
+
+  ring.resize(N / 2);
+  for (size_t i = 0; i < ring.size(); ++i)
+  {
+    if (i < L)
+    {
+      // own keys
+      ring[ring_mapping[i]] = (secret_keys[i] * c_point_G).to_public_key();
+    }
+    else
+    {
+      // fake keys
+      ring[ring_mapping[i]] = fake_pub_keys[i - L].to_public_key();
+    }
+  }
+
+  ring_mapping.resize(L);
+
+  key_images.resize(L);
+  for (size_t i = 0; i < L; ++i)
+    key_images[i] = (hash_helper_t::hp(ring[ring_mapping[i]]) / secret_keys[i]).to_key_image();
+
+  return true;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 #include "L2S.h"
 ////////////////////////////////////////////////////////////////////////////////
@@ -840,7 +954,7 @@ struct sig_check_t
 
     crypto::generate_random_bytes(sizeof prefix_hash, &prefix_hash);
 
-    for (size_t i = 0; i < decoy_set_size; ++i)
+    for (size_t i = 0; i + 1 < decoy_set_size; ++i)
     {
       crypto::public_key p;
       crypto::secret_key s;
@@ -873,14 +987,17 @@ struct sig_check_t
 
 TEST(crypto, ring_sigs)
 {
+  return true;
   size_t n = 1000;
-  size_t decoy_set = 2;
+  size_t decoy_set_size = 8;
+
+  std::cout << "using decoy set with size = " << decoy_set_size << std::endl;
 
   std::vector<sig_check_t> sigs;
   sigs.resize(n);
 
   for (size_t i = 0; i < sigs.size(); ++i)
-    sigs[i].prepare_random_data(decoy_set);
+    sigs[i].prepare_random_data(decoy_set_size);
 
   std::cout << n << " random sigs prepared" << std::endl;
 
@@ -1018,6 +1135,81 @@ TEST(crypto, sc_mul_performance)
   std::cout << m << std::endl;
 
   LOG_PRINT_L0("sc_mul: " << std::fixed << std::setprecision(3) << t / 1000.0 << " ms");
+
+  return true;
+}
+
+TEST(crypto, hp)
+{
+  bool r = false;
+  scalar_t sk;
+  r = epee::string_tools::parse_tpod_from_hex_string("407b3b73df8f11737494bdde6ca47a42e1b537390aec2fa781a2d170335c440f", sk);
+  ASSERT_TRUE(r);
+  crypto::public_key pk;
+  r = epee::string_tools::parse_tpod_from_hex_string("1b546af91d31fdb1c476fd62fbb65b6fd5ed47804185fc77d48bc4cc00f47ef0", pk);
+  ASSERT_TRUE(r);
+
+  point_t P;
+  ASSERT_TRUE(P.from_public_key(pk));
+  // make sure pk and sk are pair
+  ASSERT_EQ(P, sk * c_point_G);
+
+  // make sure generate_key_image does the same as sk * hash_helper::hp(pk)
+  crypto::key_image ki;
+  crypto::generate_key_image(pk, sk.as_secret_key(), ki);
+  point_t KI;
+  ASSERT_TRUE(KI.from_public_key((crypto::public_key&)ki)); // key image is a point
+
+  ASSERT_EQ(KI, sk * hash_helper_t::hp(P));
+
+  LOG_PRINT_L0(sk.as_secret_key() << " * G = " << P);
+
+  point_t P1 = hash_helper_t::hp(P);
+  LOG_PRINT_L0("Hp(" << P << ") = " << P1);
+  ASSERT_EQ(P1, point_from_str("f9506848342ddb23b014e5975462757f5d296a6acfa0e9837ff940f7655becdb"));
+
+  point_t P100 = P;
+  for (size_t i = 0; i < 100; ++i)
+    P100 = hash_helper_t::hp(P100);
+
+  ASSERT_EQ(P100, point_from_str("925f195fc629fa15f768c775f7eed3a43dcd45c702974d161eb610a9ab9df4f0"));
+
+
+  crypto::hash hash;
+  crypto::cn_fast_hash(sk.data(), sizeof sk, hash);
+
+  LOG_PRINT_L0("cn_fast_hash(" << sk.as_secret_key() << ") = " << hash);
+  ASSERT_EQ(hash, hash_from_str("ee05b0f64eebf20da306eec142da99283154316391caf474be41ff010afb4298"));
+
+  crypto::cn_fast_hash(nullptr, 0, hash);
+  LOG_PRINT_L0("cn_fast_hash('') = " << hash);
+  ASSERT_EQ(hash, hash_from_str("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"));
+
+  scalar_t z(hash);
+  point_t zG = z * c_point_G;
+  LOG_PRINT_L0("cn_fast_hash('') * G = " << zG.to_public_key() << " (pub_key)");
+  ASSERT_EQ(zG, point_from_str("7849297236cd7c0d6c69a3c8c179c038d3c1c434735741bb3c8995c3c9d6f2ac"));
+
+  crypto::cn_fast_hash("zano", 4, hash);
+  LOG_PRINT_L0("cn_fast_hash('zano') = " << hash);
+  ASSERT_EQ(hash, hash_from_str("23cea10abfdf3ace0b7132291d51e4eb5a392afb2147e67f907ff4f8f5dd4f9f"));
+
+  z = hash;
+  zG = z * c_point_G;
+  LOG_PRINT_L0("cn_fast_hash('zano') * G = " << zG.to_public_key() << " (pub_key)");
+  ASSERT_EQ(zG, point_from_str("71407d59e9d671fa02f26a6a7f4726c3087d8f1732453396638a1dc2929fb57a"));
+
+  char buf[2000];
+  for (size_t i = 0; i < sizeof buf; i += 4)
+    *(uint32_t*)&buf[i] = *(uint32_t*)"zano";
+  crypto::cn_fast_hash(buf, sizeof buf, (char*)&hash);
+  LOG_PRINT_L0("cn_fast_hash('zano' x 500) = " << hash);
+  ASSERT_EQ(hash, hash_from_str("16d87120c601a6ef3e4ffa5e58176a36b814288199f23ec09ef178c554e8879b"));
+
+  z = hash;
+  zG = z * c_point_G;
+  LOG_PRINT_L0("cn_fast_hash('zano' x 500) * G = " << zG.to_public_key() << " (pub_key)");
+  ASSERT_EQ(zG, point_from_str("dd93067a02fb8661aa64504ac1503402a34426f43650d970c35147cec4b61d55"));
 
   return true;
 }
