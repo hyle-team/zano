@@ -1476,8 +1476,8 @@ namespace currency
         sigs.resize(src_entr.outputs.size());
 
         if (!watch_only_mode)
-          crypto::generate_ring_signature(tx_hash_for_signature, boost::get<txin_to_key>(tx.vin[input_index]).k_image, keys_ptrs, in_contexts[in_context_index].in_ephemeral.sec, src_entr.real_output, sigs.data());
-
+          crypto::generate_ring_signature(tx_hash_for_signature, get_to_key_input_from_txin_v(tx.vin[input_index]).k_image, keys_ptrs, in_contexts[in_context_index].in_ephemeral.sec, src_entr.real_output, sigs.data());
+        
         ss_ring_s << "signatures:" << ENDL;
         std::for_each(sigs.begin(), sigs.end(), [&ss_ring_s](const crypto::signature& s) { ss_ring_s << s << ENDL; });
         ss_ring_s << "prefix_hash: " << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_contexts[in_context_index].in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output << ENDL;
@@ -1657,8 +1657,8 @@ namespace currency
   {
     for(const auto& in : tx.vin)
     {
-      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_multisig), false, "wrong variant type: "
-        << in.type().name() << ", expected " << typeid(txin_to_key).name()
+      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_multisig) || in.type() == typeid(txin_htlc), false, "wrong variant type: "
+        << in.type().name() 
         << ", in transaction id=" << get_transaction_hash(tx));
 
     }
@@ -1775,8 +1775,13 @@ namespace currency
       }
       else if (in.type() == typeid(txin_multisig))
       {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_multisig, tokey_in, false);
-        this_amount = tokey_in.amount;
+        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_multisig, ms_in, false);
+        this_amount = ms_in.amount;
+      }
+      else if (in.type() == typeid(txin_htlc))
+      {
+        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_htlc, htlc_in, false);
+        this_amount = htlc_in.amount;
       }
       else
       {
@@ -2370,7 +2375,7 @@ namespace currency
   {
     for (const auto& e : tx.vin)
     {
-      if (e.type() != typeid(txin_to_key))
+      if (e.type() != typeid(txin_to_key) || e.type() != typeid(txin_multisig) || e.type() != typeid(txin_htlc))
         return false;
       if (boost::get<txin_to_key>(e).key_offsets.size() < 2)
         return false;
@@ -2668,9 +2673,10 @@ namespace currency
       {
         tei.ins.back().amount = 0;
       }
-      else if (in.type() == typeid(txin_to_key))
+      else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
       {
-        txin_to_key& tk = boost::get<txin_to_key>(in);
+        //TODO: add htlc info
+        const txin_to_key& tk = get_to_key_input_from_txin_v(in);
         tei.ins.back().amount = tk.amount;
         tei.ins.back().kimage_or_ms_id = epee::string_tools::pod_to_hex(tk.k_image);
         std::vector<txout_ref_v> absolute_offsets = relative_output_offsets_to_absolute(tk.key_offsets);
@@ -2686,6 +2692,10 @@ namespace currency
             //disable for the reset at the moment 
             tei.ins.back().global_indexes.back() = std::numeric_limits<uint64_t>::max();
           }
+        }
+        if (in.type() == typeid(txin_htlc))
+        {
+          tei.ins.back().htlc_origin = epee::string_tools::buff_to_hex_nodelimer(boost::get<txin_htlc>(in).hltc_origin);
         }
         //tk.etc_details -> visualize it may be later
       }

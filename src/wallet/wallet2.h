@@ -400,7 +400,7 @@ namespace tools
     struct transfer_details_extra_option_htlc_info
     {
       std::string origin;  //this field filled only if htlc had been redeemed
-    }
+    };
 
     typedef boost::variant<transfer_details_extra_option_htlc_info> transfer_details_extra_options_v;
 
@@ -408,7 +408,7 @@ namespace tools
     {
       uint64_t m_global_output_index;
       crypto::key_image m_key_image; //TODO: key_image stored twice :(
-      transfer_details_extra_options_v varian_options;
+      std::vector<transfer_details_extra_options_v> varian_options;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(m_global_output_index)
@@ -856,9 +856,8 @@ namespace tools
     we use deterministic origin, if given some particular htlc_hash, then we use this hash, and this means that 
     opener-hash will be given by other side
     */
-    void create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count,
-      currency::transaction &tx, std::string &origin);
-    void get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_public::htlc_entry_info>& htlcs);
+    void create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, const crypto::hash& htlc_hash, std::string &origin);
+    void get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>& htlcs, bool only_redeem_txs);
     void redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin);
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin);
 
@@ -1076,6 +1075,14 @@ namespace boost
       a & x.m_flags;
       a & x.m_spent_height;
     }
+
+   
+    template <class Archive>
+    inline void serialize(Archive &a, tools::wallet2::transfer_details_extra_option_htlc_info &x, const boost::serialization::version_type ver)
+    {
+      a & x.origin;
+    }
+
 
     template <class Archive>
     inline void serialize(Archive &a, tools::wallet2::transfer_details &x, const boost::serialization::version_type ver)

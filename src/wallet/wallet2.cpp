@@ -398,7 +398,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target.type() == typeid(txout_htlc), "Internal error: wrong  index in m_transfers");
         //input spend active htlc
         m_transfers[it->second].m_spent_height = height;
-        transfer_details_extra_option_htlc_info& tdeohi = get_or_add_field_to_variant_vector<transfer_details_extra_option_htlc_info>();
+        transfer_details_extra_option_htlc_info& tdeohi = get_or_add_field_to_variant_vector<transfer_details_extra_option_htlc_info>(td.varian_options);
         tdeohi.origin = in_htlc.hltc_origin;
       }
     }
@@ -4029,7 +4029,7 @@ void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_publ
   origin = ft.htlc_origin;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_list_of_active_htlc(bool only_redeem_txs, std::list<wallet_public::htlc_entry_info>& htlcs)
+void wallet2::get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>& htlcs, bool only_redeem_txs)
 {
   for (auto htlc_entry : m_active_htlcs_txid)
   {
@@ -4059,7 +4059,12 @@ void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin)
   ctp.htlc_origin = origin;
   ctp.dsts.resize(1);
   ctp.dsts.back().addr.push_back(m_account.get_keys().account_address);
-  ctp.dsts.back().amount = 0;
+
+  auto it = m_active_htlcs_txid.find(htlc_tx_id);
+  WLT_THROW_IF_FALSE_WITH_CODE(it != m_active_htlcs_txid.end(),
+    "htlc not found with tx_id = " << htlc_tx_id, API_RETURN_CODE_NOT_FOUND);
+
+  ctp.dsts.back().amount = m_transfers[it->second].amount() - ctp.fee;
 
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
   this->transfer(ctp, result_tx, true, nullptr);

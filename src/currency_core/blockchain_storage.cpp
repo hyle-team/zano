@@ -1630,9 +1630,9 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
     transaction& tx = *tx_ptr;
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {
-      if (tx.vin[n].type() == typeid(txin_to_key))
+      if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
       {
-        purge_keyimage_from_big_heap(boost::get<txin_to_key>(tx.vin[n]).k_image, id);
+        purge_keyimage_from_big_heap(get_to_key_input_from_txin_v(tx.vin[n]).k_image, id);
       }
     }
   }
@@ -4185,13 +4185,12 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
   // check all tx's inputs for being already spent
   for (const txin_v& in : tx.vin)
   {
-    if (in.type() == typeid(txin_to_key))
+    if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
     {
-      if (have_tx_keyimg_as_spent(boost::get<const txin_to_key>(in).k_image))
+      if (have_tx_keyimg_as_spent(get_to_key_input_from_txin_v(in).k_image))
       {
         return true;
-      }
-        
+      }        
     }
     else if (in.type() == typeid(txin_multisig))
     {
@@ -4264,6 +4263,14 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
     else if (txin.type() == typeid(txin_htlc))
     {
       const txin_htlc& in_htlc = boost::get<txin_htlc>(txin);
+      CHECK_AND_ASSERT_MES(in_htlc.key_offsets.size(), false, "Empty in_to_key.key_offsets for input #" << sig_index << " tx: " << tx_prefix_hash);
+      TIME_MEASURE_START_PD(tx_check_inputs_loop_kimage_check);
+      if (have_tx_keyimg_as_spent(in_htlc.k_image))
+      {
+        LOG_ERROR("Key image was already spent in blockchain: " << string_tools::pod_to_hex(in_htlc.k_image) << " for input #" << sig_index << " tx: " << tx_prefix_hash);
+        return false;
+      }
+      TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_kimage_check);
       if (!check_tx_input(tx, sig_index, in_htlc, tx_prefix_hash, *psig, max_used_block_height))
       {
         LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << obj_to_json_str(in_htlc) << ") in tx: " << tx_prefix_hash);
@@ -4763,9 +4770,9 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
     }
     for (auto& in : tx_chain_entry->tx.vin)
     {
-      if (in.type() == typeid(txin_to_key))
+      if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
       {
-        if (boost::get<txin_to_key>(in).k_image == ki)
+        if (get_to_key_input_from_txin_v(in).k_image == ki)
         {
           id_result = get_transaction_hash(tx_chain_entry->tx);
           return tx_chain_entry;

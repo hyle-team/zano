@@ -371,6 +371,8 @@ namespace currency
 
     if (in.type() == typeid(txin_to_key))
       return boost::get<txin_to_key>(in).etc_details;
+    else if (in.type() == typeid(txin_htlc))
+      return boost::get<txin_htlc>(in).etc_details;
     else if (in.type() == typeid(txin_multisig))
       return boost::get<txin_multisig>(in).etc_details;
      else
@@ -502,11 +504,11 @@ namespace currency
   }
   //---------------------------------------------------------------
   template<class add_type_t, class container_type>
-  extra_t& get_or_add_field_to_variant_vector(container_type& container)
+  add_type_t& get_or_add_field_to_variant_vector(container_type& container)
   {
     for (auto& ev : container)
     {
-      if (ev.type() == typeid(exadd_type_ttra_t))
+      if (ev.type() == typeid(add_type_t))
         return boost::get<add_type_t>(ev);
     }
     container.push_back(add_type_t());
@@ -660,6 +662,8 @@ namespace currency
   {
     if (in.type().hash_code() == typeid(txin_to_key).hash_code())
       return &boost::get<txin_to_key>(in).etc_details;
+    if (in.type().hash_code() == typeid(txin_htlc).hash_code())
+      return &boost::get<txin_htlc>(in).etc_details;
     if (in.type().hash_code() == typeid(txin_multisig).hash_code())
       return &boost::get<txin_multisig>(in).etc_details;
     return nullptr;
@@ -669,6 +673,8 @@ namespace currency
   {
     if (in.type().hash_code() == typeid(txin_to_key).hash_code())
       return &boost::get<txin_to_key>(in).etc_details;
+    if (in.type().hash_code() == typeid(txin_htlc).hash_code())
+      return &boost::get<txin_htlc>(in).etc_details;
     if (in.type().hash_code() == typeid(txin_multisig).hash_code())
       return &boost::get<txin_multisig>(in).etc_details;
     return nullptr;
