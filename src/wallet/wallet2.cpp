@@ -2020,7 +2020,11 @@ bool wallet2::scan_unconfirmed_outdate_tx()
   {
     auto& t = m_transfers[i];
 
-    if (t.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT && !t.m_spent_height && !static_cast<bool>(t.m_flags&WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION))
+    if (t.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT 
+      && !t.m_spent_height 
+      && !static_cast<bool>(t.m_flags&WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION)
+      && t.m_ptx_wallet_info->m_tx.vout[t.m_internal_output_index].target.type() != typeid(txout_htlc)
+      )
     {
       //check if there is unconfirmed for this transfer is no longer exist?
       if (!ki_in_unconfirmed.count((t.m_key_image)))

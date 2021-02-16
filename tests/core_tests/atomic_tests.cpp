@@ -226,8 +226,8 @@ bool atomic_simple_test::c1(currency::core& c, size_t ev_index, const std::vecto
   CHECK_AND_FORCE_ASSERT_MES(alice_a_wlt_instance->balance() == 0, false, "Incorrect balance");
   CHECK_AND_FORCE_ASSERT_MES(bob_b_wlt_instance->balance() == 0, false, "Incorrect balance");
 
-  CHECK_AND_FORCE_ASSERT_MES(alice_b_wlt_instance->balance() == transfer_amount - TESTS_DEFAULT_FEE, false, "Incorrect balance");
-  CHECK_AND_FORCE_ASSERT_MES(bob_a_wlt_instance->balance() == transfer_amount - TESTS_DEFAULT_FEE, false, "Incorrect balance");
+  CHECK_AND_FORCE_ASSERT_MES(alice_b_wlt_instance->balance() == transfer_amount - TESTS_DEFAULT_FEE*2 , false, "Incorrect balance");
+  CHECK_AND_FORCE_ASSERT_MES(bob_a_wlt_instance->balance() == transfer_amount - TESTS_DEFAULT_FEE*2, false, "Incorrect balance");
 
   return r;
 }
