@@ -474,8 +474,10 @@ bool boosted_tcp_server<t_protocol_handler>::init_server(uint32_t port, const st
   CATCH_ENTRY_L0("boosted_tcp_server<t_protocol_handler>::init_server", false);
 }
 //-----------------------------------------------------------------------------
+// clang-format off
 PUSH_GCC_WARNINGS
 DISABLE_GCC_WARNING(maybe-uninitialized)
+// clang-format on
 template<class t_protocol_handler>
 bool boosted_tcp_server<t_protocol_handler>::init_server(const std::string port, const std::string& address)
 {
@@ -685,7 +687,7 @@ bool boosted_tcp_server<t_protocol_handler>::connect(const std::string& adr, con
     shared_context->cond.notify_one();
   };
 
-  sock_.async_connect(remote_endpoint, boost::bind<void>(connect_callback, _1, local_shared_context));
+  sock_.async_connect(remote_endpoint, boost::bind<void>(connect_callback, boost::placeholders::_1, local_shared_context));
   while(local_shared_context->ec == boost::asio::error::would_block) {
     bool r = false;
     try {
