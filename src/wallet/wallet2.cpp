@@ -1317,7 +1317,7 @@ void wallet2::process_htlc_triggers_on_block_added(uint64_t height)
   auto pair_of_it = m_htlcs.equal_range(height);
   for (auto it = pair_of_it.first; it != pair_of_it.second; it++)
   {
-    auto tr = m_transfers[it->second.transfer_index];
+    auto& tr = m_transfers[it->second.transfer_index];
     //found contract that supposed to be deactivated and set to innactive
     if (it->second.is_wallet_owns_redeem)
     {
@@ -4232,7 +4232,21 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
     //size_t real_index = src.outputs.size() ? (rand() % src.outputs.size() ):0;
     tx_output_entry real_oe;
     real_oe.first = td.m_global_output_index; // TODO: use ref_by_id when neccessary
-    real_oe.second = boost::get<txout_to_key>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target).key;
+    if (td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target.type() == typeid(txout_to_key))
+    {
+      real_oe.second = boost::get<txout_to_key>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target).key;
+    }
+    else if (td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target.type() == typeid(txout_htlc))
+    {
+      real_oe.second = boost::get<txout_htlc>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target).pkey_refund;
+    }
+    else
+    {
+      WLT_THROW_IF_FALSE_WITH_CODE(false, 
+        "Internal error: unexpected type of target: " << td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target.type().name(), 
+        API_RETURN_CODE_INTERNAL_ERROR);
+    }
+
     auto interted_it = src.outputs.insert(it_to_insert, real_oe);
     src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
     src.real_output = interted_it - src.outputs.begin();
@@ -4613,8 +4627,16 @@ bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_o
   if (!td.is_spendable())
     return false;
 
-  if (!currency::is_mixattr_applicable_for_fake_outs_counter(boost::get<currency::txout_to_key>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target).mix_attr, fake_outputs_count))
-    return false;
+  if (td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target.type() == typeid(txout_htlc))
+  {
+    if (fake_outputs_count != 0)
+      return false;
+  }
+  else
+  {
+    if (!currency::is_mixattr_applicable_for_fake_outs_counter(boost::get<currency::txout_to_key>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target).mix_attr, fake_outputs_count))
+      return false;
+  }
 
   return true;
 }
