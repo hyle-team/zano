@@ -549,6 +549,7 @@ namespace tools
     uint64_t unlocked_balance() const;
 
     void transfer(uint64_t amount, const currency::account_public_address& acc);
+    void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts,
                   size_t fake_outputs_count, 
@@ -858,7 +859,8 @@ namespace tools
     */
     void create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, const crypto::hash& htlc_hash, std::string &origin);
     void get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>& htlcs, bool only_redeem_txs);
-    void redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin);
+    void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
+    void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin);
 
 private:

@@ -1633,7 +1633,7 @@ void wallet2::refresh(std::atomic<bool>& stop)
   refresh(n, f, stop);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc)
+void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx)
 {
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
@@ -1642,9 +1642,13 @@ void wallet2::transfer(uint64_t amount, const currency::account_public_address& 
   dst.resize(1);
   dst.back().addr.push_back(acc);
   dst.back().amount = amount;
-  transaction result_tx = AUTO_VAL_INIT(result_tx);
   this->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
-
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc)
+{
+  transaction result_tx = AUTO_VAL_INIT(result_tx);
+  this->transfer(amount, acc, result_tx);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::reset_creation_time(uint64_t timestamp)
@@ -4054,7 +4058,13 @@ void wallet2::get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>&
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin)
+void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin)
+{
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  return redeem_htlc(htlc_tx_id, origin, result_tx);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx)
 {
 
   construct_tx_param ctp = get_default_construct_tx_param();
@@ -4069,8 +4079,6 @@ void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, std::string origin)
     "htlc not found with tx_id = " << htlc_tx_id, API_RETURN_CODE_NOT_FOUND);
 
   ctp.dsts.back().amount = m_transfers[it->second].amount() - ctp.fee;
-
-  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
   this->transfer(ctp, result_tx, true, nullptr);
 }
 //----------------------------------------------------------------------------------------------------

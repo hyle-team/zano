@@ -109,6 +109,11 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+  for (auto& tx : txs)
+  {
+    crypto::hash tx_id = currency::get_transaction_hash(tx);
+    bvc.m_onboard_transactions[tx_id] = tx;
+  }
   c.handle_incoming_block(t_serializable_object_to_blob(b), bvc);
   CHECK_AND_NO_ASSERT_MES(!bvc.m_verification_failed && !bvc.m_marked_as_orphaned && !bvc.m_already_exists, false, "block verification context check failed");
 
