@@ -382,7 +382,7 @@ bool atomic_test_wrong_redeem_wrong_refund::c1(currency::core& c, size_t ev_inde
   CHECK_AND_FORCE_ASSERT_MES(htlcs.size() == 1, false, "Epected htlc not found");
   currency::transaction result_redeem_tx = AUTO_VAL_INIT(result_redeem_tx);
   alice_c_wlt_instance->redeem_htlc(htlcs.front().tx_id, alice_origin_b, result_redeem_tx);
-
+  c.get_tx_pool().clear();
   c.get_blockchain_storage().truncate_blockchain(c.get_blockchain_storage().get_current_blockchain_size() - 8);
   
   //try to submit wrong transaction that do refund before expiration
