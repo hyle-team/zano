@@ -1302,6 +1302,68 @@ void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<s
   }
 }
 //----------------------------------------------------------------------------------------------------
+
+void wallet2::unprocess_htlc_triggers_on_block_removed(uint64_t height)
+{
+  if (!m_htlcs.size())
+    return;
+
+  if (height > m_htlcs.rbegin()->first)
+  {
+    //there is no active htlc that at this height
+    CHECK_AND_ASSERT_MES(m_active_htlcs.size() == 0, void(), "Self check failed: m_active_htlcs.size() = " << m_active_htlcs.size());
+    return;
+  }
+  //we have to check if there is a htlc that has to become deactivated
+  auto pair_of_it = m_htlcs.equal_range(height);
+  for (auto it = pair_of_it.first; it != pair_of_it.second; it++)
+  {
+    auto& tr = m_transfers[it->second.transfer_index];
+    //found contract that supposed to be re-activated and set to active
+    if (it->second.is_wallet_owns_redeem)
+    {
+      // this means that wallet received atomic as proposal but never activated it, and now we back to phase where out can be activated
+      //but we keep spend flag anyway
+      tr.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT; //re assure that it has spent flag
+      tr.m_spent_height = 0;
+    }
+    else
+    {
+      // this means that wallet created atomic by itself, and second part didn't redeem it, 
+      // so refund money became available, and now we back again to unavailable state
+      tr.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT; //reset spent flag
+      m_found_free_amounts.clear(); //reset free amounts cache 
+      tr.m_spent_height = 0;
+    }
+    //re-add to active contracts
+    auto pair_key = std::make_pair(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].amount, tr.m_global_output_index);
+    auto it_active_htlc = m_active_htlcs.find(pair_key);
+    if (it_active_htlc != m_active_htlcs.end())
+    {
+      LOG_ERROR("Error at putting back htlc: already exist?");
+      it_active_htlc->second = it->second.transfer_index;
+      
+    }
+    else
+    {
+      m_active_htlcs[pair_key] = it->second.transfer_index;
+      m_active_htlcs_txid[tr.tx_hash()] = it->second.transfer_index;
+    }
+
+    const crypto::hash tx_id = tr.tx_hash();
+    auto tx_id_it = m_active_htlcs_txid.find(tx_id);
+    if (tx_id_it != m_active_htlcs_txid.end())
+    {
+      LOG_ERROR("Error at putting back htlc_txid: already exist?");
+      tx_id_it->second = it->second.transfer_index;
+
+    }
+    else
+    {
+      m_active_htlcs_txid[tx_id] = it->second.transfer_index;
+    }
+  }
+}
 void wallet2::process_htlc_triggers_on_block_added(uint64_t height)
 {
   if (!m_htlcs.size())
@@ -1361,7 +1423,7 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
     !(height == m_minimum_height || get_blockchain_current_size() <= 1), error::wallet_internal_error,
     "current_index=" + std::to_string(height) + ", get_blockchain_current_height()=" + std::to_string(get_blockchain_current_size()));
 
-  process_htlc_triggers_on_block_added(height);
+  
 
 
   //optimization: seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
@@ -1393,6 +1455,8 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
   if (!is_pos_block(b))
     m_last_pow_block_h = height;
 
+
+  process_htlc_triggers_on_block_added(height);
   m_wcallback->on_new_block(height, b);
 }
 //----------------------------------------------------------------------------------------------------
@@ -2213,6 +2277,10 @@ void wallet2::detach_blockchain(uint64_t including_height)
     }
   }
  
+  for (uint64_t i = get_top_block_height(); i != including_height - 1 && i != 0; i--)
+  {
+    unprocess_htlc_triggers_on_block_removed(i);
+  }
   size_t blocks_detached = detach_from_block_ids(including_height);
 
   //rollback spends
@@ -2226,14 +2294,6 @@ void wallet2::detach_blockchain(uint64_t including_height)
       WLT_LOG_BLUE("Transfer [" << i << "] spent height: " << tr.m_spent_height << " -> 0, reason: detaching blockchain", LOG_LEVEL_1);
       tr.m_spent_height = 0;
       //check if it's hltc contract
-      if (tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].target.type() == typeid(txout_htlc) && tr.m_flags & WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM)
-      {
-        //only if htlc was spent as a redeem, then we put htlc back as active
-        const txout_htlc& htlc = boost::get<txout_htlc>(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].target);
-        auto amount_gindex_pair = std::make_pair(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].amount, tr.m_global_output_index);
-        m_active_htlcs[amount_gindex_pair] = i;
-        m_active_htlcs_txid[tr.tx_hash()] = i;
-      }
     }
   }
 
@@ -4035,6 +4095,7 @@ void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_publ
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
   origin = ft.htlc_origin;
+  tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>& htlcs, bool only_redeem_txs)

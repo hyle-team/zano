@@ -137,6 +137,27 @@ inline bool mine_next_pow_blocks_in_playtime(const currency::account_public_addr
   return true;
 }
 
+inline bool mine_next_pow_blocks_in_playtime_with_given_txs(const currency::account_public_address& miner_addr, const std::vector<currency::transaction>& txs, currency::core& c, size_t blocks_count, const crypto::hash& prev_id)
+{
+  std::vector<currency::transaction> txs_local = txs;
+
+  crypto::hash prev_id_internal = prev_id;
+  currency::block prv_block = AUTO_VAL_INIT(prv_block);
+  bool r = c.get_blockchain_storage().get_block_by_hash(prev_id, prv_block);
+  CHECK_AND_ASSERT_MES(r, false, "block with id " << prev_id  << " not found");
+
+  for (size_t i = 0; i != blocks_count; i++)
+  {
+    if (!mine_next_pow_block_in_playtime_with_given_txs(miner_addr, c, txs_local, prev_id_internal, currency::get_block_height(prv_block)+1, &prv_block))
+      return false;
+    prev_id_internal = get_block_hash(prv_block);
+    txs_local.clear();
+  }
+  return true;
+}
+
+
+
 // NOTE: stake coins return back to the wallet, newly generated coins go to miner_address (by default they are the same destinations)
 inline bool mine_next_pos_block_in_playtime_with_wallet(tools::wallet2& w, const currency::account_public_address& miner_address, size_t& pos_entries_count)
 {

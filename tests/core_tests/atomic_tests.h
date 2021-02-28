@@ -26,3 +26,12 @@ private:
   mutable currency::account_base m_mining_accunt;
 };
 
+
+struct atomic_test_altchain_simple : public wallet_test
+{
+  atomic_test_altchain_simple();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+private:
+  mutable currency::account_base m_mining_accunt;
+};

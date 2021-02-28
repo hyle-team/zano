@@ -802,6 +802,7 @@ namespace tools
       const crypto::hash& bl_id,
       uint64_t height);
     void process_htlc_triggers_on_block_added(uint64_t height);
+    void unprocess_htlc_triggers_on_block_removed(uint64_t height);
     bool get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, uint64_t new_block_expected_height = UINT64_MAX);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, const currency::account_public_address& miner_address, uint64_t new_block_expected_height = UINT64_MAX);
