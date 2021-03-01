@@ -110,6 +110,9 @@ void ge_bytes_hash_to_ec(ge_p3 *, const unsigned char *);
 
 void ge_p3_0(ge_p3 *h);
 void ge_sub(ge_p1p1 *, const ge_p3 *, const ge_cached *);
+void ge_double_scalarmult_base_vartime_p3(ge_p3 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b);
+void ge_scalarmult_vartime_p3(ge_p3 *r, const unsigned char *a, const ge_p3 *A);
+void ge_scalarmult_vartime_p3_v2(ge_p3 *r, const unsigned char *a, const ge_p3 *A);
 
 extern const fe fe_ma2;
 extern const fe fe_ma;

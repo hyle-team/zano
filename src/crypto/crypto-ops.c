@@ -1,4 +1,5 @@
-// Copyright (c) 2018-2020 Zano Project
+// Copyright (c) 2018-2021 Zano Project
+// Copyright (c) 2020-2021 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -1233,6 +1234,96 @@ void ge_double_scalarmult_base_vartime(ge_p2 *r, const unsigned char *a, const g
     ge_p1p1_to_p2(r, &t);
   }
 }
+
+/*
+r = a * A + b * B
+where a = a[0]+256*a[1]+...+256^31 a[31].
+and b = b[0]+256*b[1]+...+256^31 b[31].
+B is the Ed25519 base point (x,4/5) with x positive.
+*/
+
+void ge_double_scalarmult_base_vartime_p3(ge_p3 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b) {
+  signed char aslide[256];
+  signed char bslide[256];
+  ge_dsmp Ai; /* A, 3A, 5A, 7A, 9A, 11A, 13A, 15A */
+  ge_p1p1 t;
+  ge_p3 u;
+  ge_p2 r_p2;
+  int i;
+
+  slide(aslide, a);
+  slide(bslide, b);
+  ge_dsm_precomp(Ai, A);
+
+  ge_p2_0(&r_p2);
+
+  for (i = 255; i >= 0; --i) {
+    if (aslide[i] || bslide[i]) break;
+  }
+
+  for (; i >= 0; --i) {
+    ge_p2_dbl(&t, &r_p2);
+
+    if (aslide[i] > 0) {
+      ge_p1p1_to_p3(&u, &t);
+      ge_add(&t, &u, &Ai[aslide[i]/2]);
+    } else if (aslide[i] < 0) {
+      ge_p1p1_to_p3(&u, &t);
+      ge_sub(&t, &u, &Ai[(-aslide[i])/2]);
+    }
+
+    if (bslide[i] > 0) {
+      ge_p1p1_to_p3(&u, &t);
+      ge_madd(&t, &u, &ge_Bi[bslide[i]/2]);
+    } else if (bslide[i] < 0) {
+      ge_p1p1_to_p3(&u, &t);
+      ge_msub(&t, &u, &ge_Bi[(-bslide[i])/2]);
+    }
+
+    if (i != 0)
+      ge_p1p1_to_p2(&r_p2, &t);
+    else
+      ge_p1p1_to_p3(r, &t); // last step
+  }
+}
+
+void ge_scalarmult_vartime_p3(ge_p3 *r, const unsigned char *a, const ge_p3 *A) {
+  signed char aslide[256];
+  ge_dsmp Ai; /* A, 3A, 5A, 7A, 9A, 11A, 13A, 15A */
+  ge_p1p1 t;
+  ge_p3 u;
+  ge_p2 r_p2;
+  int i;
+
+  slide(aslide, a);
+  ge_dsm_precomp(Ai, A);
+
+  ge_p2_0(&r_p2);
+  ge_p3_0(r);
+
+  for (i = 255; i >= 0; --i) {
+    if (aslide[i]) break;
+  }
+
+  for (; i >= 0; --i) {
+    ge_p2_dbl(&t, &r_p2);
+
+    if (aslide[i] > 0) {
+      ge_p1p1_to_p3(&u, &t);
+      ge_add(&t, &u, &Ai[aslide[i] / 2]);
+    }
+    else if (aslide[i] < 0) {
+      ge_p1p1_to_p3(&u, &t);
+      ge_sub(&t, &u, &Ai[(-aslide[i]) / 2]);
+    }
+
+    if (i != 0)
+      ge_p1p1_to_p2(&r_p2, &t);
+    else
+      ge_p1p1_to_p3(r, &t); // last step
+  }
+}
+
 
 /* From ge_frombytes.c, modified */
 
@@ -3759,4 +3850,85 @@ void ge_bytes_hash_to_ec(ge_p3 *res, const unsigned char *ge_bytes)
   /*ge_p2_to_p3(res, &point); -- can be used to avoid multiplication by 8 for debugging */
   ge_mul8(&point2, &point);
   ge_p1p1_to_p3(res, &point2);
+}
+
+// returns the most non-zero index of r
+int slide_v2(signed char *r, const unsigned char *a)
+{
+  int i;
+  int b;
+  int k;
+  int nzi = 0;
+
+  for (i = 0; i < 256; ++i) {
+    r[i] = 1 & (a[i >> 3] >> (i & 7));
+  }
+
+  for (i = 0; i < 256; ++i) {
+    if (r[i]) {
+      for (b = 1; b <= 6 && i + b < 256; ++b) {
+        if (r[i + b]) {
+          if (r[i] + (r[i + b] << b) <= 15) {
+            r[i] += r[i + b] << b; r[i + b] = 0;
+          }
+          else if (r[i] - (r[i + b] << b) >= -15) {
+            r[i] -= r[i + b] << b;
+            for (k = i + b; k < 256; ++k) {
+              if (!r[k]) {
+                r[k] = 1;
+                break;
+              }
+              r[k] = 0;
+            }
+          }
+          else
+            break;
+        }
+      }
+      if (r[i])
+        nzi = i;
+    }
+  }
+
+  return nzi;
+}
+
+void ge_scalarmult_vartime_p3_v2(ge_p3 *r, const unsigned char *a, const ge_p3 *A)
+{
+  signed char aslide[256];
+  ge_dsmp Ai; /* A, 3A, 5A, 7A, 9A, 11A, 13A, 15A */
+  ge_p1p1 t;
+  ge_p3 u;
+  ge_p2 r_p2;
+  int i;
+
+  i = slide_v2(aslide, a);
+
+  if (i == 0)
+  {
+    ge_p3_0(r);
+    return;
+  }
+
+  ge_dsm_precomp(Ai, A);
+  ge_p2_0(&r_p2);
+
+  for (; i >= 0; --i)
+  {
+    ge_p2_dbl(&t, &r_p2);
+    if (aslide[i] > 0)
+    {
+      ge_p1p1_to_p3(&u, &t);
+      ge_add(&t, &u, &Ai[aslide[i] / 2]);
+    }
+    else if (aslide[i] < 0)
+    {
+      ge_p1p1_to_p3(&u, &t);
+      ge_sub(&t, &u, &Ai[(-aslide[i]) / 2]);
+    }
+    if (i != 0)
+      ge_p1p1_to_p2(&r_p2, &t);
+    else
+      ge_p1p1_to_p3(r, &t);
+  }
 }
