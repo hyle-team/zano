@@ -221,6 +221,17 @@ struct scalar_t
     // do not need to call reduce as 2^64 < L
   }
 
+  // copy at most 32 bytes and reduce
+  scalar_t(const boost::multiprecision::cpp_int &bigint)
+  {
+    zero();
+    unsigned int bytes_to_copy = bigint.backend().size() * bigint.backend().limb_bits / 8;
+    if (bytes_to_copy > sizeof *this)
+      bytes_to_copy = sizeof *this;
+    memcpy(&m_s[0], bigint.backend().limbs(), bytes_to_copy);
+    sc_reduce32(&m_s[0]);
+  }
+
   unsigned char* data()
   {
     return &m_s[0];
@@ -407,6 +418,18 @@ struct scalar_t
   std::string to_string_as_secret_key() const
   {
     return epee::string_tools::pod_to_hex(*this);
+  }
+
+  template<typename MP_type>
+  MP_type as_boost_mp_type() const
+  {
+    MP_type result = 0;
+    static_assert(sizeof result >= sizeof *this, "size missmatch"); // to avoid using types less than uint256_t
+    unsigned int sz = sizeof *this / sizeof(boost::multiprecision::limb_type);
+    result.backend().resize(sz, sz);
+    memcpy(result.backend().limbs(), &m_s[0], sizeof *this);
+    result.backend().normalize();
+    return result;
   }
 
 }; // struct scalar_t
@@ -613,9 +636,12 @@ struct hash_helper_t
 {
   static scalar_t hs(const scalar_t& s)
   {
-    crypto::hash hash;
-    crypto::cn_fast_hash(s.data(), sizeof s, hash);
-    return scalar_t(hash); // will reduce mod L
+    return scalar_t(crypto::cn_fast_hash(s.data(), sizeof s)); // will reduce mod L
+  }
+
+  static scalar_t hs(const void* data, size_t size)
+  {
+    return scalar_t(crypto::cn_fast_hash(data, size)); // will reduce mod L
   }
 
   struct hs_t
@@ -891,6 +917,13 @@ bool generate_test_ring_and_sec_keys(size_t N, size_t L, std::vector<crypto::pub
     key_images[i] = (hash_helper_t::hp(ring[ring_mapping[i]]) / secret_keys[i]).to_key_image();
 
   return true;
+}
+
+uint64_t hash_64(const void* data, size_t size)
+{
+  crypto::hash h = crypto::cn_fast_hash(data, size);
+  uint64_t* phash_as_array = (uint64_t*)&h;
+  return phash_as_array[0] ^ phash_as_array[1] ^ phash_as_array[2] ^ phash_as_array[3];
 }
 
 
