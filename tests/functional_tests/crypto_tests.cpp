@@ -531,10 +531,7 @@ struct point_t
     static_assert(sizeof one == sizeof(crypto::ec_scalar), "size missmatch");
 
     point_t result;
-    ge_p2 p2;
-    ge_double_scalarmult_base_vartime(&p2, &a.m_s[0], &m_p3, &one[0]);
-    ge_p2_to_p3(&result.m_p3, &p2);
-
+    ge_double_scalarmult_base_vartime_p3(&result.m_p3, &a.m_s[0], &m_p3, &one[0]);
     return result;
   }
 
@@ -542,10 +539,7 @@ struct point_t
   point_t mul_plus_G(const scalar_t& a, const scalar_t& b) const
   {
     point_t result;
-    ge_p2 p2;
-    ge_double_scalarmult_base_vartime(&p2, &a.m_s[0], &m_p3, &b.m_s[0]);
-    ge_p2_to_p3(&result.m_p3, &p2);
-
+    ge_double_scalarmult_base_vartime_p3(&result.m_p3, &a.m_s[0], &m_p3, &b.m_s[0]);
     return result;
   }
 
@@ -986,13 +980,13 @@ TEST(crypto, primitives)
     uint64_t m_t{};
     uint64_t m_div_coeff{ 1 };
     void start(uint64_t div_coeff = 1) { m_tp = std::chrono::high_resolution_clock::now(); m_div_coeff = div_coeff; }
-    void stop() { m_t = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_tp).count(); }
+    void stop()  { m_t = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_tp).count(); }
     uint64_t get_time_mcs() { return m_div_coeff == 1 ? m_t : m_t / m_div_coeff; }
   };
 
-  typedef uint64_t(*run_func_t)(timer_t& t, size_t rounds);
+  typedef uint64_t (*run_func_t)(timer_t& t, size_t rounds);
 
-
+  
 
   auto run = [](const std::string& title, size_t rounds, run_func_t cb)
   {
@@ -1410,7 +1404,92 @@ TEST(crypto, primitives)
 
   return true;
 }
-// test crypto_primitives
+
+TEST(crypto, ge_scalarmult_vartime_p3)
+{
+  // make sure that my ge_scalarmult_vartime_p3 gives the same result as ge_scalarmul_p3
+
+  size_t N = 5000;
+  std::vector<point_t> points;
+  points.push_back(0 * c_point_G);
+  points.push_back(1 * c_point_G);
+  points.push_back(c_scalar_Lm1 * c_point_G);
+  points.push_back(c_scalar_L * c_point_G);
+  points.push_back((c_scalar_L + 1) * c_point_G);
+  size_t i = points.size();
+  points.resize(N); // should have kept previously added points
+  ASSERT_EQ(points[0], points[3]);
+  ASSERT_EQ(points[1], points[4]);
+
+  for (; i < points.size(); ++i)
+  {
+    if (i & 1)
+      points[i] = scalar_t::random() * c_point_G;
+    else
+      points[i] = hash_helper_t::hp(points[i - 1]);
+  }
+
+  for (size_t j = 0; j < points.size(); ++j)
+  {
+    scalar_t r;
+    r.make_random();
+
+    point_t A;
+    ge_scalarmult_p3(&A.m_p3, r.data(), &points[j].m_p3);
+
+    point_t B;
+    ge_scalarmult_vartime_p3(&B.m_p3, r.data(), &points[j].m_p3);
+
+    ASSERT_EQ(A, B);
+  }
+
+  return true;
+}
+
+size_t find_pos_hash(const boost::multiprecision::uint256_t& L_div_D, const currency::wide_difficulty_type& D, const uint64_t amount,
+  uint64_t& kernel, scalar_t& d0, uint64_t& d1)
+{
+  static const boost::multiprecision::uint256_t c_L_w = c_scalar_L.as_boost_mp_type<boost::multiprecision::uint256_t>();
+
+  crypto::generate_random_bytes(sizeof kernel, &kernel);
+
+  const boost::multiprecision::uint512_t L_div_D_mul_v = boost::multiprecision::uint512_t(L_div_D) * amount;
+  scalar_t L_div_D_mul_v_sc;
+  if (L_div_D_mul_v < c_L_w)
+    L_div_D_mul_v_sc = scalar_t(L_div_D_mul_v); // here we assured that L_div_D_mul_v < 2**256
+  else
+    L_div_D_mul_v_sc = scalar_t(c_L_w); // too small D or too big amount, so any h would go
+
+  size_t i = 0;
+  for (; i < 1000000; ++i)
+  {
+    scalar_t h = hash_helper_t::hs(&kernel, sizeof kernel);
+    if (h < L_div_D_mul_v_sc)
+    {
+      // found!
+      boost::multiprecision::uint512_t h_w = h.as_boost_mp_type<boost::multiprecision::uint512_t>();
+      boost::multiprecision::uint512_t d0_w = h_w / amount * D;
+      ASSERT_TRUE(d0_w < c_L_w);
+      d0 = scalar_t(d0_w);
+
+      boost::multiprecision::uint512_t ddv = (d0_w / D) * amount;
+      ASSERT_TRUE(h_w < ddv);
+      if (h_w == ddv)
+      {
+        ASSERT_TRUE(false);
+      }
+
+      boost::multiprecision::uint512_t d1_w = ddv - h_w;
+      ASSERT_TRUE(d1_w <= UINT64_MAX);
+
+      d1 = d1_w.convert_to<uint64_t>();
+      break;
+    }
+    ++kernel;
+  }
+
+  return i;
+}
 
 struct sig_check_t
 {
@@ -1780,6 +1859,19 @@ TEST(crypto, point_basics)
 
   ASSERT_EQ(E, c_point_G + c_point_G + c_point_G + c_point_G);
   ASSERT_EQ(E - c_point_G, 3 * c_point_G);
+
+  for (size_t i = 0; i < 1000; ++i)
+  {
+    E = hash_helper_t::hp(E);
+    point_t Z = 0 * E;
+    ASSERT_TRUE(Z.is_zero());
+    scalar_t rnd;
+    rnd.make_random();
+    Z = rnd * E;
+    Z = Z - E;
+    Z = Z - (rnd - 1) * E;
+    ASSERT_TRUE(Z.is_zero());
+  }
 
   return true;
 }
