@@ -1347,7 +1347,6 @@ void wallet2::unprocess_htlc_triggers_on_block_removed(uint64_t height)
     else
     {
       m_active_htlcs[pair_key] = it->second.transfer_index;
-      m_active_htlcs_txid[tr.tx_hash()] = it->second.transfer_index;
     }
 
     const crypto::hash tx_id = tr.tx_hash();
@@ -2263,6 +2262,27 @@ void wallet2::detach_blockchain(uint64_t including_height)
 
       for (size_t i = i_start; i != m_transfers.size(); i++)
       {
+        //check for htlc
+        if (m_transfers[i].m_ptx_wallet_info->m_tx.vout[m_transfers[i].m_internal_output_index].target.type() == typeid(txout_htlc))
+        {
+          //need to find an entry in m_htlc and remove it
+          const txout_htlc& hltc = boost::get<txout_htlc>(m_transfers[i].m_ptx_wallet_info->m_tx.vout[m_transfers[i].m_internal_output_index].target);
+          uint64_t expiration_height = m_transfers[i].m_ptx_wallet_info->m_block_height + hltc.expiration;
+          auto pair_of_it = m_htlcs.equal_range(expiration_height);
+          bool found = false;
+          for (auto it = pair_of_it.first; it != pair_of_it.second; it++)
+          {
+            if (it->second.transfer_index == i)
+            {
+              found = true;
+              m_htlcs.erase(it);
+              break;
+            }
+          }
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(found, "Internal error: not found record in m_htlcs during rollback");
+        }
+
+
         if (!(m_transfers[i].m_key_image == null_ki && is_watch_only()))
         {
           auto it_ki = m_key_images.find(m_transfers[i].m_key_image);

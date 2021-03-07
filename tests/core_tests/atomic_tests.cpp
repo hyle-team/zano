@@ -599,14 +599,26 @@ bool atomic_test_altchain_simple::c1(currency::core& c, size_t ev_index, const s
   alice_a_wlt_instance->refresh();
   alice_b_wlt_instance->refresh();
 
+  //here should be zero
+  htlcs_a.clear();
+  alice_a_wlt_instance->get_list_of_active_htlc(htlcs_a, false);
+  CHECK_AND_FORCE_ASSERT_MES(htlcs_a.size() == 0, false, "Epected htlc not found");
+
+  //validate state of b
+  htlcs_b.clear();
+  alice_b_wlt_instance->get_list_of_active_htlc(htlcs_b, true);
+  CHECK_AND_FORCE_ASSERT_MES(htlcs_b.size() == 0, false, "Epected htlc not found");
+
 
   //memorize block id at split height before split to make sure split happened
   crypto::hash id_first_splited_block_2 = c.get_blockchain_storage().get_block_id_by_height(split_height_2 + 1);
 
   txs.clear();
   txs.push_back(result_redeem_tx);
-  r = mine_next_pow_blocks_in_playtime_with_given_txs(m_mining_accunt.get_public_address(), txs, c, 10, split_id_2);
+  r = mine_next_pow_blocks_in_playtime_with_given_txs(m_mining_accunt.get_public_address(), txs, c, 4, split_id_2);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  c.get_blockchain_storage().truncate_blockchain(c.get_top_block_height() - 2);
 
   //make sure reorganize happened
   crypto::hash id_new_chain_2 = c.get_blockchain_storage().get_block_id_by_height(split_height_2 + 1);
