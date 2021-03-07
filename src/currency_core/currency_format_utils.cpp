@@ -1660,7 +1660,6 @@ namespace currency
       CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_multisig) || in.type() == typeid(txin_htlc), false, "wrong variant type: "
         << in.type().name() 
         << ", in transaction id=" << get_transaction_hash(tx));
-
     }
     return true;
   }

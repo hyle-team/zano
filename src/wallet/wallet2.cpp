@@ -1392,7 +1392,11 @@ void wallet2::process_htlc_triggers_on_block_added(uint64_t height)
       tr.m_flags &= ~(WALLET_TRANSFER_DETAIL_FLAG_SPENT); //reset spent flag
       m_found_free_amounts.clear(); //reset free amounts cache 
       tr.m_spent_height = 0;
-    }
+    }    
+    
+    //reset cache
+    m_found_free_amounts.clear();
+
     //remove it from active contracts
     auto it_active_htlc = m_active_htlcs.find(std::make_pair(tr.m_ptx_wallet_info->m_tx.vout[tr.m_internal_output_index].amount, tr.m_global_output_index));
     if (it_active_htlc == m_active_htlcs.end())

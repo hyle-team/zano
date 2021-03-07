@@ -3331,6 +3331,11 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
     {
       m_db_outputs.push_back_item(ot.amount, global_output_entry::construct(tx_id, i));
       global_indexes.push_back(m_db_outputs.get_item_size(ot.amount) - 1);
+      if (ot.target.type() == typeid(txout_htlc) && !is_in_hardfork_2_zone())
+      {
+        LOG_ERROR("Error: Transaction with txout_htlc before is_in_hardfork_2_zone(before height " << m_core_runtime_config.hard_fork_02_starts_after_height <<")");
+        return false;
+      }
     }
     else if (ot.target.type() == typeid(txout_multisig))
     {
@@ -3844,6 +3849,11 @@ namespace currency
     }
     bool operator()(const txin_htlc& in) const
     {
+      if (!m_bcs.is_in_hardfork_2_zone())
+      {
+        LOG_ERROR("Error: Transaction with txin_htlc before is_in_hardfork_2_zone(before height " << m_bcs.get_core_runtime_config().hard_fork_02_starts_after_height << ")");
+        return false;
+      }
       return this->operator()(static_cast<const txin_to_key&>(in));
     }
     bool operator()(const txin_gen& in) const { return true; }
@@ -4262,6 +4272,12 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
     }
     else if (txin.type() == typeid(txin_htlc))
     {
+      if (!is_in_hardfork_2_zone())
+      {
+        LOG_ERROR("Error: Transaction with txin_htlc before is_in_hardfork_2_zone(before height " << m_core_runtime_config.hard_fork_02_starts_after_height << ")");
+        return false;
+      }
+
       const txin_htlc& in_htlc = boost::get<txin_htlc>(txin);
       CHECK_AND_ASSERT_MES(in_htlc.key_offsets.size(), false, "Empty in_to_key.key_offsets for input #" << sig_index << " tx: " << tx_prefix_hash);
       TIME_MEASURE_START_PD(tx_check_inputs_loop_kimage_check);
@@ -4299,7 +4315,29 @@ bool blockchain_storage::is_tx_spendtime_unlocked(uint64_t unlock_time) const
 {
   return currency::is_tx_spendtime_unlocked(unlock_time, get_current_blockchain_size(), m_core_runtime_config.get_core_time());
 }
-
+//------------------------------------------------------------------
+bool blockchain_storage::check_tx_fit_hardfork(const transaction& tx)
+{
+  //inputs
+  for (const auto in : tx.vin)
+  {
+    if (in.type() == typeid(txin_htlc))
+    {
+      if (!is_in_hardfork_2_zone())
+        return false;
+    }
+  }
+  //outputs
+  for (const auto out : tx.vout)
+  {
+    if (out.target.type() == typeid(txout_htlc))
+    {
+      if (!is_in_hardfork_2_zone())
+        return false;
+    }
+  }
+  return true;
+}
 //------------------------------------------------------------------
 bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
 {
@@ -5686,16 +5724,43 @@ bool blockchain_storage::update_next_comulative_size_limit()
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::is_in_hardfork_2_zone()const
+{
+  if (m_db_blocks.size() > m_core_runtime_config.hard_fork_02_starts_after_height)
+    return true;
+  return false;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::prevalidate_block(const block& bl)
 {
   if (bl.major_version == BLOCK_MAJOR_VERSION_INITAL && get_block_height(bl) <= m_core_runtime_config.hard_fork_01_starts_after_height)
     return true;
-  if (bl.major_version != CURRENT_BLOCK_MAJOR_VERSION)
+
+  if (bl.major_version == HF1_BLOCK_MAJOR_VERSION
+    && get_block_height(bl) > m_core_runtime_config.hard_fork_01_starts_after_height
+    && get_block_height(bl) <= m_core_runtime_config.hard_fork_02_starts_after_height
+    )
+  {
+    return true;
+  }
+
+  if (bl.major_version > CURRENT_BLOCK_MAJOR_VERSION)
   {
     LOG_ERROR("prevalidation failed for block " << get_block_hash(bl) << ": major block version " << static_cast<size_t>(bl.major_version) << " is incorrect, " << CURRENT_BLOCK_MAJOR_VERSION << " is expected" << ENDL
       << obj_to_json_str(bl));
     return false;
   }
+
+  if (is_in_hardfork_2_zone() && bl.minor_version > CURRENT_BLOCK_MINOR_VERSION)
+  {
+    //this means that binary block is compatible, but semantics got changed due to hardfork, daemon should be updated
+    LOG_PRINT_MAGENTA("Block's MINOR_VERSION is: " << bl.minor_version 
+      << ", while current build supports not bigger then " <<  CURRENT_BLOCK_MINOR_VERSION 
+      << ", please make sure you using latest version.", LOG_LEVEL_0
+    );
+    return false;
+  }
+
   return true;
 }
 //------------------------------------------------------------------

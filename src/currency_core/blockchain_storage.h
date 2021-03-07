@@ -470,6 +470,7 @@ namespace currency
     bool print_tx_outputs_lookup(const crypto::hash& tx_id) const;
     uint64_t get_last_x_block_height(bool pos)const;
     bool is_tx_spendtime_unlocked(uint64_t unlock_time)const;
+    bool check_tx_fit_hardfork(const transaction& tx);
   private:
 
     //-------------- DB containers --------------
@@ -658,6 +659,7 @@ namespace currency
     bool is_output_allowed_for_input(const output_key_or_htlc_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const;
     bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
+    bool is_in_hardfork_2_zone()const;
 
 
 

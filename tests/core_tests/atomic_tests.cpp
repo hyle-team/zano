@@ -31,12 +31,16 @@ struct wallet_tests_callback_handler : public tools::i_wallet2_callback
   std::vector<tools::wallet_public::wallet_transfer_info> all_wtis;
 };
 
-atomic_simple_test::atomic_simple_test()
+//////////////////////////////////////////////////////////////////////////
+
+
+atomic_base_test::atomic_base_test()
 {
-  REGISTER_CALLBACK_METHOD(atomic_simple_test, c1);
+  REGISTER_CALLBACK_METHOD(atomic_base_test, c1);
+  REGISTER_CALLBACK_METHOD(atomic_base_test, configure_core);
 }
 
-bool atomic_simple_test::generate(std::vector<test_event_entry>& events) const
+bool atomic_base_test::generate(std::vector<test_event_entry>& events) const
 {
   epee::debug::get_set_enable_assert(true, true);
 
@@ -48,13 +52,52 @@ bool atomic_simple_test::generate(std::vector<test_event_entry>& events) const
   block blk_0 = AUTO_VAL_INIT(blk_0);
   generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
   events.push_back(blk_0);
-
+  DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
 
   DO_CALLBACK(events, "c1");
   epee::debug::get_set_enable_assert(true, false);
   return true;
 }
+
+bool atomic_base_test::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
+  pc.hard_fork_01_starts_after_height = 10;
+  pc.hard_fork_01_starts_after_height = 12;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}
+/************************************************************************/
+/*                                                                      */
+/************************************************************************/
+
+atomic_simple_test::atomic_simple_test()
+{
+  //REGISTER_CALLBACK_METHOD(atomic_simple_test, c1);
+}
+
+// bool atomic_simple_test::generate(std::vector<test_event_entry>& events) const
+// {
+//   epee::debug::get_set_enable_assert(true, true);
+// 
+//   currency::account_base genesis_acc;
+//   genesis_acc.generate();
+//   m_mining_accunt.generate();
+// 
+// 
+//   block blk_0 = AUTO_VAL_INIT(blk_0);
+//   generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
+//   events.push_back(blk_0);
+// 
+//   REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+// 
+//   DO_CALLBACK(events, "c1");
+//   epee::debug::get_set_enable_assert(true, false);
+//   return true;
+// }
 
 
 
@@ -287,28 +330,28 @@ bool atomic_simple_test::c1(currency::core& c, size_t ev_index, const std::vecto
 
 atomic_test_wrong_redeem_wrong_refund::atomic_test_wrong_redeem_wrong_refund()
 {
-  REGISTER_CALLBACK_METHOD(atomic_test_wrong_redeem_wrong_refund, c1);
+  //REGISTER_CALLBACK_METHOD(atomic_test_wrong_redeem_wrong_refund, c1);
 }
 
-bool atomic_test_wrong_redeem_wrong_refund::generate(std::vector<test_event_entry>& events) const
-{
-  epee::debug::get_set_enable_assert(true, true);
-
-  currency::account_base genesis_acc;
-  genesis_acc.generate();
-  m_mining_accunt.generate();
-
-
-  block blk_0 = AUTO_VAL_INIT(blk_0);
-  generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
-  events.push_back(blk_0);
-
-  REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
-
-  DO_CALLBACK(events, "c1");
-  epee::debug::get_set_enable_assert(true, false);
-  return true;
-}
+// bool atomic_test_wrong_redeem_wrong_refund::generate(std::vector<test_event_entry>& events) const
+// {
+//   epee::debug::get_set_enable_assert(true, true);
+// 
+//   currency::account_base genesis_acc;
+//   genesis_acc.generate();
+//   m_mining_accunt.generate();
+// 
+// 
+//   block blk_0 = AUTO_VAL_INIT(blk_0);
+//   generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
+//   events.push_back(blk_0);
+// 
+//   REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+// 
+//   DO_CALLBACK(events, "c1");
+//   epee::debug::get_set_enable_assert(true, false);
+//   return true;
+// }
 
 
 
@@ -463,28 +506,28 @@ bool atomic_test_wrong_redeem_wrong_refund::c1(currency::core& c, size_t ev_inde
 
 atomic_test_altchain_simple::atomic_test_altchain_simple()
 {
-  REGISTER_CALLBACK_METHOD(atomic_test_altchain_simple, c1);
+  //REGISTER_CALLBACK_METHOD(atomic_test_altchain_simple, c1);
 }
 
-bool atomic_test_altchain_simple::generate(std::vector<test_event_entry>& events) const
-{
-  epee::debug::get_set_enable_assert(true, true);
-
-  currency::account_base genesis_acc;
-  genesis_acc.generate();
-  m_mining_accunt.generate();
-
-
-  block blk_0 = AUTO_VAL_INIT(blk_0);
-  generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
-  events.push_back(blk_0);
-
-  REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
-
-  DO_CALLBACK(events, "c1");
-  epee::debug::get_set_enable_assert(true, false);
-  return true;
-}
+// bool atomic_test_altchain_simple::generate(std::vector<test_event_entry>& events) const
+// {
+//   epee::debug::get_set_enable_assert(true, true);
+// 
+//   currency::account_base genesis_acc;
+//   genesis_acc.generate();
+//   m_mining_accunt.generate();
+// 
+// 
+//   block blk_0 = AUTO_VAL_INIT(blk_0);
+//   generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
+//   events.push_back(blk_0);
+// 
+//   REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+// 
+//   DO_CALLBACK(events, "c1");
+//   epee::debug::get_set_enable_assert(true, false);
+//   return true;
+// }
 
 
 
