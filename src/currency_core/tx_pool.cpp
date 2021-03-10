@@ -102,7 +102,7 @@ namespace currency
       return false;
     }
 
-    if (!m_blockchain.check_tx_fit_hardfork(tx))
+    if (!m_blockchain.validate_tx_for_hardfork_specific_terms(tx, id))
     {
       //
       LOG_ERROR("Transaction " << id <<" doesn't fit current hardfork");

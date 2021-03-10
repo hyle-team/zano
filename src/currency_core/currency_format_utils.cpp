@@ -1157,12 +1157,14 @@ namespace currency
     ftp.attachments = attachments;
     ftp.unlock_time = unlock_time;
     ftp.crypt_address = crypt_destination_addr;
-    ftp.expiration_time = 0;
+    ftp.expiration_time = expiration_time;
     ftp.tx_outs_attr = tx_outs_attr;
     ftp.shuffle = shuffle;
     ftp.flags = flags;
 
     finalized_tx ft = AUTO_VAL_INIT(ft);
+    ft.tx = tx;
+    ft.one_time_key = one_time_secret_key;
     bool r = construct_tx(sender_account_keys, ftp, ft);
     tx = ft.tx;
     one_time_secret_key = ft.one_time_key;

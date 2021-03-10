@@ -292,6 +292,7 @@ namespace currency
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const transaction& source_tx, size_t out_n) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
+    bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
     bool check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
@@ -470,7 +471,6 @@ namespace currency
     bool print_tx_outputs_lookup(const crypto::hash& tx_id) const;
     uint64_t get_last_x_block_height(bool pos)const;
     bool is_tx_spendtime_unlocked(uint64_t unlock_time)const;
-    bool check_tx_fit_hardfork(const transaction& tx);
   private:
 
     //-------------- DB containers --------------
@@ -659,7 +659,10 @@ namespace currency
     bool is_output_allowed_for_input(const output_key_or_htlc_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const;
     bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
-    bool is_in_hardfork_2_zone()const;
+    bool is_after_hardfork_1_zone()const;
+    bool is_after_hardfork_1_zone(uint64_t height)const;
+    bool is_after_hardfork_2_zone()const;
+    bool is_after_hardfork_2_zone(uint64_t height)const;
 
 
 
