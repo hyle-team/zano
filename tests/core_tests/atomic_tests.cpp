@@ -66,7 +66,7 @@ bool atomic_base_test::configure_core(currency::core& c, size_t ev_index, const 
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
   pc.hard_fork_01_starts_after_height = 10;
-  pc.hard_fork_01_starts_after_height = 12;
+  pc.hard_fork_02_starts_after_height = 12;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }

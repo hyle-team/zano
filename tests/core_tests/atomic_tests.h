@@ -13,7 +13,7 @@ struct atomic_base_test : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   virtual bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)=0;
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-private:
+protected:
   mutable currency::account_base m_mining_accunt;
 };
 

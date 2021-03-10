@@ -5054,6 +5054,8 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
 void wallet2::finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key /* = true */)
 {
   currency::finalized_tx result = AUTO_VAL_INIT(result);
+  result.tx = tx;
+  result.one_time_key = tx_key;
   finalize_transaction(ftp, result, broadcast_tx, store_tx_secret_key);
   tx = result.tx;
   tx_key = result.one_time_key;
