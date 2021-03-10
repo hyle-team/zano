@@ -4955,6 +4955,37 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 //------------------------------------------------------------------
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
+//   if (block_height <= m_core_runtime_config.hard_fork_01_starts_after_height)
+//   {
+//     // before hardfork 1
+// 
+//     for (const auto& el : tx.extra)
+//     {
+//       // etc_tx_details_unlock_time2 is not allowed in txs in blocks prior to hardfork 1
+//       CHECK_AND_ASSERT_MES(el.type() != typeid(etc_tx_details_unlock_time2), false, "tx " << tx_id << " contains etc_tx_details_unlock_time2 which is not allowed on height " << block_height);
+//     }
+//     return true;
+//   }
+// 
+//   if (block_height <= m_core_runtime_config.hard_fork_02_starts_after_height)
+//   {
+//     // before hardfork 2
+// 
+//     auto check_lambda = [&](const std::vector<payload_items_v>& container) -> bool
+//     {
+//       for (const auto& el : container)
+//       {
+//         const auto& type = el.type();
+//         CHECK_AND_ASSERT_MES(type != typeid(tx_payer), false, "tx " << tx_id << " contains tx_payer which is not allowed on height " << block_height);
+//         CHECK_AND_ASSERT_MES(type != typeid(tx_receiver), false, "tx " << tx_id << " contains tx_receiver which is not allowed on height " << block_height);
+//         CHECK_AND_ASSERT_MES(type != typeid(extra_alias_entry), false, "tx " << tx_id << " contains extra_alias_entry which is not allowed on height " << block_height);
+//       }
+//       return true;
+//     };
+// 
+//     return check_lambda(tx.extra) && check_lambda(tx.attachment);
+//   }
+
 
   auto is_allowed_before_hardfork2 = [&](const payload_items_v& el) -> bool
   {
@@ -5007,7 +5038,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     if (!var_is_after_hardfork_2_zone && !is_allowed_before_hardfork2(el))
       return false;
   }
-
+    
 
   return true;
 }
