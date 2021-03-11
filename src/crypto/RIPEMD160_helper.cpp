@@ -6,9 +6,9 @@
 
 #include "RIPEMD160_helper.h"
 #include "auto_val_init.h"
-//extern "C" {
+extern "C" {
 #include "RIPEMD160.h"
-//}
+}
 
 #define RMDsize 160
 
