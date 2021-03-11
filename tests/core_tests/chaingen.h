@@ -299,6 +299,7 @@ public:
     return true;
   }
 
+  void set_hard_fork_heights_to_generator(test_generator& generator) const;
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_top_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool clear_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
@@ -320,6 +321,9 @@ protected:
   size_t m_invalid_tx_index;
   size_t m_unverifiable_tx_index;
   size_t m_orphan_block_index;
+
+  uint64_t m_hardfork_01_height;
+  uint64_t m_hardfork_02_height;
 };
 
 struct wallet_test_core_proxy;

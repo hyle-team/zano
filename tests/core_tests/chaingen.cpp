@@ -2073,6 +2073,8 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   , m_orphan_block_index(std::numeric_limits<size_t>::max())
   , m_invalid_tx_index(std::numeric_limits<size_t>::max())
   , m_unverifiable_tx_index(std::numeric_limits<size_t>::max())
+  , m_hardfork_01_height(CURRENCY_MAX_BLOCK_NUMBER)
+  , m_hardfork_02_height(CURRENCY_MAX_BLOCK_NUMBER)
 {
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, configure_core);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, mark_invalid_tx);
@@ -2093,9 +2095,17 @@ bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_inde
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hard_fork_01_starts_after_height = m_hardfork_01_height;
+  pc.hard_fork_02_starts_after_height = m_hardfork_02_height;
 
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
+}
+
+void test_chain_unit_enchanced::set_hard_fork_heights_to_generator(test_generator& generator) const
+{
+  generator.set_hardfork_height(1, m_hardfork_01_height);
+  generator.set_hardfork_height(2, m_hardfork_02_height);
 }
 
 bool test_chain_unit_enchanced::check_top_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)

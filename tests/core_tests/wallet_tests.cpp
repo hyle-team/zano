@@ -1557,6 +1557,9 @@ void gen_wallet_decrypted_attachments::on_transfer2(const tools::wallet_public::
 
 gen_wallet_alias_and_unconfirmed_txs::gen_wallet_alias_and_unconfirmed_txs()
 {
+  m_hardfork_01_height = 0;
+  m_hardfork_02_height = 0;
+
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c1);
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c2);
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c3);
@@ -1570,6 +1573,7 @@ bool gen_wallet_alias_and_unconfirmed_txs::generate(std::vector<test_event_entry
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
 
@@ -1701,6 +1705,9 @@ bool gen_wallet_alias_and_unconfirmed_txs::c3(currency::core& c, size_t ev_index
 
 gen_wallet_alias_via_special_wallet_funcs::gen_wallet_alias_via_special_wallet_funcs()
 {
+  // start hardfork from block 0 in order to use extra_alias_entry (allowed only since HF2)
+  m_hardfork_01_height = 0;
+  m_hardfork_02_height = 0;
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_via_special_wallet_funcs, c1);
 }
 
@@ -1714,6 +1721,8 @@ bool gen_wallet_alias_via_special_wallet_funcs::generate(std::vector<test_event_
   block blk_0 = AUTO_VAL_INIT(blk_0);
   generator.construct_genesis_block(blk_0, miner_acc, test_core_time::get_time());
   events.push_back(blk_0);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
 
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "minerminer";

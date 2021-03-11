@@ -93,7 +93,22 @@ gen_alias_tests::gen_alias_tests()
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_height_not_changed);
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_height_changed);
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_too_many_aliases_registration);
+
+  //REGISTER_CALLBACK_METHOD(gen_alias_tests, configure_core);
+  m_hardfork_01_height = 0;
+  m_hardfork_02_height = 0;
 }
+
+/*bool gen_alias_tests::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hard_fork_01_starts_after_height = m_hardfork_01_height;
+  pc.hard_fork_02_starts_after_height = m_hardfork_02_height;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}*/
 
 bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
 {
@@ -101,44 +116,46 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   GENERATE_ACCOUNT(miner_account);                                                                                     // event index
   m_accounts.push_back(miner_account);
   MAKE_GENESIS_BLOCK(events, blk_0, preminer_account, test_core_time::get_time());                                     // 0
-  MAKE_ACCOUNT(events, first_acc);                                                                                     // 1
-  MAKE_ACCOUNT(events, second_acc);                                                                                    // 2
-  MAKE_ACCOUNT(events, third_acc);                                                                                     // 3
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                 // 2N+3 (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");                                                                               // 1
+  MAKE_ACCOUNT(events, first_acc);                                                                                     // 2
+  MAKE_ACCOUNT(events, second_acc);                                                                                    // 3
+  MAKE_ACCOUNT(events, third_acc);                                                                                     // 4
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                 // 2N+4 (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
 
   size_t small_outs_to_transfer = MAX_ALIAS_PER_BLOCK + 10;
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   bool r = construct_tx_with_many_outputs(events, blk_0, preminer_account.get_keys(), miner_account.get_public_address(), small_outs_to_transfer * TESTS_DEFAULT_FEE * 11, small_outs_to_transfer, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
-  events.push_back(tx_1);                                                                                              // 4N+4
-  MAKE_NEXT_BLOCK_TX1(events, blk_a, blk_0r, miner_account, tx_1);                                                     // 4N+5
+  events.push_back(tx_1);                                                                                              // 2N+5
+  MAKE_NEXT_BLOCK_TX1(events, blk_a, blk_0r, miner_account, tx_1);                                                     // 2N+6
 
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_ar, blk_a, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                 // 4N+5
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_ar, blk_a, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                 // 4N+6
 
-  MAKE_NEXT_BLOCK(events, blk_1, blk_ar, miner_account);                                                               // 4N+6
+  MAKE_NEXT_BLOCK(events, blk_1, blk_ar, miner_account);                                                               // 4N+7
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = FIRST_ALIAS_NAME;
   ai.m_text_comment = "first@first.com blablabla";
   ai.m_address = first_acc.get_keys().account_address;
-  MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_2, blk_1, miner_account, ai);                                           // 4N+7,4N+8
-  DO_CALLBACK(events, "check_first_alias_added");                                                                      // 4N+9
+  MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_2, blk_1, miner_account, ai);                                           // 4N+8,4N+9
+  DO_CALLBACK(events, "check_first_alias_added");                                                                      // 4N+10
 
   ai.m_alias = SECOND_ALIAS_NAME;
   ai.m_text_comment = "second@second.com blablabla";
   ai.m_address = second_acc.get_keys().account_address;
-  MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_3, blk_2, miner_account, ai);                                           // 4N+10,4N+11
-  DO_CALLBACK(events, "check_second_alias_added");                                                                     // 4N+12
+  MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_3, blk_2, miner_account, ai);                                           // 4N+11,4N+12
+  DO_CALLBACK(events, "check_second_alias_added");                                                                     // 4N+13
   
   //check split with remove alias
-  MAKE_NEXT_BLOCK(events, blk_2_split, blk_1, miner_account);                                                          // 4N+13
-  MAKE_NEXT_BLOCK(events, blk_3_split, blk_2_split, miner_account);                                                    // 4N+14
-  MAKE_NEXT_BLOCK(events, blk_4_split, blk_3_split, miner_account);                                                    // 4N+15
-  DO_CALLBACK(events, "check_aliases_removed");                                                                        // 4N+16
+  MAKE_NEXT_BLOCK(events, blk_2_split, blk_1, miner_account);                                                          // 4N+14
+  MAKE_NEXT_BLOCK(events, blk_3_split, blk_2_split, miner_account);                                                    // 4N+15
+  MAKE_NEXT_BLOCK(events, blk_4_split, blk_3_split, miner_account);                                                    // 4N+16
+  DO_CALLBACK(events, "check_aliases_removed");                                                                        // 4N+17
     
   //make back split to original and try update alias
-  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_account);                                                                // 4N+17
-  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_account);                                                                // 4N+18
-  DO_CALLBACK(events, "check_splitted_back");                                                                          // 4N+19
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_account);                                                                // 4N+18
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_account);                                                                // 4N+19
+  DO_CALLBACK(events, "check_splitted_back");                                                                          // 4N+20
 
 
   currency::extra_alias_entry ai_upd = AUTO_VAL_INIT(ai_upd);
@@ -147,8 +164,8 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   ai_upd.m_text_comment = "changed alias haha";
   r = sign_extra_alias_entry(ai_upd, first_acc.get_keys().account_address.spend_public_key, first_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "failed to sign update_alias");
-  MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_6, blk_5, miner_account, ai_upd);                                       // 4N+20,N+21
-  DO_CALLBACK(events, "check_alias_changed");                                                                          // 4N+22
+  MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(events, blk_6, blk_5, miner_account, ai_upd);                                       // 4N+21,N+22
+  DO_CALLBACK(events, "check_alias_changed");                                                                          // 4N+23
 
   //try to make fake alias change
   currency::extra_alias_entry ai_upd_fake = AUTO_VAL_INIT(ai_upd_fake);
@@ -159,74 +176,74 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   CHECK_AND_ASSERT_MES(r, false, "failed to sign update_alias");
   ai_upd_fake.m_text_comment = "changed alias haha - fake"; // changed text, signature became wrong
   std::list<currency::transaction> tx_list;
-  r = put_alias_via_tx_to_list(events, tx_list, blk_6, miner_account, ai_upd_fake, generator);                         // 4N+23
+  r = put_alias_via_tx_to_list(events, tx_list, blk_6, miner_account, ai_upd_fake, generator);                         // 4N+24
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list");
-  DO_CALLBACK(events, "mark_invalid_block");                                                                           // 4N+24
+  DO_CALLBACK(events, "mark_invalid_block");                                                                           // 4N+25
   // EXPECTED: blk_7 is rejected as containing incorrect tx (wrong alias sig)
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_7, blk_6, miner_account, tx_list);                                               // 4N+25
-  DO_CALLBACK(events, "check_alias_not_changed");                                                                      // 4N+26
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_7, blk_6, miner_account, tx_list);                                               // 4N+26
+  DO_CALLBACK(events, "check_alias_not_changed");                                                                      // 4N+27
 
   account_base someone;
   someone.generate();
   block blk_8;
-  r = put_next_block_with_alias_in_tx(events, blk_8, blk_6, THIRD_ALIAS_NAME, miner_account, someone, generator);      // 4N+27,4N+28
+  r = put_next_block_with_alias_in_tx(events, blk_8, blk_6, THIRD_ALIAS_NAME, miner_account, someone, generator);      // 4N+28,4N+29
   CHECK_AND_ASSERT_MES(r, false, "put_next_block_with_alias_in_tx failed");
 
-  MAKE_NEXT_BLOCK(events, blk_9, blk_8, miner_account);                                                                // 4N+29
-  DO_CALLBACK(events, "check_alias_added_in_tx");                                                                      // 4N+30
+  MAKE_NEXT_BLOCK(events, blk_9, blk_8, miner_account);                                                                // 4N+30
+  DO_CALLBACK(events, "check_alias_added_in_tx");                                                                      // 4N+31
   
   // lets try to register same name
   ai = AUTO_VAL_INIT(ai);
   ai.m_alias = THIRD_ALIAS_NAME;
   ai.m_address = miner_account.get_public_address();
   tx_list.clear();
-  DO_CALLBACK(events, "mark_invalid_tx");                                                                              // 4N+31
+  DO_CALLBACK(events, "mark_invalid_tx");                                                                              // 4N+32
   // EXPECTED: tx is rejected, because alias is already registered
-  r = put_alias_via_tx_to_list(events, tx_list, blk_9, miner_account, ai, generator);                                  // 4N+32
+  r = put_alias_via_tx_to_list(events, tx_list, blk_9, miner_account, ai, generator);                                  // 4N+33
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list");
-  DO_CALLBACK(events, "check_alias_not_changed");                                                                      // 4N+33
+  DO_CALLBACK(events, "check_alias_not_changed");                                                                      // 4N+34
 
-  DO_CALLBACK(events, "check_height_not_changed");                                                                     // 4N+34
+  DO_CALLBACK(events, "check_height_not_changed");                                                                     // 4N+35
 
   //check notmal tx in tx pool
-  MAKE_TX_LIST_START(events, txs_0, miner_account, miner_account, MK_TEST_COINS(1), blk_9);                            // 4N+35
+  MAKE_TX_LIST_START(events, txs_0, miner_account, miner_account, MK_TEST_COINS(1), blk_9);                            // 4N+36
 
-  if (!put_alias_via_tx_to_list(events, txs_0, blk_9, FOURTH_NAME, miner_account, miner_account, generator))           // 4N+36
+  if (!put_alias_via_tx_to_list(events, txs_0, blk_9, FOURTH_NAME, miner_account, miner_account, generator))           // 4N+37
     return false;
 
   someone.generate();
-  if (!put_alias_via_tx_to_list(events, txs_0, blk_9, FIFTH_NAME, miner_account, someone, generator))                  // 4N+37
+  if (!put_alias_via_tx_to_list(events, txs_0, blk_9, FIFTH_NAME, miner_account, someone, generator))                  // 4N+38
     return false;
 
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_13, blk_9, miner_account, txs_0);                                                // 4N+38
-  DO_CALLBACK(events, "check_height_changed");                                                                         // 4N+39
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_13, blk_9, miner_account, txs_0);                                                // 4N+39
+  DO_CALLBACK(events, "check_height_changed");                                                                         // 4N+40
   //
   //check duplicate tx in tx pool
-  MAKE_TX_LIST_START(events, txs_2, miner_account, miner_account, MK_TEST_COINS(1), blk_13);                           // 4N+40
+  MAKE_TX_LIST_START(events, txs_2, miner_account, miner_account, MK_TEST_COINS(1), blk_13);                           // 4N+41
 
   someone.generate();
-  if (!put_alias_via_tx_to_list(events, txs_2, blk_13, SIX_NAME, miner_account, someone, generator))                   // 4N+41
+  if (!put_alias_via_tx_to_list(events, txs_2, blk_13, SIX_NAME, miner_account, someone, generator))                   // 4N+42
     return false;
-  DO_CALLBACK(events, "mark_invalid_tx");                                                                              // 4N+42
+  DO_CALLBACK(events, "mark_invalid_tx");                                                                              // 4N+43
   // EXPECTED: the next tx is rejected, because alias is already registered
-  if (!put_alias_via_tx_to_list(events, txs_2, blk_13, SIX_NAME, miner_account, miner_account, generator))             // 4N+43
+  if (!put_alias_via_tx_to_list(events, txs_2, blk_13, SIX_NAME, miner_account, miner_account, generator))             // 4N+44
     return false;
 
-  DO_CALLBACK(events, "mark_invalid_block");                                                                           // 4N+44
+  DO_CALLBACK(events, "mark_invalid_block");                                                                           // 4N+45
   // EXPECTED: block is rejected as containing invalid tx
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_14, blk_13, miner_account, txs_2);                                               // 4N+45
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_14, blk_13, miner_account, txs_2);                                               // 4N+46
 
-  DO_CALLBACK(events, "check_height_not_changed");                                                                     // 4N+46
+  DO_CALLBACK(events, "check_height_not_changed");                                                                     // 4N+47
   
-  DO_CALLBACK(events, "clear_tx_pool");                                                                                // 4N+47
-  DO_CALLBACK(events, "check_too_many_aliases_registration");                                                          // 4N+48
+  DO_CALLBACK(events, "clear_tx_pool");                                                                                // 4N+48
+  DO_CALLBACK(events, "check_too_many_aliases_registration");                                                          // 4N+49
 
   return true;
 }
 
 bool gen_alias_tests::check_first_alias_added(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  const currency::account_base& first_acc = boost::get<const currency::account_base>(events[1]);
+  const currency::account_base& first_acc = boost::get<const currency::account_base>(events[2]);
 
   currency::extra_alias_entry_base ai = AUTO_VAL_INIT(ai);
   bool r = c.get_blockchain_storage().get_alias_info(FIRST_ALIAS_NAME, ai);
@@ -237,7 +254,7 @@ bool gen_alias_tests::check_first_alias_added(currency::core& c, size_t ev_index
 }
 bool gen_alias_tests::check_second_alias_added(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  const currency::account_base& second_acc = boost::get<const currency::account_base>(events[2]);
+  const currency::account_base& second_acc = boost::get<const currency::account_base>(events[3]);
 
   currency::extra_alias_entry_base ai = AUTO_VAL_INIT(ai);
   bool r = c.get_blockchain_storage().get_alias_info(SECOND_ALIAS_NAME, ai);
@@ -295,7 +312,7 @@ bool gen_alias_tests::check_splitted_back(currency::core& c, size_t ev_index, co
 
 bool gen_alias_tests::check_alias_changed(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  const currency::account_base& third_acc = boost::get<const currency::account_base>(events[3]);
+  const currency::account_base& third_acc = boost::get<const currency::account_base>(events[4]);
 
   currency::extra_alias_entry_base ai = AUTO_VAL_INIT(ai);
   bool r = c.get_blockchain_storage().get_alias_info(FIRST_ALIAS_NAME, ai);
@@ -384,6 +401,8 @@ bool gen_alias_strange_data::generate(std::vector<test_event_entry>& events) con
 
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts_start);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
   std::list<currency::transaction> tx_list;
@@ -458,6 +477,8 @@ bool gen_alias_concurrency_with_switch::generate(std::vector<test_event_entry>& 
 
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // two txs with concurrent alias registration: 1st
@@ -519,6 +540,8 @@ bool gen_alias_same_alias_in_tx_pool::generate(std::vector<test_event_entry>& ev
 
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4);
 
 
@@ -587,6 +610,8 @@ bool gen_alias_switch_and_tx_pool::generate(std::vector<test_event_entry>& event
   GENERATE_ACCOUNT(alice);
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
   events.push_back(alice);
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -652,7 +677,7 @@ bool gen_alias_switch_and_tx_pool::generate(std::vector<test_event_entry>& event
 bool gen_alias_switch_and_tx_pool::check_alias(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   const std::string& alias_name = boost::get<callback_entry>(events[ev_index]).callback_params;
-  const currency::account_base& alice = boost::get<const currency::account_base>(events[1]);
+  const currency::account_base& alice = boost::get<const currency::account_base>(events[2]);
   currency::extra_alias_entry_base ai;
   bool r = c.get_blockchain_storage().get_alias_info(alias_name, ai);
   CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
@@ -914,8 +939,10 @@ bool gen_alias_too_much_reward::generate(std::vector<test_event_entry>& events) 
 
   GENERATE_ACCOUNT(miner_acc);                                                                             // event index
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);                                                        // 0
-  events.push_back(miner_acc);                                                                             // 1
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);         // N+1
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");                                                                   // 1
+  events.push_back(miner_acc);                                                                             // 2
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);         // N+3
   uint64_t premine = get_outs_money_amount(blk_0.miner_tx);
 
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
@@ -938,7 +965,7 @@ bool gen_alias_too_much_reward::generate(std::vector<test_event_entry>& events) 
 
 bool gen_alias_too_much_reward::check_alias(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  const currency::account_base& miner_acc = boost::get<const currency::account_base>(events[1]);
+  const currency::account_base& miner_acc = boost::get<const currency::account_base>(events[2]);
   currency::extra_alias_entry_base ai;
   bool r = c.get_blockchain_storage().get_alias_info(std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a'), ai);
   CHECK_AND_ASSERT_MES(r, false, "get_alias_info failed");
@@ -1004,7 +1031,9 @@ bool gen_alias_too_small_reward::generate(std::vector<test_event_entry>& events)
 
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
-  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);     
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
   DO_CALLBACK(events, "init_runtime_config"); 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   
@@ -1190,21 +1219,23 @@ bool gen_alias_switch_and_check_block_template::generate(std::vector<test_event_
   GENERATE_ACCOUNT(alice);
 
   MAKE_GENESIS_BLOCK(events, blk_0, preminer_acc, ts);                                                       // 0
-  events.push_back(alice);                                                                                   // 1
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4);       // 2N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");                                                                     // 1
+  events.push_back(alice);                                                                                   // 2
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4);       // 2N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2
   uint64_t miner_amount = get_outs_money_amount(blk_0r.miner_tx) * 4;
   // alice get some money
-  MAKE_TX_LIST(events, tx_list, miner_acc, alice, miner_amount / 2, blk_0r);                                 // 2N+2
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);                                        // 2N+3
+  MAKE_TX_LIST(events, tx_list, miner_acc, alice, miner_amount / 2, blk_0r);                                 // 2N+3
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);                                        // 2N+4
   tx_list.clear();
 
   // Alice registers an alias
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'x');
   ai.m_address = alice.get_public_address();
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_1, alice, ai, generator);                           // 2N+4
+  bool r = put_alias_via_tx_to_list(events, tx_list, blk_1, alice, ai, generator);                           // 2N+5
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");                                         
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);                                         // 2N+5
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);                                         // 2N+6
   tx_list.clear();
 
   // Alice updates her alias (paid by miner in order not to confuse and mix the inputs)
@@ -1213,18 +1244,18 @@ bool gen_alias_switch_and_check_block_template::generate(std::vector<test_event_
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   std::vector<currency::extra_v> extra(1, ai);
 
-  MAKE_TX_FEE_MIX_ATTR_EXTRA(events, tx_0, miner_acc, miner_acc, 1, TESTS_DEFAULT_FEE, 0, blk_2, CURRENCY_TO_KEY_OUT_RELAXED, extra, true); // 2N+6
-  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_0);                                                // 2N+7
+  MAKE_TX_FEE_MIX_ATTR_EXTRA(events, tx_0, miner_acc, miner_acc, 1, TESTS_DEFAULT_FEE, 0, blk_2, CURRENCY_TO_KEY_OUT_RELAXED, extra, true); // 2N+7
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_0);                                                // 2N+8
 
   // split the chain
-  MAKE_NEXT_BLOCK(events, blk_4, blk_1, miner_acc);                                                          // 2N+8
-  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);                                                          // 2N+9
+  MAKE_NEXT_BLOCK(events, blk_4, blk_1, miner_acc);                                                          // 2N+9
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);                                                          // 2N+10
 
   // switch to altchain
-  MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);                                                          // 2N+10
+  MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);                                                          // 2N+11
 
   // try to create and add block from template
-  DO_CALLBACK_PARAMS_STR(events, "add_block_from_template", ai.m_alias);                                     // 2N+11
+  DO_CALLBACK_PARAMS_STR(events, "add_block_from_template", ai.m_alias);                                     // 2N+12
 
   return true;
 }
@@ -1250,7 +1281,7 @@ bool gen_alias_switch_and_check_block_template::add_block_from_template(currency
 
   // check that alias was successfully registered
   const std::string& alias_name = boost::get<callback_entry>(events[ev_index]).callback_params;
-  const currency::account_base& alice_acc = boost::get<const currency::account_base>(events[1]);
+  const currency::account_base& alice_acc = boost::get<const currency::account_base>(events[2]);
 
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   r = c.get_blockchain_storage().get_alias_info(alias_name, ai);
@@ -1378,7 +1409,9 @@ bool gen_alias_update_for_free::generate(std::vector<test_event_entry>& events) 
   GENERATE_ACCOUNT(miner_acc);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);                                                          // 0
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);           // 2N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");                                                                     // 1
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);           // 2N+1, 2N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW
 
   // registrate an alias - pay as usual
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
@@ -1435,6 +1468,8 @@ bool gen_alias_in_coinbase::generate(std::vector<test_event_entry>& events) cons
   uint64_t ts = 145000000;
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
 
   // reg an alias using coinbase
 

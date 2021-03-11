@@ -974,6 +974,21 @@ bool gen_crypted_attachments::check_crypted_tx(currency::core& c, size_t ev_inde
   return true;
 }
 
+gen_tx_extra_double_entry::gen_tx_extra_double_entry()
+{
+  REGISTER_CALLBACK_METHOD(gen_tx_extra_double_entry, configure_core);
+}
+
+bool gen_tx_extra_double_entry::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hard_fork_01_starts_after_height = 0;
+  pc.hard_fork_02_starts_after_height = 0;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}
 
 bool gen_tx_extra_double_entry::generate(std::vector<test_event_entry>& events) const
 {
@@ -982,6 +997,9 @@ bool gen_tx_extra_double_entry::generate(std::vector<test_event_entry>& events) 
 
   GENERATE_ACCOUNT(miner_account);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_account, ts_start);
+  generator.set_hardfork_height(0, 0);
+  generator.set_hardfork_height(1, 0); // extra_alias_entry is only allowed after HF2, so switch it on here
+  DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
 
   std::vector<tx_source_entry> sources;
