@@ -765,6 +765,8 @@ bool gen_broken_attachments::generate(std::vector<test_event_entry>& events) con
   return true;
 }
 
+//------------------------------------------------------------------------------
+
 gen_crypted_attachments::gen_crypted_attachments()
 {
   REGISTER_CALLBACK("check_crypted_tx", gen_crypted_attachments::check_crypted_tx);

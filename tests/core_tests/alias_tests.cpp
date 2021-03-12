@@ -94,21 +94,9 @@ gen_alias_tests::gen_alias_tests()
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_height_changed);
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_too_many_aliases_registration);
 
-  //REGISTER_CALLBACK_METHOD(gen_alias_tests, configure_core);
   m_hardfork_01_height = 0;
   m_hardfork_02_height = 0;
 }
-
-/*bool gen_alias_tests::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
-  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_fork_01_starts_after_height = m_hardfork_01_height;
-  pc.hard_fork_02_starts_after_height = m_hardfork_02_height;
-  c.get_blockchain_storage().set_core_runtime_config(pc);
-  return true;
-}*/
 
 bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
 {
