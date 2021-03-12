@@ -1381,6 +1381,8 @@ bool gen_wallet_transfers_and_chain_switch::generate(std::vector<test_event_entr
 gen_wallet_decrypted_attachments::gen_wallet_decrypted_attachments()
   : m_on_transfer2_called(false)
 {
+  m_hardfork_01_height = 0;
+  m_hardfork_02_height = 0; // tx_payer requires HF2
 }
 
 bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& events) const
@@ -1416,6 +1418,9 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   block blk_0 = AUTO_VAL_INIT(blk_0);
   generator.construct_genesis_block(blk_0, miner_acc, test_core_time::get_time());
   events.push_back(blk_0);
+
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");
 
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
