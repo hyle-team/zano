@@ -37,12 +37,12 @@
 #define  RMD160H
 
 /********************************************************************/
-
+#include <stdint.h>
 /* typedef 8 and 32 bit types, resp.  */
 /* adapt these, if necessary,
 for your operating system and compiler */
 typedef    unsigned char        byte;
-typedef    unsigned long        dword;
+typedef    uint32_t        dword;
 
 /* if this line causes a compiler error,
 adapt the defintion of dword above */
