@@ -50,13 +50,14 @@ namespace tools
 
     boost::system::error_code ec;
     uint64_t sz = boost::filesystem::file_size(db_main_file_path, ec);
-    if (!(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > pre_download_min_size_difference) || command_line::has_arg(vm, command_line::arg_force_predownload)) )
+    if (pre_download.unpacked_size == 0 || !(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > pre_download_min_size_difference) || command_line::has_arg(vm, command_line::arg_force_predownload)) )
     {
       LOG_PRINT_MAGENTA("Pre-downloading not needed (db file size = " << sz << ")", LOG_LEVEL_0);
       return true;
     }
 
     // okay, let's download
+
 
     std::string downloading_file_path = db_main_file_path + ".download";
 
