@@ -4116,6 +4116,9 @@ void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_publ
   htlc_option.expiration = lock_blocks_count; //about 12 hours
   htlc_option.htlc_hash = htlc_hash;
 
+  currency::create_and_add_tx_payer_to_container_from_address(ctp.extra, 
+    get_account().get_keys().account_address, get_top_block_height(), get_core_runtime_config());
+
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
   origin = ft.htlc_origin;
