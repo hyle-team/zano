@@ -74,6 +74,11 @@ namespace tools
         return m_what.c_str();
       }
 
+      virtual const std::string error_code() const noexcept
+      {
+        return m_error_code;
+      }
+
       wallet_error_base(std::string&& loc, const std::string& message, const std::string& error_code)
         : Base(message)
         , m_loc(loc)

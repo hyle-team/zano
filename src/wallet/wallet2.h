@@ -400,6 +400,7 @@ namespace tools
     struct transfer_details_extra_option_htlc_info
     {
       std::string origin;  //this field filled only if htlc had been redeemed
+      crypto::hash redeem_tx_id;
     };
 
     typedef boost::variant<transfer_details_extra_option_htlc_info> transfer_details_extra_options_v;
@@ -862,7 +863,7 @@ namespace tools
     void get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>& htlcs, bool only_redeem_txs);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
-    bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin);
+    bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
 
 private:
 

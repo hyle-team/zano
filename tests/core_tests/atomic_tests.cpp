@@ -297,7 +297,8 @@ bool atomic_simple_test::c1(currency::core& c, size_t ev_index, const std::vecto
   //=============  phase 4  =============
   //-----------  preparation  -----------
   std::string bob_detected_origin;
-  r = bob_b_wlt_instance->check_htlc_redeemed(hei_bob_b.tx_id, bob_detected_origin);
+  crypto::hash redeem_tx_id = AUTO_VAL_INIT(redeem_tx_id);
+  r = bob_b_wlt_instance->check_htlc_redeemed(hei_bob_b.tx_id, bob_detected_origin, redeem_tx_id);
   CHECK_AND_ASSERT_MES(r, false, "bob_a_wlt_instance->check_htlc_redeemed(hei_bob_b.tx_id, bob_detected_origin); returned false");
 
   CHECK_AND_ASSERT_MES(bob_detected_origin == alice_origin, false, "bob_detected_origin == alice_origin failed");

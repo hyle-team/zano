@@ -400,6 +400,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
         m_transfers[it->second].m_spent_height = height;
         transfer_details_extra_option_htlc_info& tdeohi = get_or_add_field_to_variant_vector<transfer_details_extra_option_htlc_info>(td.varian_options);
         tdeohi.origin = in_htlc.hltc_origin;
+        tdeohi.redeem_tx_id = get_transaction_hash(tx);
       }
     }
     i++;
@@ -4141,6 +4142,11 @@ void wallet2::get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>&
       "[get_list_of_active_htlc]Internal error: unexpected type of out");
     const txout_htlc& htlc = boost::get<txout_htlc>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].target);
     entry.sha256_hash = htlc.htlc_hash;
+    
+    currency::tx_payer payer = AUTO_VAL_INIT(payer);
+    if (currency::get_type_in_variant_container(td.m_ptx_wallet_info->m_tx.extra, payer))
+      entry.counterparty_address = payer.acc_addr;
+
     entry.is_redeem = td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM ? true : false;
     htlcs.push_back(entry);
   }
@@ -4170,7 +4176,7 @@ void wallet2::redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& ori
   this->transfer(ctp, result_tx, true, nullptr);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin)
+bool wallet2::check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id)
 {
   auto it = m_active_htlcs_txid.find(htlc_tx_id);
 
@@ -4185,6 +4191,7 @@ bool wallet2::check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& o
   if (htlc_options.origin.size())
   {
     origin = htlc_options.origin;
+    redeem_tx_id = htlc_options.redeem_tx_id;
     return true;
   }
   return false;
