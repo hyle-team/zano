@@ -1042,10 +1042,10 @@ namespace wallet_public
 
     struct response
     {
-      std::list<wallet_public::htlc_entry_info> m_htlcs;
+      std::list<wallet_public::htlc_entry_info> htlcs;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(m_htlcs)
+        KV_SERIALIZE(htlcs)
       END_KV_SERIALIZE_MAP()
     };
   };

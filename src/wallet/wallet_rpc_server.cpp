@@ -800,7 +800,7 @@ namespace tools
   bool wallet_rpc_server::on_get_list_of_active_htlc(const wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC::request& req, wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    m_wallet.get_list_of_active_htlc(res.m_htlcs, req.income_redeem_only);
+    m_wallet.get_list_of_active_htlc(res.htlcs, req.income_redeem_only);
     WALLET_RPC_CATCH_TRY_ENTRY();
     return true;
   }
