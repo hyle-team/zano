@@ -16,6 +16,8 @@ extern "C" {
 #include "crypto/crypto-ops.h"
 } // extern "C"
 
+namespace mp = boost::multiprecision;
+
 // out = z ^ s (mod l)
 void sc_exp(unsigned char* out, const unsigned char* z, const unsigned char* s)
 {
@@ -302,6 +304,11 @@ struct alignas(32) scalar_t
     return sc_isnonzero(&m_s[0]) == 0;
   }
 
+  bool is_reduced() const
+  {
+    return sc_check(&m_s[0]) == 0;
+  }
+
   scalar_t operator+(const scalar_t& v) const
   {
     scalar_t result;
@@ -331,20 +338,20 @@ struct alignas(32) scalar_t
   scalar_t operator*(const scalar_t& v) const
   {
     scalar_t result;
-    sc_mul(&result.m_s[0], &m_s[0], &v.m_s[0]);
+    sc_mul(result.m_s, m_s, v.m_s);
     return result;
   }
 
   scalar_t& operator*=(const scalar_t& v)
   {
-    sc_mul(&m_s[0], &m_s[0], &v.m_s[0]);
+    sc_mul(m_s, m_s, v.m_s);
     return *this;
   }
 
   scalar_t reciprocal() const
   {
     scalar_t result;
-    sc_invert(&result.m_s[0], &m_s[0]);
+    sc_invert(result.m_s, m_s);
     return result;
   }
 
@@ -997,14 +1004,99 @@ TEST(crypto, primitives)
     result += cb(t, rounds);
     t_total.stop();
     double run_time_mcs_x_100 = double(uint64_t(t.get_time_mcs() / (rounds / 100)));
-    LOG_PRINT_L0(std::left << std::setw(50) << title << std::setw(7) << rounds << " rnds -> "
-      << std::right << std::setw(7) << std::fixed << std::setprecision(2) << run_time_mcs_x_100 / 100.0 << " mcs avg. (gross: "
+    LOG_PRINT_L0(std::left << std::setw(40) << title << std::setw(7) << rounds << " rnds ->  "
+      << std::right << std::setw(7) << std::fixed << std::setprecision(2) << run_time_mcs_x_100 / 100.0 << "  mcs avg. (gross: "
       << std::fixed << std::setprecision(2) << double(t_total.get_time_mcs()) / 1000.0 << " ms), result hash: " << result);
   };
 
 #define HASH_64_VEC(vec_var_name) hash_64(vec_var_name.data(), vec_var_name.size() * sizeof(vec_var_name[0]))
 
   LOG_PRINT_L0(ENDL << "native crypto primitives:");
+
+  run("sc_reduce", 30000, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    struct bytes64
+    {
+      unsigned char b[64];
+    };
+
+    std::vector<bytes64> scalars_64(rounds);
+    for (size_t i = 0; i < scalars_64.size(); ++i)
+      crypto::generate_random_bytes(sizeof(bytes64), scalars_64[i].b);
+
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      sc_reduce(scalars_64[rnd_indecies[i]].b);
+    }
+    t.stop();
+
+    return HASH_64_VEC(scalars_64);
+  });
+
+  run("sc_reduce32", 30000, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    std::vector<crypto::ec_scalar> scalars(rounds);
+    for (size_t i = 0; i < scalars.size(); ++i)
+      crypto::generate_random_bytes(sizeof(crypto::ec_scalar), scalars[i].data);
+
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      sc_reduce32((unsigned char*)&scalars[rnd_indecies[i]].data);
+    }
+    t.stop();
+
+    return HASH_64_VEC(scalars);
+  });
+
+  run("ge_p3_tobytes", 10000, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    std::vector<ge_p3> points_p3(rounds);
+    ge_scalarmult_base(&points_p3[0], c_scalar_1.data());
+    for (size_t i = 1; i < points_p3.size(); ++i)
+      ge_bytes_hash_to_ec(&points_p3[i], (const unsigned char*)&points_p3[i - 1].X); // P_{i+1} = Hp(P_i.X)
+
+    std::vector<crypto::ec_point> points(rounds);
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      ge_p3_tobytes((unsigned char*)points[i].data, &points_p3[rnd_indecies[i]]);
+    }
+    t.stop();
+
+    return HASH_64_VEC(points);
+  });
+
+  run("ge_frombytes_vartime(p3)", 10000, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    point_t P = c_point_G;
+    
+    std::vector<crypto::ec_point> points_p3_bytes(rounds);
+    for (size_t i = 0; i < points_p3_bytes.size(); ++i)
+    {
+      P = hash_helper_t::hp(P);
+      ge_p3_tobytes((unsigned char*)&points_p3_bytes[i], &P.m_p3);
+    }
+
+    std::vector<ge_p3> points(rounds);
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      ge_frombytes_vartime(&points[i], (unsigned char*)&points_p3_bytes[rnd_indecies[i]]);
+    }
+    t.stop();
+
+    return HASH_64_VEC(points);
+  });
 
   run("ge_p3_to_cached(p3)", 10000, [](timer_t& t, size_t rounds) {
     std::vector<size_t> rnd_indecies;
@@ -1643,6 +1735,7 @@ TEST(crypto, scalar_basics)
   {
     z.make_random();
     ASSERT_FALSE(z.is_zero());
+    ASSERT_TRUE(z.is_reduced());
     ASSERT_TRUE(z > z - 1);
     ASSERT_TRUE(z < z + 1);
   }
@@ -1672,6 +1765,19 @@ TEST(crypto, scalar_basics)
   ASSERT_EQ(c_scalar_L   * c_scalar_L, 0);
 
   ASSERT_EQ(scalar_t(3) / c_scalar_Lm1, scalar_t(3) * c_scalar_Lm1);  // because (L - 1) ^ 2 = 1
+
+  // check is_reduced
+  ASSERT_TRUE(c_scalar_Lm1.is_reduced());
+  ASSERT_FALSE(c_scalar_L.is_reduced());
+  scalar_t p = c_scalar_L;
+  ASSERT_FALSE(p.is_reduced());
+  p = p + 1;
+  ASSERT_TRUE(p.is_reduced());
+  p = 0;
+  p = p + c_scalar_P;
+  ASSERT_TRUE(p.is_reduced());
+  mp::uint256_t mp_p_mod_l = c_scalar_P.as_boost_mp_type<mp::uint256_t>() % c_scalar_L.as_boost_mp_type<mp::uint256_t>();
+  ASSERT_EQ(p, scalar_t(mp_p_mod_l));
 
   return true;
 }
