@@ -403,7 +403,8 @@ namespace tools
       crypto::hash redeem_tx_id;
     };
 
-    typedef boost::variant<transfer_details_extra_option_htlc_info> transfer_details_extra_options_v;
+
+    typedef boost::variant<transfer_details_extra_option_htlc_info, currency::tx_payer> transfer_details_extra_options_v;
 
     struct transfer_details : public transfer_details_base
     {

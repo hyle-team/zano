@@ -14,6 +14,7 @@ struct atomic_base_test : public wallet_test
   virtual bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)=0;
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 protected:
+  mutable uint64_t m_genesis_timestamp;
   mutable currency::account_base m_mining_accunt;
 };
 

@@ -595,6 +595,23 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           auto amount_gindex_pair = std::make_pair(amount, td.m_global_output_index);
           m_active_htlcs[amount_gindex_pair] = transfer_index;
           m_active_htlcs_txid[get_transaction_hash(tx)] = transfer_index;
+          //add payer to extra options 
+          currency::tx_payer payer = AUTO_VAL_INIT(payer);
+          if (het.is_wallet_owns_redeem)
+          {
+            if (currency::get_type_in_variant_container(tx.extra, payer))
+            {
+              crypto::chacha_crypt(payer.acc_addr, derivation);
+              td.varian_options.push_back(payer);
+            }
+          }
+          else
+          {
+            //since this is refund-mode htlc out, then sender is this wallet itself
+            payer.acc_addr = m_account.get_public_address();
+            td.varian_options.push_back(payer);
+          }
+               
         }
         if (td.m_key_image != currency::null_ki)
           m_key_images[td.m_key_image] = transfer_index;
@@ -4144,7 +4161,7 @@ void wallet2::get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>&
     entry.sha256_hash = htlc.htlc_hash;
     
     currency::tx_payer payer = AUTO_VAL_INIT(payer);
-    if (currency::get_type_in_variant_container(td.m_ptx_wallet_info->m_tx.extra, payer))
+    if (currency::get_type_in_variant_container(td.varian_options, payer))
       entry.counterparty_address = payer.acc_addr;
 
     entry.is_redeem = td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM ? true : false;
@@ -5259,6 +5276,11 @@ void wallet2::transfer(construct_tx_param& ctp,
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!is_auditable() || !is_watch_only(), "You can't initiate coins transfer using an auditable watch-only wallet."); // btw, watch-only wallets can call transfer() within cold-signing process
 
   check_and_throw_if_self_directed_tx_with_payment_id_requested(ctp);
+
+  if (ctp.crypt_address.spend_public_key == currency::null_pkey)
+  {
+    ctp.crypt_address = currency::get_crypt_address_from_destinations(m_account.get_keys(), ctp.dsts);
+  }
 
   TIME_MEASURE_START(prepare_transaction_time);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);

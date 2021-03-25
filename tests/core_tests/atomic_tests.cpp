@@ -15,6 +15,7 @@ using namespace currency;
 #define INIT_RUNTIME_WALLET(instance_name)   \
   currency::account_base instance_name##acc_base; \
   instance_name##acc_base.generate(); \
+  instance_name##acc_base.set_createtime(m_genesis_timestamp); \
   LOG_PRINT_MAGENTA(": " << currency::get_account_address_as_str(instance_name##acc_base.get_public_address()), LOG_LEVEL_0); \
   std::shared_ptr<tools::wallet2> instance_name = init_playtime_test_wallet(events, c, instance_name##acc_base);
 
@@ -42,11 +43,17 @@ atomic_base_test::atomic_base_test()
 
 bool atomic_base_test::generate(std::vector<test_event_entry>& events) const
 {
+  random_state_test_restorer::reset_random(0); // to make the test deterministic
+  m_genesis_timestamp = 1450000000;
+  test_core_time::adjust(m_genesis_timestamp);
+
+
   epee::debug::get_set_enable_assert(true, true);
 
   currency::account_base genesis_acc;
   genesis_acc.generate();
   m_mining_accunt.generate();
+  m_mining_accunt.set_createtime(m_genesis_timestamp);
 
 
   block blk_0 = AUTO_VAL_INIT(blk_0);
