@@ -224,7 +224,7 @@ struct alignas(32) scalar_t
   }
 
   // copy at most 32 bytes and reduce
-  scalar_t(const boost::multiprecision::cpp_int &bigint)
+  explicit scalar_t(const boost::multiprecision::cpp_int &bigint)
   {
     zero();
     unsigned int bytes_to_copy = bigint.backend().size() * bigint.backend().limb_bits / 8;
