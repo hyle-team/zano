@@ -765,7 +765,7 @@ struct hash_helper_t
     point_t result;
     crypto::public_key pk = p.to_public_key();
 
-    ge_bytes_hash_to_ec(&result.m_p3, (const unsigned char*)&pk);
+    ge_bytes_hash_to_ec_32(&result.m_p3, (const unsigned char*)&pk);
 
     return result;
   }
@@ -773,7 +773,7 @@ struct hash_helper_t
   static point_t hp(const crypto::public_key& p)
   {
     point_t result;
-    ge_bytes_hash_to_ec(&result.m_p3, (const unsigned char*)&p);
+    ge_bytes_hash_to_ec_32(&result.m_p3, (const unsigned char*)&p);
     return result;
   }
 };
