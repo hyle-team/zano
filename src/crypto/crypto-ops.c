@@ -4323,21 +4323,26 @@ void ge_p2_to_p3(ge_p3 *r, const ge_p2 *t)
 
 
 /*
-  In:  ge_bytes -- points to 32 bytes of data
-  Out: res = Hp(ge_bytes)
-    where Hp = 8 * ge_fromfe_frombytes_vartime(cn_fast_hash(ge_bytes))
+  In:  data -- points to 'size' bytes of data
+  Out: res = Hp(data)
+    where Hp = 8 * ge_fromfe_frombytes_vartime(cn_fast_hash(data))
 */
-void ge_bytes_hash_to_ec(ge_p3 *res, const unsigned char *ge_bytes)
+void ge_bytes_hash_to_ec(ge_p3 *res, const void *data, size_t size)
 {
   unsigned char h[HASH_SIZE];
   ge_p2 point;
   ge_p1p1 point2;
 
-  cn_fast_hash(ge_bytes, 32, (char*)h);
+  cn_fast_hash(data, size, (char*)h);
   ge_fromfe_frombytes_vartime(&point, &h[0]);
   /*ge_p2_to_p3(res, &point); -- can be used to avoid multiplication by 8 for debugging */
   ge_mul8(&point2, &point);
   ge_p1p1_to_p3(res, &point2);
+}
+
+void ge_bytes_hash_to_ec_32(ge_p3 *res, const unsigned char *ge_bytes)
+{
+  ge_bytes_hash_to_ec(res, ge_bytes, 32);
 }
 
 void ge_mul8_p3(ge_p3 *r, const ge_p3 *t)
