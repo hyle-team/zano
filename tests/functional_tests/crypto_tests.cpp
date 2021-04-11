@@ -1,4 +1,5 @@
-// Copyright (c) 2020 Zano Project
+// Copyright (c) 2020-2021 Zano Project
+// Copyright (c) 2020-2021 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,8 +10,8 @@
 #include "epee/include/profile_tools.h"
 #include "include_base_utils.h"
 #include "common/crypto_stream_operators.h"
+#include "common/varint.h"
 #include "currency_core/difficulty.h"
-
 
 extern "C" {
 #include "crypto/crypto-ops.h"
@@ -198,6 +199,12 @@ struct alignas(32) scalar_t
     m_u64[3] = a3;
   }
 
+  // won't check scalar range validity (< L)
+  scalar_t(const unsigned char(&v)[32])
+  {
+    memcpy(m_s, v, 32);
+  }
+
   // won't check secret key validity (sk < L)
   scalar_t(const crypto::secret_key& sk)
   {
@@ -348,6 +355,24 @@ struct alignas(32) scalar_t
     return *this;
   }
 
+  /*
+  I think it has bad symantic (operator-like), consider rename/reimplement
+  */
+  // returns this * b + c
+  scalar_t muladd(const scalar_t& b, const scalar_t& c) const
+  {
+    scalar_t result;
+    sc_muladd(result.m_s, m_s, b.m_s, c.m_s);
+    return result;
+  }
+
+  // returns this = a * b + c
+  scalar_t& assign_muladd(const scalar_t& a, const scalar_t& b, const scalar_t& c)
+  {
+    sc_muladd(m_s, a.m_s, b.m_s, c.m_s);
+    return *this;
+  }
+
   scalar_t reciprocal() const
   {
     scalar_t result;
@@ -456,6 +481,20 @@ struct point_t
   explicit point_t(const crypto::public_key& pk)
   {
     from_public_key(pk); // TODO: what if it fails?
+  }
+
+  point_t(const unsigned char(&v)[32])
+  {
+    static_assert(sizeof crypto::public_key == sizeof v, "size missmatch");
+    if (!from_public_key(*(const crypto::public_key*)v))
+      zero();
+  }
+
+  point_t(const uint64_t(&v)[4])
+  {
+    static_assert(sizeof crypto::public_key == sizeof v, "size missmatch");
+    if (!from_public_key(*(const crypto::public_key*)v))
+      zero();
   }
 
   void zero()
@@ -589,7 +628,21 @@ struct point_t
     crypto::public_key pk = to_public_key();
     return epee::string_tools::pod_to_hex(pk);
   }
+
+  std::string to_hex_comma_separated_bytes_str() const
+  {
+    crypto::public_key pk = to_public_key();
+    return pod_to_hex_comma_separated_bytes(pk);
+  }
+
+  std::string to_hex_comma_separated_uint64_str() const
+  {
+    crypto::public_key pk = to_public_key();
+    return pod_to_hex_comma_separated_uint64(pk);
+  }
+
 }; // struct point_t
+
 
 struct point_g_t : public point_t
 {
@@ -630,6 +683,7 @@ static const scalar_t c_scalar_Lm1    = { 0x5812631a5cf5d3ec, 0x14def9dea2f79cd6
 static const scalar_t c_scalar_P      = { 0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
 static const scalar_t c_scalar_Pm1    = { 0xffffffffffffffec, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
 static const scalar_t c_scalar_256m1  = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff };
+static const scalar_t c_scalar_1div8  = { 0x6106e529e2dc2f79, 0x7d39db37d1cdad0,  0x0,                0x600000000000000  };
 
 
 // H_s hash function
