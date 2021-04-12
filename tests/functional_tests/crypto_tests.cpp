@@ -531,6 +531,18 @@ struct point_t
       zero();
   }
 
+  point_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
+  {
+    crypto::public_key pk;
+    ((uint64_t*)&pk)[0] = a0;
+    ((uint64_t*)&pk)[1] = a0;
+    ((uint64_t*)&pk)[2] = a0;
+    ((uint64_t*)&pk)[3] = a0;
+
+    if (!from_public_key(pk))
+      zero();
+  }
+
   void zero()
   {
     ge_p3_0(&m_p3);
@@ -550,6 +562,14 @@ struct point_t
   bool from_key_image(const crypto::key_image& ki)
   {
     return ge_frombytes_vartime(&m_p3, reinterpret_cast<const unsigned char*>(&ki)) == 0;
+  }
+
+  bool from_string(const std::string& str)
+  {
+    crypto::public_key pk;
+    if (!epee::string_tools::parse_tpod_from_hex_string(str, pk))
+      return false;
+    return from_public_key(pk);
   }
 
   crypto::public_key to_public_key() const
@@ -1298,6 +1318,8 @@ TEST(crypto, scalar_basics)
   scalar_t one = 1;
   ASSERT_FALSE(one.is_zero());
   ASSERT_TRUE(one > zero);
+  ASSERT_TRUE(one.muladd(zero, zero) == zero);
+
   scalar_t z = 0;
   for (size_t j = 0; j < 1000; ++j)
   {
@@ -1306,6 +1328,9 @@ TEST(crypto, scalar_basics)
     ASSERT_TRUE(z.is_reduced());
     ASSERT_TRUE(z > z - 1);
     ASSERT_TRUE(z < z + 1);
+    ASSERT_TRUE(z.muladd(one, zero) == z);
+    ASSERT_TRUE(z.muladd(zero, one) == one);
+    ASSERT_TRUE(z.muladd(z, z) == z * z + z);
   }
 
   ASSERT_TRUE(c_scalar_L > 0 && !(c_scalar_L < 0));
