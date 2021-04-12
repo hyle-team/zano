@@ -155,6 +155,40 @@ std::string pod_to_hex_big_endian(const pod_t &h)
   return s;
 }
 
+template<class pod_t>
+std::string pod_to_hex_comma_separated_bytes(const pod_t &h)
+{
+  std::stringstream ss;
+  ss << std::hex << std::setfill('0');
+  size_t len = sizeof h;
+  const unsigned char* p = (const unsigned char*)&h;
+  for (size_t i = 0; i < len; ++i)
+  {
+    ss << "0x" << std::setw(2) << static_cast<unsigned int>(p[i]);
+    if (i + 1 != len)
+      ss << ", ";
+  }
+  return ss.str();
+}
+
+template<class pod_t>
+std::string pod_to_hex_comma_separated_uint64(const pod_t &h)
+{
+  static_assert((sizeof h) % 8 == 0, "size of h should be a multiple of 64 bit");
+  size_t len = (sizeof h) / 8;
+  std::stringstream ss;
+  ss << std::hex << std::setfill('0');
+  const uint64_t* p = (const uint64_t*)&h;
+  for (size_t i = 0; i < len; ++i)
+  {
+    ss << "0x" << std::setw(16) << static_cast<uint64_t>(p[i]);
+    if (i + 1 != len)
+      ss << ", ";
+  }
+  return ss.str();
+}
+
+
 uint64_t rand_in_range(uint64_t from_including, uint64_t to_not_including)
 {
   uint64_t result = 0;
@@ -570,6 +604,12 @@ struct point_t
     return result;
   }
 
+  point_t& modify_mul8()
+  {
+    ge_mul8_p3(&m_p3, &m_p3);
+    return *this;
+  }
+
   // returns a * this + G
   point_t mul_plus_G(const scalar_t& a) const
   {
@@ -591,7 +631,7 @@ struct point_t
 
   friend bool operator==(const point_t& lhs, const point_t& rhs)
   {
-    // convert to xy form, then compare components (because (z, y, z, t) representation is not unique)
+    // convert to xy form, then compare components (because (x, y, z, t) representation is not unique)
     fe lrecip, lx, ly;
     fe rrecip, rx, ry;
 
@@ -982,10 +1022,6 @@ uint64_t hash_64(const void* data, size_t size)
 }
 
 
-////////////////////////////////////////////////////////////////////////////////
-#include "L2S.h"
-////////////////////////////////////////////////////////////////////////////////
-
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1003,7 +1039,7 @@ uint64_t hash_64(const void* data, size_t size)
   static bool test_name_a ## _ ## test_name_b()
 #define ASSERT_TRUE(expr)  CHECK_AND_ASSERT_MES(expr, false, "This is not true: " #expr)
 #define ASSERT_FALSE(expr) CHECK_AND_ASSERT_MES((expr) == false, false, "This is not false: " #expr)
-#define ASSERT_EQ(a, b)    CHECK_AND_ASSERT_MES(a == b, false, #a " != " #b)
+#define ASSERT_EQ(a, b)    CHECK_AND_ASSERT_MES(a == b, false, #a " != " #b "\n    " << a << " != " << b)
 
 typedef bool(*bool_func_ptr_t)();
 static std::vector<std::pair<std::string, bool_func_ptr_t>> g_tests;
@@ -1015,6 +1051,10 @@ struct test_keeper_t
   }
 };
 
+
+////////////////////////////////////////////////////////////////////////////////
+#include "L2S.h"
+////////////////////////////////////////////////////////////////////////////////
 
 
 
