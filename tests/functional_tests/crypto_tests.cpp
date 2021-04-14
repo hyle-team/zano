@@ -264,8 +264,9 @@ struct alignas(32) scalar_t
     // do not need to call reduce as 2^64 < L
   }
 
-  // copy at most 32 bytes and reduce
-  explicit scalar_t(const boost::multiprecision::cpp_int &bigint)
+  // copy at most 256 bits (32 bytes) and reduce
+  template<typename T>
+  explicit scalar_t(const boost::multiprecision::number<T>& bigint)
   {
     zero();
     unsigned int bytes_to_copy = bigint.backend().size() * bigint.backend().limb_bits / 8;
@@ -274,7 +275,7 @@ struct alignas(32) scalar_t
     memcpy(&m_s[0], bigint.backend().limbs(), bytes_to_copy);
     sc_reduce32(&m_s[0]);
   }
-
+  
   unsigned char* data()
   {
     return &m_s[0];
@@ -519,14 +520,14 @@ struct point_t
 
   point_t(const unsigned char(&v)[32])
   {
-    static_assert(sizeof crypto::public_key == sizeof v, "size missmatch");
+    static_assert(sizeof(crypto::public_key) == sizeof v, "size missmatch");
     if (!from_public_key(*(const crypto::public_key*)v))
       zero();
   }
 
   point_t(const uint64_t(&v)[4])
   {
-    static_assert(sizeof crypto::public_key == sizeof v, "size missmatch");
+    static_assert(sizeof(crypto::public_key) == sizeof v, "size missmatch");
     if (!from_public_key(*(const crypto::public_key*)v))
       zero();
   }
