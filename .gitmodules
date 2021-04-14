@@ -5,5 +5,5 @@
 	path = contrib/db/libmdbx
 	url = https://github.com/leo-yuriev/libmdbx.git
 [submodule "src\\gui\\qt-daemon\\layout"]
-	path = src\\gui\\qt-daemon\\layout
+	path = src/gui/qt-daemon/layout
 	url = git@github.com:hyle-team/zano_ui.git
