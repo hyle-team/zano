@@ -120,8 +120,8 @@ IF %ERRORLEVEL% NEQ 0 (
 
 @echo "Add html"
 
-cd %SOURCES_PATH%\src\gui\qt-daemon\
-zip -x layout/html/package.json layout/html/gulpfile.js layout/html/less/* -r %build_zip_path% html
+cd %SOURCES_PATH%\src\gui\qt-daemon\layout
+zip -x html/package.json html/gulpfile.js html/less/* -r %build_zip_path% html
 IF %ERRORLEVEL% NEQ 0 (
   goto error
 )
