@@ -17,7 +17,7 @@ namespace currency
   inline bool create_checkpoints(currency::checkpoints& checkpoints)
   {
 #ifdef TESTNET
-//    ADD_CHECKPOINT(50000,   "cb05a7bdc7f78c5cdb6ef1048f85b27c569f44879233903ce5f5a4e5bd590a3d");
+    ADD_CHECKPOINT(50000,   "492ef71f5d722a8a182d65eb0ff731b740e023a2d64881f43db9af7b39ba7988");
 #else
     // MAINNET
     ADD_CHECKPOINT(425000,  "46a6c36d5dec2d484d5e4845a8525ca322aafc06915ed9c8da2a241b51b7d1e8");
