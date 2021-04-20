@@ -143,13 +143,29 @@ template<class pod_t>
 std::string pod_to_hex_big_endian(const pod_t &h)
 {
   constexpr char hexmap[] = "0123456789abcdef";
-  const char* data = reinterpret_cast<const char*>(&h);
+  const unsigned char* data = reinterpret_cast<const unsigned char*>(&h);
   size_t len = sizeof h;
 
   std::string s(len * 2, ' ');
   for (size_t i = 0; i < len; ++i) {
-    s[2 * i] = hexmap[(data[len - 1 - i] & 0xF0) >> 4];
-    s[2 * i + 1] = hexmap[(data[len - 1 - i] & 0x0F)];
+    s[2 * i] = hexmap[data[len - 1 - i] >> 4];
+    s[2 * i + 1] = hexmap[data[len - 1 - i] & 0x0F];
+  }
+
+  return s;
+}
+
+template<class pod_t>
+std::string pod_to_hex(const pod_t &h)
+{
+  constexpr char hexmap[] = "0123456789abcdef";
+  const unsigned char* data = reinterpret_cast<const unsigned char*>(&h);
+  size_t len = sizeof h;
+
+  std::string s(len * 2, ' ');
+  for (size_t i = 0; i < len; ++i) {
+    s[2 * i] = hexmap[data[i] >> 4];
+    s[2 * i + 1] = hexmap[data[i] & 0x0F];
   }
 
   return s;
@@ -536,9 +552,9 @@ struct point_t
   {
     crypto::public_key pk;
     ((uint64_t*)&pk)[0] = a0;
-    ((uint64_t*)&pk)[1] = a0;
-    ((uint64_t*)&pk)[2] = a0;
-    ((uint64_t*)&pk)[3] = a0;
+    ((uint64_t*)&pk)[1] = a1;
+    ((uint64_t*)&pk)[2] = a2;
+    ((uint64_t*)&pk)[3] = a3;
 
     if (!from_public_key(pk))
       zero();
