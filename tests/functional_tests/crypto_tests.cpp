@@ -666,6 +666,12 @@ struct point_t
     return result;
   }
 
+  // *this = a * A + b * G
+  void assign_mul_plus_G(const scalar_t& a, const point_t& A, const scalar_t& b)
+  {
+    ge_double_scalarmult_base_vartime_p3(&m_p3, &a.m_s[0], &A.m_p3, &b.m_s[0]);
+  }
+
   friend bool operator==(const point_t& lhs, const point_t& rhs)
   {
     // convert to xy form, then compare components (because (x, y, z, t) representation is not unique)
@@ -761,6 +767,7 @@ static const scalar_t c_scalar_P      = { 0xffffffffffffffed, 0xffffffffffffffff
 static const scalar_t c_scalar_Pm1    = { 0xffffffffffffffec, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
 static const scalar_t c_scalar_256m1  = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff };
 static const scalar_t c_scalar_1div8  = { 0x6106e529e2dc2f79, 0x7d39db37d1cdad0,  0x0,                0x600000000000000  };
+static const point_t  c_point_H       = { 0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45 };  // == Hp(G), this is being check in bpp_basics
 
 
 // H_s hash function
