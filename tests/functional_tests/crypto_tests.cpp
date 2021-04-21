@@ -1860,6 +1860,150 @@ TEST(ml2s, cpp2py)
 }
 
 
+
+TEST(ml2s, sig_verif_performance)
+{
+  // sig inputs
+  scalar_t m = 31337;
+  size_t n = 8;
+  size_t N = 1ull << n;
+  size_t L = 8;
+
+  // perf counters
+  uint64_t t_sig = 0;
+  uint64_t t_verif = 0;
+  size_t tests_cnt = 20; 
+
+  LOG_PRINT_L0("N / 2 = " << N / 2 << ", L = " << L);
+  for (size_t p = 0; p < tests_cnt; ++p)
+  {
+    std::vector<point_t> ring;
+    std::vector<scalar_t> secret_keys;
+    std::vector<size_t> ring_mapping;
+    std::vector<point_t> key_images;
+    generate_test_ring_and_sec_keys(N, L, ring, secret_keys, ring_mapping, key_images);
+
+    ml2s_signature sig;
+    uint8_t err = 0;
+    TIME_MEASURE_START(time_sig);
+    bool r = ml2s_lnk_sig_gen(m, ring, secret_keys, ring_mapping, sig, &err);
+    TIME_MEASURE_FINISH(time_sig);
+    t_sig += time_sig;
+    ASSERT_TRUE(r);
+
+    err = 0;
+    TIME_MEASURE_START(time_verif);
+    r = ml2s_lnk_sig_verif(m, ring, sig, &err);
+    TIME_MEASURE_FINISH(time_verif);
+    t_verif += time_verif;
+    ASSERT_TRUE(r);
+
+    LOG_PRINT_L0(" stats over " << p + 1 << " runs:");
+    LOG_PRINT_L0("ml2s_lnk_sig_gen    avg: " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << t_sig / double(p + 1) / 1000.0 << " ms");
+    LOG_PRINT_L0("ml2s_lnk_sig_verif  avg: " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << t_verif / double(p + 1) / 1000.0 << " ms");
+  }
+
+  return true;
+}
+
+TEST(ml2s, sig_verif_performance_2)
+{
+  // sig inputs
+  scalar_t m = 31337;
+  crypto::hash mh = crypto::cn_fast_hash(&m, sizeof m);
+  size_t n = 8;
+  size_t N = 1ull << n;
+  size_t L = 1;
+
+  // perf counters
+  uint64_t t_sig = 0;
+  uint64_t t_verif = 0;
+  uint64_t t_sig_v2 = 0;
+  uint64_t t_verif_v2 = 0;
+  uint64_t t_sig_v3 = 0;
+  uint64_t t_verif_v3 = 0;
+  size_t tests_cnt = 200;
+
+  LOG_PRINT_L0("N / 2 = " << N / 2 << ", L = " << L);
+  for (size_t p = 0; p < tests_cnt; ++p)
+  {
+    std::vector<point_t> ring;
+    std::vector<scalar_t> secret_keys;
+    std::vector<size_t> ring_mapping;
+    std::vector<point_t> key_images;
+    generate_test_ring_and_sec_keys(N, L, ring, secret_keys, ring_mapping, key_images);
+
+    ml2s_signature sig;
+    uint8_t err = 0;
+    TIME_MEASURE_START(time_sig);
+    bool r = ml2s_lnk_sig_gen(m, ring, secret_keys, ring_mapping, sig, &err);
+    TIME_MEASURE_FINISH(time_sig);
+    t_sig += time_sig;
+    ASSERT_TRUE(r);
+
+    err = 0;
+    TIME_MEASURE_START(time_verif);
+    r = ml2s_lnk_sig_verif(m, ring, sig, &err);
+    TIME_MEASURE_FINISH(time_verif);
+    t_verif += time_verif;
+    ASSERT_TRUE(r);
+
+    ///////////////////////////
+    // v2
+    ml2s_signature_v2 sig_v2;
+    err = 0;
+    TIME_MEASURE_START(time_sig_v2);
+    r = ml2s_lnk_sig_gen_v2(m, ring, secret_keys, ring_mapping, key_images, sig_v2, &err);
+    TIME_MEASURE_FINISH(time_sig_v2);
+    t_sig_v2 += time_sig_v2;
+    ASSERT_TRUE(r);
+
+    err = 0;
+    TIME_MEASURE_START(time_verif_v2);
+    r = ml2s_lnk_sig_verif_v2(m, ring, key_images, sig_v2, &err);
+    TIME_MEASURE_FINISH(time_verif_v2);
+    t_verif_v2 += time_verif_v2;
+    ASSERT_TRUE(r);
+
+    ///////////////////////////
+    // v3
+    {
+      std::vector<crypto::public_key> ring;
+      std::vector<crypto::secret_key> secret_keys;
+      std::vector<size_t> ring_mapping;
+      std::vector<crypto::key_image> key_images;
+      generate_test_ring_and_sec_keys(N, L, ring, secret_keys, ring_mapping, key_images);
+
+      ml2s_signature_v3 sig_v3;
+      err = 0;
+      TIME_MEASURE_START(time_sig_v3);
+      r = ml2s_lnk_sig_gen_v3(mh, ring, secret_keys, ring_mapping, key_images, sig_v3, &err);
+      TIME_MEASURE_FINISH(time_sig_v3);
+      t_sig_v3 += time_sig_v3;
+      ASSERT_TRUE(r);
+
+      err = 0;
+      TIME_MEASURE_START(time_verif_v3);
+      r = ml2s_lnk_sig_verif_v3(mh, ring, key_images, sig_v3, &err);
+      TIME_MEASURE_FINISH(time_verif_v3);
+      t_verif_v3 += time_verif_v3;
+      ASSERT_TRUE(r);
+    }
+
+
+    LOG_PRINT_L0(" stats over " << p + 1 << " runs:");
+    LOG_PRINT_L0("ml2s_lnk_sig_gen       avg: " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << t_sig / double(p + 1) / 1000.0 << " ms");
+    LOG_PRINT_L0("ml2s_lnk_sig_gen_v2    avg: " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << t_sig_v2 / double(p + 1) / 1000.0 << " ms");
+    LOG_PRINT_L0("ml2s_lnk_sig_gen_v3    avg: " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << t_sig_v3 / double(p + 1) / 1000.0 << " ms");
+    LOG_PRINT_L0("ml2s_lnk_sig_verif     avg: " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << t_verif / double(p + 1) / 1000.0 << " ms");
+    LOG_PRINT_L0("ml2s_lnk_sig_verif_v2  avg: " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << t_verif_v2 / double(p + 1) / 1000.0 << " ms");
+    LOG_PRINT_L0("ml2s_lnk_sig_verif_v3  avg: " << std::right << std::setw(8) << std::fixed << std::setprecision(1) << t_verif_v3 / double(p + 1) / 1000.0 << " ms");
+  }
+
+  return true;
+}
+
+
 //
 // test's runner
 //
