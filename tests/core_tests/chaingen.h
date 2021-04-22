@@ -324,6 +324,7 @@ protected:
 
   uint64_t m_hardfork_01_height;
   uint64_t m_hardfork_02_height;
+  uint64_t m_hardfork_03_height;
 };
 
 struct wallet_test_core_proxy;
@@ -536,6 +537,7 @@ private:
   
   uint64_t m_hardfork_01_after_heigh;
   uint64_t m_hardfork_02_after_heigh;
+  uint64_t m_hardfork_03_after_heigh;
 
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;

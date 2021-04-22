@@ -54,6 +54,7 @@ test_generator::test_generator()
   , m_last_found_timestamp(0)
   , m_hardfork_01_after_heigh(CURRENCY_MAX_BLOCK_NUMBER)
   , m_hardfork_02_after_heigh(CURRENCY_MAX_BLOCK_NUMBER)
+  , m_hardfork_03_after_heigh(CURRENCY_MAX_BLOCK_NUMBER)
 {
 }
 
@@ -63,6 +64,7 @@ void test_generator::set_hardfork_height(size_t hardfork_id, uint64_t h)
   {
   case 1: m_hardfork_01_after_heigh = h; break;
   case 2: m_hardfork_02_after_heigh = h; break;
+  case 3: m_hardfork_03_after_heigh = h; break;
   default: CHECK_AND_ASSERT_THROW_MES(false, "invalid hardfork id: " << hardfork_id)
   }
 }
@@ -422,6 +424,7 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
     pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
     pc.hard_fork_01_starts_after_height = m_hardfork_01_after_heigh;
     pc.hard_fork_02_starts_after_height = m_hardfork_02_after_heigh;
+    pc.hard_fork_03_starts_after_height = m_hardfork_03_after_heigh;
     wallets.back()->set_core_runtime_config(pc);
   }
 
@@ -2075,6 +2078,7 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   , m_unverifiable_tx_index(std::numeric_limits<size_t>::max())
   , m_hardfork_01_height(CURRENCY_MAX_BLOCK_NUMBER)
   , m_hardfork_02_height(CURRENCY_MAX_BLOCK_NUMBER)
+  , m_hardfork_03_height(CURRENCY_MAX_BLOCK_NUMBER)
 {
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, configure_core);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, mark_invalid_tx);
@@ -2097,6 +2101,7 @@ bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_inde
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
   pc.hard_fork_01_starts_after_height = m_hardfork_01_height;
   pc.hard_fork_02_starts_after_height = m_hardfork_02_height;
+  pc.hard_fork_03_starts_after_height = m_hardfork_03_height;
 
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;

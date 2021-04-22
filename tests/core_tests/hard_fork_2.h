@@ -17,6 +17,7 @@ struct hard_fork_2_base_test : virtual public test_chain_unit_enchanced
 
   size_t m_hardfork_01_height;
   size_t m_hardfork_02_height;
+  size_t m_hardfork_03_height;
 };
 
 struct hard_fork_2_tx_payer_in_wallet : public wallet_test, public hard_fork_2_base_test

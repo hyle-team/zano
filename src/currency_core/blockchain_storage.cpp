@@ -3331,9 +3331,9 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
     {
       m_db_outputs.push_back_item(ot.amount, global_output_entry::construct(tx_id, i));
       global_indexes.push_back(m_db_outputs.get_item_size(ot.amount) - 1);
-      if (ot.target.type() == typeid(txout_htlc) && !is_after_hardfork_2_zone())
+      if (ot.target.type() == typeid(txout_htlc) && !is_after_hardfork_3_zone())
       {
-        LOG_ERROR("Error: Transaction with txout_htlc before is_after_hardfork_2_zone(before height " << m_core_runtime_config.hard_fork_02_starts_after_height <<")");
+        LOG_ERROR("Error: Transaction with txout_htlc before is_after_hardfork_3_zone(before height " << m_core_runtime_config.hard_fork_03_starts_after_height <<")");
         return false;
       }
     }
@@ -3849,9 +3849,9 @@ namespace currency
     }
     bool operator()(const txin_htlc& in) const
     {
-      if (!m_bcs.is_after_hardfork_2_zone())
+      if (!m_bcs.is_after_hardfork_3_zone())
       {
-        LOG_ERROR("Error: Transaction with txin_htlc before is_after_hardfork_2_zone(before height " << m_bcs.get_core_runtime_config().hard_fork_02_starts_after_height << ")");
+        LOG_ERROR("Error: Transaction with txin_htlc before is_after_hardfork_3_zone(before height " << m_bcs.get_core_runtime_config().hard_fork_03_starts_after_height << ")");
         return false;
       }
       return this->operator()(static_cast<const txin_to_key&>(in));
@@ -4272,9 +4272,9 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
     }
     else if (txin.type() == typeid(txin_htlc))
     {
-      if (!is_after_hardfork_2_zone())
+      if (!is_after_hardfork_3_zone())
       {
-        LOG_ERROR("Error: Transaction with txin_htlc before is_after_hardfork_2_zone(before height " << m_core_runtime_config.hard_fork_02_starts_after_height << ")");
+        LOG_ERROR("Error: Transaction with txin_htlc before is_after_hardfork_3_zone(before height " << m_core_runtime_config.hard_fork_03_starts_after_height << ")");
         return false;
       }
 
@@ -4919,34 +4919,6 @@ void blockchain_storage::get_pos_mining_estimate(uint64_t amount_coins,
   estimate_result = current_amount;
 }
 //------------------------------------------------------------------
-//    bool check_tx_fit_hardfork(const transaction& tx);
-
-/*
-//------------------------------------------------------------------
-bool blockchain_storage::check_tx_fit_hardfork(const transaction& tx)
-{
-  //inputs
-  for (const auto in : tx.vin)
-  {
-    if (in.type() == typeid(txin_htlc))
-    {
-      if (!is_after_hardfork_2_zone())
-        return false;
-    }
-  }
-  //outputs
-  for (const auto out : tx.vout)
-  {
-    if (out.target.type() == typeid(txout_htlc))
-    {
-      if (!is_after_hardfork_2_zone())
-        return false;
-    }
-  }
-  return true;
-}
-*/
-//------------------------------------------------------------------
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const
 {
   uint64_t block_height = m_db_blocks.size();
@@ -4955,38 +4927,6 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 //------------------------------------------------------------------
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
-//   if (block_height <= m_core_runtime_config.hard_fork_01_starts_after_height)
-//   {
-//     // before hardfork 1
-// 
-//     for (const auto& el : tx.extra)
-//     {
-//       // etc_tx_details_unlock_time2 is not allowed in txs in blocks prior to hardfork 1
-//       CHECK_AND_ASSERT_MES(el.type() != typeid(etc_tx_details_unlock_time2), false, "tx " << tx_id << " contains etc_tx_details_unlock_time2 which is not allowed on height " << block_height);
-//     }
-//     return true;
-//   }
-// 
-//   if (block_height <= m_core_runtime_config.hard_fork_02_starts_after_height)
-//   {
-//     // before hardfork 2
-// 
-//     auto check_lambda = [&](const std::vector<payload_items_v>& container) -> bool
-//     {
-//       for (const auto& el : container)
-//       {
-//         const auto& type = el.type();
-//         CHECK_AND_ASSERT_MES(type != typeid(tx_payer), false, "tx " << tx_id << " contains tx_payer which is not allowed on height " << block_height);
-//         CHECK_AND_ASSERT_MES(type != typeid(tx_receiver), false, "tx " << tx_id << " contains tx_receiver which is not allowed on height " << block_height);
-//         CHECK_AND_ASSERT_MES(type != typeid(extra_alias_entry), false, "tx " << tx_id << " contains extra_alias_entry which is not allowed on height " << block_height);
-//       }
-//       return true;
-//     };
-// 
-//     return check_lambda(tx.extra) && check_lambda(tx.attachment);
-//   }
-
-
   auto is_allowed_before_hardfork2 = [&](const payload_items_v& el) -> bool
   {
     CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer), false, "tx " << tx_id << " contains tx_payer which is not allowed on height " << block_height);
@@ -5003,13 +4943,14 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 
   bool var_is_after_hardfork_1_zone = is_after_hardfork_1_zone(block_height);
   bool var_is_after_hardfork_2_zone = is_after_hardfork_2_zone(block_height);
+  bool var_is_after_hardfork_3_zone = is_after_hardfork_3_zone(block_height);
   
   //inputs
   for (const auto in : tx.vin)
   {
     if (in.type() == typeid(txin_htlc))
     {
-      if (!var_is_after_hardfork_2_zone)
+      if (!var_is_after_hardfork_3_zone)
         return false;
     }
   }
@@ -5018,7 +4959,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   {
     if (out.target.type() == typeid(txout_htlc))
     {
-      if (!var_is_after_hardfork_2_zone)
+      if (!var_is_after_hardfork_3_zone)
         return false;
     }
   }
@@ -5805,9 +5746,21 @@ bool blockchain_storage::is_after_hardfork_2_zone()const
   return is_after_hardfork_2_zone(m_db_blocks.size());
 }
 //------------------------------------------------------------------
+bool blockchain_storage::is_after_hardfork_3_zone()const
+{
+  return is_after_hardfork_3_zone(m_db_blocks.size());
+}
+//------------------------------------------------------------------
 bool blockchain_storage::is_after_hardfork_2_zone(uint64_t height)const
 {
   if (height > m_core_runtime_config.hard_fork_02_starts_after_height)
+    return true;
+  return false;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_after_hardfork_3_zone(uint64_t height)const
+{
+  if (height > m_core_runtime_config.hard_fork_03_starts_after_height)
     return true;
   return false;
 }
@@ -5819,7 +5772,7 @@ bool blockchain_storage::prevalidate_block(const block& bl)
 
   if (bl.major_version == HF1_BLOCK_MAJOR_VERSION
     && get_block_height(bl) > m_core_runtime_config.hard_fork_01_starts_after_height
-    && get_block_height(bl) <= m_core_runtime_config.hard_fork_02_starts_after_height
+    && get_block_height(bl) <= m_core_runtime_config.hard_fork_03_starts_after_height
     )
   {
     return true;
@@ -5832,7 +5785,7 @@ bool blockchain_storage::prevalidate_block(const block& bl)
     return false;
   }
 
-  if (is_after_hardfork_2_zone() && bl.minor_version > CURRENT_BLOCK_MINOR_VERSION)
+  if (is_after_hardfork_3_zone() && bl.minor_version > CURRENT_BLOCK_MINOR_VERSION)
   {
     //this means that binary block is compatible, but semantics got changed due to hardfork, daemon should be updated
     LOG_PRINT_MAGENTA("Block's MINOR_VERSION is: " << bl.minor_version 

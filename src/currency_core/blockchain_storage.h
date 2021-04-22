@@ -663,6 +663,8 @@ namespace currency
     bool is_after_hardfork_1_zone(uint64_t height)const;
     bool is_after_hardfork_2_zone()const;
     bool is_after_hardfork_2_zone(uint64_t height)const;
+    bool is_after_hardfork_3_zone()const;
+    bool is_after_hardfork_3_zone(uint64_t height)const;
 
 
 
