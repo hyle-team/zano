@@ -82,33 +82,6 @@ bool atomic_base_test::configure_core(currency::core& c, size_t ev_index, const 
 /*                                                                      */
 /************************************************************************/
 
-atomic_simple_test::atomic_simple_test()
-{
-  //REGISTER_CALLBACK_METHOD(atomic_simple_test, c1);
-}
-
-// bool atomic_simple_test::generate(std::vector<test_event_entry>& events) const
-// {
-//   epee::debug::get_set_enable_assert(true, true);
-// 
-//   currency::account_base genesis_acc;
-//   genesis_acc.generate();
-//   m_mining_accunt.generate();
-// 
-// 
-//   block blk_0 = AUTO_VAL_INIT(blk_0);
-//   generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
-//   events.push_back(blk_0);
-// 
-//   REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
-// 
-//   DO_CALLBACK(events, "c1");
-//   epee::debug::get_set_enable_assert(true, false);
-//   return true;
-// }
-
-
-
 bool atomic_simple_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   epee::debug::get_set_enable_assert(true, true);
@@ -337,33 +310,6 @@ bool atomic_simple_test::c1(currency::core& c, size_t ev_index, const std::vecto
 //==============================================================================
 //==============================================================================
 
-atomic_test_wrong_redeem_wrong_refund::atomic_test_wrong_redeem_wrong_refund()
-{
-  //REGISTER_CALLBACK_METHOD(atomic_test_wrong_redeem_wrong_refund, c1);
-}
-
-// bool atomic_test_wrong_redeem_wrong_refund::generate(std::vector<test_event_entry>& events) const
-// {
-//   epee::debug::get_set_enable_assert(true, true);
-// 
-//   currency::account_base genesis_acc;
-//   genesis_acc.generate();
-//   m_mining_accunt.generate();
-// 
-// 
-//   block blk_0 = AUTO_VAL_INIT(blk_0);
-//   generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
-//   events.push_back(blk_0);
-// 
-//   REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
-// 
-//   DO_CALLBACK(events, "c1");
-//   epee::debug::get_set_enable_assert(true, false);
-//   return true;
-// }
-
-
-
 bool atomic_test_wrong_redeem_wrong_refund::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   /*
@@ -512,33 +458,6 @@ bool atomic_test_wrong_redeem_wrong_refund::c1(currency::core& c, size_t ev_inde
 //==============================================================================
 //==============================================================================
 //==============================================================================
-
-atomic_test_altchain_simple::atomic_test_altchain_simple()
-{
-  //REGISTER_CALLBACK_METHOD(atomic_test_altchain_simple, c1);
-}
-
-// bool atomic_test_altchain_simple::generate(std::vector<test_event_entry>& events) const
-// {
-//   epee::debug::get_set_enable_assert(true, true);
-// 
-//   currency::account_base genesis_acc;
-//   genesis_acc.generate();
-//   m_mining_accunt.generate();
-// 
-// 
-//   block blk_0 = AUTO_VAL_INIT(blk_0);
-//   generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
-//   events.push_back(blk_0);
-// 
-//   REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
-// 
-//   DO_CALLBACK(events, "c1");
-//   epee::debug::get_set_enable_assert(true, false);
-//   return true;
-// }
-
-
 
 bool atomic_test_altchain_simple::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
@@ -710,3 +629,57 @@ bool atomic_test_altchain_simple::c1(currency::core& c, size_t ev_index, const s
   return true;
 }
 
+
+bool atomic_test_check_hardfork_rules::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
+  pc.hard_fork_01_starts_after_height = 10;
+  pc.hard_fork_02_starts_after_height = 10;
+  pc.hard_fork_03_starts_after_height = 10;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}
+bool atomic_test_check_hardfork_rules::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  //epee::debug::get_set_enable_assert(true, true);
+  //misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([&]() {epee::debug::get_set_enable_assert(true, false); });
+
+  INIT_RUNTIME_WALLET(alice_a_wlt_instance);
+
+
+#define AMOUNT_TO_TRANSFER_HTLC    (TESTS_DEFAULT_FEE*10)
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_mining_accunt);
+
+  size_t blocks_fetched = 0;
+  bool received_money = false;
+  std::atomic<bool> atomic_false = ATOMIC_VAR_INIT(false);
+  miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
+  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+  currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
+
+
+  std::string alice_origin;
+  miner_wlt->create_htlc_proposal(AMOUNT_TO_TRANSFER_HTLC - TESTS_DEFAULT_FEE, alice_a_wlt_instance->get_account().get_public_address(), 100, res_tx, currency::null_hash, alice_origin);
+
+
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
+  pc.hard_fork_01_starts_after_height = 10;
+  pc.hard_fork_02_starts_after_height = 10;
+  pc.hard_fork_03_starts_after_height = 30;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+
+  //try to submit wrong transaction that do refund before expiration
+  //std::vector<currency::transaction> txs;
+  //txs.push_back(refund_tx);
+  //bool r = mine_next_pow_block_in_playtime_with_given_txs(m_mining_accunt.get_public_address(), c, txs);
+  bool r = mine_next_pow_block_in_playtime(m_mining_accunt.get_public_address(), c);
+  CHECK_AND_FORCE_ASSERT_MES(!r, false, "Block with HTLC before hard fork accepted");
+
+
+  return true;
+}
