@@ -413,10 +413,10 @@ POP_VS_WARNINGS
       if (ge_frombytes_vartime(&tmp3, &*pubs[i]) != 0) {
         return false;
       }
-      ge_double_scalarmult_base_vartime(&tmp2, &sig[i].c, &tmp3, &sig[i].r);
+      ge_double_scalarmult_base_vartime(&tmp2, &sig[i].c, &tmp3, &sig[i].r);                // L_i = r_i * G + c_i * P_i
       ge_tobytes(&buf->ab[i].a, &tmp2);
       hash_to_ec(*pubs[i], tmp3);
-      ge_double_scalarmult_precomp_vartime(&tmp2, &sig[i].r, &tmp3, &sig[i].c, image_pre);
+      ge_double_scalarmult_precomp_vartime(&tmp2, &sig[i].r, &tmp3, &sig[i].c, image_pre);  // R_i = r_i * Hp(P_i) + c_i * I
       ge_tobytes(&buf->ab[i].b, &tmp2);
       sc_add(&sum, &sum, &sig[i].c);
     }

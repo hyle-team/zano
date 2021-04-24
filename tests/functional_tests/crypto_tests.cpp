@@ -13,9 +13,9 @@
 #include "common/varint.h"
 #include "currency_core/difficulty.h"
 
-extern "C" {
-#include "crypto/crypto-ops.h"
-} // extern "C"
+#include "crypto/crypto-sugar.h"
+
+using namespace crypto;
 
 namespace mp = boost::multiprecision;
 
@@ -135,76 +135,6 @@ void sc_invert2(unsigned char* recip, const unsigned char* s)
 extern void *sha3(const void *in, size_t inlen, void *md, int mdlen);
 
 
-//
-// Helpers
-//
-
-template<class pod_t>
-std::string pod_to_hex_big_endian(const pod_t &h)
-{
-  constexpr char hexmap[] = "0123456789abcdef";
-  const unsigned char* data = reinterpret_cast<const unsigned char*>(&h);
-  size_t len = sizeof h;
-
-  std::string s(len * 2, ' ');
-  for (size_t i = 0; i < len; ++i) {
-    s[2 * i] = hexmap[data[len - 1 - i] >> 4];
-    s[2 * i + 1] = hexmap[data[len - 1 - i] & 0x0F];
-  }
-
-  return s;
-}
-
-template<class pod_t>
-std::string pod_to_hex(const pod_t &h)
-{
-  constexpr char hexmap[] = "0123456789abcdef";
-  const unsigned char* data = reinterpret_cast<const unsigned char*>(&h);
-  size_t len = sizeof h;
-
-  std::string s(len * 2, ' ');
-  for (size_t i = 0; i < len; ++i) {
-    s[2 * i] = hexmap[data[i] >> 4];
-    s[2 * i + 1] = hexmap[data[i] & 0x0F];
-  }
-
-  return s;
-}
-
-template<class pod_t>
-std::string pod_to_hex_comma_separated_bytes(const pod_t &h)
-{
-  std::stringstream ss;
-  ss << std::hex << std::setfill('0');
-  size_t len = sizeof h;
-  const unsigned char* p = (const unsigned char*)&h;
-  for (size_t i = 0; i < len; ++i)
-  {
-    ss << "0x" << std::setw(2) << static_cast<unsigned int>(p[i]);
-    if (i + 1 != len)
-      ss << ", ";
-  }
-  return ss.str();
-}
-
-template<class pod_t>
-std::string pod_to_hex_comma_separated_uint64(const pod_t &h)
-{
-  static_assert((sizeof h) % 8 == 0, "size of h should be a multiple of 64 bit");
-  size_t len = (sizeof h) / 8;
-  std::stringstream ss;
-  ss << std::hex << std::setfill('0');
-  const uint64_t* p = (const uint64_t*)&h;
-  for (size_t i = 0; i < len; ++i)
-  {
-    ss << "0x" << std::setw(16) << static_cast<uint64_t>(p[i]);
-    if (i + 1 != len)
-      ss << ", ";
-  }
-  return ss.str();
-}
-
-
 uint64_t rand_in_range(uint64_t from_including, uint64_t to_not_including)
 {
   uint64_t result = 0;
@@ -214,707 +144,13 @@ uint64_t rand_in_range(uint64_t from_including, uint64_t to_not_including)
 
 
 
-int fe_cmp(const fe a, const fe b)
-{
-  for (size_t i = 9; i != SIZE_MAX; --i)
-  {
-    if (reinterpret_cast<const uint32_t&>(a[i]) < reinterpret_cast<const uint32_t&>(b[i])) return -1;
-    if (reinterpret_cast<const uint32_t&>(a[i]) > reinterpret_cast<const uint32_t&>(b[i])) return 1;
-  }
-  return 0;
-}
 
 static const fe scalar_L_fe = { 16110573, 10012311, -6632702, 16062397, 5471207, 0, 0, 0, 0, 4194304 };
 
 
-struct alignas(32) scalar_t
-{
-  union
-  {
-    uint64_t      m_u64[4];
-    unsigned char m_s[32];
-  };
-  // DONE! consider 1) change to aligned array of unsigned chars
-  // consider 2) add 32 byte after to speed up sc_reduce by decreasing num of copy operations
 
-  scalar_t()
-  {}
 
-  // won't check scalar range validity (< L)
-  scalar_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
-  {
-    m_u64[0] = a0;
-    m_u64[1] = a1;
-    m_u64[2] = a2;
-    m_u64[3] = a3;
-  }
 
-  // won't check scalar range validity (< L)
-  scalar_t(const unsigned char(&v)[32])
-  {
-    memcpy(m_s, v, 32);
-  }
-
-  // won't check secret key validity (sk < L)
-  scalar_t(const crypto::secret_key& sk)
-  {
-    from_secret_key(sk);
-  }
-
-  // copy data and reduce
-  scalar_t(const crypto::hash& hash)
-  {
-    m_u64[0] = ((uint64_t*)&hash)[0];
-    m_u64[1] = ((uint64_t*)&hash)[1];
-    m_u64[2] = ((uint64_t*)&hash)[2];
-    m_u64[3] = ((uint64_t*)&hash)[3];
-    sc_reduce32(&m_s[0]);
-  }
-
-  scalar_t(uint64_t v)
-  {
-    zero();
-    if (v == 0)
-      return;
-    m_u64[0] = v;
-    // do not need to call reduce as 2^64 < L
-  }
-
-  // copy at most 256 bits (32 bytes) and reduce
-  template<typename T>
-  explicit scalar_t(const boost::multiprecision::number<T>& bigint)
-  {
-    zero();
-    unsigned int bytes_to_copy = bigint.backend().size() * bigint.backend().limb_bits / 8;
-    if (bytes_to_copy > sizeof *this)
-      bytes_to_copy = sizeof *this;
-    memcpy(&m_s[0], bigint.backend().limbs(), bytes_to_copy);
-    sc_reduce32(&m_s[0]);
-  }
-  
-  unsigned char* data()
-  {
-    return &m_s[0];
-  }
-
-  const unsigned char* data() const
-  {
-    return &m_s[0];
-  }
-
-  crypto::secret_key &as_secret_key()
-  {
-    return *(crypto::secret_key*)&m_s[0];
-  }
-
-  const crypto::secret_key& as_secret_key() const
-  {
-    return *(const crypto::secret_key*)&m_s[0];
-  }
-
-  operator crypto::secret_key() const
-  {
-    crypto::secret_key result;
-    memcpy(result.data, &m_s, sizeof result.data);
-    return result;
-  }
-
-  void from_secret_key(const crypto::secret_key& sk)
-  {
-    uint64_t *p_sk64 = (uint64_t*)&sk;
-    m_u64[0] = p_sk64[0];
-    m_u64[1] = p_sk64[1];
-    m_u64[2] = p_sk64[2];
-    m_u64[3] = p_sk64[3];
-    // assuming secret key is correct (< L), so we don't need to call reduce here
-  }
-
-  void zero()
-  {
-    m_u64[0] = 0;
-    m_u64[1] = 0;
-    m_u64[2] = 0;
-    m_u64[3] = 0;
-  }
-
-  // genrate 0 <= x < L
-  static scalar_t random()
-  {
-    unsigned char tmp[64];
-    crypto::generate_random_bytes(64, tmp);
-    sc_reduce(tmp);
-    scalar_t result;
-    memcpy(&result.m_s, tmp, sizeof result.m_s);
-    return result;
-  }
-
-  // genrate 0 <= x < L
-  void make_random()
-  {
-    unsigned char tmp[64];
-    crypto::generate_random_bytes(64, tmp);
-    sc_reduce(tmp);
-    memcpy(&m_s, tmp, sizeof m_s);
-  }
-
-  bool is_zero() const
-  {
-    return sc_isnonzero(&m_s[0]) == 0;
-  }
-
-  bool is_reduced() const
-  {
-    return sc_check(&m_s[0]) == 0;
-  }
-
-  scalar_t operator+(const scalar_t& v) const
-  {
-    scalar_t result;
-    sc_add(&result.m_s[0], &m_s[0], &v.m_s[0]);
-    return result;
-  }
-
-  scalar_t& operator+=(const scalar_t& v)
-  {
-    sc_add(&m_s[0], &m_s[0], &v.m_s[0]);
-    return *this;
-  }
-
-  scalar_t operator-(const scalar_t& v) const
-  {
-    scalar_t result;
-    sc_sub(&result.m_s[0], &m_s[0], &v.m_s[0]);
-    return result;
-  }
-
-  scalar_t& operator-=(const scalar_t& v)
-  {
-    sc_sub(&m_s[0], &m_s[0], &v.m_s[0]);
-    return *this;
-  }
-
-  scalar_t operator*(const scalar_t& v) const
-  {
-    scalar_t result;
-    sc_mul(result.m_s, m_s, v.m_s);
-    return result;
-  }
-
-  scalar_t& operator*=(const scalar_t& v)
-  {
-    sc_mul(m_s, m_s, v.m_s);
-    return *this;
-  }
-
-  /*
-  I think it has bad symantic (operator-like), consider rename/reimplement
-  */
-  // returns this * b + c
-  scalar_t muladd(const scalar_t& b, const scalar_t& c) const
-  {
-    scalar_t result;
-    sc_muladd(result.m_s, m_s, b.m_s, c.m_s);
-    return result;
-  }
-
-  // returns this = a * b + c
-  scalar_t& assign_muladd(const scalar_t& a, const scalar_t& b, const scalar_t& c)
-  {
-    sc_muladd(m_s, a.m_s, b.m_s, c.m_s);
-    return *this;
-  }
-
-  scalar_t reciprocal() const
-  {
-    scalar_t result;
-    sc_invert(result.m_s, m_s);
-    return result;
-  }
-
-  scalar_t operator/(const scalar_t& v) const
-  {
-    return operator*(v.reciprocal());
-  }
-
-  scalar_t& operator/=(const scalar_t& v)
-  {
-    scalar_t reciprocal;
-    sc_invert(&reciprocal.m_s[0], &v.m_s[0]);
-    sc_mul(&m_s[0], &m_s[0], &reciprocal.m_s[0]);
-    return *this;
-  }
-
-  bool operator==(const scalar_t& rhs) const
-  {
-    return
-      m_u64[0] == rhs.m_u64[0] &&
-      m_u64[1] == rhs.m_u64[1] &&
-      m_u64[2] == rhs.m_u64[2] &&
-      m_u64[3] == rhs.m_u64[3];
-  }
-
-  bool operator!=(const scalar_t& rhs) const
-  {
-    return
-      m_u64[0] != rhs.m_u64[0] ||
-      m_u64[1] != rhs.m_u64[1] ||
-      m_u64[2] != rhs.m_u64[2] ||
-      m_u64[3] != rhs.m_u64[3];
-  }
-
-  bool operator<(const scalar_t& rhs) const
-  {
-    if (m_u64[3] < rhs.m_u64[3]) return true;
-    if (m_u64[3] > rhs.m_u64[3]) return false;
-    if (m_u64[2] < rhs.m_u64[2]) return true;
-    if (m_u64[2] > rhs.m_u64[2]) return false;
-    if (m_u64[1] < rhs.m_u64[1]) return true;
-    if (m_u64[1] > rhs.m_u64[1]) return false;
-    if (m_u64[0] < rhs.m_u64[0]) return true;
-    if (m_u64[0] > rhs.m_u64[0]) return false;
-    return false;
-  }
-
-  bool operator>(const scalar_t& rhs) const
-  {
-    if (m_u64[3] < rhs.m_u64[3]) return false;
-    if (m_u64[3] > rhs.m_u64[3]) return true;
-    if (m_u64[2] < rhs.m_u64[2]) return false;
-    if (m_u64[2] > rhs.m_u64[2]) return true;
-    if (m_u64[1] < rhs.m_u64[1]) return false;
-    if (m_u64[1] > rhs.m_u64[1]) return true;
-    if (m_u64[0] < rhs.m_u64[0]) return false;
-    if (m_u64[0] > rhs.m_u64[0]) return true;
-    return false;
-  }
-
-  friend std::ostream& operator<<(std::ostream& ss, const scalar_t &v)
-  {
-    return ss << "0x" << pod_to_hex_big_endian(v);
-  }
-
-  std::string to_string_as_hex_number() const
-  {
-    return pod_to_hex_big_endian(*this);
-  }
-
-  std::string to_string_as_secret_key() const
-  {
-    return epee::string_tools::pod_to_hex(*this);
-  }
-
-  template<typename MP_type>
-  MP_type as_boost_mp_type() const
-  {
-    MP_type result = 0;
-    static_assert(sizeof result >= sizeof *this, "size missmatch"); // to avoid using types less than uint256_t
-    unsigned int sz = sizeof *this / sizeof(boost::multiprecision::limb_type);
-    result.backend().resize(sz, sz);
-    memcpy(result.backend().limbs(), &m_s[0], sizeof *this);
-    result.backend().normalize();
-    return result;
-  }
-
-}; // struct scalar_t
-
-
-//__declspec(align(32))
-struct point_t
-{
-  // A point(x, y) is represented in extended homogeneous coordinates (X, Y, Z, T)
-  // with x = X / Z, y = Y / Z, x * y = T / Z.
-  ge_p3 m_p3;
-
-  point_t()
-  {
-  }
-
-  explicit point_t(const crypto::public_key& pk)
-  {
-    from_public_key(pk); // TODO: what if it fails?
-  }
-
-  point_t(const unsigned char(&v)[32])
-  {
-    static_assert(sizeof(crypto::public_key) == sizeof v, "size missmatch");
-    if (!from_public_key(*(const crypto::public_key*)v))
-      zero();
-  }
-
-  point_t(const uint64_t(&v)[4])
-  {
-    static_assert(sizeof(crypto::public_key) == sizeof v, "size missmatch");
-    if (!from_public_key(*(const crypto::public_key*)v))
-      zero();
-  }
-
-  point_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
-  {
-    crypto::public_key pk;
-    ((uint64_t*)&pk)[0] = a0;
-    ((uint64_t*)&pk)[1] = a1;
-    ((uint64_t*)&pk)[2] = a2;
-    ((uint64_t*)&pk)[3] = a3;
-
-    if (!from_public_key(pk))
-      zero();
-  }
-
-  void zero()
-  {
-    ge_p3_0(&m_p3);
-  }
-
-  bool is_zero() const
-  {
-    // (0, 1) ~ (0, z, z, 0)
-    return fe_isnonzero(m_p3.X) * fe_cmp(m_p3.Y, m_p3.Z) == 0;
-  }
-
-  bool from_public_key(const crypto::public_key& pk)
-  {
-    return ge_frombytes_vartime(&m_p3, reinterpret_cast<const unsigned char*>(&pk)) == 0;
-  }
-
-  bool from_key_image(const crypto::key_image& ki)
-  {
-    return ge_frombytes_vartime(&m_p3, reinterpret_cast<const unsigned char*>(&ki)) == 0;
-  }
-
-  bool from_string(const std::string& str)
-  {
-    crypto::public_key pk;
-    if (!epee::string_tools::parse_tpod_from_hex_string(str, pk))
-      return false;
-    return from_public_key(pk);
-  }
-
-  crypto::public_key to_public_key() const
-  {
-    crypto::public_key result;
-    ge_p3_tobytes((unsigned char*)&result, &m_p3);
-    return result;
-  }
-
-  crypto::key_image to_key_image() const
-  {
-    crypto::key_image result;
-    ge_p3_tobytes((unsigned char*)&result, &m_p3);
-    return result;
-  }
-
-  point_t operator+(const point_t& rhs) const
-  {
-    point_t result;
-    ge_cached rhs_c;
-    ge_p1p1 t;
-    ge_p3_to_cached(&rhs_c, &rhs.m_p3);
-    ge_add(&t, &m_p3, &rhs_c);
-    ge_p1p1_to_p3(&result.m_p3, &t);
-    return result;
-  }
-
-  point_t operator-(const point_t& rhs) const
-  {
-    point_t result;
-    ge_cached rhs_c;
-    ge_p1p1 t;
-    ge_p3_to_cached(&rhs_c, &rhs.m_p3);
-    ge_sub(&t, &m_p3, &rhs_c);
-    ge_p1p1_to_p3(&result.m_p3, &t);
-    return result;
-  }
-
-  friend point_t operator*(const scalar_t& lhs, const point_t& rhs)
-  {
-    point_t result;
-    ge_scalarmult_p3(&result.m_p3, reinterpret_cast<const unsigned char*>(&lhs), &rhs.m_p3);
-    return result;
-  }
-
-  friend point_t operator/(const point_t& lhs, const scalar_t& rhs)
-  {
-    point_t result;
-    scalar_t reciprocal;
-    sc_invert(&reciprocal.m_s[0], &rhs.m_s[0]);
-    ge_scalarmult_p3(&result.m_p3, &reciprocal.m_s[0], &lhs.m_p3);
-    return result;
-  }
-
-  point_t& modify_mul8()
-  {
-    ge_mul8_p3(&m_p3, &m_p3);
-    return *this;
-  }
-
-  // returns a * this + G
-  point_t mul_plus_G(const scalar_t& a) const
-  {
-    static const unsigned char one[32] = { 1 };
-    static_assert(sizeof one == sizeof(crypto::ec_scalar), "size missmatch");
-
-    point_t result;
-    ge_double_scalarmult_base_vartime_p3(&result.m_p3, &a.m_s[0], &m_p3, &one[0]);
-    return result;
-  }
-
-  // returns a * this + b * G
-  point_t mul_plus_G(const scalar_t& a, const scalar_t& b) const
-  {
-    point_t result;
-    ge_double_scalarmult_base_vartime_p3(&result.m_p3, &a.m_s[0], &m_p3, &b.m_s[0]);
-    return result;
-  }
-
-  // *this = a * A + b * G
-  void assign_mul_plus_G(const scalar_t& a, const point_t& A, const scalar_t& b)
-  {
-    ge_double_scalarmult_base_vartime_p3(&m_p3, &a.m_s[0], &A.m_p3, &b.m_s[0]);
-  }
-
-  friend bool operator==(const point_t& lhs, const point_t& rhs)
-  {
-    // convert to xy form, then compare components (because (x, y, z, t) representation is not unique)
-    fe lrecip, lx, ly;
-    fe rrecip, rx, ry;
-
-    fe_invert(lrecip, lhs.m_p3.Z);
-    fe_invert(rrecip, rhs.m_p3.Z);
-
-    fe_mul(lx, lhs.m_p3.X, lrecip);
-    fe_mul(rx, rhs.m_p3.X, rrecip);
-    if (memcmp(&lx, &rx, sizeof lx) != 0)
-      return false;
-
-    fe_mul(ly, lhs.m_p3.Y, lrecip);
-    fe_mul(ry, rhs.m_p3.Y, rrecip);
-    if (memcmp(&ly, &ry, sizeof ly) != 0)
-      return false;
-
-    return true;
-  };
-
-  friend std::ostream& operator<<(std::ostream& ss, const point_t &v)
-  {
-    crypto::public_key pk = v.to_public_key();
-    return ss << epee::string_tools::pod_to_hex(pk);
-  }
-
-  operator std::string() const
-  {
-    crypto::public_key pk = to_public_key();
-    return epee::string_tools::pod_to_hex(pk);
-  }
-
-  std::string to_string() const
-  {
-    crypto::public_key pk = to_public_key();
-    return epee::string_tools::pod_to_hex(pk);
-  }
-
-  std::string to_hex_comma_separated_bytes_str() const
-  {
-    crypto::public_key pk = to_public_key();
-    return pod_to_hex_comma_separated_bytes(pk);
-  }
-
-  std::string to_hex_comma_separated_uint64_str() const
-  {
-    crypto::public_key pk = to_public_key();
-    return pod_to_hex_comma_separated_uint64(pk);
-  }
-
-}; // struct point_t
-
-
-struct point_g_t : public point_t
-{
-  point_g_t()
-  {
-    scalar_t one(1);
-    ge_scalarmult_base(&m_p3, &one.m_s[0]);
-  }
-
-  friend point_t operator*(const scalar_t& lhs, const point_g_t&)
-  {
-    point_t result;
-    ge_scalarmult_base(&result.m_p3, &lhs.m_s[0]);
-    return result;
-  }
-
-  friend point_t operator/(const point_g_t&, const scalar_t& rhs)
-  {
-    point_t result;
-    scalar_t reciprocal;
-    sc_invert(&reciprocal.m_s[0], &rhs.m_s[0]);
-    ge_scalarmult_base(&result.m_p3, &reciprocal.m_s[0]);
-    return result;
-  }
-
-
-
-
-  static_assert(sizeof(crypto::public_key) == 32, "size error");
-
-}; // struct point_g_t
-
-static const point_g_t c_point_G;
-
-static const scalar_t c_scalar_1      = { 1 };
-static const scalar_t c_scalar_L      = { 0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
-static const scalar_t c_scalar_Lm1    = { 0x5812631a5cf5d3ec, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
-static const scalar_t c_scalar_P      = { 0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
-static const scalar_t c_scalar_Pm1    = { 0xffffffffffffffec, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
-static const scalar_t c_scalar_256m1  = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff };
-static const scalar_t c_scalar_1div8  = { 0x6106e529e2dc2f79, 0x7d39db37d1cdad0,  0x0,                0x600000000000000  };
-static const point_t  c_point_H       = { 0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45 };  // == Hp(G), this is being check in bpp_basics
-
-
-// H_s hash function
-struct hash_helper_t
-{
-  static scalar_t hs(const scalar_t& s)
-  {
-    return scalar_t(crypto::cn_fast_hash(s.data(), sizeof s)); // will reduce mod L
-  }
-
-  static scalar_t hs(const void* data, size_t size)
-  {
-    return scalar_t(crypto::cn_fast_hash(data, size)); // will reduce mod L
-  }
-
-  struct hs_t
-  {
-    hs_t()
-    {
-      static_assert(sizeof(scalar_t) == sizeof(crypto::public_key), "unexpected size of data");
-    }
-
-    void reserve(size_t elements_count)
-    {
-      m_elements.reserve(elements_count);
-    }
-
-    void clear()
-    {
-      m_elements.clear();
-    }
-
-    void add_scalar(const scalar_t& scalar)
-    {
-      m_elements.emplace_back(scalar);
-    }
-
-    void add_point(const point_t& point)
-    {
-      m_elements.emplace_back(point.to_public_key());
-
-      // faster?
-      /* static_assert(sizeof point.m_p3 == 5 * sizeof(item_t), "size missmatch");
-      const item_t *p = (item_t*)&point.m_p3;
-      m_elements.emplace_back(p[0]);
-      m_elements.emplace_back(p[1]);
-      m_elements.emplace_back(p[2]);
-      m_elements.emplace_back(p[3]);
-      m_elements.emplace_back(p[4]); */
-    }
-
-    void add_pub_key(const crypto::public_key& pk)
-    {
-      m_elements.emplace_back(pk);
-    }
-
-    void add_points_array(const std::vector<point_t>& points_array)
-    {
-      for (size_t i = 0, size = points_array.size(); i < size; ++i)
-        add_point(points_array[i]);
-    }
-
-    void add_pub_keys_array(const std::vector<crypto::public_key>& pub_keys_array)
-    {
-      for (size_t i = 0, size = pub_keys_array.size(); i < size; ++i)
-        m_elements.emplace_back(pub_keys_array[i]);
-    }
-
-    void add_key_images_array(const std::vector<crypto::key_image>& key_image_array)
-    {
-      for (size_t i = 0, size = key_image_array.size(); i < size; ++i)
-        m_elements.emplace_back(key_image_array[i]);
-    }
-
-    scalar_t calc_hash(bool clear = true)
-    {
-      size_t data_size_bytes = m_elements.size() * sizeof(item_t);
-      crypto::hash hash;
-      crypto::cn_fast_hash(m_elements.data(), data_size_bytes, hash);
-      if (clear)
-        this->clear();
-      return scalar_t(hash); // this will reduce to L
-    }
-
-    union item_t
-    {
-      item_t(const scalar_t& scalar) : scalar(scalar) {}
-      item_t(const crypto::public_key& pk) : pk(pk) {}
-      item_t(const crypto::key_image& ki) : ki(ki) {}
-      scalar_t scalar;
-      crypto::public_key pk;
-      crypto::key_image ki;
-    };
-
-    std::vector<item_t> m_elements;
-  };
-
-  /*static scalar_t hs(const scalar_t& s, const std::vector<scalar_t>& ss, const std::vector<point_t>& ps)
-  {
-    scalar_t result = 0;
-    return result;
-  }*/
-
-  static scalar_t hs(const scalar_t& s, const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
-  {
-    hs_t hs_calculator;
-    hs_calculator.add_scalar(s);
-    hs_calculator.add_points_array(ps0);
-    hs_calculator.add_points_array(ps1);
-    return hs_calculator.calc_hash();
-  }
-
-  static scalar_t hs(const crypto::hash& s, const std::vector<crypto::public_key>& ps0, const std::vector<crypto::key_image>& ps1)
-  {
-    static_assert(sizeof(crypto::hash) == sizeof(scalar_t), "size missmatch");
-    hs_t hs_calculator;
-    hs_calculator.add_scalar(*reinterpret_cast<const scalar_t*>(&s));
-    hs_calculator.add_pub_keys_array(ps0);
-    hs_calculator.add_key_images_array(ps1);
-    return hs_calculator.calc_hash();
-  }
-
-  static scalar_t hs(const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
-  {
-    hs_t hs_calculator;
-    hs_calculator.add_points_array(ps0);
-    hs_calculator.add_points_array(ps1);
-    return hs_calculator.calc_hash();
-  }
-
-  static point_t hp(const point_t& p)
-  {
-    point_t result;
-    crypto::public_key pk = p.to_public_key();
-
-    ge_bytes_hash_to_ec_32(&result.m_p3, (const unsigned char*)&pk);
-
-    return result;
-  }
-
-  static point_t hp(const crypto::public_key& p)
-  {
-    point_t result;
-    ge_bytes_hash_to_ec_32(&result.m_p3, (const unsigned char*)&p);
-    return result;
-  }
-};
 
 //
 // test helpers
@@ -1193,6 +429,80 @@ size_t find_pos_hash(const boost::multiprecision::uint256_t& L_div_D, const curr
   }
 
   return i;
+}
+
+TEST(crypto, pos)
+{
+  //scalar_t D = 10000000000000001u;
+  scalar_t D = 13042196742415129u; // prime number
+  currency::wide_difficulty_type D_w = D.as_boost_mp_type<boost::multiprecision::uint256_t>().convert_to<currency::wide_difficulty_type>();
+  uint64_t amount = 1000000000000;
+  size_t count_old = 0;
+  size_t count_new = 0;
+  size_t count_3 = 0;
+  scalar_t x;
+  x.make_random();
+
+  const boost::multiprecision::uint512_t c_2_pow_256_m1(std::numeric_limits<boost::multiprecision::uint256_t>::max());
+
+
+  const boost::multiprecision::uint256_t c_L_w = c_scalar_L.as_boost_mp_type<boost::multiprecision::uint256_t>();
+  const boost::multiprecision::uint256_t c_L_div_D_w = c_L_w / D_w;
+  boost::multiprecision::uint512_t h_tres = c_L_div_D_w * amount;
+
+  currency::wide_difficulty_type final_diff = D_w / amount;
+
+  boost::multiprecision::uint512_t Lv = boost::multiprecision::uint512_t(c_L_w) * amount;
+
+  constexpr uint64_t COIN = 1000000000000;
+  const uint64_t amounts[] = {
+    COIN / 100,
+    COIN / 50,
+    COIN / 20,
+    COIN / 10,
+    COIN / 5,
+    COIN / 2,
+    COIN * 1,
+    COIN * 2,
+    COIN * 5,
+    COIN * 10,
+    COIN * 20,
+    COIN * 50,
+    COIN * 100,
+    COIN * 200,
+    COIN * 500,
+    COIN * 1000,
+    COIN * 2000,
+    COIN * 5000,
+    COIN * 10000,
+    COIN * 20000,
+    COIN * 50000,
+    COIN * 100000,
+    COIN * 200000,
+    COIN * 500000
+  };
+
+  uint64_t kernel = 0;
+  scalar_t d0 = 0;
+  uint64_t d1 = 0;
+
+
+  /*
+  for (size_t i = 0, size = sizeof pos_diffs / sizeof pos_diffs[0]; i < size; ++i)
+  {
+    auto& D = pos_diffs[i].difficulty;
+    boost::multiprecision::uint256_t L_dvi_D = c_L_w / D;
+
+    for (size_t j = 0, size_j = sizeof amounts / sizeof amounts[0]; j < size_j; ++j)
+    {
+      uint64_t amount = rand_in_range(amounts[j], amounts[j] + amounts[j] / 10);
+      size_t iter = find_pos_hash(L_dvi_D, D, amount, kernel, d0, d1);
+      LOG_PRINT_L0(i << ", " << amount << ", " << iter);
+    }
+  }
+  */
+
+  return true;
 }
 
 struct sig_check_t
@@ -1494,6 +804,41 @@ TEST(crypto, hp)
   return true;
 }
 
+TEST(crypto, cn_fast_hash_perf)
+{
+  return true;
+  crypto::hash h = { 3, 14, 15, 9, 26 };
+
+  size_t n = 100000;
+  double diff_sum = 0;
+
+  for (size_t j = 0; j < 20; ++j)
+  {
+    TIME_MEASURE_START(t_old);
+    for (size_t i = 0; i < n; ++i)
+      cn_fast_hash_old(&h, sizeof h, (char*)&h);
+    TIME_MEASURE_FINISH(t_old);
+
+    TIME_MEASURE_START(t);
+    for (size_t i = 0; i < n; ++i)
+      cn_fast_hash(&h, sizeof h, (char*)&h);
+    TIME_MEASURE_FINISH(t);
+
+    double diff = ((int64_t)t_old - (int64_t)t) / (double)n;
+
+    LOG_PRINT_L0("cn_fast_hash (old/new): " << std::fixed << std::setprecision(3) << t_old / (double)n << "   " <<
+      std::fixed << std::setprecision(3) << t * 1.0 / n << " mcs   diff => " << std::fixed << std::setprecision(4) << diff);
+
+    diff_sum += diff;
+  }
+
+  std::cout << h << "  diff sum: " << diff_sum << std::endl;
+
+  return true;
+}
+
+
+
 TEST(crypto, sc_invert_performance)
 {
   std::vector<scalar_t> scalars(10000);
@@ -1654,6 +999,42 @@ TEST(ml2s, rsum)
 
 TEST(ml2s, hs)
 {
+  mp::uint512_t L = c_scalar_L.as_boost_mp_type<mp::uint512_t>();
+  L *= 15;
+  mp::uint256_t c_256_bit_max = ((mp::uint512_t(1) << 256) - 1).convert_to<mp::uint256_t>();
+  std::cout << std::hex << c_256_bit_max << ENDL;
+
+  ASSERT_TRUE(L < c_256_bit_max);
+
+  scalar_t L15(L);
+
+  scalar_t k = epee::string_tools::hex_to_pod<scalar_t>("deefd263cbfed62a3711dd133df3ccbd1c4dc4aac21d7405fd667498bf8ebaa1");
+  std::cout << k << ENDL;
+  std::cout << k.to_string_as_secret_key() << ENDL;
+  mp::uint256_t kw = k.as_boost_mp_type<mp::uint256_t>();
+  sc_reduce32(k.m_s);
+  std::cout << k << ENDL;
+  std::cout << k.to_string_as_secret_key() << ENDL;
+
+  std::cout << kw << ENDL;
+  kw = kw % c_scalar_L.as_boost_mp_type<mp::uint256_t>();
+  std::cout << kw << ENDL;
+
+
+  for (size_t i = 0; i < 100000; ++i)
+  {
+    scalar_t x, y;
+    crypto::generate_random_bytes(32, y.m_s);
+    x = y;
+    memset(x.m_s + 18, 0xff, 13);
+    sc_reduce32(x.m_s);
+    uint64_t lo = *(uint64_t*)(x.m_s + 18);
+    uint64_t hi = *(uint64_t*)(x.m_s + 26) & 0xffffffffff;
+    ASSERT_EQ(lo, 0xffffffffffffffff);
+    ASSERT_EQ(hi, 0xffffffffff);
+  }
+
+
   scalar_t x = 2, p = 250;
   //sc_exp(r.data(), x.data(), p.data());
 
@@ -1663,21 +1044,21 @@ TEST(ml2s, hs)
   scalar_t r;
 
   sha3(0, 0, &h, sizeof h);
-  LOG_PRINT("SHA3 0 -> " << h, LOG_LEVEL_0);
-  LOG_PRINT("SHA3 0 -> " << (scalar_t&)h, LOG_LEVEL_0);
+  LOG_PRINT("SHA3() -> " << h, LOG_LEVEL_0);
+  LOG_PRINT("SHA3() -> " << (scalar_t&)h, LOG_LEVEL_0);
 
   h = crypto::cn_fast_hash(0, 0);
-  LOG_PRINT("CN 0 -> " << h, LOG_LEVEL_0);
-  LOG_PRINT("CN 0 -> " << (scalar_t&)h, LOG_LEVEL_0);
+  LOG_PRINT("CN() -> " << h, LOG_LEVEL_0);
+  LOG_PRINT("CN() -> " << (scalar_t&)h, LOG_LEVEL_0);
 
   std::string abc("abc");
   sha3(abc.c_str(), abc.size(), &h, sizeof h);
-  LOG_PRINT(abc << " -> " << h, LOG_LEVEL_0);
-  LOG_PRINT(abc << " -> " << (scalar_t&)h, LOG_LEVEL_0);
+  LOG_PRINT("SHA3(" << abc << ") -> " << h, LOG_LEVEL_0);
+  LOG_PRINT("SHA3(" << abc << ") -> " << (scalar_t&)h, LOG_LEVEL_0);
 
   h = crypto::cn_fast_hash(abc.c_str(), abc.size());
-  LOG_PRINT(abc << " -> " << h, LOG_LEVEL_0);
-  LOG_PRINT(abc << " -> " << (scalar_t&)h, LOG_LEVEL_0);
+  LOG_PRINT("CN(" << abc << ") -> " << h, LOG_LEVEL_0);
+  LOG_PRINT("CN(" << abc << ") -> " << (scalar_t&)h, LOG_LEVEL_0);
 
 
   return true;
