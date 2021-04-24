@@ -429,7 +429,7 @@ namespace crypto
         zero();
     }
 
-    explicit point_t(tag_zero&)
+    explicit point_t(tag_zero&&)
     {
       zero();
     }
