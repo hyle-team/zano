@@ -12,7 +12,9 @@
 
 // chaingen-independent helpers that may be used outside of core_tests (for ex. in functional_tests)
 
-inline bool mine_next_pow_block_in_playtime(const currency::account_public_address& miner_addr, currency::core& c, currency::block* output = nullptr)
+
+template<typename t_callbacktype>
+inline bool mine_next_pow_block_in_playtime(const currency::account_public_address& miner_addr, currency::core& c, t_callbacktype modify_block_cb, currency::block* output = nullptr)
 {
   currency::block b = AUTO_VAL_INIT(b);
   currency::wide_difficulty_type diff;
@@ -28,6 +30,7 @@ inline bool mine_next_pow_block_in_playtime(const currency::account_public_addre
   // keep global time up with blocks' timestamps
   test_core_time::adjust(b.timestamp);
 
+  modify_block_cb(b);
   r = currency::miner::find_nonce_for_given_block(b, diff, height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
@@ -39,6 +42,13 @@ inline bool mine_next_pow_block_in_playtime(const currency::account_public_addre
     *output = b;
 
   return true;
+}
+
+inline bool mine_next_pow_block_in_playtime(const currency::account_public_address& miner_addr, currency::core& c, currency::block* output = nullptr)
+{
+  auto cb = [&](currency::block& b)
+  {};
+  return mine_next_pow_block_in_playtime(miner_addr, c, cb, output);
 }
 
 inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::account_public_address& miner_addr, currency::core& c, const std::vector<currency::transaction>& txs, const crypto::hash& prev_id, uint64_t height, currency::block* output = nullptr)

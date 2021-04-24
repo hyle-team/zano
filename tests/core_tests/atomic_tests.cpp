@@ -673,10 +673,6 @@ bool atomic_test_check_hardfork_rules::c1(currency::core& c, size_t ev_index, co
   pc.hard_fork_03_starts_after_height = 30;
   c.get_blockchain_storage().set_core_runtime_config(pc);
 
-  //try to submit wrong transaction that do refund before expiration
-  //std::vector<currency::transaction> txs;
-  //txs.push_back(refund_tx);
-  //bool r = mine_next_pow_block_in_playtime_with_given_txs(m_mining_accunt.get_public_address(), c, txs);
   bool r = mine_next_pow_block_in_playtime(m_mining_accunt.get_public_address(), c);
   CHECK_AND_FORCE_ASSERT_MES(!r, false, "Block with HTLC before hard fork accepted");
 

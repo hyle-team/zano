@@ -1439,6 +1439,8 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   height = m_db_blocks.size();
   if(height <= m_core_runtime_config.hard_fork_01_starts_after_height)
     b.major_version = BLOCK_MAJOR_VERSION_INITAL;
+  else if(height <= m_core_runtime_config.hard_fork_03_starts_after_height)
+    b.major_version = HF1_BLOCK_MAJOR_VERSION;
   else
     b.major_version = CURRENT_BLOCK_MAJOR_VERSION;
 
@@ -5767,17 +5769,23 @@ bool blockchain_storage::is_after_hardfork_3_zone(uint64_t height)const
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_block(const block& bl)
 {
+  //before hard_fork1
   if (bl.major_version == BLOCK_MAJOR_VERSION_INITAL && get_block_height(bl) <= m_core_runtime_config.hard_fork_01_starts_after_height)
     return true;
 
-  if (bl.major_version == HF1_BLOCK_MAJOR_VERSION
-    && get_block_height(bl) > m_core_runtime_config.hard_fork_01_starts_after_height
-    && get_block_height(bl) <= m_core_runtime_config.hard_fork_03_starts_after_height
+
+  //after hard_fork1 and before hard_fork3
+  if ( get_block_height(bl) > m_core_runtime_config.hard_fork_01_starts_after_height  &&
+       get_block_height(bl) <= m_core_runtime_config.hard_fork_03_starts_after_height
     )
   {
-    return true;
+    if (bl.major_version == HF1_BLOCK_MAJOR_VERSION)
+      return true;
+    else
+      return false;
   }
 
+  //after hard_fork3
   if (bl.major_version > CURRENT_BLOCK_MAJOR_VERSION)
   {
     LOG_ERROR("prevalidation failed for block " << get_block_hash(bl) << ": major block version " << static_cast<size_t>(bl.major_version) << " is incorrect, " << CURRENT_BLOCK_MAJOR_VERSION << " is expected" << ENDL
@@ -5785,7 +5793,7 @@ bool blockchain_storage::prevalidate_block(const block& bl)
     return false;
   }
 
-  if (is_after_hardfork_3_zone() && bl.minor_version > CURRENT_BLOCK_MINOR_VERSION)
+  if (bl.minor_version > CURRENT_BLOCK_MINOR_VERSION)
   {
     //this means that binary block is compatible, but semantics got changed due to hardfork, daemon should be updated
     LOG_PRINT_MAGENTA("Block's MINOR_VERSION is: " << bl.minor_version 

@@ -610,3 +610,92 @@ bool gen_block_invalid_binary_format::check_all_blocks_purged(currency::core& c,
 
   return true;
 }
+
+
+gen_block_wrong_version_agains_hardfork::gen_block_wrong_version_agains_hardfork()
+{
+  REGISTER_CALLBACK("c1", gen_block_wrong_version_agains_hardfork::c1);
+}
+
+bool gen_block_wrong_version_agains_hardfork::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
+  pc.hard_fork_01_starts_after_height = 10;
+  pc.hard_fork_02_starts_after_height = 10;
+  pc.hard_fork_03_starts_after_height = 10;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+
+  currency::account_base mining_accunt;
+  mining_accunt.generate();
+  
+  bool r = mine_next_pow_block_in_playtime(mining_accunt.get_public_address(), c); // block with height 1
+
+  uint8_t major_version_to_set = 0;
+  uint8_t minor_version_to_set = 0;
+  auto cb = [&] (currency::block& b)
+  {
+    b.major_version = major_version_to_set;
+    b.minor_version = minor_version_to_set;
+  };
+
+  //between 1 and 2 hardforks
+  pc.hard_fork_01_starts_after_height = 1;
+  pc.hard_fork_02_starts_after_height = 10;
+  pc.hard_fork_03_starts_after_height = 20;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+
+  //major unknown
+  major_version_to_set = 2;
+
+  r = mine_next_pow_block_in_playtime(mining_accunt.get_public_address(), c, cb); // block with height 2 (won't pass)
+  CHECK_TEST_CONDITION(!r);
+
+  //minor unknown
+  major_version_to_set = 1;
+  minor_version_to_set = 2;
+  r = mine_next_pow_block_in_playtime(mining_accunt.get_public_address(), c, cb); // block with height 2
+  CHECK_TEST_CONDITION(r);
+
+  //between 1 and 2 hardforks
+  pc.hard_fork_01_starts_after_height = 1;
+  pc.hard_fork_02_starts_after_height = 1;
+  pc.hard_fork_03_starts_after_height = 1;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+
+
+  //major correct 
+  major_version_to_set = 2;
+  minor_version_to_set = 0;
+  r = mine_next_pow_block_in_playtime(mining_accunt.get_public_address(), c, cb); // block with height 3
+  CHECK_TEST_CONDITION(r);
+
+  //major incorrect 
+  major_version_to_set = 3;
+  minor_version_to_set = 0;
+  r = mine_next_pow_block_in_playtime(mining_accunt.get_public_address(), c, cb); // block with height 4 (won't pass)
+  CHECK_TEST_CONDITION(!r);
+
+  //minor  incorrect for hf3
+  major_version_to_set = 2;
+  minor_version_to_set = 1;
+  r = mine_next_pow_block_in_playtime(mining_accunt.get_public_address(), c, cb); // block with height 4  (won't pass)
+  CHECK_TEST_CONDITION(!r);
+
+  //major  lower then norma for hf3 (do we need this half-working backward compability)
+  major_version_to_set = 0;
+  minor_version_to_set = 0;
+  r = mine_next_pow_block_in_playtime(mining_accunt.get_public_address(), c, cb); // block with height 4  (won't pass)
+  CHECK_TEST_CONDITION(r);
+
+  return true;
+}
+
+bool gen_block_wrong_version_agains_hardfork::generate(std::vector<test_event_entry>& events) const
+{
+  BLOCK_VALIDATION_INIT_GENERATE();
+  DO_CALLBACK(events, "c1");
+  return true;
+}
