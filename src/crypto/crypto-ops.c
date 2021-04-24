@@ -342,6 +342,16 @@ int fe_isnonzero(const fe f) {
     s[27] | s[28] | s[29] | s[30] | s[31]) - 1) >> 8) + 1;
 }
 
+int fe_cmp(const fe a, const fe b)
+{
+  for (size_t i = 9; i != SIZE_MAX; --i)
+  {
+    if ((const uint32_t)a[i] < (const uint32_t)b[i]) return -1;
+    if ((const uint32_t)a[i] > (const uint32_t)b[i]) return 1;
+  }
+  return 0;
+}
+
 /* From fe_mul.c */
 
 /*
