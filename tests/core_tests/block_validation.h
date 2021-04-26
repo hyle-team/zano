@@ -169,6 +169,16 @@ struct gen_block_is_too_big : public gen_block_verification_base<1>
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
+struct gen_block_wrong_version_agains_hardfork : public gen_block_verification_base<1>
+{
+public:
+  gen_block_wrong_version_agains_hardfork();
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+
+
 struct gen_block_invalid_binary_format : public test_chain_unit_base
 {
   gen_block_invalid_binary_format();

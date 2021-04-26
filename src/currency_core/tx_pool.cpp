@@ -102,6 +102,14 @@ namespace currency
       return false;
     }
 
+    if (!m_blockchain.validate_tx_for_hardfork_specific_terms(tx, id))
+    {
+      //
+      LOG_ERROR("Transaction " << id <<" doesn't fit current hardfork");
+      tvc.m_verification_failed = true;
+      return false;
+    }
+
     TIME_MEASURE_START_PD(tx_processing_time);
     TIME_MEASURE_START_PD(check_inputs_types_supported_time);
     if(!check_inputs_types_supported(tx))

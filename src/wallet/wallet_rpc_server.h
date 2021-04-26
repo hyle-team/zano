@@ -65,6 +65,12 @@ namespace tools
         MAP_JON_RPC_WE("marketplace_push_offer",              on_marketplace_push_offer,        wallet_public::COMMAND_MARKETPLACE_PUSH_OFFER)
         MAP_JON_RPC_WE("marketplace_push_update_offer",       on_marketplace_push_update_offer, wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER)
         MAP_JON_RPC_WE("marketplace_cancel_offer",            on_marketplace_cancel_offer,      wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER)
+        //HTLC API
+        MAP_JON_RPC_WE("atomics_create_htlc_proposal", on_create_htlc_proposal, wallet_public::COMMAND_CREATE_HTLC_PROPOSAL)
+        MAP_JON_RPC_WE("atomics_get_list_of_active_htlc", on_get_list_of_active_htlc, wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC)
+        MAP_JON_RPC_WE("atomics_redeem_htlc", on_redeem_htlc, wallet_public::COMMAND_REDEEM_HTLC)
+        MAP_JON_RPC_WE("atomics_check_htlc_redeemed", on_check_htlc_redeemed, wallet_public::COMMAND_CHECK_HTLC_REDEEMED)
+
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -97,6 +103,11 @@ namespace tools
       bool on_marketplace_push_offer(const wallet_public::COMMAND_MARKETPLACE_PUSH_OFFER::request& req, wallet_public::COMMAND_MARKETPLACE_PUSH_OFFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_marketplace_push_update_offer(const wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER::request& req, wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_marketplace_cancel_offer(const wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER::request& req, wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+      bool on_create_htlc_proposal(const wallet_public::COMMAND_CREATE_HTLC_PROPOSAL::request& req, wallet_public::COMMAND_CREATE_HTLC_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_get_list_of_active_htlc(const wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC::request& req, wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_redeem_htlc(const wallet_public::COMMAND_REDEEM_HTLC::request& req, wallet_public::COMMAND_REDEEM_HTLC::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_check_htlc_redeemed(const wallet_public::COMMAND_CHECK_HTLC_REDEEMED::request& req, wallet_public::COMMAND_CHECK_HTLC_REDEEMED::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
 
       bool handle_command_line(const boost::program_options::variables_map& vm);

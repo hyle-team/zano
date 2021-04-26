@@ -53,6 +53,7 @@
 #define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
 #define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
 #define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
+#define   WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM                      uint32_t(1 << 5) // for htlc keeps info if this htlc belong as redeem or as refund
 
 
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
@@ -80,6 +81,9 @@ const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64
 #define WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
 #define WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
 #define WLT_THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, msg, ...) THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, "[W:" << m_log_prefix << "] " << msg, ## __VA_ARGS__)
+
+
+
 
 class test_generator;
 
@@ -166,6 +170,11 @@ namespace tools
         if (de.addr.size() > 1)
         {
           //for multisig we don't split
+          splitted_dsts.push_back(de);
+        }
+        else if (de.htlc_options.expiration != 0)
+        {
+          //for htlc we don't do split
           splitted_dsts.push_back(de);
         }
         else
@@ -269,6 +278,9 @@ namespace tools
     uint8_t split_strategy_id;
     bool mark_tx_as_complete;
 
+    crypto::hash htlc_tx_id;
+    std::string htlc_origin;
+
     // constructing tx
     uint64_t unlock_time;
     std::vector<currency::extra_v> extra;
@@ -279,52 +291,52 @@ namespace tools
     bool perform_packing;
   };
 
-  struct finalize_tx_param
-  {
-    uint64_t unlock_time;
-    std::vector<currency::extra_v> extra;
-    std::vector<currency::attachment_v> attachments;
-    currency::account_public_address crypt_address;
-    uint8_t tx_outs_attr;
-    bool shuffle;
-    uint8_t flags;
-    crypto::hash multisig_id;
-    std::vector<currency::tx_source_entry> sources;
-    std::vector<uint64_t> selected_transfers;
-    std::vector<currency::tx_destination_entry> prepared_destinations;
-
-    crypto::public_key spend_pub_key;  // only for validations
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(unlock_time)
-      FIELD(extra)
-      FIELD(attachments)
-      FIELD(crypt_address)
-      FIELD(tx_outs_attr)
-      FIELD(shuffle)
-      FIELD(flags)
-      FIELD(multisig_id)
-      FIELD(sources)
-      FIELD(selected_transfers)
-      FIELD(prepared_destinations)
-      FIELD(spend_pub_key)
-    END_SERIALIZE()
-  };
-
-  struct finalized_tx
-  {
-    currency::transaction tx;
-    crypto::secret_key    one_time_key;
-    finalize_tx_param     ftp;
-    std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(tx)
-      FIELD(one_time_key)
-      FIELD(ftp)
-      FIELD(outs_key_images)
-    END_SERIALIZE()
-  };
+//   struct currency::finalize_tx_param
+//   {
+//     uint64_t unlock_time;
+//     std::vector<currency::extra_v> extra;
+//     std::vector<currency::attachment_v> attachments;
+//     currency::account_public_address crypt_address;
+//     uint8_t tx_outs_attr;
+//     bool shuffle;
+//     uint8_t flags;
+//     crypto::hash multisig_id;
+//     std::vector<currency::tx_source_entry> sources;
+//     std::vector<uint64_t> selected_transfers;
+//     std::vector<currency::tx_destination_entry> prepared_destinations;
+// 
+//     crypto::public_key spend_pub_key;  // only for validations
+// 
+//     BEGIN_SERIALIZE_OBJECT()
+//       FIELD(unlock_time)
+//       FIELD(extra)
+//       FIELD(attachments)
+//       FIELD(crypt_address)
+//       FIELD(tx_outs_attr)
+//       FIELD(shuffle)
+//       FIELD(flags)
+//       FIELD(multisig_id)
+//       FIELD(sources)
+//       FIELD(selected_transfers)
+//       FIELD(prepared_destinations)
+//       FIELD(spend_pub_key)
+//     END_SERIALIZE()
+//   };
+// 
+//   struct currency::finalized_tx
+//   {
+//     currency::transaction tx;
+//     crypto::secret_key    one_time_key;
+//     currency::finalize_tx_param     ftp;
+//     std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
+// 
+//     BEGIN_SERIALIZE_OBJECT()
+//       FIELD(tx)
+//       FIELD(one_time_key)
+//       FIELD(ftp)
+//       FIELD(outs_key_images)
+//     END_SERIALIZE()
+//   };
 
   class wallet2
   {
@@ -385,10 +397,20 @@ namespace tools
     };
 
 
+    struct transfer_details_extra_option_htlc_info
+    {
+      std::string origin;  //this field filled only if htlc had been redeemed
+      crypto::hash redeem_tx_id;
+    };
+
+
+    typedef boost::variant<transfer_details_extra_option_htlc_info, currency::tx_payer> transfer_details_extra_options_v;
+
     struct transfer_details : public transfer_details_base
     {
       uint64_t m_global_output_index;
       crypto::key_image m_key_image; //TODO: key_image stored twice :(
+      std::vector<transfer_details_extra_options_v> varian_options;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(m_global_output_index)
@@ -397,7 +419,12 @@ namespace tools
       END_KV_SERIALIZE_MAP()
     };
 
-
+    //used in wallet 
+    struct htlc_expiration_trigger
+    {
+      bool is_wallet_owns_redeem; //specify if this HTLC belong to this wallet by pkey_redeem or by pkey_refund
+      uint64_t transfer_index;
+    };
 
 
     struct payment_details
@@ -524,6 +551,7 @@ namespace tools
     uint64_t unlocked_balance() const;
 
     void transfer(uint64_t amount, const currency::account_public_address& acc);
+    void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts,
                   size_t fake_outputs_count, 
@@ -564,10 +592,16 @@ namespace tools
                   const std::vector<currency::attachment_v>& attachments, 
                   currency::transaction& tx);
 
-    void transfer(const construct_tx_param& ctp,
+    void transfer(construct_tx_param& ctp,
                   currency::transaction &tx,
                   bool send_to_network,
                   std::string* p_unsigned_filename_or_tx_blob_str);
+    
+    void transfer(construct_tx_param& ctp,
+                  currency::finalized_tx& result,
+                  bool send_to_network,
+                  std::string* p_unsigned_filename_or_tx_blob_str);
+
 
     template<typename destination_split_strategy_t>
     void transfer_from_contract(
@@ -735,6 +769,14 @@ namespace tools
       {
         wipeout_extra_if_needed(m_transfer_history);
       }
+      
+      if (ver < 153)
+        return;
+      
+      a & m_htlcs;
+      a & m_active_htlcs;
+      a & m_active_htlcs_txid;
+
     }
 
     void wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history);
@@ -761,6 +803,8 @@ namespace tools
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
       uint64_t height);
+    void process_htlc_triggers_on_block_added(uint64_t height);
+    void unprocess_htlc_triggers_on_block_removed(uint64_t height);
     bool get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, uint64_t new_block_expected_height = UINT64_MAX);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, const currency::account_public_address& miner_address, uint64_t new_block_expected_height = UINT64_MAX);
@@ -799,8 +843,10 @@ namespace tools
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
-    void prepare_transaction(const construct_tx_param& ctp, finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
-    void finalize_transaction(const finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
+    void prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
+
+    void finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
+    void finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
 
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
@@ -808,6 +854,17 @@ namespace tools
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
+    
+    /*
+    create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
+    we use deterministic origin, if given some particular htlc_hash, then we use this hash, and this means that 
+    opener-hash will be given by other side
+    */
+    void create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, const crypto::hash& htlc_hash, std::string &origin);
+    void get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>& htlcs, bool only_redeem_txs);
+    void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
+    void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
+    bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
 
 private:
 
@@ -867,6 +924,7 @@ private:
     bool prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
+    bool prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     void prefetch_global_indicies_if_needed(std::vector<uint64_t>& selected_indicies);
     uint64_t get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
@@ -928,7 +986,7 @@ private:
     void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
     bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
-    bool store_unsigned_tx_to_file_and_reserve_transfers(const finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
+    bool store_unsigned_tx_to_file_and_reserve_transfers(const currency::finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
     void push_new_block_id(const crypto::hash& id, uint64_t height);
     bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);
@@ -969,6 +1027,10 @@ private:
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
     std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
 
+    std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
+    amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
+    std::unordered_map<crypto::hash, uint64_t> m_active_htlcs_txid; // map [txid] -> transfer index, limitation: 1 transactiom -> 1 htlc
+
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
     uint64_t m_height_of_start_sync;
@@ -995,7 +1057,7 @@ private:
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
 BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 9)
-BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 2)
+BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 3)
 
 
 namespace boost
@@ -1019,15 +1081,31 @@ namespace boost
       a & x.m_spent_height;
     }
 
+   
+    template <class Archive>
+    inline void serialize(Archive &a, tools::wallet2::transfer_details_extra_option_htlc_info &x, const boost::serialization::version_type ver)
+    {
+      a & x.origin;
+    }
+
+
     template <class Archive>
     inline void serialize(Archive &a, tools::wallet2::transfer_details &x, const boost::serialization::version_type ver)
     {
       a & x.m_global_output_index;
       a & x.m_key_image;
       a & static_cast<tools::wallet2::transfer_details_base&>(x);
+      if (ver < 3)
+        return;
+      a & x.varian_options;
     }
 
-
+    template <class Archive>
+    inline void serialize(Archive &a, tools::wallet2::htlc_expiration_trigger &x, const boost::serialization::version_type ver)
+    {
+      a & x.is_wallet_owns_redeem;
+      a & x.transfer_index;
+    }
 
     template <class Archive>
     inline void serialize(Archive& a, tools::wallet2::payment_details& x, const boost::serialization::version_type ver)
@@ -1065,20 +1143,6 @@ namespace boost
       a & x.selected_indicies;
       a & x.srv_attachments;
       a & x.unlock_time;
-      //do not store this items in the file since it's quite easy to restore it from original tx 
-      if (Archive::is_loading::value)
-      {
-
-        x.is_service = currency::is_service_tx(x.tx);
-        x.is_mixing = currency::is_mixin_tx(x.tx);
-        x.is_mining = currency::is_coinbase(x.tx);
-        if (!x.is_mining)
-          x.fee = currency::get_tx_fee(x.tx);
-        else
-          x.fee = 0;
-        x.show_sender = currency::is_showing_sender_addres(x.tx);
-        x.tx_type = get_tx_type(x.tx);
-      }
     }
 
     template <class Archive>
