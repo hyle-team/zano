@@ -3,4 +3,4 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
 
-int crypto_tests();
+int crypto_tests(const std::string& cmd_line_param);

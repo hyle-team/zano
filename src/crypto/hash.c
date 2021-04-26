@@ -1,3 +1,4 @@
+// Copyright (c) 2020-2021 Zano project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -17,8 +18,14 @@ void hash_process(union hash_state *state, const uint8_t *buf, size_t count) {
   keccak1600(buf, (int)count, (uint8_t*)state);
 }
 
-void cn_fast_hash(const void *data, size_t length, char *hash) {
+void cn_fast_hash_old(const void *data, size_t length, char *hash)
+{
   union hash_state state;
   hash_process(&state, data, length);
   memcpy(hash, &state, HASH_SIZE);
+}
+
+void cn_fast_hash(const void *data, size_t length, char *hash)
+{
+  keccak(data, (int)length, hash, HASH_SIZE);
 }
