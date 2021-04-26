@@ -33,7 +33,7 @@ public:
         return false;
 
       txout_to_key tx_out = boost::get<txout_to_key>(m_miner_txs[i].vout[0].target);
-      output_entries.push_back(make_serializable_pair<txout_v, crypto::public_key>(i, tx_out.key));
+      output_entries.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(i, tx_out.key));
       m_public_keys[i] = tx_out.key;
       m_public_key_ptrs[i] = &m_public_keys[i];
     }

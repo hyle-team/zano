@@ -39,3 +39,4 @@
 #define API_RETURN_CODE_UNINITIALIZED                           "UNINITIALIZED"
 #define API_RETURN_CODE_TX_IS_TOO_BIG                           "TX_IS_TOO_BIG"
 #define API_RETURN_CODE_TX_REJECTED                             "TX_REJECTED"
+#define API_RETURN_CODE_HTLC_ORIGIN_HASH_MISSMATCHED            "HTLC_ORIGIN_HASH_MISSMATCHED"

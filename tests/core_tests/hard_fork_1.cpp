@@ -80,29 +80,31 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
   crypto::secret_key tx_sec_key;
   r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  // tx_0 should be accepted
+  // tx_0 shouldn't be accepted
+  DO_CALLBACK(events, "mark_invalid_tx"); 
   events.push_back(tx_0);
 
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
   DO_CALLBACK(events, "mark_invalid_block");
   MAKE_NEXT_BLOCK_TX1(events, blk_1_bad, blk_0r, miner_acc, tx_0);
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
   DO_CALLBACK(events, "clear_tx_pool");
 
   // make another tx with the same inputs and extra (tx_0 was rejected so inputs can be reused)
   transaction tx_0a = AUTO_VAL_INIT(tx_0a);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0a, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  // tx_0a should be accepted as well
+  // tx_0a shouldn't be accepted as well
+  DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_0a);
   // make an alternative block with it and make sure it is rejected
 
   MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
 
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
   DO_CALLBACK(events, "mark_invalid_block");
   MAKE_NEXT_BLOCK_TX1(events, blk_1_alt_bad, blk_0r, miner_acc, tx_0a);              // this alt block should be rejected because of tx_0a
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
   DO_CALLBACK(events, "clear_tx_pool");
 
 

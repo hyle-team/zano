@@ -192,25 +192,6 @@ namespace currency
     key_image_cache m_key_images;
     mutable epee::critical_section m_remove_stuck_txs_lock;
 
-    
-    /************************************************************************/
-    /*                                                                      */
-    /************************************************************************/
-    class amount_visitor: public boost::static_visitor<uint64_t>
-    {
-    public:
-      uint64_t operator()(const txin_to_key& tx) const
-      {
-        return tx.amount;
-      }
-      uint64_t operator()(const txin_gen& /*tx*/) const
-      {
-        CHECK_AND_ASSERT_MES(false, 0, "coinbase transaction in memory pool");
-        return 0;
-      }
-      uint64_t operator()(const txin_multisig& in) const { return in.amount; }
-    };
-
   };
 }
 

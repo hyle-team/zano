@@ -18,6 +18,7 @@ hard_fork_2_base_test::hard_fork_2_base_test(size_t hardfork_02_height)
 hard_fork_2_base_test::hard_fork_2_base_test(size_t hardfork_01_height, size_t hardfork_02_height)
   : m_hardfork_01_height(hardfork_01_height)
   , m_hardfork_02_height(hardfork_02_height)
+  , m_hardfork_03_height(CURRENCY_MAX_BLOCK_NUMBER)
 {
   REGISTER_CALLBACK_METHOD(hard_fork_2_base_test, configure_core);
 }
@@ -29,6 +30,7 @@ bool hard_fork_2_base_test::configure_core(currency::core& c, size_t ev_index, c
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
   pc.hard_fork_01_starts_after_height = m_hardfork_01_height;
   pc.hard_fork_02_starts_after_height = m_hardfork_02_height;
+  pc.hard_fork_03_starts_after_height = m_hardfork_03_height;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
@@ -754,6 +756,7 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   tx_payer payer = AUTO_VAL_INIT(payer);
   payer.acc_addr = miner_acc.get_public_address();
   extra.push_back(payer);
+  DO_CALLBACK(events, "mark_invalid_tx");
   MAKE_TX_MIX_ATTR_EXTRA(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(1), 0, blk_0r, 0, extra, true);
 
   // blk_1b_1 is invalid as containing tx_0
@@ -775,6 +778,7 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   tx_receiver receiver = AUTO_VAL_INIT(receiver);
   receiver.acc_addr = miner_acc.get_public_address();
   extra.push_back(receiver);
+  DO_CALLBACK(events, "mark_invalid_tx");
   MAKE_TX_MIX_ATTR_EXTRA(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(1), 0, blk_1, 0, extra, true);
 
   // blk_1b_2 is invalid as containing tx_1
@@ -797,6 +801,7 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   alias_entry.m_alias = "minerminer";
 
   std::list<transaction> tx_set;
+  DO_CALLBACK(events, "mark_invalid_tx");
   r = put_alias_via_tx_to_list(events, tx_set, blk_2, miner_acc, alias_entry, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   transaction tx_2 = tx_set.front();
@@ -823,6 +828,10 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);
+
+  events.push_back(tx_0);
+  events.push_back(tx_1);
+  events.push_back(tx_2);
 
 
   // tx_0 with tx_payer should be accepted after HF2

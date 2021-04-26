@@ -191,7 +191,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::variant<uint64_t, ref_by_id> txout_v;
+  typedef boost::variant<uint64_t, ref_by_id> txout_ref_v;
   
 
   struct signed_parts
@@ -211,7 +211,7 @@ namespace currency
   struct txin_to_key
   {
     uint64_t amount;
-    std::vector<txout_v> key_offsets;
+    std::vector<txout_ref_v> key_offsets;
     crypto::key_image k_image;                    // double spending protection
     std::vector<txin_etc_details_v> etc_details;  //this flag used when TX_FLAG_SIGNATURE_MODE_SEPARATE flag is set, point to which amount of outputs(starting from zero) used in signature
 
@@ -220,6 +220,15 @@ namespace currency
       FIELD(key_offsets)
       FIELD(k_image)
       FIELD(etc_details)
+    END_SERIALIZE()
+  };
+
+  struct txin_htlc: public txin_to_key
+  {
+    std::string hltc_origin;
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(hltc_origin)
+      FIELDS(*static_cast<txin_to_key*>(this))
     END_SERIALIZE()
   };
 
@@ -249,9 +258,28 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::variant<txin_gen, txin_to_key, txin_multisig> txin_v;
+#define CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK   0x01 // 0 - SHA256, 1 - RIPEMD160
 
-  typedef boost::variant<txout_to_key, txout_multisig> txout_target_v;
+  struct txout_htlc
+  {
+    crypto::hash htlc_hash;
+    uint8_t flags;      //select type of the hash, may be some extra info in future
+    uint64_t expiration; 
+    crypto::public_key pkey_redeem; //works before expiration
+    crypto::public_key pkey_refund; //works after expiration
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(htlc_hash)
+      FIELD(flags)
+      VARINT_FIELD(expiration)
+      FIELD(pkey_redeem)
+      FIELD(pkey_refund)
+    END_SERIALIZE()
+  };
+
+  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_htlc> txin_v;
+
+  typedef boost::variant<txout_to_key, txout_multisig, txout_htlc> txout_target_v;
 
   //typedef std::pair<uint64_t, txout> out_t;
   struct tx_out
@@ -531,7 +559,7 @@ namespace currency
   {
   public:
     // tx version information
-    size_t   version{};
+    uint64_t   version{};
     //extra
     std::vector<extra_v> extra;  
     std::vector<txin_v> vin;
@@ -766,6 +794,10 @@ SET_VARIANT_TAGS(currency::tx_receiver, 32, "receiver2");
 
 // @#@ TODO @#@
 SET_VARIANT_TAGS(currency::extra_alias_entry, 33, "alias_entry2");
+
+//htlc
+SET_VARIANT_TAGS(currency::txin_htlc, 34, "txin_htlc");
+SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 
 
 

@@ -84,6 +84,9 @@ namespace wallet_public
   };
 
 
+#define WALLET_TRANSFER_INFO_FLAGS_HTLC_DEPOSIT   static_cast<uint16_t>(1 << 0)
+
+
   struct wallet_transfer_info
   {
     uint64_t      amount;
@@ -106,6 +109,7 @@ namespace wallet_public
     uint64_t      fee;
     bool          show_sender;
     std::vector<escrow_contract_details> contract;
+    uint16_t      extra_flags; 
     
     //not included in kv serialization map
     currency::transaction tx;
@@ -974,7 +978,125 @@ namespace wallet_public
     };
   };
 
+  struct htlc_entry_info
+  {
+    currency::account_public_address counterparty_address;
+    crypto::hash sha256_hash;
+    crypto::hash tx_id;
+    uint64_t amount;
+    bool is_redeem;
 
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE_ADDRESS_AS_TEXT(counterparty_address)
+      KV_SERIALIZE_POD_AS_HEX_STRING(sha256_hash)
+      KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+      KV_SERIALIZE(is_redeem)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+  struct COMMAND_CREATE_HTLC_PROPOSAL
+  {
+
+
+    struct request
+    {
+      uint64_t amount;
+      currency::account_public_address counterparty_address;
+      uint64_t lock_blocks_count;
+      crypto::hash htlc_hash;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amount)
+        KV_SERIALIZE_ADDRESS_AS_TEXT(counterparty_address)
+        KV_SERIALIZE(lock_blocks_count)
+        KV_SERIALIZE_POD_AS_HEX_STRING(htlc_hash)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string result_tx_blob;
+      crypto::hash result_tx_id;
+      std::string derived_origin_secret; // this field derived in a deterministic way if no htlc_hash was provided
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(result_tx_blob)
+        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx_id)
+        KV_SERIALIZE_BLOB_AS_HEX_STRING_N(derived_origin_secret, "derived_origin_secret_as_hex")
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_GET_LIST_OF_ACTIVE_HTLC
+  {
+    struct request
+    {
+      bool income_redeem_only;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(income_redeem_only)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::list<wallet_public::htlc_entry_info> htlcs;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(htlcs)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_REDEEM_HTLC
+  {
+    struct request
+    {
+      crypto::hash tx_id;
+      std::string origin_secret;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+        KV_SERIALIZE_BLOB_AS_HEX_STRING_N(origin_secret, "origin_secret_as_hex")
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string result_tx_blob;
+      crypto::hash result_tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(result_tx_blob)
+        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx_id)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_CHECK_HTLC_REDEEMED
+  {
+    struct request
+    {
+      crypto::hash htlc_tx_id;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(htlc_tx_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string origin_secrete;
+      crypto::hash redeem_tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_HEX_STRING_N(origin_secrete, "origin_secrete_as_hex")
+        KV_SERIALIZE_POD_AS_HEX_STRING(redeem_tx_id)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   inline std::string get_escrow_contract_state_name(uint32_t state)
   {

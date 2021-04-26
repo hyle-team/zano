@@ -109,6 +109,20 @@ public: \
 	
 
 
+  template<typename t_uint>
+  struct uint_mask_selector
+  {
+    template<t_uint mask>
+    inline static bool get_value_of_flag_by_mask(const t_uint& given_flags)
+    { 
+      return given_flags&mask == 0 ? false : true;
+    }
+  }; 
+
+
+#define KV_SERIALIZE_EPHEMERAL_BOOL_FROM_FLAG_N(var, mask, val_name) \
+  KV_SERIALIZE_EPHEMERAL_N(bool, uint_mask_selector<decltype(var)>::get_value_of_flag_by_mask<mask>, val_name)
+
 
 
 

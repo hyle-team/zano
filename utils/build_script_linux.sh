@@ -73,7 +73,7 @@ echo $version_str
 rm -rf Zano;
 mkdir -p Zano;
 
-rsync -a ../../src/gui/qt-daemon/html ./Zano --exclude less --exclude package.json --exclude gulpfile.js
+rsync -a ../../src/gui/qt-daemon/layout/html ./Zano --exclude less --exclude package.json --exclude gulpfile.js
 cp -Rv ../../utils/Zano.sh ./Zano
 chmod 777 ./Zano/Zano.sh
 mkdir ./Zano/lib

@@ -299,6 +299,7 @@ public:
     return true;
   }
 
+  void set_hard_fork_heights_to_generator(test_generator& generator) const;
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_top_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool clear_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
@@ -320,6 +321,10 @@ protected:
   size_t m_invalid_tx_index;
   size_t m_unverifiable_tx_index;
   size_t m_orphan_block_index;
+
+  uint64_t m_hardfork_01_height;
+  uint64_t m_hardfork_02_height;
+  uint64_t m_hardfork_03_height;
 };
 
 struct wallet_test_core_proxy;
@@ -532,6 +537,7 @@ private:
   
   uint64_t m_hardfork_01_after_heigh;
   uint64_t m_hardfork_02_after_heigh;
+  uint64_t m_hardfork_03_after_heigh;
 
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;
@@ -798,7 +804,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   BOOST_FOREACH(const currency::tx_destination_entry& dst_entr, shuffled_dsts)
   {
     CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
-    bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, der_hints, tx_outs_attr);
+    bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, der_hints, sender_account_keys, tx_outs_attr);
     CHECK_AND_ASSERT_MES(r, false, "Failed to construc tx out");
     output_index++;
     summary_outs_money += dst_entr.amount;

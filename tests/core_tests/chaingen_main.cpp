@@ -900,7 +900,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(alt_blocks_validation_and_same_new_amount_in_two_txs);
     GENERATE_AND_PLAY(alt_blocks_with_the_same_txs);
     GENERATE_AND_PLAY(chain_switching_when_out_spent_in_alt_chain_mixin);
-    // GENERATE_AND_PLAY(chain_switching_when_out_spent_in_alt_chain_ref_id);
+    GENERATE_AND_PLAY(chain_switching_when_out_spent_in_alt_chain_ref_id);
 
 
     // miscellaneous tests
@@ -947,6 +947,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_block_miner_tx_has_out_to_alice);
     GENERATE_AND_PLAY(gen_block_has_invalid_tx);
     GENERATE_AND_PLAY(gen_block_is_too_big);
+    GENERATE_AND_PLAY(gen_block_wrong_version_agains_hardfork);    
     //GENERATE_AND_PLAY(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
 
 
@@ -1020,6 +1021,12 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<true>);
     GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<false>);
 
+    // atomics
+    GENERATE_AND_PLAY(atomic_simple_test);
+    GENERATE_AND_PLAY(atomic_test_wrong_redeem_wrong_refund);    
+    GENERATE_AND_PLAY(atomic_test_altchain_simple);
+    GENERATE_AND_PLAY(atomic_test_check_hardfork_rules);
+    
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */

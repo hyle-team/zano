@@ -310,7 +310,7 @@ namespace currency
     account_public_address ad = AUTO_VAL_INIT(ad);
     if (!get_account_address_from_str(ad, str))
     {
-      LOG_ERROR("cannot parse address from string: " << str);
+      CHECK_AND_ASSERT_THROW_MES(false, "cannot parse address from string: " << str);
     }
     return ad;
   }
