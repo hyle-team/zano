@@ -840,7 +840,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);
-    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(), stakeholder.get_public_address());
