@@ -1385,6 +1385,20 @@ TEST(ml2s, sig_verif_performance_2)
 }
 
 
+TEST(crypto, hex_tools)
+{
+  ASSERT_EQ(parse_tpod_from_hex_string<uint8_t>("00"), 0x00);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint8_t>("01"), 0x01);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint8_t>("f1"), 0xf1);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint8_t>("fe"), 0xfe);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint64_t>("efcdab8967452301"), 0x0123456789abcdef);
+  ASSERT_EQ(parse_tpod_from_hex_string<uint64_t>("0123456789abcdef"), 0xefcdab8967452301);
+  ASSERT_EQ(parse_tpod_from_hex_string<scalar_t>("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"), c_scalar_Pm1);
+  ASSERT_EQ(parse_tpod_from_hex_string<scalar_t>("792fdce229e50661d0da1c7db39dd30700000000000000000000000000000006"), c_scalar_1div8);
+
+  return true;
+}
+
 //
 // test's runner
 //
