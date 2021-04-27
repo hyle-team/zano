@@ -108,6 +108,13 @@ if(NOT MSVC AND NOT APPLE AND NOT CLANG)  # TODO(unassigned): do we really need 
    target_compile_options(common PRIVATE -fno-var-tracking-assignments)
 endif()
 
+# disable specific warning in order not to touch original code by D. J. Bernstein
+if(MSVC)
+  set_source_files_properties("crypto/chacha8_stream.c" PROPERTIES COMPILE_FLAGS "/wd4018")
+else()
+  set_source_files_properties("crypto/chacha8_stream.c" PROPERTIES COMPILE_FLAGS "-Wno-sign-compare -Wno-strict-prototypes")
+endif()
+
 add_library(crypto ${CRYPTO})
 
 add_library(currency_core ${CURRENCY_CORE})

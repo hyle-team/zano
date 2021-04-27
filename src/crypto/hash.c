@@ -27,5 +27,5 @@ void cn_fast_hash_old(const void *data, size_t length, char *hash)
 
 void cn_fast_hash(const void *data, size_t length, char *hash)
 {
-  keccak(data, (int)length, hash, HASH_SIZE);
+  keccak(data, (int)length, (uint8_t*)hash, HASH_SIZE);
 }
