@@ -219,10 +219,17 @@ bool test_generator::construct_block(currency::block& blk,
                                      const std::list<currency::transaction>& tx_list, 
                                      const std::list<currency::account_base>& coin_stake_sources)//in case of PoS block
 {
-  if (height > m_hardfork_01_after_heigh)
-    blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
-  else
+//   if (height > m_hardfork_01_after_heigh)
+//     blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+//   else
+//     blk.major_version = BLOCK_MAJOR_VERSION_INITAL;
+
+  if (height <= m_hardfork_01_after_heigh)
     blk.major_version = BLOCK_MAJOR_VERSION_INITAL;
+  else if (height <= m_hardfork_03_after_heigh)
+    blk.major_version = HF1_BLOCK_MAJOR_VERSION;
+  else
+    blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
   
   blk.minor_version = CURRENT_BLOCK_MINOR_VERSION;
   blk.timestamp = timestamp;
