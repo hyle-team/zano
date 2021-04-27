@@ -8,7 +8,6 @@
 #include <string>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "crypto.h"
-#include "epee/include/string_tools.h"
 
 namespace crypto
 {
@@ -129,8 +128,6 @@ namespace crypto
     parse_tpod_from_hex_string(hex_str, t_pod);
     return t_pod;
   }
-
-
 
   //
   // scalar_t - holds a 256-bit scalar, normally in [0..L-1]
@@ -407,7 +404,7 @@ namespace crypto
 
     std::string to_string_as_secret_key() const
     {
-      return epee::string_tools::pod_to_hex(*this);
+      return pod_to_hex(*this);
     }
 
     template<typename MP_type>
@@ -501,7 +498,7 @@ namespace crypto
     bool from_string(const std::string& str)
     {
       crypto::public_key pk;
-      if (!epee::string_tools::parse_tpod_from_hex_string(str, pk))
+      if (!parse_tpod_from_hex_string(str, pk))
         return false;
       return from_public_key(pk);
     }
@@ -634,19 +631,19 @@ namespace crypto
     friend std::ostream& operator<<(std::ostream& ss, const point_t &v)
     {
       crypto::public_key pk = v.to_public_key();
-      return ss << epee::string_tools::pod_to_hex(pk);
+      return ss << pod_to_hex(pk);
     }
 
     operator std::string() const
     {
       crypto::public_key pk = to_public_key();
-      return epee::string_tools::pod_to_hex(pk);
+      return pod_to_hex(pk);
     }
 
     std::string to_string() const
     {
       crypto::public_key pk = to_public_key();
-      return epee::string_tools::pod_to_hex(pk);
+      return pod_to_hex(pk);
     }
 
     std::string to_hex_comma_separated_bytes_str() const
