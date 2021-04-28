@@ -222,10 +222,10 @@ bool test_generator::construct_block(currency::block& blk,
 //   if (height > m_hardfork_01_after_heigh)
 //     blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
 //   else
-//     blk.major_version = BLOCK_MAJOR_VERSION_INITAL;
+//     blk.major_version = BLOCK_MAJOR_VERSION_INITIAL;
 
   if (height <= m_hardfork_01_after_heigh)
-    blk.major_version = BLOCK_MAJOR_VERSION_INITAL;
+    blk.major_version = BLOCK_MAJOR_VERSION_INITIAL;
   else if (height <= m_hardfork_03_after_heigh)
     blk.major_version = HF1_BLOCK_MAJOR_VERSION;
   else
@@ -878,7 +878,7 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
                                               size_t txs_sizes/* = 0*/)
 {
   size_t height = get_block_height(prev_block) + 1;
-  blk.major_version = actual_params & bf_major_ver ? major_ver : BLOCK_MAJOR_VERSION_INITAL;
+  blk.major_version = actual_params & bf_major_ver ? major_ver : BLOCK_MAJOR_VERSION_INITIAL;
   blk.minor_version = actual_params & bf_minor_ver ? minor_ver : CURRENT_BLOCK_MINOR_VERSION;
   blk.timestamp     = actual_params & bf_timestamp ? timestamp : (height > 10 ? prev_block.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN: prev_block.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN-POW_DIFF_UP_TIMESTAMP_DELTA); // Keep difficulty unchanged
   blk.prev_id       = actual_params & bf_prev_id   ? prev_id   : get_block_hash(prev_block);
