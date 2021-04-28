@@ -8,7 +8,6 @@
 #include <string>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "crypto.h"
-#include "epee/include/string_tools.h"
 
 namespace crypto
 {
@@ -88,6 +87,47 @@ namespace crypto
     return ss.str();
   }
 
+  template<typename t_pod_type>
+  bool parse_tpod_from_hex_string(const std::string& hex_str, t_pod_type& t_pod)
+  {
+    static const int16_t char_map[256] = { // 0-9, a-f, A-F is only allowed
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,   // 0x00 - 0x1F
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, -1, -1, -1, -1, -1, -1,   // 0x20 - 0x3F
+      -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,   // 0x40 - 0x5F
+      -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,   // 0x60 - 0x7F
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,   // 0x80 - 0x9F
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,   // 0xA0 - 0xBF
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,   // 0xC0 - 0xDF
+      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }; // 0xE0 - 0xFF
+
+    size_t pod_size = sizeof t_pod;
+    uint8_t *p = reinterpret_cast<uint8_t*>(&t_pod);
+
+    if (hex_str.size() != 2 * pod_size)
+      return false;
+
+    for (size_t i = 0; i < pod_size; ++i)
+    {
+      int16_t hi = char_map[static_cast<uint8_t>(hex_str[2 * i])];
+      int16_t lo = char_map[static_cast<uint8_t>(hex_str[2 * i + 1])];
+      if (hi < 0 || lo < 0)
+      {
+        // invalid characters in hex_str
+        memset(p, 0, pod_size);
+        return false;
+      }
+      p[i] = static_cast<uint8_t>(hi * 16 + lo); // write byte to pod
+    }
+    return true;
+  }
+
+  template<typename t_pod_type>
+  t_pod_type parse_tpod_from_hex_string(const std::string& hex_str)
+  {
+    t_pod_type t_pod = AUTO_VAL_INIT(t_pod);
+    parse_tpod_from_hex_string(hex_str, t_pod);
+    return t_pod;
+  }
 
   //
   // scalar_t - holds a 256-bit scalar, normally in [0..L-1]
@@ -364,7 +404,7 @@ namespace crypto
 
     std::string to_string_as_secret_key() const
     {
-      return epee::string_tools::pod_to_hex(*this);
+      return pod_to_hex(*this);
     }
 
     template<typename MP_type>
@@ -458,7 +498,7 @@ namespace crypto
     bool from_string(const std::string& str)
     {
       crypto::public_key pk;
-      if (!epee::string_tools::parse_tpod_from_hex_string(str, pk))
+      if (!parse_tpod_from_hex_string(str, pk))
         return false;
       return from_public_key(pk);
     }
@@ -591,19 +631,19 @@ namespace crypto
     friend std::ostream& operator<<(std::ostream& ss, const point_t &v)
     {
       crypto::public_key pk = v.to_public_key();
-      return ss << epee::string_tools::pod_to_hex(pk);
+      return ss << pod_to_hex(pk);
     }
 
     operator std::string() const
     {
       crypto::public_key pk = to_public_key();
-      return epee::string_tools::pod_to_hex(pk);
+      return pod_to_hex(pk);
     }
 
     std::string to_string() const
     {
       crypto::public_key pk = to_public_key();
-      return epee::string_tools::pod_to_hex(pk);
+      return pod_to_hex(pk);
     }
 
     std::string to_hex_comma_separated_bytes_str() const

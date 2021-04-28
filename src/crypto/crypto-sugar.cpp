@@ -18,7 +18,7 @@ namespace crypto
   const scalar_t c_scalar_P       = { 0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
   const scalar_t c_scalar_Pm1     = { 0xffffffffffffffec, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
   const scalar_t c_scalar_256m1   = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff };
-  const scalar_t c_scalar_1div8   = { 0x6106e529e2dc2f79, 0x7d39db37d1cdad0,  0x0,                0x600000000000000 };
+  const scalar_t c_scalar_1div8   = { 0x6106e529e2dc2f79, 0x07d39db37d1cdad0, 0x0,                0x0600000000000000 };
 
   const point_t  c_point_H        = { 0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45 };  // == Hp(G), this is being checked in bpp_basics
   const point_t  c_point_0        = point_t(point_t::tag_zero());

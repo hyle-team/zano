@@ -5779,7 +5779,7 @@ bool blockchain_storage::prevalidate_block(const block& bl)
        get_block_height(bl) <= m_core_runtime_config.hard_fork_03_starts_after_height
     )
   {
-    if (bl.major_version == HF1_BLOCK_MAJOR_VERSION)
+    if (bl.major_version <= HF1_BLOCK_MAJOR_VERSION )
       return true;
     else
       return false;
