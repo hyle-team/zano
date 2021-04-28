@@ -26,6 +26,18 @@ namespace currency
     uint64_t hard_fork_02_starts_after_height;
     uint64_t hard_fork_03_starts_after_height;
 
+    bool is_hardfork_active_for_height(size_t hardfork_id, uint64_t height) const
+    {
+      switch (hardfork_id)
+      {
+      case 0: return true;
+      case 1: return height > hard_fork_01_starts_after_height;
+      case 2: return height > hard_fork_02_starts_after_height;
+      case 3: return height > hard_fork_03_starts_after_height;
+      default: return false;
+      }
+    }
+
     static uint64_t _default_core_time_function()
     {
       return time(NULL);

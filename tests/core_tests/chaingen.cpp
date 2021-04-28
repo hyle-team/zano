@@ -2099,6 +2099,7 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, print_tx_pool);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, remove_stuck_txs);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_offers_count);
+  REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_hardfork_active);
 }
 
 bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
@@ -2118,6 +2119,7 @@ void test_chain_unit_enchanced::set_hard_fork_heights_to_generator(test_generato
 {
   generator.set_hardfork_height(1, m_hardfork_01_height);
   generator.set_hardfork_height(2, m_hardfork_02_height);
+  generator.set_hardfork_height(3, m_hardfork_03_height);
 }
 
 bool test_chain_unit_enchanced::check_top_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
@@ -2228,6 +2230,22 @@ bool test_chain_unit_enchanced::check_offers_count(currency::core& c, size_t ev_
   
     CHECK_AND_ASSERT_MES(offers.size() == param.offers_count, false, "Incorrect offers count: " << offers.size() << ", expected: " << param.offers_count
       << ENDL << "Market:" << ENDL << print_market(offers_service));
+  }
+
+  return true;
+}
+
+bool test_chain_unit_enchanced::check_hardfork_active(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  size_t hardfork_id_to_check = 0;
+  const std::string& params = boost::get<callback_entry>(events[ev_index]).callback_params;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(params, hardfork_id_to_check), false, "hex_to_pod failed, params = " << params);
+
+  uint64_t top_block_height = c.get_top_block_height();
+  if (!c.get_blockchain_storage().get_core_runtime_config().is_hardfork_active_for_height(hardfork_id_to_check, top_block_height))
+  {
+    LOG_ERROR("Hardfork #" << hardfork_id_to_check << " is not active yet (top block height is " << top_block_height << ")");
+    return false;
   }
 
   return true;
