@@ -29,4 +29,4 @@ namespace currency
     return true;
   }
 
-} // namespace currency
+} // namespace currency 
