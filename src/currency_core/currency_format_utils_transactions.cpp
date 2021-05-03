@@ -262,10 +262,10 @@ namespace currency
     std::unordered_set<crypto::key_image> ki;
     BOOST_FOREACH(const auto& in, tx.vin)
     {
-      if (in.type() == typeid(txin_to_key))
+      if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
       {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, false);
-        if (!ki.insert(tokey_in.k_image).second)
+         
+        if (!ki.insert(get_to_key_input_from_txin_v(in).k_image).second)
           return false;
       }
     }

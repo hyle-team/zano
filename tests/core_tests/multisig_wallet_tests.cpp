@@ -47,7 +47,7 @@ void transfer_multisig(tools::wallet2& w,
 
     // prepare transaction will sign ms input partially with wallet's keys - it needed to be signed fully with the others
     tools::construct_tx_param ctp = AUTO_VAL_INIT(ctp);
-    tools::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
     ctp.attachments = attachments;
     ctp.crypt_address = crypt_address;
     ctp.dsts = dsts;

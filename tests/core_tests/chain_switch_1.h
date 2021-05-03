@@ -72,3 +72,13 @@ struct alt_blocks_with_the_same_txs : public test_chain_unit_enchanced
   bool check_tx_related_to_altblock(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_tx_not_related_to_altblock(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct chain_switching_when_out_spent_in_alt_chain_mixin : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+struct chain_switching_when_out_spent_in_alt_chain_ref_id : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};

@@ -42,6 +42,7 @@ public:
     m_cmd_binder.set_handler("print_bc_outs_stats", boost::bind(&daemon_commands_handler::print_bc_outs_stats, this, _1));
     m_cmd_binder.set_handler("print_block", boost::bind(&daemon_commands_handler::print_block, this, _1), "Print block, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_commands_handler::print_block_info, this, _1), "Print block info, print_block <block_hash> | <block_height>");
+    m_cmd_binder.set_handler("print_tx_prun_info", boost::bind(&daemon_commands_handler::print_tx_prun_info, this, _1), "Print tx prunning info");
     m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, _1), "Print transaction, print_tx <transaction_hash>");
     m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_commands_handler::start_mining, this, _1), "Start mining for specified address, start_mining <addr> [threads=1]");
     m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_commands_handler::stop_mining, this, _1), "Stop mining");
@@ -626,6 +627,56 @@ private:
     {
       print_block_info_by_hash(arg);
     }
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_tx_prun_info(const std::vector<std::string>& arg)
+  {
+    currency::blockchain_storage& bcs = m_srv.get_payload_object().get_core().get_blockchain_storage();
+
+    size_t txs = 0;
+    size_t pruned_txs = 0;
+    size_t signatures = 0;
+    size_t attachments = 0;
+    size_t blocks = 0;
+
+    uint64_t last_block_height = bcs.get_top_block_height();
+
+    LOG_PRINT_MAGENTA("start getting stats from 0 to " << last_block_height << " block, please wait ...", LOG_LEVEL_0);
+
+    for (uint64_t height = 0; height <= last_block_height; height++, blocks++)
+    {
+      currency::block_extended_info bei = AUTO_VAL_INIT(bei);
+      bool r = bcs.get_block_extended_info_by_height(height, bei);
+      if (!r)
+      {
+        LOG_PRINT_RED("Failed to get block #" << height, LOG_LEVEL_0);
+        break;
+      }
+
+      for (const auto& h : bei.bl.tx_hashes)
+      {
+        auto ptx = bcs.get_tx(h);
+        CHECK_AND_ASSERT_MES(ptx != nullptr, false, "failed to find transaction " << h << " in blockchain index, in block on height = " << height);
+
+        if (ptx->signatures.size() == 0)
+          pruned_txs += 1;
+
+        txs += 1;
+        signatures += ptx->signatures.size();
+        attachments += ptx->attachment.size();
+      }
+    }
+
+    LOG_PRINT_MAGENTA(ENDL << "blockchain pruning stats:" << ENDL <<
+      "  last block height: " << last_block_height << ENDL <<
+      "  blocks processed:  " << blocks << ENDL <<
+      "  total txs:         " << txs << ENDL <<
+      "  pruned txs:        " << pruned_txs << ENDL <<
+      "  total signatures:  " << signatures << ENDL <<
+      "  total attachments: " << attachments << ENDL <<
+      (pruned_txs == 0 ? "*** The database seems to be unpruned!" : "The database contains pruned transactions."), LOG_LEVEL_0);
 
     return true;
   }

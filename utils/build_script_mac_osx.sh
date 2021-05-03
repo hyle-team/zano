@@ -89,7 +89,7 @@ fi
 
 
 
-rsync -a ../../../src/gui/qt-daemon/html Zano.app/Contents/MacOS --exclude less --exclude package.json --exclude gulpfile.js
+rsync -a ../../../src/gui/qt-daemon/layout/html Zano.app/Contents/MacOS --exclude less --exclude package.json --exclude gulpfile.js
 if [ $? -ne 0 ]; then
     echo "Failed to cp html to MacOS"
     exit 1

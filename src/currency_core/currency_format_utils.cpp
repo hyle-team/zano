@@ -29,6 +29,7 @@ using namespace epee;
 #include "genesis.h"
 #include "genesis_acc.h"
 #include "common/mnemonic-encoding.h"
+#include "crypto/bitcoin/sha256_helper.h"
 
 namespace currency
 {
@@ -205,7 +206,7 @@ namespace currency
     std::set<uint16_t> deriv_cache;
     for (auto& d : destinations)
     {
-      bool r = construct_tx_out(d, txkey.sec, no, tx, deriv_cache);
+      bool r = construct_tx_out(d, txkey.sec, no, tx, deriv_cache, account_keys());
       CHECK_AND_ASSERT_MES(r, false, "Failed to contruct miner tx out");
       no++;
     }
@@ -590,7 +591,25 @@ namespace currency
 //     return true;
 //   }  
   //---------------------------------------------------------------
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr)
+  std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys)
+  {
+    std::string blob;
+    string_tools::apped_pod_to_strbuff(blob, htlc.pkey_redeem);
+    string_tools::apped_pod_to_strbuff(blob, htlc.pkey_refund);
+    string_tools::apped_pod_to_strbuff(blob, acc_keys.spend_secret_key);
+    crypto::hash origin_hs = crypto::cn_fast_hash(blob.data(), blob.size());
+    std::string origin_blob;
+    string_tools::apped_pod_to_strbuff(origin_blob, origin_hs);
+    return origin_blob;
+  }
+  //---------------------------------------------------------------
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr)
+  {
+    finalized_tx result = AUTO_VAL_INIT(result);
+    return construct_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, result, tx_outs_attr);
+  }
+  //---------------------------------------------------------------
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, finalized_tx& result, uint8_t tx_outs_attr)
   {
     CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
 
@@ -622,10 +641,58 @@ namespace currency
 
     tx_out out;
     out.amount = de.amount;
-    if (target_keys.size() == 1)
+    if (de.htlc_options.expiration != 0)
+    {
+      const destination_option_htlc_out& htlc_dest = de.htlc_options;
+      //out htlc
+      CHECK_AND_ASSERT_MES(target_keys.size() == 1, false, "Unexpected htl keys count = " << target_keys.size() << ", expected ==1");
+      txout_htlc htlc = AUTO_VAL_INIT(htlc);
+      htlc.expiration = htlc_dest.expiration;
+      htlc.flags = 0; //0 - SHA256, 1 - RIPEMD160, by default leave SHA256
+      //receiver key
+      htlc.pkey_redeem = *target_keys.begin();
+      //generate refund key
+      crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+      crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
+      bool r = derive_public_key_from_target_address(self.account_address, tx_sec_key, output_index, out_eph_public_key, derivation);
+      CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
+      htlc.pkey_refund = out_eph_public_key;
+      //add derivation hint for refund address
+      uint16_t hint = get_derivation_hint(derivation);
+      if (deriv_cache.count(hint) == 0)
+      {
+        tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
+        deriv_cache.insert(hint);
+      }
+
+
+      if (htlc_dest.htlc_hash == null_hash)
+      {
+        //we use deterministic origin, to make possible access origin on different wallets copies
+        
+        result.htlc_origin = generate_origin_for_htlc(htlc, self);
+
+        //calculate hash
+        if (!htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
+        {
+          htlc.htlc_hash = crypto::sha256_hash(result.htlc_origin.data(), result.htlc_origin.size());
+        }
+        else
+        {
+          crypto::hash160 h160 = crypto::RIPEMD160_hash(result.htlc_origin.data(), result.htlc_origin.size());
+          std::memcpy(&htlc.htlc_hash, &h160, sizeof(h160));
+        }
+      }
+      else
+      {
+        htlc.htlc_hash = htlc_dest.htlc_hash;
+      }
+      out.target = htlc;
+    }
+    else if (target_keys.size() == 1)
     {
       //out to key
-      txout_to_key tk;
+      txout_to_key tk = AUTO_VAL_INIT(tk);
       tk.key = target_keys.back();
 
       if (de.addr.front().is_auditable()) // check only the first address because there's only one in this branch
@@ -927,7 +994,29 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
-  uint64_t get_tx_type(const transaction& tx)
+  void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x)
+  {
+    x.is_service = currency::is_service_tx(x.tx);
+    x.is_mixing = currency::does_tx_have_only_mixin_inputs(x.tx);
+    x.is_mining = currency::is_coinbase(x.tx);
+    if (!x.is_mining)
+      x.fee = currency::get_tx_fee(x.tx);
+    else
+      x.fee = 0;
+    x.show_sender = currency::is_showing_sender_addres(x.tx);
+    tx_out htlc_out = AUTO_VAL_INIT(htlc_out);
+    txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
+
+    x.tx_type = get_tx_type_ex(x.tx, htlc_out, htlc_in);
+    if(x.tx_type == GUI_TX_TYPE_HTLC_DEPOSIT && x.is_income == true)
+    {
+      //need to override amount
+      x.amount = htlc_out.amount;
+    }
+  }
+
+  //---------------------------------------------------------------
+  uint64_t get_tx_type_ex(const transaction& tx, tx_out& htlc_out, txin_htlc& htlc_in)
   {
     if (is_coinbase(tx))
       return GUI_TX_TYPE_COIN_BASE;
@@ -942,7 +1031,7 @@ namespace currency
       else
         return GUI_TX_TYPE_NEW_ALIAS;
     }
-    
+
     // offers
     tx_service_attachment a = AUTO_VAL_INIT(a);
     if (get_type_in_variant_container(tx.attachment, a))
@@ -957,7 +1046,7 @@ namespace currency
           return GUI_TX_TYPE_CANCEL_OFFER;
       }
     }
-    
+
     // escrow
     tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
     if (bc_services::get_first_service_attachment_by_id(tx, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_TEMPLATES, tsa))
@@ -973,7 +1062,29 @@ namespace currency
     if (bc_services::get_first_service_attachment_by_id(tx, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_CANCEL_PROPOSAL, tsa))
       return GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL;
 
+    for (auto o : tx.vout)
+    {
+      if (o.target.type() == typeid(txout_htlc))
+      {
+        htlc_out = o;
+        return GUI_TX_TYPE_HTLC_DEPOSIT;
+      }
+    }
+
+    if (get_type_in_variant_container(tx.vin, htlc_in))
+    {
+      return GUI_TX_TYPE_HTLC_REDEEM;
+    }
+
+
     return GUI_TX_TYPE_NORMAL;
+  }
+  //---------------------------------------------------------------
+  uint64_t get_tx_type(const transaction& tx)
+  {
+    tx_out htlc_out = AUTO_VAL_INIT(htlc_out);
+    txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
+    return get_tx_type_ex(tx, htlc_out, htlc_in);
   }
   //---------------------------------------------------------------
   size_t get_multisig_out_index(const std::vector<tx_out>& outs)
@@ -1024,7 +1135,7 @@ namespace currency
       shuffle,
       flags);
   }
-
+  //---------------------------------------------------------------
   bool construct_tx(const account_keys& sender_account_keys, const std::vector<tx_source_entry>& sources,
     const std::vector<tx_destination_entry>& destinations,
     const std::vector<extra_v>& extra,
@@ -1038,6 +1149,45 @@ namespace currency
     bool shuffle,
     uint64_t flags)
   {
+    //extra copy operation, but creating transaction is not sensitive to this
+    finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    ftp.sources = sources;
+    ftp.prepared_destinations = destinations;
+    ftp.extra = extra;
+    ftp.attachments = attachments;
+    ftp.unlock_time = unlock_time;
+    ftp.crypt_address = crypt_destination_addr;
+    ftp.expiration_time = expiration_time;
+    ftp.tx_outs_attr = tx_outs_attr;
+    ftp.shuffle = shuffle;
+    ftp.flags = flags;
+
+    finalized_tx ft = AUTO_VAL_INIT(ft);
+    ft.tx = tx;
+    ft.one_time_key = one_time_secret_key;
+    bool r = construct_tx(sender_account_keys, ftp, ft);
+    tx = ft.tx;
+    one_time_secret_key = ft.one_time_key;
+    return r;
+  }
+  //---------------------------------------------------------------
+  bool construct_tx(const account_keys& sender_account_keys, const finalize_tx_param& ftp, finalized_tx& result)
+  {
+    const std::vector<tx_source_entry>& sources = ftp.sources;
+    const std::vector<tx_destination_entry>& destinations = ftp.prepared_destinations;
+    const std::vector<extra_v>& extra = ftp.extra;
+    const std::vector<attachment_v>& attachments = ftp.attachments;
+    const uint64_t& unlock_time = ftp.unlock_time;
+    const account_public_address& crypt_destination_addr = ftp.crypt_address;
+    const uint64_t& expiration_time = ftp.expiration_time;
+    const uint8_t& tx_outs_attr = ftp.tx_outs_attr;
+    const bool& shuffle = ftp.shuffle;
+    const uint64_t& flags = ftp.flags;
+                
+    transaction& tx = result.tx;
+    crypto::secret_key& one_time_secret_key = result.one_time_key;
+
+    result.ftp = ftp;
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "Too many outs (" << destinations.size() << ")! Tx can't be constructed.");
 
     bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
@@ -1119,8 +1269,56 @@ namespace currency
     for (const tx_source_entry& src_entr : sources)
     {
       in_contexts.push_back(input_generation_context_data());
-      if (!src_entr.is_multisig())
+      if(src_entr.is_multisig())
+      {//multisig input
+        txin_multisig input_multisig = AUTO_VAL_INIT(input_multisig);
+        summary_inputs_money += input_multisig.amount = src_entr.amount;
+        input_multisig.multisig_out_id = src_entr.multisig_id;
+        input_multisig.sigs_count = src_entr.ms_sigs_count;
+        tx.vin.push_back(input_multisig);
+      }
+      else if (src_entr.htlc_origin.size())
       {
+        //htlc redeem
+        keypair& in_ephemeral = in_contexts.back().in_ephemeral;
+        //txin_to_key
+        if(src_entr.outputs.size() != 1)
+        {
+          LOG_ERROR("htlc in: wrong output src_entr.outputs.size() = " << src_entr.outputs.size());
+          return false;
+        }
+        summary_inputs_money += src_entr.amount;
+
+        //key_derivation recv_derivation;
+        crypto::key_image img;
+        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
+          return false;
+
+        //check that derivated key is equal with real output key
+        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].second))
+        {
+          LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
+            << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
+            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
+          return false;
+        }
+
+        //put key image into tx input
+        txin_htlc input_to_key;
+        input_to_key.amount = src_entr.amount;
+        input_to_key.k_image = img;
+        input_to_key.hltc_origin = src_entr.htlc_origin;
+
+        //fill outputs array and use relative offsets
+        BOOST_FOREACH(const tx_source_entry::output_entry& out_entry, src_entr.outputs)
+          input_to_key.key_offsets.push_back(out_entry.first);
+
+        input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
+        tx.vin.push_back(input_to_key);
+      }
+      else
+      {
+        //regular to key out
         keypair& in_ephemeral = in_contexts.back().in_ephemeral;
         //txin_to_key
         if (src_entr.real_output >= src_entr.outputs.size())
@@ -1145,7 +1343,26 @@ namespace currency
         }
 
         //put key image into tx input
-        txin_to_key input_to_key;
+        txin_v in_v;
+        txin_to_key* ptokey = nullptr;
+        if (src_entr.htlc_origin.size())
+        {
+          //add txin_htlc
+          txin_htlc in_htlc = AUTO_VAL_INIT(in_htlc);
+          in_htlc.hltc_origin = src_entr.htlc_origin;
+          in_v = in_htlc;
+          txin_htlc& in_v_ref = boost::get<txin_htlc>(in_v);
+          ptokey = static_cast<txin_to_key*>(&in_v_ref);
+        }
+        else
+        {
+          in_v = txin_to_key();
+          txin_to_key& in_v_ref = boost::get<txin_to_key>(in_v);
+          ptokey = &in_v_ref;
+        }
+        txin_to_key& input_to_key = *ptokey;
+
+        
         input_to_key.amount = src_entr.amount;
         input_to_key.k_image = img;
 
@@ -1154,16 +1371,9 @@ namespace currency
           input_to_key.key_offsets.push_back(out_entry.first);
 
         input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
-        tx.vin.push_back(input_to_key);
+        tx.vin.push_back(in_v);
       }
-      else
-      {//multisig input
-        txin_multisig input_multisig = AUTO_VAL_INIT(input_multisig);
-        summary_inputs_money += input_multisig.amount = src_entr.amount;
-        input_multisig.multisig_out_id = src_entr.multisig_id;
-        input_multisig.sigs_count = src_entr.ms_sigs_count;
-        tx.vin.push_back(input_multisig);
-      }
+
     }
 
     // "Shuffle" outs
@@ -1178,7 +1388,7 @@ namespace currency
     for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
-      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, tx_outs_attr);
+      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construc tx out");
       output_index++;
       summary_outs_money += dst_entr.amount;
@@ -1250,9 +1460,14 @@ namespace currency
       tx.signatures.push_back(std::vector<crypto::signature>());
       std::vector<crypto::signature>& sigs = tx.signatures.back();
 
-      if (!src_entr.is_multisig())
+      if(src_entr.is_multisig())
       {
-        // txin_to_key
+        // txin_multisig -- don't sign anything here (see also sign_multisig_input_in_tx())
+        sigs.resize(src_entr.ms_keys_count, null_sig); // just reserve keys.size() null signatures (NOTE: not minimum_sigs!)
+      }
+      else
+      {
+        // regular txin_to_key or htlc
         ss_ring_s << "input #" << input_index << ", pub_keys:" << ENDL;
         std::vector<const crypto::public_key*> keys_ptrs;
         BOOST_FOREACH(const tx_source_entry::output_entry& o, src_entr.outputs)
@@ -1263,16 +1478,11 @@ namespace currency
         sigs.resize(src_entr.outputs.size());
 
         if (!watch_only_mode)
-          crypto::generate_ring_signature(tx_hash_for_signature, boost::get<txin_to_key>(tx.vin[input_index]).k_image, keys_ptrs, in_contexts[in_context_index].in_ephemeral.sec, src_entr.real_output, sigs.data());
-
+          crypto::generate_ring_signature(tx_hash_for_signature, get_to_key_input_from_txin_v(tx.vin[input_index]).k_image, keys_ptrs, in_contexts[in_context_index].in_ephemeral.sec, src_entr.real_output, sigs.data());
+        
         ss_ring_s << "signatures:" << ENDL;
         std::for_each(sigs.begin(), sigs.end(), [&ss_ring_s](const crypto::signature& s) { ss_ring_s << s << ENDL; });
         ss_ring_s << "prefix_hash: " << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_contexts[in_context_index].in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output << ENDL;
-      }
-      else
-      {
-        // txin_multisig -- don't sign anything here (see also sign_multisig_input_in_tx())
-        sigs.resize(src_entr.ms_keys_count, null_sig); // just reserve keys.size() null signatures (NOTE: not minimum_sigs!)
       }
       if (src_entr.separately_signed_tx_complete)
       {
@@ -1449,10 +1659,9 @@ namespace currency
   {
     for(const auto& in : tx.vin)
     {
-      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_multisig), false, "wrong variant type: "
-        << in.type().name() << ", expected " << typeid(txin_to_key).name()
+      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_multisig) || in.type() == typeid(txin_htlc), false, "wrong variant type: "
+        << in.type().name() 
         << ", in transaction id=" << get_transaction_hash(tx));
-
     }
     return true;
   }
@@ -1523,6 +1732,14 @@ namespace currency
         if (!check_key(boost::get<txout_to_key>(out.target).key))
           return false;
       }
+      else if (out.target.type() == typeid(txout_htlc))
+      {
+        const txout_htlc& htlc = boost::get<txout_htlc>(out.target);
+        if (!check_key(htlc.pkey_redeem))
+          return false;
+        if (!check_key(htlc.pkey_refund))
+          return false;
+      }
       else if (out.target.type() == typeid(txout_multisig))
       {
         const txout_multisig& ms = boost::get<txout_multisig>(out.target);
@@ -1559,8 +1776,13 @@ namespace currency
       }
       else if (in.type() == typeid(txin_multisig))
       {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_multisig, tokey_in, false);
-        this_amount = tokey_in.amount;
+        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_multisig, ms_in, false);
+        this_amount = ms_in.amount;
+      }
+      else if (in.type() == typeid(txin_htlc))
+      {
+        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_htlc, htlc_in, false);
+        this_amount = htlc_in.amount;
       }
       else
       {
@@ -1675,6 +1897,12 @@ namespace currency
   //---------------------------------------------------------------
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
+    std::list<htlc_info> htlc_info_list;
+    return lookup_acc_outs(acc, tx, tx_pub_key, outs, money_transfered, derivation, htlc_info_list);
+  }
+  //---------------------------------------------------------------
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list)
+  {
     money_transfered = 0;
     bool r = generate_key_derivation(tx_pub_key, acc.view_secret_key, derivation);
     CHECK_AND_ASSERT_MES(r, false, "unable to generate derivation from tx_pub = " << tx_pub_key << " * view_sec, invalid tx_pub?");
@@ -1685,7 +1913,6 @@ namespace currency
       return lookup_acc_outs_genesis(acc, tx, tx_pub_key, outs, money_transfered, derivation);
     }
 
-    
     if (!check_tx_derivation_hint(tx, derivation))
       return true;
 
@@ -1706,6 +1933,23 @@ namespace currency
         {
           outs.push_back(i);
           //don't count this money
+        }
+      }
+      else if (o.target.type() == typeid(txout_htlc))
+      {
+        htlc_info hi = AUTO_VAL_INIT(hi);
+        const txout_htlc& htlc = boost::get<txout_htlc>(o.target);
+        if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, i))
+        {
+          hi.hltc_our_out_is_before_expiration = true;
+          htlc_info_list.push_back(hi);
+          outs.push_back(i);
+        }
+        else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, i))
+        {
+          hi.hltc_our_out_is_before_expiration = false;
+          htlc_info_list.push_back(hi);
+          outs.push_back(i);
         }
       }
       else
@@ -2049,11 +2293,11 @@ namespace currency
     return genesis_id;
   }
   //---------------------------------------------------------------
-  std::vector<txout_v> relative_output_offsets_to_absolute(const std::vector<txout_v>& off)
+  std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off)
   {
     //if array has both types of outs, then global index (uint64_t) should be first, and then the rest could be out_by_id
 
-    std::vector<txout_v> res = off;
+    std::vector<txout_ref_v> res = off;
     for (size_t i = 1; i < res.size(); i++)
     {
       if (res[i].type() == typeid(ref_by_id))
@@ -2064,13 +2308,13 @@ namespace currency
     return res;
   }
   //---------------------------------------------------------------
-  std::vector<txout_v> absolute_output_offsets_to_relative(const std::vector<txout_v>& off)
+  std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off)
   {
-    std::vector<txout_v> res = off;
+    std::vector<txout_ref_v> res = off;
     if (off.size() < 2)
       return res;
 
-    std::sort(res.begin(), res.end(), [](const txout_v& lft, const txout_v& rght)
+    std::sort(res.begin(), res.end(), [](const txout_ref_v& lft, const txout_ref_v& rght)
     {
       if (lft.type() == typeid(uint64_t))
       {
@@ -2128,11 +2372,11 @@ namespace currency
     return have_type_in_variant_container<tx_payer>(tx.attachment) || have_type_in_variant_container<tx_payer_old>(tx.attachment);
   }
   //---------------------------------------------------------------
-  bool is_mixin_tx(const transaction& tx)
+  bool does_tx_have_only_mixin_inputs(const transaction& tx)
   {
     for (const auto& e : tx.vin)
     {
-      if (e.type() != typeid(txin_to_key))
+      if (e.type() != typeid(txin_to_key) || e.type() != typeid(txin_multisig) || e.type() != typeid(txin_htlc))
         return false;
       if (boost::get<txin_to_key>(e).key_offsets.size() < 2)
         return false;
@@ -2408,6 +2652,12 @@ namespace currency
         }
         tei.outs.back().minimum_sigs = otm.minimum_sigs;
       }
+      else if (out.target.type() == typeid(txout_htlc))
+      {
+        const txout_htlc& otk = boost::get<txout_htlc>(out.target);
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_redeem) + "(htlc_pkey_redeem)");
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_refund) + "(htlc_pkey_refund)");
+      }
 
       ++i;
     }
@@ -2424,12 +2674,13 @@ namespace currency
       {
         tei.ins.back().amount = 0;
       }
-      else if (in.type() == typeid(txin_to_key))
+      else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
       {
-        txin_to_key& tk = boost::get<txin_to_key>(in);
+        //TODO: add htlc info
+        const txin_to_key& tk = get_to_key_input_from_txin_v(in);
         tei.ins.back().amount = tk.amount;
         tei.ins.back().kimage_or_ms_id = epee::string_tools::pod_to_hex(tk.k_image);
-        std::vector<txout_v> absolute_offsets = relative_output_offsets_to_absolute(tk.key_offsets);
+        std::vector<txout_ref_v> absolute_offsets = relative_output_offsets_to_absolute(tk.key_offsets);
         for (auto& ao : absolute_offsets)
         {
           tei.ins.back().global_indexes.push_back(0);
@@ -2442,6 +2693,10 @@ namespace currency
             //disable for the reset at the moment 
             tei.ins.back().global_indexes.back() = std::numeric_limits<uint64_t>::max();
           }
+        }
+        if (in.type() == typeid(txin_htlc))
+        {
+          tei.ins.back().htlc_origin = epee::string_tools::buff_to_hex_nodelimer(boost::get<txin_htlc>(in).hltc_origin);
         }
         //tk.etc_details -> visualize it may be later
       }
@@ -2511,7 +2766,7 @@ namespace currency
   {
     for (size_t n = 0; n < tx.vout.size(); ++n)
     {
-      if (tx.vout[n].target.type() == typeid(txout_to_key))
+      if (tx.vout[n].target.type() == typeid(txout_to_key) || tx.vout[n].target.type() == typeid(txout_htlc))
       {
         uint64_t amount = tx.vout[n].amount;
         gindices[amount] += 1;

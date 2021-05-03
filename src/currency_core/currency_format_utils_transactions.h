@@ -16,7 +16,7 @@ namespace currency
 {
   struct tx_source_entry
   {
-    typedef serializable_pair<txout_v, crypto::public_key> output_entry; // txout_v is either global output index or ref_by_id; public_key - is output ephemeral pub key
+    typedef serializable_pair<txout_ref_v, crypto::public_key> output_entry; // txout_v is either global output index or ref_by_id; public_key - is output ephemeral pub key
 
     std::vector<output_entry> outputs;  //index + key
     uint64_t real_output;               //index in outputs vector of real output_entry
@@ -28,6 +28,7 @@ namespace currency
     size_t ms_sigs_count;               //if txin_multisig: must be equal to output's minimum_sigs
     size_t ms_keys_count;               //if txin_multisig: must be equal to size of output's keys container
     bool separately_signed_tx_complete; //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
+    std::string htlc_origin;            //for htlc, specify origin
 
     bool is_multisig() const { return ms_sigs_count > 0; }
 
@@ -42,21 +43,38 @@ namespace currency
       FIELD(ms_sigs_count)
       FIELD(ms_keys_count)
       FIELD(separately_signed_tx_complete)
-      END_SERIALIZE()
+      FIELD(htlc_origin)
+    END_SERIALIZE()
   };
+
+
+  //if this struct is present, then creating htlc out, expiration -> number of blocks that htlc proposal is active
+  struct destination_option_htlc_out
+  {
+    uint64_t expiration;
+    crypto::hash htlc_hash;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(expiration)
+      FIELD(htlc_hash)
+    END_SERIALIZE()
+  };
+
 
   struct tx_destination_entry
   {
-    uint64_t amount;                                 //money
-    std::list<account_public_address>   addr;        //destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
-    size_t   minimum_sigs;                           // if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
-    uint64_t amount_to_provide;                      //amount money that provided by initial creator of tx, used with partially created transactions
+    uint64_t amount;                                    //money
+    std::list<account_public_address>   addr;           //destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
+    size_t   minimum_sigs;                              //if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
+    uint64_t amount_to_provide;                         //amount money that provided by initial creator of tx, used with partially created transactions
     uint64_t unlock_time;
-
-    tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0), unlock_time(0){}
-    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(0){}
-    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(ut) {}
-    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0), unlock_time(0){}
+    destination_option_htlc_out htlc_options;           //htlc options      
+    
+    
+    tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc_options(destination_option_htlc_out()){}
+    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc_options(destination_option_htlc_out()) {}
+    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(ut), htlc_options(destination_option_htlc_out()) {}
+    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0), unlock_time(0), htlc_options(destination_option_htlc_out()) {}
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(amount)
@@ -64,6 +82,7 @@ namespace currency
       FIELD(minimum_sigs)
       FIELD(amount_to_provide)
       FIELD(unlock_time)
+      FIELD(htlc_options)
     END_SERIALIZE()
   };
 

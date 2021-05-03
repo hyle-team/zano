@@ -21,11 +21,11 @@ namespace tools
   };
 
 #ifndef TESTNET
-  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.43.225/pre-download/zano_mdbx_95_900000.pak", "1c748d0f90fb1ed0af0ffe59d4b8f6046b2d0f92a8b8fe21932208829733f053", 1097493715, 2147450880 };
-  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.43.225/pre-download/zano_lmdb_95_900000.pak", "f2d498ed7abf641824eca4ce584c756d6138d670980c1abdddcdf07343f10bfc", 1406827811, 2079617024 };
+  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.43.225/pre-download/zano_mdbx_95_1000000.pak", "6b0bbba85bc420eaae5ec68373e528f70bffaa17fb111c796e951d06ad71e4fe", 1104150892, 2147450880 };
+  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.43.225/pre-download/zano_lmdb_95_1000000.pak", "b4d45c727dbf1b92671f9fd1a9624e79019e890bd3d33cb71e011ab4bcb0d21e", 1450748151, 2114449408 };
 #else
-  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.43.225/pre-download/zano_testnet_mdbx_97_700000.pak", "499b4294bbfedccea98bebd369c1fb7c676de0226e9f52657daab45dac908050", 491920310, 1073725440 };
-  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.43.225/pre-download/zano_testnet_lmdb_97_700000.pak", "a8d5fc57a69576fdd9d538f37af7f1abe3a33c721a597d4a86aa198dcc1d1e0e", 669535639, 1020039168 };
+  static constexpr pre_download_entry c_pre_download_mdbx = { "", "", 0, 0 };
+  static constexpr pre_download_entry c_pre_download_lmdb = { "", "", 0, 0 };
 #endif
 
   static constexpr uint64_t pre_download_min_size_difference = 512 * 1024 * 1024; // minimum difference in size between local DB and the downloadable one to start downloading
@@ -50,13 +50,14 @@ namespace tools
 
     boost::system::error_code ec;
     uint64_t sz = boost::filesystem::file_size(db_main_file_path, ec);
-    if (!(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > pre_download_min_size_difference) || command_line::has_arg(vm, command_line::arg_force_predownload)) )
+    if (pre_download.unpacked_size == 0 || !(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > pre_download_min_size_difference) || command_line::has_arg(vm, command_line::arg_force_predownload)) )
     {
       LOG_PRINT_MAGENTA("Pre-downloading not needed (db file size = " << sz << ")", LOG_LEVEL_0);
       return true;
     }
 
     // okay, let's download
+
 
     std::string downloading_file_path = db_main_file_path + ".download";
 
