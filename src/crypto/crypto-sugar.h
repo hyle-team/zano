@@ -394,7 +394,7 @@ namespace crypto
 
     friend std::ostream& operator<<(std::ostream& ss, const scalar_t &v)
     {
-      return ss << "0x" << pod_to_hex_reversed(v);
+      return ss << pod_to_hex(v);
     }
 
     std::string to_string_as_hex_number() const
@@ -510,6 +510,11 @@ namespace crypto
       return result;
     }
 
+    void to_public_key(crypto::public_key& result) const
+    {
+      ge_p3_tobytes((unsigned char*)&result, &m_p3);
+    }
+
     crypto::key_image to_key_image() const
     {
       crypto::key_image result;
@@ -562,8 +567,15 @@ namespace crypto
     friend point_t operator*(const scalar_t& lhs, const point_t& rhs)
     {
       point_t result;
-      ge_scalarmult_p3(&result.m_p3, reinterpret_cast<const unsigned char*>(&lhs), &rhs.m_p3);
+      ge_scalarmult_p3(&result.m_p3, lhs.m_s, &rhs.m_p3);
       return result;
+    }
+
+    point_t& operator*=(const scalar_t& rhs)
+    {
+      // TODO: ge_scalarmult_vartime_p3
+      ge_scalarmult_p3(&m_p3, rhs.m_s, &m_p3);
+      return *this;
     }
 
     friend point_t operator/(const point_t& lhs, const scalar_t& rhs)
@@ -742,6 +754,11 @@ namespace crypto
         m_elements.reserve(elements_count);
       }
 
+      void resize(size_t elements_count)
+      {
+        m_elements.resize(elements_count);
+      }
+
       void clear()
       {
         m_elements.clear();
@@ -769,6 +786,16 @@ namespace crypto
       void add_pub_key(const crypto::public_key& pk)
       {
         m_elements.emplace_back(pk);
+      }
+
+      scalar_t& access_scalar(size_t index)
+      {
+        return m_elements[index].scalar;
+      }
+
+      public_key& access_public_key(size_t index)
+      {
+        return m_elements[index].pk;
       }
 
       void add_points_array(const std::vector<point_t>& points_array)
@@ -801,6 +828,7 @@ namespace crypto
 
       union item_t
       {
+        item_t() {}
         item_t(const scalar_t& scalar) : scalar(scalar) {}
         item_t(const crypto::public_key& pk) : pk(pk) {}
         item_t(const crypto::key_image& ki) : ki(ki) {}
