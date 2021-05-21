@@ -16,8 +16,24 @@ using namespace epee;
 #include "crypto/hash.h"
 #include "core_rpc_server_error_codes.h"
 
-#include "stratum/stratum_helpers.h"
+namespace {
+  constexpr char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
+  template<class pod_t>
+  std::string pod_to_net_format(const pod_t &h)
+  {
+    const char* data = reinterpret_cast<const char*>(&h);
+    size_t len = sizeof h;
+
+    std::string s(len * 2, ' ');
+    for (size_t i = 0; i < len; ++i) {
+      s[2 * i]     = hexmap[(data[i] & 0xF0) >> 4];
+      s[2 * i + 1] = hexmap[(data[i] & 0x0F)];
+    }
+
+    return "0x" + s;
+  }
+}
 
 namespace currency
 {
@@ -868,7 +884,7 @@ namespace currency
     blobdata block_blob = t_serializable_object_to_blob(resp.b);
     std::string block_template_hash_blob = get_block_hashing_blob(resp.b);
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
-    res.blocktemplate_work = stratum::pod_to_net_format(crypto::cn_fast_hash(block_template_hash_blob.data(), block_template_hash_blob.size()));
+    res.blocktemplate_work = pod_to_net_format(crypto::cn_fast_hash(block_template_hash_blob.data(), block_template_hash_blob.size()));
     res.prev_hash = string_tools::pod_to_hex(resp.b.prev_id);
     res.height = resp.height;
     //calculate epoch seed
