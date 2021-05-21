@@ -16,6 +16,7 @@ using namespace epee;
 #include "crypto/hash.h"
 #include "core_rpc_server_error_codes.h"
 
+#include "stratum/stratum_helpers.h"
 
 
 namespace currency
@@ -254,7 +255,6 @@ namespace currency
       res.expiration_median_timestamp = m_core.get_blockchain_storage().get_tx_expiration_median();
     }
       
-
 
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -866,7 +866,9 @@ namespace currency
 
     res.difficulty = resp.diffic.convert_to<std::string>();
     blobdata block_blob = t_serializable_object_to_blob(resp.b);
+    std::string block_template_hash_blob = get_block_hashing_blob(resp.b);
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
+    res.blocktemplate_work = stratum::pod_to_net_format(crypto::cn_fast_hash(block_template_hash_blob.data(), block_template_hash_blob.size()));
     res.prev_hash = string_tools::pod_to_hex(resp.b.prev_id);
     res.height = resp.height;
     //calculate epoch seed
