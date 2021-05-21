@@ -791,6 +791,12 @@ namespace currency
     typedef std::string response;
   };
 
+  struct COMMAND_RPC_CHECKSOLUTION
+  {
+    typedef std::vector<std::string> request;
+
+    typedef bool response;
+  };
 
   struct COMMAND_RPC_GETBLOCKTEMPLATE
   {

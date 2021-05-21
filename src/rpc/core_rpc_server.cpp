@@ -17,8 +17,34 @@ using namespace epee;
 #include "core_rpc_server_error_codes.h"
 
 namespace {
+  std::string trim_0x(const std::string& s)
+  {
+    if (s.length() >= 2 && s[0] == '0' && s[1] == 'x')
+      return s.substr(2);
+    return s;
+  }
+  
   constexpr char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
-
+  constexpr char hexmap_backward[] =
+  { //0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // 0
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // 1
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // 2
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,   20,  20,  20,  20,  20,  20, // 3
+      20,  10,  11,  12,  13,  14,  15,  20,  20,  20,  20,  20,  20,  20,  20,  20, // 4
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // 5
+      20,  10,  11,  12,  13,  14,  15,  20,  20,  20,  20,  20,  20,  20,  20,  20, // 6
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // 7
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // 8
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // 9
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // A
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // B
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // C
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // D
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20, // E
+      20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20,  20  // F
+  };
+  
   template<class pod_t>
   std::string pod_to_net_format(const pod_t &h)
   {
@@ -32,6 +58,56 @@ namespace {
     }
 
     return "0x" + s;
+  }
+
+  template<class pod_t>
+  bool pod_from_net_format(const std::string& str, pod_t& result, bool assume_following_zeroes = false)
+  {
+    std::string s = trim_0x(str);
+    if (s.size() != sizeof(pod_t) * 2)
+    {
+      if (!assume_following_zeroes || s.size() > sizeof(pod_t) * 2)
+        return false; // invalid string length
+      s.insert(s.size() - 1, sizeof(pod_t) * 2 - s.size(), '0'); // add zeroes at the end
+    }
+
+    const unsigned char* hex_str = reinterpret_cast<const unsigned char*>(s.c_str());
+    char* pod_data = reinterpret_cast<char*>(&result);
+
+    for (size_t i = 0; i < sizeof(pod_t); ++i)
+    {
+      char a = hexmap_backward[hex_str[2 * i + 1]];
+      char b = hexmap_backward[hex_str[2 * i + 0]];
+      if (a > 15 || b > 15)
+        return false; // invalid character
+      pod_data[i] = a | (b << 4);
+    }
+    return true;
+  }
+
+  template<class pod_t>
+  bool pod_from_net_format_reverse(const std::string& str, pod_t& result, bool assume_leading_zeroes = false)
+  {
+    std::string s = trim_0x(str);
+    if (s.size() != sizeof(pod_t) * 2)
+    {
+      if (!assume_leading_zeroes || s.size() > sizeof(pod_t) * 2)
+        return false; // invalid string length
+      s.insert(0, sizeof(pod_t) * 2 - s.size(), '0'); // add zeroes at the beginning
+    }
+
+    const unsigned char* hex_str = reinterpret_cast<const unsigned char*>(s.c_str());
+    char* pod_data = reinterpret_cast<char*>(&result);
+
+    for (size_t i = 0; i < sizeof(pod_t); ++i)
+    {
+      char a = hexmap_backward[hex_str[2 * i + 1]];
+      char b = hexmap_backward[hex_str[2 * i + 0]];
+      if (a > 15 || b > 15)
+        return false; // invalid character
+      pod_data[sizeof(pod_t) - i - 1] = a | (b << 4); // reverse byte order
+    }
+    return true;
   }
 }
 
@@ -812,6 +888,33 @@ namespace currency
       error_resp.message = std::string("To big height: ") + std::to_string(h) + ", current blockchain size = " +  std::to_string(m_core.get_current_blockchain_size());
     }
     res = string_tools::pod_to_hex(m_core.get_block_id_by_height(h));
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_checksolution(const COMMAND_RPC_CHECKSOLUTION::request& req, COMMAND_RPC_CHECKSOLUTION::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+    res = false;
+    if(!check_core_ready())
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
+      error_resp.message = "Core is busy";
+      return false;
+    }
+    
+    uint64_t nonce = 0;
+    CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(req[0], nonce, true), false, "Can't parse nonce from " << req[0]);
+    crypto::hash header_hash = null_hash;
+    CHECK_AND_ASSERT_MES(pod_from_net_format(req[1], header_hash), false, "Can't parse header hash from " << req[1]);
+    std::string mixhash_str = req[2];
+    uint64_t height = 0;
+    CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(req[3], nonce, true), false, "Can't parse height from " << req[3]);
+    wide_difficulty_type diff = 0;
+    CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(req[4], diff, true), false, "Can't parse difficulty from " << req[4]);
+
+    crypto::hash block_pow_hash = get_block_longhash(height, header_hash, nonce);
+    
+    res = check_hash(block_pow_hash, diff);
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
