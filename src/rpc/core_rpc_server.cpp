@@ -911,6 +911,13 @@ namespace currency
     wide_difficulty_type diff = 0;
     CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(req[4], diff, true), false, "Can't parse difficulty from " << req[4]);
 
+    std::cout << "CHECKING SOLUTION:" << std::endl;
+    std::cout << "  Nonce       : " << req[0] << ' ' << nonce << std::endl;
+    std::cout << "  Header hash : " << req[1] << ' ' << header_hash << std::endl;
+    std::cout << "  Mix Hash    : " << req[2] << ' ' << mixhash_str << std::endl;
+    std::cout << "  Height      : " << req[3] << ' ' << height << std::endl;
+    std::cout << "  Difficulty  : " << req[4] << ' ' << diff << std::endl;
+    
     crypto::hash block_pow_hash = get_block_longhash(height, header_hash, nonce);
     
     res = check_hash(block_pow_hash, diff);
