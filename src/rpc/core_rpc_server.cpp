@@ -907,7 +907,7 @@ namespace currency
     CHECK_AND_ASSERT_MES(pod_from_net_format(req[1], header_hash), false, "Can't parse header hash from " << req[1]);
     std::string mixhash_str = req[2];
     uint64_t height = 0;
-    CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(req[3], nonce, true), false, "Can't parse height from " << req[3]);
+    CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(req[3], height, true), false, "Can't parse height from " << req[3]);
     wide_difficulty_type diff = 0;
     CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(req[4], diff, true), false, "Can't parse difficulty from " << req[4]);
 
