@@ -79,6 +79,7 @@ namespace currency
     static std::string vector_of_chars_to_string(const std::vector<unsigned char>& v) { return std::string(v.begin(), v.end()); }
     static std::vector<unsigned char> string_to_vector_of_chars(const std::string& v) { return std::vector<unsigned char>(v.begin(), v.end()); }
     static bool is_seed_password_protected(const std::string& seed_phrase, bool& is_password_protected);
+    static bool is_seed_tracking(const std::string& seed_phrase);
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_keys)

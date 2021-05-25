@@ -38,3 +38,4 @@
 #include "hard_fork_1_bad_pos_source.h"
 #include "hard_fork_1.h"
 #include "hard_fork_2.h"
+#include "atomic_tests.h"

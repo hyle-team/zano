@@ -245,4 +245,4 @@ namespace stratum
 
 } // namespace stratum 
 
-inline std::ostream &operator <<(std::ostream &o, const ethash_hash256 &v) { return print256(o, v); }
+inline std::ostream &operator <<(std::ostream &o, const ethash_hash256 &v) { return print_t(o, v); }

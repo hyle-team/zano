@@ -4,9 +4,7 @@
 <dict>
 	<key>LSEnvironment</key>
 	<dict>
-      		<key>QTWEBENGINE_REMOTE_DEBUGGING</key>
-      		<string>11113</string>
-        </dict>
+  </dict>
 	<key>BuildMachineOSBuild</key>
 	<string>14E46</string>
 	<key>CFBundleDevelopmentRegion</key>

@@ -80,29 +80,31 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
   crypto::secret_key tx_sec_key;
   r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  // tx_0 should be accepted
+  // tx_0 shouldn't be accepted
+  DO_CALLBACK(events, "mark_invalid_tx"); 
   events.push_back(tx_0);
 
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
   DO_CALLBACK(events, "mark_invalid_block");
   MAKE_NEXT_BLOCK_TX1(events, blk_1_bad, blk_0r, miner_acc, tx_0);
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
   DO_CALLBACK(events, "clear_tx_pool");
 
   // make another tx with the same inputs and extra (tx_0 was rejected so inputs can be reused)
   transaction tx_0a = AUTO_VAL_INIT(tx_0a);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0a, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  // tx_0a should be accepted as well
+  // tx_0a shouldn't be accepted as well
+  DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_0a);
   // make an alternative block with it and make sure it is rejected
 
   MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
 
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
   DO_CALLBACK(events, "mark_invalid_block");
   MAKE_NEXT_BLOCK_TX1(events, blk_1_alt_bad, blk_0r, miner_acc, tx_0a);              // this alt block should be rejected because of tx_0a
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
   DO_CALLBACK(events, "clear_tx_pool");
 
 
@@ -111,8 +113,8 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc); // hardfork should happen here
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
   // make sure hardfork went okay
-  CHECK_AND_ASSERT_MES(blk_2.major_version != CURRENT_BLOCK_MAJOR_VERSION && blk_3.major_version == CURRENT_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
-
+  CHECK_AND_ASSERT_MES(blk_2.major_version != HF1_BLOCK_MAJOR_VERSION && blk_3.major_version == HF1_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(1));
 
   //
   // after hardfork 1
@@ -216,8 +218,8 @@ bool hard_fork_1_unlock_time_2_in_coinbase::generate(std::vector<test_event_entr
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);  // hardfork should happen here
   MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
   // make sure hardfork went okay
-  CHECK_AND_ASSERT_MES(blk_3.major_version != CURRENT_BLOCK_MAJOR_VERSION && blk_4.major_version == CURRENT_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
-
+  CHECK_AND_ASSERT_MES(blk_3.major_version != HF1_BLOCK_MAJOR_VERSION && blk_4.major_version == HF1_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(1));
 
   // after hardfork 1
 
@@ -277,8 +279,8 @@ bool hard_fork_1_chain_switch_pow_only::generate(std::vector<test_event_entry>& 
   MAKE_NEXT_BLOCK(events, blk_3a, blk_2a, miner_acc); // hardfork should happen here
   MAKE_NEXT_BLOCK(events, blk_4a, blk_3a, miner_acc);
   // make sure hardfork went okay
-  CHECK_AND_ASSERT_MES(blk_3a.major_version != CURRENT_BLOCK_MAJOR_VERSION && blk_4a.major_version == CURRENT_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
-
+  CHECK_AND_ASSERT_MES(blk_3a.major_version != HF1_BLOCK_MAJOR_VERSION && blk_4a.major_version == HF1_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(1));
 
   //
   // after hardfork 1
@@ -355,7 +357,8 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);             // <-- hard fork
   MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
   // make sure hardfork went okay
-  CHECK_AND_ASSERT_MES(blk_3.major_version != CURRENT_BLOCK_MAJOR_VERSION && blk_4.major_version == CURRENT_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+  CHECK_AND_ASSERT_MES(blk_3.major_version != HF1_BLOCK_MAJOR_VERSION && blk_4.major_version == HF1_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(1));
 
   //
   // after hardfork 1
@@ -395,7 +398,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);
-    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(), stakeholder.get_public_address());
@@ -492,7 +495,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   DO_CALLBACK_PARAMS(events, "check_outputs_with_unique_amount", unique_amount_params(unique_amount_bob, 0) );
 
   // create few locked outputs in the blockchain with unique amount 
-  // tx_0 : miner -> Alice 
+  // tx_0 : miner -> Alice (locked till block 100 using etc_tx_details_unlock_time)
   std::vector<extra_v> extra;
   etc_tx_details_unlock_time ut = AUTO_VAL_INIT(ut);
   ut.v = 100; // locked until block 100
@@ -507,7 +510,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
 
-  // tx_1 : miner -> Bob
+  // tx_1 : miner -> Bob (locked till block 100 using etc_tx_details_unlock_time2)
   extra.clear();
   uint64_t ut2_unlock_time = 100; // locked until block 100
   etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
@@ -522,16 +525,19 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx_to_key(events, tx_1, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_1);
   
+  // etc_tx_details_unlock_time is allowed prior to HF 1 so tx_0 should pass all the checks nicely
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
 
   // block with tx_1 should be rejected because etc_tx_details_unlock_time2 is not allowed prior to hardfork 1
-  DO_CALLBACK(events, "mark_invalid_block");
-  MAKE_NEXT_BLOCK_TX1(events, blk_1b, blk_1, miner_acc, tx_1);
+  //DO_CALLBACK(events, "mark_invalid_block");
+  //MAKE_NEXT_BLOCK_TX1(events, blk_1b, blk_1, miner_acc, tx_1);
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
+  // Alice should have received 5 * unique_amount_alice coins via tx_0
   DO_CALLBACK_PARAMS(events, "check_outputs_with_unique_amount", unique_amount_params(unique_amount_alice, 5) );
 
   // make sure outputs with m_unique_amount are still locked
@@ -581,9 +587,9 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
-  // make sure hardfork went okay
-  CHECK_AND_ASSERT_MES(blk_2.major_version != CURRENT_BLOCK_MAJOR_VERSION && blk_3.major_version == CURRENT_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
-
+  // make sure hardfork 1 went okay
+  CHECK_AND_ASSERT_MES(blk_2.major_version != HF1_BLOCK_MAJOR_VERSION && blk_3.major_version == HF1_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(1));
 
   // try to make a PoS block with locked stake after the hardfork
 
@@ -607,7 +613,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);
-    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address());
@@ -620,6 +626,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   events.push_back(blk_4b);
 
   // blk_4 with tx_1 (etc_tx_details_unlock_time2) should be accepted after hardfork 1
+  events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_1);
 
   block prev = blk_4;
@@ -627,11 +634,13 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   {
     MAKE_NEXT_POS_BLOCK(events, b, prev, miner_acc, std::list<currency::account_base>{miner_acc});
     prev = b;
+    events.push_back(event_core_time(get_actual_timestamp(b) + 100));
   }
 
 
   //REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
+  // try to make a PoS block with the stake locked using etc_tx_details_unlock_time2 (it's still locked)
   block blk_5;
   {
     const block& prev_block = prev;
@@ -652,7 +661,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);
-    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address());
@@ -663,7 +672,6 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   // it should not be accepted, because stake coins is still locked
   DO_CALLBACK(events, "mark_invalid_block");
   events.push_back(blk_5);
-
 
   return true;
 }
@@ -724,7 +732,8 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0); // first block after hardfork
 
   // make sure hardfork went okay
-  CHECK_AND_ASSERT_MES(blk_0r.major_version != CURRENT_BLOCK_MAJOR_VERSION && blk_1.major_version == CURRENT_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+  CHECK_AND_ASSERT_MES(blk_0r.major_version != HF1_BLOCK_MAJOR_VERSION && blk_1.major_version == HF1_BLOCK_MAJOR_VERSION, false, "hardfork did not happen as expected");
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(1));
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
@@ -749,7 +758,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);
-    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(), stakeholder.get_public_address());
@@ -794,7 +803,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);
-    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(), stakeholder.get_public_address());
@@ -838,7 +847,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);
-    pb.m_block.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+    pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(), stakeholder.get_public_address());

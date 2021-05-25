@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      86
+#define CURRENCY_FORMATION_VERSION                      88
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -27,7 +27,9 @@
 #define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49 // auditable integrated addresses start with 'aiZX'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     1
-#define CURRENT_BLOCK_MAJOR_VERSION                     1
+#define HF1_BLOCK_MAJOR_VERSION                         1
+#define CURRENT_BLOCK_MAJOR_VERSION                     2
+
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2
 #define CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT            60*20
@@ -222,7 +224,7 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+68)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+69)
 
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
@@ -230,13 +232,15 @@
 //hard forks section
 #define BLOCK_MAJOR_VERSION_GENESIS                     1
 #define BLOCK_MINOR_VERSION_GENESIS                     0
-#define BLOCK_MAJOR_VERSION_INITAL                      0
+#define BLOCK_MAJOR_VERSION_INITIAL                     0
 #ifndef TESTNET
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999
+#define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577
 #else
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   1440
-#define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999
+#define ZANO_HARDFORK_02_AFTER_HEIGHT                   1800
+#define ZANO_HARDFORK_03_AFTER_HEIGHT                   1801
 #endif
 
 

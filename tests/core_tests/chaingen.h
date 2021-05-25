@@ -299,6 +299,7 @@ public:
     return true;
   }
 
+  void set_hard_fork_heights_to_generator(test_generator& generator) const;
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_top_block(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool clear_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
@@ -307,6 +308,7 @@ public:
   bool print_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool remove_stuck_txs(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_offers_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_hardfork_active(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
 protected:
   struct params_top_block
@@ -320,6 +322,11 @@ protected:
   size_t m_invalid_tx_index;
   size_t m_unverifiable_tx_index;
   size_t m_orphan_block_index;
+
+  // the following members is intended to be set by coretests with specific HF-related needs 
+  uint64_t m_hardfork_01_height;
+  uint64_t m_hardfork_02_height;
+  uint64_t m_hardfork_03_height;
 };
 
 struct wallet_test_core_proxy;
@@ -532,6 +539,7 @@ private:
   
   uint64_t m_hardfork_01_after_heigh;
   uint64_t m_hardfork_02_after_heigh;
+  uint64_t m_hardfork_03_after_heigh;
 
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;
@@ -599,7 +607,7 @@ currency::transaction construct_tx_with_fee(std::vector<test_event_entry>& event
 
 bool construct_tx_with_many_outputs(std::vector<test_event_entry>& events, const currency::block& blk_head,
                                             const currency::account_keys& keys_from, const currency::account_public_address& addr_to,
-                                            uint64_t total_amount, size_t outputs_count, uint64_t fee, currency::transaction& tx);
+                                            uint64_t total_amount, size_t outputs_count, uint64_t fee, currency::transaction& tx, bool use_ref_by_id = false);
 
 void get_confirmed_txs(const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, map_hash2tx_t& confirmed_txs);
 bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head);
@@ -798,7 +806,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   BOOST_FOREACH(const currency::tx_destination_entry& dst_entr, shuffled_dsts)
   {
     CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
-    bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, der_hints, tx_outs_attr);
+    bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, der_hints, sender_account_keys, tx_outs_attr);
     CHECK_AND_ASSERT_MES(r, false, "Failed to construc tx out");
     output_index++;
     summary_outs_money += dst_entr.amount;
@@ -914,6 +922,26 @@ inline uint64_t get_sources_total_amount(const std::vector<currency::tx_source_e
   for (auto& e : s)
     result += e.amount;
   return result;
+}
+
+inline void count_ref_by_id_and_gindex_refs_for_tx_inputs(const currency::transaction& tx, size_t& refs_by_id, size_t& refs_by_gindex)
+{
+  refs_by_id = 0;
+  refs_by_gindex = 0;
+  for (auto& in : tx.vin)
+  {
+    if (in.type() != typeid(currency::txin_to_key))
+      continue;
+
+    const currency::txin_to_key& in2key = boost::get<currency::txin_to_key>(in);
+    for (auto& ko : in2key.key_offsets)
+    {
+      if (ko.type() == typeid(currency::ref_by_id))
+        ++refs_by_id;
+      else if (ko.type() == typeid(uint64_t))
+        ++refs_by_gindex;
+    }
+  }
 }
 
 template<typename U, typename V>

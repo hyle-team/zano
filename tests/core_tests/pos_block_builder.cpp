@@ -24,7 +24,7 @@ void pos_block_builder::step1_init_header(size_t block_height, crypto::hash& pre
 {
   CHECK_AND_ASSERT_THROW_MES(m_step == 0, "pos_block_builder: incorrect step sequence");
   m_block.minor_version = CURRENT_BLOCK_MINOR_VERSION;
-  m_block.major_version = BLOCK_MAJOR_VERSION_INITAL;
+  m_block.major_version = BLOCK_MAJOR_VERSION_INITIAL;
   m_block.timestamp = 0; // to be set at step 3
   m_block.prev_id = prev_block_hash;
   m_block.flags = CURRENCY_BLOCK_FLAG_POS_BLOCK;

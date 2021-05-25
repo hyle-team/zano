@@ -55,7 +55,7 @@ ENDMACRO(ENABLE_SHARED_PCH_EXECUTABLE)
 
 file(GLOB_RECURSE PCH pch/*)
 file(GLOB_RECURSE COMMON common/*)
-file(GLOB CRYPTO crypto/*.*)
+file(GLOB_RECURSE CRYPTO crypto/*)
 file(GLOB_RECURSE CURRENCY_CORE currency_core/*)
 file(GLOB_RECURSE CURRENCY_PROTOCOL currency_protocol/*)
 file(GLOB_RECURSE DAEMON daemon/*)
@@ -106,6 +106,13 @@ ENABLE_SHARED_PCH(common COMMON)
 
 if(NOT MSVC AND NOT APPLE AND NOT CLANG)  # TODO(unassigned): do we really need the clang equivalent?
    target_compile_options(common PRIVATE -fno-var-tracking-assignments)
+endif()
+
+# disable specific warning in order not to touch original code by D. J. Bernstein
+if(MSVC)
+  set_source_files_properties("crypto/chacha8_stream.c" PROPERTIES COMPILE_FLAGS "/wd4018")
+else()
+  set_source_files_properties("crypto/chacha8_stream.c" PROPERTIES COMPILE_FLAGS "-Wno-sign-compare -Wno-strict-prototypes")
 endif()
 
 add_library(crypto ${CRYPTO})
@@ -200,7 +207,7 @@ if(BUILD_GUI)
   set_property(TARGET Zano PROPERTY FOLDER "prog")
   set_target_properties(Zano PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/Info.plist.in)
 
-  set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/html)
+  set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/layout/html)
   set_target_properties(Zano PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "--html-path=${HTML_DIR}")
 
   set(CMAKE_AUTOMOC OFF)

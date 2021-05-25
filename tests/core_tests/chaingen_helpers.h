@@ -12,7 +12,9 @@
 
 // chaingen-independent helpers that may be used outside of core_tests (for ex. in functional_tests)
 
-inline bool mine_next_pow_block_in_playtime(const currency::account_public_address& miner_addr, currency::core& c, currency::block* output = nullptr)
+
+template<typename t_callbacktype>
+inline bool mine_next_pow_block_in_playtime(const currency::account_public_address& miner_addr, currency::core& c, t_callbacktype modify_block_cb, currency::block* output = nullptr)
 {
   currency::block b = AUTO_VAL_INIT(b);
   currency::wide_difficulty_type diff;
@@ -28,6 +30,7 @@ inline bool mine_next_pow_block_in_playtime(const currency::account_public_addre
   // keep global time up with blocks' timestamps
   test_core_time::adjust(b.timestamp);
 
+  modify_block_cb(b);
   r = currency::miner::find_nonce_for_given_block(b, diff, height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
@@ -39,6 +42,13 @@ inline bool mine_next_pow_block_in_playtime(const currency::account_public_addre
     *output = b;
 
   return true;
+}
+
+inline bool mine_next_pow_block_in_playtime(const currency::account_public_address& miner_addr, currency::core& c, currency::block* output = nullptr)
+{
+  auto cb = [&](currency::block& b)
+  {};
+  return mine_next_pow_block_in_playtime(miner_addr, c, cb, output);
 }
 
 inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::account_public_address& miner_addr, currency::core& c, const std::vector<currency::transaction>& txs, const crypto::hash& prev_id, uint64_t height, currency::block* output = nullptr)
@@ -109,6 +119,11 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+  for (auto& tx : txs)
+  {
+    crypto::hash tx_id = currency::get_transaction_hash(tx);
+    bvc.m_onboard_transactions[tx_id] = tx;
+  }
   c.handle_incoming_block(t_serializable_object_to_blob(b), bvc);
   CHECK_AND_NO_ASSERT_MES(!bvc.m_verification_failed && !bvc.m_marked_as_orphaned && !bvc.m_already_exists, false, "block verification context check failed");
 
@@ -131,6 +146,27 @@ inline bool mine_next_pow_blocks_in_playtime(const currency::account_public_addr
 
   return true;
 }
+
+inline bool mine_next_pow_blocks_in_playtime_with_given_txs(const currency::account_public_address& miner_addr, const std::vector<currency::transaction>& txs, currency::core& c, size_t blocks_count, const crypto::hash& prev_id)
+{
+  std::vector<currency::transaction> txs_local = txs;
+
+  crypto::hash prev_id_internal = prev_id;
+  currency::block prv_block = AUTO_VAL_INIT(prv_block);
+  bool r = c.get_blockchain_storage().get_block_by_hash(prev_id, prv_block);
+  CHECK_AND_ASSERT_MES(r, false, "block with id " << prev_id  << " not found");
+
+  for (size_t i = 0; i != blocks_count; i++)
+  {
+    if (!mine_next_pow_block_in_playtime_with_given_txs(miner_addr, c, txs_local, prev_id_internal, currency::get_block_height(prv_block)+1, &prv_block))
+      return false;
+    prev_id_internal = get_block_hash(prv_block);
+    txs_local.clear();
+  }
+  return true;
+}
+
+
 
 // NOTE: stake coins return back to the wallet, newly generated coins go to miner_address (by default they are the same destinations)
 inline bool mine_next_pos_block_in_playtime_with_wallet(tools::wallet2& w, const currency::account_public_address& miner_address, size_t& pos_entries_count)
