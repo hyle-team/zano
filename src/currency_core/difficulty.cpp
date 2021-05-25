@@ -93,6 +93,13 @@ namespace currency {
       carry = cadc(high, top, carry);
       return !carry;
     }
+
+    //std::cout << "   hash_      : " << hash_.data << std::endl;
+    //std::cout << "   h          : " << h.data << std::endl;
+    std::cout << "ch difficulty : " << difficulty << std::endl;
+    std::cout << "ch fast check : " << ((const uint64_t *)&h)[3] << std::endl;
+    std::cout << "ch max256bit  : " << max256bit << std::endl;
+    
     // fast check
     if (((const uint64_t *)&h)[3] > 0)
       return false;
