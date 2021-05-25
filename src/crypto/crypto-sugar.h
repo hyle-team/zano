@@ -271,6 +271,11 @@ namespace crypto
       return sc_check(&m_s[0]) == 0;
     }
 
+    void reduce()
+    {
+      sc_reduce32(&m_s[0]);
+    }
+
     scalar_t operator+(const scalar_t& v) const
     {
       scalar_t result;
@@ -824,6 +829,16 @@ namespace crypto
         if (clear)
           this->clear();
         return scalar_t(hash); // this will reduce to L
+      }
+      
+      void assign_calc_hash(scalar_t& result, bool clear = true)
+      {
+        static_assert(sizeof result == sizeof(crypto::hash), "size missmatch");
+        size_t data_size_bytes = m_elements.size() * sizeof(item_t);
+        crypto::cn_fast_hash(m_elements.data(), data_size_bytes, (crypto::hash&)result);
+        result.reduce();
+        if (clear)
+          this->clear();
       }
 
       union item_t
