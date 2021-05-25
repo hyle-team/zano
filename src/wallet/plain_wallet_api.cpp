@@ -95,21 +95,21 @@ namespace plain_wallet
   std::string get_wallets_folder()
   {
 #ifdef WIN32
-    return "";
+    std::string path = get_bundle_working_dir() + "/" + WALLETS_FOLDER_NAME + "/";
 #else
     std::string path = get_bundle_working_dir() + "/" + WALLETS_FOLDER_NAME + "/";
-    return path;
 #endif // WIN32
+    return path;
   }
 
   std::string get_app_config_folder()
   {
 #ifdef WIN32
-    return "";
+    std::string path = get_bundle_working_dir() + "/" + APP_CONFIG_FOLDER + "/";
 #else
     std::string path = get_bundle_working_dir() + "/" + APP_CONFIG_FOLDER + "/";
-    return path;
 #endif // WIN32
+    return path;
   }
 #ifdef ANDROID_BUILD
   class android_logger : public log_space::ibase_log_stream
