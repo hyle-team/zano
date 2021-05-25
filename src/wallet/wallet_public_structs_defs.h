@@ -184,11 +184,13 @@ namespace wallet_public
     bool syntax_correct;
     bool require_password;
     bool hash_sum_matched;
+    bool tracking;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(syntax_correct)
       KV_SERIALIZE(require_password)
       KV_SERIALIZE(hash_sum_matched)
+      KV_SERIALIZE(tracking)
     END_KV_SERIALIZE_MAP()
   };
 

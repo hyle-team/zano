@@ -31,17 +31,29 @@ struct try_pull_result_open_response
 void run_plain_wallet_api_test()
 {
   LOG_PRINT_L0("Creating instance...");
-  std::string s = plain_wallet::init("195.201.107.230", "11211", boost::dll::program_location().parent_path().string(), 1);
-  s = plain_wallet::get_export_private_info("E:\\tmp\\check_export");
 
-  std::string key = plain_wallet::generate_random_key(10);
-  std::string test_data = "1234567890 test test ";
-  std::string res = plain_wallet::set_appconfig(test_data, key);
-  std::string test_data2 =  plain_wallet::get_appconfig(key);
-  if (test_data2 != test_data)
-  {
-    LOG_ERROR("Error");
-  }
+  //plain_wallet::set_bundle_working_dir("E:\\tmp\\check_export");
+  std::string s = plain_wallet::init("195.201.107.230", "33333", boost::dll::program_location().parent_path().string(), 1);
+  //s = plain_wallet::get_export_private_info("E:\\tmp\\check_export");
+
+
+  std::string res = plain_wallet::sync_call("get_seed_phrase_info", 0, "{\"seed_phrase\":\"aZxat4HAWriVQ3enkGcVsrZRdMseAJswG3CSEwTqZS246VsFQ53w26eZstYsu1jWE74Atz9ajLxFnBsVTafncWNH5SMv4zHFaTS:1780c4d5dd7e97cc4a75ea8baa7977d12ef948b9a6dddc2a9a37e5e22ac7180e:1599495055\"}");
+
+
+  res = plain_wallet::restore("footstep knowledge fur capture honey minute carefully peaceful lovely crawl lunch government nightmare friendship myself sign possibly plan flower depression bread rainbow wrong hardly dark chest",
+    "test_wall2.zan", "111", "");
+
+
+  epee::misc_utils::sleep_no_w(10000000);
+
+  //std::string key = plain_wallet::generate_random_key(10);
+  //std::string test_data = "1234567890 test test ";
+  //std::string res = plain_wallet::set_appconfig(test_data, key);
+  //std::string test_data2 =  plain_wallet::get_appconfig(key);
+  //if (test_data2 != test_data)
+  //{
+  //  LOG_ERROR("Error");
+  //}
   return;
   //std::string fres = plain_wallet::get_logs_buffer();
   //std::string fres2 = plain_wallet::truncate_log();

@@ -48,6 +48,16 @@ namespace tools
         result.hash_sum_matched = false;
       }
     }
+    if (!result.syntax_correct)
+    {
+      //possibly tracking wallet
+      currency::account_base acc;
+      result.syntax_correct = acc.restore_from_tracking_seed(seed_phrase);
+      if (result.syntax_correct)
+      {
+        result.tracking = true;
+      }
+    }
     return API_RETURN_CODE_OK;
   }
 }
