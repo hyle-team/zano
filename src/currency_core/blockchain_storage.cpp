@@ -1438,7 +1438,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   CRITICAL_REGION_BEGIN(m_read_lock);
   height = m_db_blocks.size();
   if(height <= m_core_runtime_config.hard_fork_01_starts_after_height)
-    b.major_version = BLOCK_MAJOR_VERSION_INITAL;
+    b.major_version = BLOCK_MAJOR_VERSION_INITIAL;
   else if(height <= m_core_runtime_config.hard_fork_03_starts_after_height)
     b.major_version = HF1_BLOCK_MAJOR_VERSION;
   else
@@ -5770,7 +5770,7 @@ bool blockchain_storage::is_after_hardfork_3_zone(uint64_t height)const
 bool blockchain_storage::prevalidate_block(const block& bl)
 {
   //before hard_fork1
-  if (bl.major_version == BLOCK_MAJOR_VERSION_INITAL && get_block_height(bl) <= m_core_runtime_config.hard_fork_01_starts_after_height)
+  if (bl.major_version == BLOCK_MAJOR_VERSION_INITIAL && get_block_height(bl) <= m_core_runtime_config.hard_fork_01_starts_after_height)
     return true;
 
 
