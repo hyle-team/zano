@@ -385,12 +385,18 @@ namespace tools
       std::string to_string() const
       {
         std::ostringstream ss;
-        ss << transfer_error::to_string() << ", mixin_count = " << m_mixin_count << ", scanty_outs:";
-        for (const auto& outs_for_amount : m_scanty_outs)
-        {
-          ss << '\n' << currency::print_money(outs_for_amount.amount) << " - " << outs_for_amount.outs.size();
-        }
+        ss << API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_MIXING;
+        //ss << transfer_error::to_string() << ", mixin_count = " << m_mixin_count << ", scanty_outs:";
+        //for (const auto& outs_for_amount : m_scanty_outs)
+        //{
+        //  ss << '\n' << currency::print_money(outs_for_amount.amount) << " - " << outs_for_amount.outs.size();
+        //}
         return ss.str();
+      }
+
+      virtual const char* what() const noexcept
+      {
+        return API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_MIXING;
       }
 
     private:
@@ -534,14 +540,18 @@ namespace tools
       std::string to_string() const
       {
         std::ostringstream ss;
-        currency::transaction tx = m_tx;
-        ss << transfer_error::to_string() <<
-          ", tx_size_limit = " << m_tx_size_limit <<
-          ", tx size = " << get_object_blobsize(m_tx) <<
-          ", tx:\n" << currency::obj_to_json_str(tx);
+        ss << API_RETURN_CODE_TX_IS_TOO_BIG;
+        //currency::transaction tx = m_tx;
+        //ss << transfer_error::to_string() <<
+        //  ", tx_size_limit = " << m_tx_size_limit <<
+        //  ", tx size = " << get_object_blobsize(m_tx) <<
+        //  ", tx:\n" << currency::obj_to_json_str(tx);
         return ss.str();
       }
-
+      virtual const char* what() const noexcept
+      {
+        return API_RETURN_CODE_TX_IS_TOO_BIG;
+      }
     private:
       currency::transaction m_tx;
       uint64_t m_tx_size_limit;

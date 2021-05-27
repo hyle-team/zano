@@ -40,11 +40,18 @@ void run_plain_wallet_api_test()
   std::string res = plain_wallet::sync_call("get_seed_phrase_info", 0, "{\"seed_phrase\":\"aZxat4HAWriVQ3enkGcVsrZRdMseAJswG3CSEwTqZS246VsFQ53w26eZstYsu1jWE74Atz9ajLxFnBsVTafncWNH5SMv4zHFaTS:1780c4d5dd7e97cc4a75ea8baa7977d12ef948b9a6dddc2a9a37e5e22ac7180e:1599495055\"}");
 
 
-  res = plain_wallet::restore("footstep knowledge fur capture honey minute carefully peaceful lovely crawl lunch government nightmare friendship myself sign possibly plan flower depression bread rainbow wrong hardly dark chest",
-    "test_wall2.zan", "111", "");
+//  res = plain_wallet::restore("footstep knowledge fur capture honey minute carefully peaceful lovely crawl lunch government nightmare friendship myself sign possibly plan flower depression bread rainbow wrong hardly dark chest",
+//    "test_wall2.zan", "111", "");
+
+//  epee::misc_utils::sleep_no_w(30000);
+
+//  plain_wallet::close_wallet(0);
+  res = plain_wallet::open("test_wall2.zan", "111");
 
 
-  epee::misc_utils::sleep_no_w(10000000);
+  res = plain_wallet::invoke(0, "{\"method\":\"transfer\",\"params\":{\"destinations\":[{\"amount\":10000000000,\"address\":\"aZxat4HAWriVQ3enkGcVsrZRdMseAJswG3CSEwTqZS246VsFQ53w26eZstYsu1jWE74Atz9ajLxFnBsVTafncWNH5SMv4zHFaTS\"}],\"fee\":10000000000,\"mixin\":1011111,\"payment_id\":\"\",\"push_payer\":true,\"hide_receiver\":false}}");
+
+  //epee::misc_utils::sleep_no_w(10000000);
 
   //std::string key = plain_wallet::generate_random_key(10);
   //std::string test_data = "1234567890 test test ";
