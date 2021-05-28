@@ -2682,7 +2682,15 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   if (m_watch_only && !is_auditable())
     load_keys2ki(true, need_to_resync);
 
-  WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) << " with public address: " << m_account.get_public_address_str());
+  boost::system::error_code ec = AUTO_VAL_INIT(ec);
+  m_current_wallet_file_size = boost::filesystem::file_size(wallet_, ec);
+
+  WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) 
+    << " with public address: " << m_account.get_public_address_str() 
+    << ", file_size=" << m_current_wallet_file_size
+    << ", blockchain_size: " << m_chain.get_blockchain_current_size()
+  );
+
   WLT_LOG_L0("(after loading: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
   if (need_to_resync)
@@ -2690,9 +2698,6 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
     reset_history();
     WLT_LOG_L0("Unable to load history data from wallet file, wallet will be resynced!");
   } 
-
-  boost::system::error_code ec = AUTO_VAL_INIT(ec);
-  m_current_wallet_file_size = boost::filesystem::file_size(wallet_, ec);
 
   THROW_IF_TRUE_WALLET_EX(need_to_resync, error::wallet_load_notice_wallet_restored, epee::string_encoding::convert_to_ansii(m_wallet_file));
 }
@@ -2755,8 +2760,8 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   data_file.flush();
   data_file.close();
-
-  WLT_LOG_L1("Stored successfully to temporary file " << tmp_file_path.string());
+  boost::uintmax_t tmp_file_size = boost::filesystem::file_size(tmp_file_path);
+  WLT_LOG_L0("Stored successfully to temporary file " << tmp_file_path.string() << ", file size=" << tmp_file_size);
 
   // for the sake of safety perform a double-renaming: wallet file -> old tmp, new tmp -> wallet file, remove old tmp
   
@@ -2785,7 +2790,9 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   m_current_wallet_file_size = boost::filesystem::file_size(path_to_save, ec);
   if (path_to_save_exists && !tmp_file_path_exists && !tmp_old_file_path_exists)
   {
-    WLT_LOG_L0("Wallet was successfully stored to " << ascii_path_to_save);
+
+    WLT_LOG_L0("Wallet was successfully stored to " << ascii_path_to_save << ", file size=" << m_current_wallet_file_size
+      << " blockchain_size: " << m_chain.get_blockchain_current_size());
   }
   else
   {
