@@ -791,12 +791,6 @@ namespace currency
     typedef std::string response;
   };
 
-  struct COMMAND_RPC_CHECKSOLUTION
-  {
-    typedef std::vector<std::string> request;
-
-    typedef bool response;
-  };
 
   struct COMMAND_RPC_GETBLOCKTEMPLATE
   {
@@ -829,7 +823,6 @@ namespace currency
       uint64_t height;
       crypto::hash seed;
       blobdata blocktemplate_blob;
-      std::string blocktemplate_work;
       std::string prev_hash;
       std::string status;
 
@@ -838,7 +831,6 @@ namespace currency
         KV_SERIALIZE(height)
         KV_SERIALIZE_POD_AS_HEX_STRING(seed)
         KV_SERIALIZE(blocktemplate_blob)
-        KV_SERIALIZE(blocktemplate_work)
         KV_SERIALIZE(prev_hash)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()

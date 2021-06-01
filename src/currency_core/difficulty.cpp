@@ -93,7 +93,6 @@ namespace currency {
       carry = cadc(high, top, carry);
       return !carry;
     }
-
     // fast check
     if (((const uint64_t *)&h)[3] > 0)
       return false;
