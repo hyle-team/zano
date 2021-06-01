@@ -915,28 +915,9 @@ namespace currency
     wide_difficulty_type diff = 0;
     CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(req[4], diff, true), false, "Can't parse difficulty from " << req[4]);
 
-    /*
-    crypto::hash target_boundary = null_hash;
-    difficulty_to_boundary_long(diff, target_boundary);
-
-    std::cout << "CHECKING SOLUTION:" << std::endl;
-    std::cout << "  Nonce       : " << req[0] << ' ' << nonce << std::endl;
-    std::cout << "  Header hash : " << req[1] << ' ' << header_hash << std::endl;
-    std::cout << "  Mix Hash    : " << req[2] << ' ' << mix_hash << std::endl;
-    std::cout << "  Height      : " << req[3] << ' ' << height << std::endl;
-    std::cout << "  Difficulty  : " << req[4] << ' ' << diff << " / " << target_boundary << std::endl;
-
-    int epoch = currency::ethash_height_to_epoch(height);
-    
-    const auto& context = progpow::get_global_epoch_context(epoch);
-    res = progpow::verify(context, height, *(ethash::hash256*)&header_hash, *(ethash::hash256*)&mix_hash, nonce, *(ethash::hash256*)&target_boundary);
-    */
-
     crypto::hash block_pow_hash = get_block_longhash(height, header_hash, nonce);
 
     res = check_hash(block_pow_hash, diff);
-    
-    std::cout << " res          : " << res << std::endl;
     
     return true;
   }
