@@ -5,7 +5,7 @@ version_file_path=../src/version.h.in
 pushd $curr_path
 
 # clear old local changes if any
-git checkout -- src/*
+git checkout -- ../src/*
 
 git pull --ff-only
 
