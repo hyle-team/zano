@@ -148,7 +148,9 @@
 
 #define WALLET_FILE_SIGNATURE_OLD                       0x1111012101101011LL  // Bender's nightmare
 #define WALLET_FILE_SIGNATURE_V2                        0x1111011201101011LL  // another Bender's nightmare
-#define WALLET_FILE_BINARY_HEADER_VERSION               1001
+#define WALLET_FILE_BINARY_HEADER_VERSION_INITAL        1000
+#define WALLET_FILE_BINARY_HEADER_VERSION_2             1001
+#define WALLET_FILE_BINARY_HEADER_VERSION_3             1002
 
 #define WALLET_FILE_MAX_KEYS_SIZE                       10000 //
 #define WALLET_BRAIN_DATE_OFFSET                        1543622400
