@@ -308,6 +308,7 @@ public:
   bool print_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool remove_stuck_txs(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_offers_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_hardfork_active(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
 protected:
   struct params_top_block
@@ -322,6 +323,7 @@ protected:
   size_t m_unverifiable_tx_index;
   size_t m_orphan_block_index;
 
+  // the following members is intended to be set by coretests with specific HF-related needs 
   uint64_t m_hardfork_01_height;
   uint64_t m_hardfork_02_height;
   uint64_t m_hardfork_03_height;
