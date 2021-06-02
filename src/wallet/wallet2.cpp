@@ -2674,7 +2674,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
     boost::iostreams::filtering_istream in;
     in.push(decrypt_filter);
     in.push(data_file);
-    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
+    need_to_resync = !tools::portable_unserialize_obj_from_stream2(*this, in);
   }
     
     
@@ -2750,7 +2750,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   out.push(decrypt_filter);
   out.push(data_file);
 
-  r = tools::portble_serialize_obj_to_stream(*this, out);
+  r = tools::portble_serialize_obj_to_stream2(*this, out);
   if (!r)
   {
     data_file.close();
