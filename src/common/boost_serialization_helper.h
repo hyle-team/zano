@@ -104,28 +104,4 @@ namespace tools
     return !stream.fail();
     CATCH_ENTRY_L0("portable_unserialize_obj_from_stream", false);
   }
-
-  template<class t_object, class t_stream>
-  bool portable_unserialize_obj_from_stream2(t_object& obj, t_stream& stream)
-  {
-    TRY_ENTRY();
-
-    portable_binary_iarchive a(stream);
-
-    a >> obj;
-    return !stream.fail();
-    CATCH_ENTRY_L0("portable_unserialize_obj_from_stream", false);
-  }
-
-  template<class t_object, class t_stream>
-  bool portble_serialize_obj_to_stream2(t_object& obj, t_stream& stream)
-  {
-    TRY_ENTRY();
-
-    portable_binary_oarchive a(stream);
-    a << obj;
-
-    return !stream.fail();
-    CATCH_ENTRY_L0("portble_serialize_obj_to_stream", false);
-  }
 }

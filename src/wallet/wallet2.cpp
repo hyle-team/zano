@@ -2678,15 +2678,6 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
     need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
     WLT_LOG_L0("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_2(need_to_resync=" << need_to_resync << ")");
   }
-  else if(wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_3)
-  {
-    tools::encrypt_chacha_in_filter decrypt_filter(password, kf_data.iv);
-    boost::iostreams::filtering_istream in;
-    in.push(decrypt_filter);
-    in.push(data_file);
-    need_to_resync = !tools::portable_unserialize_obj_from_stream2(*this, in);
-    WLT_LOG_L0("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_3(need_to_resync="<< need_to_resync <<")");
-  }
   else
   {
     WLT_LOG_L0("Unknown wallet body version(" << wbh.m_ver << "), resync initiated.");
@@ -2747,7 +2738,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   wbh.m_signature = WALLET_FILE_SIGNATURE_V2;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
-  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION_3;
+  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION_2;
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
   uint64_t ts = m_core_runtime_config.get_core_time();
@@ -2768,7 +2759,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   out.push(decrypt_filter);
   out.push(data_file);
 
-  r = tools::portble_serialize_obj_to_stream2(*this, out);
+  r = tools::portble_serialize_obj_to_stream(*this, out);
   if (!r)
   {
     data_file.close();
