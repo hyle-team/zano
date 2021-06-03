@@ -280,7 +280,7 @@ std::string wallet_chain_shortener::get_internal_state_text() const
 #define PRINT_CHAIN_SHORTENER_STATE_INFO(cont_name) \
   if (cont_name.size()) \
   { \
-    ss << #cont_name << ".size(): [" << cont_name.begin().first << ": " << cont_name.begin().second << "]" << ENDL; \
+    ss << #cont_name << ".size(): [" << cont_name.begin()->first << ": " << cont_name.begin()->second << "]" << ENDL; \
   }
 
   PRINT_CHAIN_SHORTENER_STATE_INFO(m_last_20_blocks);
