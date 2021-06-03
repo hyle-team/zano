@@ -87,7 +87,7 @@ For instance, by adding the following lines to `~/.bashrc`
 
 7. Look for the binaries in `build` folder
 
-<br>
+
 ### Windows
 Recommended OS version: Windows 7 x64.
 1. Install required prerequisites (Boost, Qt, CMake).
@@ -101,7 +101,7 @@ In order to correctly deploy Qt GUI application, you also need to do the followi
 7. Run  `PATH_TO_QT\bin\windeployqt.exe deploy/Zano.exe`.
 8. Copy folder `\src\gui\qt-daemon\html` to `deploy\html`.
 
-<br>
+
 ### macOS
 Recommended OS version: macOS Sierra 10.15.4 x64.
 1. Install required prerequisites.
