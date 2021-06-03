@@ -21,6 +21,12 @@ Be sure to clone the repository properly:\
 | [Boost](https://www.boost.org/users/download/) | 1.56 | 1.68 | 1.69 |
 | [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.13.2 |
 
+Note:\
+[*server version*] denotes steps required for building command-line tools (daemon, simplewallet, etc.).\
+[*GUI version*] denotes steps required for building Zano executable with GUI.
+
+<br />
+
 ### Linux
 
 Recommended OS version: Ubuntu 18.04 LTS.
@@ -87,6 +93,7 @@ For instance, by adding the following lines to `~/.bashrc`
 
 7. Look for the binaries in `build` folder
 
+<br />
 
 ### Windows
 Recommended OS version: Windows 7 x64.
@@ -97,10 +104,13 @@ Recommended OS version: Windows 7 x64.
 5. Build.
 
 In order to correctly deploy Qt GUI application, you also need to do the following:
-6. Copy Zano.exe to a folder (e.g. `depoy`). 
-7. Run  `PATH_TO_QT\bin\windeployqt.exe deploy/Zano.exe`.
-8. Copy folder `\src\gui\qt-daemon\html` to `deploy\html`.
 
+6. Copy Zano.exe to a folder (e.g. `depoy`). 
+7. Run  `PATH_TO_QT\bin\windeployqt.exe deploy\Zano.exe`.
+8. Copy folder `\src\gui\qt-daemon\html` to `deploy\html`.
+9. Now you can run `Zano.exe`
+
+<br />
 
 ### macOS
 Recommended OS version: macOS Sierra 10.15.4 x64.
