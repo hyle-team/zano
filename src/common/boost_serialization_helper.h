@@ -9,10 +9,7 @@
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <eos/portable_archive.hpp>
-#include "common/portable_binary_iarchive.hpp"
-#include "common/portable_binary_oarchive.hpp"
 
-//#include <boost>
 
 
 
