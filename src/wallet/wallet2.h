@@ -696,7 +696,7 @@ namespace tools
     uint64_t get_top_block_height() const { return m_chain.get_top_block_height(); }
 
     template <class t_archive>
-    inline void serialize(t_archive &a, const unsigned int ver_)
+    inline void serialize(t_archive &a, const unsigned int ver)
     {
       if (t_archive::is_saving::value)
       {
