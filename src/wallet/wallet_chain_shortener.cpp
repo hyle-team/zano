@@ -274,6 +274,23 @@ void wallet_chain_shortener::check_if_block_matched(uint64_t i, const crypto::ha
   }
 }
 //----------------------------------------------------------------------------------------------------
+std::string wallet_chain_shortener::get_internal_state_text() const
+{
+  std::stringstream ss;
+#define PRINT_CHAIN_SHORTENER_STATE_INFO(cont_name) \
+  if (cont_name.size()) \
+  { \
+    ss << #cont_name << ".size(): [" << cont_name.begin().first << ": " << cont_name.begin().second << "]" << ENDL; \
+  }
+
+  PRINT_CHAIN_SHORTENER_STATE_INFO(m_last_20_blocks);
+  PRINT_CHAIN_SHORTENER_STATE_INFO(m_last_144_blocks_every_10);
+  PRINT_CHAIN_SHORTENER_STATE_INFO(m_last_144_blocks_every_100);
+  PRINT_CHAIN_SHORTENER_STATE_INFO(m_last_144_blocks_every_1000);
+  ss << "m_local_bc_size = " << m_local_bc_size << ENDL;
+  return ss.str();
+}
+//----------------------------------------------------------------------------------------------------
 void clean_map_from_items_above(std::map<uint64_t, crypto::hash>& container, uint64_t height)
 {
   while (container.size() && (--container.end())->first >= height)

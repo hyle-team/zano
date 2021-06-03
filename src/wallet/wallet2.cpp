@@ -2667,6 +2667,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_INITAL)
   {
     need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
+    WLT_LOG_L0("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_INITAL(need_to_resync=" << need_to_resync << ")");
   }
   else if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_2)
   {
@@ -2675,6 +2676,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
     in.push(decrypt_filter);
     in.push(data_file);
     need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
+    WLT_LOG_L0("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_2(need_to_resync=" << need_to_resync << ")");
   }
   else if(wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_3)
   {
@@ -2683,6 +2685,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
     in.push(decrypt_filter);
     in.push(data_file);
     need_to_resync = !tools::portable_unserialize_obj_from_stream2(*this, in);
+    WLT_LOG_L0("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_3(need_to_resync="<< need_to_resync <<")");
   }
   else
   {
@@ -2703,6 +2706,8 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
     << ", file_size=" << m_current_wallet_file_size
     << ", blockchain_size: " << m_chain.get_blockchain_current_size()
   );
+  WLT_LOG_L0("[LOADING]Blockchain shortener state: " << ENDL << m_chain.get_internal_state_text());
+  
 
   WLT_LOG_L0("(after loading: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
@@ -2775,6 +2780,8 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   data_file.close();
   boost::uintmax_t tmp_file_size = boost::filesystem::file_size(tmp_file_path);
   WLT_LOG_L0("Stored successfully to temporary file " << tmp_file_path.string() << ", file size=" << tmp_file_size);
+
+  WLT_LOG_L0("[LOADING]Blockchain shortener state: " << ENDL << m_chain.get_internal_state_text());
 
   // for the sake of safety perform a double-renaming: wallet file -> old tmp, new tmp -> wallet file, remove old tmp
   
