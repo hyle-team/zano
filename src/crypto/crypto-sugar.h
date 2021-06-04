@@ -315,6 +315,13 @@ namespace crypto
       return *this;
     }
 
+    // returns this = a * b
+    scalar_t& assign_mul(const scalar_t& a, const scalar_t& b)
+    {
+      sc_mul(m_s, a.m_s, b.m_s);
+      return *this;
+    }
+
     /*
     I think it has bad symantic (operator-like), consider rename/reimplement -- sowle
     */
