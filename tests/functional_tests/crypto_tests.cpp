@@ -1551,6 +1551,30 @@ TEST(crypto, hex_tools)
   return true;
 }
 
+
+TEST(crypto, calc_lsb_32)
+{
+  auto& local_calc_lsb = [](uint32_t v) {
+    uint8_t r = 0;
+    while (v != 0 && (v & 1) == 0)
+    {
+      v >>= 1;
+      ++r;
+    }
+    return r;
+  };
+
+  for (uint32_t x = 0; x < UINT32_MAX; ++x)
+  {
+    if (x % 10000000 == 0)
+      std::cout << x << ENDL;
+    ASSERT_EQ((int)local_calc_lsb(x), (int)calc_lsb_32(x));
+  }
+  ASSERT_EQ((int)local_calc_lsb(UINT32_MAX), (int)calc_lsb_32(UINT32_MAX));
+
+  return true;
+}
+
 //
 // test's runner
 //
