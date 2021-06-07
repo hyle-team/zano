@@ -67,7 +67,6 @@ POP_VS_WARNINGS
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/version.hpp>
 #include <boost/spirit/home/support/detail/endian/endian.hpp>
-#include <boost/spirit/home/support/detail/math/fpclassify.hpp>
 #include <boost/thread.hpp>
 #include <boost/timer/timer.hpp>
 #include <boost/type_traits/is_arithmetic.hpp>
