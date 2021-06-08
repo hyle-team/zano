@@ -14,6 +14,7 @@
 #include "currency_core/difficulty.h"
 
 #include "crypto/crypto-sugar.h"
+#include "crypto/range_proofs.h"
 
 using namespace crypto;
 
