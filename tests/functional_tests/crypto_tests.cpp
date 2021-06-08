@@ -1555,7 +1555,7 @@ TEST(crypto, hex_tools)
 
 TEST(crypto, calc_lsb_32)
 {
-  auto& local_calc_lsb = [](uint32_t v) {
+  auto local_calc_lsb = [](uint32_t v) {
     uint8_t r = 0;
     while (v != 0 && (v & 1) == 0)
     {

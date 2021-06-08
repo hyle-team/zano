@@ -9,6 +9,7 @@
 // Namely, Bulletproofs+ https://eprint.iacr.org/2020/735.pdf
 //
 
+#include "epee/include/misc_log_ex.h"
 #include "crypto-sugar.h"
 
 namespace crypto
@@ -140,8 +141,8 @@ namespace crypto
     const size_t c_bpp_mn = c_bpp_m * c_bpp_n;
     const size_t c_bpp_log2_mn = c_bpp_log2_m + c_bpp_log2_n;
 
-    // TODO: multiply values and masks by c_scalar_1div8
-    // in order to enforce that points in verify() after mul by 8 will be in the prime-order subgroup
+    // pre-multiply all output points by c_scalar_1div8
+    // in order to enforce these points to be in the prime-order subgroup (after mul by 8 in bpp_verify())
 
     // calc commitments vector as commitments[i] = 1/8 * values[i] * G + 1/8 * masks[i] * H
     commitments.resize(values.size());
@@ -778,7 +779,7 @@ namespace crypto
       DBG_PRINT("H_scalar: " << H_scalar);
 
       // uncommon generators' multiplicands
-      point_t summand_8 = c_point_0; // this summand to be multiplied by 8 and rwf before adding to the main summand
+      point_t summand_8 = c_point_0; // this summand to be multiplied by 8 before adding to the main summand
       // - rwf * e^2 * A0
       summand_8 -= rwf * interm.e_final_sq * interm.A0;
       DBG_PRINT("A0_scalar: " << c_scalar_Lm1 * interm.e_final_sq * rwf);
