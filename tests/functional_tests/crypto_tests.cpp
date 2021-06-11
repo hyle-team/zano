@@ -14,6 +14,7 @@
 #include "currency_core/difficulty.h"
 
 #include "crypto/crypto-sugar.h"
+#include "crypto/range_proofs.h"
 
 using namespace crypto;
 
@@ -1547,6 +1548,30 @@ TEST(crypto, hex_tools)
   ASSERT_EQ(parse_tpod_from_hex_string<uint64_t>("0123456789abcdef"), 0xefcdab8967452301);
   ASSERT_EQ(parse_tpod_from_hex_string<scalar_t>("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"), c_scalar_Pm1);
   ASSERT_EQ(parse_tpod_from_hex_string<scalar_t>("792fdce229e50661d0da1c7db39dd30700000000000000000000000000000006"), c_scalar_1div8);
+
+  return true;
+}
+
+
+TEST(crypto, calc_lsb_32)
+{
+  auto local_calc_lsb = [](uint32_t v) {
+    uint8_t r = 0;
+    while (v != 0 && (v & 1) == 0)
+    {
+      v >>= 1;
+      ++r;
+    }
+    return r;
+  };
+
+  for (uint32_t x = 0; x < UINT32_MAX; ++x)
+  {
+    if (x % 10000000 == 0)
+      std::cout << x << ENDL;
+    ASSERT_EQ((int)local_calc_lsb(x), (int)calc_lsb_32(x));
+  }
+  ASSERT_EQ((int)local_calc_lsb(UINT32_MAX), (int)calc_lsb_32(UINT32_MAX));
 
   return true;
 }
