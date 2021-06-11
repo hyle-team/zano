@@ -47,6 +47,7 @@ void run_plain_wallet_api_test()
 
 //  plain_wallet::close_wallet(0);
   res = plain_wallet::open("test_wall2.zan", "111");
+  res = plain_wallet::close_wallet(0);
 
 
   res = plain_wallet::invoke(0, "{\"method\":\"transfer\",\"params\":{\"destinations\":[{\"amount\":10000000000,\"address\":\"aZxat4HAWriVQ3enkGcVsrZRdMseAJswG3CSEwTqZS246VsFQ53w26eZstYsu1jWE74Atz9ajLxFnBsVTafncWNH5SMv4zHFaTS\"}],\"fee\":10000000000,\"mixin\":1011111,\"payment_id\":\"\",\"push_payer\":true,\"hide_receiver\":false}}");

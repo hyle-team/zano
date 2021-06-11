@@ -226,7 +226,7 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 #ifndef TESTNET
-#define WALLET_FILE_SERIALIZATION_VERSION               154
+#define WALLET_FILE_SERIALIZATION_VERSION               153
 #else 
 #define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+69)
 #endif
