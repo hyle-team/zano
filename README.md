@@ -17,9 +17,9 @@ Be sure to clone the repository properly:\
 | llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
 | [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2015 (14.0 update 1) | 2017 (15.9.0) | 2019 |
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 9.2 | 12.3 | 12.3 |
-| [CMake](https://cmake.org/download/) | 2.8.6 | 3.15.5 | 3.18.1 |
-| [Boost](https://www.boost.org/users/download/) | 1.56 | 1.68 | 1.69 |
-| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.13.2 |
+| [CMake](https://cmake.org/download/) | 2.8.6 | 3.15.5 | 3.20 |
+| [Boost](https://www.boost.org/users/download/) | 1.56 | 1.68 | 1.76 |
+| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |
 
 Note:\
 [*server version*] denotes steps required for building command-line tools (daemon, simplewallet, etc.).\
