@@ -3916,8 +3916,13 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
     }
   }
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_inputs);
-  if(need_to_profile && mixins_count > 0)
+  if (need_to_profile && mixins_count > 0)
+  {
     m_performance_data.tx_mixin_count.push(mixins_count);
+#ifdef _DEBUG
+    LOG_PRINT_L0("[TX_MIXINS]: " <<  mixins_count);
+#endif
+  }
 
   //check if there is already transaction with this hash
   TIME_MEASURE_START_PD(tx_check_exist);

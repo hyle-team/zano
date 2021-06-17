@@ -6,7 +6,7 @@ case $1 in
 graph_args --alt-autoscale
 graph_title mixins
 graph_vlabel mixins
-graph_category daemon
+graph_category transactions
 mixins.label mixins
 
 EOM
