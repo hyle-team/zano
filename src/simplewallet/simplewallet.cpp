@@ -20,6 +20,7 @@
 #include "wallet/wallet_rpc_server.h"
 #include "version.h"
 #include "string_coding.h"
+#include "wallet/wrap_service.h"
 
 #include <cstdlib>
 
@@ -1208,13 +1209,32 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     return true;
   }
 
+  std::vector<extra_v> extra;
   vector<currency::tx_destination_entry> dsts;
+  bool wrapped_transaction = false;
   for (size_t i = 0; i < local_args.size(); i += 2) 
   {
     std::string integrated_payment_id;
     currency::tx_destination_entry de;
     de.addr.resize(1);
-    if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(local_args[i], de.addr.front(), integrated_payment_id)))
+    //check if address looks like wrapped address
+    if (is_address_looks_like_wrapped(local_args[i]))
+    {
+      success_msg_writer(true) << "Address " << local_args[i] << " recognized as wrapped address, creating wrapping transaction...";
+      //put into service attachment specially encrypted entry which will contain wrap address and network
+      tx_service_attachment sa = AUTO_VAL_INIT(sa);
+      sa.service_id = BC_WRAP_SERVICE_ID;
+      sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
+      sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE;
+      sa.body = local_args[i];
+      extra.push_back(sa);
+
+      currency::account_public_address acc = AUTO_VAL_INIT(acc);
+      currency::get_account_address_from_str(acc, BC_WRAP_SERVICE_CUSTODY_WALLET);
+      de.addr.front() = acc;
+      wrapped_transaction = true;
+      //encrypt body with a special way
+    }else if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(local_args[i], de.addr.front(), integrated_payment_id)))
     {
       fail_msg_writer() << "wrong address: " << local_args[i];
       return true;
@@ -1258,13 +1278,19 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   try
   {
     currency::transaction tx;
-    std::vector<extra_v> extra;
     m_wallet->transfer(dsts, fake_outs_count, 0, m_wallet->get_core_runtime_config().tx_default_fee, extra, attachments, tx);
 
     if (!m_wallet->is_watch_only())
-      success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+    {
+      if(wrapped_transaction)
+        success_msg_writer(true) << "Money successfully sent to wZano custody wallet, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+      else
+        success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+    }
     else
+    {
       success_msg_writer(true) << "Transaction prepared for signing and saved into \"zano_tx_unsigned\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
+    }
   }
   catch (const tools::error::daemon_busy&)
   {

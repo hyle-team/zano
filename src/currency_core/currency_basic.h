@@ -386,8 +386,14 @@ namespace currency
   };
 
 // applicable flags for tx_service_attachment::flags, can be combined using bitwise OR
-#define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY  static_cast<uint8_t>(1 << 0)
-#define TX_SERVICE_ATTACHMENT_DEFLATE_BODY  static_cast<uint8_t>(1 << 1)
+#define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY                    static_cast<uint8_t>(1 << 0)
+#define TX_SERVICE_ATTACHMENT_DEFLATE_BODY                    static_cast<uint8_t>(1 << 1)
+
+// with this flag enabled body encrypted/decrypted with the key created as a derivation from onetime key and "spend keys" of receiver
+#define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE  static_cast<uint8_t>(1 << 2)  
+// add proof of content, without revealing secrete
+#define TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF               static_cast<uint8_t>(1 << 3)  
+
   //,
 
   
