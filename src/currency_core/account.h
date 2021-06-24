@@ -97,6 +97,7 @@ namespace currency
     std::vector<unsigned char> m_keys_seed_binary;
   };
 
+  const static account_keys null_acc_keys = AUTO_VAL_INIT(null_acc_keys);
 
   std::string transform_addr_to_str(const account_public_address& addr);
   account_public_address transform_str_to_addr(const std::string& str);

@@ -696,6 +696,7 @@ namespace currency
       return k;
     }
   };
+  const static keypair null_keypair = AUTO_VAL_INIT(null_keypair);
   //---------------------------------------------------------------
   //PoS
   //based from ppcoin/novacoin approach
