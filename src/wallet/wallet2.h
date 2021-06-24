@@ -1056,9 +1056,8 @@ private:
 } // namespace tools
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
-BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 9)
+BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 10)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 3)
-
 
 namespace boost
 {
@@ -1141,8 +1140,11 @@ namespace boost
       a & x.comment;
       a & x.contract;
       a & x.selected_indicies;
-      a & x.srv_attachments;
+      a & x.marketplace_entries;
       a & x.unlock_time;
+      if (ver < 10)
+        return;
+      a & x.service_entries;
     }
 
     template <class Archive>

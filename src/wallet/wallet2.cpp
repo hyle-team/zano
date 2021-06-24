@@ -715,6 +715,11 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
     wti.show_sender = handle_2_alternative_types_in_variant_container<tx_payer, tx_payer_old>(decrypted_att, [&](const tx_payer& p) { sender_address = p.acc_addr; return false; /* <- continue? */ } );
     if (wti.show_sender)
       wti.remote_addresses.push_back(currency::get_account_address_as_str(sender_address));
+
+    for (const auto& item : decrypted_att)
+    {
+      wti.service_entries.push_back(item);
+    }
   }
   else
   {
@@ -1238,7 +1243,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
   wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
   wti.tx_hash = currency::get_transaction_hash(tx);
   load_wallet_transfer_info_flags(wti);
-  bc_services::extract_market_instructions(wti.srv_attachments, tx.attachment);
+  bc_services::extract_market_instructions(wti.marketplace_entries, tx.attachment);
 
   // escrow transactions, which are built with TX_FLAG_SIGNATURE_MODE_SEPARATE flag actually encrypt attachments 
   // with buyer as a sender, and seller as receiver, despite the fact that for both sides transaction seen as outgoing
@@ -4570,7 +4575,7 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
     case GUI_TX_TYPE_PUSH_OFFER:
     {
       bc_services::offer_details od;
-      if (!get_type_in_variant_container(m_transfer_history[i].srv_attachments, od))
+      if (!get_type_in_variant_container(m_transfer_history[i].marketplace_entries, od))
       {
         WLT_LOG_ERROR("Transaction history entry " << i << " market as type " << m_transfer_history[i].tx_type << " but get_type_in_variant_container returned false for bc_services::offer_details");
         break;
@@ -4591,7 +4596,7 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
     case GUI_TX_TYPE_UPDATE_OFFER:
     {
       bc_services::update_offer uo;
-      if (!get_type_in_variant_container(m_transfer_history[i].srv_attachments, uo))
+      if (!get_type_in_variant_container(m_transfer_history[i].marketplace_entries, uo))
       {
         WLT_LOG_ERROR("Transaction history entry " << i << " market as type " << m_transfer_history[i].tx_type << " but get_type_in_variant_container returned false for update_offer");
         break;
@@ -4623,7 +4628,7 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
     case GUI_TX_TYPE_CANCEL_OFFER:
     {
       bc_services::cancel_offer co;
-      if (!get_type_in_variant_container(m_transfer_history[i].srv_attachments, co))
+      if (!get_type_in_variant_container(m_transfer_history[i].marketplace_entries, co))
       {
         WLT_LOG_ERROR("Transaction history entry " << i << " market as type " << m_transfer_history[i].tx_type << " but get_type_in_variant_container returned false for cancel_offer");
         break;
