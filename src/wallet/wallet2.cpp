@@ -718,7 +718,10 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
 
     for (const auto& item : decrypted_att)
     {
-      wti.service_entries.push_back(item);
+      if (item.type() == typeid(currency::tx_service_attachment))
+      {
+        wti.service_entries.push_back(tools::wallet_public::tx_service_attachment_kv(boost::get<currency::tx_service_attachment>(item)));
+      }
     }
   }
   else

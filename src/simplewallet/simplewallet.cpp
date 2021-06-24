@@ -1218,7 +1218,7 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     currency::tx_destination_entry de;
     de.addr.resize(1);
     //check if address looks like wrapped address
-    if (is_address_looks_like_wrapped(local_args[i]))
+    if (is_address_like_wrapped(local_args[i]))
     {
       success_msg_writer(true) << "Address " << local_args[i] << " recognized as wrapped address, creating wrapping transaction...";
       //put into service attachment specially encrypted entry which will contain wrap address and network

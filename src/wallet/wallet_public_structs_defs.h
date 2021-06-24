@@ -87,7 +87,7 @@ namespace wallet_public
 #define WALLET_TRANSFER_INFO_FLAGS_HTLC_DEPOSIT   static_cast<uint16_t>(1 << 0)
 
 
-  struct tx_service_attachment_kv: public tx_service_attachment
+  struct tx_service_attachment_kv: public currency::tx_service_attachment
   {
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(service_id)

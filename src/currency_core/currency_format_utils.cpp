@@ -793,7 +793,7 @@ namespace currency
     }
     void operator()(tx_service_attachment& sa)
     {
-      const std::string orignal_body = sa.body;
+      const std::string original_body = sa.body;
       if (sa.flags&TX_SERVICE_ATTACHMENT_DEFLATE_BODY)
       {
         zlib_helper::pack(sa.body);
@@ -818,7 +818,7 @@ namespace currency
         {
           //take hash from derivation and use it as a salt
           crypto::hash derivation_hash = crypto::cn_fast_hash(&derivation_local, sizeof(derivation_local));
-          std::string salted_body = orignal_body;
+          std::string salted_body = original_body;
           string_tools::apped_pod_to_strbuff(salted_body, derivation_hash);
           crypto::hash proof_hash = crypto::cn_fast_hash(salted_body.data(), salted_body.size());
           sa.security.push_back(*(crypto::public_key*)&proof_hash);
@@ -2950,7 +2950,7 @@ namespace currency
     return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (normal)
   }
   //-----------------------------------------------------------------------
-  bool is_address_looks_like_wrapped(const std::string& addr)
+  bool is_address_like_wrapped(const std::string& addr)
   {
     if (addr.length() == 42 && addr.substr(0, 2) == "0x")
       return true;
