@@ -763,7 +763,7 @@ namespace currency
     const account_public_address& m_destination_addr;
     const crypto::key_derivation& m_key;
 
-    encrypt_attach_visitor(bool& was_crypted_entries, const crypto::key_derivation& key, const  keypair& onetime_keypair = keypair(), const account_public_address& destination_addr = account_public_address()) :
+    encrypt_attach_visitor(bool& was_crypted_entries, const crypto::key_derivation& key, const  keypair& onetime_keypair = null_keypair, const account_public_address& destination_addr = null_pub_addr) :
       m_was_crypted_entries(was_crypted_entries), m_key(key), m_onetime_keypair(onetime_keypair), m_destination_addr(m_destination_addr)
     {}
     void operator()(tx_comment& comment)
@@ -807,6 +807,7 @@ namespace currency
           CHECK_AND_ASSERT_THROW_MES(m_destination_addr.spend_public_key != currency::null_pkey && m_onetime_keypair.sec != currency::null_skey, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: keys uninitialized");
           //encrypt with "spend keys" only, to prevent auditable watchers decrypt it
           bool r = crypto::generate_key_derivation(m_destination_addr.spend_public_key, m_onetime_keypair.sec, derivation_local);
+          CHECK_AND_ASSERT_THROW_MES(r, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: Failed to make derivation");
           crypto::chacha_crypt(sa.body, derivation_local);
         }
         else
@@ -839,8 +840,8 @@ namespace currency
     std::vector<payload_items_v>& rdecrypted_att;
     decrypt_attach_visitor(const crypto::key_derivation& key,
       std::vector<payload_items_v>& decrypted_att, 
-      const account_keys& acc_keys = account_keys(),
-      const crypto::public_key& tx_onetime_pubkey = crypto::public_key()) :
+      const account_keys& acc_keys = null_acc_keys,
+      const crypto::public_key& tx_onetime_pubkey = null_pkey) :
       rkey(key),
       rdecrypted_att(decrypted_att), 
       m_acc_keys(acc_keys), 
@@ -866,7 +867,7 @@ namespace currency
             //this watch only wallet, decrypting supposed to be impossible
             return;
           }
-          CHECK_AND_ASSERT_THROW_MES(m_acc_keys.spend_secret_key != currency::null_skey, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: keys uninitialized");
+          CHECK_AND_ASSERT_THROW_MES(m_acc_keys.spend_secret_key != currency::null_skey && m_tx_onetime_pubkey != currency::null_pkey, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: keys uninitialized");
           bool r = crypto::generate_key_derivation(m_tx_onetime_pubkey, m_acc_keys.spend_secret_key, derivation_local);
           CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate_key_derivation at TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
           crypto::chacha_crypt(sa.body, derivation_local);
@@ -930,8 +931,8 @@ namespace currency
 
   //---------------------------------------------------------------
   template<class items_container_t>
-  bool decrypt_payload_items(const crypto::key_derivation& derivation, const items_container_t& items_to_decrypt, std::vector<payload_items_v>& decrypted_att, const account_keys& acc_keys = account_keys(),
-    const crypto::public_key& tx_onetime_pubkey = crypto::public_key())
+  bool decrypt_payload_items(const crypto::key_derivation& derivation, const items_container_t& items_to_decrypt, std::vector<payload_items_v>& decrypted_att, const account_keys& acc_keys = null_acc_keys,
+    const crypto::public_key& tx_onetime_pubkey = null_pkey)
   {
     decrypt_attach_visitor v(derivation, decrypted_att, acc_keys, tx_onetime_pubkey);
     for (auto& a : items_to_decrypt)
