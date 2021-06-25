@@ -32,7 +32,7 @@ Recommended OS version: Ubuntu 18.04 LTS.
           
    1. Prerequisites for GUI version:
 
-          sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen mesa-common-dev libglu1-mesa-dev`
+          sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen mesa-common-dev libglu1-mesa-dev
 
 2. Download and build Boost
 
@@ -71,7 +71,7 @@ Recommended OS version: Ubuntu 18.04 LTS.
    1. Building GUI:
 
           cd zano
-          utils/build_sript_linux.sh
+          utils/build_script_linux.sh
 
 7. Look for the binaries in `build` folder
 
