@@ -11,7 +11,7 @@ struct isolate_auditable_and_proof : public wallet_test
 {
   isolate_auditable_and_proof();
   bool generate(std::vector<test_event_entry>& events) const;
-  virtual bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)=0;
+  virtual bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   virtual bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 protected:
   mutable uint64_t m_genesis_timestamp;
