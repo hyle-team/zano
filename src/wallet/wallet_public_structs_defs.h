@@ -87,17 +87,6 @@ namespace wallet_public
 #define WALLET_TRANSFER_INFO_FLAGS_HTLC_DEPOSIT   static_cast<uint16_t>(1 << 0)
 
 
-  struct tx_service_attachment_kv: public currency::tx_service_attachment
-  {
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(service_id)
-      KV_SERIALIZE(instruction)
-      KV_SERIALIZE(body)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(security)
-      KV_SERIALIZE(flags)
-    END_KV_SERIALIZE_MAP()
-  };
-
   struct wallet_transfer_info
   {
     uint64_t      amount;
@@ -116,7 +105,7 @@ namespace wallet_public
     bool          is_mining;
     uint64_t      tx_type;
     wallet_transfer_info_details td;
-    std::vector<tx_service_attachment_kv> service_entries;
+    std::vector<currency::tx_service_attachment> service_entries;
     //not included in streaming serialization
     uint64_t      fee;
     bool          show_sender;
