@@ -6,7 +6,9 @@
 #include "escrow_wallet_tests.h"
 #include "random_helper.h"
 #include "chaingen_helpers.h"
-#include "atomic_tests.h"
+#include "isolate_auditable_and_proof.h"
+#include "wallet/wrap_service.h"
+#include "wallet/wallet_rpc_server.h"
 
 using namespace epee;
 using namespace crypto;
@@ -77,7 +79,7 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
   {
     std::vector<extra_v> extra;
     std::vector<currency::attachment_v> attachments;
-    vector<currency::tx_destination_entry> dsts;
+    std::vector<currency::tx_destination_entry> dsts;
 
     currency::tx_destination_entry de;
     de.addr.resize(1);
@@ -104,11 +106,11 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
   tools::wallet_rpc_server miner_wlt_rpc(*auditable_test_instance);
-  wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request req = AUTO_VAL_INIT();
-  wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request res = AUTO_VAL_INIT();
+  tools::wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request req = AUTO_VAL_INIT(req);
+  tools::wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response res = AUTO_VAL_INIT(res);
   req.count = 100;
   req.offset = 0;
-  miner_wlt_rpc->on_get_recent_txs_and_info(req, res, je, ctx);
+  miner_wlt_rpc.on_get_recent_txs_and_info(req, res, je, ctx);
   std::string ps = epee::serialization::store_t_to_json(res);
 
   return r;

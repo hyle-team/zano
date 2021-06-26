@@ -383,6 +383,14 @@ namespace currency
       FIELD(security)
       FIELD(flags)
     END_SERIALIZE()
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(service_id)
+      KV_SERIALIZE(instruction)
+      KV_SERIALIZE(body)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(security)
+      KV_SERIALIZE(flags)
+    END_KV_SERIALIZE_MAP()
   };
 
 // applicable flags for tx_service_attachment::flags, can be combined using bitwise OR
