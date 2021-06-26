@@ -764,7 +764,7 @@ namespace currency
     const crypto::key_derivation& m_key;
 
     encrypt_attach_visitor(bool& was_crypted_entries, const crypto::key_derivation& key, const  keypair& onetime_keypair = null_keypair, const account_public_address& destination_addr = null_pub_addr) :
-      m_was_crypted_entries(was_crypted_entries), m_key(key), m_onetime_keypair(onetime_keypair), m_destination_addr(m_destination_addr)
+      m_was_crypted_entries(was_crypted_entries), m_key(key), m_onetime_keypair(onetime_keypair), m_destination_addr(destination_addr)
     {}
     void operator()(tx_comment& comment)
     {
@@ -870,7 +870,7 @@ namespace currency
           CHECK_AND_ASSERT_THROW_MES(m_acc_keys.spend_secret_key != currency::null_skey && m_tx_onetime_pubkey != currency::null_pkey, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: keys uninitialized");
           bool r = crypto::generate_key_derivation(m_tx_onetime_pubkey, m_acc_keys.spend_secret_key, derivation_local);
           CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate_key_derivation at TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
-          crypto::chacha_crypt(sa.body, derivation_local);
+          crypto::chacha_crypt(local_sa.body, derivation_local);
 
         }
         else

@@ -87,7 +87,7 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
     tx_service_attachment sa = AUTO_VAL_INIT(sa);
     sa.service_id = BC_WRAP_SERVICE_ID;
     sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
-    sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE;
+    sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE| TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF;
     sa.body = "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B";
     extra.push_back(sa);
 
