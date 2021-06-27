@@ -1017,8 +1017,8 @@ namespace currency
       return true;
     }
     
-    decrypt_payload_items(derivation, tx.extra, decrypted_items, acc_keys, get_tx_pub_key_from_extra(tx));
-    decrypt_payload_items(derivation, tx.attachment, decrypted_items, acc_keys, get_tx_pub_key_from_extra(tx));
+    decrypt_payload_items(derivation, tx.extra, decrypted_items, is_income ? acc_keys: account_keys(), get_tx_pub_key_from_extra(tx));
+    decrypt_payload_items(derivation, tx.attachment, decrypted_items, is_income ? acc_keys : account_keys(), get_tx_pub_key_from_extra(tx));
     return true;
   }
 

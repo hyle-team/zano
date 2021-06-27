@@ -93,7 +93,9 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
 
     currency::account_public_address acc = AUTO_VAL_INIT(acc);
     de.addr.front() = auditable_test.get_public_address();
-    currency::transaction tx;
+    de.amount = AMOUNT_TO_TRANSFER_LOCAL;
+    dsts.push_back(de);
+    currency::transaction tx = AUTO_VAL_INIT(tx);
     miner_wlt->transfer(dsts, 0, 0, miner_wlt->get_core_runtime_config().tx_default_fee, extra, attachments, tx);
   }
 
