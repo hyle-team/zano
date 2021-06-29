@@ -1,4 +1,5 @@
-set -x #echo on
+set -x # echo on
+set +e # switch off exit on error
 curr_path=${BASH_SOURCE%/*}
 
 # check that all the required environment vars are set
@@ -21,6 +22,8 @@ if [ "$testnet" == true ]; then
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
 fi
 
+# cd "$ZANO_BUILD_DIR/release/src"
+# if false; then
 
 rm -rf $ZANO_BUILD_DIR; mkdir -p "$ZANO_BUILD_DIR/release"; cd "$ZANO_BUILD_DIR/release"
 
@@ -101,11 +104,43 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-codesign -s "Zano" --deep -vv -f Zano.app
+#fi
+
+codesign -s "Developer ID Application: Zano Limited" --timestamp --options runtime -f --entitlements ../../../utils/macos_entitlements.plist --deep ./Zano.app
+#codesign -s "Zano" --deep -vv -f Zano.app
 if [ $? -ne 0 ]; then
-    echo "Failed to sign application"
+    echo "Failed to sign Zano.app"
     exit 1
 fi
+
+
+rm -f Zano.zip
+
+# creating archive for notarizing
+echo "Creating archive for notarizing"
+/usr/bin/ditto -c -k --keepParent ./Zano.app ./Zano.zip
+
+#fi
+
+# notarization
+echo "Notarizing..."
+tmpfile="tmptmptmp"
+xcrun altool --notarize-app --primary-bundle-id "org.zano.desktop" -u "andrey@zano.org" -p "@keychain:Developer-altool" --file ./Zano.zip > $tmpfile 2>&1
+NOTARIZE_RES=$?
+NOTARIZE_OUTPUT=$( cat $tmpfile )
+rm $tmpfile
+echo "NOTARIZE_OUTPUT=$NOTARIZE_OUTPUT"
+if [ $NOTARIZE_RES -ne 0 ]; then
+    echo "Notarization failed"
+    exit 1
+fi
+
+GUID=$(echo "$NOTARIZE_OUTPUT" | egrep -Ewo '[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}')
+if [ ${#GUID} -ne 36 ]; then
+    echo "Couldn't get correct GUID from the response, got only \"$GUID\""
+    exit 1
+fi
+
 
 read version_str <<< $(DYLD_LIBRARY_PATH=$ZANO_BOOST_LIBS_PATH ./connectivity_tool --version | awk '/^Zano/ { print $2 }')
 version_str=${version_str}
@@ -134,7 +169,30 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+
+success=0
+
+# check notarization status
+for i in {1..10}; do
+    xcrun altool --notarization-info $GUID -u "andrey@zano.org" -p "@keychain:Developer-altool" > $tmpfile 2>&1
+    NOTARIZE_OUTPUT=$( cat $tmpfile )
+    rm $tmpfile 
+    NOTARIZATION_LOG_URL=$(echo "$NOTARIZE_OUTPUT" | sed -n "s/.*LogFileURL\: \([[:graph:]]*\).*/\1/p")
+    if [ $(#NOTARIZATION_LOG_URL) -ge 30 ]; then
+        success=1
+        curl -L $NOTARIZATION_LOG_URL
+        break
+    fi
+    sleep 60 
+done
+
 cd ../../..
+
+if [ $success -ne 1 ]; then
+    echo "Build notarizaton failed"
+    exit 1
+fi
+
 echo "Build success"
 
 echo "############### Uploading... ################"
