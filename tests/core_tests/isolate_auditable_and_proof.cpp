@@ -76,7 +76,7 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
 
 
   //create transaction that use TX_SERVICE_ATTACHMENT_ENCRYPT_BODY and TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE
-  {
+  //{
     std::vector<extra_v> extra;
     std::vector<currency::attachment_v> attachments;
     std::vector<currency::tx_destination_entry> dsts;
@@ -97,7 +97,7 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
     dsts.push_back(de);
     currency::transaction tx = AUTO_VAL_INIT(tx);
     miner_wlt->transfer(dsts, 0, 0, miner_wlt->get_core_runtime_config().tx_default_fee, extra, attachments, tx);
-  }
+  //}
 
   bool r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
@@ -113,8 +113,13 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
   req.count = 100;
   req.offset = 0;
   miner_wlt_rpc.on_get_recent_txs_and_info(req, res, je, ctx);
-  std::string ps = epee::serialization::store_t_to_json(res);
+  CHECK_AND_ASSERT_MES(res.transfers.size() == 1, false, "res.transfers.size() == 1 failed");
+  CHECK_AND_ASSERT_MES(res.transfers[0].service_entries.size(), false, "res.transfers[0].service_entries.size() failed");
+  
+  CHECK_AND_ASSERT_MES(res.transfers[0].service_entries[0].body == sa.body, false, "res.transfers[0].service_entries[0].body == sa.body failed");
+  CHECK_AND_ASSERT_MES(res.transfers[0].service_entries[0].service_id == sa.service_id, false, "res.transfers[0].service_entries[0].service_id == sa.service_id failed");
+  CHECK_AND_ASSERT_MES(res.transfers[0].service_entries[0].instruction == sa.instruction, false, "res.transfers[0].service_entries[0].instruction == sa.instruction failed");
 
-  return r;
+  return true;
 }
 
