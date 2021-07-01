@@ -1662,7 +1662,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
         //block matched in that number
         last_matched_index = height;
         been_matched_block = true;
-        WLT_LOG_L2("Block " << bl_id << " @ " << height << " is already in wallet's blockchain");
+        WLT_LOG_L4("Block " << bl_id << " @ " << height << " is already in wallet's blockchain");
       }
       else
       {
@@ -3207,6 +3207,7 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
     trs.push_back(*it);
     load_wallet_transfer_info_flags(trs.back());
     last_item_index = it - m_transfer_history.rbegin();
+    trs.back().transfer_internal_index = last_item_index;
     
     if (trs.size() >= count)
     {

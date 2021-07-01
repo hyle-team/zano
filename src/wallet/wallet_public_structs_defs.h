@@ -111,6 +111,7 @@ namespace wallet_public
     bool          show_sender;
     std::vector<escrow_contract_details> contract;
     uint16_t      extra_flags; 
+    uint64_t      transfer_internal_index;
     
     
     //not included in kv serialization map
@@ -139,6 +140,7 @@ namespace wallet_public
       KV_SERIALIZE(show_sender)
       KV_SERIALIZE(contract)
       KV_SERIALIZE(service_entries)
+      KV_SERIALIZE(transfer_internal_index)
     END_KV_SERIALIZE_MAP()
   };
 
