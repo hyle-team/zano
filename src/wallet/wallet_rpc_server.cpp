@@ -208,6 +208,7 @@ namespace tools
       for (const auto& ent : distribution)
         res.utxo_distribution.push_back(currency::print_money_brief(ent.first) + ":" + std::to_string(ent.second));
       
+      res.current_height = m_wallet.get_top_block_height();
       return true;
     }
     catch (std::exception& e)
@@ -245,6 +246,7 @@ namespace tools
         res.pi.balance = m_wallet.balance(res.pi.unlocked_balance);
         res.pi.transfer_entries_count = m_wallet.get_transfer_entries_count();
         res.pi.transfers_count = m_wallet.get_recent_transfers_total_count();
+        res.pi.curent_height = m_wallet.get_top_block_height();
       }
 
       if (req.offset == 0)

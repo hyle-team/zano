@@ -259,6 +259,7 @@ namespace wallet_public
       uint64_t                  transfer_entries_count;
       bool                      is_whatch_only;
       std::vector<std::string>  utxo_distribution;
+      uint64_t                  current_height;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(address)
@@ -267,6 +268,8 @@ namespace wallet_public
         KV_SERIALIZE(transfer_entries_count)
         KV_SERIALIZE(is_whatch_only)
         KV_SERIALIZE(utxo_distribution)
+        KV_SERIALIZE(current_height)
+        KV_SERIALIZE_POD_AS_HEX_STRING(last_block_id)
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -304,6 +307,7 @@ namespace wallet_public
     uint64_t                  transfer_entries_count;
     uint64_t                  balance;
     uint64_t                  unlocked_balance;
+    uint64_t                  curent_height;
 
 
     BEGIN_KV_SERIALIZE_MAP()
@@ -311,6 +315,7 @@ namespace wallet_public
       KV_SERIALIZE(transfer_entries_count)
       KV_SERIALIZE(balance)
       KV_SERIALIZE(unlocked_balance)
+      KV_SERIALIZE(curent_height)
     END_KV_SERIALIZE_MAP()
   };
 
