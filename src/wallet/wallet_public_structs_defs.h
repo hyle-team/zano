@@ -269,7 +269,6 @@ namespace wallet_public
         KV_SERIALIZE(is_whatch_only)
         KV_SERIALIZE(utxo_distribution)
         KV_SERIALIZE(current_height)
-        KV_SERIALIZE_POD_AS_HEX_STRING(last_block_id)
       END_KV_SERIALIZE_MAP()
     };
   };
