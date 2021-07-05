@@ -22,8 +22,11 @@ if [ "$testnet" == true ]; then
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}testnet-
 fi
 
-# cd "$ZANO_BUILD_DIR/release/src"
-# if false; then
+######### DEBUG ##########
+#cd "$ZANO_BUILD_DIR/release/src"
+#rm *.dmg
+#if false; then
+##### end of DEBUG ######
 
 rm -rf $ZANO_BUILD_DIR; mkdir -p "$ZANO_BUILD_DIR/release"; cd "$ZANO_BUILD_DIR/release"
 
@@ -104,40 +107,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-#fi
-
 codesign -s "Developer ID Application: Zano Limited" --timestamp --options runtime -f --entitlements ../../../utils/macos_entitlements.plist --deep ./Zano.app
-#codesign -s "Zano" --deep -vv -f Zano.app
 if [ $? -ne 0 ]; then
     echo "Failed to sign Zano.app"
-    exit 1
-fi
-
-
-rm -f Zano.zip
-
-# creating archive for notarizing
-echo "Creating archive for notarizing"
-/usr/bin/ditto -c -k --keepParent ./Zano.app ./Zano.zip
-
-#fi
-
-# notarization
-echo "Notarizing..."
-tmpfile="tmptmptmp"
-xcrun altool --notarize-app --primary-bundle-id "org.zano.desktop" -u "andrey@zano.org" -p "@keychain:Developer-altool" --file ./Zano.zip > $tmpfile 2>&1
-NOTARIZE_RES=$?
-NOTARIZE_OUTPUT=$( cat $tmpfile )
-rm $tmpfile
-echo "NOTARIZE_OUTPUT=$NOTARIZE_OUTPUT"
-if [ $NOTARIZE_RES -ne 0 ]; then
-    echo "Notarization failed"
-    exit 1
-fi
-
-GUID=$(echo "$NOTARIZE_OUTPUT" | egrep -Ewo '[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}')
-if [ ${#GUID} -ne 36 ]; then
-    echo "Couldn't get correct GUID from the response, got only \"$GUID\""
     exit 1
 fi
 
@@ -160,12 +132,68 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+#fi
+
 package_filename=${ARCHIVE_NAME_PREFIX}${version_str}.dmg
 
 source ../../../utils/macosx_dmg_builder.sh
 build_fancy_dmg package_folder $package_filename
 if [ $? -ne 0 ]; then
     echo "Failed to create fancy dmg"
+    exit 1
+fi
+
+echo "Build success"
+
+echo "############### Uploading... ################"
+
+package_filepath=$package_filename
+
+scp $package_filepath zano_build_server:/var/www/html/builds/
+if [ $? -ne 0 ]; then
+    echo "Failed to upload to remote server"
+    exit 1
+fi
+
+
+read checksum <<< $( shasum -a 256 $package_filepath | awk '/^/ { print $1 }' )
+
+mail_msg="New ${build_prefix_label}${testnet_label}build for macOS-x64:<br>
+https://build.zano.org/builds/$package_filename<br>
+sha256: $checksum"
+
+echo "$mail_msg"
+
+echo "$mail_msg" | mail -s "Zano macOS-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}
+
+
+######################
+# notarization
+######################
+
+cd package_folder
+
+echo "Notarizing..."
+
+# creating archive for notarizing
+echo "Creating archive for notarizing"
+rm -f Zano.zip
+/usr/bin/ditto -c -k --keepParent ./Zano.app ./Zano.zip
+
+tmpfile="tmptmptmp"
+xcrun altool --notarize-app --primary-bundle-id "org.zano.desktop" -u "andrey@zano.org" -p "@keychain:Developer-altool" --file ./Zano.zip > $tmpfile 2>&1
+NOTARIZE_RES=$?
+NOTARIZE_OUTPUT=$( cat $tmpfile )
+rm $tmpfile
+echo "NOTARIZE_OUTPUT=$NOTARIZE_OUTPUT"
+if [ $NOTARIZE_RES -ne 0 ]; then
+    echo "Notarization failed"
+    exit 1
+fi
+
+GUID=$(echo "$NOTARIZE_OUTPUT" | egrep -Ewo '[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}')
+if [ ${#GUID} -ne 36 ]; then
+    echo "Couldn't get correct GUID from the response, got only \"$GUID\""
     exit 1
 fi
 
@@ -186,32 +214,9 @@ for i in {1..10}; do
     sleep 60 
 done
 
-cd ../../..
-
 if [ $success -ne 1 ]; then
-    echo "Build notarizaton failed"
+    echo "Build notarization failed"
     exit 1
 fi
 
-echo "Build success"
-
-echo "############### Uploading... ################"
-
-package_filepath=$ZANO_BUILD_DIR/release/src/$package_filename
-
-scp $package_filepath zano_build_server:/var/www/html/builds/
-if [ $? -ne 0 ]; then
-    echo "Failed to upload to remote server"
-    exit 1
-fi
-
-
-read checksum <<< $( shasum -a 256 $package_filepath | awk '/^/ { print $1 }' )
-
-mail_msg="New ${build_prefix_label}${testnet_label}build for macOS-x64:<br>
-https://build.zano.org/builds/$package_filename<br>
-sha256: $checksum"
-
-echo "$mail_msg"
-
-echo "$mail_msg" | mail -s "Zano macOS-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}
+echo "Notarization done"

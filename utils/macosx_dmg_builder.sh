@@ -19,6 +19,7 @@ function build_fancy_dmg() # $1 - path to package folder, $2 - dmg output filena
     --icon Zano.app 112 115 \
     --hide-extension Zano.app \
     --app-drop-link 365 115 \
+    --no-internet-enable \
     $2 \
     $1
 
