@@ -206,7 +206,7 @@ for i in {1..10}; do
     NOTARIZE_OUTPUT=$( cat $tmpfile )
     rm $tmpfile 
     NOTARIZATION_LOG_URL=$(echo "$NOTARIZE_OUTPUT" | sed -n "s/.*LogFileURL\: \([[:graph:]]*\).*/\1/p")
-    if [ $(#NOTARIZATION_LOG_URL) -ge 30 ]; then
+    if [ ${#NOTARIZATION_LOG_URL} -ge 30 ]; then
         success=1
         curl -L $NOTARIZATION_LOG_URL
         break
