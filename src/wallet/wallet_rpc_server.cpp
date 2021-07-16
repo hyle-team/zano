@@ -281,7 +281,18 @@ namespace tools
       return false;
     }
 
-    std::vector<currency::tx_destination_entry> dsts;
+    construct_tx_param ctp = m_wallet.get_default_construct_tx_param_inital();
+    if (req.service_entries_permanent)
+    {
+      //put it to extra
+      ctp.extra.insert(ctp.extra.end(), req.service_entries.begin(), req.service_entries.end());
+    }
+    else
+    {
+      //put it to attachments
+      ctp.attachments.insert(ctp.extra.end(), req.service_entries.begin(), req.service_entries.end());
+    }
+    std::vector<currency::tx_destination_entry>& dsts = ctp.dsts;
     for (auto it = req.destinations.begin(); it != req.destinations.end(); it++) 
     {
       currency::tx_destination_entry de;
@@ -308,8 +319,8 @@ namespace tools
     }
     try
     {
-      std::vector<currency::attachment_v> attachments; 
-      std::vector<currency::extra_v> extra;
+      std::vector<currency::attachment_v>& attachments = ctp.attachments;
+      std::vector<currency::extra_v>& extra = ctp.extra;
       if (!payment_id.empty() && !currency::set_payment_id_to_tx(attachments, payment_id))
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
@@ -338,10 +349,11 @@ namespace tools
         }
       }
 
-      currency::transaction tx;
-      
+      currency::finalized_tx result = AUTO_VAL_INIT(result);
       std::string unsigned_tx_blob_str;
-      m_wallet.transfer(dsts, req.mixin, 0/*req.unlock_time*/, req.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, CURRENCY_TO_KEY_OUT_RELAXED, true, 0, true, &unsigned_tx_blob_str);
+      ctp.fee = req.fee;
+      ctp.fake_outputs_count = 0;
+      m_wallet.transfer(ctp, result, true, &unsigned_tx_blob_str);
       if (m_wallet.is_watch_only())
       {
         res.tx_unsigned_hex = epee::string_tools::buff_to_hex_nodelimer(unsigned_tx_blob_str); // watch-only wallets could not sign and relay transactions
@@ -349,8 +361,8 @@ namespace tools
       }
       else
       {
-        res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
-        res.tx_size = get_object_blobsize(tx);
+        res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(result.tx));
+        res.tx_size = get_object_blobsize(result.tx);
       }
       return true;
     }

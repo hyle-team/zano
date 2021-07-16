@@ -595,12 +595,12 @@ namespace tools
     void transfer(construct_tx_param& ctp,
                   currency::transaction &tx,
                   bool send_to_network,
-                  std::string* p_unsigned_filename_or_tx_blob_str);
+                  std::string* p_unsigned_filename_or_tx_blob_str = nullptr);
     
     void transfer(construct_tx_param& ctp,
                   currency::finalized_tx& result,
                   bool send_to_network,
-                  std::string* p_unsigned_filename_or_tx_blob_str);
+                  std::string* p_unsigned_filename_or_tx_blob_str = nullptr);
 
 
     template<typename destination_split_strategy_t>
@@ -854,6 +854,7 @@ namespace tools
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
+    construct_tx_param get_default_construct_tx_param_inital();
     
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
@@ -943,7 +944,7 @@ private:
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_public::wallet_transfer_info& wti) const;
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
     
-    construct_tx_param get_default_construct_tx_param_inital();
+
     const construct_tx_param& get_default_construct_tx_param();
 
     uint64_t get_tx_expiration_median() const;
