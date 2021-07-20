@@ -249,7 +249,7 @@ namespace tools
         res.pi.curent_height = m_wallet.get_top_block_height();
       }
 
-      if (req.offset == 0)
+      if (req.offset == 0 && !req.exclude_unconfirmed)
         m_wallet.get_unconfirmed_transfers(res.transfers, req.exclude_mining_txs);
       
       bool start_from_end = true;

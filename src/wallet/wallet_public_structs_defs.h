@@ -342,6 +342,7 @@ namespace wallet_public
       */
       bool update_provision_info;  
       bool exclude_mining_txs;
+      bool exclude_unconfirmed;
       std::string order; // "FROM_BEGIN_TO_END" or "FROM_END_TO_BEGIN"
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -349,6 +350,7 @@ namespace wallet_public
         KV_SERIALIZE(count)
         KV_SERIALIZE(update_provision_info)
         KV_SERIALIZE(exclude_mining_txs)
+        KV_SERIALIZE(exclude_unconfirmed)
         KV_SERIALIZE(order)
       END_KV_SERIALIZE_MAP()
     };
