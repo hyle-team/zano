@@ -3192,29 +3192,49 @@ uint64_t wallet2::get_transfer_entries_count()
   return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs)
+
+template<typename callback_t, typename iterator_t>
+bool enum_container(iterator_t it_begin, iterator_t it_end, callback_t cb)
+{
+  for (iterator_t it = it_begin; it != it_end; it++)
+  {
+    if (!cb(*it, it - it_begin))
+      return true;
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs, bool start_from_end)
 {
   if (!count || offset >= m_transfer_history.size())
     return;
 
-  for (auto it = m_transfer_history.rbegin() + offset; it != m_transfer_history.rend(); it++)
-  {
+  auto cb = [&](wallet_public::wallet_transfer_info& wti, size_t local_offset) {
+  
     if (exclude_mining_txs)
     {
-      if(currency::is_coinbase(it->tx))
-        continue;
+      if (currency::is_coinbase(wti.tx))
+        return true;
     }
-    trs.push_back(*it);
+    trs.push_back(wti);
     load_wallet_transfer_info_flags(trs.back());
-    last_item_index = it - m_transfer_history.rbegin();
+    last_item_index = offset + local_offset;
     trs.back().transfer_internal_index = last_item_index;
-    
+
     if (trs.size() >= count)
     {
-      break;
+      return false;
     }
-  }
+    return true;
+  };
+  
+  if(start_from_end)
+    enum_container(m_transfer_history.rbegin() + offset, m_transfer_history.rend(), cb);
+  else 
+    enum_container(m_transfer_history.begin() + offset, m_transfer_history.end(), cb);
+
   total = m_transfer_history.size();
+
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)

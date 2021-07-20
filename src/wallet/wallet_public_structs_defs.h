@@ -318,6 +318,10 @@ namespace wallet_public
     END_KV_SERIALIZE_MAP()
   };
 
+
+#define ORDER_FROM_BEGIN_TO_END        "FROM_BEGIN_TO_END"
+#define ORDER_FROM_FROM_END_TO_BEGIN   "FROM_END_TO_BEGIN"
+
   struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
   {
     struct request
@@ -338,12 +342,14 @@ namespace wallet_public
       */
       bool update_provision_info;  
       bool exclude_mining_txs;
+      std::string order; // "FROM_BEGIN_TO_END" or "FROM_END_TO_BEGIN"
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(offset)
         KV_SERIALIZE(count)
         KV_SERIALIZE(update_provision_info)
         KV_SERIALIZE(exclude_mining_txs)
+        KV_SERIALIZE(order)
       END_KV_SERIALIZE_MAP()
     };
 

@@ -768,7 +768,7 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
   std::vector<tools::wallet_public::wallet_transfer_info> recent;
   uint64_t total = 0;
   uint64_t last_index = 0;
-  m_wallet->get_recent_transfers_history(recent, std::stoll(args[0]), std::stoll(args[1]), total, last_index, false);
+  m_wallet->get_recent_transfers_history(recent, std::stoll(args[0]), std::stoll(args[1]), total, last_index, false, false);
   m_wallet->get_unconfirmed_transfers(unconfirmed, false);
   //workaround for missed fee
   

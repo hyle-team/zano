@@ -252,7 +252,12 @@ namespace tools
       if (req.offset == 0)
         m_wallet.get_unconfirmed_transfers(res.transfers, req.exclude_mining_txs);
       
-      m_wallet.get_recent_transfers_history(res.transfers, req.offset, req.count, res.total_transfers, res.last_item_index, req.exclude_mining_txs);
+      bool start_from_end = true;
+      if (req.order == ORDER_FROM_BEGIN_TO_END)
+      {
+        start_from_end = false;
+      }
+      m_wallet.get_recent_transfers_history(res.transfers, req.offset, req.count, res.total_transfers, res.last_item_index, req.exclude_mining_txs, start_from_end);
 
       return true;
     }

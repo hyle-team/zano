@@ -509,7 +509,7 @@ namespace tools
     currency::account_base& get_account() { return m_account; }
     const currency::account_base& get_account() const { return m_account; }
 
-    void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs = false);
+    void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs = false, bool start_from_end = true);
     uint64_t get_recent_transfers_total_count();
     uint64_t get_transfer_entries_count();
     void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs = false);
