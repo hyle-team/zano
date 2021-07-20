@@ -709,20 +709,21 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
   }
   get_payment_id_from_tx(decrypted_att, wti.payment_id);
 
+  for (const auto& item : decrypted_att)
+  {
+    if (item.type() == typeid(currency::tx_service_attachment))
+    {
+      wti.service_entries.push_back(boost::get<currency::tx_service_attachment>(item));
+    }
+  }
+
+
   if (wti.is_income)
   {
     account_public_address sender_address = AUTO_VAL_INIT(sender_address);
     wti.show_sender = handle_2_alternative_types_in_variant_container<tx_payer, tx_payer_old>(decrypted_att, [&](const tx_payer& p) { sender_address = p.acc_addr; return false; /* <- continue? */ } );
     if (wti.show_sender)
       wti.remote_addresses.push_back(currency::get_account_address_as_str(sender_address));
-
-    for (const auto& item : decrypted_att)
-    {
-      if (item.type() == typeid(currency::tx_service_attachment))
-      {
-        wti.service_entries.push_back(boost::get<currency::tx_service_attachment>(item));
-      }
-    }
   }
   else
   {
