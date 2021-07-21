@@ -141,8 +141,10 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_PRINT_CHANNEL_2_JORNAL(log_channel, log_name, x, y) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, true, log_name);CATCH_ALL_DO_NOTHING();}}
 
-#define LOG_ERROR2(log_name, x) { \
-  TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << "[ERROR] Location: " << std::endl << LOCATION_SS << epee::misc_utils::get_callstack() << " Message:" << std::endl << x << std::endl; epee::log_space::log_singletone::do_log_message(ss________.str(), LOG_LEVEL_0, epee::log_space::console_color_red, true, log_name); LOCAL_ASSERT(0); epee::log_space::increase_error_count(LOG_DEFAULT_CHANNEL);CATCH_ALL_DO_NOTHING();}
+#define LOG_ERROR2_CB(log_name, x, cb) { \
+  TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << "[ERROR] Location: " << std::endl << LOCATION_SS << epee::misc_utils::get_callstack() << " Message:" << std::endl << x << std::endl; epee::log_space::log_singletone::do_log_message(ss________.str(), LOG_LEVEL_0, epee::log_space::console_color_red, true, log_name); LOCAL_ASSERT(0); epee::log_space::increase_error_count(LOG_DEFAULT_CHANNEL); cb(ss________.str()); CATCH_ALL_DO_NOTHING();}
+
+#define LOG_ERROR2(log_name, x) LOG_ERROR2_CB(log_name, x, epee::log_space::log_stub)
 
 #define LOG_FRAME2(log_name, x, y) epee::log_space::log_frame frame(x, y, log_name)
 
@@ -194,6 +196,7 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_PRINT_J(mess, level)        LOG_PRINT2_JORNAL(LOG_DEFAULT_TARGET, mess, level)
 
 #define LOG_ERROR(mess)               LOG_ERROR2(LOG_DEFAULT_TARGET, mess)
+#define LOG_ERROR_CB(mess, cb)        LOG_ERROR2_CB(LOG_DEFAULT_TARGET, mess, cb)
 #define LOG_FRAME(mess, level)        LOG_FRAME2(LOG_DEFAULT_TARGET, mess, level)
 #define LOG_VALUE(mess, level)        LOG_VALUE2(LOG_DEFAULT_TARGET, mess, level)
 #define LOG_ARRAY(mess, level)        LOG_ARRAY2(LOG_DEFAULT_TARGET, mess, level)
@@ -334,7 +337,8 @@ namespace log_space
   /*                                                                      */
   /************************************************************************/
 #define CONSOLE_DEFAULT_STREAM  std::cout
-
+  
+  inline void log_stub(const std::string& /**/) {}
 
   struct delete_ptr
   {
