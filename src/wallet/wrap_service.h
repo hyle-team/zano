@@ -10,4 +10,4 @@
 #define BC_WRAP_SERVICE_INSTRUCTION_UNWRAP                "UNWRAP"  //erc20 unwrap operation
 
 
-#define BC_WRAP_SERVICE_CUSTODY_WALLET                    "aZxbJPXzkjCJDpGEVvkMir9B4fRKPo73r2e5D7nLHuVgEBXXQYc2Tk2hHroxVwiCDLDHZu215pgNocUsrchH4HHzWbHzL4nMfPq"
+#define BC_WRAP_SERVICE_CUSTODY_WALLET                    "aZxaszi4TaDCUqRCmqe23HASryshQNHmBSFnUN1pY8VsRfss2ZSMGBpLhdFtHgKmFr353NneaYRT6CpSz7zA3EC9bocQcq7m9nP"
