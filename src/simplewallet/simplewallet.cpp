@@ -192,7 +192,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, _1), "Show current wallet balance");
   m_cmd_binder.set_handler("incoming_transfers", boost::bind(&simple_wallet::show_incoming_transfers, this, _1), "incoming_transfers [available|unavailable] - Show incoming transfers - all of them or filter them by availability");
   m_cmd_binder.set_handler("incoming_counts", boost::bind(&simple_wallet::show_incoming_transfers_counts, this, _1), "incoming_transfers counts");
-  m_cmd_binder.set_handler("list_recent_transfers", boost::bind(&simple_wallet::list_recent_transfers, this, _1), "list_recent_transfers - Show recent maximum 1000 transfers");
+  m_cmd_binder.set_handler("list_recent_transfers", boost::bind(&simple_wallet::list_recent_transfers, this, _1), "list_recent_transfers [offset] [count] - Show recent maximum 1000 transfers, offset default = 0, count default = 100 ");
   m_cmd_binder.set_handler("export_recent_transfers", boost::bind(&simple_wallet::export_recent_transfers, this, _1), "list_recent_transfers_tx - Write recent transfer in json to wallet_recent_transfers.txt");
   m_cmd_binder.set_handler("list_outputs", boost::bind(&simple_wallet::list_outputs, this, _1), "list_outputs [spent|unspent] - Lists all the outputs that have ever been sent to this wallet if called without arguments, otherwise it lists only the spent or unspent outputs");
   m_cmd_binder.set_handler("dump_transfers", boost::bind(&simple_wallet::dump_trunsfers, this, _1), "dump_transfers - Write  transfers in json to dump_transfers.txt");
@@ -766,9 +766,15 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
 {
   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
   std::vector<tools::wallet_public::wallet_transfer_info> recent;
+  uint64_t offset = 0;
+  if (args.size() > 0)
+    offset = std::stoll(args[0]);
+  uint64_t count = 1000; 
+  if (args.size() > 1)
+    count = std::stoll(args[1]);
   uint64_t total = 0;
   uint64_t last_index = 0;
-  m_wallet->get_recent_transfers_history(recent, std::stoll(args[0]), std::stoll(args[1]), total, last_index, false, false);
+  m_wallet->get_recent_transfers_history(recent, offset, count, total, last_index, false, false);
   m_wallet->get_unconfirmed_transfers(unconfirmed, false);
   //workaround for missed fee
   
