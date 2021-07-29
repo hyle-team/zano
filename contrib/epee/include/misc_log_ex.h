@@ -197,7 +197,7 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_PRINT_BLUE(mess, level)       LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, level, LOG_COLOR_BLUE)
 #define LOG_PRINT_YELLOW(mess, level)       LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, level, LOG_COLOR_YELLOW)
 #define LOG_PRINT_CYAN(mess, level)       LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, level, LOG_COLOR_CYAN)
-#define LOG_PRINT_MAGENTA(mess, level)       LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, level, )
+#define LOG_PRINT_MAGENTA(mess, level)       LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, level, LOG_COLOR_MAGENTA)
 
 #define LOG_PRINT_RED_L0(mess)                 LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, LOG_LEVEL_0, epee::log_space::console_color_red)
 #define LOG_PRINT_GREEN_L0(mess)        LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, LOG_LEVEL_0, epee::log_space::console_color_green)
