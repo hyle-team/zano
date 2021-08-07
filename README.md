@@ -39,7 +39,7 @@ Recommended OS version: Ubuntu 18.04 LTS.
           
    [*GUI version*]
 
-       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen mesa-common-dev libglu1-mesa-dev`
+       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen mesa-common-dev libglu1-mesa-dev
 
 2. Download and build Boost
 
@@ -85,6 +85,8 @@ For instance, by adding the following lines to `~/.bashrc`
           make -j1 daemon simplewallet
 
       **NOTICE**: If you are building on a machine with a relatively high amount of RAM or with the proper setting of virtual memory, then you can use `-j2` or `-j` option to speed up the building process. Use with caution.
+      
+      **NOTICE 2**: If you'd like to build binaries for the testnet, use `cmake -D TESTNET=TRUE ..` instead of `cmake ..` .
    
    1. Building GUI:
 

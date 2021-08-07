@@ -199,6 +199,7 @@ if(BUILD_GUI)
 
   if(APPLE)
     target_link_libraries(Zano ${COCOA_LIBRARY})
+    set_property(TARGET Zano PROPERTY XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME YES)
   endif()
   if(MSVC)
     target_link_libraries(Zano shlwapi.lib)
