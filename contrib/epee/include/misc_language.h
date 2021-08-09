@@ -65,6 +65,8 @@ namespace epee
 	}
 
 
+#define STD_TRY_CATCH_LOCATION(return_val) STD_TRY_CATCH(LOCATION_SS, return_val)
+
   /* helper class, to make able get namespace via decltype()::*/
   template<class base_class>
   class namespace_accessor: public base_class{};

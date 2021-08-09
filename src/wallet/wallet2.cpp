@@ -2389,10 +2389,6 @@ bool wallet2::deinit()
 bool wallet2::clear()
 {
   reset_all();
-  //currency::block b;
-  //currency::generate_genesis_block(b);
-  m_chain.clear();
-  //m_blockchain.push_back(get_block_hash(b));
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2666,6 +2662,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   bool need_to_resync = false;
   if (wbh.m_ver == 1000)
   {
+    // old WALLET_FILE_BINARY_HEADER_VERSION version means no encryption
     need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
   }
   else

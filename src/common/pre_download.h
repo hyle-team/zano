@@ -50,7 +50,8 @@ namespace tools
 
     boost::system::error_code ec;
     uint64_t sz = boost::filesystem::file_size(db_main_file_path, ec);
-    if (pre_download.unpacked_size == 0 || !(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > pre_download_min_size_difference) || command_line::has_arg(vm, command_line::arg_force_predownload)) )
+    bool flag_force_predownload = command_line::has_arg(vm, command_line::arg_force_predownload);
+    if (pre_download.unpacked_size == 0 || !(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > pre_download_min_size_difference) || flag_force_predownload) )
     {
       LOG_PRINT_MAGENTA("Pre-downloading not needed (db file size = " << sz << ")", LOG_LEVEL_0);
       return true;
@@ -92,15 +93,15 @@ namespace tools
     r = cl.download_and_unzip(cb, downloading_file_path, url, 5000 /* timout */, "GET", std::string(), 30 /* fails count */);
     if (!r)
     {
-      LOG_PRINT_RED("Download failed", LOG_LEVEL_0);
-      return false;
+      LOG_PRINT_RED("Downloading failed", LOG_LEVEL_0);
+      return !flag_force_predownload;  // fatal error only if force-predownload
     }
 
     crypto::hash data_hash = hash_stream.calculate_hash();
     if (epee::string_tools::pod_to_hex(data_hash) != pre_download.hash)
     {
       LOG_ERROR("hash missmatch in downloaded file, got: " << epee::string_tools::pod_to_hex(data_hash) << ", expected: " << pre_download.hash);
-      return false;
+      return !flag_force_predownload;  // fatal error only if force-predownload
     }
 
     LOG_PRINT_GREEN("Download succeeded, hash " << pre_download.hash << " is correct" , LOG_LEVEL_0);
