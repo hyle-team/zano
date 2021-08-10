@@ -73,33 +73,35 @@ namespace currency
       epee::math_helper::average<uint64_t, 5> target_calculating_calc;
 
       //tx processing zone
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_time;
-      epee::math_helper::average<uint64_t, 5> tx_add_one_tx_time;
-      epee::math_helper::average<uint64_t, 5> tx_process_extra;
-      epee::math_helper::average<uint64_t, 5> tx_process_attachment;
-      epee::math_helper::average<uint64_t, 5> tx_process_inputs ;
-      epee::math_helper::average<uint64_t, 5> tx_push_global_index;
-      epee::math_helper::average<uint64_t, 5> tx_check_exist;
-      epee::math_helper::average<uint64_t, 5> tx_print_log;
-      epee::math_helper::average<uint64_t, 5> tx_prapare_append;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_time;
+      epee::math_helper::average<uint64_t, 1> tx_add_one_tx_time;
+      epee::math_helper::average<uint64_t, 1> tx_process_extra;
+      epee::math_helper::average<uint64_t, 1> tx_process_attachment;
+      epee::math_helper::average<uint64_t, 1> tx_process_inputs ;
+      epee::math_helper::average<uint64_t, 1> tx_push_global_index;
+      epee::math_helper::average<uint64_t, 1> tx_check_exist;
+      epee::math_helper::average<uint64_t, 1> tx_print_log;
+      epee::math_helper::average<uint64_t, 1> tx_prapare_append;
               
-      epee::math_helper::average<uint64_t, 5> tx_append_time;
-      epee::math_helper::average<uint64_t, 5> tx_append_rl_wait;
-      epee::math_helper::average<uint64_t, 5> tx_append_is_expired;
+      epee::math_helper::average<uint64_t, 1> tx_append_time;
+      epee::math_helper::average<uint64_t, 1> tx_append_rl_wait;
+      epee::math_helper::average<uint64_t, 1> tx_append_is_expired;
 
-      epee::math_helper::average<uint64_t, 5> tx_store_db;
+      epee::math_helper::average<uint64_t, 1> tx_store_db;
 
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_prefix_hash;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_attachment_check;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_loop;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_loop_kimage_check;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_loop_ch_in_val_sig;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_loop_scan_outputkeys_get_item_size;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_loop_scan_outputkeys_relative_to_absolute;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_loop_scan_outputkeys_loop;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_loop_scan_outputkeys_loop_get_subitem;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_loop_scan_outputkeys_loop_find_tx;
-      epee::math_helper::average<uint64_t, 5> tx_check_inputs_loop_scan_outputkeys_loop_handle_output;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_prefix_hash;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_attachment_check;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_loop;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_loop_kimage_check;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_loop_ch_in_val_sig;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_loop_scan_outputkeys_get_item_size;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_loop_scan_outputkeys_relative_to_absolute;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_loop_scan_outputkeys_loop;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_loop_scan_outputkeys_loop_get_subitem;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_loop_scan_outputkeys_loop_find_tx;
+      epee::math_helper::average<uint64_t, 1> tx_check_inputs_loop_scan_outputkeys_loop_handle_output;
+
+      epee::math_helper::average<uint64_t, 1> tx_mixin_count;
 
       
       //TODO: move this to suitable place or remove it all

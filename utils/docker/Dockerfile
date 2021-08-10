@@ -46,7 +46,7 @@ RUN curl https://github.com/Kitware/CMake/releases/download/v3.15.5/cmake-3.15.5
 
 # Boost 1.68
 
-RUN curl https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.bz2 -OL &&\
+RUN curl  https://boostorg.jfrog.io/artifactory/main/release/1.68.0/source/boost_1_68_0.tar.bz2 -OL &&\
     echo '7f6130bc3cf65f56a618888ce9d5ea704fa10b462be126ad053e80e553d6d8b7 boost_1_68_0.tar.bz2' | sha256sum -c - &&\
     tar -xjf boost_1_68_0.tar.bz2 &&\
     rm boost_1_68_0.tar.bz2 &&\

@@ -14,6 +14,7 @@
 #include "currency_core/difficulty.h"
 
 #include "crypto/crypto-sugar.h"
+#include "crypto/range_proofs.h"
 
 using namespace crypto;
 
@@ -1096,6 +1097,52 @@ TEST(crypto, point_basics)
   return true;
 }
 
+TEST(crypto, neg_identity)
+{
+  point_t z = c_point_0;                  // 0 group element (identity)
+  public_key z_pk = z.to_public_key();    // pub key, corresponding to 0 ge (pub key is not zero bitwise)
+  public_key z_neg_pk = z_pk;
+  ((unsigned char*)&z_neg_pk)[31] = 0x80; // set sign bit manually
+  std::cout << "-Identity = " << z_pk << ENDL;
+  point_t z_neg;
+  ASSERT_FALSE(z_neg.from_public_key(z_neg_pk)); // negative identity should not be loaded
+
+  key_image z_ki;
+  memset(&z_ki, 0, sizeof(z_ki));
+  ((unsigned char*)&z_ki)[00] = 0x01; // y = 1
+
+  ASSERT_TRUE(validate_key_image(z_ki));
+
+  key_image z_neg_ki = z_ki;
+  ((unsigned char*)&z_neg_ki)[31] = 0x80; // set sign bit manually
+
+  ASSERT_FALSE(validate_key_image(z_neg_ki)); // negative identity should not be loaded
+
+
+  // also do zero-byte pub key / key image checks
+
+  public_key zzz_pk;
+  memset(&zzz_pk, 0, sizeof public_key);
+
+  ASSERT_TRUE(check_key(zzz_pk));
+
+  point_t zzz;
+  ASSERT_TRUE(zzz.from_public_key(zzz_pk));
+  ASSERT_FALSE(zzz.is_in_main_subgroup());
+
+  key_image zzz_ki;
+  memset(&zzz_ki, 0, sizeof key_image);
+
+  ASSERT_FALSE(validate_key_image(zzz_ki));
+
+  point_t zzz2;
+  ASSERT_TRUE(zzz2.from_key_image(zzz_ki));
+  ASSERT_FALSE(zzz2.is_in_main_subgroup());
+  ASSERT_EQ(zzz, zzz2);
+
+  return true;
+}
+
 TEST(crypto, scalar_reciprocal)
 {
   int64_t test_nums[] = { 1, 2, 10 };
@@ -1547,6 +1594,30 @@ TEST(crypto, hex_tools)
   ASSERT_EQ(parse_tpod_from_hex_string<uint64_t>("0123456789abcdef"), 0xefcdab8967452301);
   ASSERT_EQ(parse_tpod_from_hex_string<scalar_t>("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"), c_scalar_Pm1);
   ASSERT_EQ(parse_tpod_from_hex_string<scalar_t>("792fdce229e50661d0da1c7db39dd30700000000000000000000000000000006"), c_scalar_1div8);
+
+  return true;
+}
+
+
+TEST(crypto, calc_lsb_32)
+{
+  auto local_calc_lsb = [](uint32_t v) {
+    uint8_t r = 0;
+    while (v != 0 && (v & 1) == 0)
+    {
+      v >>= 1;
+      ++r;
+    }
+    return r;
+  };
+
+  for (uint32_t x = 0; x < UINT32_MAX; ++x)
+  {
+    if (x % 10000000 == 0)
+      std::cout << x << ENDL;
+    ASSERT_EQ((int)local_calc_lsb(x), (int)calc_lsb_32(x));
+  }
+  ASSERT_EQ((int)local_calc_lsb(UINT32_MAX), (int)calc_lsb_32(UINT32_MAX));
 
   return true;
 }

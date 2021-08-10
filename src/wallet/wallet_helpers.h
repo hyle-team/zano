@@ -37,6 +37,8 @@ namespace tools
         result.require_password = false;
         result.hash_sum_matched = false;
         result.syntax_correct = acc.restore_from_tracking_seed(seed_phrase);
+        if (result.syntax_correct)
+          result.tracking = true;
       }
       else
       {

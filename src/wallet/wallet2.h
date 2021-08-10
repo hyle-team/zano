@@ -707,7 +707,7 @@ namespace tools
 
       if (ver < 149)
       {
-        WLT_LOG_MAGENTA("Wallet file truncated due to old version", LOG_LEVEL_0);
+        WLT_LOG_MAGENTA("Wallet file truncated due to old version: " << ver, LOG_LEVEL_0);
         return;
       }
 

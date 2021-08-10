@@ -5,7 +5,7 @@ case $1 in
         cat <<'EOM'
 graph_title performance_transactions
 graph_vlabel mcs
-graph_category daemon
+graph_category transactions
 tx_add_one_tx_time.label tx_add_one_tx_time
 tx_add_one_tx_time.draw LINE
 tx_append_time.label tx_append_time
