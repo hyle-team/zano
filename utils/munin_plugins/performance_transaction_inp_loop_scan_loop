@@ -5,7 +5,7 @@ case $1 in
         cat <<'EOM'
 graph_title performance_tranactions_inp.every_inp.every_key
 graph_vlabel mcs
-graph_category daemon.inp
+graph_category transactions.inp
 tx_check_inputs_loop_scan_outputkeys_loop_get_subitem.label get_subitem
 tx_check_inputs_loop_scan_outputkeys_loop_get_subitem.draw AREA
 tx_check_inputs_loop_scan_outputkeys_loop_find_tx.label find_tx

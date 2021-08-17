@@ -709,6 +709,15 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
   }
   get_payment_id_from_tx(decrypted_att, wti.payment_id);
 
+  for (const auto& item : decrypted_att)
+  {
+    if (item.type() == typeid(currency::tx_service_attachment))
+    {
+      wti.service_entries.push_back(boost::get<currency::tx_service_attachment>(item));
+    }
+  }
+
+
   if (wti.is_income)
   {
     account_public_address sender_address = AUTO_VAL_INIT(sender_address);
@@ -1238,7 +1247,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
   wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
   wti.tx_hash = currency::get_transaction_hash(tx);
   load_wallet_transfer_info_flags(wti);
-  bc_services::extract_market_instructions(wti.srv_attachments, tx.attachment);
+  bc_services::extract_market_instructions(wti.marketplace_entries, tx.attachment);
 
   // escrow transactions, which are built with TX_FLAG_SIGNATURE_MODE_SEPARATE flag actually encrypt attachments 
   // with buyer as a sender, and seller as receiver, despite the fact that for both sides transaction seen as outgoing
@@ -1654,7 +1663,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
         //block matched in that number
         last_matched_index = height;
         been_matched_block = true;
-        WLT_LOG_L2("Block " << bl_id << " @ " << height << " is already in wallet's blockchain");
+        WLT_LOG_L4("Block " << bl_id << " @ " << height << " is already in wallet's blockchain");
       }
       else
       {
@@ -3202,28 +3211,49 @@ uint64_t wallet2::get_transfer_entries_count()
   return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs)
+
+template<typename callback_t, typename iterator_t>
+bool enum_container(iterator_t it_begin, iterator_t it_end, callback_t cb)
+{
+  for (iterator_t it = it_begin; it != it_end; it++)
+  {
+    if (!cb(*it, it - it_begin))
+      return true;
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs, bool start_from_end)
 {
   if (!count || offset >= m_transfer_history.size())
     return;
 
-  for (auto it = m_transfer_history.rbegin() + offset; it != m_transfer_history.rend(); it++)
-  {
+  auto cb = [&](wallet_public::wallet_transfer_info& wti, size_t local_offset) {
+  
     if (exclude_mining_txs)
     {
-      if(currency::is_coinbase(it->tx))
-        continue;
+      if (currency::is_coinbase(wti.tx))
+        return true;
     }
-    trs.push_back(*it);
+    trs.push_back(wti);
     load_wallet_transfer_info_flags(trs.back());
-    last_item_index = it - m_transfer_history.rbegin();
-    
+    last_item_index = offset + local_offset;
+    trs.back().transfer_internal_index = last_item_index;
+
     if (trs.size() >= count)
     {
-      break;
+      return false;
     }
-  }
+    return true;
+  };
+  
+  if(start_from_end)
+    enum_container(m_transfer_history.rbegin() + offset, m_transfer_history.rend(), cb);
+  else 
+    enum_container(m_transfer_history.begin() + offset, m_transfer_history.end(), cb);
+
   total = m_transfer_history.size();
+
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
@@ -4588,7 +4618,7 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
     case GUI_TX_TYPE_PUSH_OFFER:
     {
       bc_services::offer_details od;
-      if (!get_type_in_variant_container(m_transfer_history[i].srv_attachments, od))
+      if (!get_type_in_variant_container(m_transfer_history[i].marketplace_entries, od))
       {
         WLT_LOG_ERROR("Transaction history entry " << i << " market as type " << m_transfer_history[i].tx_type << " but get_type_in_variant_container returned false for bc_services::offer_details");
         break;
@@ -4609,7 +4639,7 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
     case GUI_TX_TYPE_UPDATE_OFFER:
     {
       bc_services::update_offer uo;
-      if (!get_type_in_variant_container(m_transfer_history[i].srv_attachments, uo))
+      if (!get_type_in_variant_container(m_transfer_history[i].marketplace_entries, uo))
       {
         WLT_LOG_ERROR("Transaction history entry " << i << " market as type " << m_transfer_history[i].tx_type << " but get_type_in_variant_container returned false for update_offer");
         break;
@@ -4641,7 +4671,7 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
     case GUI_TX_TYPE_CANCEL_OFFER:
     {
       bc_services::cancel_offer co;
-      if (!get_type_in_variant_container(m_transfer_history[i].srv_attachments, co))
+      if (!get_type_in_variant_container(m_transfer_history[i].marketplace_entries, co))
       {
         WLT_LOG_ERROR("Transaction history entry " << i << " market as type " << m_transfer_history[i].tx_type << " but get_type_in_variant_container returned false for cancel_offer");
         break;

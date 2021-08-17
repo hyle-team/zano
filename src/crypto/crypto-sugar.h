@@ -433,6 +433,17 @@ namespace crypto
 
   }; // struct scalar_t
 
+  //
+  // Global constants
+  //
+
+  extern const scalar_t c_scalar_1;
+  extern const scalar_t c_scalar_L;
+  extern const scalar_t c_scalar_Lm1;
+  extern const scalar_t c_scalar_P;
+  extern const scalar_t c_scalar_Pm1;
+  extern const scalar_t c_scalar_256m1;
+  extern const scalar_t c_scalar_1div8;
 
   //
   //
@@ -486,6 +497,7 @@ namespace crypto
       zero();
     }
 
+    // as we're using additive notation, zero means identity group element here and after
     void zero()
     {
       ge_p3_0(&m_p3);
@@ -495,6 +507,11 @@ namespace crypto
     {
       // (0, 1) ~ (0, z, z, 0)
       return fe_isnonzero(m_p3.X) * fe_cmp(m_p3.Y, m_p3.Z) == 0;
+    }
+
+    bool is_in_main_subgroup() const
+    {
+      return (c_scalar_L * *this).is_zero();
     }
 
     bool from_public_key(const crypto::public_key& pk)
@@ -862,14 +879,6 @@ namespace crypto
   //
 
   extern const point_g_t c_point_G;
-  
-  extern const scalar_t c_scalar_1;
-  extern const scalar_t c_scalar_L;
-  extern const scalar_t c_scalar_Lm1;
-  extern const scalar_t c_scalar_P;
-  extern const scalar_t c_scalar_Pm1;
-  extern const scalar_t c_scalar_256m1;
-  extern const scalar_t c_scalar_1div8;
 
   extern const point_t  c_point_H;
   extern const point_t  c_point_0;

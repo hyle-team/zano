@@ -3816,12 +3816,14 @@ namespace currency
     const crypto::hash& m_tx_id;
     const crypto::hash& m_bl_id;
     const uint64_t m_bl_height;
-    add_transaction_input_visitor(blockchain_storage& bcs, blockchain_storage::key_images_container& m_db_spent_keys, const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height) :
+    uint64_t &m_mixins_count;
+    add_transaction_input_visitor(blockchain_storage& bcs, blockchain_storage::key_images_container& m_db_spent_keys, const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, uint64_t& mixins_count) :
       m_bcs(bcs),
       m_db_spent_keys(m_db_spent_keys),
       m_tx_id(tx_id),
       m_bl_id(bl_id),
-      m_bl_height(bl_height)
+      m_bl_height(bl_height), 
+      m_mixins_count(mixins_count)
     {}
     bool operator()(const txin_to_key& in) const
     {
@@ -3846,7 +3848,8 @@ namespace currency
           return false;
         }
       }
-
+      if (m_mixins_count < in.key_offsets.size())
+        m_mixins_count = in.key_offsets.size();
       return true;
     }
     bool operator()(const txin_htlc& in) const
@@ -3896,11 +3899,11 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   process_blockchain_tx_attachments(tx, bl_height, bl_id, timestamp);
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_attachment);
 
-
+  uint64_t mixins_count = 0;
   TIME_MEASURE_START_PD(tx_process_inputs);
   for(const txin_v& in : tx.vin)
   {
-    if(!boost::apply_visitor(add_transaction_input_visitor(*this, m_db_spent_keys, tx_id, bl_id, bl_height), in))
+    if(!boost::apply_visitor(add_transaction_input_visitor(*this, m_db_spent_keys, tx_id, bl_id, bl_height, mixins_count), in))
     {
       LOG_ERROR("critical internal error: add_transaction_input_visitor failed. but key_images should be already checked");
       purge_transaction_keyimages_from_blockchain(tx, false);
@@ -3913,6 +3916,13 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
     }
   }
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_inputs);
+  if (need_to_profile && mixins_count > 0)
+  {
+    m_performance_data.tx_mixin_count.push(mixins_count);
+#ifdef _DEBUG
+    LOG_PRINT_L0("[TX_MIXINS]: " <<  mixins_count);
+#endif
+  }
 
   //check if there is already transaction with this hash
   TIME_MEASURE_START_PD(tx_check_exist);

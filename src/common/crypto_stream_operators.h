@@ -15,20 +15,20 @@ bool parse_hash256(const std::string str_hash, crypto::hash& hash);
 template <class T>
 std::ostream &print_t(std::ostream &o, const T &v)
 {
-  return o << "<" << epee::string_tools::pod_to_hex(v) << ">";
+  return o << "" << epee::string_tools::pod_to_hex(v) << "";
 }
 
 
 template <class T>
 std::ostream &print16(std::ostream &o, const T &v)
 {
-  return o << "<" << epee::string_tools::pod_to_hex(v).substr(0, 5) << "..>";
+  return o << "" << epee::string_tools::pod_to_hex(v).substr(0, 5) << "..";
 }
 
 template <class T>
 std::string print16(const T &v)
 {
-  return std::string("<") + epee::string_tools::pod_to_hex(v).substr(0, 5) + "..>";
+  return std::string("") + epee::string_tools::pod_to_hex(v).substr(0, 5) + "..";
 }
 
 

@@ -17,9 +17,9 @@ Be sure to clone the repository properly:\
 | llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
 | [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2015 (14.0 update 1) | 2017 (15.9.0) | 2019 |
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 9.2 | 12.3 | 12.3 |
-| [CMake](https://cmake.org/download/) | 2.8.6 | 3.15.5 | 3.18.1 |
-| [Boost](https://www.boost.org/users/download/) | 1.56 | 1.68 | 1.69 |
-| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.13.2 |
+| [CMake](https://cmake.org/download/) | 2.8.6 | 3.15.5 | 3.20 |
+| [Boost](https://www.boost.org/users/download/) | 1.56 | 1.68 | 1.76 |
+| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |
 
 Note:\
 [*server version*] denotes steps required for building command-line tools (daemon, simplewallet, etc.).\
@@ -39,7 +39,7 @@ Recommended OS version: Ubuntu 18.04 LTS.
           
    [*GUI version*]
 
-       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen mesa-common-dev libglu1-mesa-dev`
+       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen mesa-common-dev libglu1-mesa-dev
 
 2. Download and build Boost
 
@@ -85,6 +85,8 @@ For instance, by adding the following lines to `~/.bashrc`
           make -j1 daemon simplewallet
 
       **NOTICE**: If you are building on a machine with a relatively high amount of RAM or with the proper setting of virtual memory, then you can use `-j2` or `-j` option to speed up the building process. Use with caution.
+      
+      **NOTICE 2**: If you'd like to build binaries for the testnet, use `cmake -D TESTNET=TRUE ..` instead of `cmake ..` .
    
    1. Building GUI:
 

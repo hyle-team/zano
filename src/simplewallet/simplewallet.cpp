@@ -20,6 +20,7 @@
 #include "wallet/wallet_rpc_server.h"
 #include "version.h"
 #include "string_coding.h"
+#include "wallet/wrap_service.h"
 
 #include <cstdlib>
 
@@ -191,7 +192,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, _1), "Show current wallet balance");
   m_cmd_binder.set_handler("incoming_transfers", boost::bind(&simple_wallet::show_incoming_transfers, this, _1), "incoming_transfers [available|unavailable] - Show incoming transfers - all of them or filter them by availability");
   m_cmd_binder.set_handler("incoming_counts", boost::bind(&simple_wallet::show_incoming_transfers_counts, this, _1), "incoming_transfers counts");
-  m_cmd_binder.set_handler("list_recent_transfers", boost::bind(&simple_wallet::list_recent_transfers, this, _1), "list_recent_transfers - Show recent maximum 1000 transfers");
+  m_cmd_binder.set_handler("list_recent_transfers", boost::bind(&simple_wallet::list_recent_transfers, this, _1), "list_recent_transfers [offset] [count] - Show recent maximum 1000 transfers, offset default = 0, count default = 100 ");
   m_cmd_binder.set_handler("export_recent_transfers", boost::bind(&simple_wallet::export_recent_transfers, this, _1), "list_recent_transfers_tx - Write recent transfer in json to wallet_recent_transfers.txt");
   m_cmd_binder.set_handler("list_outputs", boost::bind(&simple_wallet::list_outputs, this, _1), "list_outputs [spent|unspent] - Lists all the outputs that have ever been sent to this wallet if called without arguments, otherwise it lists only the spent or unspent outputs");
   m_cmd_binder.set_handler("dump_transfers", boost::bind(&simple_wallet::dump_trunsfers, this, _1), "dump_transfers - Write  transfers in json to dump_transfers.txt");
@@ -753,7 +754,7 @@ bool print_wti(const tools::wallet_public::wallet_transfer_info& wti)
       remote_side += remote_side.empty() ? it : (separator + it);
   }
 
-  message_writer(cl) << epee::misc_utils::get_time_str_v2(wti.timestamp) << " "
+  success_msg_writer(cl) << "[" << wti.transfer_internal_index << "]" << epee::misc_utils::get_time_str_v2(wti.timestamp) << " "
     << (wti.is_income ? "Received " : "Sent    ")
     << print_money(wti.amount) << "(fee:" << print_money(wti.fee) << ")  "
     << remote_side
@@ -765,9 +766,15 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
 {
   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
   std::vector<tools::wallet_public::wallet_transfer_info> recent;
+  uint64_t offset = 0;
+  if (args.size() > 0)
+    offset = std::stoll(args[0]);
+  uint64_t count = 1000; 
+  if (args.size() > 1)
+    count = std::stoll(args[1]);
   uint64_t total = 0;
   uint64_t last_index = 0;
-  m_wallet->get_recent_transfers_history(recent, 0, 0, total, last_index, false);
+  m_wallet->get_recent_transfers_history(recent, offset, count, total, last_index, false, false);
   m_wallet->get_unconfirmed_transfers(unconfirmed, false);
   //workaround for missed fee
   
@@ -1208,13 +1215,32 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     return true;
   }
 
+  std::vector<extra_v> extra;
   vector<currency::tx_destination_entry> dsts;
+  bool wrapped_transaction = false;
   for (size_t i = 0; i < local_args.size(); i += 2) 
   {
     std::string integrated_payment_id;
     currency::tx_destination_entry de;
     de.addr.resize(1);
-    if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(local_args[i], de.addr.front(), integrated_payment_id)))
+    //check if address looks like wrapped address
+    if (is_address_like_wrapped(local_args[i]))
+    {
+      success_msg_writer(true) << "Address " << local_args[i] << " recognized as wrapped address, creating wrapping transaction...";
+      //put into service attachment specially encrypted entry which will contain wrap address and network
+      tx_service_attachment sa = AUTO_VAL_INIT(sa);
+      sa.service_id = BC_WRAP_SERVICE_ID;
+      sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
+      sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE;
+      sa.body = local_args[i];
+      extra.push_back(sa);
+
+      currency::account_public_address acc = AUTO_VAL_INIT(acc);
+      currency::get_account_address_from_str(acc, BC_WRAP_SERVICE_CUSTODY_WALLET);
+      de.addr.front() = acc;
+      wrapped_transaction = true;
+      //encrypt body with a special way
+    }else if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(local_args[i], de.addr.front(), integrated_payment_id)))
     {
       fail_msg_writer() << "wrong address: " << local_args[i];
       return true;
@@ -1258,13 +1284,19 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   try
   {
     currency::transaction tx;
-    std::vector<extra_v> extra;
     m_wallet->transfer(dsts, fake_outs_count, 0, m_wallet->get_core_runtime_config().tx_default_fee, extra, attachments, tx);
 
     if (!m_wallet->is_watch_only())
-      success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+    {
+      if(wrapped_transaction)
+        success_msg_writer(true) << "Money successfully sent to wZano custody wallet, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+      else
+        success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+    }
     else
+    {
       success_msg_writer(true) << "Transaction prepared for signing and saved into \"zano_tx_unsigned\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
+    }
   }
   catch (const tools::error::daemon_busy&)
   {

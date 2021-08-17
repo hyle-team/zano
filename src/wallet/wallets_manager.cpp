@@ -1753,7 +1753,11 @@ std::string wallets_manager::get_offers_ex(const bc_services::core_offers_filter
 std::string wallets_manager::validate_address(const std::string& addr_str, std::string& payment_id)
 {
   currency::account_public_address acc = AUTO_VAL_INIT(acc);
-  if (currency::get_account_address_and_payment_id_from_str(acc, payment_id, addr_str))
+  if (currency::is_address_like_wrapped(addr_str))
+  {
+    return API_RETURN_CODE_TRUE;
+  }
+  else if (currency::get_account_address_and_payment_id_from_str(acc, payment_id, addr_str))
     return API_RETURN_CODE_TRUE;
   else
     return API_RETURN_CODE_FALSE;

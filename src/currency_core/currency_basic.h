@@ -383,11 +383,25 @@ namespace currency
       FIELD(security)
       FIELD(flags)
     END_SERIALIZE()
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(service_id)
+      KV_SERIALIZE(instruction)
+      KV_SERIALIZE_BLOB_AS_HEX_STRING(body)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(security)
+      KV_SERIALIZE(flags)
+    END_KV_SERIALIZE_MAP()
   };
 
 // applicable flags for tx_service_attachment::flags, can be combined using bitwise OR
-#define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY  static_cast<uint8_t>(1 << 0)
-#define TX_SERVICE_ATTACHMENT_DEFLATE_BODY  static_cast<uint8_t>(1 << 1)
+#define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY                    static_cast<uint8_t>(1 << 0)
+#define TX_SERVICE_ATTACHMENT_DEFLATE_BODY                    static_cast<uint8_t>(1 << 1)
+
+// with this flag enabled body encrypted/decrypted with the key created as a derivation from onetime key and "spend keys" of receiver
+#define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE  static_cast<uint8_t>(1 << 2)  
+// add proof of content, without revealing secrete
+#define TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF               static_cast<uint8_t>(1 << 3)  
+
   //,
 
   
@@ -690,6 +704,7 @@ namespace currency
       return k;
     }
   };
+  const static keypair null_keypair = AUTO_VAL_INIT(null_keypair);
   //---------------------------------------------------------------
   //PoS
   //based from ppcoin/novacoin approach

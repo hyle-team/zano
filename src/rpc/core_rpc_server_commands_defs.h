@@ -500,6 +500,8 @@ namespace currency
     uint64_t tx_print_log;
     uint64_t tx_prapare_append;
 
+    uint64_t tx_mixin_count;
+
 
     uint64_t tx_store_db;
     
@@ -547,6 +549,7 @@ namespace currency
       KV_SERIALIZE(tx_store_db)
       KV_SERIALIZE(tx_print_log)
       KV_SERIALIZE(tx_prapare_append)
+      KV_SERIALIZE(tx_mixin_count)      
 
       KV_SERIALIZE(tx_check_inputs_prefix_hash)
       KV_SERIALIZE(tx_check_inputs_attachment_check)

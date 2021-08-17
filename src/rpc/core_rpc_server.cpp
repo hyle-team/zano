@@ -210,6 +210,7 @@ namespace currency
       res.performance_data.tx_append_time = pd.tx_append_time.get_avg();
       res.performance_data.tx_append_rl_wait = pd.tx_append_rl_wait.get_avg();
       res.performance_data.tx_append_is_expired = pd.tx_append_is_expired.get_avg();
+      res.performance_data.tx_mixin_count = pd.tx_mixin_count.get_avg();
 
       
       res.performance_data.tx_store_db = pd.tx_store_db.get_avg();
