@@ -698,6 +698,12 @@ namespace tools
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
     {
+      if (t_archive::is_saving::value)
+      {
+        WLT_LOG_MAGENTA("Serializing file with ver: " << ver, LOG_LEVEL_0);
+      }
+
+
       // do not load wallet if data version is greather than the code version 
       if (ver > WALLET_FILE_SERIALIZATION_VERSION)
       {
@@ -707,7 +713,7 @@ namespace tools
 
       if (ver < 149)
       {
-        WLT_LOG_MAGENTA("Wallet file truncated due to old version: " << ver, LOG_LEVEL_0);
+        WLT_LOG_MAGENTA("Wallet file truncated due to old version. ver: " << ver << ", WALLET_FILE_SERIALIZATION_VERSION=" << WALLET_FILE_SERIALIZATION_VERSION, LOG_LEVEL_0);
         return;
       }
 

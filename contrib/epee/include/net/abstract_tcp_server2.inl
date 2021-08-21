@@ -588,10 +588,18 @@ bool boosted_tcp_server<t_protocol_handler>::timed_wait_server_stop(uint64_t wai
   TRY_ENTRY();
   boost::chrono::milliseconds ms(wait_mseconds);
   for(std::size_t i = 0; i < m_threads.size(); ++i) {
-    if(m_threads[i]->joinable() && !m_threads[i]->try_join_for(ms)) {
+#ifdef ANDROID_BUILD
+    if (m_threads[i]->joinable())
+    {
+      m_threads[i]->join();
+    }
+#else
+    if (m_threads[i]->joinable() && !m_threads[i]->try_join_for(ms))
+    {
       LOG_PRINT_L0("Interrupting thread " << m_threads[i]->native_handle());
       m_threads[i]->interrupt();
     }
+#endif
   }
   return true;
   CATCH_ENTRY_L0("boosted_tcp_server<t_protocol_handler>::timed_wait_server_stop", false);
