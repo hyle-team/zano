@@ -16,6 +16,7 @@ using namespace epee;
 #include "crypto/hash.h"
 #include "wallet_rpc_server_error_codes.h"
 #include "wallet_helpers.h"
+#include "wrap_service.h"
 
 #define WALLET_RPC_BEGIN_TRY_ENTRY()     try {
 #define WALLET_RPC_CATCH_TRY_ENTRY()     } \
@@ -303,7 +304,24 @@ namespace tools
       currency::tx_destination_entry de;
       de.addr.resize(1);
       std::string embedded_payment_id;
-      if(!m_wallet.get_transfer_address(it->address, de.addr.back(), embedded_payment_id))
+      //check if address looks like wrapped address
+      if (currency::is_address_like_wrapped(it->address))
+      {
+        LOG_PRINT_L0("Address " << it->address << " recognized as wrapped address, creating wrapping transaction...");
+        //put into service attachment specially encrypted entry which will contain wrap address and network
+        currency::tx_service_attachment sa = AUTO_VAL_INIT(sa);
+        sa.service_id = BC_WRAP_SERVICE_ID;
+        sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
+        sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE;
+        sa.body = it->address;
+        ctp.extra.push_back(sa);
+
+        currency::account_public_address acc = AUTO_VAL_INIT(acc);
+        currency::get_account_address_from_str(acc, BC_WRAP_SERVICE_CUSTODY_WALLET);
+        de.addr.front() = acc;
+        //encrypt body with a special way
+      }
+      else if(!m_wallet.get_transfer_address(it->address, de.addr.back(), embedded_payment_id))
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
         er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + it->address;
