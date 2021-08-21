@@ -1755,7 +1755,7 @@ std::string wallets_manager::validate_address(const std::string& addr_str, std::
   currency::account_public_address acc = AUTO_VAL_INIT(acc);
   if (currency::is_address_like_wrapped(addr_str))
   {
-    return API_RETURN_CODE_TRUE;
+    return API_RETURN_CODE_WRAP;
   }
   else if (currency::get_account_address_and_payment_id_from_str(acc, payment_id, addr_str))
     return API_RETURN_CODE_TRUE;
