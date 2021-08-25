@@ -1226,6 +1226,11 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     //check if address looks like wrapped address
     if (is_address_like_wrapped(local_args[i]))
     {
+      if (wrapped_transaction)
+      {
+        fail_msg_writer() << "Second wrap entry not allowed in one tx";
+        return true;
+      }
       success_msg_writer(true) << "Address " << local_args[i] << " recognized as wrapped address, creating wrapping transaction...";
       //put into service attachment specially encrypted entry which will contain wrap address and network
       tx_service_attachment sa = AUTO_VAL_INIT(sa);
@@ -1273,6 +1278,10 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     dsts.push_back(de);
   }
 
+  if (wrapped_transaction)
+  {
+    currency::create_and_add_tx_payer_to_container_from_address(extra, m_wallet->get_account().get_keys().account_address, m_wallet->get_top_block_height(), m_wallet->get_core_runtime_config());
+  }
 
   std::vector<currency::attachment_v> attachments;
   if (!payment_id.empty() && !set_payment_id_to_tx(attachments, payment_id))
