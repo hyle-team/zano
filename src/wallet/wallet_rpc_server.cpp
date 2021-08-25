@@ -298,6 +298,7 @@ namespace tools
       //put it to attachments
       ctp.attachments.insert(ctp.extra.end(), req.service_entries.begin(), req.service_entries.end());
     }
+    bool wrap = false;
     std::vector<currency::tx_destination_entry>& dsts = ctp.dsts;
     for (auto it = req.destinations.begin(); it != req.destinations.end(); it++) 
     {
@@ -307,6 +308,13 @@ namespace tools
       //check if address looks like wrapped address
       if (currency::is_address_like_wrapped(it->address))
       {
+        if (wrap) {
+          LOG_ERROR("More then one entries in transactions");
+          er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+          er.message = "Second wrap entry not supported in transactions";
+          return false;
+
+        }
         LOG_PRINT_L0("Address " << it->address << " recognized as wrapped address, creating wrapping transaction...");
         //put into service attachment specially encrypted entry which will contain wrap address and network
         currency::tx_service_attachment sa = AUTO_VAL_INIT(sa);
@@ -319,6 +327,7 @@ namespace tools
         currency::account_public_address acc = AUTO_VAL_INIT(acc);
         currency::get_account_address_from_str(acc, BC_WRAP_SERVICE_CUSTODY_WALLET);
         de.addr.front() = acc;
+        wrap = true;
         //encrypt body with a special way
       }
       else if(!m_wallet.get_transfer_address(it->address, de.addr.back(), embedded_payment_id))
@@ -358,7 +367,7 @@ namespace tools
         attachments.push_back(comment);
       }
 
-      if (req.push_payer)
+      if (req.push_payer | wrap)
       {
         currency::create_and_add_tx_payer_to_container_from_address(extra, m_wallet.get_account().get_keys().account_address, m_wallet.get_top_block_height(), m_wallet.get_core_runtime_config());
       }
