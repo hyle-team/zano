@@ -21,7 +21,7 @@
 #include "version.h"
 #include "string_coding.h"
 #include "wallet/wrap_service.h"
-
+#include "common/general_purpose_commands_defs.h"
 #include <cstdlib>
 
 #if defined(WIN32)
@@ -1176,6 +1176,52 @@ bool simple_wallet::show_wallet_bcheight(const std::vector<std::string>& args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool simple_wallet::validate_wrap_status(uint64_t amount)
+{
+  //check if amount is fit erc20 fees and amount left in circulation 
+  epee::net_utils::http::http_simple_client http_client;
+
+  currency::void_struct req = AUTO_VAL_INIT(req);
+  currency::rpc_get_wrap_info_response res = AUTO_VAL_INIT(res);
+  bool r = epee::net_utils::invoke_http_json_remote_command2("http://wrapped.zano.org/api/get_wrap_info", req, res, http_client, 10000);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to request wrap status from server, check internet connection";
+    return false;
+  }
+  //check if amount is bigger then erc20 fee
+  uint64_t zano_needed_for_wrap = std::stoll(res.tx_cost.zano_needed_for_erc20);
+  if (amount <= zano_needed_for_wrap)
+  {
+    fail_msg_writer() << "Too small amount to cover ERC20 fee. ERC20 cost is: " 
+      << print_money(zano_needed_for_wrap) << " Zano" <<
+      "($" << res.tx_cost.usd_needed_for_erc20 << ")";
+    return false;
+  }
+  uint64_t unwrapped_coins_left = std::stoll(res.unwraped_coins_left);
+  if (amount > unwrapped_coins_left)
+  {
+    fail_msg_writer() << "Amount is bigger than ERC20 tokens left available: "
+      << print_money(unwrapped_coins_left) << " wZano";
+    return false;
+  }
+  
+  success_msg_writer(false) << "You'll receive estimate " << print_money(amount - zano_needed_for_wrap) << " wZano (" << print_money(zano_needed_for_wrap)<< " Zano will be used to cover ERC20 fee)";
+  success_msg_writer(false) << "Proceed? (yes/no)";
+  while (true)
+  {
+    std::string user_response;
+    std::getline(std::cin, user_response);
+    if (user_response == "yes" || user_response == "y")
+      return true;
+    else if (user_response == "no" || user_response == "n")
+      return false;
+    else {
+      success_msg_writer(false) << "Wrong response, can be \"yes\" or \"no\"";
+    }
+  }
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::transfer(const std::vector<std::string> &args_)
 {
   if (!try_connect_to_daemon())
@@ -1223,10 +1269,26 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     std::string integrated_payment_id;
     currency::tx_destination_entry de;
     de.addr.resize(1);
+
+    bool ok = currency::parse_amount(de.amount, local_args[i + 1]);
+    if (!ok || 0 == de.amount)
+    {
+      fail_msg_writer() << "amount is wrong: " << local_args[i] << ' ' << local_args[i + 1] <<
+        ", expected number from 0 to " << print_money(std::numeric_limits<uint64_t>::max());
+      return true;
+    }
+    
     //check if address looks like wrapped address
     if (is_address_like_wrapped(local_args[i]))
     {
-      success_msg_writer(true) << "Address " << local_args[i] << " recognized as wrapped address, creating wrapping transaction...";
+
+      success_msg_writer(false) << "Address " << local_args[i] << " recognized as wrapped address, creating wrapping transaction.";
+      success_msg_writer(false) << "This transaction will create wZano (\"Wrapped Zano\") which will be sent to the specified address on the Ethereum network.";
+
+      if (!validate_wrap_status(de.amount))
+      {
+        return true;
+      }
       //put into service attachment specially encrypted entry which will contain wrap address and network
       tx_service_attachment sa = AUTO_VAL_INIT(sa);
       sa.service_id = BC_WRAP_SERVICE_ID;
@@ -1249,14 +1311,6 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     if (local_args.size() <= i + 1)
     {
       fail_msg_writer() << "amount for the last address " << local_args[i] << " is not specified";
-      return true;
-    }
-
-    bool ok = currency::parse_amount(de.amount, local_args[i + 1]);
-    if(!ok || 0 == de.amount)
-    {
-      fail_msg_writer() << "amount is wrong: " << local_args[i] << ' ' << local_args[i + 1] <<
-        ", expected number from 0 to " << print_money(std::numeric_limits<uint64_t>::max());
       return true;
     }
 
