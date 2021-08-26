@@ -1359,7 +1359,9 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
     {
       return API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
     }
-    else if(!currency::parse_amount(dsts.back().amount, d.amount))
+    
+    
+    if(!currency::parse_amount(dsts.back().amount, d.amount))
     {
       return API_RETURN_CODE_BAD_ARG_WRONG_AMOUNT;
     }
