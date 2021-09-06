@@ -1404,7 +1404,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
     tc.comment = tp.comment;
     extra.push_back(tc);
   }
-  if (tp.push_payer || wrap)
+  if (tp.push_payer)
   {
     currency::create_and_add_tx_payer_to_container_from_address(extra, w->get()->get_account().get_keys().account_address,  w->get()->get_top_block_height(),  w->get()->get_core_runtime_config());
   }    
