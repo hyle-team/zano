@@ -367,15 +367,30 @@ namespace plain_wallet
     currency::account_public_address apa = AUTO_VAL_INIT(apa);
     currency::payment_id_t pid = AUTO_VAL_INIT(pid);
     bool valid = false;
-    if(currency::get_account_address_and_payment_id_from_str(apa, pid, addr))
+    bool wrap = false;
+    while (true)
     {
-      valid = true;
+      if (currency::is_address_like_wrapped(addr))
+      {
+        wrap = true;
+        valid = true;
+        break;
+      }
+
+      if (currency::get_account_address_and_payment_id_from_str(apa, pid, addr))
+      {
+        valid = true;
+      }
+      break;
     }
+
     //lazy to make struct for it
     std::stringstream res;
     res << "{ \"valid\": " << (valid?"true":"false") << ", \"auditable\": "
       << (apa.is_auditable() ? "true" : "false")
-      << ",\"payment_id\": " << (pid.size() ? "true" : "false") << "}";
+      << ",\"payment_id\": " << (pid.size() ? "true" : "false") 
+      << ",\"wrap\": " << (wrap ? "true" : "false")
+      << "}";
     return res.str();
   }
 

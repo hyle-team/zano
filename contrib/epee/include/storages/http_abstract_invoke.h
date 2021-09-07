@@ -94,9 +94,28 @@ namespace epee
       return serialization::load_t_from_binary(result_struct, pri->m_body);
     }
 
+
+    template<class t_request, class t_response, class t_transport>
+    bool invoke_http_json_rpc(const std::string& url, const std::string& method_name, const t_request& out_struct, t_response& result_struct, t_transport& transport, epee::json_rpc::error& err, unsigned int timeout = 5000, const std::string& http_method = "GET", const std::string& req_id = "0")
+    {
+      epee::json_rpc::request<t_request> req_t = AUTO_VAL_INIT(req_t);
+      req_t.jsonrpc = "2.0";
+      req_t.id = req_id;
+      req_t.method = method_name;
+      req_t.params = out_struct;
+      epee::json_rpc::response<t_response, epee::json_rpc::error> resp_t = AUTO_VAL_INIT(resp_t);
+      if (!epee::net_utils::invoke_http_json_remote_command2(url, req_t, resp_t, transport, timeout, http_method))
+      {
+        return false;
+      }
+      err = resp_t.error;
+      result_struct = resp_t.result;
+      return true;
+    }
+
     template<class t_request, class t_response, class t_transport>
     bool invoke_http_json_rpc(const std::string& url, const std::string& method_name, const t_request& out_struct, t_response& result_struct, t_transport& transport, unsigned int timeout = 5000, const std::string& http_method = "GET", const std::string& req_id = "0")
-    {
+      {
       epee::json_rpc::request<t_request> req_t = AUTO_VAL_INIT(req_t);
       req_t.jsonrpc = "2.0";
       req_t.id = req_id;

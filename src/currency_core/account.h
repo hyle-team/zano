@@ -16,13 +16,15 @@
 #define SEED_PHRASE_V2_WORDS_COUNT 26
 
 
+#ifndef FORCE_HEADER_ONLY 
+  #define KV_SERIALIZE_ADDRESS_AS_TEXT_N(varialble, val_name) \
+    KV_SERIALIZE_CUSTOM_N(varialble, std::string, currency::transform_addr_to_str, currency::transform_str_to_addr, val_name)
 
-#define KV_SERIALIZE_ADDRESS_AS_TEXT_N(varialble, val_name) \
-  KV_SERIALIZE_CUSTOM_N(varialble, std::string, currency::transform_addr_to_str, currency::transform_str_to_addr, val_name)
-
-#define KV_SERIALIZE_ADDRESS_AS_TEXT(varialble)  KV_SERIALIZE_ADDRESS_AS_TEXT_N(varialble, #varialble)
-
-
+  #define KV_SERIALIZE_ADDRESS_AS_TEXT(varialble)  KV_SERIALIZE_ADDRESS_AS_TEXT_N(varialble, #varialble)
+#else
+  #define KV_SERIALIZE_ADDRESS_AS_TEXT_N(varialble, val_name)     
+  #define KV_SERIALIZE_ADDRESS_AS_TEXT(varialble) 
+#endif
 namespace currency
 {
 
@@ -97,6 +99,7 @@ namespace currency
     std::vector<unsigned char> m_keys_seed_binary;
   };
 
+  const static account_keys null_acc_keys = AUTO_VAL_INIT(null_acc_keys);
 
   std::string transform_addr_to_str(const account_public_address& addr);
   account_public_address transform_str_to_addr(const std::string& str);

@@ -46,7 +46,7 @@ public:
   }
 
   //debug functions
-  
+  std::string get_internal_state_text() const;
 private:
   std::atomic<uint64_t> m_local_bc_size; //temporary workaround 
   crypto::hash m_genesis;

@@ -709,6 +709,15 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
   }
   get_payment_id_from_tx(decrypted_att, wti.payment_id);
 
+  for (const auto& item : decrypted_att)
+  {
+    if (item.type() == typeid(currency::tx_service_attachment))
+    {
+      wti.service_entries.push_back(boost::get<currency::tx_service_attachment>(item));
+    }
+  }
+
+
   if (wti.is_income)
   {
     account_public_address sender_address = AUTO_VAL_INIT(sender_address);
@@ -1238,7 +1247,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t hei
   wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
   wti.tx_hash = currency::get_transaction_hash(tx);
   load_wallet_transfer_info_flags(wti);
-  bc_services::extract_market_instructions(wti.srv_attachments, tx.attachment);
+  bc_services::extract_market_instructions(wti.marketplace_entries, tx.attachment);
 
   // escrow transactions, which are built with TX_FLAG_SIGNATURE_MODE_SEPARATE flag actually encrypt attachments 
   // with buyer as a sender, and seller as receiver, despite the fact that for both sides transaction seen as outgoing
@@ -1654,7 +1663,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
         //block matched in that number
         last_matched_index = height;
         been_matched_block = true;
-        WLT_LOG_L2("Block " << bl_id << " @ " << height << " is already in wallet's blockchain");
+        WLT_LOG_L4("Block " << bl_id << " @ " << height << " is already in wallet's blockchain");
       }
       else
       {
@@ -2660,18 +2669,25 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   load_keys(keys_buff, password, wbh.m_signature, kf_data);
 
   bool need_to_resync = false;
-  if (wbh.m_ver == 1000)
+  if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_INITAL)
   {
     // old WALLET_FILE_BINARY_HEADER_VERSION version means no encryption
     need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, data_file);
+    WLT_LOG_L0("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_INITAL(need_to_resync=" << need_to_resync << ")");
   }
-  else
+  else if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_2)
   {
     tools::encrypt_chacha_in_filter decrypt_filter(password, kf_data.iv);
     boost::iostreams::filtering_istream in;
     in.push(decrypt_filter);
     in.push(data_file);
     need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
+    WLT_LOG_L0("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_2(need_to_resync=" << need_to_resync << ")");
+  }
+  else
+  {
+    WLT_LOG_L0("Unknown wallet body version(" << wbh.m_ver << "), resync initiated.");
+    need_to_resync = true;
   }
     
     
@@ -2679,7 +2695,17 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   if (m_watch_only && !is_auditable())
     load_keys2ki(true, need_to_resync);
 
-  WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) << " with public address: " << m_account.get_public_address_str());
+  boost::system::error_code ec = AUTO_VAL_INIT(ec);
+  m_current_wallet_file_size = boost::filesystem::file_size(wallet_, ec);
+
+  WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) 
+    << " with public address: " << m_account.get_public_address_str() 
+    << ", file_size=" << m_current_wallet_file_size
+    << ", blockchain_size: " << m_chain.get_blockchain_current_size()
+  );
+  WLT_LOG_L0("[LOADING]Blockchain shortener state: " << ENDL << m_chain.get_internal_state_text());
+  
+
   WLT_LOG_L0("(after loading: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
   if (need_to_resync)
@@ -2687,9 +2713,6 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
     reset_history();
     WLT_LOG_L0("Unable to load history data from wallet file, wallet will be resynced!");
   } 
-
-  boost::system::error_code ec = AUTO_VAL_INIT(ec);
-  m_current_wallet_file_size = boost::filesystem::file_size(wallet_, ec);
 
   THROW_IF_TRUE_WALLET_EX(need_to_resync, error::wallet_load_notice_wallet_restored, epee::string_encoding::convert_to_ansii(m_wallet_file));
 }
@@ -2721,7 +2744,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   wbh.m_signature = WALLET_FILE_SIGNATURE_V2;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
-  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION;
+  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION_2;
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
   uint64_t ts = m_core_runtime_config.get_core_time();
@@ -2752,8 +2775,10 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   data_file.flush();
   data_file.close();
+  boost::uintmax_t tmp_file_size = boost::filesystem::file_size(tmp_file_path);
+  WLT_LOG_L0("Stored successfully to temporary file " << tmp_file_path.string() << ", file size=" << tmp_file_size);
 
-  WLT_LOG_L1("Stored successfully to temporary file " << tmp_file_path.string());
+  WLT_LOG_L0("[LOADING]Blockchain shortener state: " << ENDL << m_chain.get_internal_state_text());
 
   // for the sake of safety perform a double-renaming: wallet file -> old tmp, new tmp -> wallet file, remove old tmp
   
@@ -2782,7 +2807,9 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   m_current_wallet_file_size = boost::filesystem::file_size(path_to_save, ec);
   if (path_to_save_exists && !tmp_file_path_exists && !tmp_old_file_path_exists)
   {
-    WLT_LOG_L0("Wallet was successfully stored to " << ascii_path_to_save);
+
+    WLT_LOG_L0("Wallet was successfully stored to " << ascii_path_to_save << ", file size=" << m_current_wallet_file_size
+      << " blockchain_size: " << m_chain.get_blockchain_current_size());
   }
   else
   {
@@ -3184,28 +3211,49 @@ uint64_t wallet2::get_transfer_entries_count()
   return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs)
+
+template<typename callback_t, typename iterator_t>
+bool enum_container(iterator_t it_begin, iterator_t it_end, callback_t cb)
+{
+  for (iterator_t it = it_begin; it != it_end; it++)
+  {
+    if (!cb(*it, it - it_begin))
+      return true;
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs, bool start_from_end)
 {
   if (!count || offset >= m_transfer_history.size())
     return;
 
-  for (auto it = m_transfer_history.rbegin() + offset; it != m_transfer_history.rend(); it++)
-  {
+  auto cb = [&](wallet_public::wallet_transfer_info& wti, size_t local_offset) {
+  
     if (exclude_mining_txs)
     {
-      if(currency::is_coinbase(it->tx))
-        continue;
+      if (currency::is_coinbase(wti.tx))
+        return true;
     }
-    trs.push_back(*it);
+    trs.push_back(wti);
     load_wallet_transfer_info_flags(trs.back());
-    last_item_index = it - m_transfer_history.rbegin();
-    
+    last_item_index = offset + local_offset;
+    trs.back().transfer_internal_index = last_item_index;
+
     if (trs.size() >= count)
     {
-      break;
+      return false;
     }
-  }
+    return true;
+  };
+  
+  if(start_from_end)
+    enum_container(m_transfer_history.rbegin() + offset, m_transfer_history.rend(), cb);
+  else 
+    enum_container(m_transfer_history.begin() + offset, m_transfer_history.end(), cb);
+
   total = m_transfer_history.size();
+
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
@@ -4570,7 +4618,7 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
     case GUI_TX_TYPE_PUSH_OFFER:
     {
       bc_services::offer_details od;
-      if (!get_type_in_variant_container(m_transfer_history[i].srv_attachments, od))
+      if (!get_type_in_variant_container(m_transfer_history[i].marketplace_entries, od))
       {
         WLT_LOG_ERROR("Transaction history entry " << i << " market as type " << m_transfer_history[i].tx_type << " but get_type_in_variant_container returned false for bc_services::offer_details");
         break;
@@ -4591,7 +4639,7 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
     case GUI_TX_TYPE_UPDATE_OFFER:
     {
       bc_services::update_offer uo;
-      if (!get_type_in_variant_container(m_transfer_history[i].srv_attachments, uo))
+      if (!get_type_in_variant_container(m_transfer_history[i].marketplace_entries, uo))
       {
         WLT_LOG_ERROR("Transaction history entry " << i << " market as type " << m_transfer_history[i].tx_type << " but get_type_in_variant_container returned false for update_offer");
         break;
@@ -4623,7 +4671,7 @@ bool wallet2::extract_offers_from_transfer_entry(size_t i, std::unordered_map<cr
     case GUI_TX_TYPE_CANCEL_OFFER:
     {
       bc_services::cancel_offer co;
-      if (!get_type_in_variant_container(m_transfer_history[i].srv_attachments, co))
+      if (!get_type_in_variant_container(m_transfer_history[i].marketplace_entries, co))
       {
         WLT_LOG_ERROR("Transaction history entry " << i << " market as type " << m_transfer_history[i].tx_type << " but get_type_in_variant_container returned false for cancel_offer");
         break;
