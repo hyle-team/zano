@@ -1029,6 +1029,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(atomic_test_wrong_redeem_wrong_refund);    
     GENERATE_AND_PLAY(atomic_test_altchain_simple);
     GENERATE_AND_PLAY(atomic_test_check_hardfork_rules);
+
+    GENERATE_AND_PLAY(isolate_auditable_and_proof);
+    
     
 
     // GENERATE_AND_PLAY(gen_block_reward);

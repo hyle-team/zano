@@ -115,7 +115,7 @@ public: \
     template<t_uint mask>
     inline static bool get_value_of_flag_by_mask(const t_uint& given_flags)
     { 
-      return given_flags&mask == 0 ? false : true;
+      return (given_flags&mask) == 0 ? false : true;
     }
   }; 
 

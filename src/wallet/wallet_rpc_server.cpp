@@ -16,6 +16,7 @@ using namespace epee;
 #include "crypto/hash.h"
 #include "wallet_rpc_server_error_codes.h"
 #include "wallet_helpers.h"
+#include "wrap_service.h"
 
 #define WALLET_RPC_BEGIN_TRY_ENTRY()     try {
 #define WALLET_RPC_CATCH_TRY_ENTRY()     } \
@@ -208,6 +209,7 @@ namespace tools
       for (const auto& ent : distribution)
         res.utxo_distribution.push_back(currency::print_money_brief(ent.first) + ":" + std::to_string(ent.second));
       
+      res.current_height = m_wallet.get_top_block_height();
       return true;
     }
     catch (std::exception& e)
@@ -245,12 +247,18 @@ namespace tools
         res.pi.balance = m_wallet.balance(res.pi.unlocked_balance);
         res.pi.transfer_entries_count = m_wallet.get_transfer_entries_count();
         res.pi.transfers_count = m_wallet.get_recent_transfers_total_count();
+        res.pi.curent_height = m_wallet.get_top_block_height();
       }
 
-      if (req.offset == 0)
+      if (req.offset == 0 && !req.exclude_unconfirmed)
         m_wallet.get_unconfirmed_transfers(res.transfers, req.exclude_mining_txs);
       
-      m_wallet.get_recent_transfers_history(res.transfers, req.offset, req.count, res.total_transfers, res.last_item_index, req.exclude_mining_txs);
+      bool start_from_end = true;
+      if (req.order == ORDER_FROM_BEGIN_TO_END)
+      {
+        start_from_end = false;
+      }
+      m_wallet.get_recent_transfers_history(res.transfers, req.offset, req.count, res.total_transfers, res.last_item_index, req.exclude_mining_txs, start_from_end);
 
       return true;
     }
@@ -279,13 +287,50 @@ namespace tools
       return false;
     }
 
-    std::vector<currency::tx_destination_entry> dsts;
+    construct_tx_param ctp = m_wallet.get_default_construct_tx_param_inital();
+    if (req.service_entries_permanent)
+    {
+      //put it to extra
+      ctp.extra.insert(ctp.extra.end(), req.service_entries.begin(), req.service_entries.end());
+    }
+    else
+    {
+      //put it to attachments
+      ctp.attachments.insert(ctp.extra.end(), req.service_entries.begin(), req.service_entries.end());
+    }
+    bool wrap = false;
+    std::vector<currency::tx_destination_entry>& dsts = ctp.dsts;
     for (auto it = req.destinations.begin(); it != req.destinations.end(); it++) 
     {
       currency::tx_destination_entry de;
       de.addr.resize(1);
       std::string embedded_payment_id;
-      if(!m_wallet.get_transfer_address(it->address, de.addr.back(), embedded_payment_id))
+      //check if address looks like wrapped address
+      if (currency::is_address_like_wrapped(it->address))
+      {
+        if (wrap) {
+          LOG_ERROR("More then one entries in transactions");
+          er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+          er.message = "Second wrap entry not supported in transactions";
+          return false;
+
+        }
+        LOG_PRINT_L0("Address " << it->address << " recognized as wrapped address, creating wrapping transaction...");
+        //put into service attachment specially encrypted entry which will contain wrap address and network
+        currency::tx_service_attachment sa = AUTO_VAL_INIT(sa);
+        sa.service_id = BC_WRAP_SERVICE_ID;
+        sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
+        sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE;
+        sa.body = it->address;
+        ctp.extra.push_back(sa);
+
+        currency::account_public_address acc = AUTO_VAL_INIT(acc);
+        currency::get_account_address_from_str(acc, BC_WRAP_SERVICE_CUSTODY_WALLET);
+        de.addr.front() = acc;
+        wrap = true;
+        //encrypt body with a special way
+      }
+      else if(!m_wallet.get_transfer_address(it->address, de.addr.back(), embedded_payment_id))
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
         er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + it->address;
@@ -306,8 +351,8 @@ namespace tools
     }
     try
     {
-      std::vector<currency::attachment_v> attachments; 
-      std::vector<currency::extra_v> extra;
+      std::vector<currency::attachment_v>& attachments = ctp.attachments;
+      std::vector<currency::extra_v>& extra = ctp.extra;
       if (!payment_id.empty() && !currency::set_payment_id_to_tx(attachments, payment_id))
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
@@ -322,7 +367,7 @@ namespace tools
         attachments.push_back(comment);
       }
 
-      if (req.push_payer)
+      if (req.push_payer )
       {
         currency::create_and_add_tx_payer_to_container_from_address(extra, m_wallet.get_account().get_keys().account_address, m_wallet.get_top_block_height(), m_wallet.get_core_runtime_config());
       }
@@ -336,10 +381,11 @@ namespace tools
         }
       }
 
-      currency::transaction tx;
-      
+      currency::finalized_tx result = AUTO_VAL_INIT(result);
       std::string unsigned_tx_blob_str;
-      m_wallet.transfer(dsts, req.mixin, 0/*req.unlock_time*/, req.fee, extra, attachments, detail::ssi_digit, tx_dust_policy(DEFAULT_DUST_THRESHOLD), tx, CURRENCY_TO_KEY_OUT_RELAXED, true, 0, true, &unsigned_tx_blob_str);
+      ctp.fee = req.fee;
+      ctp.fake_outputs_count = 0;
+      m_wallet.transfer(ctp, result, true, &unsigned_tx_blob_str);
       if (m_wallet.is_watch_only())
       {
         res.tx_unsigned_hex = epee::string_tools::buff_to_hex_nodelimer(unsigned_tx_blob_str); // watch-only wallets could not sign and relay transactions
@@ -347,8 +393,8 @@ namespace tools
       }
       else
       {
-        res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
-        res.tx_size = get_object_blobsize(tx);
+        res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(result.tx));
+        res.tx_size = get_object_blobsize(result.tx);
       }
       return true;
     }

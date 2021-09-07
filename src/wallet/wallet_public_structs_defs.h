@@ -105,16 +105,19 @@ namespace wallet_public
     bool          is_mining;
     uint64_t      tx_type;
     wallet_transfer_info_details td;
+    std::vector<currency::tx_service_attachment> service_entries;
     //not included in streaming serialization
     uint64_t      fee;
     bool          show_sender;
     std::vector<escrow_contract_details> contract;
     uint16_t      extra_flags; 
+    uint64_t      transfer_internal_index;
+    
     
     //not included in kv serialization map
     currency::transaction tx;
     std::vector<uint64_t> selected_indicies;
-    std::list<bc_services::offers_attachment_t> srv_attachments;
+    std::list<bc_services::offers_attachment_t> marketplace_entries;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
@@ -136,6 +139,8 @@ namespace wallet_public
       KV_SERIALIZE(tx_type)
       KV_SERIALIZE(show_sender)
       KV_SERIALIZE(contract)
+      KV_SERIALIZE(service_entries)
+      KV_SERIALIZE(transfer_internal_index)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -254,6 +259,7 @@ namespace wallet_public
       uint64_t                  transfer_entries_count;
       bool                      is_whatch_only;
       std::vector<std::string>  utxo_distribution;
+      uint64_t                  current_height;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(address)
@@ -262,6 +268,7 @@ namespace wallet_public
         KV_SERIALIZE(transfer_entries_count)
         KV_SERIALIZE(is_whatch_only)
         KV_SERIALIZE(utxo_distribution)
+        KV_SERIALIZE(current_height)
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -299,6 +306,7 @@ namespace wallet_public
     uint64_t                  transfer_entries_count;
     uint64_t                  balance;
     uint64_t                  unlocked_balance;
+    uint64_t                  curent_height;
 
 
     BEGIN_KV_SERIALIZE_MAP()
@@ -306,8 +314,13 @@ namespace wallet_public
       KV_SERIALIZE(transfer_entries_count)
       KV_SERIALIZE(balance)
       KV_SERIALIZE(unlocked_balance)
+      KV_SERIALIZE(curent_height)
     END_KV_SERIALIZE_MAP()
   };
+
+
+#define ORDER_FROM_BEGIN_TO_END        "FROM_BEGIN_TO_END"
+#define ORDER_FROM_FROM_END_TO_BEGIN   "FROM_END_TO_BEGIN"
 
   struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
   {
@@ -329,12 +342,16 @@ namespace wallet_public
       */
       bool update_provision_info;  
       bool exclude_mining_txs;
+      bool exclude_unconfirmed;
+      std::string order; // "FROM_BEGIN_TO_END" or "FROM_END_TO_BEGIN"
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(offset)
         KV_SERIALIZE(count)
         KV_SERIALIZE(update_provision_info)
         KV_SERIALIZE(exclude_mining_txs)
+        KV_SERIALIZE(exclude_unconfirmed)
+        KV_SERIALIZE(order)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -379,16 +396,19 @@ namespace wallet_public
       std::string comment; 
       bool push_payer;
       bool hide_receiver;
+      std::vector<currency::tx_service_attachment> service_entries;
+      bool service_entries_permanent;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(destinations)
         KV_SERIALIZE(fee)
         KV_SERIALIZE(mixin)
-        //KV_SERIALIZE(unlock_time)
         KV_SERIALIZE(payment_id)
         KV_SERIALIZE(comment)
         KV_SERIALIZE(push_payer)
         KV_SERIALIZE(hide_receiver)
+        KV_SERIALIZE(service_entries)
+        KV_SERIALIZE(service_entries_permanent)
       END_KV_SERIALIZE_MAP()
     };
 

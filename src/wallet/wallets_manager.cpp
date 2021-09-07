@@ -17,6 +17,7 @@
 #include "core_default_rpc_proxy.h"
 #include "common/db_backend_selector.h"
 #include "common/pre_download.h"
+#include "wallet/wrap_service.h"
 
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    \
@@ -1323,6 +1324,10 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
     return API_RETURN_CODE_BAD_ARG_EMPTY_DESTINATIONS;
 
   uint64_t fee = tp.fee;
+  //payment_id
+  std::vector<currency::attachment_v> attachments;
+  std::vector<currency::extra_v> extra;
+  bool wrap = false;
 //  if (!currency::parse_amount(fee, tp.fee))
 //    return API_RETURN_CODE_BAD_ARG_WRONG_FEE;
 
@@ -1331,11 +1336,31 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
   {
     dsts.push_back(currency::tx_destination_entry());
     dsts.back().addr.resize(1);
+    currency::tx_destination_entry& de = dsts.back();
     std::string embedded_payment_id;
-    if (!tools::get_transfer_address(d.address, dsts.back().addr.back(), embedded_payment_id, m_rpc_proxy.get()))
+    if (currency::is_address_like_wrapped(d.address))
+    {
+      CHECK_AND_ASSERT_MES(!wrap, API_RETURN_CODE_BAD_ARG, "Second wrap entry in one tx not allowed");
+      LOG_PRINT_L0("Address " << d.address << " recognized as wrapped address, creating wrapping transaction...");
+      //put into service attachment specially encrypted entry which will contain wrap address and network
+      currency::tx_service_attachment sa = AUTO_VAL_INIT(sa);
+      sa.service_id = BC_WRAP_SERVICE_ID;
+      sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
+      sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE;
+      sa.body = d.address;
+      extra.push_back(sa);
+
+      currency::account_public_address acc = AUTO_VAL_INIT(acc);
+      currency::get_account_address_from_str(acc, BC_WRAP_SERVICE_CUSTODY_WALLET);
+      de.addr.front() = acc;
+      wrap = true;
+    }
+    else if (!tools::get_transfer_address(d.address, dsts.back().addr.back(), embedded_payment_id, m_rpc_proxy.get()))
     {
       return API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
     }
+    
+    
     if(!currency::parse_amount(dsts.back().amount, d.amount))
     {
       return API_RETURN_CODE_BAD_ARG_WRONG_AMOUNT;
@@ -1347,9 +1372,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
       payment_id = embedded_payment_id;
     }
   }
-  //payment_id
-  std::vector<currency::attachment_v> attachments;
-  std::vector<currency::extra_v> extra;
+
   if (payment_id.size())
   {
     if (!currency::is_payment_id_size_ok(payment_id))
@@ -1753,7 +1776,11 @@ std::string wallets_manager::get_offers_ex(const bc_services::core_offers_filter
 std::string wallets_manager::validate_address(const std::string& addr_str, std::string& payment_id)
 {
   currency::account_public_address acc = AUTO_VAL_INIT(acc);
-  if (currency::get_account_address_and_payment_id_from_str(acc, payment_id, addr_str))
+  if (currency::is_address_like_wrapped(addr_str))
+  {
+    return API_RETURN_CODE_WRAP;
+  }
+  else if (currency::get_account_address_and_payment_id_from_str(acc, payment_id, addr_str))
     return API_RETURN_CODE_TRUE;
   else
     return API_RETURN_CODE_FALSE;

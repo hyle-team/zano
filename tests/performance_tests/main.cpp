@@ -33,8 +33,20 @@ int main(int argc, char** argv)
     epee::log_space::log_singletone::get_default_log_file().c_str(),
     epee::log_space::log_singletone::get_default_log_folder().c_str());
 
+  
+  std::string buf1 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX);
+  std::string buf2 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX);
+  std::string buf3 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX);
+  std::string buf4 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX);
+  std::string buf5 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX);
 
+  std::cout << "Buf1: " << epee::string_tools::buff_to_hex_nodelimer(buf1) << ENDL;
+  std::cout << "Buf2: " << epee::string_tools::buff_to_hex_nodelimer(buf2) << ENDL;
+  std::cout << "Buf3: " << epee::string_tools::buff_to_hex_nodelimer(buf3) << ENDL;
+  std::cout << "Buf4: " << epee::string_tools::buff_to_hex_nodelimer(buf4) << ENDL;
+  std::cout << "Buf5: " << epee::string_tools::buff_to_hex_nodelimer(buf5) << ENDL;
 
+  
   do_htlc_hash_tests();
   //run_serialization_performance_test();
   //return 1;
