@@ -367,7 +367,7 @@ namespace tools
         attachments.push_back(comment);
       }
 
-      if (req.push_payer )
+      if (req.push_payer && !wrap)
       {
         currency::create_and_add_tx_payer_to_container_from_address(extra, m_wallet.get_account().get_keys().account_address, m_wallet.get_top_block_height(), m_wallet.get_core_runtime_config());
       }
