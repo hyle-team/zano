@@ -13,6 +13,7 @@
 
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/version.hpp>
+#include <boost/serialization/library_version_type.hpp>
 #include <boost/serialization/list.hpp>
 
 #include <boost/foreach.hpp>

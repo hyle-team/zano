@@ -1122,7 +1122,7 @@ TEST(crypto, neg_identity)
   // also do zero-byte pub key / key image checks
 
   public_key zzz_pk;
-  memset(&zzz_pk, 0, sizeof public_key);
+  memset(&zzz_pk, 0, sizeof(public_key));
 
   ASSERT_TRUE(check_key(zzz_pk));
 
@@ -1131,7 +1131,7 @@ TEST(crypto, neg_identity)
   ASSERT_FALSE(zzz.is_in_main_subgroup());
 
   key_image zzz_ki;
-  memset(&zzz_ki, 0, sizeof key_image);
+  memset(&zzz_ki, 0, sizeof(key_image));
 
   ASSERT_FALSE(validate_key_image(zzz_ki));
 
