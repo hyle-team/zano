@@ -91,6 +91,18 @@ namespace tools
             LOG_PRINT_L2("wallet RPC idle: trying to do PoS iteration...");
             m_wallet.try_mint_pos(miner_address);
           }
+
+          //auto-store wallet in server mode, let's do it every 24-hour
+          if (m_wallet.get_top_block_height() < m_last_wallet_store_height)
+          {
+            LOG_ERROR("Unexpected m_last_wallet_store_height = " << m_last_wallet_store_height << " or " << m_wallet.get_top_block_height());
+          }
+          else if (m_wallet.get_top_block_height() - m_last_wallet_store_height > CURRENCY_BLOCKS_PER_DAY)
+          {
+            //store wallet
+            m_wallet.store();
+            m_last_wallet_store_height = m_wallet.get_top_block_height();
+          }
         }
         catch (error::no_connection_to_daemon&)
         {
@@ -132,6 +144,7 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::init(const boost::program_options::variables_map& vm)
   {
+    m_last_wallet_store_height = m_wallet.get_top_block_height();
     m_net_server.set_threads_prefix("RPC");
     bool r = handle_command_line(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to process command line in core_rpc_server");
