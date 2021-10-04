@@ -118,6 +118,7 @@ namespace tools
       std::string m_bind_ip;
       bool m_do_mint;
       bool m_deaf;
+      uint64_t m_last_wallet_store_height;
   };
 
 } // namespace tools
