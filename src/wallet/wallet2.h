@@ -1203,16 +1203,20 @@ namespace tools
     const currency::core_runtime_config &runtime_config)
   {
     cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
-    uint64_t timstamp_start = runtime_config.get_core_time();
     uint64_t timstamp_last_idle_call = runtime_config.get_core_time();
     cxt.rsp.iterations_processed = 0;
 
+    uint64_t ts_from = cxt.rsp.starter_timestamp; // median ts of last BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW blocks
+    ts_from = ts_from - (ts_from % POS_SCAN_STEP) + POS_SCAN_STEP;
+    uint64_t ts_to = runtime_config.get_core_time() + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT - 5;
+    ts_to = ts_to - (ts_to % POS_SCAN_STEP);
+    CHECK_AND_ASSERT_MES(ts_to > ts_from, false, "scan_pos: ts_to <= ts_from: " << ts_to << ", " << ts_from);
+    uint64_t ts_middle = (ts_to + ts_from) / 2;
+    ts_middle -= ts_middle % POS_SCAN_STEP;
+    uint64_t ts_window = std::min(ts_middle - ts_from, ts_to - ts_middle);
+
     for (size_t i = 0; i != cxt.sp.pos_entries.size(); i++)
     {
-      //set timestamp starting from timestamp%POS_SCAN_STEP = 0
-      uint64_t adjusted_starter_timestamp = timstamp_start - POS_SCAN_STEP;
-      adjusted_starter_timestamp = POS_SCAN_STEP * 2 - (adjusted_starter_timestamp%POS_SCAN_STEP) + adjusted_starter_timestamp;
-      
       bool go_past = true;
       uint64_t step = 0;
       
@@ -1232,7 +1236,7 @@ namespace tools
         }
       };
 
-      while(step <= POS_SCAN_WINDOW)
+      while(step <= ts_window)
       {
 
         //check every WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL seconds if top block changes, in case - break loop 
@@ -1248,8 +1252,8 @@ namespace tools
         }
 
 
-        uint64_t ts = go_past ? adjusted_starter_timestamp - step : adjusted_starter_timestamp + step;
-        if (ts < cxt.rsp.starter_timestamp)
+        uint64_t ts = go_past ? ts_middle - step : ts_middle + step;
+        if (ts < ts_from || ts > ts_to)
         {
           next_turn();
           continue;

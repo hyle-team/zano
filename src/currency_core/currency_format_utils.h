@@ -329,8 +329,10 @@ namespace currency
 
   // prints amount in format "3.14", "0.0"
   std::string print_money_brief(uint64_t amount);
-  uint64_t get_actual_timestamp(const block& b);
-  
+  uint64_t get_actual_timestamp(const block& b); // obsolete and depricated, use get_block_datetime
+  uint64_t get_block_datetime(const block& b);
+  void set_block_datetime(uint64_t datetime, block& b);
+
   bool addendum_to_hexstr(const std::vector<crypto::hash>& add, std::string& hex_buff);
   bool hexstr_to_addendum(const std::string& hex_buff, std::vector<crypto::hash>& add);
   bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id);

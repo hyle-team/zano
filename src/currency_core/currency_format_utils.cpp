@@ -26,6 +26,7 @@ using namespace epee;
 #include "bc_payments_id_service.h"
 #include "bc_escrow_service.h"
 #include "bc_attachments_helpers.h"
+#include "bc_block_datetime_service.h"
 #include "genesis.h"
 #include "genesis_acc.h"
 #include "common/mnemonic-encoding.h"
@@ -2108,6 +2109,8 @@ namespace currency
     return median_fee * 10;
   }
   //---------------------------------------------------------------
+  // NOTE: this function is obsolete and depricated
+  // PoS block real timestamp is set using a service attachment in mining tx extra since 2021-10 
   uint64_t get_actual_timestamp(const block& b)
   {
     uint64_t tes_ts = b.timestamp;
@@ -2118,6 +2121,41 @@ namespace currency
         tes_ts = t.v;
     }
     return tes_ts;
+  }
+  //---------------------------------------------------------------
+  // returns timestamp from BC_BLOCK_DATETIME_SERVICE_ID via tx_service_attachment in extra
+  // fallbacks to old-style actual timestamp via etc_tx_time, then to block timestamp
+  uint64_t get_block_datetime(const block& b)
+  {
+    // first try BC_BLOCK_DATETIME_SERVICE_ID
+    tx_service_attachment sa = AUTO_VAL_INIT(sa);
+    if (get_type_in_variant_container(b.miner_tx.extra, sa))
+    {
+      if (sa.service_id == BC_BLOCK_DATETIME_SERVICE_ID && sa.instruction == BC_BLOCK_DATETIME_INSTRUCTION_DEFAULT)
+      {
+        uint64_t ts;
+        if (epee::string_tools::get_pod_from_strbuff(sa.body, ts))
+          return ts;
+      }
+    }
+    
+    // next try etc_tx_time
+    etc_tx_time t = AUTO_VAL_INIT(t);
+    if (get_type_in_variant_container(b.miner_tx.extra, t))
+      return t.v;
+
+    // otherwise return default: block.ts
+    return b.timestamp;
+  }
+  //---------------------------------------------------------------
+  void set_block_datetime(uint64_t datetime, block& b)
+  {
+    tx_service_attachment sa = AUTO_VAL_INIT(sa);
+    sa.service_id = BC_BLOCK_DATETIME_SERVICE_ID;
+    sa.instruction = BC_BLOCK_DATETIME_INSTRUCTION_DEFAULT;
+    sa.flags = 0;
+    epee::string_tools::append_pod_to_strbuff(sa.body, datetime);
+    b.miner_tx.extra.push_back(sa);
   }
   //------------------------------------------------------------------
   bool validate_alias_name(const std::string& al)
@@ -2777,7 +2815,7 @@ namespace currency
     pei_rpc.timestamp = bei_chain.bl.timestamp;
     pei_rpc.id = epee::string_tools::pod_to_hex(h);
     pei_rpc.prev_id = epee::string_tools::pod_to_hex(bei_chain.bl.prev_id);
-    pei_rpc.actual_timestamp = get_actual_timestamp(bei_chain.bl);
+    pei_rpc.actual_timestamp = get_block_datetime(bei_chain.bl);
     pei_rpc.type = is_pos_block(bei_chain.bl) ? 0 : 1;
     pei_rpc.already_generated_coins = boost::lexical_cast<std::string>(bei_chain.already_generated_coins);
     pei_rpc.this_block_fee_median = bei_chain.this_block_tx_fee_median;

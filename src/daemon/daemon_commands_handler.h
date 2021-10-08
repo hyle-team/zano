@@ -330,7 +330,7 @@ private:
       currency::block_extended_info bei = AUTO_VAL_INIT(bei);
       CHECK_AND_ASSERT_MES(bcs.get_block_extended_info_by_height(tx_chain_entry->m_keeper_block_height, bei), false, "cannot find block by height " << tx_chain_entry->m_keeper_block_height);
 
-      LOG_PRINT_L0("Key image found in tx: " << tx_id << " height " << tx_chain_entry->m_keeper_block_height << " (ts: " << epee::misc_utils::get_time_str_v2(currency::get_actual_timestamp(bei.bl)) << ")" << ENDL
+      LOG_PRINT_L0("Key image found in tx: " << tx_id << " height " << tx_chain_entry->m_keeper_block_height << " (ts: " << epee::misc_utils::get_time_str_v2(currency::get_block_datetime(bei.bl)) << ")" << ENDL
         << obj_to_json_str(tx_chain_entry->tx));
     }
     else

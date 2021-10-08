@@ -1365,7 +1365,7 @@ bool gen_wallet_transfers_and_chain_switch::generate(std::vector<test_event_entr
   CHECK_AND_ASSERT_MES(trs.size() == 2 && trs[0].is_spent() && trs[1].is_spent(), false, "Wrong transfers state");
 
   // fast forward time to make tx_1 and tx_2 outdated (blk_3 is the block where tx_2 came with)
-  test_core_time::adjust(get_actual_timestamp(blk_3) + CURRENCY_MEMPOOL_TX_LIVETIME + 1);
+  test_core_time::adjust(get_block_datetime(blk_3) + CURRENCY_MEMPOOL_TX_LIVETIME + 1);
 
   MAKE_NEXT_BLOCK(events, blk_5a, blk_4a, miner_acc);
 
