@@ -920,7 +920,7 @@ private:
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
     std::string get_alias_for_address(const std::string& addr);
-    static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, currency::stake_kernel& kernel, uint64_t& coindays_weight, uint64_t timestamp);
+    static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, const uint64_t timestamp, currency::stake_kernel& kernel);
     bool is_connected_to_net();
     bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time);
     bool scan_unconfirmed_outdate_tx();
@@ -1258,27 +1258,27 @@ namespace tools
         if (stop)
           return false;
         currency::stake_kernel sk = AUTO_VAL_INIT(sk);
-        uint64_t coindays_weight = 0;
-        build_kernel(cxt.sp.pos_entries[i], cxt.sm, sk, coindays_weight, ts);
+        const uint64_t& stake_amount = cxt.sp.pos_entries[i].amount;
+        build_kernel(cxt.sp.pos_entries[i], cxt.sm, ts, sk);
         crypto::hash kernel_hash;
         {
           PROFILE_FUNC("calc_hash");
           kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
         }
 
-        currency::wide_difficulty_type this_coin_diff = cxt.basic_diff / coindays_weight;
+        currency::wide_difficulty_type final_diff = cxt.basic_diff / stake_amount;
         bool check_hash_res;
         {
           PROFILE_FUNC("check_hash");
-          check_hash_res = currency::check_hash(kernel_hash, this_coin_diff);
+          check_hash_res = currency::check_hash(kernel_hash, final_diff);
           ++cxt.rsp.iterations_processed;
         }
         if (check_hash_res)
         {
           //found kernel
-          LOG_PRINT_GREEN("Found kernel: amount=" << currency::print_money(cxt.sp.pos_entries[i].amount) << ENDL
-            << "difficulty_basic=" << cxt.basic_diff << ", diff for this coin: " << this_coin_diff << ENDL
-            << "index=" << cxt.sp.pos_entries[i].index << ENDL
+          LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money(stake_amount) << ENDL
+            << "difficulty: " << cxt.basic_diff << ", final_diff: " << final_diff << ENDL
+            << "index: " << cxt.sp.pos_entries[i].index << ENDL
             << "kernel info: " << ENDL
             << print_stake_kernel_info(sk) << ENDL 
             << "kernel_hash(proof): " << kernel_hash,

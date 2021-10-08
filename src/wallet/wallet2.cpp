@@ -3377,16 +3377,13 @@ bool wallet2::prepare_and_sign_pos_block(currency::block& b,
   return true;
 }
 //------------------------------------------------------------------
-bool wallet2::build_kernel(const pos_entry& pe, const stake_modifier_type& stake_modifier, stake_kernel& kernel, uint64_t& coindays_weight, uint64_t timestamp)
+bool wallet2::build_kernel(const pos_entry& pe, const stake_modifier_type& stake_modifier, const uint64_t timestamp, stake_kernel& kernel)
 {
   PROFILE_FUNC("build_kernel");
-  coindays_weight = 0;
   kernel = stake_kernel();
   kernel.kimage = pe.keyimage;
   kernel.stake_modifier = stake_modifier;
   kernel.block_timestamp = timestamp;
-
-  coindays_weight = get_coinday_weight(pe.amount);
   return true;
 }
 //----------------------------------------------------------------------------------------------------

@@ -64,11 +64,6 @@ namespace currency
   pos_entry());
   }*/
   //---------------------------------------------------------------
-  uint64_t get_coinday_weight(uint64_t amount)
-  {
-    return amount;
-  }
-  //---------------------------------------------------------------
   wide_difficulty_type correct_difficulty_with_sequence_factor(size_t sequence_factor, wide_difficulty_type diff)
   {
     //delta=delta*(0.75^n)
