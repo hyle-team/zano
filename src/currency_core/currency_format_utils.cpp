@@ -594,12 +594,12 @@ namespace currency
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys)
   {
     std::string blob;
-    string_tools::apped_pod_to_strbuff(blob, htlc.pkey_redeem);
-    string_tools::apped_pod_to_strbuff(blob, htlc.pkey_refund);
-    string_tools::apped_pod_to_strbuff(blob, acc_keys.spend_secret_key);
+    string_tools::append_pod_to_strbuff(blob, htlc.pkey_redeem);
+    string_tools::append_pod_to_strbuff(blob, htlc.pkey_refund);
+    string_tools::append_pod_to_strbuff(blob, acc_keys.spend_secret_key);
     crypto::hash origin_hs = crypto::cn_fast_hash(blob.data(), blob.size());
     std::string origin_blob;
-    string_tools::apped_pod_to_strbuff(origin_blob, origin_hs);
+    string_tools::append_pod_to_strbuff(origin_blob, origin_hs);
     return origin_blob;
   }
   //---------------------------------------------------------------
@@ -819,7 +819,7 @@ namespace currency
           //take hash from derivation and use it as a salt
           crypto::hash derivation_hash = crypto::cn_fast_hash(&derivation_local, sizeof(derivation_local));
           std::string salted_body = original_body;
-          string_tools::apped_pod_to_strbuff(salted_body, derivation_hash);
+          string_tools::append_pod_to_strbuff(salted_body, derivation_hash);
           crypto::hash proof_hash = crypto::cn_fast_hash(salted_body.data(), salted_body.size());
           sa.security.push_back(*(crypto::public_key*)&proof_hash);
         }
@@ -890,8 +890,8 @@ namespace currency
         //take hash from derivation and use it as a salt
         crypto::hash derivation_hash = crypto::cn_fast_hash(&derivation_local, sizeof(derivation_local));
         std::string salted_body = local_sa.body;
-        string_tools::apped_pod_to_strbuff(salted_body, derivation_hash);
-        crypto::hash proof_hash = crypto::cn_fast_hash(salted_body.data(), salted_body.size());
+        string_tools::append_pod_to_strbuff(salted_body, derivation_hash);
+        crypto::hash proof_hash = crypto::cn_fast_hash(salted_body.data(), salted_body.size()); // proof_hash = Hs(local_sa.body || Hs(s * R)), s - spend secret, R - tx pub
         CHECK_AND_ASSERT_MES(*(crypto::public_key*)&proof_hash == sa.security.front(), void(), "Proof hash missmatch on decrypting with TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF");
       }
 
@@ -2062,8 +2062,8 @@ namespace currency
   crypto::hash hash_together(const pod_operand_a& a, const pod_operand_b& b)
   {
     std::string blob;
-    string_tools::apped_pod_to_strbuff(blob, a);
-    string_tools::apped_pod_to_strbuff(blob, b);
+    string_tools::append_pod_to_strbuff(blob, a);
+    string_tools::append_pod_to_strbuff(blob, b);
     return crypto::cn_fast_hash(blob.data(), blob.size());
   }
   //------------------------------------------------------------------
