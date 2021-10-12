@@ -3531,6 +3531,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     keys_ptrs.push_back(&txtokey.key);
 
     // set a real timestamp
+    b.timestamp = rsp.block_timestamp;
     uint64_t current_timestamp = m_core_runtime_config.get_core_time();
     set_block_datetime(current_timestamp, b);
     WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
