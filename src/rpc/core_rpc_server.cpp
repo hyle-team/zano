@@ -916,17 +916,6 @@ namespace currency
       error_resp.message = "Block not accepted";
       return false;
     }
-    //@#@
-    //temporary double check timestamp
-    if (time(NULL) - static_cast<int64_t>(get_block_datetime(b)) > 5)
-    {
-      LOG_PRINT_RED_L0("Found block (" << get_block_hash(b) << ") timestamp (" << get_block_datetime(b)
-        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_block_datetime(b)) << ") than current time ( " << time(NULL) << ")");
-      //mark node to make it easier to find it via scanner      
-      m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend = true;
-    }
-    //
-
 
     res.status = "OK";
     return true;
@@ -973,17 +962,6 @@ namespace currency
       error_resp.message = "Block not accepted";
       return false;
     }
-    //@#@
-    //temporary double check timestamp
-    if (time(NULL) - static_cast<int64_t>(get_block_datetime(b)) > 5)
-    {
-      LOG_PRINT_RED_L0("Found block (" << get_block_hash(b) << ") timestamp (" << get_block_datetime(b)
-        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_block_datetime(b)) << ") than current time ( " << time(NULL) << ")");
-      //mark node to make it easier to find it via scanner      
-      m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend = true;
-    }
-    //
-
 
     res.status = "OK";
     return true;

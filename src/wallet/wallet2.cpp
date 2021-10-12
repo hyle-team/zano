@@ -3560,14 +3560,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     }    
     WLT_LOG_GREEN("POS block generated and accepted, congrats!", LOG_LEVEL_0);
     m_wcallback->on_pos_block_found(b);
-    //@#@
-    //double check timestamp
-    if (time(NULL) - static_cast<int64_t>(get_block_datetime(b)) > 5)
-    {
-      WLT_LOG_RED("Found block (" << get_block_hash(b) << ") timestamp ("  << get_block_datetime(b)
-        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_block_datetime(b)) << ") than current time ( " << time(NULL) << ")", LOG_LEVEL_0);
-    }
-    //
+
     return true;
 }
 //----------------------------------------------------------------------------------------------------
