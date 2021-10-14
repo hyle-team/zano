@@ -563,17 +563,15 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
       {
 
         stake_kernel sk = AUTO_VAL_INIT(sk);
-        uint64_t coindays_weight = 0;
         build_kernel(scan_pos_entries.pos_entries[i].amount,
           scan_pos_entries.pos_entries[i].index,
           scan_pos_entries.pos_entries[i].keyimage,
           sk,
-          coindays_weight,
           blck_chain,
           indexes, 
           ts);
         crypto::hash kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
-        wide_difficulty_type this_coin_diff = basic_diff / coindays_weight;
+        wide_difficulty_type this_coin_diff = basic_diff / scan_pos_entries.pos_entries[i].amount;
         if (!check_hash(kernel_hash, this_coin_diff))
           continue;
         else
@@ -672,12 +670,10 @@ bool test_generator::build_kernel(uint64_t amount,
                                   uint64_t global_index, 
                                   const crypto::key_image& ki, 
                                   stake_kernel& kernel, 
-                                  uint64_t& coindays_weight,
                                   const test_generator::blockchain_vector& blck_chain,
                                   const test_generator::outputs_index& indexes, 
                                   uint64_t timestamp)
 {
-  coindays_weight = 0;
   kernel = stake_kernel();
   kernel.kimage = ki;
 
@@ -701,7 +697,6 @@ bool test_generator::build_kernel(uint64_t amount,
 
   kernel.block_timestamp = timestamp;
 
-  coindays_weight = get_coinday_weight(amount);
   build_stake_modifier(kernel.stake_modifier, blck_chain);
   return true;
 }
