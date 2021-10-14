@@ -410,7 +410,6 @@ public:
                     uint64_t global_index, 
                     const crypto::key_image& ki,
                     currency::stake_kernel& kernel,
-                    uint64_t& coindays_weight,
                     const blockchain_vector& blck_chain,
                     const outputs_index& indexes, 
                     uint64_t timestamp);

@@ -920,7 +920,7 @@ private:
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
     std::string get_alias_for_address(const std::string& addr);
-    static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, currency::stake_kernel& kernel, uint64_t& coindays_weight, uint64_t timestamp);
+    static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, const uint64_t timestamp, currency::stake_kernel& kernel);
     bool is_connected_to_net();
     bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time);
     bool scan_unconfirmed_outdate_tx();
@@ -1203,16 +1203,20 @@ namespace tools
     const currency::core_runtime_config &runtime_config)
   {
     cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
-    uint64_t timstamp_start = runtime_config.get_core_time();
     uint64_t timstamp_last_idle_call = runtime_config.get_core_time();
     cxt.rsp.iterations_processed = 0;
 
+    uint64_t ts_from = cxt.rsp.starter_timestamp; // median ts of last BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW blocks
+    ts_from = ts_from - (ts_from % POS_SCAN_STEP) + POS_SCAN_STEP;
+    uint64_t ts_to = runtime_config.get_core_time() + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT - 5;
+    ts_to = ts_to - (ts_to % POS_SCAN_STEP);
+    CHECK_AND_ASSERT_MES(ts_to > ts_from, false, "scan_pos: ts_to <= ts_from: " << ts_to << ", " << ts_from);
+    uint64_t ts_middle = (ts_to + ts_from) / 2;
+    ts_middle -= ts_middle % POS_SCAN_STEP;
+    uint64_t ts_window = std::min(ts_middle - ts_from, ts_to - ts_middle);
+
     for (size_t i = 0; i != cxt.sp.pos_entries.size(); i++)
     {
-      //set timestamp starting from timestamp%POS_SCAN_STEP = 0
-      uint64_t adjusted_starter_timestamp = timstamp_start - POS_SCAN_STEP;
-      adjusted_starter_timestamp = POS_SCAN_STEP * 2 - (adjusted_starter_timestamp%POS_SCAN_STEP) + adjusted_starter_timestamp;
-      
       bool go_past = true;
       uint64_t step = 0;
       
@@ -1232,7 +1236,7 @@ namespace tools
         }
       };
 
-      while(step <= POS_SCAN_WINDOW)
+      while(step <= ts_window)
       {
 
         //check every WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL seconds if top block changes, in case - break loop 
@@ -1248,8 +1252,8 @@ namespace tools
         }
 
 
-        uint64_t ts = go_past ? adjusted_starter_timestamp - step : adjusted_starter_timestamp + step;
-        if (ts < cxt.rsp.starter_timestamp)
+        uint64_t ts = go_past ? ts_middle - step : ts_middle + step;
+        if (ts < ts_from || ts > ts_to)
         {
           next_turn();
           continue;
@@ -1258,27 +1262,27 @@ namespace tools
         if (stop)
           return false;
         currency::stake_kernel sk = AUTO_VAL_INIT(sk);
-        uint64_t coindays_weight = 0;
-        build_kernel(cxt.sp.pos_entries[i], cxt.sm, sk, coindays_weight, ts);
+        const uint64_t& stake_amount = cxt.sp.pos_entries[i].amount;
+        build_kernel(cxt.sp.pos_entries[i], cxt.sm, ts, sk);
         crypto::hash kernel_hash;
         {
           PROFILE_FUNC("calc_hash");
           kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
         }
 
-        currency::wide_difficulty_type this_coin_diff = cxt.basic_diff / coindays_weight;
+        currency::wide_difficulty_type final_diff = cxt.basic_diff / stake_amount;
         bool check_hash_res;
         {
           PROFILE_FUNC("check_hash");
-          check_hash_res = currency::check_hash(kernel_hash, this_coin_diff);
+          check_hash_res = currency::check_hash(kernel_hash, final_diff);
           ++cxt.rsp.iterations_processed;
         }
         if (check_hash_res)
         {
           //found kernel
-          LOG_PRINT_GREEN("Found kernel: amount=" << currency::print_money(cxt.sp.pos_entries[i].amount) << ENDL
-            << "difficulty_basic=" << cxt.basic_diff << ", diff for this coin: " << this_coin_diff << ENDL
-            << "index=" << cxt.sp.pos_entries[i].index << ENDL
+          LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money(stake_amount) << ENDL
+            << "difficulty: " << cxt.basic_diff << ", final_diff: " << final_diff << ENDL
+            << "index: " << cxt.sp.pos_entries[i].index << ENDL
             << "kernel info: " << ENDL
             << print_stake_kernel_info(sk) << ENDL 
             << "kernel_hash(proof): " << kernel_hash,
