@@ -23,6 +23,10 @@ isolate_auditable_and_proof::isolate_auditable_and_proof()
 
 bool isolate_auditable_and_proof::generate(std::vector<test_event_entry>& events) const
 {
+  // Test outline: this test makes sure:
+  //   1) that only owner of the secret spend key can decode the attachment (TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE)
+  //   2) TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF -- add public hash of original info
+
   random_state_test_restorer::reset_random(0); // to make the test deterministic
   m_genesis_timestamp = 1450000000;
   test_core_time::adjust(m_genesis_timestamp);
@@ -87,7 +91,7 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
     tx_service_attachment sa = AUTO_VAL_INIT(sa);
     sa.service_id = BC_WRAP_SERVICE_ID;
     sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
-    sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE| TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF;
+    sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE | TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF;
     sa.body = "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B";
     extra.push_back(sa);
 
@@ -122,4 +126,3 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
 
   return true;
 }
-

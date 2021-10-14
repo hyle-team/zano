@@ -180,7 +180,7 @@ namespace currency
       res.pos_block_ts_shift_vs_actual = 0;
       auto last_pos_block_ptr = m_core.get_blockchain_storage().get_last_block_of_type(true);
       if (last_pos_block_ptr)
-        res.pos_block_ts_shift_vs_actual = last_pos_block_ptr->bl.timestamp - get_actual_timestamp(last_pos_block_ptr->bl);
+        res.pos_block_ts_shift_vs_actual = last_pos_block_ptr->bl.timestamp - get_block_datetime(last_pos_block_ptr->bl);
     }
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_OUTS_STAT)
       m_core.get_blockchain_storage().get_outs_index_stat(res.outs_stat);
@@ -916,17 +916,6 @@ namespace currency
       error_resp.message = "Block not accepted";
       return false;
     }
-    //@#@
-    //temporary double check timestamp
-    if (time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) > 5)
-    {
-      LOG_PRINT_RED_L0("Found block (" << get_block_hash(b) << ") timestamp (" << get_actual_timestamp(b)
-        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) << ") than current time ( " << time(NULL) << ")");
-      //mark node to make it easier to find it via scanner      
-      m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend = true;
-    }
-    //
-
 
     res.status = "OK";
     return true;
@@ -973,17 +962,6 @@ namespace currency
       error_resp.message = "Block not accepted";
       return false;
     }
-    //@#@
-    //temporary double check timestamp
-    if (time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) > 5)
-    {
-      LOG_PRINT_RED_L0("Found block (" << get_block_hash(b) << ") timestamp (" << get_actual_timestamp(b)
-        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) << ") than current time ( " << time(NULL) << ")");
-      //mark node to make it easier to find it via scanner      
-      m_core.get_blockchain_storage().get_performnce_data().epic_failure_happend = true;
-    }
-    //
-
 
     res.status = "OK";
     return true;
