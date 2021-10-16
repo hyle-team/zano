@@ -1802,7 +1802,10 @@ void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public:
 
   GET_WALLET_OPTIONS_BY_ID_VOID_RET(wallet_id, w);
   tei.is_wallet_in_sync_process = w.long_refresh_in_progress;
-  m_pview->money_transfer(tei);
+  if (!(w.w->get()->is_watch_only()))
+  {
+    m_pview->money_transfer(tei);
+  }
 }
 void wallets_manager::on_pos_block_found(size_t wallet_id, const currency::block& b)
 {
