@@ -65,7 +65,14 @@ namespace nodetool
     CHECK_AND_ASSERT_MES(r, false, "Failed to parse P2P_MAINTAINERS_PUB_KEY = " << P2P_MAINTAINERS_PUB_KEY);
 
     std::string state_file_path = m_config_folder + "/" + P2P_NET_DATA_FILENAME;
-    tools::unserialize_obj_from_file(*this, state_file_path);
+    boost::system::error_code ec = AUTO_VAL_INIT(ec);
+    std::time_t last_update_time  = boost::filesystem::last_write_time(state_file_path, ec);
+    //let's assume that if p2p peer list file stored more then 2 weeks ago, 
+    //then it outdated and we need to fetch peerlist from seed nodes 
+    if (!ec &&  time(nullptr) - last_update_time < 86400 * 14)
+    {      
+      tools::unserialize_obj_from_file(*this, state_file_path);
+    }
 
     //always use new id, to be able differ cloned computers
     m_config.m_peer_id  = crypto::rand<uint64_t>();

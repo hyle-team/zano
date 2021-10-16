@@ -70,8 +70,7 @@ namespace currency
     iv = *((crypto::chacha8_iv*)&pass_hash);
     crypto::chacha8(scr_data, src_length, key, iv, (char*)dst_data);
   }
-
-
+  //-----------------------------------------------------------------
   std::string account_base::get_seed_phrase(const std::string& password) const 
   {
     if (m_keys_seed_binary.empty())
