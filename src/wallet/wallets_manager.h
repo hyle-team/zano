@@ -89,7 +89,7 @@ public:
 
   wallets_manager();
   ~wallets_manager();
-  bool init_command_line(int argc, char* argv[]);
+  bool init_command_line(int argc, char* argv[], std::string& fail_message);
   bool init(view::i_view* pview_handler);
   bool start();
   bool stop();

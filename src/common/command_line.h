@@ -153,12 +153,20 @@ namespace command_line
   template<typename F>
   bool handle_error_helper(const boost::program_options::options_description& desc, F parser)
   {
+    std::string stub_err;
+    return handle_error_helper(desc, stub_err, parser);
+  }
+
+  template<typename F>
+  bool handle_error_helper(const boost::program_options::options_description& desc, std::string& err, F parser)
+  {
     try
     {
       return parser();
     }
     catch (std::exception& e)
     {
+      err = e.what();
       std::cerr << "Failed to parse arguments: " << e.what() << std::endl;
       std::cerr << desc << std::endl;
       return false;

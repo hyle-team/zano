@@ -729,14 +729,26 @@ void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, c
 bool MainWindow::init_backend(int argc, char* argv[])
 {
   TRY_ENTRY();
-  if (!m_backend.init_command_line(argc, argv))
+  std::string command_line_fail_details;
+  if (!m_backend.init_command_line(argc, argv, command_line_fail_details))
+  {
+    this->show_msg_box(command_line_fail_details);
     return false;
+  }
 
   if (!init_window())
+  {
+    this->show_msg_box("Failed to main screen launch, check logs for the more detais.");
     return false;
+  }
 
   if (!m_backend.init(this))
+  {
+    this->show_msg_box("Failed to initialize backend, check debug logs for more details.");
     return false;
+  }
+
+
 
   if (m_backend.is_qt_logs_enabled())
   {
