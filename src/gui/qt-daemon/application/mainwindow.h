@@ -64,6 +64,7 @@ public:
     std::pair<int64_t, int64_t> m_window_size;
     bool is_maximazed;
     bool is_showed;
+    bool disable_notifications;
   };
 
   protected slots:
@@ -150,6 +151,9 @@ public:
   QString get_default_fee();
   QString get_options();  
   void    bool_toggle_icon(const QString& param);
+  
+  bool    get_is_disabled_notifications();
+  bool    set_is_disabled_notifications(const bool& param);
   QString get_log_file();
   QString check_available_sources(const QString& param);
   QString open_url_in_browser(const QString& param);

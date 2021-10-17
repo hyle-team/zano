@@ -643,6 +643,7 @@ bool MainWindow::show_inital()
     restore_pos(true);
   else
   {
+    m_config = AUTO_VAL_INIT(m_config);
     this->show();
     QSize sz;
     sz.setHeight(770);
@@ -651,6 +652,7 @@ bool MainWindow::show_inital()
     store_window_pos();
     m_config.is_maximazed = false;
     m_config.is_showed = true;
+    m_config.disable_notifications = false;
   }
   return true;
   CATCH_ENTRY2(false);
@@ -811,7 +813,15 @@ bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, l
   CATCH_ENTRY2(false);
 }
 
-
+bool MainWindow::get_is_disabled_notifications()
+{
+  return m_config.disable_notifications;
+}
+bool MainWindow::set_is_disabled_notifications(const bool& param)
+{
+  m_config.disable_notifications = param;
+  return m_config.disable_notifications;
+}
 
 bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
 {
@@ -869,7 +879,8 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
   else if (tei.ti.unlock_time)
     msg += m_localization[localization_id_locked];
 
-  show_notification(title, msg);
+  if(!m_config.disable_notifications)
+    show_notification(title, msg);
 
   return true;
   CATCH_ENTRY2(false);
