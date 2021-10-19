@@ -2053,6 +2053,25 @@ bool check_ring_signature_at_gen_time(const std::vector<test_event_entry>& event
   return true;
 }
 
+bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, currency::core& c)
+{
+  std::shared_ptr<const currency::transaction_chain_entry> ptce = c.get_blockchain_storage().get_tx_chain_entry(tx_id);
+  if (!ptce)
+    return false;
+
+  for (size_t i = 0; i < ptce->tx.vin.size(); ++i)
+  {
+    auto& input = ptce->tx.vin[i];
+    if (input.type() == typeid(txin_to_key))
+    {
+      auto& intk = boost::get<txin_to_key>(input);
+      CHECK_AND_ASSERT_MES(intk.key_offsets.size() == mixin + 1, false, "for input #" << i << " mixin count is " << intk.key_offsets.size() - 1 << ", expected is " << mixin);
+    }
+  }
+
+  return true;
+}
+
 //------------------------------------------------------------------------------
 
 void test_chain_unit_base::register_callback(const std::string& cb_name, verify_callback cb)
