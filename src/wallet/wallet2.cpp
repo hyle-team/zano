@@ -3255,6 +3255,87 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
   total = m_transfer_history.size();
 
 }
+
+void wallet2::wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) {
+  ss << index << ",";
+  ss << epee::misc_utils::get_time_str_v2(wti.timestamp) << ",";
+  ss << print_money(wti.amount) << ",";
+  ss << "\"" << wti.comment << "\",";
+  ss << "[";
+  std::copy(wti.remote_addresses.begin(), wti.remote_addresses.end(), std::ostream_iterator<std::string>(ss, " "));
+  ss << "]" << ",";
+  ss << wti.tx_hash << ",";
+  ss << wti.height << ",";
+  ss << wti.unlock_time << ",";
+  ss << wti.tx_blob_size << ",";
+  ss << epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) << ",";
+  ss << "[";
+  std::copy(wti.recipients_aliases.begin(), wti.recipients_aliases.end(), std::ostream_iterator<std::string>(ss, " "));
+  ss << "]" << ",";
+  ss << (wti.is_income ? "in" : "out") << ",";
+  ss << (wti.is_service ? "[SERVICE]" : "") << (wti.is_mixing ? "[MIXINS]" : "") << (wti.is_mining ? "[MINING]" : "") << ",";
+  ss << wti.tx_type << ",";
+  ss << wti.fee << ENDL;
+};
+
+void wallet2::wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) 
+{
+  ss << (wti.is_income ? "[INC]" : "[OUT]") << "\t"
+    << epee::misc_utils::get_time_str(wti.timestamp) << "\t"
+    << print_money(wti.amount) << "\t"
+    << print_money(wti.fee) << "\t"
+    << wti.remote_addresses << "\t"
+    << wti.comment << ENDL;
+};
+
+void wallet2::wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) 
+{
+  ss << epee::serialization::store_t_to_json(wti, 4) << ",";
+};
+
+
+//----------------------------------------------------------------------------------------------------
+void wallet2::export_transaction_history(std::ostream& ss, const std::string& format,  bool include_pos_transactions)
+{
+  //typedef int(*t_somefunc)(int, int);
+  typedef void(*playout_cb_type)(std::ostream&, const wallet_public::wallet_transfer_info&, size_t);
+  playout_cb_type cb_csv = &wallet2::wti_to_csv_entry;
+  playout_cb_type cb_json = &wallet2::wti_to_json_line;
+  playout_cb_type cb_plain_text = &wallet2::wti_to_txt_line;
+
+  playout_cb_type cb = cb_csv;
+  if (format == "json")
+  {
+    ss << "{ \"history\": [";
+    cb = cb_json;
+  }
+  else if (format == "text")
+  {
+    cb = cb_plain_text;
+  }
+  else
+  {
+    //csv by default
+    ss << "N, Date, Amount, Comment, Address, ID, Height, Unlock timestamp, Tx size, Alias, In/Out, Flags, Type, Fee" << ENDL;
+  }
+
+
+  enum_container(m_transfer_history.begin(), m_transfer_history.end(), [&](wallet_public::wallet_transfer_info& wti, size_t index) {
+    if (!include_pos_transactions)
+    {
+      if (currency::is_coinbase(wti.tx))
+        return true;
+    }
+    cb(ss, wti, index);
+    return true;
+  });
+
+  if (format == "json")
+  {
+    ss << "{}]}";
+  }
+
+}
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
 {
