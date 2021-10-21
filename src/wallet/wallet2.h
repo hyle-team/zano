@@ -862,7 +862,7 @@ namespace tools
     void set_use_deffered_global_outputs(bool use);
     construct_tx_param get_default_construct_tx_param_inital();
 
-    void wallet2::export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
+    void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
     
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
