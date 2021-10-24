@@ -834,7 +834,16 @@ bool MainWindow::set_is_disabled_notifications(const bool& param)
   m_config.disable_notifications = param;
   return m_config.disable_notifications;
 }
-
+QString   MainWindow::export_wallet_history(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::export_wallet_info, ewi);
+  PREPARE_RESPONSE(view::api_response, ar);
+  ar.error_code = m_backend.export_wallet_history(ewi);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY2(false);
+}
 bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
 {
   TRY_ENTRY();

@@ -838,47 +838,6 @@ bool simple_wallet::export_recent_transfers(const std::vector<std::string>& args
     success_msg_writer() << "Failed";
     return false;
   }
-
-
-//   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
-//   std::vector<tools::wallet_public::wallet_transfer_info> recent;
-//   uint64_t total = 0;
-//   uint64_t last_index = 0;
-//   m_wallet->get_recent_transfers_history(recent, 0, 0, total, last_index, false);
-//   m_wallet->get_unconfirmed_transfers(unconfirmed, false);
-//   //workaround for missed fee
-//   stringstream ss;
-//   LOG_PRINT_GREEN("Generating text....", LOG_LEVEL_0);
-//   ss << "Unconfirmed transfers: " << ENDL;
-//   for (auto & wti : unconfirmed)
-//   {
-//     if(ignore_pos && wti.is_mining)
-//       continue;
-//     if (!wti.fee)
-//       wti.fee = currency::get_tx_fee(wti.tx);
-//     if(export_to_json)
-//       ss << epee::serialization::store_t_to_json(wti) << ENDL;
-//     else
-//       ss << wti_to_text_line(wti) << ENDL;
-// 
-//   }
-//   ss << "Recent transfers: " << ENDL;
-//   for (auto & wti : recent)
-//   {
-//     if (ignore_pos && wti.is_mining)
-//       continue;
-//     if (!wti.fee)
-//       wti.fee = currency::get_tx_fee(wti.tx);
-//     
-//     if (export_to_json)
-//       ss << epee::serialization::store_t_to_json(wti) << ENDL;
-//     else
-//       ss << wti_to_text_line(wti) << ENDL;
-//   }
-//   LOG_PRINT_GREEN("Storing text to wallet_recent_transfers.txt....", LOG_LEVEL_0);
-//   file_io_utils::save_string_to_file(log_space::log_singletone::get_default_log_folder() + "/wallet_recent_transfers.txt", ss.str());
-//   LOG_PRINT_GREEN("Done", LOG_LEVEL_0);
-
   return true;
 }
 //----------------------------------------------------------------------------------------------------

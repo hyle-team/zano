@@ -803,6 +803,24 @@ std::string wallets_manager::get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INF
 }
 
 
+std::string wallets_manager::export_wallet_history(const view::export_wallet_info& ewi)
+{
+  GET_WALLET_OPT_BY_ID(ewi.wallet_id, wo);
+  try {
+
+    boost::filesystem::ofstream fstream;
+    fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    fstream.open(ewi.path, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+    wo.w->get()->export_transaction_history(fstream, ewi.format, ewi.include_pos_transactions);
+    fstream.close();
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
+
 uint64_t wallets_manager::get_default_fee()
 {
   return TX_DEFAULT_FEE;
