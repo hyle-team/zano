@@ -107,21 +107,17 @@ namespace nodetool
     if (m_offline_mode)
       return false;
 
-    //@#@ temporary workaround
-    return true;
-#if 0
     CRITICAL_REGION_LOCAL(m_blocked_ips_lock);
     auto it = m_blocked_ips.find(addr);
-    if(it == m_blocked_ips.end())
+    if (it == m_blocked_ips.end())
       return true;
-    if(time(nullptr) - it->second > P2P_IP_BLOCKTIME )
+    if (time(nullptr) - it->second > P2P_IP_BLOCKTIME)
     {
       m_blocked_ips.erase(it);
-      LOG_PRINT_CYAN("Ip " << string_tools::get_ip_string_from_int32(addr) << "is unblocked.", LOG_LEVEL_0);
+      LOG_PRINT_CYAN("IP " << string_tools::get_ip_string_from_int32(addr) << " is unblocked due to blocking expiration.", LOG_LEVEL_0);
       return true;
     }
     return false;
-#endif
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -129,7 +125,8 @@ namespace nodetool
   {
     CRITICAL_REGION_LOCAL(m_blocked_ips_lock);
     m_blocked_ips[addr] = time(nullptr);
-    LOG_PRINT_CYAN("Ip " << string_tools::get_ip_string_from_int32(addr) << " blocked.", LOG_LEVEL_0);
+    m_peerlist.remove_peers_by_ip_from_all(addr);
+    LOG_PRINT_CYAN("IP " << string_tools::get_ip_string_from_int32(addr) << " blocked and removed from peerlist", LOG_LEVEL_0);
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -144,6 +141,10 @@ namespace nodetool
       CHECK_AND_ASSERT_MES(it != m_ip_fails_score.end(), false, "internal error");
       it->second = P2P_IP_FAILS_BEFOR_BLOCK/2;
       block_ip(address);
+    }
+    else
+    {
+      LOG_PRINT_CYAN("IP " << string_tools::get_ip_string_from_int32(address) << ": fail recorded, total fails count: " << fails, LOG_LEVEL_2);
     }
     return true;
   }
@@ -686,7 +687,6 @@ namespace nodetool
         << string_tools::get_ip_string_from_int32(na.ip)
         << ":" << string_tools::num_to_string_fast(na.port)
         /*<< ", try " << try_count*/);
-      //m_peerlist.set_peer_unreachable(pe);
       return false;
     }
     peerid_type pi = AUTO_VAL_INIT(pi);
@@ -708,12 +708,15 @@ namespace nodetool
       return true;
     }
 
-    peerlist_entry pe_local = AUTO_VAL_INIT(pe_local);
-    pe_local.adr = na;
-    pe_local.id = pi;
-    time(&pe_local.last_seen);
-    m_peerlist.append_with_peer_white(pe_local);
-    //update last seen and push it to peerlist manager
+    if (is_remote_ip_allowed(na.ip)) // additional check to avoid IP shown up in peers in the case of non-blocking incoming connections
+    {
+      //update last seen and push it to peerlist manager
+      peerlist_entry pe_local = AUTO_VAL_INIT(pe_local);
+      pe_local.adr = na;
+      pe_local.id = pi;
+      time(&pe_local.last_seen);
+      m_peerlist.append_with_peer_white(pe_local);
+    }
 
     LOG_PRINT_CC_GREEN(con, "CONNECTION HANDSHAKED OK with peer " << string_tools::get_ip_string_from_int32(na.ip) << ":" << string_tools::num_to_string_fast(na.port), LOG_LEVEL_2);
     return true;
@@ -784,11 +787,14 @@ namespace nodetool
         continue;
       }
 
+      // IP blocking for incoming connections is temporary disabled
+      /*
       if (!is_remote_ip_allowed(pe.adr.ip))
       {
         ++peer_index;
         continue;
       }
+      */
 
       if (is_addr_recently_failed(pe.adr))
       {
@@ -1380,7 +1386,8 @@ namespace nodetool
     //associate peer_id with this connection
     context.peer_id = arg.node_data.peer_id;
 
-    if(arg.node_data.peer_id != m_config.m_peer_id && arg.node_data.my_port)
+    if(arg.node_data.peer_id != m_config.m_peer_id && arg.node_data.my_port
+      && is_remote_ip_allowed(context.m_remote_ip)) // additional check to avoid IP shown up in peers in the case of non-blocking incoming connections
     {
       peerid_type peer_id_l = arg.node_data.peer_id;
       uint32_t port_l = arg.node_data.my_port;
