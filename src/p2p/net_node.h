@@ -215,6 +215,7 @@ namespace nodetool
     bool urgent_alert_worker();
     bool critical_alert_worker();
     bool remove_dead_connections();
+    bool is_ip_good_for_adding_to_peerlist(uint32_t adress);
 
 
     //debug functions

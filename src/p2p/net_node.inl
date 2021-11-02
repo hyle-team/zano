@@ -106,6 +106,16 @@ namespace nodetool
   {
     if (m_offline_mode)
       return false;
+    
+    // blocking incoming connections by IP address is temporary disabled 
+    return true;
+  }
+  //-----------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+  bool node_server<t_payload_net_handler>::is_ip_good_for_adding_to_peerlist(uint32_t addr)
+  {
+    if (m_offline_mode)
+      return false;
 
     CRITICAL_REGION_LOCAL(m_blocked_ips_lock);
     auto it = m_blocked_ips.find(addr);
@@ -708,7 +718,7 @@ namespace nodetool
       return true;
     }
 
-    if (is_remote_ip_allowed(na.ip)) // additional check to avoid IP shown up in peers in the case of non-blocking incoming connections
+    if (is_ip_good_for_adding_to_peerlist(na.ip)) // additional check to avoid IP shown up in peers in the case of non-blocking incoming connections
     {
       //update last seen and push it to peerlist manager
       peerlist_entry pe_local = AUTO_VAL_INIT(pe_local);
@@ -787,14 +797,11 @@ namespace nodetool
         continue;
       }
 
-      // IP blocking for incoming connections is temporary disabled
-      /*
       if (!is_remote_ip_allowed(pe.adr.ip))
       {
         ++peer_index;
         continue;
       }
-      */
 
       if (is_addr_recently_failed(pe.adr))
       {
@@ -1387,7 +1394,7 @@ namespace nodetool
     context.peer_id = arg.node_data.peer_id;
 
     if(arg.node_data.peer_id != m_config.m_peer_id && arg.node_data.my_port
-      && is_remote_ip_allowed(context.m_remote_ip)) // additional check to avoid IP shown up in peers in the case of non-blocking incoming connections
+      && is_ip_good_for_adding_to_peerlist(context.m_remote_ip)) // additional check to avoid IP shown up in peers in the case of non-blocking incoming connections
     {
       peerid_type peer_id_l = arg.node_data.peer_id;
       uint32_t port_l = arg.node_data.my_port;
