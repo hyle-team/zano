@@ -181,6 +181,7 @@ signals:
   void do_dispatch(const QString status, const QString params);  //general function
   void on_core_event(const QString method_name);  //general function
   void set_options(const QString str);  //general function
+  void get_wallet_name();
 
 private:
   //--------------------  i_core_event_handler --------------------
@@ -259,7 +260,7 @@ private:
 
   enum localization_string_indices
   {
-    // order is surprizingly important here! (see also updateLocalisation in AppController.js)
+    // order is surprisingly important here! (see also updateLocalisation in AppController.js)
     localization_id_quit = 0, 
     localization_id_is_received,
     localization_id_is_confirmed, 

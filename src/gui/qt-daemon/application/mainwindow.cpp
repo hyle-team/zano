@@ -865,6 +865,10 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
   LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer]" << std::endl << json_str);
   //this->money_transfer(json_str.c_str());
   QMetaObject::invokeMethod(this, "money_transfer", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  if (m_config.disable_notifications)
+    return true;
+
+
   if (!m_tray_icon)
     return true;
   if (!tei.ti.is_income)
@@ -883,7 +887,7 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
     return true;
   }
 
-  auto amount_str = currency::print_money(tei.ti.amount);
+  auto amount_str = currency::print_money_brief(tei.ti.amount);
   std::string title, msg;
   if (tei.ti.height == 0) // unconfirmed trx
   {
@@ -900,8 +904,8 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
   else if (tei.ti.unlock_time)
     msg += m_localization[localization_id_locked];
 
-  if(!m_config.disable_notifications)
-    show_notification(title, msg);
+  
+  show_notification(title, msg);
 
   return true;
   CATCH_ENTRY2(false);
