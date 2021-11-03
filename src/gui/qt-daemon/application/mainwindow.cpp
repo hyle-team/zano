@@ -643,6 +643,7 @@ bool MainWindow::show_inital()
     restore_pos(true);
   else
   {
+    m_config = AUTO_VAL_INIT(m_config);
     this->show();
     QSize sz;
     sz.setHeight(770);
@@ -651,6 +652,7 @@ bool MainWindow::show_inital()
     store_window_pos();
     m_config.is_maximazed = false;
     m_config.is_showed = true;
+    m_config.disable_notifications = false;
   }
   return true;
   CATCH_ENTRY2(false);
@@ -727,14 +729,26 @@ void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, c
 bool MainWindow::init_backend(int argc, char* argv[])
 {
   TRY_ENTRY();
-  if (!m_backend.init_command_line(argc, argv))
+  std::string command_line_fail_details;
+  if (!m_backend.init_command_line(argc, argv, command_line_fail_details))
+  {
+    this->show_msg_box(command_line_fail_details);
     return false;
+  }
 
   if (!init_window())
+  {
+    this->show_msg_box("Failed to main screen launch, check logs for the more detais.");
     return false;
+  }
 
   if (!m_backend.init(this))
+  {
+    this->show_msg_box("Failed to initialize backend, check debug logs for more details.");
     return false;
+  }
+
+
 
   if (m_backend.is_qt_logs_enabled())
   {
@@ -811,8 +825,25 @@ bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, l
   CATCH_ENTRY2(false);
 }
 
-
-
+bool MainWindow::get_is_disabled_notifications()
+{
+  return m_config.disable_notifications;
+}
+bool MainWindow::set_is_disabled_notifications(const bool& param)
+{
+  m_config.disable_notifications = param;
+  return m_config.disable_notifications;
+}
+QString   MainWindow::export_wallet_history(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::export_wallet_info, ewi);
+  PREPARE_RESPONSE(view::api_response, ar);
+  ar.error_code = m_backend.export_wallet_history(ewi);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY2(false);
+}
 bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
 {
   TRY_ENTRY();
@@ -834,6 +865,10 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
   LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer]" << std::endl << json_str);
   //this->money_transfer(json_str.c_str());
   QMetaObject::invokeMethod(this, "money_transfer", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  if (m_config.disable_notifications)
+    return true;
+
+
   if (!m_tray_icon)
     return true;
   if (!tei.ti.is_income)
@@ -852,7 +887,7 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
     return true;
   }
 
-  auto amount_str = currency::print_money(tei.ti.amount);
+  auto amount_str = currency::print_money_brief(tei.ti.amount);
   std::string title, msg;
   if (tei.ti.height == 0) // unconfirmed trx
   {
@@ -869,6 +904,7 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
   else if (tei.ti.unlock_time)
     msg += m_localization[localization_id_locked];
 
+  
   show_notification(title, msg);
 
   return true;

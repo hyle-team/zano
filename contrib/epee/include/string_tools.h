@@ -284,12 +284,19 @@ POP_GCC_WARNINGS
 	typedef std::map<std::wstring, std::wstring> command_line_params_w;
 
   template<typename t_pod_data>
-  void apped_pod_to_strbuff(std::string& buff, const t_pod_data& pod)
+  void append_pod_to_strbuff(std::string& buff, const t_pod_data& pod)
   {
     buff.append(reinterpret_cast<const char*>(&pod), sizeof(pod));
   }
 
-
+  template<typename pod_t>
+  bool get_pod_from_strbuff(const std::string& buff, pod_t& output)
+  {
+    if (buff.size() != sizeof(pod_t))
+      return false;
+    output = *reinterpret_cast<const pod_t*>(buff.data());
+    return true;
+  }
 
 	template<class t_string>
 	bool parse_commandline(std::map<t_string, t_string>& res, int argc, char** argv)

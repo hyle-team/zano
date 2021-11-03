@@ -21,3 +21,11 @@ struct wallet_rpc_integrated_address_transfer : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct wallet_rpc_transfer : public wallet_test
+{
+  wallet_rpc_transfer();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

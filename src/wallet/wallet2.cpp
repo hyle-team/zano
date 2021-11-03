@@ -1281,7 +1281,7 @@ void wallet2::handle_money_received2(const currency::block& b, const currency::t
   m_transfer_history.push_back(AUTO_VAL_INIT(wallet_public::wallet_transfer_info()));
   wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
   wti.is_income = true;
-  prepare_wti(wti, get_block_height(b), get_actual_timestamp(b), tx, amount, td);
+  prepare_wti(wti, get_block_height(b), get_block_datetime(b), tx, amount, td);
   WLT_LOG_L1("[MONEY RECEIVED]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
 }
@@ -1311,7 +1311,7 @@ void wallet2::handle_money_spent2(const currency::block& b,
 
   wti.remote_addresses = recipients;
   wti.recipients_aliases = recipients_aliases;
-  prepare_wti(wti, get_block_height(b), get_actual_timestamp(b), in_tx, amount, td);
+  prepare_wti(wti, get_block_height(b), get_block_datetime(b), in_tx, amount, td);
   WLT_LOG_L1("[MONEY SPENT]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
 }
@@ -3255,6 +3255,87 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
   total = m_transfer_history.size();
 
 }
+
+void wallet2::wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) {
+  ss << index << ",";
+  ss << epee::misc_utils::get_time_str_v2(wti.timestamp) << ",";
+  ss << print_money(wti.amount) << ",";
+  ss << "\"" << wti.comment << "\",";
+  ss << "[";
+  std::copy(wti.remote_addresses.begin(), wti.remote_addresses.end(), std::ostream_iterator<std::string>(ss, " "));
+  ss << "]" << ",";
+  ss << wti.tx_hash << ",";
+  ss << wti.height << ",";
+  ss << wti.unlock_time << ",";
+  ss << wti.tx_blob_size << ",";
+  ss << epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) << ",";
+  ss << "[";
+  std::copy(wti.recipients_aliases.begin(), wti.recipients_aliases.end(), std::ostream_iterator<std::string>(ss, " "));
+  ss << "]" << ",";
+  ss << (wti.is_income ? "in" : "out") << ",";
+  ss << (wti.is_service ? "[SERVICE]" : "") << (wti.is_mixing ? "[MIXINS]" : "") << (wti.is_mining ? "[MINING]" : "") << ",";
+  ss << wti.tx_type << ",";
+  ss << wti.fee << ENDL;
+};
+
+void wallet2::wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) 
+{
+  ss << (wti.is_income ? "[INC]" : "[OUT]") << "\t"
+    << epee::misc_utils::get_time_str(wti.timestamp) << "\t"
+    << print_money(wti.amount) << "\t"
+    << print_money(wti.fee) << "\t"
+    << wti.remote_addresses << "\t"
+    << wti.comment << ENDL;
+};
+
+void wallet2::wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) 
+{
+  ss << epee::serialization::store_t_to_json(wti, 4) << ",";
+};
+
+
+//----------------------------------------------------------------------------------------------------
+void wallet2::export_transaction_history(std::ostream& ss, const std::string& format,  bool include_pos_transactions)
+{
+  //typedef int(*t_somefunc)(int, int);
+  typedef void(*playout_cb_type)(std::ostream&, const wallet_public::wallet_transfer_info&, size_t);
+  playout_cb_type cb_csv = &wallet2::wti_to_csv_entry;
+  playout_cb_type cb_json = &wallet2::wti_to_json_line;
+  playout_cb_type cb_plain_text = &wallet2::wti_to_txt_line;
+
+  playout_cb_type cb = cb_csv;
+  if (format == "json")
+  {
+    ss << "{ \"history\": [";
+    cb = cb_json;
+  }
+  else if (format == "text")
+  {
+    cb = cb_plain_text;
+  }
+  else
+  {
+    //csv by default
+    ss << "N, Date, Amount, Comment, Address, ID, Height, Unlock timestamp, Tx size, Alias, In/Out, Flags, Type, Fee" << ENDL;
+  }
+
+
+  enum_container(m_transfer_history.begin(), m_transfer_history.end(), [&](wallet_public::wallet_transfer_info& wti, size_t index) {
+    if (!include_pos_transactions)
+    {
+      if (currency::is_coinbase(wti.tx))
+        return true;
+    }
+    cb(ss, wti, index);
+    return true;
+  });
+
+  if (format == "json")
+  {
+    ss << "{}]}";
+  }
+
+}
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
 {
@@ -3377,16 +3458,13 @@ bool wallet2::prepare_and_sign_pos_block(currency::block& b,
   return true;
 }
 //------------------------------------------------------------------
-bool wallet2::build_kernel(const pos_entry& pe, const stake_modifier_type& stake_modifier, stake_kernel& kernel, uint64_t& coindays_weight, uint64_t timestamp)
+bool wallet2::build_kernel(const pos_entry& pe, const stake_modifier_type& stake_modifier, const uint64_t timestamp, stake_kernel& kernel)
 {
   PROFILE_FUNC("build_kernel");
-  coindays_weight = 0;
   kernel = stake_kernel();
   kernel.kimage = pe.keyimage;
   kernel.stake_modifier = stake_modifier;
   kernel.block_timestamp = timestamp;
-
-  coindays_weight = get_coinday_weight(pe.amount);
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3457,7 +3535,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     build_minted_block(ctx.sp, ctx.rsp, miner_address);
   }
 
-  WLT_LOG_L0("PoS mining iteration finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
+  WLT_LOG_L0("PoS mining: " << ctx.rsp.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
 
   return true;
 }
@@ -3533,12 +3611,11 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     const currency::txout_to_key& txtokey = boost::get<currency::txout_to_key>(target);
     keys_ptrs.push_back(&txtokey.key);
 
-    //put actual time for tx block
+    // set a real timestamp
     b.timestamp = rsp.block_timestamp;
-    currency::etc_tx_time tt = AUTO_VAL_INIT(tt);
-    tt.v = m_core_runtime_config.get_core_time();
-    b.miner_tx.extra.push_back(tt);
-    WLT_LOG_MAGENTA("Applying actual timestamp: " << epee::misc_utils::get_time_str(tt.v), LOG_LEVEL_0);
+    uint64_t current_timestamp = m_core_runtime_config.get_core_time();
+    set_block_datetime(current_timestamp, b);
+    WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
 
     //sign block
     res = prepare_and_sign_pos_block(b,
@@ -3564,14 +3641,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     }    
     WLT_LOG_GREEN("POS block generated and accepted, congrats!", LOG_LEVEL_0);
     m_wcallback->on_pos_block_found(b);
-    //@#@
-    //double check timestamp
-    if (time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) > 5)
-    {
-      WLT_LOG_RED("Found block (" << get_block_hash(b) << ") timestamp ("  << get_actual_timestamp(b)
-        << ") is suspiciously less (" << time(NULL) - static_cast<int64_t>(get_actual_timestamp(b)) << ") than current time ( " << time(NULL) << ")", LOG_LEVEL_0);
-    }
-    //
+
     return true;
 }
 //----------------------------------------------------------------------------------------------------

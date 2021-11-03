@@ -634,7 +634,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   {
     MAKE_NEXT_POS_BLOCK(events, b, prev, miner_acc, std::list<currency::account_base>{miner_acc});
     prev = b;
-    events.push_back(event_core_time(get_actual_timestamp(b) + 100));
+    events.push_back(event_core_time(get_block_datetime(b) + 100));
   }
 
 

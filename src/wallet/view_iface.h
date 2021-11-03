@@ -284,6 +284,20 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct export_wallet_info
+  {
+    uint64_t wallet_id;
+    bool include_pos_transactions;
+    std::string path;
+    std::string format;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(include_pos_transactions)
+      KV_SERIALIZE(path)
+      KV_SERIALIZE(format)
+    END_KV_SERIALIZE_MAP()
+  };
 
   struct response_mining_estimate
   {

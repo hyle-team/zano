@@ -201,7 +201,8 @@ namespace plain_wallet
     args[1] = const_cast<char*>(argss_1.c_str());
     args[2] = const_cast<char*>(argss_2.c_str());
     args[3] = nullptr;
-    if (!(ptr->gwm.init_command_line(3, args) && ptr->gwm.init(nullptr)))
+    std::string command_line_fail_details;
+    if (!(ptr->gwm.init_command_line(3, args, command_line_fail_details) && ptr->gwm.init(nullptr)))
     {
       LOG_ERROR("Failed to init wallets_manager");
       return GENERAL_INTERNAL_ERRROR_INIT;

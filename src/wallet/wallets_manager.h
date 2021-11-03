@@ -89,7 +89,7 @@ public:
 
   wallets_manager();
   ~wallets_manager();
-  bool init_command_line(int argc, char* argv[]);
+  bool init_command_line(int argc, char* argv[], std::string& fail_message);
   bool init(view::i_view* pview_handler);
   bool start();
   bool stop();
@@ -139,6 +139,7 @@ public:
   std::string get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
   std::string get_fav_offers(const std::list<bc_services::offer_id>& hashes, const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
   std::string get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res);
+  std::string export_wallet_history(const view::export_wallet_info& ewi);
   uint64_t get_default_fee();
   std::string get_mining_estimate(uint64_t amuont_coins, 
     uint64_t time, 

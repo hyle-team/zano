@@ -87,7 +87,7 @@ DISABLE_VS_WARNINGS(4996)
 POP_VS_WARNINGS
 
 		if(pt)
-			strftime( tmpbuf, 199, "%Y_%m_%d %H_%M_%S", pt );
+			strftime( tmpbuf, 199, "%Y-%m-%d %H-%M-%S", pt );
 		else
 		{
 			std::stringstream strs;

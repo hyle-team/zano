@@ -228,6 +228,7 @@ simple_wallet::simple_wallet()
 
   m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this, _1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this, _1), "submit_transfer <signed_tx_file> - broadcast signed tx");
+  m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::submit_transfer, this, _1), "Export transaction history in CSV file");
 }
 //----------------------------------------------------------------------------------------------------
 simple_wallet::~simple_wallet()
@@ -798,12 +799,7 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
 std::string wti_to_text_line(const tools::wallet_public::wallet_transfer_info& wti)
 {
   stringstream ss;
-  ss << (wti.is_income ? "[INC]" : "[OUT]") << "\t"
-    << epee::misc_utils::get_time_str(wti.timestamp) << "\t"
-    << print_money(wti.amount) << "\t"
-    << print_money(wti.fee) << "\t"
-    << wti.remote_addresses << "\t"
-    << wti.comment << "\t";
+
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------
@@ -811,58 +807,37 @@ bool simple_wallet::export_recent_transfers(const std::vector<std::string>& args
 {
   bool export_to_json = true;
   bool ignore_pos = false;
-  if (args.size())
-  {
-    if (args[0] == "json")
-      export_to_json = true;
-    else if (args[0] == "txt")
-      export_to_json = false;
-  }
   if (args.size() > 1)
   {
     if (args[1] == "ignore-pos")
       ignore_pos = true;
   }
 
-  std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
-  std::vector<tools::wallet_public::wallet_transfer_info> recent;
-  uint64_t total = 0;
-  uint64_t last_index = 0;
-  m_wallet->get_recent_transfers_history(recent, 0, 0, total, last_index, false);
-  m_wallet->get_unconfirmed_transfers(unconfirmed, false);
-  //workaround for missed fee
-  stringstream ss;
-  LOG_PRINT_GREEN("Generating text....", LOG_LEVEL_0);
-  ss << "Unconfirmed transfers: " << ENDL;
-  for (auto & wti : unconfirmed)
+  std::string format = "csv";
+  if (args.size() > 0)
   {
-    if(ignore_pos && wti.is_mining)
-      continue;
-    if (!wti.fee)
-      wti.fee = currency::get_tx_fee(wti.tx);
-    if(export_to_json)
-      ss << epee::serialization::store_t_to_json(wti) << ENDL;
+    if (args[0] == "json" || args[0] == "csv" || args[0] == "text")
+    {
+      format = args[0];
+    }
     else
-      ss << wti_to_text_line(wti) << ENDL;
-
+    {
+      fail_msg_writer() << "Unknown format: \"" << args[0] << "\", only \"csv\"(default), \"json\" and \"text\" supported";
+    }
   }
-  ss << "Recent transfers: " << ENDL;
-  for (auto & wti : recent)
+
+  try {
+    boost::filesystem::ofstream fstream;
+    fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    fstream.open(log_space::log_singletone::get_default_log_folder() + "/wallet_recent_transfers.txt", std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+    m_wallet->export_transaction_history(fstream, format, !ignore_pos);
+    fstream.close();
+  }
+  catch (...)
   {
-    if (ignore_pos && wti.is_mining)
-      continue;
-    if (!wti.fee)
-      wti.fee = currency::get_tx_fee(wti.tx);
-    
-    if (export_to_json)
-      ss << epee::serialization::store_t_to_json(wti) << ENDL;
-    else
-      ss << wti_to_text_line(wti) << ENDL;
+    success_msg_writer() << "Failed";
+    return false;
   }
-  LOG_PRINT_GREEN("Storing text to wallet_recent_transfers.txt....", LOG_LEVEL_0);
-  file_io_utils::save_string_to_file(log_space::log_singletone::get_default_log_folder() + "/wallet_recent_transfers.txt", ss.str());
-  LOG_PRINT_GREEN("Done", LOG_LEVEL_0);
-
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1183,7 +1158,7 @@ bool simple_wallet::validate_wrap_status(uint64_t amount)
 
   currency::void_struct req = AUTO_VAL_INIT(req);
   currency::rpc_get_wrap_info_response res = AUTO_VAL_INIT(res);
-  bool r = epee::net_utils::invoke_http_json_remote_command2("http://wrapped.zano.org/api/get_wrap_info", req, res, http_client, 10000);
+  bool r = epee::net_utils::invoke_http_json_remote_command2("http://wrapped.zano.org/api2/get_wrap_info", req, res, http_client, 10000);
   if (!r)
   {
     fail_msg_writer() << "Failed to request wrap status from server, check internet connection";

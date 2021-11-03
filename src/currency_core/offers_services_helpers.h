@@ -97,8 +97,8 @@ namespace bc_services
   inline currency::blobdata make_offer_sig_blob(const update_offer& uo)
   {
     currency::blobdata bd;
-    epee::string_tools::apped_pod_to_strbuff(bd, uo.tx_id);
-    epee::string_tools::apped_pod_to_strbuff(bd, uo.offer_index);
+    epee::string_tools::append_pod_to_strbuff(bd, uo.tx_id);
+    epee::string_tools::append_pod_to_strbuff(bd, uo.offer_index);
     bd += epee::serialization::store_t_to_binary(uo.of);
     return bd;
   }
@@ -106,8 +106,8 @@ namespace bc_services
   inline currency::blobdata make_offer_sig_blob(const cancel_offer& co)
   {
     currency::blobdata bd;
-    epee::string_tools::apped_pod_to_strbuff(bd, co.tx_id);
-    epee::string_tools::apped_pod_to_strbuff(bd, co.offer_index);
+    epee::string_tools::append_pod_to_strbuff(bd, co.tx_id);
+    epee::string_tools::append_pod_to_strbuff(bd, co.offer_index);
     return bd;
   }
 

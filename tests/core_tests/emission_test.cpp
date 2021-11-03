@@ -112,7 +112,7 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
       pb.step2_set_txs(std::vector<transaction>());
       pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, difficulty, prev_id, null_hash, timestamp);
       pb.step4_generate_coinbase_tx(0, already_generated_coins, m_miner_acc.get_public_address());
-      pb.m_block.miner_tx.extra.push_back(currency::etc_tx_time({ timestamp })); // actual timestamp
+      set_block_datetime(timestamp, pb.m_block);
       pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, m_miner_acc);
 
       c.handle_incoming_block(t_serializable_object_to_blob(pb.m_block), bvc);

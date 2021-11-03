@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2021 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -11,8 +11,6 @@
 #include <map>
 #include <iterator>
 #include <boost/foreach.hpp>
-//#include <boost/bimap.hpp>
-//#include <boost/bimap/multiset_of.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/serialization/version.hpp>
@@ -55,10 +53,10 @@ namespace nodetool
     bool append_with_peer_gray(const peerlist_entry& pr);
     bool set_peer_just_seen(peerid_type peer, uint32_t ip, uint32_t port);
     bool set_peer_just_seen(peerid_type peer, const net_address& addr);
-    bool set_peer_unreachable(const peerlist_entry& pr);
     bool is_ip_allowed(uint32_t ip);
     void trim_white_peerlist();
     void trim_gray_peerlist();
+    bool remove_peers_by_ip_from_all(const uint32_t ip);
 
     
   private:
@@ -110,17 +108,6 @@ namespace nodetool
       > 
     > peers_indexed;
 
-    typedef boost::multi_index_container<
-      peerlist_entry,
-      boost::multi_index::indexed_by<
-      // access by peerlist_entry::id<
-      boost::multi_index::ordered_unique<boost::multi_index::tag<by_id>, boost::multi_index::member<peerlist_entry,uint64_t,&peerlist_entry::id> >,
-      // access by peerlist_entry::net_adress
-      boost::multi_index::ordered_unique<boost::multi_index::tag<by_addr>, boost::multi_index::member<peerlist_entry,net_address,&peerlist_entry::adr> >,
-      // sort by peerlist_entry::last_seen<
-      boost::multi_index::ordered_non_unique<boost::multi_index::tag<by_time>, boost::multi_index::member<peerlist_entry,time_t,&peerlist_entry::last_seen> >
-      > 
-    > peers_indexed_old;
   public:    
     
     template <class Archive, class t_version_type>
@@ -134,9 +121,7 @@ namespace nodetool
       ar & m_peers_gray;
     }
 
-  private: 
-    bool peers_indexed_from_old(const peers_indexed_old& pio, peers_indexed& pi);
-
+  private:
     friend class boost::serialization::access;
     epee::critical_section m_peerlist_lock;
     std::string m_config_folder;
@@ -185,21 +170,6 @@ namespace nodetool
   inline
     bool peerlist_manager::deinit()
   {
-    return true;
-  }
-  //--------------------------------------------------------------------------------------------------
-  inline 
-  bool peerlist_manager::peers_indexed_from_old(const peers_indexed_old& pio, peers_indexed& pi)
-  {
-    for(auto x: pio)
-    {
-      auto by_addr_it = pi.get<by_addr>().find(x.adr);
-      if(by_addr_it == pi.get<by_addr>().end())
-      {
-        pi.insert(x);
-      }
-    }
-
     return true;
   }
   //--------------------------------------------------------------------------------------------------
@@ -391,6 +361,33 @@ namespace nodetool
     return true;
     CATCH_ENTRY_L0("peerlist_manager::append_with_peer_gray()", false);
     return true;
+  }
+  //--------------------------------------------------------------------------------------------------
+  inline
+  bool peerlist_manager::remove_peers_by_ip_from_all(const uint32_t ip)
+  {
+    TRY_ENTRY();
+
+    CRITICAL_REGION_LOCAL(m_peerlist_lock);
+
+    for (auto it = m_peers_white.begin(); it != m_peers_white.end();)
+    {
+      if (it->adr.ip == ip)
+        it = m_peers_white.erase(it);
+      else
+        ++it;
+    }
+    
+    for (auto it = m_peers_gray.begin(); it != m_peers_gray.end();)
+    {
+      if (it->adr.ip == ip)
+        it = m_peers_gray.erase(it);
+      else
+        ++it;
+    }
+
+    return true;
+    CATCH_ENTRY_L0("peerlist_manager::remove_peers_by_ip_from_all()", false);
   }
   //--------------------------------------------------------------------------------------------------
 }

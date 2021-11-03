@@ -64,9 +64,9 @@ int main(int argc, char *argv[])
   MainWindow viewer;
   if (!viewer.init_backend(argc, argv))
   {
-    static_cast<view::i_view*>(&viewer)->show_msg_box("Failed to initialize backend, check debug logs for more details.");
     return 1;
   }
+
   app.installNativeEventFilter(&viewer);
   viewer.setWindowTitle(CURRENCY_NAME_BASE);
   viewer.show_inital();

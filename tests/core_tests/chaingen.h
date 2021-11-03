@@ -410,7 +410,6 @@ public:
                     uint64_t global_index, 
                     const crypto::key_image& ki,
                     currency::stake_kernel& kernel,
-                    uint64_t& coindays_weight,
                     const blockchain_vector& blck_chain,
                     const outputs_index& indexes, 
                     uint64_t timestamp);
@@ -680,6 +679,7 @@ bool generate_pos_block_with_given_coinstake(test_generator& generator, const st
 bool check_ring_signature_at_gen_time(const std::vector<test_event_entry>& events, const crypto::hash& last_block_id, const currency::txin_to_key& in_t_k,
   const crypto::hash& hash_for_sig, const std::vector<crypto::signature> &sig);
 
+bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, currency::core& c);
 
 //--------------------------------------------------------------------------
 template<class t_test_class>
