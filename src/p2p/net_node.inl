@@ -26,18 +26,19 @@ namespace nodetool
 
   namespace
   {
-    const command_line::arg_descriptor<std::string>               arg_p2p_bind_ip        = {"p2p-bind-ip", "Interface for p2p network protocol", "0.0.0.0"};
-    const command_line::arg_descriptor<std::string>               arg_p2p_bind_port      = {"p2p-bind-port", "Port for p2p network protocol", boost::to_string(P2P_DEFAULT_PORT)};
-    const command_line::arg_descriptor<uint32_t>                  arg_p2p_external_port  = {"p2p-external-port", "External port for p2p network protocol (if port forwarding used with NAT)", 0};
-    const command_line::arg_descriptor<bool>                      arg_p2p_allow_local_ip = {"allow-local-ip", "Allow local ip add to peer list, mostly in debug purposes"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_peer       = {"add-peer", "Manually add peer to local peerlist"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_priority_node   = {"add-priority-node", "Specify list of peers to connect to and attempt to keep the connection open"};
+    const command_line::arg_descriptor<std::string>               arg_p2p_bind_ip                   = {"p2p-bind-ip", "Interface for p2p network protocol", "0.0.0.0"};
+    const command_line::arg_descriptor<std::string>               arg_p2p_bind_port                 = {"p2p-bind-port", "Port for p2p network protocol", boost::to_string(P2P_DEFAULT_PORT)};
+    const command_line::arg_descriptor<uint32_t>                  arg_p2p_external_port             = {"p2p-external-port", "External port for p2p network protocol (if port forwarding used with NAT)", 0};
+    const command_line::arg_descriptor<bool>                      arg_p2p_allow_local_ip            = {"allow-local-ip", "Allow local ip add to peer list, mostly in debug purposes"};
+    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_peer                  = {"add-peer", "Manually add peer to local peerlist"};
+    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_priority_node         = {"add-priority-node", "Specify list of peers to connect to and attempt to keep the connection open"};
     const command_line::arg_descriptor<bool>                      arg_p2p_use_only_priority_nodes   = {"use-only-priority-nodes", "Try to connect only to priority nodes"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_seed_node      = {"seed-node", "Connect to a node to retrieve peer addresses, and disconnect"};
-    const command_line::arg_descriptor<bool>                      arg_p2p_hide_my_port   = {"hide-my-port", "Do not announce yourself as peerlist candidate", false, true}; 
-    const command_line::arg_descriptor<bool>                      arg_p2p_offline_mode   = { "offline-mode", "Don't connect to any node and reject any connections", false, true };
-    const command_line::arg_descriptor<bool>                      arg_p2p_disable_debug_reqs = { "disable-debug-p2p-requests", "Disable p2p debug requests", false, true };
-}
+    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_seed_node                 = {"seed-node", "Connect to a node to retrieve peer addresses, and disconnect"};
+    const command_line::arg_descriptor<bool>                      arg_p2p_hide_my_port              = {"hide-my-port", "Do not announce yourself as peerlist candidate", false, true}; 
+    const command_line::arg_descriptor<bool>                      arg_p2p_offline_mode              = { "offline-mode", "Don't connect to any node and reject any connections", false, true };
+    const command_line::arg_descriptor<bool>                      arg_p2p_disable_debug_reqs        = { "disable-debug-p2p-requests", "Disable p2p debug requests", false, true };
+    const command_line::arg_descriptor<uint32_t>                  arg_p2p_ip_auto_blocking          = { "p2p-ip-auto-blocking", "Enable (1) or disable (0) peers auto-blocking by IP <0|1>. Default: 0", 0, false };
+  }
 
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -53,7 +54,8 @@ namespace nodetool
     command_line::add_arg(desc, arg_p2p_hide_my_port);   
     command_line::add_arg(desc, arg_p2p_offline_mode);
     command_line::add_arg(desc, arg_p2p_disable_debug_reqs);
-    command_line::add_arg(desc, arg_p2p_use_only_priority_nodes);       
+    command_line::add_arg(desc, arg_p2p_use_only_priority_nodes);
+    command_line::add_arg(desc, arg_p2p_ip_auto_blocking);
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -106,9 +108,11 @@ namespace nodetool
   {
     if (m_offline_mode)
       return false;
+
+    if (!m_ip_auto_blocking_enabled)
+      return true;
     
-    // blocking incoming connections by IP address is temporary disabled 
-    return true;
+    return !is_ip_in_blacklist(addr);
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -117,17 +121,27 @@ namespace nodetool
     if (m_offline_mode)
       return false;
 
+    // even if IP auto blocking is disabled, bad peers should not be added to peerlists and be shared with other nodes
+
+    return !is_ip_in_blacklist(addr);
+  }
+  //-----------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+  bool node_server<t_payload_net_handler>::is_ip_in_blacklist(uint32_t addr)
+  {
     CRITICAL_REGION_LOCAL(m_blocked_ips_lock);
     auto it = m_blocked_ips.find(addr);
     if (it == m_blocked_ips.end())
-      return true;
+      return false;
+
     if (time(nullptr) - it->second > P2P_IP_BLOCKTIME)
     {
       m_blocked_ips.erase(it);
       LOG_PRINT_CYAN("IP " << string_tools::get_ip_string_from_int32(addr) << " is unblocked due to blocking expiration.", LOG_LEVEL_0);
-      return true;
+      return false;
     }
-    return false;
+
+    return true;
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -180,6 +194,9 @@ namespace nodetool
     m_allow_local_ip = command_line::get_arg(vm, arg_p2p_allow_local_ip);
     m_offline_mode = command_line::get_arg(vm, arg_p2p_offline_mode);
     m_debug_requests_enabled = !command_line::get_arg(vm, arg_p2p_disable_debug_reqs);
+    m_ip_auto_blocking_enabled = (command_line::get_arg(vm, arg_p2p_ip_auto_blocking) != 0);
+
+    LOG_PRINT_L0("p2p peers auto-blocking is " << (m_ip_auto_blocking_enabled ? "enabled" : "disabled"), LOG_LEVEL_0);
 
     if (m_offline_mode)
     {
@@ -1394,7 +1411,7 @@ namespace nodetool
     context.peer_id = arg.node_data.peer_id;
 
     if(arg.node_data.peer_id != m_config.m_peer_id && arg.node_data.my_port
-      && is_ip_good_for_adding_to_peerlist(context.m_remote_ip)) // additional check to avoid IP shown up in peers in the case of non-blocking incoming connections
+      && is_ip_good_for_adding_to_peerlist(context.m_remote_ip))
     {
       peerid_type peer_id_l = arg.node_data.peer_id;
       uint32_t port_l = arg.node_data.my_port;
