@@ -196,7 +196,7 @@ namespace nodetool
     m_debug_requests_enabled = !command_line::get_arg(vm, arg_p2p_disable_debug_reqs);
     m_ip_auto_blocking_enabled = (command_line::get_arg(vm, arg_p2p_ip_auto_blocking) != 0);
 
-    LOG_PRINT_L0("p2p peers auto-blocking is " << (m_ip_auto_blocking_enabled ? "enabled" : "disabled"), LOG_LEVEL_0);
+    LOG_PRINT_L0("p2p peers auto-blocking is " << (m_ip_auto_blocking_enabled ? "enabled" : "disabled"));
 
     if (m_offline_mode)
     {
