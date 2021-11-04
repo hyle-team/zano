@@ -7,7 +7,7 @@
 
 #include "include_base_utils.h"
 #include <boost/foreach.hpp>
-#ifndef ANDROID_BUILD
+#ifndef MOBILE_WALLET_BUILD
   #include <boost/locale.hpp>
 #endif
 using namespace epee;
@@ -3208,7 +3208,7 @@ namespace currency
     return o << "<" << r.n << ":" << r.tx_id << ">";
   }
   //--------------------------------------------------------------------------------
-#ifndef ANDROID_BUILD
+#ifndef MOBILE_WALLET_BUILD
   const std::locale& utf8_get_conversion_locale()
   {
     static std::locale loc = boost::locale::generator().generate("en_US.UTF-8");
