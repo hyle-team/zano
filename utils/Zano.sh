@@ -33,9 +33,12 @@ create_desktop_icon()
     echo Terminal=true | tee -a $target_file_name  > /dev/null
     echo Type=Application | tee -a $target_file_name  > /dev/null
     echo "Categories=Qt;Utility;" | tee -a $target_file_name  > /dev/null
+    echo "MimeType=x-scheme-handler/zano;" | tee -a $target_file_name  > /dev/null
 }
 
 
 create_desktop_icon $out_file_name
+
+xdg-mime default Zano.desktop x-scheme-handler/zano
 
 call_app
