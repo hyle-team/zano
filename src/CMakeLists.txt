@@ -155,7 +155,7 @@ add_dependencies(stratum version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(stratum STRATUM)
 
 
-target_link_libraries(currency_core lmdb mdbx)
+target_link_libraries(currency_core lmdb mdbx-static)
 
 add_executable(daemon ${DAEMON} ${P2P} ${CURRENCY_PROTOCOL})
 add_dependencies(daemon version)
