@@ -143,10 +143,10 @@ namespace tools
         else
         {
           int res = 0;
-          MDBX_txn_flags_t flags = MDBX_txn_flags_t();
-          unsigned int flags_ = 0;
+          //MDBX_txn_flags_t flags = MDBX_txn_flags_t();
+          unsigned int flags = 0;
           if (read_only)
-            flags = MDBX_TXN_RDONLY;
+            flags = MDBX_RDONLY;//flags = MDBX_TXN_RDONLY;
 
           //don't use parent tx in write transactions if parent tx was read-only (restriction in mdbx) 
           //see "Nested transactions: Max 1 child, write txns only, no writemap"
@@ -341,7 +341,8 @@ namespace tools
       data[0].iov_base = (void*)v;
       data[0].iov_len = vs;
 
-      MDBX_put_flags_t flags = MDBX_put_flags_t();
+      //MDBX_put_flags_t flags = MDBX_put_flags_t();
+      unsigned  flags = 0;
       res = mdbx_put(get_current_tx(), static_cast<MDBX_dbi>(h), &key, data, flags);
       CHECK_AND_ASSERT_MESS_MDBX_DB(res, false, "Unable to mdbx_put");
       return true;
