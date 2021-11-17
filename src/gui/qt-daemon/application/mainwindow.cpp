@@ -842,7 +842,7 @@ QString   MainWindow::export_wallet_history(const QString& param)
   PREPARE_RESPONSE(view::api_response, ar);
   ar.error_code = m_backend.export_wallet_history(ewi);
   return MAKE_RESPONSE(ar);
-  CATCH_ENTRY2(false);
+  CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
 {
