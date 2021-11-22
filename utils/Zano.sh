@@ -29,7 +29,7 @@ create_desktop_icon()
     echo GenericName=My Application | tee -a $target_file_name  > /dev/null
     echo Comment=Doing some funny stuff | tee -a $target_file_name > /dev/null
     echo Icon=$script_dir/html/files/desktop_linux_icon.png | tee -a $target_file_name > /dev/null
-    echo Exec=$script_dir/Zano | tee -a $target_file_name  > /dev/null
+    echo Exec=$script_dir/Zano %u | tee -a $target_file_name  > /dev/null
     echo Terminal=true | tee -a $target_file_name  > /dev/null
     echo Type=Application | tee -a $target_file_name  > /dev/null
     echo "Categories=Qt;Utility;" | tee -a $target_file_name  > /dev/null

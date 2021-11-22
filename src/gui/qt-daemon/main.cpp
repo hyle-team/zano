@@ -26,6 +26,10 @@ int main(int argc, char *argv[])
        // See http://crbug.com/436603.
 //       _set_FMA3_enable(0);
 //#endif  // ARCH_CPU_X86_64 && _MSC_VER <= 1800
+  
+  std::cout << argc << std::endl;
+  std::cout << argv[0] << std::endl;
+  std::cout << argv[1] << std::endl;
 
 #ifdef _MSC_VER 
   #ifdef _WIN64
