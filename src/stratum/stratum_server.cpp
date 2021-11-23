@@ -951,13 +951,14 @@ namespace
       bool r = params_array != nullptr && ps.get_next_value(params_array, rate_submit_id_str);
       CHECK_AND_ASSERT_MES(r, false, "Incorrect parameters");
 
-      uint64_t rate = 0;
-      CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(rate_str, rate, true), false, "Can't parse rate from " << rate_str);
+      struct { uint64_t low, high; } rate_128 = { 0 };
+      CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(rate_str, rate_128, true), false, "Can't parse rate from " << rate_str);
+      CHECK_AND_ASSERT_MES(rate_128.high == 0, false, "rate overflow, rate str: " << rate_str);
       crypto::hash rate_submit_id = null_hash;
       CHECK_AND_ASSERT_MES(pod_from_net_format(rate_submit_id_str, rate_submit_id), false, "Can't parse rate_submit_id from " << rate_submit_id_str);
 
-      m_last_reported_hashrate = rate;
-      return m_config.handle_submit_hashrate(this, rate, rate_submit_id);
+      m_last_reported_hashrate = rate_128.low;
+      return m_config.handle_submit_hashrate(this, rate_128.low, rate_submit_id);
     }
 
     bool handle_method_eth_submitWork(const jsonrpc_id_t& id, epee::serialization::portable_storage& ps, epee::serialization::portable_storage::hsection params_section)
@@ -1123,7 +1124,7 @@ void stratum_server::init_options(boost::program_options::options_description& d
   command_line::add_arg(desc, arg_stratum_block_template_update_period);
   command_line::add_arg(desc, arg_stratum_hr_print_interval);
   command_line::add_arg(desc, arg_stratum_always_online);
-  
+
 }
 //------------------------------------------------------------------------------------------------------------------------------
 bool stratum_server::should_start(const boost::program_options::variables_map& vm)

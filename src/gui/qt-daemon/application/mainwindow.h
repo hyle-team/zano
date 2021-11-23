@@ -8,6 +8,7 @@
 #include <QWebChannel>
 
 #include "wallet/view_iface.h"
+#include "serialization/keyvalue_helper_structs.h"
 
 #ifndef Q_MOC_RUN
 #include "wallet/wallets_manager.h"
@@ -60,11 +61,20 @@ public:
 
   struct app_config
   {
-    std::pair<int64_t, int64_t> m_window_position;
-    std::pair<int64_t, int64_t> m_window_size;
+    
+    epee::kvserializable_pair<int64_t, int64_t> m_window_position;
+    epee::kvserializable_pair<int64_t, int64_t> m_window_size;
     bool is_maximazed;
     bool is_showed;
     bool disable_notifications;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(m_window_position)
+      KV_SERIALIZE(m_window_size)
+      KV_SERIALIZE(is_maximazed)
+      KV_SERIALIZE(is_showed)
+      KV_SERIALIZE(disable_notifications)
+    END_KV_SERIALIZE_MAP()
   };
 
   protected slots:

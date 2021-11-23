@@ -387,9 +387,9 @@ void MainWindow::changeEvent(QEvent *e)
 bool MainWindow::store_app_config()
 {
   TRY_ENTRY();
-  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG;
-  LOG_PRINT_L0("storing gui internal config from " << conf_path);
-  CHECK_AND_ASSERT_MES(tools::serialize_obj_to_file(m_config, conf_path), false, "failed to store gui internal config");
+  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG2;
+  LOG_PRINT_L0("storing gui internal config to " << conf_path);
+  CHECK_AND_ASSERT_MES(epee::serialization::store_t_to_json_file(m_config, conf_path), false, "failed to store gui internal config");
   return true;
   CATCH_ENTRY2(false);
 }
@@ -397,9 +397,9 @@ bool MainWindow::store_app_config()
 bool MainWindow::load_app_config()
 {
   TRY_ENTRY();
-  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG;
+  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG2;
   LOG_PRINT_L0("loading gui internal config from " << conf_path);
-  bool r = tools::unserialize_obj_from_file(m_config, conf_path);
+  bool r = epee::serialization::load_t_from_json_file(m_config, conf_path);
   LOG_PRINT_L0("gui internal config " << (r ? "loaded ok" : "was not loaded"));
   return r;
   CATCH_ENTRY2(false);
@@ -842,7 +842,7 @@ QString   MainWindow::export_wallet_history(const QString& param)
   PREPARE_RESPONSE(view::api_response, ar);
   ar.error_code = m_backend.export_wallet_history(ewi);
   return MAKE_RESPONSE(ar);
-  CATCH_ENTRY2(false);
+  CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
 {
