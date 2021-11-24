@@ -25,9 +25,9 @@ create_desktop_icon()
     rm -f $target_file_name
     echo [Desktop Entry] | tee -a $target_file_name  > /dev/null
     echo Version=1.0 | tee -a $target_file_name  > /dev/null
-    echo Name=My Application | tee -a $target_file_name > /dev/null
-    echo GenericName=My Application | tee -a $target_file_name  > /dev/null
-    echo Comment=Doing some funny stuff | tee -a $target_file_name > /dev/null
+    echo Name=Zano | tee -a $target_file_name > /dev/null
+    echo GenericName=Zano | tee -a $target_file_name  > /dev/null
+    echo Comment=Privacy blockchain | tee -a $target_file_name > /dev/null
     echo Icon=$script_dir/html/files/desktop_linux_icon.png | tee -a $target_file_name > /dev/null
     echo Exec=$script_dir/Zano %u | tee -a $target_file_name  > /dev/null
     echo Terminal=true | tee -a $target_file_name  > /dev/null
