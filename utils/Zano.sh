@@ -12,7 +12,7 @@ out_file_name=~/.local/share/applications/Zano.desktop
 call_app()
 {
   pushd $script_dir
-  ./Zano
+  ./Zano "$@"
   popd
   exit
 }
@@ -29,7 +29,7 @@ create_desktop_icon()
     echo GenericName=Zano | tee -a $target_file_name  > /dev/null
     echo Comment=Privacy blockchain | tee -a $target_file_name > /dev/null
     echo Icon=$script_dir/html/files/desktop_linux_icon.png | tee -a $target_file_name > /dev/null
-    echo Exec=$script_dir/Zano %u | tee -a $target_file_name  > /dev/null
+    echo Exec=$script_dir/Zano.sh %u | tee -a $target_file_name  > /dev/null
     echo Terminal=true | tee -a $target_file_name  > /dev/null
     echo Type=Application | tee -a $target_file_name  > /dev/null
     echo "Categories=Qt;Utility;" | tee -a $target_file_name  > /dev/null
@@ -41,4 +41,4 @@ create_desktop_icon $out_file_name
 
 xdg-mime default Zano.desktop x-scheme-handler/zano
 
-call_app
+call_app "$@"
