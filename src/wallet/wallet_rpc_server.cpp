@@ -56,7 +56,11 @@ namespace tools
     command_line::add_arg(desc, arg_deaf_mode);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  wallet_rpc_server::wallet_rpc_server(wallet2& w):m_wallet(w), m_do_mint(false), m_deaf(false)
+  wallet_rpc_server::wallet_rpc_server(wallet2& w)
+    : m_wallet(w)
+    , m_do_mint(false)
+    , m_deaf(false)
+    , m_last_wallet_store_height(0)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address)
@@ -309,7 +313,7 @@ namespace tools
     else
     {
       //put it to attachments
-      ctp.attachments.insert(ctp.extra.end(), req.service_entries.begin(), req.service_entries.end());
+      ctp.attachments.insert(ctp.attachments.end(), req.service_entries.begin(), req.service_entries.end());
     }
     bool wrap = false;
     std::vector<currency::tx_destination_entry>& dsts = ctp.dsts;
@@ -397,7 +401,7 @@ namespace tools
       currency::finalized_tx result = AUTO_VAL_INIT(result);
       std::string unsigned_tx_blob_str;
       ctp.fee = req.fee;
-      ctp.fake_outputs_count = 0;
+      ctp.fake_outputs_count = req.mixin;
       m_wallet.transfer(ctp, result, true, &unsigned_tx_blob_str);
       if (m_wallet.is_watch_only())
       {

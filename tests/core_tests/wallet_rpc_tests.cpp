@@ -148,6 +148,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   alice_wlt->get_payments(payment_id, payments);
   CHECK_AND_ASSERT_MES(payments.size() == 1, false, "Invalid payments count: " << payments.size());
   CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(3), false, "Invalid payment");
+  CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(0, payments.front().m_tx_hash, c), false, ""); // make sure number of decoys is correct
 
 
   // 3. standard address + invalid external payment id => fail
@@ -181,9 +182,127 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   alice_wlt->get_payments(payment_id, payments);
   CHECK_AND_ASSERT_MES(payments.size() == 1, false, "Invalid payments count: " << payments.size());
   CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(7), false, "Invalid payment");
+  CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(0, payments.front().m_tx_hash, c), false, ""); // make sure number of decoys is correct
 
 
   return true;
 }
 
 //------------------------------------------------------------------------------
+
+wallet_rpc_transfer::wallet_rpc_transfer()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_transfer, configure_core);
+  REGISTER_CALLBACK_METHOD(wallet_rpc_transfer, c1);
+}
+
+bool wallet_rpc_transfer::generate(std::vector<test_event_entry>& events) const
+{
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  set_hard_fork_heights_to_generator(generator);
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 6);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_rpc_transfer::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.hard_fork_01_starts_after_height = 1;
+  pc.hard_fork_02_starts_after_height = 1;
+  pc.hard_fork_03_starts_after_height = 1;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}
+
+bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  miner_wlt->refresh();
+
+  // wallet RPC server
+  tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
+  epee::json_rpc::error je;
+  tools::wallet_rpc_server::connection_context ctx;
+
+  // 1. Check non-zero mixin and default settings
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request  req = AUTO_VAL_INIT(req);
+  req.fee = TESTS_DEFAULT_FEE;
+  req.mixin = 2;
+  tools::wallet_public::transfer_destination tds = AUTO_VAL_INIT(tds);
+  tds.address = m_accounts[ALICE_ACC_IDX].get_public_address_str();
+  tds.amount = MK_TEST_COINS(3);
+  req.destinations.push_back(tds);
+
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response res = AUTO_VAL_INIT(res);
+
+  r = miner_wlt_rpc.on_transfer(req, res, je, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC call failed, code: " << je.code << ", msg: " << je.message);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, tds.amount), false, "");
+
+  // check the transfer has been received
+  tools::wallet2::transfer_details td = AUTO_VAL_INIT(td);
+  CHECK_AND_ASSERT_MES(alice_wlt->get_transfer_info_by_index(0, td), false, "");
+  CHECK_AND_ASSERT_MES(td.amount() == MK_TEST_COINS(3), false, "Invalid payment");
+  CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(2, td.tx_hash(), c), false, "");
+
+  // make sure tx_received is set by default, but tx_payer is not
+  std::shared_ptr<const transaction_chain_entry> pche = c.get_blockchain_storage().get_tx_chain_entry(td.tx_hash());
+  CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_receiver>(pche->tx.extra) == 1, false, "tx_receiver: incorrect count of items");
+  CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_payer>(pche->tx.extra) == 0, false, "tx_payer: incorrect count of items");
+
+
+  // 2. check tx_receiver and tx_payer non-default
+  req.mixin = 1;
+  req.hide_receiver = true;
+  req.push_payer = true;
+  tds.amount = MK_TEST_COINS(5);
+  req.destinations.clear();
+  req.destinations.push_back(tds);
+
+  res = AUTO_VAL_INIT(res);
+
+  r = miner_wlt_rpc.on_transfer(req, res, je, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC call failed, code: " << je.code << ", msg: " << je.message);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(3 + 5)), false, "");
+  
+  td = AUTO_VAL_INIT(td);
+  CHECK_AND_ASSERT_MES(alice_wlt->get_transfer_info_by_index(1, td), false, "");
+  CHECK_AND_ASSERT_MES(td.amount() == MK_TEST_COINS(5), false, "Invalid payment");
+  CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(1, td.tx_hash(), c), false, "");
+
+  // make sure tx_received is set by default, but tx_payer is not
+  pche = c.get_blockchain_storage().get_tx_chain_entry(td.tx_hash());
+  CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_receiver>(pche->tx.extra) == 0, false, "tx_receiver: incorrect count of items");
+  CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_payer>(pche->tx.extra) == 1, false, "tx_payer: incorrect count of items");
+
+
+  return true;
+}

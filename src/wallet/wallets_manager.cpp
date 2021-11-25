@@ -152,7 +152,7 @@ bool wallets_manager::do_exception_safe_call(guarded_code_t guarded_code, error_
 }
 
 
-bool wallets_manager::init_command_line(int argc, char* argv[])
+bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fail_message)
 {
   TRY_ENTRY();
   po::options_description desc_cmd_only("Command line options");
@@ -197,9 +197,8 @@ bool wallets_manager::init_command_line(int argc, char* argv[])
   po::options_description desc_options("Allowed options");
   desc_options.add(desc_cmd_only).add(desc_cmd_sett);
 
-
-  
-  bool coomand_line_parsed = command_line::handle_error_helper(desc_options, [&]()
+  std::string err_str;
+  bool command_line_parsed = command_line::handle_error_helper(desc_options, err_str, [&]()
   {
     po::store(po::parse_command_line(argc, argv, desc_options), m_vm);
 
@@ -230,22 +229,28 @@ bool wallets_manager::init_command_line(int argc, char* argv[])
     return true;
   });
 
-  if (!coomand_line_parsed)
+  if (!command_line_parsed)
   {
     std::stringstream ss;
     ss << "Command line has wrong arguments: " << std::endl;
     for (int i = 0; i != argc; i++)
       ss << "[" << i << "] " << argv[i] << std::endl;
     std::cerr << ss.str() << std::endl << std::flush;
+
+    fail_message = "Error parsing arguments.\n";
+    fail_message += err_str + "\n";
+    std::stringstream s;
+    desc_options.print(s);
+    fail_message += s.str();
     return false;
   }
 
   m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
   m_qt_dev_tools = command_line::get_arg(m_vm, arg_qt_dev_tools);
-
   return true;
   CATCH_ENTRY2(false);
 }
+
 
 void terminate_handler_func()
 {
@@ -797,6 +802,24 @@ std::string wallets_manager::get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INF
   return API_RETURN_CODE_OK;
 }
 
+
+std::string wallets_manager::export_wallet_history(const view::export_wallet_info& ewi)
+{
+  GET_WALLET_OPT_BY_ID(ewi.wallet_id, wo);
+  try {
+
+    boost::filesystem::ofstream fstream;
+    fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    fstream.open(ewi.path, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+    wo.w->get()->export_transaction_history(fstream, ewi.format, ewi.include_pos_transactions);
+    fstream.close();
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
 
 uint64_t wallets_manager::get_default_fee()
 {
@@ -1802,7 +1825,10 @@ void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public:
 
   GET_WALLET_OPTIONS_BY_ID_VOID_RET(wallet_id, w);
   tei.is_wallet_in_sync_process = w.long_refresh_in_progress;
-  m_pview->money_transfer(tei);
+  if (!(w.w->get()->is_watch_only()))
+  {
+    m_pview->money_transfer(tei);
+  }
 }
 void wallets_manager::on_pos_block_found(size_t wallet_id, const currency::block& b)
 {
