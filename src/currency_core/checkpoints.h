@@ -20,6 +20,8 @@ namespace currency
     bool is_height_passed_zone(uint64_t height, uint64_t blockchain_last_block_height) const;
     bool check_block(uint64_t height, const crypto::hash& h) const;
     uint64_t get_top_checkpoint_height() const;
+
+    uint64_t get_checkpoint_before_height(uint64_t height) const;
   private:
     std::map<uint64_t, crypto::hash> m_points;
   };
