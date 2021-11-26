@@ -958,7 +958,7 @@ bool gen_checkpoints_set_after_switching_to_altchain::prune_blockchain(currency:
   uint64_t height = 0;
   uint64_t transactions_pruned = 0, signatures_pruned = 0, attachments_pruned = 0;
 
-  c.get_blockchain_storage().prune_ring_signatures_and_attachments_if_need();
+  //c.get_blockchain_storage().prune_ring_signatures_and_attachments_if_need();
 
   /*for (uint64_t height = 1, size = c.get_current_blockchain_size(); height < size; ++height)
   {
