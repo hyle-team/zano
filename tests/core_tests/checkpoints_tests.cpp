@@ -36,12 +36,17 @@ bool checkpoints_test::set_checkpoint(currency::core& c, size_t ev_index, const 
     {
       if (pcp.hash != null_hash && pcp.hash != get_block_hash(b))
         continue;
-      currency::checkpoints cp;
-      cp.add_checkpoint(currency::get_block_height(b), epee::string_tools::pod_to_hex(currency::get_block_hash(b)));
-      c.set_checkpoints(std::move(cp));
+      m_local_checkpoints.add_checkpoint(pcp.height, epee::string_tools::pod_to_hex(currency::get_block_hash(b)));
+      c.set_checkpoints(currency::checkpoints(m_local_checkpoints));
+      LOG_PRINT_YELLOW("CHECKPOINT set at height " << pcp.height, LOG_LEVEL_0);
+
+      //for(uint64_t h = 0; h <= pcp.height + 1; ++h)
+      //  LOG_PRINT_MAGENTA("%% " << h << " : " << m_local_checkpoints.get_checkpoint_before_height(h), LOG_LEVEL_0);
       return true;
     }
   }
+
+  LOG_ERROR("set_checkpoint failed trying to set checkpoint at height " << pcp.height);
 
   return false;
 }
@@ -895,3 +900,74 @@ bool gen_checkpoints_and_invalid_tx_to_pool::c1(currency::core& c, size_t ev_ind
   return true;
 }
 
+//------------------------------------------------------------------------------
+
+gen_checkpoints_set_after_switching_to_altchain::gen_checkpoints_set_after_switching_to_altchain()
+{
+  REGISTER_CALLBACK_METHOD(gen_checkpoints_set_after_switching_to_altchain, prune_blockchain);
+}
+
+bool gen_checkpoints_set_after_switching_to_altchain::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure 
+
+  //  0 ... N     N+1   N+2   N+3   N+4   N+5   N+6   <- height (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+  //                    tx1
+  // (0 )- (0r)- (1 )- (2a)- (3a)-                    <- alt chain
+  //               \ 
+  //                \- (2 )-                          <- main chain
+
+  bool r = false;
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "check_not_being_in_cp_zone");
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
+  MAKE_TX(events, tx1, miner_acc, alice_acc, MK_TEST_COINS(1), blk_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1, miner_acc, tx1);
+  MAKE_NEXT_BLOCK(events, blk_3a, blk_2a, miner_acc);
+
+  DO_CALLBACK(events, "check_not_being_in_cp_zone");
+
+  //  0 ... N     N+1   N+2   N+3   N+4   N+5   N+6   <- height (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+  //                        +-----------> CP          <- checkpoint
+  //                    tx1 |                          
+  // (0 )- (0r)- (1 )- (2a)- (3a)-                    <- alt chain
+  //               \        |                         <- when CP set up
+  //                \- (2 )- (3 )- (4 )- (5 )- (6 )-  <- main chain
+
+  DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5));
+  DO_CALLBACK(events, "prune_blockchain");
+
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc); // <-- CHECKPOINT
+  MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
+
+  return true;
+}
+
+bool gen_checkpoints_set_after_switching_to_altchain::prune_blockchain(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  uint64_t height = 0;
+  uint64_t transactions_pruned = 0, signatures_pruned = 0, attachments_pruned = 0;
+
+  c.get_blockchain_storage().prune_ring_signatures_and_attachments_if_need();
+
+  /*for (uint64_t height = 1, size = c.get_current_blockchain_size(); height < size; ++height)
+  {
+    r = c.get_blockchain_storage().prune_ring_signatures_and_attachments(height, transactions_pruned, signatures_pruned, attachments_pruned);
+    CHECK_AND_ASSERT_MES(r, false, "prune_ring_signatures_and_attachments failed for height " << height);
+  }
+
+  // make sure only one tx was pruned (namely, tx1)
+  CHECK_AND_ASSERT_MES(transactions_pruned == 1, false, "incorrect number of pruned txs: " << transactions_pruned);
+  */
+  return true;
+}

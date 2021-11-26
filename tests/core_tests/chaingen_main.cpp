@@ -814,6 +814,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_checkpoints_reorganize);
     GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
     GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
+    GENERATE_AND_PLAY(gen_checkpoints_set_after_switching_to_altchain);
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase);
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 
