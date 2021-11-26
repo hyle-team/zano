@@ -578,13 +578,13 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
   catch (const std::exception& ex)
   {
     m_db.abort_transaction();
-    LOG_ERROR("UNKNOWN EXCEPTION WHILE ADDINIG NEW BLOCK: " << ex.what());
+    LOG_ERROR("UNKNOWN EXCEPTION WHILE SETTING CHECKPOINTS: " << ex.what());
     return false;
   }
   catch (...)
   {
     m_db.abort_transaction();
-    LOG_ERROR("UNKNOWN EXCEPTION WHILE ADDINIG NEW BLOCK.");
+    LOG_ERROR("UNKNOWN EXCEPTION WHILE SETTING CHECKPOINTS.");
     return false;
   }
   
@@ -1036,7 +1036,9 @@ void blockchain_storage::purge_alt_block_txs_hashs(const block& b)
 //------------------------------------------------------------------
 void blockchain_storage::do_erase_altblock(alt_chain_container::iterator it)
 {
-  purge_altblock_keyimages_from_big_heap(it->second.bl, get_block_hash(it->second.bl));
+  crypto::hash id = get_block_hash(it->second.bl);
+  LOG_PRINT_L1("erasing alt block " << print16(id) << " @ " << get_block_height(it->second.bl));
+  purge_altblock_keyimages_from_big_heap(it->second.bl, id);
   purge_alt_block_txs_hashs(it->second.bl);
   m_alternative_chains.erase(it);
 }

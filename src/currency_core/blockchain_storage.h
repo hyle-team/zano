@@ -396,7 +396,7 @@ namespace currency
         else
         {
           CHECK_AND_ASSERT_MES(*block_ind_ptr < m_db_blocks.size(), false, "Internal error: bl_id=" << string_tools::pod_to_hex(bl_id)
-            << " have index record with offset=" << *block_ind_ptr << ", bigger then m_blocks.size()=" << m_db_blocks.size());
+            << " have index record with offset=" << *block_ind_ptr << ", bigger then m_db_blocks.size()=" << m_db_blocks.size());
           blocks.push_back(m_db_blocks[*block_ind_ptr]->bl);
         }
       }
