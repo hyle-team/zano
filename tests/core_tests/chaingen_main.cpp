@@ -57,7 +57,7 @@ bool clean_data_directory()
 {
   std::string config_folder = command_line::get_arg(g_vm, command_line::arg_data_dir);
 
-  static const std::set<std::string> files = { CURRENCY_POOLDATA_FOLDERNAME_OLD, CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD, P2P_NET_DATA_FILENAME, MINER_CONFIG_FILENAME, GUI_SECURE_CONFIG_FILENAME, GUI_CONFIG_FILENAME, GUI_INTERNAL_CONFIG };
+  static const std::set<std::string> files = { CURRENCY_POOLDATA_FOLDERNAME_OLD, CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD, P2P_NET_DATA_FILENAME, MINER_CONFIG_FILENAME, GUI_SECURE_CONFIG_FILENAME, GUI_CONFIG_FILENAME, GUI_INTERNAL_CONFIG2 };
   static const std::set<std::string> prefixes = { CURRENCY_POOLDATA_FOLDERNAME_PREFIX, CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX };
 
   std::vector<boost::filesystem::path> entries_to_remove;
