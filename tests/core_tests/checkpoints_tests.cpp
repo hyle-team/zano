@@ -945,9 +945,16 @@ bool gen_checkpoints_set_after_switching_to_altchain::generate(std::vector<test_
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
-  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc); // <-- this should trigger the switching
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_4), get_block_hash(blk_4)));
+  DO_CALLBACK(events, "check_being_in_cp_zone");
+
   MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc); // <-- CHECKPOINT
   MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_6), get_block_hash(blk_6)));
+  DO_CALLBACK(events, "check_not_being_in_cp_zone");
 
   return true;
 }
