@@ -626,22 +626,20 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  if (m_db_blocks.size() > 1 && m_checkpoints.get_top_checkpoint_height() && m_checkpoints.get_top_checkpoint_height() > m_db_current_pruned_rs_height)
-  {    
-    uint64_t pruning_last_height = std::min(m_db_blocks.size() - 1, m_checkpoints.get_top_checkpoint_height());
-    if (pruning_last_height > m_db_current_pruned_rs_height)
+  uint64_t top_block_height = get_top_block_height();
+  uint64_t pruning_end_height = m_checkpoints.get_checkpoint_before_height(top_block_height);
+  if (pruning_end_height > m_db_current_pruned_rs_height)
+  {
+    LOG_PRINT_CYAN("Starting pruning ring signatues and attachments from height " << m_db_current_pruned_rs_height + 1 << " to height " << pruning_end_height
+      << " (" << pruning_end_height - m_db_current_pruned_rs_height << " blocks)", LOG_LEVEL_0);
+    uint64_t tx_count = 0, sig_count = 0, attach_count = 0;
+    for(uint64_t height = m_db_current_pruned_rs_height + 1; height <= pruning_end_height; height++)
     {
-      LOG_PRINT_CYAN("Starting pruning ring signatues and attachments from height " << m_db_current_pruned_rs_height + 1 << " to height " << pruning_last_height
-        << " (" << pruning_last_height - m_db_current_pruned_rs_height << " blocks)", LOG_LEVEL_0);
-      uint64_t tx_count = 0, sig_count = 0, attach_count = 0;
-      for(uint64_t height = m_db_current_pruned_rs_height + 1; height <= pruning_last_height; height++)
-      {
-        bool res = prune_ring_signatures_and_attachments(height, tx_count, sig_count, attach_count);
-        CHECK_AND_ASSERT_MES(res, false, "failed to prune_ring_signatures_and_attachments for height = " << height);
-      }
-      m_db_current_pruned_rs_height = pruning_last_height;
-      LOG_PRINT_CYAN("Transaction pruning finished: " << sig_count << " signatures and " << attach_count << " attachments released in " << tx_count << " transactions.", LOG_LEVEL_0);
+      bool res = prune_ring_signatures_and_attachments(height, tx_count, sig_count, attach_count);
+      CHECK_AND_ASSERT_MES(res, false, "failed to prune_ring_signatures_and_attachments for height = " << height);
     }
+    m_db_current_pruned_rs_height = pruning_end_height;
+    LOG_PRINT_CYAN("Transaction pruning finished: " << sig_count << " signatures and " << attach_count << " attachments released in " << tx_count << " transactions.", LOG_LEVEL_0);
   }
   return true;
 }
