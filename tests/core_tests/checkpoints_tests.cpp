@@ -400,8 +400,13 @@ bool gen_checkpoints_prun_txs_after_blockchain_load::generate(std::vector<test_e
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
   DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2));
 
-  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_0 goes with blk_1_bad
-  MAKE_TX(events, tx_0, miner_acc, alice, MK_TEST_COINS(1), blk_0r);
+  std::vector<attachment_v> attach;
+  attach.push_back(tx_comment{"jokes are funny"});
+
+  // tx pool won't accept the tx, because it cannot be verified in CP zone
+  // set kept_by_block flag, so tx_0 be accepted
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  MAKE_TX_ATTACH(events, tx_0, miner_acc, alice, MK_TEST_COINS(1), blk_0r, attach);
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
   
@@ -412,11 +417,12 @@ bool gen_checkpoints_prun_txs_after_blockchain_load::generate(std::vector<test_e
 
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
 
-  MAKE_TX(events, tx_1, miner_acc, alice, MK_TEST_COINS(1), blk_3);
+  MAKE_TX_ATTACH(events, tx_1, miner_acc, alice, MK_TEST_COINS(1), blk_3, attach);
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_1);
 
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
 
+  // BCS tx pruning (on interval 0 - CP1) should be triggered once the following checkpoint is set
   DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 6));
 
   MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
@@ -442,8 +448,8 @@ bool gen_checkpoints_prun_txs_after_blockchain_load::check_txs(currency::core& c
 
   r = c.get_transaction(m_tx1_id, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "can't get transaction tx_1");
-  CHECK_AND_ASSERT_MES(tx_1.signatures.empty(), false, "tx_1 has non-empty sig");
-  CHECK_AND_ASSERT_MES(tx_1.attachment.empty(), false, "tx_1 has non-empty attachments");
+  CHECK_AND_ASSERT_MES(!tx_1.signatures.empty(), false, "tx_1 has empty sig");
+  CHECK_AND_ASSERT_MES(!tx_1.attachment.empty(), false, "tx_1 has empty attachments");
 
   return true;
 }
@@ -904,12 +910,16 @@ bool gen_checkpoints_and_invalid_tx_to_pool::c1(currency::core& c, size_t ev_ind
 
 gen_checkpoints_set_after_switching_to_altchain::gen_checkpoints_set_after_switching_to_altchain()
 {
-  REGISTER_CALLBACK_METHOD(gen_checkpoints_set_after_switching_to_altchain, prune_blockchain);
 }
 
 bool gen_checkpoints_set_after_switching_to_altchain::generate(std::vector<test_event_entry>& events) const
 {
-  // Test idea: make sure 
+  // Test outline:
+  // 0) no checkpoints are set;
+  // 1) core is in a subchain, that will become alternative;
+  // 2) checkpoint is set (in the furute), transaction pruning is executed;
+  // 3) core continues to sync, chain switching occurs
+  // Make sure that chain switching is still possible after pruning.
 
   //  0 ... N     N+1   N+2   N+3   N+4   N+5   N+6   <- height (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
   //                    tx1
@@ -941,7 +951,6 @@ bool gen_checkpoints_set_after_switching_to_altchain::generate(std::vector<test_
   //                \- (2 )- (3 )- (4 )- (5 )- (6 )-  <- main chain
 
   DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5));
-  DO_CALLBACK(events, "prune_blockchain");
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
@@ -956,25 +965,5 @@ bool gen_checkpoints_set_after_switching_to_altchain::generate(std::vector<test_
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_6), get_block_hash(blk_6)));
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
 
-  return true;
-}
-
-bool gen_checkpoints_set_after_switching_to_altchain::prune_blockchain(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  bool r = false;
-  uint64_t height = 0;
-  uint64_t transactions_pruned = 0, signatures_pruned = 0, attachments_pruned = 0;
-
-  //c.get_blockchain_storage().prune_ring_signatures_and_attachments_if_need();
-
-  /*for (uint64_t height = 1, size = c.get_current_blockchain_size(); height < size; ++height)
-  {
-    r = c.get_blockchain_storage().prune_ring_signatures_and_attachments(height, transactions_pruned, signatures_pruned, attachments_pruned);
-    CHECK_AND_ASSERT_MES(r, false, "prune_ring_signatures_and_attachments failed for height " << height);
-  }
-
-  // make sure only one tx was pruned (namely, tx1)
-  CHECK_AND_ASSERT_MES(transactions_pruned == 1, false, "incorrect number of pruned txs: " << transactions_pruned);
-  */
   return true;
 }

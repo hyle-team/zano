@@ -117,5 +117,4 @@ struct gen_checkpoints_set_after_switching_to_altchain : public checkpoints_test
 {
   gen_checkpoints_set_after_switching_to_altchain();
   bool generate(std::vector<test_event_entry>& events) const;
-  bool prune_blockchain(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
