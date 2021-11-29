@@ -87,8 +87,8 @@ namespace currency
       return top_cp;
 
     auto it = m_points.lower_bound(height);                // if found, it->first >= height
-    if (it == m_points.end() || --it == m_points.end())
+    if (it == m_points.end() || it == m_points.begin())
       return 0;
-    return it->first;
+    return (--it)->first;
   }
 }
