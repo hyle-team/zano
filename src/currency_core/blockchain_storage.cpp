@@ -594,7 +594,7 @@ bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, 
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  CHECK_AND_ASSERT_MES(height < m_db_blocks.size(), false, "prune_ring_signatures called with wrong parameter: " << height << ", m_blocks.size() " << m_db_blocks.size());
+  CHECK_AND_ASSERT_MES(height < m_db_blocks.size(), false, "prune_ring_signatures called with wrong parameter: " << height << ", m_blocks.size() = " << m_db_blocks.size());
   auto vptr = m_db_blocks[height];
   CHECK_AND_ASSERT_MES(vptr.get(), false, "Failed to get block on height");
 
@@ -631,7 +631,7 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
   if (pruning_end_height > m_db_current_pruned_rs_height)
   {
     LOG_PRINT_CYAN("Starting pruning ring signatues and attachments from height " << m_db_current_pruned_rs_height + 1 << " to height " << pruning_end_height
-      << " (" << pruning_end_height - m_db_current_pruned_rs_height << " blocks)", LOG_LEVEL_0);
+      << " (" << pruning_end_height - m_db_current_pruned_rs_height << " blocks), top block height is " << top_block_height, LOG_LEVEL_0);
     uint64_t tx_count = 0, sig_count = 0, attach_count = 0;
     for(uint64_t height = m_db_current_pruned_rs_height + 1; height <= pruning_end_height; height++)
     {
