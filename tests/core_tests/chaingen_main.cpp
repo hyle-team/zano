@@ -743,6 +743,9 @@ int main(int argc, char* argv[])
 
 #undef MARK_TEST_AS_POSTPONED
 
+
+    // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
+
     GENERATE_AND_PLAY(pos_minting_tx_packing);
 
     GENERATE_AND_PLAY(multisig_wallet_test);

@@ -3555,3 +3555,85 @@ bool wallet_watch_only_and_chain_switch::c1(currency::core& c, size_t ev_index, 
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+wallet_spend_form_auditable_and_track::wallet_spend_form_auditable_and_track()
+{
+  REGISTER_CALLBACK_METHOD(wallet_spend_form_auditable_and_track, c1);
+}
+
+bool wallet_spend_form_auditable_and_track::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(true); // Alice has auditable wallet
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX];   bob_acc = alice_acc; bob_acc.make_account_watch_only(); // Bob has Alice's tracking wallet
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(5), blk_0r);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+
+  std::vector<attachment_v> attachments;
+  tx_comment comment_attachment = AUTO_VAL_INIT(comment_attachment);
+  m_comment = "Jokes are funny!";
+  comment_attachment.comment = m_comment;
+  attachments.push_back(comment_attachment);
+  MAKE_TX_ATTACH(events, tx_2, alice_acc, miner_acc, MK_TEST_COINS(1), blk_1r, attachments);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_2);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_spend_form_auditable_and_track::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+
+  // make sure Alice's wallet is autibale and not watch-only
+  CHECK_AND_ASSERT_MES(!alice_wlt->is_watch_only() && alice_wlt->is_auditable(), false, "incorrect type of Alice's wallet");
+  // make sure Bob's wallet is a tracking wallet
+  CHECK_AND_ASSERT_MES(bob_wlt->is_watch_only() && bob_wlt->is_auditable(), false, "incorrect type of Bob's wallet");
+
+  const account_public_address& bob_addr   = bob_wlt->get_account().get_public_address();
+  const account_public_address& alice_addr = alice_wlt->get_account().get_public_address();
+
+  // make sure their addresses are linked indeed
+  CHECK_AND_ASSERT_MES(bob_addr.view_public_key == alice_addr.view_public_key && bob_addr.spend_public_key == alice_addr.spend_public_key, false,
+    "Bob's tracking wallet address is not linked with Alice's one");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
+
+  bob_wlt->refresh();
+
+  // check the balances
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(3), false, UINT64_MAX, 0, 0, 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(3), false, UINT64_MAX, 0, 0, 0, 0), false, "");
+
+  r = false;
+  bool r_comment = false;
+  bob_wlt->enumerate_transfers_history([&](const tools::wallet_public::wallet_transfer_info& wti) {
+    if (wti.amount == MK_TEST_COINS(5))
+    {
+      r_comment = (wti.comment == m_comment);
+      if (!r_comment)
+        return false; // stop
+    }
+    return true; // continue
+  }, true);
+  CHECK_AND_ASSERT_MES(r, false, "cannot get comment from tx");
+  CHECK_AND_ASSERT_MES(r_comment, false, "wrong comment got from tx");
+
+  return true;
+}
