@@ -578,13 +578,13 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
   catch (const std::exception& ex)
   {
     m_db.abort_transaction();
-    LOG_ERROR("UNKNOWN EXCEPTION WHILE ADDINIG NEW BLOCK: " << ex.what());
+    LOG_ERROR("UNKNOWN EXCEPTION WHILE SETTING CHECKPOINTS: " << ex.what());
     return false;
   }
   catch (...)
   {
     m_db.abort_transaction();
-    LOG_ERROR("UNKNOWN EXCEPTION WHILE ADDINIG NEW BLOCK.");
+    LOG_ERROR("UNKNOWN EXCEPTION WHILE SETTING CHECKPOINTS.");
     return false;
   }
   
@@ -594,7 +594,7 @@ bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, 
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  CHECK_AND_ASSERT_MES(height < m_db_blocks.size(), false, "prune_ring_signatures called with wrong parameter: " << height << ", m_blocks.size() " << m_db_blocks.size());
+  CHECK_AND_ASSERT_MES(height < m_db_blocks.size(), false, "prune_ring_signatures called with wrong parameter: " << height << ", m_blocks.size() = " << m_db_blocks.size());
   auto vptr = m_db_blocks[height];
   CHECK_AND_ASSERT_MES(vptr.get(), false, "Failed to get block on height");
 
@@ -626,22 +626,20 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  if (m_db_blocks.size() > 1 && m_checkpoints.get_top_checkpoint_height() && m_checkpoints.get_top_checkpoint_height() > m_db_current_pruned_rs_height)
-  {    
-    uint64_t pruning_last_height = std::min(m_db_blocks.size() - 1, m_checkpoints.get_top_checkpoint_height());
-    if (pruning_last_height > m_db_current_pruned_rs_height)
+  uint64_t top_block_height = get_top_block_height();
+  uint64_t pruning_end_height = m_checkpoints.get_checkpoint_before_height(top_block_height);
+  if (pruning_end_height > m_db_current_pruned_rs_height)
+  {
+    LOG_PRINT_CYAN("Starting pruning ring signatues and attachments from height " << m_db_current_pruned_rs_height + 1 << " to height " << pruning_end_height
+      << " (" << pruning_end_height - m_db_current_pruned_rs_height << " blocks), top block height is " << top_block_height, LOG_LEVEL_0);
+    uint64_t tx_count = 0, sig_count = 0, attach_count = 0;
+    for(uint64_t height = m_db_current_pruned_rs_height + 1; height <= pruning_end_height; height++)
     {
-      LOG_PRINT_CYAN("Starting pruning ring signatues and attachments from height " << m_db_current_pruned_rs_height + 1 << " to height " << pruning_last_height
-        << " (" << pruning_last_height - m_db_current_pruned_rs_height << " blocks)", LOG_LEVEL_0);
-      uint64_t tx_count = 0, sig_count = 0, attach_count = 0;
-      for(uint64_t height = m_db_current_pruned_rs_height + 1; height <= pruning_last_height; height++)
-      {
-        bool res = prune_ring_signatures_and_attachments(height, tx_count, sig_count, attach_count);
-        CHECK_AND_ASSERT_MES(res, false, "failed to prune_ring_signatures_and_attachments for height = " << height);
-      }
-      m_db_current_pruned_rs_height = pruning_last_height;
-      LOG_PRINT_CYAN("Transaction pruning finished: " << sig_count << " signatures and " << attach_count << " attachments released in " << tx_count << " transactions.", LOG_LEVEL_0);
+      bool res = prune_ring_signatures_and_attachments(height, tx_count, sig_count, attach_count);
+      CHECK_AND_ASSERT_MES(res, false, "failed to prune_ring_signatures_and_attachments for height = " << height);
     }
+    m_db_current_pruned_rs_height = pruning_end_height;
+    LOG_PRINT_CYAN("Transaction pruning finished: " << sig_count << " signatures and " << attach_count << " attachments released in " << tx_count << " transactions.", LOG_LEVEL_0);
   }
   return true;
 }
@@ -1036,7 +1034,9 @@ void blockchain_storage::purge_alt_block_txs_hashs(const block& b)
 //------------------------------------------------------------------
 void blockchain_storage::do_erase_altblock(alt_chain_container::iterator it)
 {
-  purge_altblock_keyimages_from_big_heap(it->second.bl, get_block_hash(it->second.bl));
+  crypto::hash id = get_block_hash(it->second.bl);
+  LOG_PRINT_L1("erasing alt block " << print16(id) << " @ " << get_block_height(it->second.bl));
+  purge_altblock_keyimages_from_big_heap(it->second.bl, id);
   purge_alt_block_txs_hashs(it->second.bl);
   m_alternative_chains.erase(it);
 }

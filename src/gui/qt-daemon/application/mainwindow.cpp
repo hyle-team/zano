@@ -548,15 +548,29 @@ void MainWindow::restore_pos(bool consider_showed)
   }
   else
   {
-
-    QPoint pos;
-    QSize sz;
-    pos.setX(m_config.m_window_position.first);
-    pos.setY(m_config.m_window_position.second);
-    sz.setHeight(m_config.m_window_size.first);
-    sz.setWidth(m_config.m_window_size.second);
-    this->move(pos);
-    this->resize(sz);
+    QPoint point = QApplication::desktop()->screenGeometry().bottomRight();
+    if (m_config.m_window_position.first + m_config.m_window_size.second > point.x() ||
+      m_config.m_window_position.second + m_config.m_window_size.first > point.y()
+      )
+    {
+      QSize sz = AUTO_VAL_INIT(sz);
+      sz.setHeight(770);
+      sz.setWidth(1200);
+      this->resize(sz);
+      store_window_pos();
+      //reset position(screen changed or other reason)
+    }
+    else
+    {
+      QPoint pos = AUTO_VAL_INIT(pos);
+      QSize sz = AUTO_VAL_INIT(sz);
+      pos.setX(m_config.m_window_position.first);
+      pos.setY(m_config.m_window_position.second);
+      sz.setHeight(m_config.m_window_size.first);
+      sz.setWidth(m_config.m_window_size.second);
+      this->move(pos);
+      this->resize(sz);
+    }
   }
 
   if (consider_showed)
@@ -645,7 +659,7 @@ bool MainWindow::show_inital()
   {
     m_config = AUTO_VAL_INIT(m_config);
     this->show();
-    QSize sz;
+    QSize sz = AUTO_VAL_INIT(sz);
     sz.setHeight(770);
     sz.setWidth(1200);
     this->resize(sz);

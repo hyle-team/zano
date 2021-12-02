@@ -36,12 +36,17 @@ bool checkpoints_test::set_checkpoint(currency::core& c, size_t ev_index, const 
     {
       if (pcp.hash != null_hash && pcp.hash != get_block_hash(b))
         continue;
-      currency::checkpoints cp;
-      cp.add_checkpoint(currency::get_block_height(b), epee::string_tools::pod_to_hex(currency::get_block_hash(b)));
-      c.set_checkpoints(std::move(cp));
+      m_local_checkpoints.add_checkpoint(pcp.height, epee::string_tools::pod_to_hex(currency::get_block_hash(b)));
+      c.set_checkpoints(currency::checkpoints(m_local_checkpoints));
+      LOG_PRINT_YELLOW("CHECKPOINT set at height " << pcp.height, LOG_LEVEL_0);
+
+      //for(uint64_t h = 0; h <= pcp.height + 1; ++h)
+      //  LOG_PRINT_MAGENTA("%% " << h << " : " << m_local_checkpoints.get_checkpoint_before_height(h), LOG_LEVEL_0);
       return true;
     }
   }
+
+  LOG_ERROR("set_checkpoint failed trying to set checkpoint at height " << pcp.height);
 
   return false;
 }
@@ -395,8 +400,13 @@ bool gen_checkpoints_prun_txs_after_blockchain_load::generate(std::vector<test_e
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
   DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2));
 
-  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_0 goes with blk_1_bad
-  MAKE_TX(events, tx_0, miner_acc, alice, MK_TEST_COINS(1), blk_0r);
+  std::vector<attachment_v> attach;
+  attach.push_back(tx_comment{"jokes are funny"});
+
+  // tx pool won't accept the tx, because it cannot be verified in CP zone
+  // set kept_by_block flag, so tx_0 be accepted
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  MAKE_TX_ATTACH(events, tx_0, miner_acc, alice, MK_TEST_COINS(1), blk_0r, attach);
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
   
@@ -407,11 +417,12 @@ bool gen_checkpoints_prun_txs_after_blockchain_load::generate(std::vector<test_e
 
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
 
-  MAKE_TX(events, tx_1, miner_acc, alice, MK_TEST_COINS(1), blk_3);
+  MAKE_TX_ATTACH(events, tx_1, miner_acc, alice, MK_TEST_COINS(1), blk_3, attach);
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_1);
 
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
 
+  // BCS tx pruning (on interval 0 - CP1) should be triggered once the following checkpoint is set
   DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 6));
 
   MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
@@ -437,8 +448,8 @@ bool gen_checkpoints_prun_txs_after_blockchain_load::check_txs(currency::core& c
 
   r = c.get_transaction(m_tx1_id, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "can't get transaction tx_1");
-  CHECK_AND_ASSERT_MES(tx_1.signatures.empty(), false, "tx_1 has non-empty sig");
-  CHECK_AND_ASSERT_MES(tx_1.attachment.empty(), false, "tx_1 has non-empty attachments");
+  CHECK_AND_ASSERT_MES(!tx_1.signatures.empty(), false, "tx_1 has empty sig");
+  CHECK_AND_ASSERT_MES(!tx_1.attachment.empty(), false, "tx_1 has empty attachments");
 
   return true;
 }
@@ -895,3 +906,64 @@ bool gen_checkpoints_and_invalid_tx_to_pool::c1(currency::core& c, size_t ev_ind
   return true;
 }
 
+//------------------------------------------------------------------------------
+
+gen_checkpoints_set_after_switching_to_altchain::gen_checkpoints_set_after_switching_to_altchain()
+{
+}
+
+bool gen_checkpoints_set_after_switching_to_altchain::generate(std::vector<test_event_entry>& events) const
+{
+  // Test outline:
+  // 0) no checkpoints are set;
+  // 1) core is in a subchain, that will become alternative;
+  // 2) checkpoint is set (in the furute), transaction pruning is executed;
+  // 3) core continues to sync, chain switching occurs
+  // Make sure that chain switching is still possible after pruning.
+
+  //  0 ... N     N+1   N+2   N+3   N+4   N+5   N+6   <- height (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+  //                    tx1
+  // (0 )- (0r)- (1 )- (2a)- (3a)-                    <- alt chain
+  //               \ 
+  //                \- (2 )-                          <- main chain
+
+  bool r = false;
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "check_not_being_in_cp_zone");
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
+  MAKE_TX(events, tx1, miner_acc, alice_acc, MK_TEST_COINS(1), blk_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1, miner_acc, tx1);
+  MAKE_NEXT_BLOCK(events, blk_3a, blk_2a, miner_acc);
+
+  DO_CALLBACK(events, "check_not_being_in_cp_zone");
+
+  //  0 ... N     N+1   N+2   N+3   N+4   N+5   N+6   <- height (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+  //                        +-----------> CP          <- checkpoint
+  //                    tx1 |                          
+  // (0 )- (0r)- (1 )- (2a)- (3a)-                    <- alt chain
+  //               \        |                         <- when CP set up
+  //                \- (2 )- (3 )- (4 )- (5 )- (6 )-  <- main chain
+
+  DO_CALLBACK_PARAMS(events, "set_checkpoint", params_checkpoint(CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5));
+
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc); // <-- this should trigger the switching
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_4), get_block_hash(blk_4)));
+  DO_CALLBACK(events, "check_being_in_cp_zone");
+
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc); // <-- CHECKPOINT
+  MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_6), get_block_hash(blk_6)));
+  DO_CALLBACK(events, "check_not_being_in_cp_zone");
+
+  return true;
+}
