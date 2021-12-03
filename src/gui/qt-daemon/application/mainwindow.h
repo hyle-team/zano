@@ -8,6 +8,7 @@
 #include <QWebChannel>
 
 #include "wallet/view_iface.h"
+#include "serialization/keyvalue_helper_structs.h"
 
 #ifndef Q_MOC_RUN
 #include "wallet/wallets_manager.h"
@@ -60,10 +61,20 @@ public:
 
   struct app_config
   {
-    std::pair<int64_t, int64_t> m_window_position;
-    std::pair<int64_t, int64_t> m_window_size;
+    
+    epee::kvserializable_pair<int64_t, int64_t> m_window_position;
+    epee::kvserializable_pair<int64_t, int64_t> m_window_size;
     bool is_maximazed;
     bool is_showed;
+    bool disable_notifications;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(m_window_position)
+      KV_SERIALIZE(m_window_size)
+      KV_SERIALIZE(is_maximazed)
+      KV_SERIALIZE(is_showed)
+      KV_SERIALIZE(disable_notifications)
+    END_KV_SERIALIZE_MAP()
   };
 
   protected slots:
@@ -150,6 +161,10 @@ public:
   QString get_default_fee();
   QString get_options();  
   void    bool_toggle_icon(const QString& param);
+  
+  bool    get_is_disabled_notifications();
+  bool    set_is_disabled_notifications(const bool& param);
+  QString export_wallet_history(const QString& param);
   QString get_log_file();
   QString check_available_sources(const QString& param);
   QString open_url_in_browser(const QString& param);
@@ -176,6 +191,7 @@ signals:
   void do_dispatch(const QString status, const QString params);  //general function
   void on_core_event(const QString method_name);  //general function
   void set_options(const QString str);  //general function
+  void get_wallet_name();
 
 private:
   //--------------------  i_core_event_handler --------------------
@@ -254,7 +270,7 @@ private:
 
   enum localization_string_indices
   {
-    // order is surprizingly important here! (see also updateLocalisation in AppController.js)
+    // order is surprisingly important here! (see also updateLocalisation in AppController.js)
     localization_id_quit = 0, 
     localization_id_is_received,
     localization_id_is_confirmed, 

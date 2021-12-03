@@ -861,6 +861,8 @@ namespace tools
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
     construct_tx_param get_default_construct_tx_param_inital();
+
+    void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
     
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
@@ -872,7 +874,6 @@ namespace tools
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
-
 private:
 
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
@@ -1005,6 +1006,10 @@ private:
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
+
+    static void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
+    static void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
+    static void wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
 
     currency::account_base m_account;
     bool m_watch_only;

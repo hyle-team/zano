@@ -39,3 +39,87 @@ TEST(checkpoints_test, test_checkpoints_for_alternative)
   r = cp.is_height_passed_zone(11, 12);
   ASSERT_FALSE(r);
 }
+
+
+TEST(checkpoints_test, get_checkpoint_before_height_1)
+{
+  currency::checkpoints cp;
+  cp.add_checkpoint(15, "0000000000000000000000000000000000000000000000000000000000000000");
+
+  for (uint64_t h = 0; h <= 15; ++h)
+    ASSERT_TRUE(cp.get_checkpoint_before_height(h) == 0);
+
+  ASSERT_TRUE(cp.get_checkpoint_before_height(16) == 15);
+
+  for (uint64_t h = 17; h < 100; ++h)
+    ASSERT_TRUE(cp.get_checkpoint_before_height(h) == 15);
+}
+
+
+TEST(checkpoints_test, get_checkpoint_before_height_2)
+{
+  currency::checkpoints cp;
+  cp.add_checkpoint(11, "0000000000000000000000000000000000000000000000000000000000000000");
+  cp.add_checkpoint(15, "0000000000000000000000000000000000000000000000000000000000000000");
+
+  for (uint64_t h = 0; h < 11; ++h)
+    ASSERT_TRUE(cp.get_checkpoint_before_height(h) == 0);
+
+  ASSERT_TRUE(cp.get_checkpoint_before_height(11) == 0);
+
+  ASSERT_TRUE(cp.get_checkpoint_before_height(12) == 11);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(13) == 11);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(14) == 11);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(15) == 11);
+
+  ASSERT_TRUE(cp.get_checkpoint_before_height(16) == 15);
+
+  for (uint64_t h = 17; h < 100; ++h)
+    ASSERT_TRUE(cp.get_checkpoint_before_height(h) == 15);
+}
+
+
+TEST(checkpoints_test, get_checkpoint_before_height_3)
+{
+  currency::checkpoints cp;
+  cp.add_checkpoint(11, "0000000000000000000000000000000000000000000000000000000000000000");
+  cp.add_checkpoint(15, "0000000000000000000000000000000000000000000000000000000000000000");
+  cp.add_checkpoint(21, "0000000000000000000000000000000000000000000000000000000000000000");
+
+  for (uint64_t h = 0; h < 11; ++h)
+    ASSERT_TRUE(cp.get_checkpoint_before_height(h) == 0);
+
+  ASSERT_TRUE(cp.get_checkpoint_before_height(11) == 0);
+
+  ASSERT_TRUE(cp.get_checkpoint_before_height(12) == 11);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(13) == 11);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(14) == 11);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(15) == 11);
+
+  ASSERT_TRUE(cp.get_checkpoint_before_height(16) == 15);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(17) == 15);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(18) == 15);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(19) == 15);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(20) == 15);
+  ASSERT_TRUE(cp.get_checkpoint_before_height(21) == 15);
+
+  ASSERT_TRUE(cp.get_checkpoint_before_height(22) == 21);
+
+  for (uint64_t h = 22; h < 100; ++h)
+    ASSERT_TRUE(cp.get_checkpoint_before_height(h) == 21);
+}
+
+
+TEST(checkpoints_test, is_in_checkpoint_zone)
+{
+  currency::checkpoints cp;
+  cp.add_checkpoint(11, "0000000000000000000000000000000000000000000000000000000000000000");
+  cp.add_checkpoint(15, "0000000000000000000000000000000000000000000000000000000000000000");
+  cp.add_checkpoint(21, "0000000000000000000000000000000000000000000000000000000000000000");
+
+  for (uint64_t h = 0; h < 22; ++h)
+    ASSERT_TRUE(cp.is_in_checkpoint_zone(h));
+
+  for (uint64_t h = 22; h < 100; ++h)
+    ASSERT_FALSE(cp.is_in_checkpoint_zone(h));
+}

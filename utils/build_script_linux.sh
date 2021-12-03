@@ -46,24 +46,17 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-make -j1 daemon Zano;
+make -j2 daemon simplewallet connectivity_tool
 if [ $? -ne 0 ]; then
     echo "Failed to make!"
     exit 1
 fi
 
-make -j1 simplewallet;
+make -j1 Zano
 if [ $? -ne 0 ]; then
     echo "Failed to make!"
     exit 1
 fi
-
-make -j1 connectivity_tool;
-if [ $? -ne 0 ]; then
-    echo "Failed to make!"
-    exit 1
-fi
-
 
 
 read version_str <<< $(./src/zanod --version | awk '/^Zano/ { print $2 }')

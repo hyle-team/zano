@@ -81,7 +81,8 @@ namespace nodetool
                                                         m_last_stat_request_time{},
                                                         m_use_only_priority_peers(false),
                                                         m_peer_livetime{},
-                                                        m_debug_requests_enabled(false)
+                                                        m_debug_requests_enabled(false),
+                                                        m_ip_auto_blocking_enabled(false)
     {}
 
     static void init_options(boost::program_options::options_description& desc);
@@ -215,6 +216,8 @@ namespace nodetool
     bool urgent_alert_worker();
     bool critical_alert_worker();
     bool remove_dead_connections();
+    bool is_ip_good_for_adding_to_peerlist(uint32_t adress);
+    bool is_ip_in_blacklist(uint32_t adress);
 
 
     //debug functions
@@ -245,6 +248,7 @@ namespace nodetool
     bool m_hide_my_port;
     bool m_offline_mode;
     bool m_debug_requests_enabled;
+    bool m_ip_auto_blocking_enabled;
     uint64_t m_startup_time;
 
 

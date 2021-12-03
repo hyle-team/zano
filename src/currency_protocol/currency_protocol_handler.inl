@@ -914,7 +914,8 @@ namespace currency
       LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_CHAIN_ENTRY, with \r\nm_total_height=" << arg.total_height
                                                                          << "\r\nm_start_height=" << arg.start_height
                                                                          << "\r\nm_block_ids.size()=" << arg.m_block_ids.size());
-      //m_p2p->drop_connection(context);
+      m_p2p->drop_connection(context);
+      m_p2p->add_ip_fail(context.m_remote_ip);
     }
 
     BOOST_FOREACH(auto& bl_details, arg.m_block_ids)

@@ -387,9 +387,9 @@ void MainWindow::changeEvent(QEvent *e)
 bool MainWindow::store_app_config()
 {
   TRY_ENTRY();
-  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG;
-  LOG_PRINT_L0("storing gui internal config from " << conf_path);
-  CHECK_AND_ASSERT_MES(tools::serialize_obj_to_file(m_config, conf_path), false, "failed to store gui internal config");
+  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG2;
+  LOG_PRINT_L0("storing gui internal config to " << conf_path);
+  CHECK_AND_ASSERT_MES(epee::serialization::store_t_to_json_file(m_config, conf_path), false, "failed to store gui internal config");
   return true;
   CATCH_ENTRY2(false);
 }
@@ -397,9 +397,9 @@ bool MainWindow::store_app_config()
 bool MainWindow::load_app_config()
 {
   TRY_ENTRY();
-  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG;
+  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG2;
   LOG_PRINT_L0("loading gui internal config from " << conf_path);
-  bool r = tools::unserialize_obj_from_file(m_config, conf_path);
+  bool r = epee::serialization::load_t_from_json_file(m_config, conf_path);
   LOG_PRINT_L0("gui internal config " << (r ? "loaded ok" : "was not loaded"));
   return r;
   CATCH_ENTRY2(false);
@@ -548,15 +548,29 @@ void MainWindow::restore_pos(bool consider_showed)
   }
   else
   {
-
-    QPoint pos;
-    QSize sz;
-    pos.setX(m_config.m_window_position.first);
-    pos.setY(m_config.m_window_position.second);
-    sz.setHeight(m_config.m_window_size.first);
-    sz.setWidth(m_config.m_window_size.second);
-    this->move(pos);
-    this->resize(sz);
+    QPoint point = QApplication::desktop()->screenGeometry().bottomRight();
+    if (m_config.m_window_position.first + m_config.m_window_size.second > point.x() ||
+      m_config.m_window_position.second + m_config.m_window_size.first > point.y()
+      )
+    {
+      QSize sz = AUTO_VAL_INIT(sz);
+      sz.setHeight(770);
+      sz.setWidth(1200);
+      this->resize(sz);
+      store_window_pos();
+      //reset position(screen changed or other reason)
+    }
+    else
+    {
+      QPoint pos = AUTO_VAL_INIT(pos);
+      QSize sz = AUTO_VAL_INIT(sz);
+      pos.setX(m_config.m_window_position.first);
+      pos.setY(m_config.m_window_position.second);
+      sz.setHeight(m_config.m_window_size.first);
+      sz.setWidth(m_config.m_window_size.second);
+      this->move(pos);
+      this->resize(sz);
+    }
   }
 
   if (consider_showed)
@@ -643,14 +657,16 @@ bool MainWindow::show_inital()
     restore_pos(true);
   else
   {
+    m_config = AUTO_VAL_INIT(m_config);
     this->show();
-    QSize sz;
+    QSize sz = AUTO_VAL_INIT(sz);
     sz.setHeight(770);
     sz.setWidth(1200);
     this->resize(sz);
     store_window_pos();
     m_config.is_maximazed = false;
     m_config.is_showed = true;
+    m_config.disable_notifications = false;
   }
   return true;
   CATCH_ENTRY2(false);
@@ -727,14 +743,26 @@ void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, c
 bool MainWindow::init_backend(int argc, char* argv[])
 {
   TRY_ENTRY();
-  if (!m_backend.init_command_line(argc, argv))
+  std::string command_line_fail_details;
+  if (!m_backend.init_command_line(argc, argv, command_line_fail_details))
+  {
+    this->show_msg_box(command_line_fail_details);
     return false;
+  }
 
   if (!init_window())
+  {
+    this->show_msg_box("Failed to main screen launch, check logs for the more detais.");
     return false;
+  }
 
   if (!m_backend.init(this))
+  {
+    this->show_msg_box("Failed to initialize backend, check debug logs for more details.");
     return false;
+  }
+
+
 
   if (m_backend.is_qt_logs_enabled())
   {
@@ -811,8 +839,25 @@ bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, l
   CATCH_ENTRY2(false);
 }
 
-
-
+bool MainWindow::get_is_disabled_notifications()
+{
+  return m_config.disable_notifications;
+}
+bool MainWindow::set_is_disabled_notifications(const bool& param)
+{
+  m_config.disable_notifications = param;
+  return m_config.disable_notifications;
+}
+QString   MainWindow::export_wallet_history(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::export_wallet_info, ewi);
+  PREPARE_RESPONSE(view::api_response, ar);
+  ar.error_code = m_backend.export_wallet_history(ewi);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
+}
 bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
 {
   TRY_ENTRY();
@@ -834,6 +879,10 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
   LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer]" << std::endl << json_str);
   //this->money_transfer(json_str.c_str());
   QMetaObject::invokeMethod(this, "money_transfer", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  if (m_config.disable_notifications)
+    return true;
+
+
   if (!m_tray_icon)
     return true;
   if (!tei.ti.is_income)
@@ -852,7 +901,7 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
     return true;
   }
 
-  auto amount_str = currency::print_money(tei.ti.amount);
+  auto amount_str = currency::print_money_brief(tei.ti.amount);
   std::string title, msg;
   if (tei.ti.height == 0) // unconfirmed trx
   {
@@ -869,6 +918,7 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
   else if (tei.ti.unlock_time)
     msg += m_localization[localization_id_locked];
 
+  
   show_notification(title, msg);
 
   return true;

@@ -57,7 +57,7 @@ bool clean_data_directory()
 {
   std::string config_folder = command_line::get_arg(g_vm, command_line::arg_data_dir);
 
-  static const std::set<std::string> files = { CURRENCY_POOLDATA_FOLDERNAME_OLD, CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD, P2P_NET_DATA_FILENAME, MINER_CONFIG_FILENAME, GUI_SECURE_CONFIG_FILENAME, GUI_CONFIG_FILENAME, GUI_INTERNAL_CONFIG };
+  static const std::set<std::string> files = { CURRENCY_POOLDATA_FOLDERNAME_OLD, CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD, P2P_NET_DATA_FILENAME, MINER_CONFIG_FILENAME, GUI_SECURE_CONFIG_FILENAME, GUI_CONFIG_FILENAME, GUI_INTERNAL_CONFIG2 };
   static const std::set<std::string> prefixes = { CURRENCY_POOLDATA_FOLDERNAME_PREFIX, CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX };
 
   std::vector<boost::filesystem::path> entries_to_remove;
@@ -743,6 +743,9 @@ int main(int argc, char* argv[])
 
 #undef MARK_TEST_AS_POSTPONED
 
+
+    // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
+
     GENERATE_AND_PLAY(pos_minting_tx_packing);
 
     GENERATE_AND_PLAY(multisig_wallet_test);
@@ -814,6 +817,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_checkpoints_reorganize);
     GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
     GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
+    GENERATE_AND_PLAY(gen_checkpoints_set_after_switching_to_altchain);
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase);
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 
@@ -867,6 +871,7 @@ int main(int argc, char* argv[])
 
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
     GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
+    GENERATE_AND_PLAY(wallet_rpc_transfer);
     GENERATE_AND_PLAY(wallet_chain_switch_with_spending_the_same_ki);
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
 

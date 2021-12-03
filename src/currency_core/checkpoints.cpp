@@ -36,11 +36,11 @@ namespace currency
     if(height > blockchain_last_block_height)
       return false;
 
-    auto it = m_points.lower_bound(height);
+    auto it = m_points.lower_bound(height);   // if found, it->first >= height
     if(it == m_points.end())
       return false;
     if(it->first <= blockchain_last_block_height)
-      return true;
+      return true; // this is the case only if height <= it->first <= blockchain_last_block_height
     else 
       return false;
   }
@@ -67,5 +67,28 @@ namespace currency
       LOG_ERROR("CHECKPOINT FAILED FOR HEIGHT " << height << ". EXPECTED HASH: " << it->second << ", FETCHED HASH: " << h);
       return false;
     }
+  }
+  //---------------------------------------------------------------------------
+  uint64_t checkpoints::get_checkpoint_before_height(uint64_t height) const
+  {
+    // returns height of the leftmost CP with height that is LESS than the given height
+    // ex:
+    // If there are two CP at 11 and 15:
+    // get_checkpoint_before_height(10) = 0
+    // get_checkpoint_before_height(11) = 0
+    // get_checkpoint_before_height(12) = 11
+    // get_checkpoint_before_height(13) = 11
+    // get_checkpoint_before_height(14) = 11
+    // get_checkpoint_before_height(15) = 11
+    // get_checkpoint_before_height(16) = 15
+
+    uint64_t top_cp = get_top_checkpoint_height();
+    if (height > top_cp)
+      return top_cp;
+
+    auto it = m_points.lower_bound(height);                // if found, it->first >= height
+    if (it == m_points.end() || it == m_points.begin())
+      return 0;
+    return (--it)->first;
   }
 }

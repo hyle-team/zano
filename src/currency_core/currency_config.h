@@ -211,7 +211,7 @@
 #define MINER_CONFIG_FILENAME                           "miner_conf.json"
 #define GUI_SECURE_CONFIG_FILENAME                      "gui_secure_conf.bin"
 #define GUI_CONFIG_FILENAME                             "gui_settings.json"
-#define GUI_INTERNAL_CONFIG                             "gui_internal_config.bin"
+#define GUI_INTERNAL_CONFIG2                            "gui_internal_config.json"
 
 
 
