@@ -959,33 +959,85 @@ TEST(crypto, hp)
 
 TEST(crypto, cn_fast_hash_perf)
 {
-  return true;
-  crypto::hash h = { 3, 14, 15, 9, 26 };
+  //return true;
+  const crypto::hash h_initial = *(crypto::hash*)(&scalar_t::random());
 
-  size_t n = 100000;
+  std::vector<std::vector<uint8_t>> test_data;
+  test_data.push_back(std::vector<uint8_t>(32, 0));
+  test_data.push_back(std::vector<uint8_t>(63, 0));
+  test_data.push_back(std::vector<uint8_t>(127, 0));
+  test_data.push_back(std::vector<uint8_t>(135, 0));
+  test_data.push_back(std::vector<uint8_t>(255, 0));
+  test_data.push_back(std::vector<uint8_t>(271, 0)); // 271 = 136 * 2 - 1
+  test_data.push_back(std::vector<uint8_t>(2030, 0));
+
+  for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    crypto::generate_random_bytes(test_data[j].size(), test_data[j].data());
+
+  struct times_t
+  {
+    uint64_t t_old{ 0 }, t_new{ 0 };
+    crypto::hash h_old{};
+    double diff{ 0 };
+  };
+  std::vector<times_t> results(test_data.size());
+
+  size_t n = 50000;
   double diff_sum = 0;
 
-  for (size_t j = 0; j < 20; ++j)
+  for (size_t k = 0; k < 50; ++k)
   {
-    TIME_MEASURE_START(t_old);
-    for (size_t i = 0; i < n; ++i)
-      cn_fast_hash_old(&h, sizeof h, (char*)&h);
-    TIME_MEASURE_FINISH(t_old);
+    for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    {
+      crypto::hash h = h_initial;
+      TIME_MEASURE_START(t_old);
+      for (size_t i = 0; i < n; ++i)
+      {
+        *(crypto::hash*)(test_data[j].data()) = h;
+        cn_fast_hash_old(test_data[j].data(), test_data[j].size(), (char*)&h);
+      }
+      TIME_MEASURE_FINISH(t_old);
+      results[j].t_old = t_old;
+      results[j].h_old = h;
+    }
 
-    TIME_MEASURE_START(t);
-    for (size_t i = 0; i < n; ++i)
-      cn_fast_hash(&h, sizeof h, (char*)&h);
-    TIME_MEASURE_FINISH(t);
+    for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    {
+      crypto::hash h = h_initial;
+      TIME_MEASURE_START(t_new);
+      for (size_t i = 0; i < n; ++i)
+      {
+        *(crypto::hash*)(test_data[j].data()) = h;
+        cn_fast_hash(test_data[j].data(), test_data[j].size(), (char*)&h);
+      }
+      TIME_MEASURE_FINISH(t_new);
+      results[j].t_new = t_new;
+      ASSERT_EQ(h, results[j].h_old);
+    }
 
-    double diff = ((int64_t)t_old - (int64_t)t) / (double)n;
+    std::stringstream ss;
+    double diff_round = 0;
+    for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    {
+      double diff = ((int64_t)results[j].t_old - (int64_t)results[j].t_new) / (double)n;
 
-    LOG_PRINT_L0("cn_fast_hash (old/new): " << std::fixed << std::setprecision(3) << t_old / (double)n << "   " <<
-      std::fixed << std::setprecision(3) << t * 1.0 / n << " mcs   diff => " << std::fixed << std::setprecision(4) << diff);
+      ss << std::fixed << std::setprecision(3) << results[j].t_old / (double)n << "/" <<
+        std::fixed << std::setprecision(3) << results[j].t_new / (double)n << "  ";
 
-    diff_sum += diff;
+      results[j].diff += diff;
+      diff_round += diff;
+    }
+
+    diff_sum += diff_round;
+
+    LOG_PRINT_L0("cn_fast_hash (old/new) [" << std::setw(2) << k << "]: " << ss.str() << " mcs, diff_round = " << std::fixed << std::setprecision(4) << diff_round <<
+     " diff_sum = " << std::fixed << std::setprecision(4) << diff_sum);
   }
 
-  std::cout << h << "  diff sum: " << diff_sum << std::endl;
+  std::stringstream ss;
+  for (size_t j = 0, sz = results.size(); j < sz; ++j)
+    ss << std::fixed << std::setprecision(4) << results[j].diff << "       ";
+  LOG_PRINT_L0("                             " << ss.str());
 
   return true;
 }
