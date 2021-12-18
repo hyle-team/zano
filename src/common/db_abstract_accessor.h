@@ -600,6 +600,8 @@ namespace tools
         bdb.get_backend()->enumerate(m_h, &local_enum_handler);
       }
 
+      // callback format: bool cb(uint64_t index, const key_t& key, const value_t& value)
+      // cb should return true to continue, false -- to stop enumeration 
       template<class t_cb>
       void enumerate_items(t_cb cb)const 
       {
