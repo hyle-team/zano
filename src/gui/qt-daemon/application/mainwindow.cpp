@@ -740,6 +740,69 @@ void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, c
     }
 }
 
+ 
+
+bool MainWindow::init_ipc_server()
+{
+
+#define GUI_IPC_BUFFER_SIZE  4000
+  try {
+    //Create a message queue.
+    std::shared_ptr<boost::interprocess::message_queue*> pmq = new boost::interprocess::message_queue(create_only //only create
+      , GUI_IPC_MESSAGE_CHANNEL_NAME           //name
+      , 100                                    //max message number
+      , GUI_IPC_BUFFER_SIZE                                   //max message size
+    );
+
+    m_ipc_worker = std::thread([this, pmq]()
+    {
+      //m_ipc_worker;
+      try
+      {
+        unsigned int priority = 0;
+        boost::interprocess::message_queue::size_type recvd_size = 0;
+
+        while (m_gui_deinitialize_done_1 == false)
+        {
+          std::string buff(GUI_IPC_BUFFER_SIZE, ' ');
+          bool data_received = pmq->timed_receive(buff.data(), GUI_IPC_BUFFER_SIZE, recvd_size, priority, boost::posix_time::ptime(microsec_clock::universal_time()) + boost::posix_time::milliseconds(300));
+          if (data_received && recvd_size != 0)
+          {
+            //todo process token
+          }
+        }
+        message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+      }
+      catch (const std::exception& ex)
+      {
+        boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+        LOG_ERROR("Failed to receive IPC que: " << ex.what());
+      }
+
+      catch (...)
+      {
+        boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+        LOG_ERROR("Failed to receive IPC que: unknown exception");
+      }
+    });
+  }
+  catch(const std::exception& ex)
+  {
+    boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+    LOG_ERROR("Failed to initialize IPC que: " << ex.what());
+    return false;
+  }
+
+  catch (...)
+  {
+    boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+    LOG_ERROR("Failed to initialize IPC que: unknown exception");
+    return false;
+  }
+  return true;
+}
+
+
 bool MainWindow::init_backend(int argc, char* argv[])
 {
   TRY_ENTRY();

@@ -6,9 +6,11 @@
 
 #include <QtWidgets>
 #include <QWebChannel>
+#include <boost/interprocess/ipc/message_queue.hpp>
 
 #include "wallet/view_iface.h"
 #include "serialization/keyvalue_helper_structs.h"
+
 
 #ifndef Q_MOC_RUN
 #include "wallet/wallets_manager.h"

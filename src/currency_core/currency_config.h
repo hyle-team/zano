@@ -212,6 +212,7 @@
 #define GUI_SECURE_CONFIG_FILENAME                      "gui_secure_conf.bin"
 #define GUI_CONFIG_FILENAME                             "gui_settings.json"
 #define GUI_INTERNAL_CONFIG2                            "gui_internal_config.json"
+#define GUI_IPC_MESSAGE_CHANNEL_NAME                    CURRENCY_NAME_BASE "_message_que"
 
 
 
