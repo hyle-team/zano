@@ -839,7 +839,10 @@ namespace currency
     {
       // treat as error getting ntp time
       if (m_disable_ntp)
+      {
+        LOG_PRINT_RED("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ") while NTP is disabled", LOG_LEVEL_0);
         return false;
+      }
       int64_t ntp_time = tools::get_ntp_time();
       LOG_PRINT_L2("NTP: received time " << ntp_time << " (" << epee::misc_utils::get_time_str_v2(ntp_time) << "), diff: " << std::showpos << get_core_time() - ntp_time);
       if (ntp_time == 0)
