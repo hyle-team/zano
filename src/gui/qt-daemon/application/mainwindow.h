@@ -60,6 +60,7 @@ public:
   bool init_backend(int argc, char* argv[]);
   bool show_inital();
   void show_notification(const std::string& title, const std::string& message);
+  bool handle_ipc_event(const std::string& arguments);
 
   struct app_config
   {
@@ -194,6 +195,7 @@ signals:
   void on_core_event(const QString method_name);  //general function
   void set_options(const QString str);  //general function
   void get_wallet_name();
+  void handle_deeplink_click(const QString str);
 
 private:
   //--------------------  i_core_event_handler --------------------
@@ -236,6 +238,8 @@ private:
   bool store_app_config();
   bool load_app_config();
   bool init_window();
+  bool init_ipc_server();
+  
 
   std::string get_wallet_log_prefix(size_t wallet_id) const { return m_backend.get_wallet_log_prefix(wallet_id); }
 
@@ -258,6 +262,7 @@ private:
   app_config m_config;
 
   epee::locked_object<std::map<uint64_t, uint64_t>> m_wallet_states;
+  std::thread m_ipc_worker;
   struct events_que_struct
   {
     std::list<currency::core_event> m_que;

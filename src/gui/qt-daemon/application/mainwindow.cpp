@@ -121,6 +121,10 @@ MainWindow::~MainWindow()
     delete m_channel;
     m_channel = nullptr;
   }
+  if (m_ipc_worker.joinable())
+  {
+    m_ipc_worker.join();
+  }
 }
 
 void MainWindow::on_load_finished(bool ok)
@@ -745,14 +749,14 @@ void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, c
 bool MainWindow::init_ipc_server()
 {
 
-#define GUI_IPC_BUFFER_SIZE  4000
+#define GUI_IPC_BUFFER_SIZE  10000
   try {
     //Create a message queue.
-    std::shared_ptr<boost::interprocess::message_queue*> pmq = new boost::interprocess::message_queue(create_only //only create
+    std::shared_ptr<boost::interprocess::message_queue> pmq(new boost::interprocess::message_queue(boost::interprocess::create_only //only create
       , GUI_IPC_MESSAGE_CHANNEL_NAME           //name
       , 100                                    //max message number
-      , GUI_IPC_BUFFER_SIZE                                   //max message size
-    );
+      , GUI_IPC_BUFFER_SIZE                    //max message size
+    ));
 
     m_ipc_worker = std::thread([this, pmq]()
     {
@@ -765,13 +769,14 @@ bool MainWindow::init_ipc_server()
         while (m_gui_deinitialize_done_1 == false)
         {
           std::string buff(GUI_IPC_BUFFER_SIZE, ' ');
-          bool data_received = pmq->timed_receive(buff.data(), GUI_IPC_BUFFER_SIZE, recvd_size, priority, boost::posix_time::ptime(microsec_clock::universal_time()) + boost::posix_time::milliseconds(300));
+          bool data_received = pmq->timed_receive((void*)buff.data(), GUI_IPC_BUFFER_SIZE, recvd_size, priority, boost::posix_time::ptime(boost::posix_time::microsec_clock::universal_time()) + boost::posix_time::milliseconds(1000));
           if (data_received && recvd_size != 0)
           {
-            //todo process token
+            handle_ipc_event(buff);//todo process token
           }
-        }
-        message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+        }        
+        boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+        LOG_PRINT_L0("IPC Handling thread finished");
       }
       catch (const std::exception& ex)
       {
@@ -803,6 +808,32 @@ bool MainWindow::init_ipc_server()
 }
 
 
+bool MainWindow::handle_ipc_event(const std::string& arguments)
+{
+  std::string zzz = "Received IPC: " + arguments;
+  message_box(zzz.c_str());
+
+  handle_deeplink_click(arguments.c_str());
+
+  return true;
+}
+
+bool MainWindow::handle_deeplink_params_in_commandline()
+{
+  std::string deep_link_params = command_line::get_arg(m_backend.get_arguments(), command_line::arg_deeplink);
+
+  try {
+    boost::interprocess::message_queue mq(boost::interprocess::open_only, GUI_IPC_MESSAGE_CHANNEL_NAME);
+    mq.send(deep_link_params.data(), deep_link_params.size(), 0);
+    return false;
+  }
+  catch (...)
+  {
+    //ui not launched yet
+    return true;
+  }
+}
+
 bool MainWindow::init_backend(int argc, char* argv[])
 {
   TRY_ENTRY();
@@ -811,6 +842,12 @@ bool MainWindow::init_backend(int argc, char* argv[])
   {
     this->show_msg_box(command_line_fail_details);
     return false;
+  }
+
+  if (command_line::has_arg(m_backend.get_arguments(), command_line::arg_deeplink))
+  {
+    if (!handle_deeplink_params_in_commandline())
+      return false;
   }
 
   if (!init_window())
@@ -831,6 +868,12 @@ bool MainWindow::init_backend(int argc, char* argv[])
   {
     qInstallMessageHandler(qt_log_message_handler);
     QLoggingCategory::setFilterRules("*=true"); // enable all logs
+  }
+
+  if (!init_ipc_server())
+  {
+    this->show_msg_box("Failed to initialize IP server, check debug logs for more details.");
+    return false;
   }
 
   return true;

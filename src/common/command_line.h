@@ -224,4 +224,5 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_force_predownload;
   extern const arg_descriptor<bool>        arg_validate_predownload;
   extern const arg_descriptor<std::string> arg_predownload_link;
+  extern const arg_descriptor<std::string> arg_deeplink;
 }
