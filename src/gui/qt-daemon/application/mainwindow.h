@@ -224,7 +224,7 @@ private:
   void contextMenuEvent(QContextMenuEvent * event);
   void changeEvent(QEvent *e);
   void on_maximized();
-
+  bool handle_deeplink_params_in_commandline();
   //void setOrientation(Qt::ScreenOrientation orientation);
   
   

@@ -836,6 +836,13 @@ bool MainWindow::handle_deeplink_params_in_commandline()
 
 bool MainWindow::init_backend(int argc, char* argv[])
 {
+  if (argc > 1)
+  {
+    std::string msg = "Command_line 1: ";
+    msg += argv[1];
+    message_box(msg.c_str());
+  }
+
   TRY_ENTRY();
   std::string command_line_fail_details;
   if (!m_backend.init_command_line(argc, argv, command_line_fail_details))
@@ -872,7 +879,7 @@ bool MainWindow::init_backend(int argc, char* argv[])
 
   if (!init_ipc_server())
   {
-    this->show_msg_box("Failed to initialize IP server, check debug logs for more details.");
+    this->show_msg_box("Failed to initialize IPC server, check debug logs for more details.");
     return false;
   }
 

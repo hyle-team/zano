@@ -990,6 +990,11 @@ bool wallets_manager::get_opened_wallets(std::list<view::open_wallet_response>& 
   return true;
 }
 
+const po::variables_map& wallets_manager::get_arguments()
+{
+  return m_vm;
+}
+
 std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist, bool exclude_mining_txs)
 {
   GET_WALLET_BY_ID(wallet_id, w);
