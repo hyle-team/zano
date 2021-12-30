@@ -117,6 +117,7 @@ namespace currency
     int64_t m_last_median2local_time_difference;
     int64_t m_last_ntp2local_time_difference;
     uint32_t m_debug_ip_address;
+    bool m_disable_ntp;
 
     template<class t_parametr>
     bool post_notify(typename t_parametr::request& arg, currency_connection_context& context)
