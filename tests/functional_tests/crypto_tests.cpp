@@ -1740,6 +1740,69 @@ TEST(crypto, torsion_elements)
   return true;
 }
 
+TEST(crypto, point_is_zero)
+{
+  static const fe fancy_p         = { -19, 33554432, -1, 33554432, -1, 33554432, -1, 33554432, -1, 33554432 }; // 2**255 - 19
+  static const fe fancy_p_plus_1  = { -18, 33554432, -1, 33554432, -1, 33554432, -1, 33554432, -1, 33554432 }; // 2**255 - 18
+  static const fe f_one = { 1 };
+
+  ASSERT_TRUE(fe_isnonzero(fancy_p) == 0);
+  ASSERT_TRUE(fe_isnonzero(fancy_p_plus_1) != 0);
+
+  fe f_r, f_x;
+  fe_frombytes(f_x, scalar_t::random().data());
+  fe_mul(f_r, f_x, fancy_p);
+  ASSERT_TRUE(fe_isnonzero(f_r) == 0);
+  
+  fe_sub(f_r, fancy_p_plus_1, f_one);
+  ASSERT_TRUE(fe_isnonzero(f_r) == 0);
+
+  // is_zero
+
+  point_t p;
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.X, fancy_p, sizeof p.m_p3.X); // X = 2**255-19
+  memcpy(&p.m_p3.Y, fancy_p_plus_1, sizeof p.m_p3.Y); // Y = 2**255-19+1
+  p.m_p3.Z[0] = 1;
+  // {P, P+1, 1, 0} == {0, 1} (the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.X, fancy_p, sizeof p.m_p3.X); // X = 2**255-19
+  memcpy(&p.m_p3.Y, fancy_p_plus_1, sizeof p.m_p3.Y); // Y = 2**255-19+1
+  p.m_p3.Z[0] = -1;
+  // {P, P+1, -1, 0} == {0, -1} (not an identity point, torsion element order 2)
+
+  ASSERT_FALSE(p.is_zero());
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  p.m_p3.Y[0] = 2;
+  p.m_p3.Z[0] = 2;
+  // {0, 2, 2, 0} == {0, 1} (the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+  // all fe 10 components must be in [-33554432, 33554432]  (curve25519-20060209.pdf page 9)
+  //        2**0      2**26     2**51   2**77    2**102   2**128     2**153    2**179   2**204    2*230 
+  fe a0 = { 7172245,  16777211, 922265, 8160646, 9625798, -12989394, 10843498, 6987154, 15156548, -5214544 };
+  fe a1 = { 7172245, -16777221, 922266, 8160646, 9625798, -12989394, 10843498, 6987154, 15156548, -5214544 };
+  // note, a0 == a1:
+  //  16777211 * 2**26  + 922265 * 2**51 = 2076757281067996545024
+  // -16777221 * 2**26  + 922266 * 2**51 = 2076757281067996545024
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.Y, &a0, sizeof a0);
+  memcpy(&p.m_p3.Z, &a1, sizeof a1);
+  // {0, x, x, 0} == {0, 1, 1, 0} == {0, 1} (the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+  return true;
+}
+
+
 //
 // test's runner
 //

@@ -246,7 +246,7 @@ namespace crypto
       return result;
     }
 
-    // genrate 0 <= x < L
+    // generate 0 <= x < L
     void make_random()
     {
       unsigned char tmp[64];
