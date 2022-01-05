@@ -63,7 +63,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_pack_file          = {"pack-file", "perform gzip-packing and calculate hash for a given file", "", true };
   const command_line::arg_descriptor<std::string> arg_unpack_file        = {"unpack-file", "Perform gzip-unpacking and calculate hash for a given file", "", true };
   const command_line::arg_descriptor<std::string> arg_target_file        = {"target-file", "Specify target file for pack-file and unpack-file commands", "", true };
-  const command_line::arg_descriptor<std::string> arg_send_ipc           = {"send-ipc", "Send IPC request to UI", "", true };
+  //const command_line::arg_descriptor<std::string> arg_send_ipc           = {"send-ipc", "Send IPC request to UI", "", true };
 }
 
 typedef COMMAND_REQUEST_STAT_INFO_T<t_currency_protocol_handler<core>::stat_info> COMMAND_REQUEST_STAT_INFO;
@@ -1293,7 +1293,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_pack_file);
   command_line::add_arg(desc_params, arg_unpack_file);
   command_line::add_arg(desc_params, arg_target_file);
-  command_line::add_arg(desc_params, arg_send_ipc);
+  //command_line::add_arg(desc_params, arg_send_ipc);
   
 
   po::options_description desc_all;
@@ -1371,10 +1371,10 @@ int main(int argc, char* argv[])
   {
     return handle_pack_file(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
-  else if (command_line::has_arg(vm, arg_send_ipc))
+  /*else if (command_line::has_arg(vm, arg_send_ipc))
   {
     handle_send_ipc(command_line::get_arg(vm, arg_send_ipc)) ? EXIT_SUCCESS : EXIT_FAILURE;
-  }
+  }*/
   else
   {
     std::cerr << "Not enough arguments." << ENDL;
