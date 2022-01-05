@@ -7,9 +7,10 @@ bool URLEventFilter::eventFilter(QObject *obj, QEvent *event)
           QFileOpenEvent *fileEvent = static_cast<QFileOpenEvent*>(event);
           if(!fileEvent->url().isEmpty())
           {
-            QMessageBox msg;
-            msg.setText(fileEvent->url().toString());
-            msg.exec();
+            m_pmainwindow->handle_deeplink_click(fileEvent->url());
+            //QMessageBox msg;
+            //msg.setText(fileEvent->url().toString());
+            //msg.exec();
           }
       } else {
           // standard event processing

@@ -66,17 +66,17 @@ int main(int argc, char *argv[])
 
 
   QApplication app(argc, argv);
-    
-#ifdef Q_OS_DARWIN
-  URLEventFilter url_event_filter;
-  app.installEventFilter(&url_event_filter);
-#endif
 
   MainWindow viewer;
   if (!viewer.init_backend(argc, argv))
   {
     return 1;
   }
+
+#ifdef Q_OS_DARWIN
+  URLEventFilter url_event_filter(&viewer);
+  app.installEventFilter(&url_event_filter);
+#endif
 
   app.installNativeEventFilter(&viewer);
   viewer.setWindowTitle(CURRENCY_NAME_BASE);
