@@ -12,7 +12,7 @@
 
 using namespace epee;
 #include <boost/program_options.hpp>
-#include <boost/interprocess/ipc/message_queue.hpp>
+//#include <boost/interprocess/ipc/message_queue.hpp>
 #include "p2p/p2p_protocol_defs.h"
 #include "common/command_line.h"
 #include "currency_core/currency_core.h"
@@ -1167,7 +1167,7 @@ bool process_archive(archive_processor_t& arch_processor, bool is_packing, std::
   return true;
 }
 
-
+/*
 bool handle_send_ipc(const std::string& parms)
 {
   try{
@@ -1193,6 +1193,7 @@ bool handle_send_ipc(const std::string& parms)
   }
   return false;
 }
+*/
 
 bool handle_pack_file(po::variables_map& vm)
 {
