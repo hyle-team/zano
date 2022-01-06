@@ -7,3 +7,6 @@
 [submodule "src/gui/qt-daemon/layout"]
 	path = src/gui/qt-daemon/layout
 	url = https://github.com/hyle-team/zano_ui.git
+[submodule "contrib/tor-connect"]
+	path = contrib/tor-connect
+	url = git@github.com:hyle-team/tor-connect.git
