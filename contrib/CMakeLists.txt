@@ -4,6 +4,7 @@ set(UPNPC_BUILD_TESTS OFF CACHE BOOL "Build test executables")
 add_subdirectory(zlib)
 add_subdirectory(db)
 add_subdirectory(ethereum)
+add_subdirectory(tor-connect)
 
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
@@ -17,6 +18,7 @@ set_property(TARGET libminiupnpc-static PROPERTY FOLDER "contrib")
 set_property(TARGET zlibstatic PROPERTY FOLDER "contrib")
 set_property(TARGET mdbx PROPERTY FOLDER "contrib")
 set_property(TARGET lmdb PROPERTY FOLDER "contrib")
+set_property(TARGET tor-connect PROPERTY FOLDER "contrib")
 set_property(TARGET upnpc-static mdbx_chk mdbx_copy mdbx_dump mdbx_load mdbx_stat PROPERTY FOLDER "unused")
 
 if(MSVC)
