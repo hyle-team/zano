@@ -375,8 +375,11 @@ namespace currency
     if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
       return 1;
 
-    if(context.m_state != currency_connection_context::state_normal)
+    //if(context.m_state != currency_connection_context::state_normal)
+    //  return 1;
+    if (!this->is_synchronized())
       return 1;
+  
     uint64_t inital_tx_count = arg.txs.size();
     TIME_MEASURE_START_MS(new_transactions_handle_time);
     for(auto tx_blob_it = arg.txs.begin(); tx_blob_it!=arg.txs.end();)

@@ -13,6 +13,7 @@
 #include <iostream>
 #include <boost/utility/value_init.hpp>
 #include "include_base_utils.h"
+#include "net/levin_client.h"
 using namespace epee;
 
 #include "string_coding.h"
@@ -31,6 +32,8 @@ using namespace epee;
 #include "common/encryption_filter.h"
 #include "crypto/bitcoin/sha256_helper.h"
 using namespace currency;
+
+
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
 
@@ -4585,6 +4588,23 @@ uint64_t wallet2::get_needed_money(uint64_t fee, const std::vector<currency::tx_
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::send_transaction_to_network(const transaction& tx)
 {
+#define ENABLE_TOR_RELAY
+#ifdef ENABLE_TOR_RELAY
+  //TODO check that core synchronized
+  epee::levin::levin_client_impl p2p_client;
+  if (!p2p_client.connect("127.0.0.1", P2P_DEFAULT_PORT, 100000))
+  {
+    THROW_IF_FALSE_WALLET_EX(false, error::no_connection_to_daemon, "Failed to connect to TOR node");
+  }
+  currency::NOTIFY_NEW_TRANSACTIONS::request p2p_req = AUTO_VAL_INIT(p2p_req);
+  p2p_req.txs.push_back(t_serializable_object_to_blob(tx));
+  std::string blob;
+  epee::serialization::store_t_to_binary(p2p_req, blob);
+
+  p2p_client.notify(NOTIFY_NEW_TRANSACTIONS::ID, blob);
+  p2p_client.disconnect();
+  return;
+#endif //
   COMMAND_RPC_SEND_RAW_TX::request req;
   req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(tx));
   COMMAND_RPC_SEND_RAW_TX::response daemon_send_resp;
@@ -4596,7 +4616,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
 
   WLT_LOG_L2("transaction " << get_transaction_hash(tx) << " generated ok and sent to daemon:" << ENDL << currency::obj_to_json_str(tx));
 }
-
+//----------------------------------------------------------------------------------------------------------------
 void wallet2::add_sent_tx_detailed_info(const transaction& tx,
   const std::vector<currency::tx_destination_entry>& destinations,
   const std::vector<uint64_t>& selected_transfers)
