@@ -4591,7 +4591,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
 #define ENABLE_TOR_RELAY
 #ifdef ENABLE_TOR_RELAY
   //TODO check that core synchronized
-  epee::levin::levin_client_impl p2p_client;
+  epee::net_utils::levin_client2 p2p_client;
   if (!p2p_client.connect("127.0.0.1", P2P_DEFAULT_PORT, 100000))
   {
     THROW_IF_FALSE_WALLET_EX(false, error::no_connection_to_daemon, "Failed to connect to TOR node");
