@@ -9,4 +9,4 @@
 	url = https://github.com/hyle-team/zano_ui.git
 [submodule "contrib/tor-connect"]
 	path = contrib/tor-connect
-	url = git@github.com:hyle-team/tor-connect.git
+	url = https://github.com/hyle-team/tor-connect.git
