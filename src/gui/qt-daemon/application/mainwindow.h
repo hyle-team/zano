@@ -240,6 +240,7 @@ private:
   bool load_app_config();
   bool init_window();
   bool init_ipc_server();
+  bool remove_ipc();
   
 
   std::string get_wallet_log_prefix(size_t wallet_id) const { return m_backend.get_wallet_log_prefix(wallet_id); }
