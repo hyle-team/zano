@@ -825,7 +825,7 @@ bool MainWindow::init_ipc_server()
 
 bool MainWindow::handle_ipc_event(const std::string& arguments)
 {
-  std::string zzz = "Received IPC: " + arguments.c_str();
+  std::string zzz = std::string("Received IPC: ") + arguments.c_str();
   std::cout << zzz;//message_box(zzz.c_str());
 
   handle_deeplink_click(arguments.c_str());
