@@ -786,6 +786,7 @@ bool MainWindow::init_ipc_server()
           bool data_received = pmq->timed_receive((void*)buff.data(), GUI_IPC_BUFFER_SIZE, recvd_size, priority, boost::posix_time::ptime(boost::posix_time::microsec_clock::universal_time()) + boost::posix_time::milliseconds(1000));
           if (data_received && recvd_size != 0)
           {
+            buff.resize(recvd_size, '*');
             handle_ipc_event(buff);//todo process token
           }
         }        
