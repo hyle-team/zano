@@ -16,7 +16,7 @@ namespace utils
     virtual void execute()=0;
   };
 
-  template<class t_executor_func>
+  template<typename t_executor_func>
   struct call_executor_t : public call_executor_base
   {
     call_executor_t(t_executor_func f) :m_func(f)
@@ -28,15 +28,16 @@ namespace utils
     }
   };
 
-  template<t_executor_func> 
+  template<typename t_executor_func> 
   std::shared_ptr<call_executor_base> build_call_executor(t_executor_func func)
   {
-    std::shared_ptr<call_executor_base> res = new call_executor_t<t_executor_func>(func);
+    std::shared_ptr<call_executor_base> res(static_cast<call_executor_base*>(new call_executor_t<t_executor_func>(func)));
     return res;
   }
 
   class threads_pool
   {
+  public: 
     void init()
     {
       m_is_stop = false;
@@ -44,14 +45,14 @@ namespace utils
       
       for (int i = 0; i < num_threads; i++)
       {
-        m_threads.push_back(std::thread(worker_func));
+        m_threads.push_back(std::thread([this](){this->worker_func(); }));
       }
     }
 
     threads_pool(): m_is_stop(false), m_threads_counter(0)
     {}
     
-    template<t_executor_func>
+    template<typename t_executor_func>
     bool add_job(t_executor_func func)
     {
       {
@@ -60,6 +61,16 @@ namespace utils
       }
       m_condition.notify_one();
       return true;
+    }
+
+    ~threads_pool()
+    {
+      m_is_stop = true;
+      m_condition.notify_all();
+      for (auto& th : m_threads)
+      {
+        th.join();
+      }
     }
 
     private:
@@ -96,7 +107,7 @@ namespace utils
       std::condition_variable m_condition;
       std::mutex m_queue_mutex;
       std::vector<std::thread> m_threads;
-      atomic<bool> m_is_stop;
+      std::atomic<bool> m_is_stop;
       std::atomic<int64_t> m_threads_counter;
   };
 }

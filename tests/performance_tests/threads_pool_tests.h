@@ -6,10 +6,27 @@
  
 #include <string>
 #include "include_base_utils.h"
-#include "threads_pool.h"
+#include "common/threads_pool.h"
 
 
 inline
 void thread_pool_tests()
 {
+  {
+    utils::threads_pool pool;
+    pool.init();
+    std::atomic<uint64_t> count_jobs_finished = 0;
+    size_t i = 0;
+    for (; i != 10; i++)
+    {
+      pool.add_job([&, i]() {LOG_PRINT_L0("Job " << i << " started"); epee::misc_utils::sleep_no_w(10000); ++count_jobs_finished; LOG_PRINT_L0("Job " << i << " finished"); });
+    }
+    while (count_jobs_finished != i)
+    {
+      epee::misc_utils::sleep_no_w(500);
+    }
+    LOG_PRINT_L0("All jobs finished");
+  }
+  LOG_PRINT_L0("Scope left");
+
 }
