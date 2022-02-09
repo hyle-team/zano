@@ -744,11 +744,25 @@ void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, c
     }
 }
 
+bool MainWindow::remove_ipc()
+{
+  try {
+    boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+  }
+  catch (...)
+  {
+  }
+  return true;
+}
  
 
 bool MainWindow::init_ipc_server()
 {
 
+  //in case previous instance wasn't close graceful, ipc channel will remain open and new creation will fail, so we 
+  //trying to close it anyway before open, to make sure there are no dead channels. If there are another running instance, it wom't 
+  //let channel to close, so it will fail later on creating channel
+  remove_ipc();
 #define GUI_IPC_BUFFER_SIZE  10000
   try {
     //Create a message queue.
@@ -772,21 +786,23 @@ bool MainWindow::init_ipc_server()
           bool data_received = pmq->timed_receive((void*)buff.data(), GUI_IPC_BUFFER_SIZE, recvd_size, priority, boost::posix_time::ptime(boost::posix_time::microsec_clock::universal_time()) + boost::posix_time::milliseconds(1000));
           if (data_received && recvd_size != 0)
           {
+            buff.resize(recvd_size, '*');
             handle_ipc_event(buff);//todo process token
           }
         }        
-        boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+        remove_ipc();
         LOG_PRINT_L0("IPC Handling thread finished");
       }
       catch (const std::exception& ex)
       {
+        remove_ipc();
         boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
         LOG_ERROR("Failed to receive IPC que: " << ex.what());
       }
 
       catch (...)
       {
-        boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+        remove_ipc();
         LOG_ERROR("Failed to receive IPC que: unknown exception");
       }
     });
@@ -810,8 +826,8 @@ bool MainWindow::init_ipc_server()
 
 bool MainWindow::handle_ipc_event(const std::string& arguments)
 {
-  std::string zzz = "Received IPC: " + arguments;
-  message_box(zzz.c_str());
+  std::string zzz = std::string("Received IPC: ") + arguments.c_str();
+  std::cout << zzz;//message_box(zzz.c_str());
 
   handle_deeplink_click(arguments.c_str());
 
