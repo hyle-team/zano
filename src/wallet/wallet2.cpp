@@ -4594,7 +4594,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
   //TODO check that core synchronized
   //epee::net_utils::levin_client2 p2p_client;
   tools::levin_over_tor_client p2p_client;
-  if (!p2p_client.connect("144.76.183.143", 2121, 100000))
+  if (!p2p_client.connect("144.76.183.143", 2121, 10000))
   {
     THROW_IF_FALSE_WALLET_EX(false, error::no_connection_to_daemon, "Failed to connect to TOR node");
   }
