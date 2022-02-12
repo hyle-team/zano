@@ -31,6 +31,8 @@
 #include <limits>
 #include <set>
 #include <iterator>
+#include <algorithm>
+#include <functional>
 #include <boost/thread.hpp>
 #include "include_base_utils.h"
 #include "auto_val_init.h"
@@ -110,17 +112,6 @@ namespace misc_utils
 		{
 			return (std::numeric_limits<t_type>::max)();
 		}
-
-	// TEMPLATE STRUCT less
-	template<class _Ty>
-	struct less_as_pod
-		: public std::binary_function<_Ty, _Ty, bool>
-	{	// functor for operator<
-		bool operator()(const _Ty& _Left, const _Ty& _Right) const
-		{	// apply operator< to operands
-			return memcmp(&_Left, &_Right, sizeof(_Left)) < 0;
-		}
-	};
 
   template<class _Ty>
   bool is_less_as_pod(const _Ty& _Left, const _Ty& _Right)
