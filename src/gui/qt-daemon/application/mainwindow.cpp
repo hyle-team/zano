@@ -852,12 +852,6 @@ bool MainWindow::handle_deeplink_params_in_commandline()
 
 bool MainWindow::init_backend(int argc, char* argv[])
 {
-  if (argc > 1)
-  {
-    std::string msg = "Command_line 1: ";
-    msg += argv[1];
-    message_box(msg.c_str());
-  }
 
   TRY_ENTRY();
   std::string command_line_fail_details;
