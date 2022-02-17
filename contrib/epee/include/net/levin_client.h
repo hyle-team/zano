@@ -77,6 +77,8 @@ namespace levin
 
     int invoke(int command, const std::string& in_buff, std::string& buff_out);
     int notify(int command, const std::string& in_buff);
+
+    transport_t& get_transport() {return this->m_transport;}
   };
 
 }
