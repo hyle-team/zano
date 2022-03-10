@@ -4,11 +4,14 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#pragma once
 #include <QtWidgets>
 #include <QWebChannel>
+#include <boost/interprocess/ipc/message_queue.hpp>
 
 #include "wallet/view_iface.h"
 #include "serialization/keyvalue_helper_structs.h"
+
 
 #ifndef Q_MOC_RUN
 #include "wallet/wallets_manager.h"
@@ -58,6 +61,7 @@ public:
   bool init_backend(int argc, char* argv[]);
   bool show_inital();
   void show_notification(const std::string& title, const std::string& message);
+  bool handle_ipc_event(const std::string& arguments);
 
   struct app_config
   {
@@ -192,6 +196,7 @@ signals:
   void on_core_event(const QString method_name);  //general function
   void set_options(const QString str);  //general function
   void get_wallet_name();
+  void handle_deeplink_click(const QString str);
 
 private:
   //--------------------  i_core_event_handler --------------------
@@ -220,7 +225,7 @@ private:
   void contextMenuEvent(QContextMenuEvent * event);
   void changeEvent(QEvent *e);
   void on_maximized();
-
+  bool handle_deeplink_params_in_commandline();
   //void setOrientation(Qt::ScreenOrientation orientation);
   
   
@@ -234,6 +239,9 @@ private:
   bool store_app_config();
   bool load_app_config();
   bool init_window();
+  bool init_ipc_server();
+  bool remove_ipc();
+  
 
   std::string get_wallet_log_prefix(size_t wallet_id) const { return m_backend.get_wallet_log_prefix(wallet_id); }
 
@@ -256,6 +264,7 @@ private:
   app_config m_config;
 
   epee::locked_object<std::map<uint64_t, uint64_t>> m_wallet_states;
+  std::thread m_ipc_worker;
   struct events_que_struct
   {
     std::list<currency::core_event> m_que;

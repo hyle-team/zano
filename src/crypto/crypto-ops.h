@@ -111,6 +111,7 @@ void ge_fromfe_frombytes_vartime(ge_p2 *, const unsigned char *);
 void ge_p2_to_p3(ge_p3 *r, const ge_p2 *t);
 void ge_bytes_hash_to_ec(ge_p3 *, const void *, size_t);
 void ge_bytes_hash_to_ec_32(ge_p3 *, const unsigned char *);
+void ge_cached_to_p2(ge_p2 *r, const ge_cached *c);
 
 void ge_p3_0(ge_p3 *h);
 void ge_sub(ge_p1p1 *, const ge_p3 *, const ge_cached *);
@@ -138,8 +139,9 @@ void sc_invert(unsigned char*, const unsigned char*);
 
 void fe_sq(fe h, const fe f);
 int fe_isnonzero(const fe f);
-int fe_cmp(const fe a, const fe b);
+void fe_sub(fe h, const fe f, const fe g);
 void fe_mul(fe, const fe, const fe);
 void fe_frombytes(fe h, const unsigned char *s);
 void fe_invert(fe out, const fe z);
 void fe_tobytes(unsigned char *s, const fe h);
+int fe_isnegative(const fe f);

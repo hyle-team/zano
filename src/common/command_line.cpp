@@ -28,6 +28,7 @@ namespace command_line
   const arg_descriptor<bool>        arg_show_rpc_autodoc = { "show_rpc_autodoc", "Display rpc auto-generated documentation template" };
 
   const arg_descriptor<bool>        arg_disable_upnp = { "disable-upnp", "Disable UPnP (enhances local network privacy)", false, true };
+  const arg_descriptor<bool>        arg_disable_ntp = { "disable-ntp", "Disable NTP, could enhance to time synchronization issue but increase network privacy, consider using disable-stop-if-time-out-of-sync with it", false, true };
 
   const arg_descriptor<bool>        arg_disable_stop_if_time_out_of_sync = { "disable-stop-if-time-out-of-sync", "Do not stop the daemon if serious time synchronization problem is detected", false, true };
   const arg_descriptor<bool>        arg_disable_stop_on_low_free_space   = { "disable-stop-on-low-free-space", "Do not stop the daemon if free space at data dir is critically low", false, true };
@@ -38,5 +39,7 @@ namespace command_line
   const arg_descriptor<bool>        arg_force_predownload    = { "force-predownload", "Pre-download blockchain database regardless of it's status", };
   const arg_descriptor<bool>        arg_validate_predownload = { "validate-predownload", "Paranoid mode, re-validate each block from pre-downloaded database and rebuild own database", };
   const arg_descriptor<std::string> arg_predownload_link     = { "predownload-link", "Override url for blockchain database pre-downloading", "", true };
+
+  const arg_descriptor<std::string> arg_deeplink = { "deeplink-params", "Deeplink parameter, in that case app just forward params to running app", "", true };
 
 }

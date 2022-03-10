@@ -183,6 +183,8 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_deeplink);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
 
 
 #ifndef MOBILE_WALLET_BUILD
@@ -247,6 +249,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
 
   m_qt_logs_enbaled = command_line::get_arg(m_vm, arg_enable_qt_logs);
   m_qt_dev_tools = command_line::get_arg(m_vm, arg_qt_dev_tools);
+
   return true;
   CATCH_ENTRY2(false);
 }
@@ -986,6 +989,11 @@ bool wallets_manager::get_opened_wallets(std::list<view::open_wallet_response>& 
     get_wallet_info(w.second, owr.wi);
   }
   return true;
+}
+
+const po::variables_map& wallets_manager::get_arguments()
+{
+  return m_vm;
 }
 
 std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist, bool exclude_mining_txs)

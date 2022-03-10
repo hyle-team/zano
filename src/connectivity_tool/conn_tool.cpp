@@ -12,6 +12,7 @@
 
 using namespace epee;
 #include <boost/program_options.hpp>
+//#include <boost/interprocess/ipc/message_queue.hpp>
 #include "p2p/p2p_protocol_defs.h"
 #include "common/command_line.h"
 #include "currency_core/currency_core.h"
@@ -62,6 +63,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_pack_file          = {"pack-file", "perform gzip-packing and calculate hash for a given file", "", true };
   const command_line::arg_descriptor<std::string> arg_unpack_file        = {"unpack-file", "Perform gzip-unpacking and calculate hash for a given file", "", true };
   const command_line::arg_descriptor<std::string> arg_target_file        = {"target-file", "Specify target file for pack-file and unpack-file commands", "", true };
+  //const command_line::arg_descriptor<std::string> arg_send_ipc           = {"send-ipc", "Send IPC request to UI", "", true };
 }
 
 typedef COMMAND_REQUEST_STAT_INFO_T<t_currency_protocol_handler<core>::stat_info> COMMAND_REQUEST_STAT_INFO;
@@ -1165,6 +1167,34 @@ bool process_archive(archive_processor_t& arch_processor, bool is_packing, std::
   return true;
 }
 
+/*
+bool handle_send_ipc(const std::string& parms)
+{
+  try{
+    boost::interprocess::message_queue mq
+    (boost::interprocess::open_only   //only open
+      , GUI_IPC_MESSAGE_CHANNEL_NAME  //name
+    );
+    
+    mq.send(parms.data(), parms.size(), 0);
+    
+    return true;
+  }
+  catch (const std::exception& ex)
+  {
+    boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+    LOG_ERROR("Failed to receive IPC que: " << ex.what());
+  }
+
+  catch (...)
+  {
+    boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+    LOG_ERROR("Failed to receive IPC que: unknown exception");
+  }
+  return false;
+}
+*/
+
 bool handle_pack_file(po::variables_map& vm)
 {
   bool do_pack = false;
@@ -1263,6 +1293,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_pack_file);
   command_line::add_arg(desc_params, arg_unpack_file);
   command_line::add_arg(desc_params, arg_target_file);
+  //command_line::add_arg(desc_params, arg_send_ipc);
+  
 
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
@@ -1339,6 +1371,10 @@ int main(int argc, char* argv[])
   {
     return handle_pack_file(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
+  /*else if (command_line::has_arg(vm, arg_send_ipc))
+  {
+    handle_send_ipc(command_line::get_arg(vm, arg_send_ipc)) ? EXIT_SUCCESS : EXIT_FAILURE;
+  }*/
   else
   {
     std::cerr << "Not enough arguments." << ENDL;

@@ -325,7 +325,7 @@ Preconditions:
    |f| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
 */
 
-static int fe_isnegative(const fe f) {
+int fe_isnegative(const fe f) {
   unsigned char s[32];
   fe_tobytes(s, f);
   return s[0] & 1;
@@ -340,16 +340,6 @@ int fe_isnonzero(const fe f) {
     s[9] | s[10] | s[11] | s[12] | s[13] | s[14] | s[15] | s[16] | s[17] |
     s[18] | s[19] | s[20] | s[21] | s[22] | s[23] | s[24] | s[25] | s[26] |
     s[27] | s[28] | s[29] | s[30] | s[31]) - 1) >> 8) + 1;
-}
-
-int fe_cmp(const fe a, const fe b)
-{
-  for (size_t i = 9; i != SIZE_MAX; --i)
-  {
-    if ((const uint32_t)a[i] < (const uint32_t)b[i]) return -1;
-    if ((const uint32_t)a[i] > (const uint32_t)b[i]) return 1;
-  }
-  return 0;
 }
 
 /* From fe_mul.c */
@@ -970,7 +960,7 @@ Postconditions:
    |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
 */
 
-static void fe_sub(fe h, const fe f, const fe g) {
+void fe_sub(fe h, const fe f, const fe g) {
   int32_t f0 = f[0];
   int32_t f1 = f[1];
   int32_t f2 = f[2];
@@ -4309,4 +4299,18 @@ void ge_scalarmult_vartime_p3_v2(ge_p3 *r, const unsigned char *a, const ge_p3 *
     else
       ge_p1p1_to_p3(r, &t);
   }
+}
+
+
+void ge_cached_to_p2(ge_p2 *r, const ge_cached *c)
+{
+  static const fe inv2 = { 10, 0, 0, 0, 0, 0, 0, 0, 0, -16777216 };
+
+  fe_sub(r->X, c->YplusX, c->YminusX);
+  fe_mul(r->X, r->X, inv2);
+
+  fe_add(r->Y, c->YplusX, c->YminusX);
+  fe_mul(r->Y, r->Y, inv2);
+
+  fe_copy(r->Z, c->Z);
 }

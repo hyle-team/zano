@@ -216,6 +216,7 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_show_details;
   extern const arg_descriptor<bool>        arg_show_rpc_autodoc;
   extern const arg_descriptor<bool>        arg_disable_upnp;
+  extern const arg_descriptor<bool>        arg_disable_ntp;
   extern const arg_descriptor<bool>        arg_disable_stop_if_time_out_of_sync;
   extern const arg_descriptor<bool>        arg_disable_stop_on_low_free_space;
   extern const arg_descriptor<bool>        arg_enable_offers_service;
@@ -224,4 +225,5 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_force_predownload;
   extern const arg_descriptor<bool>        arg_validate_predownload;
   extern const arg_descriptor<std::string> arg_predownload_link;
+  extern const arg_descriptor<std::string> arg_deeplink;
 }

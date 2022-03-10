@@ -23,6 +23,7 @@ namespace currency
     , m_last_median2local_time_difference(0)
     , m_last_ntp2local_time_difference(0)
     , m_debug_ip_address(0)
+    , m_disable_ntp(false)
   {
     if(!m_p2p)
       m_p2p = &m_p2p_stub;
@@ -38,6 +39,8 @@ namespace currency
   bool t_currency_protocol_handler<t_core>::init(const boost::program_options::variables_map& vm)
   {
     m_relay_que_thread = std::thread([this](){relay_que_worker();});
+    if (command_line::has_arg(vm, command_line::arg_disable_ntp))
+      m_disable_ntp = command_line::get_arg(vm, command_line::arg_disable_ntp);
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------  
@@ -834,6 +837,12 @@ namespace currency
     LOG_PRINT_MAGENTA("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ")", ((m_last_median2local_time_difference >= 3) ? LOG_LEVEL_2 : LOG_LEVEL_3));
     if (std::abs(m_last_median2local_time_difference) > TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE)
     {
+      // treat as error getting ntp time
+      if (m_disable_ntp)
+      {
+        LOG_PRINT_RED("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ") while NTP is disabled", LOG_LEVEL_0);
+        return false;
+      }
       int64_t ntp_time = tools::get_ntp_time();
       LOG_PRINT_L2("NTP: received time " << ntp_time << " (" << epee::misc_utils::get_time_str_v2(ntp_time) << "), diff: " << std::showpos << get_core_time() - ntp_time);
       if (ntp_time == 0)
