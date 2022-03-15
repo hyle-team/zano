@@ -3279,7 +3279,7 @@ void wallet2::wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_tra
   ss << (wti.is_income ? "in" : "out") << ",";
   ss << (wti.is_service ? "[SERVICE]" : "") << (wti.is_mixing ? "[MIXINS]" : "") << (wti.is_mining ? "[MINING]" : "") << ",";
   ss << wti.tx_type << ",";
-  ss << wti.fee << ENDL;
+  ss << print_money(wti.fee) << ENDL;
 };
 
 void wallet2::wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) 
@@ -3320,7 +3320,7 @@ void wallet2::export_transaction_history(std::ostream& ss, const std::string& fo
   else
   {
     //csv by default
-    ss << "N, Date, Amount, Comment, Address, ID, Height, Unlock timestamp, Tx size, Alias, In/Out, Flags, Type, Fee" << ENDL;
+    ss << "N, Date, Amount, Comment, Address, ID, Height, Unlock timestamp, Tx size, Alias, PaymentID, In/Out, Flags, Type, Fee" << ENDL;
   }
 
 
@@ -3330,6 +3330,7 @@ void wallet2::export_transaction_history(std::ostream& ss, const std::string& fo
       if (currency::is_coinbase(wti.tx))
         return true;
     }
+    wti.fee = currency::get_tx_fee(wti.tx);
     cb(ss, wti, index);
     return true;
   });
