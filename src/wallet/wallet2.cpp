@@ -3258,7 +3258,7 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
 
 void wallet2::wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) {
   ss << index << ",";
-  ss << epee::misc_utils::get_time_str_v2(wti.timestamp) << ",";
+  ss << epee::misc_utils::get_time_str(wti.timestamp) << ",";
   ss << print_money(wti.amount) << ",";
   ss << "\"" << wti.comment << "\",";
   ss << "[";

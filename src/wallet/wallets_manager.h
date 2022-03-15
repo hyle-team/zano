@@ -97,6 +97,8 @@ public:
   bool quick_clear_wallets_no_save();
   bool send_stop_signal();
   bool get_opened_wallets(std::list<view::open_wallet_response>& result);
+  const po::variables_map& get_arguments();
+
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr, bool exclude_mining_txs = false);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& seed_phrase, const std::string& seed_password, view::open_wallet_response& owr);

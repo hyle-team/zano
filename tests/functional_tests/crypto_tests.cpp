@@ -959,33 +959,85 @@ TEST(crypto, hp)
 
 TEST(crypto, cn_fast_hash_perf)
 {
-  return true;
-  crypto::hash h = { 3, 14, 15, 9, 26 };
+  //return true;
+  const crypto::hash h_initial = *(crypto::hash*)(&scalar_t::random());
 
-  size_t n = 100000;
+  std::vector<std::vector<uint8_t>> test_data;
+  test_data.push_back(std::vector<uint8_t>(32, 0));
+  test_data.push_back(std::vector<uint8_t>(63, 0));
+  test_data.push_back(std::vector<uint8_t>(127, 0));
+  test_data.push_back(std::vector<uint8_t>(135, 0));
+  test_data.push_back(std::vector<uint8_t>(255, 0));
+  test_data.push_back(std::vector<uint8_t>(271, 0)); // 271 = 136 * 2 - 1
+  test_data.push_back(std::vector<uint8_t>(2030, 0));
+
+  for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    crypto::generate_random_bytes(test_data[j].size(), test_data[j].data());
+
+  struct times_t
+  {
+    uint64_t t_old{ 0 }, t_new{ 0 };
+    crypto::hash h_old{};
+    double diff{ 0 };
+  };
+  std::vector<times_t> results(test_data.size());
+
+  size_t n = 50000;
   double diff_sum = 0;
 
-  for (size_t j = 0; j < 20; ++j)
+  for (size_t k = 0; k < 50; ++k)
   {
-    TIME_MEASURE_START(t_old);
-    for (size_t i = 0; i < n; ++i)
-      cn_fast_hash_old(&h, sizeof h, (char*)&h);
-    TIME_MEASURE_FINISH(t_old);
+    for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    {
+      crypto::hash h = h_initial;
+      TIME_MEASURE_START(t_old);
+      for (size_t i = 0; i < n; ++i)
+      {
+        *(crypto::hash*)(test_data[j].data()) = h;
+        cn_fast_hash_old(test_data[j].data(), test_data[j].size(), (char*)&h);
+      }
+      TIME_MEASURE_FINISH(t_old);
+      results[j].t_old = t_old;
+      results[j].h_old = h;
+    }
 
-    TIME_MEASURE_START(t);
-    for (size_t i = 0; i < n; ++i)
-      cn_fast_hash(&h, sizeof h, (char*)&h);
-    TIME_MEASURE_FINISH(t);
+    for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    {
+      crypto::hash h = h_initial;
+      TIME_MEASURE_START(t_new);
+      for (size_t i = 0; i < n; ++i)
+      {
+        *(crypto::hash*)(test_data[j].data()) = h;
+        cn_fast_hash(test_data[j].data(), test_data[j].size(), (char*)&h);
+      }
+      TIME_MEASURE_FINISH(t_new);
+      results[j].t_new = t_new;
+      ASSERT_EQ(h, results[j].h_old);
+    }
 
-    double diff = ((int64_t)t_old - (int64_t)t) / (double)n;
+    std::stringstream ss;
+    double diff_round = 0;
+    for (size_t j = 0, sz = test_data.size(); j < sz; ++j)
+    {
+      double diff = ((int64_t)results[j].t_old - (int64_t)results[j].t_new) / (double)n;
 
-    LOG_PRINT_L0("cn_fast_hash (old/new): " << std::fixed << std::setprecision(3) << t_old / (double)n << "   " <<
-      std::fixed << std::setprecision(3) << t * 1.0 / n << " mcs   diff => " << std::fixed << std::setprecision(4) << diff);
+      ss << std::fixed << std::setprecision(3) << results[j].t_old / (double)n << "/" <<
+        std::fixed << std::setprecision(3) << results[j].t_new / (double)n << "  ";
 
-    diff_sum += diff;
+      results[j].diff += diff;
+      diff_round += diff;
+    }
+
+    diff_sum += diff_round;
+
+    LOG_PRINT_L0("cn_fast_hash (old/new) [" << std::setw(2) << k << "]: " << ss.str() << " mcs, diff_round = " << std::fixed << std::setprecision(4) << diff_round <<
+     " diff_sum = " << std::fixed << std::setprecision(4) << diff_sum);
   }
 
-  std::cout << h << "  diff sum: " << diff_sum << std::endl;
+  std::stringstream ss;
+  for (size_t j = 0, sz = results.size(); j < sz; ++j)
+    ss << std::fixed << std::setprecision(4) << results[j].diff << "       ";
+  LOG_PRINT_L0("                             " << ss.str());
 
   return true;
 }
@@ -1621,6 +1673,135 @@ TEST(crypto, calc_lsb_32)
 
   return true;
 }
+
+TEST(crypto, torsion_elements)
+{
+  // let ty = -sqrt((-sqrt(D+1)-1) / D), is_neg(ty) == false
+  // canonical serialization                                           sig  order  EC point
+  // 26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05  0    8      (sqrt(-1)*ty, ty)
+  // 0000000000000000000000000000000000000000000000000000000000000000  0    4      (sqrt(-1), 0)
+  // c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a  0    8      (sqrt(-1)*ty, -ty)
+  // ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f  0    2      (0, -1)
+  // c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa  1    8      (-sqrt(-1)*ty, -ty)
+  // 0000000000000000000000000000000000000000000000000000000000000080  1    4      (-sqrt(-1), 0)
+  // 26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85  1    8      (-sqrt(-1)*ty, ty)
+
+  struct canonical_torsion_elements_t
+  {
+    const char* string;
+    bool sign;
+    uint8_t order;
+    uint8_t incorrect_order_0;
+    uint8_t incorrect_order_1;
+  };
+
+  canonical_torsion_elements_t canonical_torsion_elements[] = {
+    {"26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05", false, 8, 4, 7},
+    {"0000000000000000000000000000000000000000000000000000000000000000", false, 4, 2, 3},
+    {"c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a", false, 8, 4, 7},
+    {"ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f", false, 2, 1, 3},
+    {"c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa", true,  8, 4, 7},
+    {"0000000000000000000000000000000000000000000000000000000000000080", true,  4, 2, 3},
+    {"26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85", true,  8, 4, 7}
+  };
+
+  point_t tor;
+
+  for (size_t i = 0, n = sizeof canonical_torsion_elements / sizeof canonical_torsion_elements[0]; i < n; ++i)
+  {
+    const canonical_torsion_elements_t& el = canonical_torsion_elements[i];
+    ASSERT_TRUE(tor.from_string(el.string));
+    ASSERT_FALSE(tor.is_zero());
+    ASSERT_FALSE(tor.is_in_main_subgroup());
+
+    ASSERT_EQ((fe_isnegative(tor.m_p3.X) != 0), el.sign);
+
+    ASSERT_FALSE(el.incorrect_order_0 * tor == c_point_0);
+    ASSERT_FALSE(el.incorrect_order_1 * tor == c_point_0);
+    ASSERT_TRUE(el.order * tor == c_point_0);
+  }
+
+  // non-canonical elements should not load at all (thanks to the checks in ge_frombytes_vartime)
+
+  const char* noncanonical_torsion_elements[] = {
+    "0100000000000000000000000000000000000000000000000000000000000080", // (-0, 1)
+    "ECFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", // (-0, -1)
+    "EEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7F", // (0, 2*255-18)
+    "EEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", // (-0, 2*255-18)
+    "EDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7F", // (sqrt(-1), 2*255-19)
+    "EDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"  // (-sqrt(-1), 2*255-19)
+  };
+
+  for (size_t i = 0, n = sizeof noncanonical_torsion_elements / sizeof noncanonical_torsion_elements[0]; i < n; ++i)
+  {
+    ASSERT_FALSE(tor.from_string(noncanonical_torsion_elements[i]));
+  }
+
+  return true;
+}
+
+TEST(crypto, point_is_zero)
+{
+  static const fe fancy_p         = { -19, 33554432, -1, 33554432, -1, 33554432, -1, 33554432, -1, 33554432 }; // 2**255 - 19
+  static const fe fancy_p_plus_1  = { -18, 33554432, -1, 33554432, -1, 33554432, -1, 33554432, -1, 33554432 }; // 2**255 - 18
+  static const fe f_one = { 1 };
+
+  ASSERT_TRUE(fe_isnonzero(fancy_p) == 0);
+  ASSERT_TRUE(fe_isnonzero(fancy_p_plus_1) != 0);
+
+  fe f_r, f_x;
+  fe_frombytes(f_x, scalar_t::random().data());
+  fe_mul(f_r, f_x, fancy_p);
+  ASSERT_TRUE(fe_isnonzero(f_r) == 0);
+  
+  fe_sub(f_r, fancy_p_plus_1, f_one);
+  ASSERT_TRUE(fe_isnonzero(f_r) == 0);
+
+  // is_zero
+
+  point_t p;
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.X, fancy_p, sizeof p.m_p3.X); // X = 2**255-19
+  memcpy(&p.m_p3.Y, fancy_p_plus_1, sizeof p.m_p3.Y); // Y = 2**255-19+1
+  p.m_p3.Z[0] = 1;
+  // {P, P+1, 1, 0} == {0, 1} (the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.X, fancy_p, sizeof p.m_p3.X); // X = 2**255-19
+  memcpy(&p.m_p3.Y, fancy_p_plus_1, sizeof p.m_p3.Y); // Y = 2**255-19+1
+  p.m_p3.Z[0] = -1;
+  // {P, P+1, -1, 0} == {0, -1} (not an identity point, torsion element order 2)
+
+  ASSERT_FALSE(p.is_zero());
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  p.m_p3.Y[0] = 2;
+  p.m_p3.Z[0] = 2;
+  // {0, 2, 2, 0} == {0, 1} (the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+  // all fe 10 components must be in [-33554432, 33554432]  (curve25519-20060209.pdf page 9)
+  //        2**0      2**26     2**51   2**77    2**102   2**128     2**153    2**179   2**204    2*230 
+  fe a0 = { 7172245,  16777211, 922265, 8160646, 9625798, -12989394, 10843498, 6987154, 15156548, -5214544 };
+  fe a1 = { 7172245, -16777221, 922266, 8160646, 9625798, -12989394, 10843498, 6987154, 15156548, -5214544 };
+  // note, a0 == a1:
+  //  16777211 * 2**26  + 922265 * 2**51 = 2076757281067996545024
+  // -16777221 * 2**26  + 922266 * 2**51 = 2076757281067996545024
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.Y, &a0, sizeof a0);
+  memcpy(&p.m_p3.Z, &a1, sizeof a1);
+  // {0, x, x, 0} == {0, 1, 1, 0} == {0, 1} (the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+  return true;
+}
+
 
 //
 // test's runner
