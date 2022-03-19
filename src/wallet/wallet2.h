@@ -121,6 +121,7 @@ namespace tools
     virtual void on_sync_progress(const uint64_t& /*percents*/) {}
     virtual void on_transfer_canceled(const wallet_public::wallet_transfer_info& wti) {}
     virtual void on_message(message_severity /*severity*/, const std::string& /*m*/) {}
+    virtual void on_tor_status_change(const std::string& state) {}
   };
 
   struct tx_dust_policy
@@ -338,7 +339,7 @@ namespace tools
 //     END_SERIALIZE()
 //   };
 
-  class wallet2
+  class wallet2: public tools::tor::t_transport_state_notifier
   {
     wallet2(const wallet2&) = delete;
   public:
@@ -861,6 +862,7 @@ namespace tools
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
     construct_tx_param get_default_construct_tx_param_inital();
+    void set_disable_tor_relay(bool disable);
 
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
     
@@ -875,6 +877,11 @@ namespace tools
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
 private:
+
+    // -------- t_transport_state_notifier ------------------------------------------------
+    virtual void notify_state_change(const std::string& state_code, const std::string& details = std::string());
+    // ------------------------------------------------------------------------------------
+
 
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
@@ -1060,6 +1067,7 @@ private:
 
     mutable uint64_t m_current_wallet_file_size;
     bool m_use_deffered_global_outputs;
+    bool m_disable_tor_relay;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  

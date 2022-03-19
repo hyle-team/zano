@@ -174,6 +174,34 @@ namespace currency
     };
   };
 
+
+  /************************************************************************/
+  /*                                                                      */
+  /************************************************************************/
+  struct INVOKE_NEW_TRANSACTION
+  {
+    const static int ID = BC_COMMANDS_POOL_BASE + 8;
+
+    struct request
+    {
+      blobdata  tx;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string code;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(code)
+      END_KV_SERIALIZE_MAP()
+    };
+
+  };
+
 }
 
 #include "currency_protocol_defs_print.h"
