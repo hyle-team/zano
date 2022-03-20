@@ -55,7 +55,7 @@ namespace utils
     {
       m_is_stop = false;
 
-      for (int i = 0; i < num_threads; i++)
+      for (unsigned int i = 0; i < num_threads; i++)
       {
         m_threads.push_back(std::thread([this]() {this->worker_func(); }));
       }
