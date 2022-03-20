@@ -94,7 +94,7 @@ public:
     // Start the asynchronous operation itself. The handle_receive function
     // used as a callback will update the ec and length variables.
     socket_.async_receive(boost::asio::buffer(buffer),
-        boost::bind(&udp_blocking_client::handle_receive, _1, _2, &ec, &length));
+        boost::bind(&udp_blocking_client::handle_receive, boost::placeholders::_1, boost::placeholders::_2, &ec, &length));
 
     // Block until the asynchronous operation has completed.
     do io_service_.run_one(); while (ec == boost::asio::error::would_block);
