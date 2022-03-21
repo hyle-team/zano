@@ -667,6 +667,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   command_line::add_arg(desc_options, command_line::arg_stop_after_height);
+  command_line::add_arg(desc_options, command_line::arg_disable_ntp);
 
   currency::core::init_options(desc_options);
   tools::db::db_backend_selector::init_options(desc_options);
