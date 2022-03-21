@@ -369,48 +369,79 @@ namespace currency
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
-  int t_currency_protocol_handler<t_core>::handle_notify_new_transactions(int command, NOTIFY_NEW_TRANSACTIONS::request& arg, currency_connection_context& context)
+  int t_currency_protocol_handler<t_core>::handle_notify_new_transactions(int command, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& context)
+  {
+    NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response rsp_dummy = AUTO_VAL_INIT(rsp_dummy);
+    return this->handle_new_transaction_from_net(arg, rsp_dummy, context, true);
+  }
+  //------------------------------------------------------------------------------------------------------------------------
+  template<class t_core>
+  int t_currency_protocol_handler<t_core>::handle_invoke_new_transaction(int command, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& req, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response& rsp, currency_connection_context& context)
+  {
+    return this->handle_new_transaction_from_net(req, rsp, context, false);
+  }
+  //------------------------------------------------------------------------------------------------------------------------
+  template<class t_core>
+  int t_currency_protocol_handler<t_core>::handle_new_transaction_from_net(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response& rsp, currency_connection_context& context, bool is_notify)
   {
     //do not process requests if it comes from node wich is debugged
     if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
+    {
+      rsp.code = API_RETURN_CODE_ACCESS_DENIED;
       return 1;
+    }
 
     //if(context.m_state != currency_connection_context::state_normal)
     //  return 1;
     if (!this->is_synchronized())
+    {
+      rsp.code = API_RETURN_CODE_BUSY;
       return 1;
-  
+    }
+
+
     uint64_t inital_tx_count = arg.txs.size();
+
+    if (inital_tx_count > CURRENCY_RELAY_TXS_MAX_COUNT)
+    {
+      LOG_PRINT_L1("NOTIFY_NEW_TRANSACTIONS: To many transactions in NOTIFY_OR_INVOKE_NEW_TRANSACTIONS(" << inital_tx_count << ")");
+      rsp.code = API_RETURN_CODE_OVERFLOW;
+      return 1;
+    }
+
     TIME_MEASURE_START_MS(new_transactions_handle_time);
-    for(auto tx_blob_it = arg.txs.begin(); tx_blob_it!=arg.txs.end();)
+    for (auto tx_blob_it = arg.txs.begin(); tx_blob_it != arg.txs.end();)
     {
       currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
 
       m_core.handle_incoming_tx(*tx_blob_it, tvc, false);
-      if(tvc.m_verification_failed)
+      if (tvc.m_verification_failed)
       {
         LOG_PRINT_L0("NOTIFY_NEW_TRANSACTIONS: Tx verification failed, dropping connection");
-        m_p2p->drop_connection(context);
-
+        if(is_notify)
+          m_p2p->drop_connection(context);
+        else 
+          rsp.code = API_RETURN_CODE_FAIL;
         return 1;
       }
-      if(tvc.m_should_be_relayed)
+      if (tvc.m_should_be_relayed)
         ++tx_blob_it;
       else
         arg.txs.erase(tx_blob_it++);
     }
 
-    if(arg.txs.size())
+    if (arg.txs.size())
     {
       //TODO: add announce usage here
       relay_transactions(arg, context);
     }
     TIME_MEASURE_FINISH_MS(new_transactions_handle_time);
 
-    LOG_PRINT_L2("NOTIFY_NEW_TRANSACTIONS: " << new_transactions_handle_time << "ms (inital_tx_count: " << inital_tx_count << ", relayed_tx_count: " << arg.txs.size() << ")");
-
-    return true;
+    LOG_PRINT_L2("NOTIFY_OR_INVOKE_NEW_TRANSACTIONS(is_notify=" << is_notify <<"): " << new_transactions_handle_time << "ms (inital_tx_count: " << inital_tx_count << ", relayed_tx_count: " << arg.txs.size() << ")");
+    rsp.code = API_RETURN_CODE_OK;
+    return 1;
   }
+
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
   int t_currency_protocol_handler<t_core>::handle_request_get_objects(int command, NOTIFY_REQUEST_GET_OBJECTS::request& arg, currency_connection_context& context)
@@ -759,7 +790,7 @@ namespace currency
     m_p2p->get_connections(connections);
     for (auto& cc : connections)
     {
-      NOTIFY_NEW_TRANSACTIONS::request req = AUTO_VAL_INIT(req);
+      NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request req = AUTO_VAL_INIT(req);
       for (auto& qe : que)
       {
         //exclude relaying to original sender
@@ -769,7 +800,7 @@ namespace currency
       }
       if (req.txs.size())
       {
-        post_notify<NOTIFY_NEW_TRANSACTIONS>(req, cc);
+        post_notify<NOTIFY_OR_INVOKE_NEW_TRANSACTIONS>(req, cc);
 
         if (debug_ss.tellp())
           debug_ss << ", ";
@@ -947,7 +978,7 @@ namespace currency
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
-  bool t_currency_protocol_handler<t_core>::relay_transactions(NOTIFY_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context)
+  bool t_currency_protocol_handler<t_core>::relay_transactions(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context)
     {
 #ifdef ASYNC_RELAY_MODE
     {
@@ -959,7 +990,7 @@ namespace currency
     //m_relay_que_cv.notify_all();
     return true;
 #else 
-    return relay_post_notify<NOTIFY_NEW_TRANSACTIONS>(arg, exclude_context);
+    return relay_post_notify<NOTIFY_OR_INVOKE_NEW_TRANSACTIONS>(arg, exclude_context);
 #endif
   }
 }

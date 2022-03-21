@@ -705,7 +705,7 @@ namespace currency
     }
 
 
-    NOTIFY_NEW_TRANSACTIONS::request r;
+    NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request r;
     r.txs.push_back(tx_blob);
     m_core.get_protocol()->relay_transactions(r, fake_context);
     //TODO: make sure that tx has reached other nodes here, probably wait to receive reflections from other nodes
@@ -716,7 +716,7 @@ namespace currency
 	bool core_rpc_server::on_force_relaey_raw_txs(const COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& req, COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& res, connection_context& cntx)
 	{
 		CHECK_CORE_READY();
-		NOTIFY_NEW_TRANSACTIONS::request r = AUTO_VAL_INIT(r);
+		NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request r = AUTO_VAL_INIT(r);
 
 		for (const auto& t : req.txs_as_hex)
 		{

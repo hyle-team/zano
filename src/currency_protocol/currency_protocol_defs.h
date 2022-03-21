@@ -71,7 +71,7 @@ namespace currency
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  struct NOTIFY_NEW_TRANSACTIONS
+  struct NOTIFY_OR_INVOKE_NEW_TRANSACTIONS
   {
     const static int ID = BC_COMMANDS_POOL_BASE + 2;
 
@@ -83,6 +83,16 @@ namespace currency
         KV_SERIALIZE(txs)
       END_KV_SERIALIZE_MAP()
     };
+
+    struct response
+    {
+      std::string code;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(code)
+      END_KV_SERIALIZE_MAP()
+    };
+
   };
   /************************************************************************/
   /*                                                                      */
@@ -172,34 +182,6 @@ namespace currency
         KV_SERIALIZE(m_block_ids)
       END_KV_SERIALIZE_MAP()
     };
-  };
-
-
-  /************************************************************************/
-  /*                                                                      */
-  /************************************************************************/
-  struct INVOKE_NEW_TRANSACTION
-  {
-    const static int ID = BC_COMMANDS_POOL_BASE + 8;
-
-    struct request
-    {
-      blobdata  tx;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tx)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string code;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(code)
-      END_KV_SERIALIZE_MAP()
-    };
-
   };
 
 }
