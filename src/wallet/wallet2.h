@@ -41,6 +41,7 @@
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
 #include "wallet_chain_shortener.h"
+#include "tor-connect/torlib/tor_lib_iface.h"
 
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10

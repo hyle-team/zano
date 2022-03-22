@@ -658,6 +658,11 @@ void simple_wallet::on_message(i_wallet2_callback::message_severity severity, co
   message_writer(color, true, std::string()) << m;
 }
 //----------------------------------------------------------------------------------------------------
+void simple_wallet::on_tor_status_change(const std::string& state)
+{
+  message_writer(epee::log_space::console_color_yellow, false, std::string("TOR")) << state;
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::refresh(const std::vector<std::string>& args)
 {
   if (m_offline_mode)
