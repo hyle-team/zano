@@ -4621,12 +4621,12 @@ void wallet2::send_transaction_to_network(const transaction& tx)
       currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request p2p_req = AUTO_VAL_INIT(p2p_req);
       currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response p2p_rsp = AUTO_VAL_INIT(p2p_rsp);
       p2p_req.txs.push_back(t_serializable_object_to_blob(tx));
-      //std::string blob;
-      //epee::serialization::store_t_to_binary(p2p_req, blob);
       epee::net_utils::invoke_remote_command2(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::ID, p2p_req, p2p_rsp, p2p_client);
-      //p2p_client.invoke(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::ID, blob,m );
       p2p_client.disconnect();
-
+      if (p2p_rsp.code == API_RETURN_CODE_OK)
+      {
+        break;
+      }
       //checking if transaction got relayed to other nodes and 
       //return;
     }
