@@ -660,7 +660,23 @@ void simple_wallet::on_message(i_wallet2_callback::message_severity severity, co
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::on_tor_status_change(const std::string& state)
 {
-  message_writer(epee::log_space::console_color_yellow, false, std::string("TOR")) << state;
+  std::string human_message;
+  if (state == TOR_LIB_STATE_INITIALIZING)
+    human_message = "Initializing...";
+  else if (state == TOR_LIB_STATE_DOWNLOADING_CONSENSUS)
+    human_message = "Downloading consensus...";
+  else if (state == TOR_LIB_STATE_MAKING_TUNNEL_A)
+    human_message = "Building tunnel to A...";
+  else if (state == TOR_LIB_STATE_MAKING_TUNNEL_B)
+    human_message = "Building tunnel to B...";
+  else if (state == TOR_LIB_STATE_CREATING_STREAM)
+    human_message = "Creating stream...";
+  else if (state == TOR_LIB_STATE_SUCCESS)
+    human_message = "Successfully created stream";
+  else if (state == TOR_LIB_STATE_FAILED)
+    human_message = "Failed created stream";
+
+  message_writer(epee::log_space::console_color_yellow, true, std::string("TOR")) << human_message;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::refresh(const std::vector<std::string>& args)
