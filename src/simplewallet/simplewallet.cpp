@@ -675,8 +675,15 @@ void simple_wallet::on_tor_status_change(const std::string& state)
     human_message = "Successfully created stream";
   else if (state == TOR_LIB_STATE_FAILED)
     human_message = "Failed created stream";
+  else if (state == WALLET_LIB_STATE_SENDING)
+    human_message = "Sending transaction...";
+  else if (state == WALLET_LIB_SENT_SUCCESS)
+    human_message = "Successfully sent!";
+  else if (state == WALLET_LIB_SEND_FAILED)
+    human_message = "Sending failed";
 
-  message_writer(epee::log_space::console_color_yellow, true, std::string("TOR")) << human_message;
+
+  message_writer(epee::log_space::console_color_yellow, true, std::string("[TOR]: ")) << human_message;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::refresh(const std::vector<std::string>& args)

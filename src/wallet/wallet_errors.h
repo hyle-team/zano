@@ -16,6 +16,12 @@
 
 // TODO: get rid of all these types, leave only wallet_error with a string message and string/enum error designator
 
+
+#define WALLET_LIB_STATE_SENDING                       "STATE_SENDING"
+#define WALLET_LIB_SENT_SUCCESS                        "STATE_SENT_SUCCESS"
+#define WALLET_LIB_SEND_FAILED                         "STATE_SEND_FAILED"
+
+
 namespace tools
 {
   namespace error
