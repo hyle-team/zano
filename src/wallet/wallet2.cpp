@@ -4618,6 +4618,8 @@ void wallet2::send_transaction_to_network(const transaction& tx)
       {
         continue;//THROW_IF_FALSE_WALLET_EX(false, error::no_connection_to_daemon, "Failed to connect to TOR node");
       }
+
+
       currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request p2p_req = AUTO_VAL_INIT(p2p_req);
       currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response p2p_rsp = AUTO_VAL_INIT(p2p_rsp);
       p2p_req.txs.push_back(t_serializable_object_to_blob(tx));

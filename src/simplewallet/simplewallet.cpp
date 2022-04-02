@@ -55,6 +55,7 @@ namespace
   const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
   const command_line::arg_descriptor<std::string> arg_scan_for_wallet = { "scan-for-wallet", "", "", true };
   const command_line::arg_descriptor<std::string> arg_addr_to_compare = { "addr-to-compare", "", "", true };
+  const command_line::arg_descriptor<bool> arg_disable_tor_relay = { "disable-tor-relay", "Do PoS mining", false, false };
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
 
@@ -123,17 +124,9 @@ namespace
         m_flush = false;
 
         LOG_PRINT(m_oss.str(), m_log_level)
-
-        if (epee::log_space::console_color_default == m_color)
-        {
-          std::cout << m_oss.str();
-        }
-        else
-        {
-          epee::log_space::set_console_color(m_color, m_bright);
-          std::cout << m_oss.str();
-          epee::log_space::reset_console_color();
-        }
+        epee::log_space::set_console_color(m_color, m_bright);
+        std::cout << m_oss.str();
+        epee::log_space::reset_console_color();
         std::cout << std::endl;
       }
 
@@ -229,6 +222,8 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this, _1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this, _1), "submit_transfer <signed_tx_file> - broadcast signed tx");
   m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::submit_transfer, this, _1), "Export transaction history in CSV file");
+  m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, _1), "Enable relaying transactions over TOR network(enabled by default)");
+  m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, _1), "Enable relaying transactions over TOR network(enabled by default)");
 }
 //----------------------------------------------------------------------------------------------------
 simple_wallet::~simple_wallet()
@@ -361,6 +356,11 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     bool r = open_wallet(m_wallet_file, pwd_container.password());
     CHECK_AND_ASSERT_MES(r, false, "could not open account");
   }
+  if (m_disable_tor)
+  {
+    m_wallet->set_disable_tor_relay(true);
+    message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) << "Notice: Relaying transactions over TOR disabled with command line parameter";
+  }
 
   return true;
 }
@@ -384,6 +384,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_do_not_set_date = command_line::get_arg(vm, arg_dont_set_date);
   m_do_pos_mining   = command_line::get_arg(vm, arg_do_pos_mining);
   m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
+  m_disable_tor     = command_line::get_arg(vm, arg_disable_tor_relay);
 } 
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::try_connect_to_daemon()
@@ -1739,6 +1740,21 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool simple_wallet::tor_enable(const std::vector<std::string> &args)
+{
+  success_msg_writer(true) << "TOR relaying enabled";
+  m_wallet->set_disable_tor_relay(false);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::tor_disable(const std::vector<std::string> &args)
+{
+  m_wallet->set_disable_tor_relay(true);
+  success_msg_writer(true) << "TOR relaying disabled";
+  return true;
+}
+
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::sweep_below(const std::vector<std::string> &args)
 {
   bool r = false;
@@ -1988,6 +2004,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_log_level);
   command_line::add_arg(desc_params, arg_scan_for_wallet);
   command_line::add_arg(desc_params, arg_addr_to_compare);
+  command_line::add_arg(desc_params, arg_disable_tor_relay);
+  
 
   tools::wallet_rpc_server::init_options(desc_params);
 

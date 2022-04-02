@@ -86,6 +86,8 @@ namespace currency
     bool sign_transfer(const std::vector<std::string> &args);
     bool submit_transfer(const std::vector<std::string> &args);
     bool sweep_below(const std::vector<std::string> &args);
+    bool tor_enable(const std::vector<std::string> &args);
+    bool tor_disable(const std::vector<std::string> &args);
     bool validate_wrap_status(uint64_t amount);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);
@@ -167,6 +169,7 @@ namespace currency
     bool m_do_not_set_date;
     bool m_do_pos_mining;
     bool m_offline_mode;
+    bool m_disable_tor;
     std::string m_restore_wallet;
 
     epee::console_handlers_binder m_cmd_binder;
