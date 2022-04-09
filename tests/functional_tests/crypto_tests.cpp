@@ -1803,6 +1803,46 @@ TEST(crypto, point_is_zero)
 }
 
 
+TEST(crypto, sc_get_bit)
+{
+  static_assert(sizeof(scalar_t) * 8 == 256, "size missmatch");
+
+  scalar_t v = 0; // all bits are 0
+  for (size_t n = 0; n < 256; ++n)
+  {
+    ASSERT_EQ(v.get_bit(n), false);
+  }
+
+  v = c_scalar_256m1; // all bits are 1
+  for (size_t n = 0; n < 256; ++n)
+  {
+    ASSERT_EQ(v.get_bit(n), true);
+  }
+
+  // bits out of the [0; 255] range supposed to be always 0
+  for (size_t n = 256; n < 2048; ++n)
+  {
+    ASSERT_EQ(v.get_bit(n), false);
+  }
+
+  // check random value
+  const scalar_t x = scalar_t::random();
+  for (size_t n = 0; n < 64; ++n)
+    ASSERT_EQ(x.get_bit(n), ((x.m_u64[0] & (1ull << (n - 0))) != 0));
+  for (size_t n = 64; n < 128; ++n)
+    ASSERT_EQ(x.get_bit(n), ((x.m_u64[1] & (1ull << (n - 64))) != 0));
+  for (size_t n = 128; n < 192; ++n)
+    ASSERT_EQ(x.get_bit(n), ((x.m_u64[2] & (1ull << (n - 128))) != 0));
+  for (size_t n = 192; n < 256; ++n)
+    ASSERT_EQ(x.get_bit(n), ((x.m_u64[3] & (1ull << (n - 192))) != 0));
+
+  // bits out of the [0; 255] range supposed to be always 0
+  for (size_t n = 256; n < 2048; ++n)
+    ASSERT_EQ(x.get_bit(n), false);
+
+  return true;
+}
+
 //
 // test's runner
 //

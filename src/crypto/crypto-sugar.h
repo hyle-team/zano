@@ -431,6 +431,13 @@ namespace crypto
       return result;
     }
 
+    bool get_bit(size_t bit_index) const
+    {
+      if (bit_index > 255)
+        return false; // TODO: consider performace implications
+      return (m_u64[bit_index >> 6] & (1ull << (bit_index & 63))) != 0;
+    }
+
   }; // struct scalar_t
 
   //
@@ -1063,6 +1070,21 @@ namespace crypto
       ge_bytes_hash_to_ec_32(&result.m_p3, (const unsigned char*)&p);
       return result;
     }
+
+    static point_t hp(const scalar_t& s)
+    {
+      point_t result;
+      ge_bytes_hash_to_ec_32(&result.m_p3, s.data());
+      return result;
+    }
+
+    static point_t hp(const void* data, size_t size)
+    {
+      point_t result;
+      ge_bytes_hash_to_ec(&result.m_p3, data, size);
+      return result;
+    }
+
   }; // hash_helper_t struct
 
 
