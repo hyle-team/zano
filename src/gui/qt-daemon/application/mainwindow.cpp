@@ -947,6 +947,17 @@ bool MainWindow::set_options(const view::gui_options& opt)
   CATCH_ENTRY2(false);
 }
 
+bool MainWindow::update_tor_status(const view::current_action_status& opt)
+{
+  TRY_ENTRY();
+  std::string json_str;
+  epee::serialization::store_t_to_json(opt, json_str, 0, epee::serialization::eol_lf);
+  LOG_PRINT_L0("SENDING SIGNAL -> [HANDLE_CURRENT_ACTION_STATE]:" << std::endl << json_str);
+  QMetaObject::invokeMethod(this, "handle_current_action_state", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  return true;
+  CATCH_ENTRY2(false);
+}
+
 bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, long *result)
 {
   TRY_ENTRY();

@@ -1871,6 +1871,13 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   }
   m_pview->money_transfer_cancel(tei);
 }
+
+void wallets_manager::on_tor_status_change(size_t wallet_id, const std::string& state)
+{
+  view::current_action_status tsu = { wallet_id , state };
+  m_pview->update_tor_status(tsu);
+}
+
 void wallets_manager::wallet_vs_options::worker_func()
 {
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet handler thread started, addr: " << w->get()->get_account().get_public_address_str(), LOG_LEVEL_0);

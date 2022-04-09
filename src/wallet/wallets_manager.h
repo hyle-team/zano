@@ -187,6 +187,8 @@ private:
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/);
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/);
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
+  virtual void on_tor_status_change(size_t wallet_id, const std::string& state);
+
 
   std::thread m_main_worker_thread;
   

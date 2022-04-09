@@ -197,6 +197,7 @@ signals:
   void set_options(const QString str);  //general function
   void get_wallet_name();
   void handle_deeplink_click(const QString str);
+  void handle_current_action_state(const QString str);
 
 private:
   //--------------------  i_core_event_handler --------------------
@@ -216,6 +217,7 @@ private:
   virtual bool init(const std::string& path);
   virtual bool pos_block_found(const currency::block& block_found);
   virtual bool set_options(const view::gui_options& opt);
+  virtual bool update_tor_status(const view::current_action_status& opt);
   //--------- QAbstractNativeEventFilter ---------------------------
   virtual bool nativeEventFilter(const QByteArray &eventType, void *message, long *result);
   //----------------------------------------------

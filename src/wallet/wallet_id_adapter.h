@@ -16,6 +16,7 @@ public:
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/) {}
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/) {}
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti) {}
+  virtual void on_tor_status_change(size_t wallet_id, const std::string& state) {}
 };
 
 struct i_wallet_to_i_backend_adapter: public tools::i_wallet2_callback
@@ -39,6 +40,11 @@ struct i_wallet_to_i_backend_adapter: public tools::i_wallet2_callback
   virtual void on_transfer_canceled(const tools::wallet_public::wallet_transfer_info& wti) {
     m_pbackend->on_transfer_canceled(m_wallet_id, wti);
   }
+  virtual void on_tor_status_change(const std::string& state)
+  {
+    m_pbackend->on_tor_status_change(m_wallet_id, state);
+  }
+
 private:
   i_backend_wallet_callback* m_pbackend;
   size_t m_wallet_id;
