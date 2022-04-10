@@ -4612,6 +4612,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
     //make few attempts
     tools::levin_over_tor_client p2p_client;
     p2p_client.get_transport().set_notifier(this);
+    bool succeseful_sent = false;
     for (size_t i = 0; i != 3; i++)
     {
       if (!p2p_client.connect("144.76.183.143", 2121, 10000))
@@ -4629,11 +4630,17 @@ void wallet2::send_transaction_to_network(const transaction& tx)
       if (p2p_rsp.code == API_RETURN_CODE_OK)
       {
         this->notify_state_change(WALLET_LIB_SENT_SUCCESS);
+        succeseful_sent = true;
         break;
       }
       this->notify_state_change(WALLET_LIB_SEND_FAILED);
       //checking if transaction got relayed to other nodes and 
       //return;
+    }
+    if (!succeseful_sent)
+    {
+      this->notify_state_change(WALLET_LIB_SEND_FAILED);
+      THROW_IF_FALSE_WALLET_EX(succeseful_sent, error::no_connection_to_daemon, "Faile to build TOR stream");
     }
   }
   else
