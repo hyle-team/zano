@@ -36,42 +36,42 @@ namespace epee
   {
 
     template<typename transport_t>
-      bool levin_client_impl_t<transport_t>::connect(u_long ip, int port, unsigned int timeout, const std::string& bind_ip)
+    bool levin_client_impl_t<transport_t>::connect(u_long ip, int port, unsigned int timeout, const std::string& bind_ip)
     {
       return m_transport.connect(string_tools::get_ip_string_from_int32(ip), port, timeout, timeout, bind_ip);
     }
     //------------------------------------------------------------------------------
     template<typename transport_t>
-      bool levin_client_impl_t<transport_t>::connect(const std::string& addr, int port, unsigned int timeout, const std::string& bind_ip)
+    bool levin_client_impl_t<transport_t>::connect(const std::string& addr, int port, unsigned int timeout, const std::string& bind_ip)
     {
       return m_transport.connect(addr, port, timeout, timeout, bind_ip);
     }
     //------------------------------------------------------------------------------
     template<typename transport_t>
-      bool levin_client_impl_t<transport_t>::is_connected()
+    bool levin_client_impl_t<transport_t>::is_connected()
     {
       return m_transport.is_connected();
     }
     //------------------------------------------------------------------------------
     template<typename transport_t>
-      bool levin_client_impl_t<transport_t>::disconnect()
+    bool levin_client_impl_t<transport_t>::disconnect()
     {
       return m_transport.disconnect();
     }
     //------------------------------------------------------------------------------
     template<typename transport_t>
-      levin_client_impl_t<transport_t>::levin_client_impl_t()
+    levin_client_impl_t<transport_t>::levin_client_impl_t()
     {
     }
     //------------------------------------------------------------------------------
     template<typename transport_t>
-      levin_client_impl_t<transport_t>::~levin_client_impl_t()
+    levin_client_impl_t<transport_t>::~levin_client_impl_t()
     {
       disconnect();
     }
     //------------------------------------------------------------------------------
     template<typename transport_t>
-      int levin_client_impl_t<transport_t>::invoke(int command, const std::string& in_buff, std::string& buff_out)
+    int levin_client_impl_t<transport_t>::invoke(int command, const std::string& in_buff, std::string& buff_out)
     {
       if (!is_connected())
         return -1;
@@ -107,7 +107,7 @@ namespace epee
     }
     //------------------------------------------------------------------------------
     template<typename transport_t>
-      int levin_client_impl_t<transport_t>::notify(int command, const std::string& in_buff)
+    int levin_client_impl_t<transport_t>::notify(int command, const std::string& in_buff)
     {
       if (!is_connected())
         return -1;
@@ -127,7 +127,7 @@ namespace epee
       return 1;
     }
     //------------------------------------------------------------------------------
-      template<typename transport_t>
+    template<typename transport_t>
     int levin_client_impl2<transport_t>::invoke(int command, const std::string& in_buff, std::string& buff_out)
     {
       if (!is_connected())
@@ -140,10 +140,10 @@ namespace epee
       head.m_command = static_cast<uint32_t>(command);
       head.m_protocol_version = LEVIN_PROTOCOL_VER_1;
       head.m_flags = LEVIN_PACKET_REQUEST;
-      if (!m_transport.send(&head, sizeof(head)))
+      if (!this->m_transport.send(&head, sizeof(head)))
         return -1;
 
-      if (!m_transport.send(in_buff))
+      if (!this->m_transport.send(in_buff))
         return -1;
 
       //Since other side of connection could be running by async server, 
@@ -153,7 +153,7 @@ namespace epee
 
       while (true)
       {
-        if (!m_transport.recv_n(local_buff, sizeof(bucket_head2)))
+        if (!this->m_transport.recv_n(local_buff, sizeof(bucket_head2)))
           return LEVIN_ERROR_NET_ERROR;
 
         head = *(bucket_head2*)local_buff.data();
@@ -162,7 +162,7 @@ namespace epee
           LOG_PRINT_L0("Signature missmatch in response");
           return LEVIN_ERROR_SIGNATURE_MISMATCH;
         }
-        if (!m_transport.recv_n(buff_out, head.m_cb))
+        if (!this->m_transport.recv_n(buff_out, head.m_cb))
           return LEVIN_ERROR_NET_ERROR;
 
         //now check if this is response to invoke  (and extra validate if it's response to this(!) invoke)
@@ -178,7 +178,7 @@ namespace epee
     }
     //------------------------------------------------------------------------------
     template<typename transport_t>
-      int levin_client_impl2<transport_t>::notify(int command, const std::string& in_buff)
+    int levin_client_impl2<transport_t>::notify(int command, const std::string& in_buff)
     {
       if (!is_connected())
         return -1;
@@ -191,10 +191,10 @@ namespace epee
       head.m_protocol_version = LEVIN_PROTOCOL_VER_1;
       head.m_flags = LEVIN_PACKET_REQUEST;
 
-      if (!m_transport.send((const char*)&head, sizeof(head)))
+      if (!this->m_transport.send((const char*)&head, sizeof(head)))
         return -1;
 
-      if (!m_transport.send(in_buff))
+      if (!this->m_transport.send(in_buff))
         return -1;
 
       return 1;
