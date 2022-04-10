@@ -57,6 +57,9 @@ endif()
 
 set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
 
+get_filename_component(EPEE_INCLUDE_PATH_FOR_SUBMODULES contrib/epee/include ABSOLUTE ) 
+message("Epee absolute path set to: ${EPEE_INCLUDE_PATH_FOR_SUBMODULES}")
+
 include_directories(src contrib/eos_portable_archive contrib contrib/epee/include "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
 
 add_definitions(-DSTATICLIB)
