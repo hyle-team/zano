@@ -897,6 +897,7 @@ namespace crypto
   extern const point_g_t c_point_G;
 
   extern const point_t  c_point_H;
+  extern const point_t  c_point_H2;
   extern const point_t  c_point_0;
 
   //
