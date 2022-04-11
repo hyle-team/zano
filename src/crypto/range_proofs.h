@@ -148,3 +148,4 @@ namespace crypto
 } // namespace crypto
 
 #include "range_proof_bpp.h"
+#include "range_proof_bppe.h"

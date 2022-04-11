@@ -180,3 +180,82 @@ TEST(bpp, power_256)
   return true;
 }
 
+
+
+//
+// tests for Bulletproofs+ Extended (with double-blinded commitments)
+//
+
+
+TEST(bppe, basics)
+{
+  /*
+  srand(0);
+  for (size_t i = 0; i < 10; ++i)
+    std::cout << scalar_t::random().to_string_as_secret_key() << ENDL;
+  */
+
+  scalar_vec_t values = { 5 };
+  scalar_vec_t masks   = { 0 };
+  scalar_vec_t masks_2 = { 0 };
+  
+  bppe_signature bppe_sig;
+  std::vector<point_t> commitments;
+  uint8_t err = 0;
+
+  bool r = bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks_2, bppe_sig, commitments, &err);
+
+  ASSERT_TRUE(r);
+
+  return true;
+}
+
+TEST(bppe, two)
+{
+  std::vector<bppe_signature> signatures_vector;
+  signatures_vector.reserve(10);
+  std::vector<std::vector<point_t>> commitments_vector;
+  commitments_vector.reserve(10);
+
+  std::vector<bppe_sig_commit_ref_t> sigs;
+  uint8_t err = 0;
+  bool r = false;
+
+  {
+    signatures_vector.resize(signatures_vector.size() + 1);
+    bppe_signature &bppe_sig = signatures_vector.back();
+    commitments_vector.resize(commitments_vector.size() + 1);
+    std::vector<point_t>& commitments = commitments_vector.back();
+
+    scalar_vec_t values = { 5 };
+    scalar_vec_t masks  = { scalar_t(77 + 256 * 77) };
+    scalar_vec_t masks2 = { scalar_t(88 + 256 * 88) };
+
+    r = bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks2, bppe_sig, commitments, &err);
+    ASSERT_TRUE(r);
+
+    sigs.emplace_back(bppe_sig, commitments);
+  }
+
+  {
+    signatures_vector.resize(signatures_vector.size() + 1);
+    bppe_signature &bppe_sig = signatures_vector.back();
+    commitments_vector.resize(commitments_vector.size() + 1);
+    std::vector<point_t>& commitments = commitments_vector.back();
+
+    scalar_vec_t values = { 5, 700, 8 };
+    scalar_vec_t masks  = { scalar_t(77 + 256 * 77), scalar_t(255), scalar_t(17) };
+    scalar_vec_t masks2 = { scalar_t(88 + 256 * 88), scalar_t(1), scalar_t(19) };
+
+    r = bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks2, bppe_sig, commitments, &err);
+    ASSERT_TRUE(r);
+
+    sigs.emplace_back(bppe_sig, commitments);
+  }
+
+  r = bppe_verify<bpp_crypto_trait_zano<>>(sigs, &err);
+  ASSERT_TRUE(r);
+
+
+  return true;
+}
