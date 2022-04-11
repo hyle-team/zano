@@ -109,7 +109,7 @@ namespace epee
     template<typename transport_t>
     int levin_client_impl_t<transport_t>::notify(int command, const std::string& in_buff)
     {
-      if (!is_connected())
+      if (!this->is_connected())
         return -1;
 
       bucket_head head = { 0 };
@@ -130,7 +130,7 @@ namespace epee
     template<typename transport_t>
     int levin_client_impl2<transport_t>::invoke(int command, const std::string& in_buff, std::string& buff_out)
     {
-      if (!is_connected())
+      if (!this->is_connected())
         return -1;
 
       bucket_head2 head = { 0 };
@@ -180,7 +180,7 @@ namespace epee
     template<typename transport_t>
     int levin_client_impl2<transport_t>::notify(int command, const std::string& in_buff)
     {
-      if (!is_connected())
+      if (!this->is_connected())
         return -1;
 
       bucket_head2 head = { 0 };
