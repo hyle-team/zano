@@ -7,6 +7,7 @@ SET LOCAL_BOOST_PATH=C:\dev\_sdk\boost_1_68_0
 SET LOCAL_BOOST_LIB_PATH=C:\dev\_sdk\boost_1_68_0\lib64-msvc-14.1
 SET MY_PATH=%~dp0
 SET SOURCES_PATH=%MY_PATH:~0,-7%
+SET OPENSSL_ROOT_DIR=C:\dev\_sdk\OpenSSL-Win64
 
 IF NOT [%build_prefix%] == [] (
   SET ACHIVE_NAME_PREFIX=%ACHIVE_NAME_PREFIX%%build_prefix%-
@@ -44,7 +45,7 @@ cd %SOURCES_PATH%
 rmdir build /s /q
 mkdir build
 cd build
-cmake %TESTNET_DEF% -D CMAKE_PREFIX_PATH="%QT_PREFIX_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -G "Visual Studio 15 2017 Win64" -T host=x64 ..
+cmake %TESTNET_DEF% -D OPENSSL_ROOT_DIR="%OPENSSL_ROOT_DIR%" -D CMAKE_PREFIX_PATH="%QT_PREFIX_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -G "Visual Studio 15 2017 Win64" -T host=x64 ..
 IF %ERRORLEVEL% NEQ 0 (
   goto error
 )
