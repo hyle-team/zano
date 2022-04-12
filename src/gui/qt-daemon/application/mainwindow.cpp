@@ -1665,6 +1665,20 @@ QString MainWindow::get_log_level(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString set_enable_tor(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<bool>, enabl_tor);
+  m_backend.
+  //epee::log_space::get_set_log_detalisation_level(true, enabl_tor.v);
+  default_ar.error_code = API_RETURN_CODE_OK;
+  LOG_PRINT("[LOG LEVEL]: set to " << lvl.v, LOG_LEVEL_MIN);
+
+  return MAKE_RESPONSE(default_ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
 // QString MainWindow::dump_all_offers()
 // {
 //   LOG_API_TIMING();

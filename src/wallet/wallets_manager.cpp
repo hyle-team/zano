@@ -81,7 +81,8 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_is_pos_allowed(false),
                                  m_qt_logs_enbaled(false), 
                                  m_dont_save_wallet_at_stop(false), 
-                                 m_use_deffered_global_outputs(false)
+                                 m_use_deffered_global_outputs(false), 
+                                 m_use_tor(true)
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
@@ -791,6 +792,8 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
       m_wallet_log_prefixes.resize(id + 1);
     m_wallet_log_prefixes[id] = std::string("[") + epee::string_tools::num_to_string_fast(id) + ":" + wo.w->get()->get_account().get_public_address_str().substr(0, 6) + "] ";
   }
+  
+  wo.w->get()->set_disable_tor_relay(!m_use_tor);
 }
 
 
@@ -1842,6 +1845,17 @@ void wallets_manager::on_pos_block_found(size_t wallet_id, const currency::block
 {
   m_pview->pos_block_found(b);
 }
+bool wallets_manager::set_use_tor(bool use_tor)
+{
+  m_use_tor = use_tor;
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
+  for (auto& w : m_wallets)
+  {
+    w.second.w->get()->set_disable_tor_relay(!m_use_tor);
+  }
+  return true;
+}
+
 void wallets_manager::on_sync_progress(size_t wallet_id, const uint64_t& percents)
 {
   // do not lock m_wallets_lock down the callstack! It will lead to a deadlock, because wallet locked_object is aready locked

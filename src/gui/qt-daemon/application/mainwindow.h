@@ -137,6 +137,7 @@ public:
   QString stop_pos_mining(const QString& param);
   QString set_log_level(const QString& param);
   QString get_log_level(const QString& param);
+  QString set_enable_tor(const QString& param);
 //  QString dump_all_offers();
   QString webkit_launched_script();
   QString get_smart_wallet_info(const QString& param);
