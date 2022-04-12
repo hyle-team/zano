@@ -194,7 +194,12 @@ namespace tools
       ntp_packet packet_sent = AUTO_VAL_INIT(packet_sent);
       packet_sent.li_vn_mode = 0x1b;
       auto packet_sent_time = std::chrono::high_resolution_clock::now();
-      socket.send_to(boost::asio::buffer(&packet_sent, sizeof packet_sent), receiver_endpoint);
+      auto send_res = socket.send_to(boost::asio::buffer(&packet_sent, sizeof packet_sent), receiver_endpoint);
+      if (send_res != sizeof packet_sent)
+      {
+        LOG_PRINT_L3("NTP: get_ntp_time(" << host_name << "): wrong send_res: " << send_res << ", expected sizeof packet_sent = " << sizeof packet_sent);
+        return 0;
+      }
 
       ntp_packet packet_received = AUTO_VAL_INIT(packet_received);
       boost::asio::ip::udp::endpoint sender_endpoint;
