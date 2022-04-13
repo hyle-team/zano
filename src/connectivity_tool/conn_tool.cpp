@@ -640,7 +640,7 @@ bool handle_request_stat(po::variables_map& vm, peerid_type peer_id)
 
   response_schema rs = AUTO_VAL_INIT(rs);
 
-  levin::levin_client_impl2 transport;
+  net_utils::levin_client2 transport;
   if(!transport.connect(command_line::get_arg(vm, arg_ip), static_cast<int>(command_line::get_arg(vm, arg_port)), static_cast<int>(command_line::get_arg(vm, arg_timeout))))
   {
     std::cout << "{" << ENDL << "  \"status\": \"ERROR: " << "Failed to connect to " << command_line::get_arg(vm, arg_ip) << ":" << command_line::get_arg(vm, arg_port) << "\"" << ENDL << "}" << ENDL;
@@ -878,7 +878,7 @@ bool generate_and_print_keys()
 }
 //---------------------------------------------------------------------------------------------------------------
 template<class command_t>
-bool invoke_debug_command(po::variables_map& vm, const crypto::secret_key& sk, levin::levin_client_impl2& transport, peerid_type& peer_id, typename command_t::request& req, typename command_t::response& rsp)
+bool invoke_debug_command(po::variables_map& vm, const crypto::secret_key& sk, net_utils::levin_client2& transport, peerid_type& peer_id, typename command_t::request& req, typename command_t::response& rsp)
 {
   if (!transport.is_connected())
   {
@@ -933,7 +933,7 @@ bool handle_set_peer_log_level(po::variables_map& vm)
     return false;
   }
 
-  levin::levin_client_impl2 transport;
+  net_utils::levin_client2 transport;
   peerid_type peer_id = 0;
 
   COMMAND_SET_LOG_LEVEL::request req = AUTO_VAL_INIT(req);
@@ -982,7 +982,7 @@ bool handle_download_peer_log(po::variables_map& vm)
   }
   uint64_t start_offset = static_cast<uint64_t>(start_offset_signed);
 
-  levin::levin_client_impl2 transport;
+  net_utils::levin_client2 transport;
   peerid_type peer_id = 0;
 
   COMMAND_REQUEST_LOG::request req = AUTO_VAL_INIT(req);
