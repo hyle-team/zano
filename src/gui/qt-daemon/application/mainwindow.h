@@ -196,7 +196,6 @@ signals:
   void do_dispatch(const QString status, const QString params);  //general function
   void on_core_event(const QString method_name);  //general function
   void set_options(const QString str);  //general function
-  void get_wallet_name();
   void handle_deeplink_click(const QString str);
   void handle_current_action_state(const QString str);
 
