@@ -2200,6 +2200,13 @@ int main(int argc, char* argv[])
   }
   else // if(command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
   {
+    if (command_line::get_arg(vm, arg_do_pos_mining))
+    { 
+      // PoS mining can be turned on only in RPC server mode, please provide --rpc-bind-port to make this
+      fail_msg_writer() << "PoS mining can be turned on only in RPC server mode, please provide --rpc-bind-port=PORT_NO to enable staking in simplewallet";
+      return EXIT_FAILURE;
+    }
+
     //runs wallet with console interface
     sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
