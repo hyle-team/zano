@@ -1,9 +1,4 @@
-;;SET QT_PREFIX_PATH=C:\dev\_sdk\Qt5.11.2\5.11.2
-;;SET INNOSETUP_PATH=C:\Program Files (x86)\Inno Setup 5\ISCC.exe
-;;SET ETC_BINARIES_PATH=C:\dev\deploy\etc-binaries
-;;SET BUILDS_PATH=C:\dev\deploy\zano
-;;SET LOCAL_BOOST_PATH=C:\dev\_sdk\boost_1_70_0
-;;SET OPENSSL_ROOT_DIR=C:\dev\_sdk\OpenSSL-Win64
+call configure_local_paths.cmd
 
 ;; MSVC version-specific paths
 SET LOCAL_BOOST_LIB_PATH=%LOCAL_BOOST_PATH%\lib64-msvc-14.1
