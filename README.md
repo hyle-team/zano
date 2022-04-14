@@ -36,11 +36,11 @@ Recommended OS version: Ubuntu 18.04 LTS.
 
    [*server version*]
    
-       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen
+       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev
           
    [*GUI version*]
 
-       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen mesa-common-dev libglu1-mesa-dev
+       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev mesa-common-dev libglu1-mesa-dev
 
 2. Download and build Boost
 
@@ -63,9 +63,8 @@ Recommended OS version: Ubuntu 18.04 LTS.
 
 4. Install OpenSSL
 
-   We recommend installing OpenSSL v1.1.1 locally unless you would like to use the same version system-wide.
+   We recommend installing OpenSSL v1.1.1n locally unless you would like to use the same version system-wide.
 
-       sudo apt install build-essential checkinstall zlib1g-dev -y
        curl -OL https://www.openssl.org/source/openssl-1.1.1n.tar.gz
        tar xaf openssl-1.1.1n.tar.gz 
        cd openssl-1.1.1n/
@@ -80,20 +79,20 @@ For instance, by adding the following lines to `~/.bashrc`
 
     [*server version*]
 
-       export BOOST_ROOT=/home/user/boost_1_68_0  
+       export BOOST_ROOT=/home/user/boost_1_70_0  
        export OPENSSL_ROOT_DIR=/home/user/openssl
 
 
     [*GUI version*]
 
-       export BOOST_ROOT=/home/user/boost_1_68_0
+       export BOOST_ROOT=/home/user/boost_1_70_0
        export OPENSSL_ROOT_DIR=/home/user/openssl  
        export QT_PREFIX_PATH=/home/user/Qt5.11.2/5.11.2/gcc_64
 
 
 
-6. Building binaries
-   1. Building daemon and simplewallet:
+6. Build the binaries
+   1. Build daemon and simplewallet:
 
           cd zano/ && make -j1
       or 
@@ -106,7 +105,7 @@ For instance, by adding the following lines to `~/.bashrc`
       
       **NOTICE 2**: If you'd like to build binaries for the testnet, use `cmake -D TESTNET=TRUE ..` instead of `cmake ..` .
    
-   1. Building GUI:
+   1. Build GUI:
 
           cd zano
           utils/build_sript_linux.sh
