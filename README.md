@@ -18,7 +18,8 @@ Be sure to clone the repository properly:\
 | [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2015 (14.0 update 1) | 2017 (15.9.0) | 2019 |
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 9.2 | 12.3 | 12.3 |
 | [CMake](https://cmake.org/download/) | 2.8.6 | 3.15.5 | 3.20 |
-| [Boost](https://www.boost.org/users/download/) | 1.56 | 1.68 | 1.76 |
+| [Boost](https://www.boost.org/users/download/) | 1.70 | 1.70 | 1.76 |
+| [OpenSSL](https://www.openssl.org/source/) | - | 1.1.1n | 1.1.1n | 
 | [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |
 
 Note:\
@@ -43,10 +44,10 @@ Recommended OS version: Ubuntu 18.04 LTS.
 
 2. Download and build Boost
 
-       wget https://boostorg.jfrog.io/artifactory/main/release/1.68.0/source/boost_1_68_0.tar.bz2
-       tar -xjf boost_1_68_0.tar.bz2
-       cd boost_1_68_0
-       ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer
+       curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.70.0/source/boost_1_70_0.tar.bz2
+       tar -xjf boost_1_70_0.tar.bz2
+       cd boost_1_70_0
+       ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
        ./b2
 
 3. Install Qt\
@@ -54,27 +55,44 @@ Recommended OS version: Ubuntu 18.04 LTS.
 
     [*GUI version*]
 
-       wget https://download.qt.io/new_archive/qt/5.11/5.11.2/qt-opensource-linux-x64-5.11.2.run
+       curl -OL https://download.qt.io/new_archive/qt/5.11/5.11.2/qt-opensource-linux-x64-5.11.2.run
        chmod +x qt-opensource-linux-x64-5.11.2.run
        ./qt-opensource-linux-x64-5.11.2.run
     Then follow the instructions in Wizard. Don't forget to tick the WebEngine module checkbox!
 
-4. Set environment variables properly\
+
+4. Install OpenSSL
+
+   We recommend installing OpenSSL v1.1.1 locally unless you would like to use the same version system-wide.
+
+       sudo apt install build-essential checkinstall zlib1g-dev -y
+       curl -OL https://www.openssl.org/source/openssl-1.1.1n.tar.gz
+       tar xaf openssl-1.1.1n.tar.gz 
+       cd openssl-1.1.1n/
+       ./config --prefix=/home/user/openssl --openssldir=/home/user/openssl shared zlib
+       make
+       make test
+       make install
+
+
+5. Set environment variables properly\
 For instance, by adding the following lines to `~/.bashrc`
 
     [*server version*]
 
        export BOOST_ROOT=/home/user/boost_1_68_0  
+       export OPENSSL_ROOT_DIR=/home/user/openssl
 
 
     [*GUI version*]
 
-       export BOOST_ROOT=/home/user/boost_1_68_0  
+       export BOOST_ROOT=/home/user/boost_1_68_0
+       export OPENSSL_ROOT_DIR=/home/user/openssl  
        export QT_PREFIX_PATH=/home/user/Qt5.11.2/5.11.2/gcc_64
 
 
 
-5. Building binaries
+6. Building binaries
    1. Building daemon and simplewallet:
 
           cd zano/ && make -j1
@@ -99,9 +117,9 @@ For instance, by adding the following lines to `~/.bashrc`
 
 ### Windows
 Recommended OS version: Windows 7 x64.
-1. Install required prerequisites (Boost, Qt, CMake).
+1. Install required prerequisites (Boost, Qt, CMake, OpenSSL).
 2. Edit paths in `utils/configure_local_paths.cmd`.
-3. Run `utils/configure_win64_msvs2015_gui.cmd` or `utils/configure_win64_msvs2017_gui.cmd` according to your MSVC version.
+3. Run one of `utils/configure_win64_msvsNNNN_gui.cmd` according to your MSVC version.
 4. Go to the build folder and open generated Zano.sln in MSVC.
 5. Build.
 
@@ -115,7 +133,7 @@ In order to correctly deploy Qt GUI application, you also need to do the followi
 <br />
 
 ### macOS
-Recommended OS version: macOS Sierra 10.15.4 x64.
+Recommended OS version: macOS Big Sur 11.4 x64.
 1. Install required prerequisites.
 2. Set environment variables as stated in `utils/macosx_build_config.command`.
 3.  `mkdir build` <br> `cd build` <br> `cmake ..` <br> `make`
