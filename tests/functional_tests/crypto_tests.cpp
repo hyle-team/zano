@@ -473,6 +473,7 @@ uint64_t hash_64(const void* data, size_t size)
 #define ASSERT_TRUE(expr)  CHECK_AND_ASSERT_MES(expr, false, "This is not true: " #expr)
 #define ASSERT_FALSE(expr) CHECK_AND_ASSERT_MES((expr) == false, false, "This is not false: " #expr)
 #define ASSERT_EQ(a, b)    CHECK_AND_ASSERT_MES(a == b, false, #a " != " #b "\n    " << a << " != " << b)
+#define ASSERT_NEQ(a, b)   CHECK_AND_ASSERT_MES(a != b, false, #a " == " #b "\n    " << a)
 
 typedef bool(*bool_func_ptr_t)();
 static std::vector<std::pair<std::string, bool_func_ptr_t>> g_tests;
