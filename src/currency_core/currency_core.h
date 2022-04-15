@@ -20,6 +20,7 @@
 #include "currency_core/currency_stat_info.h"
 #include "warnings.h"
 #include "crypto/hash.h"
+#include "global_config_structure.h"
 
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4355)
@@ -152,6 +153,7 @@ namespace currency
 
      critical_section m_blockchain_update_listeners_lock;
      std::vector<i_blockchain_update_listener*> m_blockchain_update_listeners;
+     global_config_structure m_global_config;
    };
 }
 

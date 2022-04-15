@@ -142,9 +142,30 @@ namespace currency
     return m_blockchain_storage.get_alternative_blocks_count();
   }
   //-----------------------------------------------------------------------------------------------
+  bool core::verify_global_config()
+  {
+    //validate path not empty
+    if (m_global_config.data_storage_path.empty())
+      m_global_config.data_storage_path = m_config_folder;
+
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool core::init_global_config()
+  {
+    const std::string path_to_conf = m_config_folder + "/" CURRENCY_GLOBAL_CONFIG_FILENAME;
+    epee::serialization::load_t_from_json_file(m_global_config, path_to_conf);
+    verify_global_config();
+    return epee::serialization::store_t_to_json_file(m_global_config, path_to_conf);
+  }
+  //-----------------------------------------------------------------------------------------------
   bool core::init(const boost::program_options::variables_map& vm)
   {
+
     bool r = handle_command_line(vm);
+
+    r = init_global_config();
+    CHECK_AND_ASSERT_MES(r, false, "Failed to initialize gobal config");
 
     uint64_t available_space = 0;
     CHECK_AND_ASSERT_MES(!check_if_free_space_critically_low(&available_space), false, "free space in data folder is critically low: " << std::fixed << available_space / (1024 * 1024) << " MB");

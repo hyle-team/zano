@@ -109,7 +109,6 @@ namespace currency
       tools::db::stat_info si;
     };
 
-
     struct key_images_ptr_compare
     {
       bool operator()(const std::shared_ptr<crypto::key_image>& a, const std::shared_ptr<crypto::key_image>& b) const
