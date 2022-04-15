@@ -431,11 +431,29 @@ namespace crypto
       return result;
     }
 
-    bool get_bit(size_t bit_index) const
+    // Little-endian assumed; TODO: consider Big-endian support
+    bool get_bit(uint8_t bit_index) const
     {
-      if (bit_index > 255)
-        return false; // TODO: consider performace implications
       return (m_u64[bit_index >> 6] & (1ull << (bit_index & 63))) != 0;
+    }
+
+    // Little-endian assumed; TODO: consider Big-endian support
+    void set_bit(size_t bit_index)
+    {
+      m_u64[bit_index >> 6] |= (1ull << (bit_index & 63));
+    }
+
+    // Little-endian assumed; TODO: consider Big-endian support
+    void clear_bit(size_t bit_index)
+    {
+      m_u64[bit_index >> 6] &= ~(1ull << (bit_index & 63));
+    }
+
+    static scalar_t power_of_2(uint8_t exponent)
+    {
+      scalar_t result = 0;
+      result.set_bit(exponent);
+      return result;
     }
 
   }; // struct scalar_t
