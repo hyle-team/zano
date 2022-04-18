@@ -100,6 +100,7 @@ MainWindow::MainWindow()
   , m_system_shutdown(false)
   , m_view(nullptr)
   , m_channel(nullptr)
+  , m_ui_dispatch_id_counter(0)
 {
 #ifndef _MSC_VER
   //workaround for macos broken tolower from std, very dirty hack
@@ -415,7 +416,7 @@ bool MainWindow::init(const std::string& html_path)
   //QtWebEngine::initialize();
   init_tray_icon(html_path);
   set_html_path(html_path);
-
+  m_threads_pool.init(2);
   m_backend.subscribe_to_core_events(this);
 
   bool r = QSslSocket::supportsSsl();
@@ -919,6 +920,41 @@ QString MainWindow::start_backend(const QString& params)
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+
+QString MainWindow::sync_call(const QString& func_name, const QString& params)
+{
+  if (func_name == "transfer")
+  {
+    return this->transfer(params);
+  }
+  else if (func_name == "test_call")
+  {
+    return params;
+  }
+  else
+  {
+    return QString(QString() + "{ \"status\": \"Method '" + func_name  + "' not found\"}");
+  }
+}
+
+QString MainWindow::async_call(const QString& func_name, const QString& params)
+{
+
+  uint64_t job_id = m_ui_dispatch_id_counter++;
+  QString method_name = func_name;
+  QString argements = params;
+
+  auto async_callback = [this, method_name, argements, job_id]()
+  {
+    QString res_str = this->sync_call(method_name, argements);
+    this->dispatch_async_call_result(std::to_string(job_id).c_str(), res_str);  //general function
+  };
+
+  m_threads_pool.add_job(async_callback);
+  LOG_PRINT_L2("[UI_ASYNC_CALL]: started " << method_name.toStdString() << ", job id: " << job_id);
+  return QString::fromStdString(std::string("{ \"job_id\": ") + std::to_string(job_id) + "}");
+}
+
 
 bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
 {

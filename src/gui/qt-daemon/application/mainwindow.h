@@ -18,6 +18,8 @@
 #include "currency_core/offers_services_helpers.h"
 #endif
 
+#include "common/threads_pool.h"
+
 QT_BEGIN_NAMESPACE
 class QWebEngineView;
 class QLineEdit;
@@ -180,6 +182,9 @@ public:
   QString is_remnotenode_mode_preconfigured();
   QString start_backend(const QString& params);
 
+  QString async_call(const QString& func_name, const QString& params);
+  QString sync_call(const QString& func_name, const QString& params);
+
   //for test purposes onlys
   QString request_dummy();
 
@@ -193,11 +198,11 @@ signals:
   void wallet_sync_progress(const QString str);
   void handle_internal_callback(const QString str, const QString callback_name);
   void update_pos_mining_text(const QString str);
-  void do_dispatch(const QString status, const QString params);  //general function
   void on_core_event(const QString method_name);  //general function
   void set_options(const QString str);  //general function
   void handle_deeplink_click(const QString str);
   void handle_current_action_state(const QString str);
+  void dispatch_async_call_result(const QString id, const QString resp);  //general function
 
 private:
   //--------------------  i_core_event_handler --------------------
@@ -259,6 +264,8 @@ private:
   std::atomic<bool> m_gui_deinitialize_done_1;
   std::atomic<bool> m_backend_stopped_2;
   std::atomic<bool> m_system_shutdown;
+  std::atomic<uint64_t> m_ui_dispatch_id_counter;
+  utils::threads_pool m_threads_pool;
 
   std::string m_master_password;
 
