@@ -81,7 +81,7 @@ namespace utils
       std::mutex batch_mutex;
 
 
-      std::atomic<size_t> cnt = 0;
+      std::atomic<size_t> cnt(0);
       for (const auto& jb : cntr)
       {
         call_executor_base* pjob = jb.get();
