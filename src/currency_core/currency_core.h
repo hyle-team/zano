@@ -153,7 +153,7 @@ namespace currency
 
      critical_section m_blockchain_update_listeners_lock;
      std::vector<i_blockchain_update_listener*> m_blockchain_update_listeners;
-     global_config_structure m_global_config;
+     global_config_data m_global_config;
    };
 }
 

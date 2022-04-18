@@ -144,15 +144,21 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::verify_global_config()
   {
+    if (!m_global_config.pvm)
+      m_global_config.pvm = &m_global_config.vm_stub;
+
+
     //validate path not empty
     if (m_global_config.data_storage_path.empty())
       m_global_config.data_storage_path = m_config_folder;
 
+
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::init_global_config()
+  bool core::init_global_config(boost::program_options::variables_map& vm)
   {
+    m_global_config.pvm = &vm;
     const std::string path_to_conf = m_config_folder + "/" CURRENCY_GLOBAL_CONFIG_FILENAME;
     epee::serialization::load_t_from_json_file(m_global_config, path_to_conf);
     verify_global_config();
@@ -164,7 +170,7 @@ namespace currency
 
     bool r = handle_command_line(vm);
 
-    r = init_global_config();
+    r = init_global_config(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize gobal config");
 
     uint64_t available_space = 0;

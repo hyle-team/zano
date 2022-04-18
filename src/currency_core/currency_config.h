@@ -213,7 +213,7 @@
 #define GUI_CONFIG_FILENAME                             "gui_settings.json"
 #define GUI_INTERNAL_CONFIG2                            "gui_internal_config.json"
 #define GUI_IPC_MESSAGE_CHANNEL_NAME                    CURRENCY_NAME_BASE "_message_que"
-#define CURRENCY_CORE_CONFIG_FILENAME                   "global_settings.json"
+#define CURRENCY_GLOBAL_CONFIG_FILENAME                 "global_settings.json"
 
 
 
