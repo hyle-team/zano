@@ -110,6 +110,12 @@ namespace crypto
       return generators[2 * index + (select_H ? 1 : 0)];
     }
 
+    static const scalar_t& get_2_to_the_power_of_N_minus_1()
+    {
+      static scalar_t result = scalar_t::power_of_2(c_bpp_n) - 1;
+      return result;
+    }
+
     static const point_t& bpp_H;
     static const point_t& bpp_H2;
   }; // struct bpp_crypto_trait_zano

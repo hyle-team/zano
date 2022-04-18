@@ -588,9 +588,7 @@ namespace crypto
         for (size_t i = 0; i < interm.c_bpp_m; ++i)
           d(i, j) = d(i, j - 1) + d(i, j - 1);
       // sum(d) (see also note in proof function for this)
-      // TODO: check for not 2^64 version
-      static const scalar_t c_scalar_2_power_n_minus_1 = { 0xffffffffffffffff, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000 };
-      const scalar_t sum_d = c_scalar_2_power_n_minus_1 * sum_of_powers(interm.z_sq, interm.c_bpp_log2_m);
+      const scalar_t sum_d = CT::get_2_to_the_power_of_N_minus_1() * sum_of_powers(interm.z_sq, interm.c_bpp_log2_m);
 
       DBG_PRINT("Hs(d): " << d.calc_hs());
       DBG_PRINT("sum(d): " << sum_d);
