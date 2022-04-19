@@ -165,7 +165,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   // tools::get_default_data_dir() can't be called during static initialization
   command_line::add_arg(desc_cmd_only, command_line::arg_data_dir, tools::get_default_data_dir());
   command_line::add_arg(desc_cmd_only, command_line::arg_stop_after_height);
-  command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
+  //command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
 
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_dir);
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
@@ -203,24 +203,25 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   std::string err_str;
   bool command_line_parsed = command_line::handle_error_helper(desc_options, err_str, [&]()
   {
-    po::store(po::parse_command_line(argc, argv, desc_options), m_vm);
+    po::store(po::parse_command_line(argc, argv, desc_options), m_global_config.m_vm);
 
-    if (command_line::get_arg(m_vm, command_line::arg_help))
+    if (command_line::get_arg(m_global_config.m_vm, command_line::arg_help))
     {
       std::cout << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ENDL << ENDL;
       std::cout << desc_options << std::endl;
       return false;
     }
 
-    m_data_dir = command_line::get_arg(m_vm, command_line::arg_data_dir);
-    std::string config = command_line::get_arg(m_vm, command_line::arg_config_file);
+    //m_data_dir = command_line::get_arg(m_vm, command_line::arg_data_dir);
+    //std::string config = command_line::get_arg(m_vm, command_line::arg_config_file);
 
     boost::filesystem::path data_dir_path(epee::string_encoding::utf8_to_wstring(m_data_dir));
     boost::filesystem::path config_path(epee::string_encoding::utf8_to_wstring(config));
-    if (!config_path.has_parent_path())
-    {
-      config_path = data_dir_path / config_path;
-    }
+    //if (!config_path.has_parent_path())
+    //{
+    //  config_path = data_dir_path / config_path;
+    //}
+
 
     boost::system::error_code ec;
     if (boost::filesystem::exists(config_path, ec))

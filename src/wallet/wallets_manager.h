@@ -199,7 +199,8 @@ private:
   view::i_view m_view_stub;
   view::i_view* m_pview;
   std::shared_ptr<tools::i_core_proxy> m_rpc_proxy;
-  po::variables_map m_vm;
+  global_config_data m_global_config;
+  //po::variables_map m_vm;
 
   bool m_use_deffered_global_outputs;
   std::atomic<uint64_t> m_last_daemon_height;
