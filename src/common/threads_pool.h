@@ -51,11 +51,11 @@ namespace utils
       int num_threads = std::thread::hardware_concurrency();
       this->init(num_threads);
     }
-    void init(unsigned int num_threads)
+    void init(size_t num_threads)
     {
       m_is_stop = false;
 
-      for (int i = 0; i < num_threads; i++)
+      for (size_t i = 0; i < num_threads; i++)
       {
         m_threads.push_back(std::thread([this]() {this->worker_func(); }));
       }
@@ -81,7 +81,7 @@ namespace utils
       std::mutex batch_mutex;
 
 
-      std::atomic<size_t> cnt = 0;
+      std::atomic<size_t> cnt(0);
       for (const auto& jb : cntr)
       {
         call_executor_base* pjob = jb.get();
