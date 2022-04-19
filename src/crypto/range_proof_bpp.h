@@ -33,6 +33,7 @@ namespace crypto
     if (!(cond)) { LOG_PRINT_RED("bpp_gen: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
+    static_assert(CT::c_bpp_n <= 255, "too big N");
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(values.size() > 0 && values.size() <= CT::c_bpp_values_max && values.size() == masks.size(), 1);
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(masks.is_reduced(), 3);
 
@@ -65,7 +66,7 @@ namespace crypto
     for (size_t i = 0; i < values.size(); ++i)
     {
       const scalar_t& v = values[i];
-      for (size_t j = 0; j < CT::c_bpp_n; ++j)
+      for (uint8_t j = 0; j < CT::c_bpp_n; ++j)
       {
         if (v.get_bit(j))
           aLs(i, j) = c_scalar_1;    // aL = 1, aR = 0
@@ -112,7 +113,7 @@ namespace crypto
     DBG_VAL_PRINT(z);
 
     // Computing vector d for aggregated version of the protocol (BP+ paper, page 17)
-    // (note: elements is stored column-by-column in memory)
+    // (note: elements are stored column-by-column in memory)
     // d = | 1       * z^(2*1),        1 * z^(2*2),        1 * z^(2*3),      ...,        1 * z^(2*m)  |
     //     | 2       * z^(2*1),        2 * z^(2*2),        2 * z^(2*3),      ...,        2 * z^(2*m)  |
     //     | 4       * z^(2*1),        4 * z^(2*2),        4 * z^(2*3),      ...,        4 * z^(2*m)  |
@@ -164,7 +165,7 @@ namespace crypto
 
     DBG_VAL_PRINT(alpha_hat);
 
-    // calculate y^-1, y^-2, ...
+    // calculate 1, y^-1, y^-2, ...
     const scalar_t y_inverse = y.reciprocal();
     scalar_vec_t y_inverse_powers(c_bpp_mn / 2 + 1); // the greatest power we need is c_bpp_mn/2 (at the first reduction round)
     y_inverse_powers[0] = 1;
@@ -347,6 +348,7 @@ namespace crypto
 
     DBG_PRINT(ENDL << " . . . . bpp_verify() . . . . ");
 
+    static_assert(CT::c_bpp_n <= 255, "too big N");
     const size_t kn = sigs.size();
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(kn > 0, 1);
 
