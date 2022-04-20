@@ -66,9 +66,6 @@ int main(int argc, char* argv[])
   TRY_ENTRY();
   string_tools::set_module_name_and_folder(argv[0]);
 
-  uint64_t reward = 0;
-  currency::get_block_reward(false, 500000, 589313, 10300000000000000, reward, 11030);
-
   //set up logging options
   //log_space::get_set_log_detalisation_level(true, LOG_LEVEL_1);
   //log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);

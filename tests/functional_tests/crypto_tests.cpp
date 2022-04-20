@@ -473,6 +473,7 @@ uint64_t hash_64(const void* data, size_t size)
 #define ASSERT_TRUE(expr)  CHECK_AND_ASSERT_MES(expr, false, "This is not true: " #expr)
 #define ASSERT_FALSE(expr) CHECK_AND_ASSERT_MES((expr) == false, false, "This is not false: " #expr)
 #define ASSERT_EQ(a, b)    CHECK_AND_ASSERT_MES(a == b, false, #a " != " #b "\n    " << a << " != " << b)
+#define ASSERT_NEQ(a, b)   CHECK_AND_ASSERT_MES(a != b, false, #a " == " #b "\n    " << a)
 
 typedef bool(*bool_func_ptr_t)();
 static std::vector<std::pair<std::string, bool_func_ptr_t>> g_tests;
@@ -487,6 +488,7 @@ struct test_keeper_t
 
 ////////////////////////////////////////////////////////////////////////////////
 #include "L2S.h"
+#include "crypto_tests_range_proofs.h"
 ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -1801,6 +1803,68 @@ TEST(crypto, point_is_zero)
 
   return true;
 }
+
+
+TEST(crypto, sc_get_bit)
+{
+  static_assert(sizeof(scalar_t) * 8 == 256, "size missmatch");
+
+  scalar_t v = 0; // all bits are 0
+  for (size_t n = 0; n < 256; ++n)
+  {
+    ASSERT_EQ(v.get_bit(static_cast<uint8_t>(n)), false);
+  }
+
+  v = c_scalar_256m1; // all bits are 1
+  for (size_t n = 0; n < 256; ++n)
+  {
+    ASSERT_EQ(v.get_bit(static_cast<uint8_t>(n)), true);
+  }
+
+  // bits out of the [0; 255] range supposed to be always 0
+  for (size_t n = 256; n < 2048; ++n)
+  {
+    ASSERT_EQ(v.get_bit(static_cast<uint8_t>(n)), false);
+  }
+
+  // check random value
+  const scalar_t x = scalar_t::random();
+  for (size_t n = 0; n < 64; ++n)
+    ASSERT_EQ(x.get_bit(static_cast<uint8_t>(n)), ((x.m_u64[0] & (1ull << (n - 0))) != 0));
+  for (size_t n = 64; n < 128; ++n)
+    ASSERT_EQ(x.get_bit(static_cast<uint8_t>(n)), ((x.m_u64[1] & (1ull << (n - 64))) != 0));
+  for (size_t n = 128; n < 192; ++n)
+    ASSERT_EQ(x.get_bit(static_cast<uint8_t>(n)), ((x.m_u64[2] & (1ull << (n - 128))) != 0));
+  for (size_t n = 192; n < 256; ++n)
+    ASSERT_EQ(x.get_bit(static_cast<uint8_t>(n)), ((x.m_u64[3] & (1ull << (n - 192))) != 0));
+
+  return true;
+}
+
+
+TEST(crypto, sc_set_bit_clear_bit)
+{
+  static_assert(sizeof(scalar_t) * 8 == 256, "size missmatch");
+
+  // check random value
+  const scalar_t x = scalar_t::random();
+  scalar_t y = scalar_t::random();
+  ASSERT_NEQ(x, y);
+
+  uint8_t i = 0;
+  do
+  {
+    if (x.get_bit(i))
+      y.set_bit(i);
+    else
+      y.clear_bit(i);
+  } while(++i != 0);
+
+  ASSERT_EQ(x, y);
+
+  return true;
+}
+
 
 
 //
