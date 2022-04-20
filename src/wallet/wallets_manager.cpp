@@ -163,17 +163,17 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_only, command_line::arg_version);
   command_line::add_arg(desc_cmd_only, command_line::arg_os_version);
   // tools::get_default_data_dir() can't be called during static initialization
-  command_line::add_arg(desc_cmd_only, command_line::arg_data_dir, tools::get_default_data_dir());
+  command_line::add_arg(desc_cmd_sett, command_line::arg_data_dir, tools::get_default_data_dir());
   command_line::add_arg(desc_cmd_only, command_line::arg_stop_after_height);
   command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
 
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_dir);
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_show_details);
+  command_line::add_arg(desc_cmd_only, command_line::arg_show_details);
   command_line::add_arg(desc_cmd_sett, arg_alloc_win_console);
   command_line::add_arg(desc_cmd_sett, arg_html_folder);
-  command_line::add_arg(desc_cmd_sett, arg_xcode_stub);
+  command_line::add_arg(desc_cmd_only, arg_xcode_stub);
   command_line::add_arg(desc_cmd_sett, arg_enable_gui_debug_mode);
   command_line::add_arg(desc_cmd_sett, arg_qt_remote_debugging_port);
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
@@ -184,7 +184,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_deeplink);
+  command_line::add_arg(desc_cmd_only, command_line::arg_deeplink);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
 
 
