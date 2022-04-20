@@ -31,7 +31,10 @@ using namespace epee;
 #include "version.h"
 #include "common/encryption_filter.h"
 #include "crypto/bitcoin/sha256_helper.h"
-#include "common/tor_helper.h"
+#ifndef DISABLE_TOR
+  #include "common/tor_helper.h"
+#endif
+
 #include "storages/levin_abstract_invoke2.h"
 
 using namespace currency;
@@ -4602,8 +4605,7 @@ void wallet2::notify_state_change(const std::string& state_code, const std::stri
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::send_transaction_to_network(const transaction& tx)
 {
-#define ENABLE_TOR_RELAY
-#ifdef ENABLE_TOR_RELAY
+#ifndef DISABLE_TOR
   if (!m_disable_tor_relay)
   {
     //TODO check that core synchronized
@@ -4644,6 +4646,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
     }
   }
   else
+#endif //
   {
     COMMAND_RPC_SEND_RAW_TX::request req;
     req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(tx));
@@ -4656,7 +4659,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
 
     WLT_LOG_L2("transaction " << get_transaction_hash(tx) << " generated ok and sent to daemon:" << ENDL << currency::obj_to_json_str(tx));
   }
-#endif //
+
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::add_sent_tx_detailed_info(const transaction& tx,
