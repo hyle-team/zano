@@ -130,6 +130,10 @@ else()
   ENABLE_SHARED_PCH(wallet WALLET)
 endif()
 
+if(NOT DISABLE_TOR)
+  target_link_libraries(wallet tor-connect)
+endif()
+
 
 
 
@@ -158,7 +162,7 @@ target_link_libraries(currency_core lmdb mdbx)
 
 add_executable(daemon ${DAEMON} ${P2P} ${CURRENCY_PROTOCOL})
 add_dependencies(daemon version)
-  target_link_libraries(daemon rpc stratum currency_core crypto common libminiupnpc-static zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+target_link_libraries(daemon rpc stratum currency_core crypto common libminiupnpc-static zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 ENABLE_SHARED_PCH(daemon DAEMON)
 ENABLE_SHARED_PCH_EXECUTABLE(daemon)
                      
@@ -171,9 +175,6 @@ ENABLE_SHARED_PCH_EXECUTABLE(connectivity_tool)
 add_executable(simplewallet ${SIMPLEWALLET})
 add_dependencies(simplewallet version) 
 target_link_libraries(simplewallet wallet rpc currency_core crypto common zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-  if(NOT DISABLE_TOR)
-    target_link_libraries(simplewallet tor-connect)
-  endif()
 
 ENABLE_SHARED_PCH(simplewallet SIMPLEWALLET)
 ENABLE_SHARED_PCH_EXECUTABLE(simplewallet)
@@ -199,9 +200,6 @@ if(BUILD_GUI)
   find_package(Qt5PrintSupport REQUIRED)
 
   target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic ethash Qt5::WebEngineWidgets Qt5::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-  if(NOT DISABLE_TOR)
-    target_link_libraries(Zano tor-connect)
-  endif()
   if (UNIX AND NOT APPLE)
 	target_link_libraries(Zano rt)
   endif()
