@@ -81,7 +81,8 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_is_pos_allowed(false),
                                  m_qt_logs_enbaled(false), 
                                  m_dont_save_wallet_at_stop(false), 
-                                 m_use_deffered_global_outputs(false)
+                                 m_use_deffered_global_outputs(false), 
+                                 m_use_tor(true)
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
@@ -162,17 +163,17 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_only, command_line::arg_version);
   command_line::add_arg(desc_cmd_only, command_line::arg_os_version);
   // tools::get_default_data_dir() can't be called during static initialization
-  command_line::add_arg(desc_cmd_only, command_line::arg_data_dir, tools::get_default_data_dir());
+  command_line::add_arg(desc_cmd_sett, command_line::arg_data_dir, tools::get_default_data_dir());
   command_line::add_arg(desc_cmd_only, command_line::arg_stop_after_height);
   command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
 
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_dir);
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_show_details);
+  command_line::add_arg(desc_cmd_only, command_line::arg_show_details);
   command_line::add_arg(desc_cmd_sett, arg_alloc_win_console);
   command_line::add_arg(desc_cmd_sett, arg_html_folder);
-  command_line::add_arg(desc_cmd_sett, arg_xcode_stub);
+  command_line::add_arg(desc_cmd_only, arg_xcode_stub);
   command_line::add_arg(desc_cmd_sett, arg_enable_gui_debug_mode);
   command_line::add_arg(desc_cmd_sett, arg_qt_remote_debugging_port);
   command_line::add_arg(desc_cmd_sett, arg_remote_node);
@@ -183,7 +184,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_deeplink);
+  command_line::add_arg(desc_cmd_only, command_line::arg_deeplink);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
 
 
@@ -791,6 +792,8 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
       m_wallet_log_prefixes.resize(id + 1);
     m_wallet_log_prefixes[id] = std::string("[") + epee::string_tools::num_to_string_fast(id) + ":" + wo.w->get()->get_account().get_public_address_str().substr(0, 6) + "] ";
   }
+  
+  wo.w->get()->set_disable_tor_relay(!m_use_tor);
 }
 
 
@@ -1842,6 +1845,17 @@ void wallets_manager::on_pos_block_found(size_t wallet_id, const currency::block
 {
   m_pview->pos_block_found(b);
 }
+bool wallets_manager::set_use_tor(bool use_tor)
+{
+  m_use_tor = use_tor;
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
+  for (auto& w : m_wallets)
+  {
+    w.second.w->get()->set_disable_tor_relay(!m_use_tor);
+  }
+  return true;
+}
+
 void wallets_manager::on_sync_progress(size_t wallet_id, const uint64_t& percents)
 {
   // do not lock m_wallets_lock down the callstack! It will lead to a deadlock, because wallet locked_object is aready locked
@@ -1871,6 +1885,13 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   }
   m_pview->money_transfer_cancel(tei);
 }
+
+void wallets_manager::on_tor_status_change(size_t wallet_id, const std::string& state)
+{
+  view::current_action_status tsu = { wallet_id , state };
+  m_pview->update_tor_status(tsu);
+}
+
 void wallets_manager::wallet_vs_options::worker_func()
 {
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet handler thread started, addr: " << w->get()->get_account().get_public_address_str(), LOG_LEVEL_0);

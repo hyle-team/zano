@@ -56,18 +56,23 @@ if(APPLE)
 endif()
 
 set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
+set(DISABLE_TOR FALSE CACHE BOOL "Disable TOR library(and related tor-connect submodule)")
+set(TESTNET FALSE CACHE BOOL "Compile for testnet")
+set(BUILD_GUI FALSE CACHE BOOL "Build qt-daemon")
 
 include_directories(src contrib/eos_portable_archive contrib contrib/epee/include "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
 
 add_definitions(-DSTATICLIB)
 
-set(TESTNET FALSE CACHE BOOL "Compile for testnet")
 if(TESTNET)
   message("!!!!!! NOTICE: Project is building for TESTNET !!!!!!")  
   add_definitions(-DTESTNET)  
 endif()
 
-set(BUILD_GUI FALSE CACHE BOOL "Build qt-daemon")
+if(DISABLE_TOR)
+  message("NOTICE: Building with disabled TOR support!")  
+  add_definitions(-DDISABLE_TOR)  
+endif()
 
 
 set(STATIC ${MSVC} CACHE BOOL "Link libraries statically")
@@ -197,7 +202,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
   set(Boost_LIBRARY_DIRS "${Boost_LIBRARY_DIRS}/${CMAKE_ANDROID_ARCH_ABI}/")
   set(Boost_LIBRARIES "${Boost_LIBRARY_DIRS}libboost_system.a;${Boost_LIBRARY_DIRS}libboost_filesystem.a;${Boost_LIBRARY_DIRS}libboost_thread.a;${Boost_LIBRARY_DIRS}libboost_timer.a;${Boost_LIBRARY_DIRS}libboost_date_time.a;${Boost_LIBRARY_DIRS}libboost_chrono.a;${Boost_LIBRARY_DIRS}libboost_regex.a;${Boost_LIBRARY_DIRS}libboost_serialization.a;${Boost_LIBRARY_DIRS}libboost_atomic.a;${Boost_LIBRARY_DIRS}libboost_program_options.a")
 else()
-  find_package(Boost 1.55 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale)
+  find_package(Boost 1.70 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale)
 endif()
 
 

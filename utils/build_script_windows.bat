@@ -1,10 +1,10 @@
-SET QT_PREFIX_PATH=C:\dev\_sdk\Qt5.11.2\5.11.2\msvc2017_64
-SET INNOSETUP_PATH=C:\Program Files (x86)\Inno Setup 5\ISCC.exe
-SET ETC_BINARIES_PATH=C:\dev\deploy\etc-binaries
-SET BUILDS_PATH=C:\dev\deploy\zano
+call configure_local_paths.cmd
+
+;; MSVC version-specific paths
+SET LOCAL_BOOST_LIB_PATH=%LOCAL_BOOST_PATH%\lib64-msvc-14.1
+SET QT_MSVC_PATH=%QT_PREFIX_PATH%\msvc2017_64
+
 SET ACHIVE_NAME_PREFIX=zano-win-x64-
-SET LOCAL_BOOST_PATH=C:\dev\_sdk\boost_1_68_0
-SET LOCAL_BOOST_LIB_PATH=C:\dev\_sdk\boost_1_68_0\lib64-msvc-14.1
 SET MY_PATH=%~dp0
 SET SOURCES_PATH=%MY_PATH:~0,-7%
 
@@ -44,7 +44,7 @@ cd %SOURCES_PATH%
 rmdir build /s /q
 mkdir build
 cd build
-cmake %TESTNET_DEF% -D CMAKE_PREFIX_PATH="%QT_PREFIX_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -G "Visual Studio 15 2017 Win64" -T host=x64 ..
+cmake %TESTNET_DEF% -D OPENSSL_ROOT_DIR="%OPENSSL_ROOT_DIR%" -D CMAKE_PREFIX_PATH="%QT_MSVC_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -G "Visual Studio 15 2017 Win64" -T host=x64 ..
 IF %ERRORLEVEL% NEQ 0 (
   goto error
 )
@@ -108,7 +108,7 @@ copy /Y zanod.exe bunch
 copy /Y simplewallet.exe bunch
 copy /Y *.pdb bunch
 
-%QT_PREFIX_PATH%\bin\windeployqt.exe bunch\Zano.exe
+%QT_MSVC_PATH%\bin\windeployqt.exe bunch\Zano.exe
 
 cd bunch
 
