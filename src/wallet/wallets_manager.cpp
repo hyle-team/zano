@@ -51,15 +51,15 @@
 #define HTTP_PROXY_TIMEOUT                2000
 #define HTTP_PROXY_ATTEMPTS_COUNT         1
 
-const command_line::arg_descriptor<bool> arg_alloc_win_console = { "alloc-win-console", "Allocates debug console with GUI", false };
-const command_line::arg_descriptor<std::string> arg_html_folder = { "html-path", "Manually set GUI html folder path", "",  true };
-const command_line::arg_descriptor<std::string> arg_xcode_stub = { "-NSDocumentRevisionsDebugMode", "Substitute for xcode bug", "",  true };
-const command_line::arg_descriptor<bool> arg_enable_gui_debug_mode = { "gui-debug-mode", "Enable debug options in GUI", false, true };
-const command_line::arg_descriptor<uint32_t> arg_qt_remote_debugging_port = { "remote-debugging-port", "Specify port for Qt remote debugging", 30333, true };
-const command_line::arg_descriptor<std::string> arg_remote_node = { "remote-node", "Switch GUI to work with remote node instead of local daemon", "",  true };
-const command_line::arg_descriptor<bool> arg_enable_qt_logs = { "enable-qt-logs", "Forward Qt log messages into main log", false,  true };
+const command_line::arg_descriptor<bool> arg_alloc_win_console  ( "alloc-win-console", "Allocates debug console with GUI", false );
+const command_line::arg_descriptor<std::string> arg_html_folder  ( "html-path", "Manually set GUI html folder path");
+const command_line::arg_descriptor<std::string> arg_xcode_stub  ( "-NSDocumentRevisionsDebugMode", "Substitute for xcode bug");
+const command_line::arg_descriptor<bool> arg_enable_gui_debug_mode  ( "gui-debug-mode", "Enable debug options in GUI");
+const command_line::arg_descriptor<uint32_t> arg_qt_remote_debugging_port  ( "remote-debugging-port", "Specify port for Qt remote debugging");
+const command_line::arg_descriptor<std::string> arg_remote_node  ( "remote-node", "Switch GUI to work with remote node instead of local daemon");
+const command_line::arg_descriptor<bool> arg_enable_qt_logs  ( "enable-qt-logs", "Forward Qt log messages into main log");
 const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
-const command_line::arg_descriptor<std::string> arg_qt_dev_tools = { "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "",  false };
+const command_line::arg_descriptor<std::string> arg_qt_dev_tools  ( "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "");
 
 wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_stop_singal_sent(false),

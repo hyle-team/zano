@@ -22,9 +22,9 @@ namespace currency
 {
   namespace
   {
-    const command_line::arg_descriptor<std::string> arg_rpc_bind_ip   = {"rpc-bind-ip", "", "127.0.0.1"};
-    const command_line::arg_descriptor<std::string> arg_rpc_bind_port = {"rpc-bind-port", "", std::to_string(RPC_DEFAULT_PORT)};
-    const command_line::arg_descriptor<bool> arg_rpc_ignore_status    = {"rpc-ignore-offline", "Let rpc calls despite online/offline status", false, true };
+    const command_line::arg_descriptor<std::string> arg_rpc_bind_ip    ("rpc-bind-ip", "", "127.0.0.1");
+    const command_line::arg_descriptor<std::string> arg_rpc_bind_port  ("rpc-bind-port", "", std::to_string(RPC_DEFAULT_PORT));
+    const command_line::arg_descriptor<bool> arg_rpc_ignore_status     ("rpc-ignore-offline", "Let rpc calls despite online/offline status");
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)

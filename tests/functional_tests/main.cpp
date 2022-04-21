@@ -23,40 +23,40 @@ using namespace epee;
 
 namespace po = boost::program_options;
 
-const command_line::arg_descriptor<std::string> arg_test_core_prepare_and_store = { "prepare-and-store-events-to-file", "", "", true };
-const command_line::arg_descriptor<std::string> arg_test_core_load_and_replay = { "load-and-replay-events-from-file", "", "", true };
+const command_line::arg_descriptor<std::string> arg_test_core_prepare_and_store  ( "prepare-and-store-events-to-file", "");
+const command_line::arg_descriptor<std::string> arg_test_core_load_and_replay  ( "load-and-replay-events-from-file", "");
 
 namespace
 {
-  const command_line::arg_descriptor<bool> arg_test_transactions_flow = {"test-transactions-flow", ""};
-  const command_line::arg_descriptor<bool> arg_test_miniupnp          = {"test-miniupnp", ""};
-  const command_line::arg_descriptor<bool> arg_test_core_concurrency  = {"test-core-concurrency", ""};
+  const command_line::arg_descriptor<bool> arg_test_transactions_flow  ("test-transactions-flow", "");
+  const command_line::arg_descriptor<bool> arg_test_miniupnp           ("test-miniupnp", "");
+  const command_line::arg_descriptor<bool> arg_test_core_concurrency   ("test-core-concurrency", "");
 
-  const command_line::arg_descriptor<std::string> arg_working_folder  = {"working-folder", "", "."};
-  const command_line::arg_descriptor<std::string> arg_source_wallet   = {"source-wallet",  "", "", true};
-  const command_line::arg_descriptor<std::string> arg_dest_wallet     = {"dest-wallet",    "", "", true};
-  const command_line::arg_descriptor<std::string> arg_source_wallet_pass   = {"source-wallet-pass",  "", "", true};
-  const command_line::arg_descriptor<std::string> arg_dest_wallet_pass     = {"dest-wallet-pass",    "", "", true};
+  const command_line::arg_descriptor<std::string> arg_working_folder   ("working-folder", "", ".");
+  const command_line::arg_descriptor<std::string> arg_source_wallet    ("source-wallet",  "");
+  const command_line::arg_descriptor<std::string> arg_dest_wallet      ("dest-wallet",    "");
+  const command_line::arg_descriptor<std::string> arg_source_wallet_pass    ("source-wallet-pass",  "");
+  const command_line::arg_descriptor<std::string> arg_dest_wallet_pass      ("dest-wallet-pass",    "");
 
-  const command_line::arg_descriptor<std::string> arg_daemon_addr_a   = {"daemon-addr-a",  "", "127.0.0.1:8080"};
-  const command_line::arg_descriptor<std::string> arg_daemon_addr_b   = {"daemon-addr-b",  "", "127.0.0.1:8082"};
+  const command_line::arg_descriptor<std::string> arg_daemon_addr_a    ("daemon-addr-a",  "", "127.0.0.1:8080");
+  const command_line::arg_descriptor<std::string> arg_daemon_addr_b    ("daemon-addr-b",  "", "127.0.0.1:8082");
 
-  const command_line::arg_descriptor<uint64_t> arg_transfer_amount = {"transfer-amount",   "", 60000000000000};
-  const command_line::arg_descriptor<size_t> arg_mix_in_factor     = {"mix-in-factor",     "", 10};
-  const command_line::arg_descriptor<size_t> arg_tx_count          = {"tx-count",          "", 100};
-  const command_line::arg_descriptor<size_t> arg_tx_per_second     = {"tx-per-second",     "", 20};
-  const command_line::arg_descriptor<size_t> arg_test_repeat_count = {"test-repeat-count", "", 1};
-  const command_line::arg_descriptor<size_t> arg_action            = {"action", "", 0 };
-  const command_line::arg_descriptor<size_t> arg_max_tx_in_pool    = { "max-tx-in-pool", "", 10000 };
-  const command_line::arg_descriptor<std::string> arg_data_dir     = {"data-dir", "Specify data directory", "."};
-  const command_line::arg_descriptor<size_t> arg_wthreads          = {"wthreads",          "number of writing threads to run", 1};
-  const command_line::arg_descriptor<size_t> arg_rthreads          = {"rthreads",          "number of reading threads to run", 1};
-  const command_line::arg_descriptor<size_t> arg_blocks            = {"blocks",            "number of blocks to generate", 250};
-  const command_line::arg_descriptor<size_t> arg_generate_test_genesis_json = { "generate-test-genesis-json",            "generates test genesis json, specify amount of accounts", 0, true };
-  const command_line::arg_descriptor<bool>   arg_deadlock_guard    = { "test-deadlock-guard",            "Do deadlock guard test", false, true };
-  const command_line::arg_descriptor<std::string>   arg_difficulty_analysis = { "difficulty-analysis", "Do difficulty analysis", "", true };
-  const command_line::arg_descriptor<bool>   arg_test_plain_wallet = { "test-plainwallet", "Do testing of plain wallet interface", false, true };
-  const command_line::arg_descriptor<std::string> arg_crypto_tests = { "crypto-tests", "Run experimental crypto tests", "", true };
+  const command_line::arg_descriptor<uint64_t> arg_transfer_amount  ("transfer-amount",   "", 60000000000000);
+  const command_line::arg_descriptor<size_t> arg_mix_in_factor      ("mix-in-factor",     "", 10);
+  const command_line::arg_descriptor<size_t> arg_tx_count           ("tx-count",          "", 100);
+  const command_line::arg_descriptor<size_t> arg_tx_per_second      ("tx-per-second",     "", 20);
+  const command_line::arg_descriptor<size_t> arg_test_repeat_count  ("test-repeat-count", "", 1);
+  const command_line::arg_descriptor<size_t> arg_action             ("action", "", 0 );
+  const command_line::arg_descriptor<size_t> arg_max_tx_in_pool     ( "max-tx-in-pool", "", 10000 );
+  const command_line::arg_descriptor<std::string> arg_data_dir      ("data-dir", "Specify data directory", ".");
+  const command_line::arg_descriptor<size_t> arg_wthreads           ("wthreads",          "number of writing threads to run", 1);
+  const command_line::arg_descriptor<size_t> arg_rthreads           ("rthreads",          "number of reading threads to run", 1);
+  const command_line::arg_descriptor<size_t> arg_blocks             ("blocks",            "number of blocks to generate", 250);
+  const command_line::arg_descriptor<size_t> arg_generate_test_genesis_json  ( "generate-test-genesis-json",            "generates test genesis json, specify amount of accounts");
+  const command_line::arg_descriptor<bool>   arg_deadlock_guard     ( "test-deadlock-guard",            "Do deadlock guard test");
+  const command_line::arg_descriptor<std::string>   arg_difficulty_analysis  ( "difficulty-analysis", "Do difficulty analysis");
+  const command_line::arg_descriptor<bool>   arg_test_plain_wallet  ( "test-plainwallet", "Do testing of plain wallet interface");
+  const command_line::arg_descriptor<std::string> arg_crypto_tests  ( "crypto-tests", "Run experimental crypto tests");
 
 }
 

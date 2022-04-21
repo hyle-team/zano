@@ -40,25 +40,25 @@ namespace ph = boost::placeholders;
 
 namespace
 {
-  const command_line::arg_descriptor<std::string> arg_wallet_file = {"wallet-file", "Use wallet <arg>", ""};
-  const command_line::arg_descriptor<std::string> arg_generate_new_wallet = {"generate-new-wallet", "Generate new wallet and save it to <arg> or <address>.wallet by default", ""};
-  const command_line::arg_descriptor<std::string> arg_generate_new_auditable_wallet = {"generate-new-auditable-wallet", "Generate new auditable wallet and store it to <arg>", ""};
-  const command_line::arg_descriptor<std::string> arg_daemon_address = {"daemon-address", "Use daemon instance at <host>:<port>", ""};
-  const command_line::arg_descriptor<std::string> arg_daemon_host = {"daemon-host", "Use daemon instance at host <arg> instead of localhost", ""};
-  const command_line::arg_descriptor<std::string> arg_password = {"password", "Wallet password", "", true};
-  const command_line::arg_descriptor<bool> arg_dont_refresh = { "no-refresh", "Do not refresh after load", false, true };
-  const command_line::arg_descriptor<bool> arg_dont_set_date = { "no-set-creation-date", "Do not set wallet creation date", false, false };
-  const command_line::arg_descriptor<int> arg_daemon_port = {"daemon-port", "Use daemon instance at port <arg> instead of default", 0};
-  const command_line::arg_descriptor<uint32_t> arg_log_level = {"set-log", "", 0, true};
-  const command_line::arg_descriptor<bool> arg_do_pos_mining = { "do-pos-mining", "Do PoS mining", false, false };
-  const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address = { "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" };
-  const command_line::arg_descriptor<std::string> arg_restore_wallet = { "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" };
-  const command_line::arg_descriptor<bool> arg_offline_mode = { "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)", false, true };
-  const command_line::arg_descriptor<std::string> arg_scan_for_wallet = { "scan-for-wallet", "", "", true };
-  const command_line::arg_descriptor<std::string> arg_addr_to_compare = { "addr-to-compare", "", "", true };
-  const command_line::arg_descriptor<bool> arg_disable_tor_relay = { "disable-tor-relay", "Do PoS mining", false, false };
+  const command_line::arg_descriptor<std::string> arg_wallet_file  ("wallet-file", "Use wallet <arg>", "");
+  const command_line::arg_descriptor<std::string> arg_generate_new_wallet  ("generate-new-wallet", "Generate new wallet and save it to <arg> or <address>.wallet by default", "");
+  const command_line::arg_descriptor<std::string> arg_generate_new_auditable_wallet  ("generate-new-auditable-wallet", "Generate new auditable wallet and store it to <arg>", "");
+  const command_line::arg_descriptor<std::string> arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
+  const command_line::arg_descriptor<std::string> arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
+  const command_line::arg_descriptor<std::string> arg_password  ("password", "Wallet password");
+  const command_line::arg_descriptor<bool> arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
+  const command_line::arg_descriptor<bool> arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
+  const command_line::arg_descriptor<int> arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
+  const command_line::arg_descriptor<uint32_t> arg_log_level  ("set-log", "");
+  const command_line::arg_descriptor<bool> arg_do_pos_mining  ( "do-pos-mining", "Do PoS mining", false);
+  const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address  ( "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" );
+  const command_line::arg_descriptor<std::string> arg_restore_wallet  ( "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" );
+  const command_line::arg_descriptor<bool> arg_offline_mode  ( "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)");
+  const command_line::arg_descriptor<std::string> arg_scan_for_wallet  ( "scan-for-wallet", "");
+  const command_line::arg_descriptor<std::string> arg_addr_to_compare  ( "addr-to-compare", "");
+  const command_line::arg_descriptor<bool> arg_disable_tor_relay  ( "disable-tor-relay", "Do PoS mining", false);
 
-  const command_line::arg_descriptor< std::vector<std::string> > arg_command = {"command", ""};
+  const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
   inline std::string interpret_rpc_response(bool ok, const std::string& status)
   {

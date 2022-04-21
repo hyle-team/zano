@@ -38,32 +38,32 @@ using namespace nodetool;
 
 namespace
 {
-  const command_line::arg_descriptor<std::string> arg_ip                 = {"ip", "set ip", "127.0.0.1", false};
-  const command_line::arg_descriptor<size_t>      arg_port               = {"port", "set port"};
-  const command_line::arg_descriptor<size_t>      arg_rpc_port           = {"rpc-port", "set rpc port", RPC_DEFAULT_PORT, false};
-  const command_line::arg_descriptor<uint32_t>    arg_timeout            = {"timeout", "set timeout", 5000, false};
-  const command_line::arg_descriptor<std::string> arg_priv_key           = {"private-key", "private key to subscribe debug command", "", true};
-  const command_line::arg_descriptor<uint64_t>    arg_peer_id            = {"peer-id", "peerid if known(if not - will be requested)", 0};
-  const command_line::arg_descriptor<bool>        arg_generate_keys      = {"generate-keys-pair", "generate private and public keys pair"};
-  const command_line::arg_descriptor<bool>        arg_request_stat_info  = {"request-stat-info", "request statistics information"};
-  const command_line::arg_descriptor<uint64_t>    arg_log_journal_len    = { "log-journal-len", "Specify length of list of last error messages in log", 0, true };
-  const command_line::arg_descriptor<bool>        arg_request_net_state  = {"request-net-state", "request network state information (peer list, connections count)"};
-  const command_line::arg_descriptor<bool>        arg_get_daemon_info    = {"rpc-get-daemon-info", "request daemon state info vie rpc (--rpc-port option should be set ).", "", true};
-  const command_line::arg_descriptor<bool>        arg_get_aliases        = {"rpc-get-aliases", "request daemon aliases all list", "", true};
-  const command_line::arg_descriptor<std::string> arg_increment_build_no = { "increment-build-no", "Increment build nimber", "", true };
-  const command_line::arg_descriptor<std::string> arg_upate_maintainers_info = {"update-maintainers-info", "Push maintainers info into the network, update-maintainers-info=file-with-info.json", "", true};
-  const command_line::arg_descriptor<std::string> arg_update_build_no    = {"update-build-no", "Updated version number in version template file", "", true};
-  const command_line::arg_descriptor<std::string> arg_generate_genesis   = {"generate-genesis", "Generate genesis coinbase based on config file", "", true };
-  const command_line::arg_descriptor<uint64_t>    arg_genesis_split_amount = { "genesis-split-amount", "Set split amount for generating genesis block", 0, true };
-  const command_line::arg_descriptor<std::string> arg_get_info_flags     = { "getinfo-flags-hex", "Set of bits for rpc-get-daemon-info", "", true };
-  const command_line::arg_descriptor<int64_t>    arg_set_peer_log_level = { "set-peer-log-level", "Set log level for remote peer", 0, true };
-  const command_line::arg_descriptor<std::string> arg_download_peer_log =  { "download-peer-log", "Download log from remote peer <starting_offset>[,<count>]", "", true };
-  const command_line::arg_descriptor<bool>        arg_do_consloe_log    = { "do-console-log", "Tool generates debug console output(debug purposes)", "", true };
-  const command_line::arg_descriptor<std::string> arg_generate_integrated_address = { "generate-integrated-address", "Tool create integrated address from simple address and payment_id", "", true };
-  const command_line::arg_descriptor<std::string> arg_pack_file          = {"pack-file", "perform gzip-packing and calculate hash for a given file", "", true };
-  const command_line::arg_descriptor<std::string> arg_unpack_file        = {"unpack-file", "Perform gzip-unpacking and calculate hash for a given file", "", true };
-  const command_line::arg_descriptor<std::string> arg_target_file        = {"target-file", "Specify target file for pack-file and unpack-file commands", "", true };
-  //const command_line::arg_descriptor<std::string> arg_send_ipc           = {"send-ipc", "Send IPC request to UI", "", true };
+  const command_line::arg_descriptor<std::string> arg_ip                  ("ip", "set ip", "127.0.0.1");
+  const command_line::arg_descriptor<size_t>      arg_port                ("port", "set port");
+  const command_line::arg_descriptor<size_t>      arg_rpc_port            ("rpc-port", "set rpc port", RPC_DEFAULT_PORT);
+  const command_line::arg_descriptor<uint32_t>    arg_timeout             ("timeout", "set timeout", 5000);
+  const command_line::arg_descriptor<std::string> arg_priv_key            ("private-key", "private key to subscribe debug command");
+  const command_line::arg_descriptor<uint64_t>    arg_peer_id             ("peer-id", "peerid if known(if not - will be requested)", 0);
+  const command_line::arg_descriptor<bool>        arg_generate_keys       ("generate-keys-pair", "generate private and public keys pair");
+  const command_line::arg_descriptor<bool>        arg_request_stat_info   ("request-stat-info", "request statistics information");
+  const command_line::arg_descriptor<uint64_t>    arg_log_journal_len     ( "log-journal-len", "Specify length of list of last error messages in log");
+  const command_line::arg_descriptor<bool>        arg_request_net_state   ("request-net-state", "request network state information (peer list, connections count)");
+  const command_line::arg_descriptor<bool>        arg_get_daemon_info     ("rpc-get-daemon-info", "request daemon state info vie rpc (--rpc-port option should be set ).");
+  const command_line::arg_descriptor<bool>        arg_get_aliases         ("rpc-get-aliases", "request daemon aliases all list");
+  const command_line::arg_descriptor<std::string> arg_increment_build_no  ( "increment-build-no", "Increment build nimber");
+  const command_line::arg_descriptor<std::string> arg_upate_maintainers_info  ("update-maintainers-info", "Push maintainers info into the network, update-maintainers-info=file-with-info.json");
+  const command_line::arg_descriptor<std::string> arg_update_build_no     ("update-build-no", "Updated version number in version template file");
+  const command_line::arg_descriptor<std::string> arg_generate_genesis    ("generate-genesis", "Generate genesis coinbase based on config file");
+  const command_line::arg_descriptor<uint64_t>    arg_genesis_split_amount  ( "genesis-split-amount", "Set split amount for generating genesis block");
+  const command_line::arg_descriptor<std::string> arg_get_info_flags      ( "getinfo-flags-hex", "Set of bits for rpc-get-daemon-info", "");
+  const command_line::arg_descriptor<int64_t>    arg_set_peer_log_level  ( "set-peer-log-level", "Set log level for remote peer");
+  const command_line::arg_descriptor<std::string> arg_download_peer_log   ( "download-peer-log", "Download log from remote peer <starting_offset>[,<count>]");
+  const command_line::arg_descriptor<bool>        arg_do_consloe_log     ( "do-console-log", "Tool generates debug console output(debug purposes)");
+  const command_line::arg_descriptor<std::string> arg_generate_integrated_address  ( "generate-integrated-address", "Tool create integrated address from simple address and payment_id");
+  const command_line::arg_descriptor<std::string> arg_pack_file           ("pack-file", "perform gzip-packing and calculate hash for a given file");
+  const command_line::arg_descriptor<std::string> arg_unpack_file         ("unpack-file", "Perform gzip-unpacking and calculate hash for a given file");
+  const command_line::arg_descriptor<std::string> arg_target_file         ("target-file", "Specify target file for pack-file and unpack-file commands");
+  //const command_line::arg_descriptor<std::string> arg_send_ipc            ("send-ipc", "Send IPC request to UI");
 }
 
 typedef COMMAND_REQUEST_STAT_INFO_T<t_currency_protocol_handler<core>::stat_info> COMMAND_REQUEST_STAT_INFO;

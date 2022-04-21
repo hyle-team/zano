@@ -21,13 +21,13 @@ namespace po = boost::program_options;
 
 namespace
 {
-  const command_line::arg_descriptor<std::string> arg_test_data_path              = {"test-data-path", "", ""};
-  const command_line::arg_descriptor<bool>        arg_generate_test_data          = {"generate-test-data", ""};
-  const command_line::arg_descriptor<bool>        arg_play_test_data              = {"play-test-data", ""};
-  const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data = {"generate-and-play-test-data", ""};
-  const command_line::arg_descriptor<bool>        arg_test_transactions           = {"test-transactions", ""};
-  const command_line::arg_descriptor<std::string> arg_run_single_test             = {"run-single-test", "" };
-  const command_line::arg_descriptor<bool>        arg_enable_debug_asserts        = {"enable-debug-asserts", "" };
+  const command_line::arg_descriptor<std::string> arg_test_data_path               ("test-data-path", "", "");
+  const command_line::arg_descriptor<bool>        arg_generate_test_data           ("generate-test-data", "");
+  const command_line::arg_descriptor<bool>        arg_play_test_data               ("play-test-data", "");
+  const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data  ("generate-and-play-test-data", "");
+  const command_line::arg_descriptor<bool>        arg_test_transactions            ("test-transactions", "");
+  const command_line::arg_descriptor<std::string> arg_run_single_test              ("run-single-test", "" );
+  const command_line::arg_descriptor<bool>        arg_enable_debug_asserts         ("enable-debug-asserts", "" );
 
   boost::program_options::variables_map g_vm;
 }
