@@ -53,6 +53,11 @@ namespace command_line
   template<typename T>
   struct arg_descriptor<std::vector<T>, false>
   {
+    arg_descriptor(const char* _name, const char* _description) :
+      name(_name),
+      description(_description)
+    {}
+
     typedef std::vector<T> value_type;
 
     const char* name;

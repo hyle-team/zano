@@ -168,7 +168,7 @@ int main(int argc, char* argv[])
 
 
   arg_market_disable.default_value = true;
-  arg_market_disable.not_use_default = false;
+  arg_market_disable.use_default = true;
 
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);
