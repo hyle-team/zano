@@ -60,6 +60,7 @@ const command_line::arg_descriptor<std::string> arg_remote_node  ( "remote-node"
 const command_line::arg_descriptor<bool> arg_enable_qt_logs  ( "enable-qt-logs", "Forward Qt log messages into main log");
 const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
 const command_line::arg_descriptor<std::string> arg_qt_dev_tools  ( "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "");
+const command_line::arg_descriptor<bool> arg_disable_price_fetch("gui-disable-price-fetch", "Disable price fetching in UI(for privacy matter)");
 
 wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_stop_singal_sent(false),
@@ -186,6 +187,8 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   command_line::add_arg(desc_cmd_only, command_line::arg_deeplink);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
+  command_line::add_arg(desc_cmd_sett, arg_disable_price_fetch);
+  
 
 
 #ifndef MOBILE_WALLET_BUILD
@@ -299,10 +302,15 @@ bool wallets_manager::init(view::i_view* pview_handler)
   {
     log_space::log_singletone::get_set_log_detalisation_level(true, command_line::get_arg(m_vm, command_line::arg_log_level));
   }
-  if (command_line::has_arg(m_vm, arg_enable_gui_debug_mode))
+  if (command_line::has_arg(m_vm, arg_enable_gui_debug_mode) && command_line::get_arg(m_vm, arg_enable_gui_debug_mode))
   {
     m_ui_opt.use_debug_mode = true;
   }
+  if (command_line::has_arg(m_vm, arg_disable_price_fetch) && command_line::get_arg(m_vm, arg_disable_price_fetch))
+  {
+    m_ui_opt.disable_price_fetch = true;
+  }
+  
 
   //set up logging options
   std::string log_dir;

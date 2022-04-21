@@ -754,9 +754,11 @@ public:
   struct gui_options
   {
     bool use_debug_mode;
+    bool disable_price_fetch;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(use_debug_mode)
+      KV_SERIALIZE(disable_price_fetch)
     END_KV_SERIALIZE_MAP()
 
   };

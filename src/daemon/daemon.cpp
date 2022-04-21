@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_only, command_line::arg_version);
   command_line::add_arg(desc_cmd_only, command_line::arg_os_version);
   // tools::get_default_data_dir() can't be called during static initialization
-  command_line::add_arg(desc_cmd_only, command_line::arg_data_dir, tools::get_default_data_dir());
+  command_line::add_arg(desc_cmd_sett, command_line::arg_data_dir, tools::get_default_data_dir());
   command_line::add_arg(desc_cmd_only, command_line::arg_stop_after_height);
   command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
   command_line::add_arg(desc_cmd_only, command_line::arg_disable_upnp);
@@ -154,8 +154,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_dir);
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_show_details);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_show_rpc_autodoc);
+  command_line::add_arg(desc_cmd_only, command_line::arg_show_details);
+  command_line::add_arg(desc_cmd_only, command_line::arg_show_rpc_autodoc);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_if_time_out_of_sync);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_on_low_free_space);
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_offers_service);
