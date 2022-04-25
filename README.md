@@ -19,7 +19,7 @@ Be sure to clone the repository properly:\
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 9.2 | 12.3 | 12.3 |
 | [CMake](https://cmake.org/download/) | 2.8.6 | 3.15.5 | 3.20 |
 | [Boost](https://www.boost.org/users/download/) | 1.70 | 1.70 | 1.76 |
-| [OpenSSL](https://www.openssl.org/source/) | - | 1.1.1n | 1.1.1n | 
+| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | - | 1.1.1n | 1.1.1n | 
 | [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |
 
 Note:\
