@@ -15,6 +15,7 @@
 
 #include "crypto/crypto-sugar.h"
 #include "crypto/range_proofs.h"
+#include "../core_tests/random_helper.h"
 
 using namespace crypto;
 
@@ -1908,7 +1909,7 @@ int crypto_tests(const std::string& cmd_line_param)
     epee::log_space::log_singletone::get_default_log_folder().c_str());
 
 
-
+  size_t filtered_tests_count = 0;
   std::vector<size_t> failed_tests;
   for (size_t i = 0; i < g_tests.size(); ++i)
   {
@@ -1916,6 +1917,8 @@ int crypto_tests(const std::string& cmd_line_param)
 
     if (!wildcard_match(cmd_line_param.c_str(), test.first.c_str()))
       continue;
+
+    ++filtered_tests_count;
 
     LOG_PRINT("   " << std::setw(40) << std::left << test.first << " >", LOG_LEVEL_0);
     TIME_MEASURE_START(runtime);
@@ -1946,10 +1949,16 @@ int crypto_tests(const std::string& cmd_line_param)
     }
   }
 
+  if (filtered_tests_count == 0)
+  {
+    LOG_PRINT_YELLOW(ENDL << ENDL << "No tests were selected, check the filter mask", LOG_LEVEL_0);
+    return 1;
+  }
+
   if (failed_tests.empty())
   {
     LOG_PRINT_GREEN(ENDL, LOG_LEVEL_0);
-    LOG_PRINT_GREEN("All tests passed okay", LOG_LEVEL_0);
+    LOG_PRINT_GREEN(filtered_tests_count << " tests passed okay", LOG_LEVEL_0);
     return 0;
   }
 
