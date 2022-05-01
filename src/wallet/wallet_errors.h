@@ -70,7 +70,10 @@ namespace tools
       std::string to_string() const
       {
         std::ostringstream ss;
-        ss << m_loc << ':' << typeid(*this).name() << "[" << m_error_code << "]: " << Base::what();
+        ss << m_loc << ':' << typeid(*this).name();
+        if (!m_error_code.empty())
+          ss << "[" << m_error_code << "]";
+        ss << ": " << Base::what();
         return ss.str();
       }
 

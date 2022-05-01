@@ -106,7 +106,7 @@ bool generate_and_play(const char* const genclass_name)
   std::vector<test_event_entry> events;
   bool generated = false;
   bool result = true;
-  std::cout << concolor::bright_white << "#TEST# " << genclass_name << concolor::normal << std::endl;
+  std::cout << ENDL << concolor::bright_white << "#TEST# " << genclass_name << concolor::normal << ENDL << ENDL;
   LOG_PRINT2("get_object_blobsize.log", "#TEST# " << genclass_name, LOG_LEVEL_3);
 
   if (!clean_data_directory())
