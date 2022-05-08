@@ -94,7 +94,7 @@ public:
     // Start the asynchronous operation itself. The handle_receive function
     // used as a callback will update the ec and length variables.
     socket_.async_receive(boost::asio::buffer(buffer),
-        boost::bind(&udp_blocking_client::handle_receive, _1, _2, &ec, &length));
+        boost::bind(&udp_blocking_client::handle_receive, boost::placeholders::_1, boost::placeholders::_2, &ec, &length));
 
     // Block until the asynchronous operation has completed.
     do io_service_.run_one(); while (ec == boost::asio::error::would_block);
@@ -194,7 +194,12 @@ namespace tools
       ntp_packet packet_sent = AUTO_VAL_INIT(packet_sent);
       packet_sent.li_vn_mode = 0x1b;
       auto packet_sent_time = std::chrono::high_resolution_clock::now();
-      socket.send_to(boost::asio::buffer(&packet_sent, sizeof packet_sent), receiver_endpoint);
+      auto send_res = socket.send_to(boost::asio::buffer(&packet_sent, sizeof packet_sent), receiver_endpoint);
+      if (send_res != sizeof packet_sent)
+      {
+        LOG_PRINT_L3("NTP: get_ntp_time(" << host_name << "): wrong send_res: " << send_res << ", expected sizeof packet_sent = " << sizeof packet_sent);
+        return 0;
+      }
 
       ntp_packet packet_received = AUTO_VAL_INIT(packet_received);
       boost::asio::ip::udp::endpoint sender_endpoint;

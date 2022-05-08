@@ -5,6 +5,10 @@ add_subdirectory(zlib)
 add_subdirectory(db)
 add_subdirectory(ethereum)
 
+if( NOT DISABLE_TOR)
+  add_subdirectory(tor-connect)
+endif()
+
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
   message("excluded upnp support for IOS build")
@@ -17,6 +21,10 @@ set_property(TARGET libminiupnpc-static PROPERTY FOLDER "contrib")
 set_property(TARGET zlibstatic PROPERTY FOLDER "contrib")
 set_property(TARGET mdbx PROPERTY FOLDER "contrib")
 set_property(TARGET lmdb PROPERTY FOLDER "contrib")
+if( NOT DISABLE_TOR)
+  set_property(TARGET tor-connect PROPERTY FOLDER "contrib")
+endif()
+
 set_property(TARGET upnpc-static mdbx_chk mdbx_copy mdbx_dump mdbx_load mdbx_stat PROPERTY FOLDER "unused")
 
 if(MSVC)

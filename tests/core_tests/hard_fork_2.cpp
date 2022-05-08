@@ -922,6 +922,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
   bob_wlt_awo->load(bob_wo_filename, "");
   bob_wlt_awo->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
   bob_wlt_awo->set_core_proxy(m_core_proxy);
+  bob_wlt_awo->set_disable_tor_relay(true);
 
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(110), false, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE), false, "");
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, 0, false, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE), false, "");
@@ -1054,6 +1055,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
   bob_wlt_awo_restored->restore(bob_wo_restored_filename, "", bob_tracking_seed, true, "");
   bob_wlt_awo_restored->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
   bob_wlt_awo_restored->set_core_proxy(m_core_proxy);
+  bob_wlt_awo_restored->set_disable_tor_relay(true);
 
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob_awo_restored", bob_wlt_awo_restored, MK_TEST_COINS(3), false), false, "");
 
@@ -1092,6 +1094,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
   bob_wlt_non_auditable->restore(bob_non_auditable_filename, "", bob_seed, false, "");
   bob_wlt_non_auditable->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
   bob_wlt_non_auditable->set_core_proxy(m_core_proxy);
+  bob_wlt_non_auditable->set_disable_tor_relay(true);
 
   // the balance for non-auditable wallet should be greather by mix_attr!=1 output (7 test coins + 1 left from prev step)
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob_non_auditable", bob_wlt_non_auditable, MK_TEST_COINS(8), false), false, "");

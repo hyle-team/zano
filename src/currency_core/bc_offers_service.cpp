@@ -13,7 +13,7 @@
 #include "storages/portable_storage_template_helper.h"
 
 
-command_line::arg_descriptor<bool>      arg_market_disable = { "disable-market", "Start GUI with market service disabled", false, true };
+command_line::arg_descriptor<bool>      arg_market_disable  ( "disable-market", "Start GUI with market service disabled");
 
 
 namespace bc_services

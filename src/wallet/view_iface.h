@@ -600,6 +600,18 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct current_action_status
+  {
+    uint64_t wallet_id;
+    std::string status;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(status)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   struct wallet_sync_status_info
   {
     bool is_daemon_connected;
@@ -742,9 +754,11 @@ public:
   struct gui_options
   {
     bool use_debug_mode;
+    bool disable_price_fetch;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(use_debug_mode)
+      KV_SERIALIZE(disable_price_fetch)
     END_KV_SERIALIZE_MAP()
 
   };
@@ -828,6 +842,7 @@ public:
     virtual bool pos_block_found(const currency::block& block_found){ return true; }
     virtual bool money_transfer_cancel(const transfer_event_info& wsi){ return true; }
     virtual bool set_options(const gui_options& opt){ return true; }
+    virtual bool update_tor_status(const current_action_status & opt) { return true; }
   };
 
 }

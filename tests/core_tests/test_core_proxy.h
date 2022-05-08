@@ -51,7 +51,7 @@ public:
   //----------------- i_currency_protocol ---------------------------------------
   virtual bool relay_block(currency::NOTIFY_NEW_BLOCK::request& /*arg*/, currency::currency_connection_context& /*exclude_context*/) override { return false; }
   
-  virtual bool relay_transactions(currency::NOTIFY_NEW_TRANSACTIONS::request& arg, currency::currency_connection_context& /*exclude_context*/) override
+  virtual bool relay_transactions(currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency::currency_connection_context& /*exclude_context*/) override
   {
     if (m_core_listener)
     {

@@ -26,32 +26,38 @@ namespace command_line
     arg_descriptor(const char* _name, const char* _description):
       name(_name),
       description(_description),
-      not_use_default(true),
+      use_default(false),
       default_value(T())
     {}
     arg_descriptor(const char* _name, const char* _description, const T& default_val) :
       name(_name),
       description(_description),
-      not_use_default(false),
+      use_default(true),
       default_value(default_val)
     {}
-    arg_descriptor(const char* _name, const char* _description, const T& default_val, bool not_use_default) :
-      name(_name),
-      description(_description),
-      default_value(default_val),
-      not_use_default(not_use_default)
-    {}
+//     arg_descriptor(const char* _name, const char* _description, const T& default_val, bool not_use_default) :
+//       name(_name),
+//       description(_description),
+//       default_value(default_val),
+//       not_use_default(not_use_default)
+//     {}
+
 
 
     const char* name;
     const char* description;
+    bool use_default;
     T default_value;
-    bool not_use_default;
   };
 
   template<typename T>
   struct arg_descriptor<std::vector<T>, false>
   {
+    arg_descriptor(const char* _name, const char* _description) :
+      name(_name),
+      description(_description)
+    {}
+
     typedef std::vector<T> value_type;
 
     const char* name;
@@ -79,7 +85,7 @@ namespace command_line
   boost::program_options::typed_value<T, char>* make_semantic(const arg_descriptor<T, false>& arg)
   {
     auto semantic = boost::program_options::value<T>();
-    if (!arg.not_use_default)
+    if (arg.use_default)
       semantic->default_value(arg.default_value);
     return semantic;
   }
@@ -88,7 +94,7 @@ namespace command_line
   boost::program_options::typed_value<T, char>* make_semantic(const arg_descriptor<T, false>& arg, const T& def)
   {
     auto semantic = boost::program_options::value<T>();
-    if (!arg.not_use_default)
+    if (arg.use_default)
       semantic->default_value(def);
     return semantic;
   }

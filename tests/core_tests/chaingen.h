@@ -997,10 +997,10 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 
 #define REGISTER_CALLBACK(CB_NAME, CLBACK) \
-  register_callback(CB_NAME, boost::bind(&CLBACK, this, _1, _2, _3));
+  register_callback(CB_NAME, boost::bind(&CLBACK, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3))
 
 #define REGISTER_CALLBACK_METHOD(CLASS, METHOD) \
-  register_callback(#METHOD, boost::bind(&CLASS::METHOD, this, _1, _2, _3));
+  register_callback(#METHOD, boost::bind(&CLASS::METHOD, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3))
 
 #define MAKE_GENESIS_BLOCK(VEC_EVENTS, BLK_NAME, MINER_ACC, TS)                       \
   test_generator generator;                                                           \

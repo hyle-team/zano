@@ -6,7 +6,4 @@
 
 namespace crypto
 {
-  const point_t& bpp_crypto_trait_zano::bpp_H = c_point_H;
-
-
 }

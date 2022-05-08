@@ -927,6 +927,7 @@ bool test_generator::init_test_wallet(const currency::account_base& account, con
   w->assign_account(account);
   w->set_genesis(genesis_hash);
   w->set_core_proxy(m_wallet_test_core_proxy);
+  w->set_disable_tor_relay(true);
 
   result = w;
   return true;

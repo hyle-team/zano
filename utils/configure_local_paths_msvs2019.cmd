@@ -6,3 +6,4 @@ rem
 
 set QT_PREFIX_PATH=C:\dev\_sdk\Qt5.15.2\5.15.2
 set BOOST_ROOT=C:\dev\_sdk\boost_1_76_0
+set OPENSSL_ROOT_DIR=C:\dev\_sdk\OpenSSL-Win64

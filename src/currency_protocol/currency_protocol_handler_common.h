@@ -17,7 +17,7 @@ namespace currency
   struct i_currency_protocol
   {
     virtual bool relay_block(NOTIFY_NEW_BLOCK::request& arg, currency_connection_context& exclude_context)=0;
-    virtual bool relay_transactions(NOTIFY_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context)=0;
+    virtual bool relay_transactions(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context)=0;
     //virtual bool request_objects(NOTIFY_REQUEST_GET_OBJECTS::request& arg, currency_connection_context& context)=0;
   };
 
@@ -30,7 +30,7 @@ namespace currency
     {
       return false;
     }
-    virtual bool relay_transactions(NOTIFY_NEW_TRANSACTIONS::request& /*arg*/, currency_connection_context& /*exclude_context*/)
+    virtual bool relay_transactions(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& /*arg*/, currency_connection_context& /*exclude_context*/)
     {
       return false;
     }
