@@ -44,18 +44,37 @@ RUN curl https://github.com/Kitware/CMake/releases/download/v3.15.5/cmake-3.15.5
     cmake --version &&\
     rm cmake-3.15.5-Linux-x86_64.sh
 
-# Boost 1.68
 
-RUN curl  https://boostorg.jfrog.io/artifactory/main/release/1.68.0/source/boost_1_68_0.tar.bz2 -OL &&\
-    echo '7f6130bc3cf65f56a618888ce9d5ea704fa10b462be126ad053e80e553d6d8b7 boost_1_68_0.tar.bz2' | sha256sum -c - &&\
-    tar -xjf boost_1_68_0.tar.bz2 &&\
-    rm boost_1_68_0.tar.bz2 &&\
-    cd boost_1_68_0 &&\
-    ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer &&\
+# Boost 1.70
+
+RUN curl https://boostorg.jfrog.io/artifactory/main/release/1.70.0/source/boost_1_70_0.tar.bz2 -OL &&\
+    echo '430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778 boost_1_70_0.tar.bz2' | sha256sum -c - &&\
+    tar -xjf boost_1_70_0.tar.bz2 &&\
+    rm boost_1_70_0.tar.bz2 &&\
+    cd boost_1_70_0 &&\
+    ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log &&\
     ./b2 &&\
     cd ..
 
-ENV BOOST_ROOT=/root/boost_1_68_0
+ENV BOOST_ROOT=/root/boost_1_70_0
+
+
+# OpenSSL 1.1.1n
+
+RUN curl https://www.openssl.org/source/openssl-1.1.1n.tar.gz -OL &&\
+    echo '40dceb51a4f6a5275bde0e6bf20ef4b91bfc32ed57c0552e2e8e15463372b17a openssl-1.1.1n.tar.gz' | sha256sum -c - &&\
+    tar xaf openssl-1.1.1n.tar.gz &&\
+    rm openssl-1.1.1n.tar.gz &&\
+    cd openssl-1.1.1n &&\
+    ./config --prefix=/root/openssl --openssldir=/root/openssl shared zlib &&\
+    make &&\
+    make test &&\
+    make install &&\
+    cd .. &&\
+    rm -rf openssl-1.1.1n
+
+ENV OPENSSL_ROOT_DIR=/root/openssl
+
 
 # Zano
 
@@ -63,9 +82,8 @@ RUN pwd && mem_avail_gb=$(( $(getconf _AVPHYS_PAGES) * $(getconf PAGE_SIZE) / (1
     make_job_slots=$(( $mem_avail_gb < 4 ? 1 : $mem_avail_gb / 4)) &&\
     echo make_job_slots=$make_job_slots &&\
     set -x &&\
-    git clone --single-branch https://github.com/hyle-team/zano.git &&\
+    git clone --single-branch --recursive https://github.com/hyle-team/zano.git &&\
     cd zano &&\
-    git submodule update --init --recursive &&\
     mkdir build && cd build &&\
     cmake -D STATIC=TRUE .. &&\
     make -j $make_job_slots daemon simplewallet
