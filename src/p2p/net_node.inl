@@ -26,18 +26,18 @@ namespace nodetool
 
   namespace
   {
-    const command_line::arg_descriptor<std::string>               arg_p2p_bind_ip                   = {"p2p-bind-ip", "Interface for p2p network protocol", "0.0.0.0"};
-    const command_line::arg_descriptor<std::string>               arg_p2p_bind_port                 = {"p2p-bind-port", "Port for p2p network protocol", boost::to_string(P2P_DEFAULT_PORT)};
-    const command_line::arg_descriptor<uint32_t>                  arg_p2p_external_port             = {"p2p-external-port", "External port for p2p network protocol (if port forwarding used with NAT)", 0};
-    const command_line::arg_descriptor<bool>                      arg_p2p_allow_local_ip            = {"allow-local-ip", "Allow local ip add to peer list, mostly in debug purposes"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_peer                  = {"add-peer", "Manually add peer to local peerlist"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_priority_node         = {"add-priority-node", "Specify list of peers to connect to and attempt to keep the connection open"};
-    const command_line::arg_descriptor<bool>                      arg_p2p_use_only_priority_nodes   = {"use-only-priority-nodes", "Try to connect only to priority nodes"};
-    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_seed_node                 = {"seed-node", "Connect to a node to retrieve peer addresses, and disconnect"};
-    const command_line::arg_descriptor<bool>                      arg_p2p_hide_my_port              = {"hide-my-port", "Do not announce yourself as peerlist candidate", false, true}; 
-    const command_line::arg_descriptor<bool>                      arg_p2p_offline_mode              = { "offline-mode", "Don't connect to any node and reject any connections", false, true };
-    const command_line::arg_descriptor<bool>                      arg_p2p_disable_debug_reqs        = { "disable-debug-p2p-requests", "Disable p2p debug requests", false, true };
-    const command_line::arg_descriptor<uint32_t>                  arg_p2p_ip_auto_blocking          = { "p2p-ip-auto-blocking", "Enable (1) or disable (0) peers auto-blocking by IP <0|1>. Default: 0", 0, false };
+    const command_line::arg_descriptor<std::string>               arg_p2p_bind_ip                    ("p2p-bind-ip", "Interface for p2p network protocol", "0.0.0.0");
+    const command_line::arg_descriptor<std::string>               arg_p2p_bind_port                  ("p2p-bind-port", "Port for p2p network protocol", boost::to_string(P2P_DEFAULT_PORT));
+    const command_line::arg_descriptor<uint32_t>                  arg_p2p_external_port              ("p2p-external-port", "External port for p2p network protocol (if port forwarding used with NAT)", 0);
+    const command_line::arg_descriptor<bool>                      arg_p2p_allow_local_ip             ("allow-local-ip", "Allow local ip add to peer list, mostly in debug purposes");
+    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_peer                   ("add-peer", "Manually add peer to local peerlist");
+    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_add_priority_node          ("add-priority-node", "Specify list of peers to connect to and attempt to keep the connection open");
+    const command_line::arg_descriptor<bool>                      arg_p2p_use_only_priority_nodes    ("use-only-priority-nodes", "Try to connect only to priority nodes");
+    const command_line::arg_descriptor<std::vector<std::string> > arg_p2p_seed_node                  ("seed-node", "Connect to a node to retrieve peer addresses, and disconnect");
+    const command_line::arg_descriptor<bool>                      arg_p2p_hide_my_port               ("hide-my-port", "Do not announce yourself as peerlist candidate"); 
+    const command_line::arg_descriptor<bool>                      arg_p2p_offline_mode               ( "offline-mode", "Don't connect to any node and reject any connections");
+    const command_line::arg_descriptor<bool>                      arg_p2p_disable_debug_reqs         ( "disable-debug-p2p-requests", "Disable p2p debug requests");
+    const command_line::arg_descriptor<uint32_t>                  arg_p2p_ip_auto_blocking           ( "p2p-ip-auto-blocking", "Enable (1) or disable (0) peers auto-blocking by IP <0|1>. Default: 0", 1);
   }
 
   //-----------------------------------------------------------------------------------

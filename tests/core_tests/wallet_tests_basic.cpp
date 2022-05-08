@@ -83,6 +83,7 @@ std::shared_ptr<tools::wallet2> wallet_test::init_playtime_test_wallet(const std
   w->assign_account(acc);
   w->set_genesis(genesis_hash);
   w->set_core_proxy(m_core_proxy);
+  w->set_disable_tor_relay(true);
   return w;
 }
 

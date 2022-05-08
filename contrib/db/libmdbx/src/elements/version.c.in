@@ -3,10 +3,10 @@
 
 #include "internals.h"
 
-#if MDBX_VERSION_MAJOR != ${MDBX_VERSION_MAJOR} ||                             \
-    MDBX_VERSION_MINOR != ${MDBX_VERSION_MINOR}
-#error "API version mismatch! Had `git fetch --tags` done?"
-#endif
+//#if MDBX_VERSION_MAJOR != ${MDBX_VERSION_MAJOR} ||                             \
+//    MDBX_VERSION_MINOR != ${MDBX_VERSION_MINOR}
+//#error "API version mismatch! Had `git fetch --tags` done?"
+//#endif
 
 static const char sourcery[] = STRINGIFY(MDBX_BUILD_SOURCERY);
 

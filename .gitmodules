@@ -5,3 +5,7 @@
 	path = src/gui/qt-daemon/layout
 	url = https://github.com/hyle-team/zano_ui.git
 	branch = main
+[submodule "contrib/tor-connect"]
+	path = contrib/tor-connect
+	url = https://github.com/hyle-team/tor-connect.git
+	branch = main

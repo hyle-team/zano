@@ -163,7 +163,7 @@ public:
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
   std::string get_qt_dev_tools_option() const { return m_qt_dev_tools; }
   void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
-
+  bool set_use_tor(bool use_tor);
 private:
   void main_worker(const po::variables_map& vm);
   bool init_local_daemon();
@@ -187,6 +187,8 @@ private:
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/);
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/);
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
+  virtual void on_tor_status_change(size_t wallet_id, const std::string& state);
+
 
   std::thread m_main_worker_thread;
   
@@ -224,6 +226,7 @@ private:
   bool m_qt_logs_enbaled;
   std::string m_qt_dev_tools;
   std::atomic<bool> m_is_pos_allowed;
+  std::atomic<bool> m_use_tor;
 
 
   std::map<size_t, wallet_vs_options> m_wallets;

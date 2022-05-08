@@ -43,10 +43,10 @@ using namespace epee;
 namespace tools
 {
   //-----------------------------------------------------------------------------------
-  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_port = {"rpc-bind-port", "Starts wallet as rpc server for wallet operations, sets bind port for server", "", true};
-  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip = {"rpc-bind-ip", "Specify ip to bind rpc server", "127.0.0.1"};
-  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_miner_text_info = { "miner-text-info", "Wallet password", "", true };
-  const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_deaf_mode = { "deaf", "Put wallet into 'deaf' mode make it ignore any rpc commands(usable for safe PoS mining)", false, true };
+  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_port  ("rpc-bind-port", "Starts wallet as rpc server for wallet operations, sets bind port for server");
+  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip  ("rpc-bind-ip", "Specify ip to bind rpc server", "127.0.0.1");
+  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_miner_text_info  ( "miner-text-info", "Wallet password");
+  const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_deaf_mode  ( "deaf", "Put wallet into 'deaf' mode make it ignore any rpc commands(usable for safe PoS mining)");
 
   void wallet_rpc_server::init_options(boost::program_options::options_description& desc)
   {

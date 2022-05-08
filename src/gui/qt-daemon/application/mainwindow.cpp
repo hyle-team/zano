@@ -100,6 +100,7 @@ MainWindow::MainWindow()
   , m_system_shutdown(false)
   , m_view(nullptr)
   , m_channel(nullptr)
+  , m_ui_dispatch_id_counter(0)
 {
 #ifndef _MSC_VER
   //workaround for macos broken tolower from std, very dirty hack
@@ -415,7 +416,7 @@ bool MainWindow::init(const std::string& html_path)
   //QtWebEngine::initialize();
   init_tray_icon(html_path);
   set_html_path(html_path);
-
+  m_threads_pool.init(2);
   m_backend.subscribe_to_core_events(this);
 
   bool r = QSslSocket::supportsSsl();
@@ -920,6 +921,41 @@ QString MainWindow::start_backend(const QString& params)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::sync_call(const QString& func_name, const QString& params)
+{
+  if (func_name == "transfer")
+  {
+    return this->transfer(params);
+  }
+  else if (func_name == "test_call")
+  {
+    return params;
+  }
+  else
+  {
+    return QString(QString() + "{ \"status\": \"Method '" + func_name  + "' not found\"}");
+  }
+}
+
+QString MainWindow::async_call(const QString& func_name, const QString& params)
+{
+
+  uint64_t job_id = m_ui_dispatch_id_counter++;
+  QString method_name = func_name;
+  QString argements = params;
+
+  auto async_callback = [this, method_name, argements, job_id]()
+  {
+    QString res_str = this->sync_call(method_name, argements);
+    this->dispatch_async_call_result(std::to_string(job_id).c_str(), res_str);  //general function
+  };
+
+  m_threads_pool.add_job(async_callback);
+  LOG_PRINT_L2("[UI_ASYNC_CALL]: started " << method_name.toStdString() << ", job id: " << job_id);
+  return QString::fromStdString(std::string("{ \"job_id\": ") + std::to_string(job_id) + "}");
+}
+
+
 bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
 {
   TRY_ENTRY();
@@ -943,6 +979,17 @@ bool MainWindow::set_options(const view::gui_options& opt)
   epee::serialization::store_t_to_json(opt, json_str, 0, epee::serialization::eol_lf);
   LOG_PRINT_L0("SENDING SIGNAL -> [set_options]:" << std::endl << json_str);
   QMetaObject::invokeMethod(this, "set_options", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  return true;
+  CATCH_ENTRY2(false);
+}
+
+bool MainWindow::update_tor_status(const view::current_action_status& opt)
+{
+  TRY_ENTRY();
+  std::string json_str;
+  epee::serialization::store_t_to_json(opt, json_str, 0, epee::serialization::eol_lf);
+  LOG_PRINT_L0("SENDING SIGNAL -> [HANDLE_CURRENT_ACTION_STATE]:" << std::endl << json_str);
+  QMetaObject::invokeMethod(this, "handle_current_action_state", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -1651,6 +1698,20 @@ QString MainWindow::get_log_level(const QString& param)
   ar.response_data.v = epee::log_space::get_set_log_detalisation_level();
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::set_enable_tor(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<bool>, enabl_tor);
+  m_backend.set_use_tor(enabl_tor.v);
+  //epee::log_space::get_set_log_detalisation_level(true, enabl_tor.v);
+  default_ar.error_code = API_RETURN_CODE_OK;
+  LOG_PRINT("[TOR]: Enable TOR set to " << enabl_tor.v, LOG_LEVEL_MIN);
+
+  return MAKE_RESPONSE(default_ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 

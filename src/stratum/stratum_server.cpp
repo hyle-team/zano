@@ -39,25 +39,25 @@ namespace
 #define VDIFF_RETARGET_SHARES_COUNT 12 // enforce retargeting if this many shares are received (high performace in terms of current difficulty)
 #define VDIFF_VARIANCE_PERCENT_DEFAULT 25 // %
 
-  const command_line::arg_descriptor<bool>        arg_stratum               = {"stratum",                   "Stratum server: enable" };
-  const command_line::arg_descriptor<std::string> arg_stratum_bind_ip       = {"stratum-bind-ip",           "Stratum server: IP to bind",                STRATUM_BIND_IP_DEFAULT };
-  const command_line::arg_descriptor<std::string> arg_stratum_bind_port     = {"stratum-bind-port",         "Stratum server: port to listen at",         std::to_string(STRATUM_DEFAULT_PORT) };
-  const command_line::arg_descriptor<size_t>      arg_stratum_threads       = {"stratum-threads-count",     "Stratum server: number of server threads",  STRATUM_THREADS_COUNT_DEFAULT };
+  const command_line::arg_descriptor<bool>        arg_stratum                ("stratum",                   "Stratum server: enable" );
+  const command_line::arg_descriptor<std::string> arg_stratum_bind_ip        ("stratum-bind-ip",           "Stratum server: IP to bind",                STRATUM_BIND_IP_DEFAULT );
+  const command_line::arg_descriptor<std::string> arg_stratum_bind_port      ("stratum-bind-port",         "Stratum server: port to listen at",         std::to_string(STRATUM_DEFAULT_PORT) );
+  const command_line::arg_descriptor<size_t>      arg_stratum_threads        ("stratum-threads-count",     "Stratum server: number of server threads",  STRATUM_THREADS_COUNT_DEFAULT );
   const command_line::arg_descriptor<std::string> arg_stratum_miner_address = {"stratum-miner-address",     "Stratum server: miner address. All workers"
     " will mine to this address. If not set here, ALL workers should use the very same wallet address as username."
-    " If set here - they're allowed to log in with username '" WORKER_ALLOWED_USERNAME "' instead of address.", "", true };
+    " If set here - they're allowed to log in with username '" WORKER_ALLOWED_USERNAME "' instead of address."};
   
   const command_line::arg_descriptor<size_t>      arg_stratum_block_template_update_period = {"stratum-template-update-period",
     "Stratum server: if there are no new blocks, update block template this often (sec.)",  STRATUM_BLOCK_TEMPLATE_UPD_PERIOD_DEFAULT };
-  const command_line::arg_descriptor<uint64_t>    arg_stratum_hr_print_interval = {"stratum-hr-print-interval", "Stratum server: how often to print hashrate stats (sec.)", STRATUM_TOTAL_HR_PRINT_INTERVAL_S_DEFAULT };
+  const command_line::arg_descriptor<uint64_t>    arg_stratum_hr_print_interval  ("stratum-hr-print-interval", "Stratum server: how often to print hashrate stats (sec.)", STRATUM_TOTAL_HR_PRINT_INTERVAL_S_DEFAULT );
   
-  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_target_min = {"stratum-vdiff-target-min",  "Stratum server: minimum worker difficulty",  VDIFF_TARGET_MIN_DEFAULT };
-  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_target_max = {"stratum-vdiff-target-max",  "Stratum server: maximum worker difficulty",  VDIFF_TARGET_MAX_DEFAULT };
-  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_target_time = {"stratum-vdiff-target-time",  "Stratum server: target time per share (i.e. try to get one share per this many seconds)",  VDIFF_TARGET_TIME_DEFAULT };
-  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_retarget_time = {"stratum-vdiff-retarget-time",  "Stratum server: check to see if we should retarget this often (sec.)",  VDIFF_RETARGET_TIME_DEFAULT };
-  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_retarget_shares = {"stratum-vdiff-retarget-shares",  "Stratum server: enforce retargeting if got this many shares",  VDIFF_RETARGET_SHARES_COUNT };
-  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_variance_percent  = {"stratum-vdiff-variance-percent",  "Stratum server: allow average time to very this % from target without retarget",  VDIFF_VARIANCE_PERCENT_DEFAULT };
-  const command_line::arg_descriptor<bool>        arg_stratum_always_online = { "stratum-always-online",                   "Stratum server consider the core being synchronized regardless of online status, useful for debugging with --offline-mode" };
+  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_target_min  ("stratum-vdiff-target-min",  "Stratum server: minimum worker difficulty",  VDIFF_TARGET_MIN_DEFAULT );
+  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_target_max  ("stratum-vdiff-target-max",  "Stratum server: maximum worker difficulty",  VDIFF_TARGET_MAX_DEFAULT );
+  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_target_time  ("stratum-vdiff-target-time",  "Stratum server: target time per share (i.e. try to get one share per this many seconds)",  VDIFF_TARGET_TIME_DEFAULT );
+  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_retarget_time  ("stratum-vdiff-retarget-time",  "Stratum server: check to see if we should retarget this often (sec.)",  VDIFF_RETARGET_TIME_DEFAULT );
+  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_retarget_shares  ("stratum-vdiff-retarget-shares",  "Stratum server: enforce retargeting if got this many shares",  VDIFF_RETARGET_SHARES_COUNT );
+  const command_line::arg_descriptor<uint64_t>    arg_stratum_vdiff_variance_percent   ("stratum-vdiff-variance-percent",  "Stratum server: allow average time to very this % from target without retarget",  VDIFF_VARIANCE_PERCENT_DEFAULT );
+  const command_line::arg_descriptor<bool>        arg_stratum_always_online  ( "stratum-always-online",                   "Stratum server consider the core being synchronized regardless of online status, useful for debugging with --offline-mode" );
 
 //==============================================================================================================================
 

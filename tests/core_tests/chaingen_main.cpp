@@ -21,13 +21,13 @@ namespace po = boost::program_options;
 
 namespace
 {
-  const command_line::arg_descriptor<std::string> arg_test_data_path              = {"test-data-path", "", ""};
-  const command_line::arg_descriptor<bool>        arg_generate_test_data          = {"generate-test-data", ""};
-  const command_line::arg_descriptor<bool>        arg_play_test_data              = {"play-test-data", ""};
-  const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data = {"generate-and-play-test-data", ""};
-  const command_line::arg_descriptor<bool>        arg_test_transactions           = {"test-transactions", ""};
-  const command_line::arg_descriptor<std::string> arg_run_single_test             = {"run-single-test", "" };
-  const command_line::arg_descriptor<bool>        arg_enable_debug_asserts        = {"enable-debug-asserts", "" };
+  const command_line::arg_descriptor<std::string> arg_test_data_path               ("test-data-path", "", "");
+  const command_line::arg_descriptor<bool>        arg_generate_test_data           ("generate-test-data", "");
+  const command_line::arg_descriptor<bool>        arg_play_test_data               ("play-test-data", "");
+  const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data  ("generate-and-play-test-data", "");
+  const command_line::arg_descriptor<bool>        arg_test_transactions            ("test-transactions", "");
+  const command_line::arg_descriptor<std::string> arg_run_single_test              ("run-single-test", "" );
+  const command_line::arg_descriptor<bool>        arg_enable_debug_asserts         ("enable-debug-asserts", "" );
 
   boost::program_options::variables_map g_vm;
 }
@@ -106,7 +106,7 @@ bool generate_and_play(const char* const genclass_name)
   std::vector<test_event_entry> events;
   bool generated = false;
   bool result = true;
-  std::cout << concolor::bright_white << "#TEST# " << genclass_name << concolor::normal << std::endl;
+  std::cout << ENDL << concolor::bright_white << "#TEST# " << genclass_name << concolor::normal << ENDL << ENDL;
   LOG_PRINT2("get_object_blobsize.log", "#TEST# " << genclass_name, LOG_LEVEL_3);
 
   if (!clean_data_directory())
@@ -667,6 +667,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   command_line::add_arg(desc_options, command_line::arg_stop_after_height);
+  command_line::add_arg(desc_options, command_line::arg_disable_ntp);
 
   currency::core::init_options(desc_options);
   tools::db::db_backend_selector::init_options(desc_options);

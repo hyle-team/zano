@@ -22,9 +22,9 @@ namespace currency
 {
   namespace
   {
-    const command_line::arg_descriptor<std::string> arg_rpc_bind_ip   = {"rpc-bind-ip", "", "127.0.0.1"};
-    const command_line::arg_descriptor<std::string> arg_rpc_bind_port = {"rpc-bind-port", "", std::to_string(RPC_DEFAULT_PORT)};
-    const command_line::arg_descriptor<bool> arg_rpc_ignore_status    = {"rpc-ignore-offline", "Let rpc calls despite online/offline status", false, true };
+    const command_line::arg_descriptor<std::string> arg_rpc_bind_ip    ("rpc-bind-ip", "", "127.0.0.1");
+    const command_line::arg_descriptor<std::string> arg_rpc_bind_port  ("rpc-bind-port", "", std::to_string(RPC_DEFAULT_PORT));
+    const command_line::arg_descriptor<bool> arg_rpc_ignore_status     ("rpc-ignore-offline", "Let rpc calls despite online/offline status");
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)
@@ -705,7 +705,7 @@ namespace currency
     }
 
 
-    NOTIFY_NEW_TRANSACTIONS::request r;
+    NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request r;
     r.txs.push_back(tx_blob);
     m_core.get_protocol()->relay_transactions(r, fake_context);
     //TODO: make sure that tx has reached other nodes here, probably wait to receive reflections from other nodes
@@ -716,7 +716,7 @@ namespace currency
 	bool core_rpc_server::on_force_relaey_raw_txs(const COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& req, COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& res, connection_context& cntx)
 	{
 		CHECK_CORE_READY();
-		NOTIFY_NEW_TRANSACTIONS::request r = AUTO_VAL_INIT(r);
+		NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request r = AUTO_VAL_INIT(r);
 
 		for (const auto& t : req.txs_as_hex)
 		{

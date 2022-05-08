@@ -431,6 +431,31 @@ namespace crypto
       return result;
     }
 
+    // Little-endian assumed; TODO: consider Big-endian support
+    bool get_bit(uint8_t bit_index) const
+    {
+      return (m_u64[bit_index >> 6] & (1ull << (bit_index & 63))) != 0;
+    }
+
+    // Little-endian assumed; TODO: consider Big-endian support
+    void set_bit(size_t bit_index)
+    {
+      m_u64[bit_index >> 6] |= (1ull << (bit_index & 63));
+    }
+
+    // Little-endian assumed; TODO: consider Big-endian support
+    void clear_bit(size_t bit_index)
+    {
+      m_u64[bit_index >> 6] &= ~(1ull << (bit_index & 63));
+    }
+
+    static scalar_t power_of_2(uint8_t exponent)
+    {
+      scalar_t result = 0;
+      result.set_bit(exponent);
+      return result;
+    }
+
   }; // struct scalar_t
 
   //
@@ -890,6 +915,7 @@ namespace crypto
   extern const point_g_t c_point_G;
 
   extern const point_t  c_point_H;
+  extern const point_t  c_point_H2;
   extern const point_t  c_point_0;
 
   //
@@ -1063,6 +1089,21 @@ namespace crypto
       ge_bytes_hash_to_ec_32(&result.m_p3, (const unsigned char*)&p);
       return result;
     }
+
+    static point_t hp(const scalar_t& s)
+    {
+      point_t result;
+      ge_bytes_hash_to_ec_32(&result.m_p3, s.data());
+      return result;
+    }
+
+    static point_t hp(const void* data, size_t size)
+    {
+      point_t result;
+      ge_bytes_hash_to_ec(&result.m_p3, data, size);
+      return result;
+    }
+
   }; // hash_helper_t struct
 
 
