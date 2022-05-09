@@ -608,7 +608,7 @@ namespace currency
       VARINT_FIELD(version)
       if(CURRENT_TRANSACTION_VERSION < version) return false;
       FIELD(vin)
-      if(version <= 1)
+      //if(version <= 1)
       FIELD(vout)
       FIELD(extra)
     END_SERIALIZE()
