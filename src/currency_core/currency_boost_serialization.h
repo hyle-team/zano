@@ -110,7 +110,14 @@ namespace boost
       a & x.target;
     }
 
-
+    template <class Archive>
+    inline void serialize(Archive &a, currency::tx_out_zarcanum &x, const boost::serialization::version_type ver)
+    {
+      a & x.stealth_address;
+      a & x.concealing_point;
+      a & x.commitment;
+      a & x.encrypted_amount;
+    }
 
     template <class Archive>
     inline void serialize(Archive &a, currency::tx_comment &x, const boost::serialization::version_type ver)

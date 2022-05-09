@@ -294,6 +294,31 @@ namespace currency
   };
 
 
+#pragma pack(push, 1)
+  struct tx_out_zarcanum
+  {
+    tx_out_zarcanum() {}
+    
+    // Boost's Assignable concept
+    tx_out_zarcanum(const tx_out_zarcanum&)            = default;
+    tx_out_zarcanum& operator=(const tx_out_zarcanum&) = default;
+
+    crypto::public_key  stealth_address;
+    crypto::public_key  concealing_point;
+    crypto::public_key  commitment;
+    uint64_t            encrypted_amount;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(stealth_address)
+      FIELD(concealing_point)
+      FIELD(commitment)
+      FIELD(encrypted_amount)
+    END_SERIALIZE()
+  };
+#pragma pack(pop)
+
+  typedef boost::variant<tx_out, tx_out_zarcanum> tx_out_v;
+
 
   struct tx_comment
   {
@@ -814,6 +839,8 @@ SET_VARIANT_TAGS(currency::extra_alias_entry, 33, "alias_entry2");
 SET_VARIANT_TAGS(currency::txin_htlc, 34, "txin_htlc");
 SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 
+// Zarcanum
+SET_VARIANT_TAGS(currency::tx_out_zarcanum, 36, "tx_out_zarcanum");
 
 
 #undef SET_VARIANT_TAGS
