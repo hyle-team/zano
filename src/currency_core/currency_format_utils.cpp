@@ -1209,6 +1209,7 @@ namespace currency
   {
     //extra copy operation, but creating transaction is not sensitive to this
     finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    ftp.tx_version = CURRENT_TRANSACTION_VERSION;
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;
     ftp.extra = extra;
@@ -1264,7 +1265,7 @@ namespace currency
       tx.signatures.clear();
       tx.extra = extra;
 
-      tx.version = CURRENT_TRANSACTION_VERSION;
+      tx.version = ftp.tx_version;
       if (unlock_time != 0)
         set_tx_unlock_time(tx, unlock_time);
 
