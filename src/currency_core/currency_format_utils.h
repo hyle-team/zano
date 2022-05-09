@@ -156,6 +156,7 @@ namespace currency
     std::vector<currency::tx_destination_entry> prepared_destinations;
     uint64_t expiration_time;
     crypto::public_key spend_pub_key;  // only for validations
+    uint64_t tx_version;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(unlock_time)
@@ -171,6 +172,7 @@ namespace currency
       FIELD(prepared_destinations)
       FIELD(expiration_time)
       FIELD(spend_pub_key)
+      FIELD(tx_version)
     END_SERIALIZE()
   };
 

@@ -27,6 +27,7 @@
 #define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49 // auditable integrated addresses start with 'aiZX'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     1
+#define CURRENT_TRANSACTION_VERSION_HF4                 2
 #define HF1_BLOCK_MAJOR_VERSION                         1
 #define CURRENT_BLOCK_MAJOR_VERSION                     2
 
