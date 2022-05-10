@@ -23,16 +23,11 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
-
-
-
 #ifndef _STRING_TOOLS_H_
 #define _STRING_TOOLS_H_
 
-//#include <objbase.h>
 #include <locale>
 #include <cstdlib>
-//#include <strsafe.h>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
@@ -321,13 +316,6 @@ POP_GCC_WARNINGS
     }
     return true;
 	}
-
-/*  template<typename t_type>
-  bool get_xparam_from_command_line(const std::map<std::string, std::string>& res, const std::basic_string<typename t_string::value_type> & key, t_type& val)
-  {
-
-  }
-  */
 
 	template<class t_string, typename t_type>
 	bool get_xparam_from_command_line(const std::map<t_string, t_string>& res, const t_string & key, t_type& val)
@@ -803,6 +791,6 @@ POP_GCC_WARNINGS
 		return buff;	
 	}
 #endif
-}
-}
+} // namespace stringtools
+} // namwspace epee
 #endif //_STRING_TOOLS_H_
