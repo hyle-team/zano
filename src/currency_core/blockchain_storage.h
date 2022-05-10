@@ -395,7 +395,7 @@ namespace currency
           missed_bs.push_back(bl_id);
         else
         {
-          CHECK_AND_ASSERT_MES(*block_ind_ptr < m_db_blocks.size(), false, "Internal error: bl_id=" << string_tools::pod_to_hex(bl_id)
+          CHECK_AND_ASSERT_MES(*block_ind_ptr < m_db_blocks.size(), false, "Internal error: bl_id=" << epee::string_tools::pod_to_hex(bl_id)
             << " have index record with offset=" << *block_ind_ptr << ", bigger then m_db_blocks.size()=" << m_db_blocks.size());
           blocks.push_back(m_db_blocks[*block_ind_ptr]->bl);
         }
@@ -756,7 +756,7 @@ namespace currency
       }
       TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_find_tx);
       auto tx_ptr = m_db_transactions.find(tx_id);
-      CHECK_AND_ASSERT_MES(tx_ptr, false, "Wrong transaction id in output indexes: " << string_tools::pod_to_hex(tx_id));
+      CHECK_AND_ASSERT_MES(tx_ptr, false, "Wrong transaction id in output indexes: " << epee::string_tools::pod_to_hex(tx_id));
       CHECK_AND_ASSERT_MES(n < tx_ptr->tx.vout.size(), false,
         "Wrong index in transaction outputs: " << n << ", expected less then " << tx_ptr->tx.vout.size());
       //check mix_attr

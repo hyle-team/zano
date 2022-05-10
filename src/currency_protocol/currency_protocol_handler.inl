@@ -107,7 +107,7 @@ namespace currency
       std::stringstream conn_ss;
       time_t livetime = time(NULL) - cntxt.m_started;
       conn_ss << std::setw(29) << std::left << std::string(cntxt.m_is_income ? "[INC]":"[OUT]") + 
-        string_tools::get_ip_string_from_int32(cntxt.m_remote_ip) + ":" + std::to_string(cntxt.m_remote_port) 
+        epee::string_tools::get_ip_string_from_int32(cntxt.m_remote_ip) + ":" + std::to_string(cntxt.m_remote_port) 
         << std::setw(20) << std::hex << peer_id
         << std::setw(25) << std::to_string(cntxt.m_recv_cnt)+ "(" + std::to_string(time(NULL) - cntxt.m_last_recv) + ")" + "/" + std::to_string(cntxt.m_send_cnt) + "(" + std::to_string(time(NULL) - cntxt.m_last_send) + ")"
         << std::setw(25) << get_protocol_state_string(cntxt.m_state)
@@ -523,7 +523,7 @@ namespace currency
       if(!parse_and_validate_block_from_blob(block_entry.block, b))
       {
         LOG_ERROR_CCONTEXT("sent wrong block: failed to parse and validate block: \r\n" 
-          << string_tools::buff_to_hex_nodelimer(block_entry.block) << "\r\n dropping connection");
+          << epee::string_tools::buff_to_hex_nodelimer(block_entry.block) << "\r\n dropping connection");
         m_p2p->drop_connection(context);
         m_p2p->add_ip_fail(context.m_remote_ip);
         return 1;
@@ -547,14 +547,14 @@ namespace currency
       auto req_it = context.m_priv.m_requested_objects.find(get_block_hash(b));
       if(req_it == context.m_priv.m_requested_objects.end())
       {
-        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << string_tools::pod_to_hex(get_blob_hash(block_entry.block)) 
+        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epee::string_tools::pod_to_hex(get_blob_hash(block_entry.block)) 
           << " wasn't requested, dropping connection");
         m_p2p->drop_connection(context);
         return 1;
       }
       if(b.tx_hashes.size() != block_entry.txs.size()) 
       {
-        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << string_tools::pod_to_hex(get_blob_hash(block_entry.block)) 
+        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epee::string_tools::pod_to_hex(get_blob_hash(block_entry.block)) 
           << ", tx_hashes.size()=" << b.tx_hashes.size() << " mismatch with block_complete_entry.m_txs.size()=" << block_entry.txs.size() << ", dropping connection");
         m_p2p->drop_connection(context);
         return 1;
@@ -575,7 +575,7 @@ namespace currency
 
     {
       m_core.pause_mine();
-      misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
+      epee::misc_utils::auto_scope_leave_caller scope_exit_handler = epee::misc_utils::create_scope_leave_handler(
         boost::bind(&t_core::resume_mine, &m_core));
       size_t count = 0;
       for (const block_complete_entry& block_entry : arg.blocks)
@@ -593,7 +593,7 @@ namespace currency
           if (!parse_and_validate_tx_from_blob(tx_blob, tx, tx_id))
           {
             LOG_ERROR_CCONTEXT("failed to parse tx: " 
-              << string_tools::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
+              << epee::string_tools::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
             m_p2p->drop_connection(context);
             return 1;
           }
@@ -742,7 +742,7 @@ namespace currency
                            << "\r\nm_remote_blockchain_height=" << context.m_remote_blockchain_height
                            << "\r\nm_needed_objects.size()=" << context.m_priv.m_needed_objects.size()
                            << "\r\nm_requested_objects.size()=" << context.m_priv.m_requested_objects.size()
-                           << "\r\non connection [" << net_utils::print_connection_context_short(context)<< "]");
+                           << "\r\non connection [" << epee::net_utils::print_connection_context_short(context)<< "]");
       
       context.m_state = currency_connection_context::state_normal;
       LOG_PRINT_GREEN("[REQUEST_MISSING_OBJECTS]: SYNCHRONIZED OK", LOG_LEVEL_0);
@@ -944,7 +944,7 @@ namespace currency
     if(!m_core.have_block(arg.m_block_ids.front().h))
     {
       LOG_ERROR_CCONTEXT("sent m_block_ids starting from unknown id: "
-                                              << string_tools::pod_to_hex(arg.m_block_ids.front()) << " , dropping connection");
+                                              << epee::string_tools::pod_to_hex(arg.m_block_ids.front()) << " , dropping connection");
       m_p2p->drop_connection(context);
       m_p2p->add_ip_fail(context.m_remote_ip);
       return 1;
