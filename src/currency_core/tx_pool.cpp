@@ -40,6 +40,8 @@ DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated 
 #define LOG_DEFAULT_CHANNEL "tx_pool"
 ENABLE_CHANNEL_BY_DEFAULT("tx_pool");
 
+using namespace epee;
+
 namespace currency
 {
   //---------------------------------------------------------------------------------

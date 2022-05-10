@@ -6,7 +6,6 @@
 
 #pragma once
 #include "include_base_utils.h"
-using namespace epee;
 
 
 #include <set>

@@ -368,7 +368,7 @@ namespace
 
     void block_template_update_thread()
     {
-      log_space::log_singletone::set_thread_log_prefix("[ST]");
+      epee::log_space::log_singletone::set_thread_log_prefix("[ST]");
       while (!m_stop_flag)
       {
         if (is_core_syncronized() && epee::misc_utils::get_tick_count() - m_block_template_update_ts >= m_block_template_update_pediod_ms)
