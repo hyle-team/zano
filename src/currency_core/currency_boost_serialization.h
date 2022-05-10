@@ -15,7 +15,7 @@
 #include <boost/serialization/is_bitwise_serializable.hpp>
 #include "currency_basic.h"
 #include "common/unordered_containers_boost_serialization.h"
-#include "common/crypto_boost_serialization.h"
+#include "common/crypto_serialization.h"
 #include "offers_services_helpers.h"
 
 #define CURRENT_BLOCK_ARCHIVE_VER   2
