@@ -94,8 +94,8 @@ gen_alias_tests::gen_alias_tests()
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_height_changed);
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_too_many_aliases_registration);
 
-  m_hardfork_01_height = 0;
-  m_hardfork_02_height = 0;
+  m_hardforks.hard_fork_01_starts_after_height = 0;
+  m_hardforks.hard_fork_02_starts_after_height = 0;
 }
 
 bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
@@ -1112,7 +1112,8 @@ bool gen_alias_too_small_reward::make_tx_reg_alias(std::vector<test_event_entry>
     destinations.push_back(tx_destination_entry(sources_amount - (alias_reward + TESTS_DEFAULT_FEE), miner_acc.get_public_address())); // change
   
   crypto::secret_key stub;
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx, stub, 0);
+  uint64_t tx_version = get_tx_version(get_block_height(prev_block), m_hardforks);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx, tx_version, stub, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx);
 
@@ -1322,7 +1323,8 @@ bool gen_alias_too_many_regs_in_block_template::generate(std::vector<test_event_
     destinations.push_back(tx_destination_entry(sources_amount - total_alias_cost, preminer_acc.get_public_address())); // return the change in order to keep median_fee low
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  uint64_t tx_version = get_tx_version(get_block_height(blk_0r), m_hardforks);
+  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, tx_version, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   events.push_back(tx_1);

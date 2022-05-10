@@ -324,9 +324,7 @@ protected:
   size_t m_orphan_block_index;
 
   // the following members is intended to be set by coretests with specific HF-related needs 
-  uint64_t m_hardfork_01_height;
-  uint64_t m_hardfork_02_height;
-  uint64_t m_hardfork_03_height;
+  currency::hard_forks_descriptor m_hardforks;
 };
 
 struct wallet_test_core_proxy;
@@ -530,15 +528,14 @@ public:
   void set_pos_to_low_timestamp(bool do_pos_to_low_timestamp) { m_do_pos_to_low_timestamp = do_pos_to_low_timestamp; }
   void set_ignore_last_pow_in_wallets(bool ignore_last_pow_in_wallets) { m_ignore_last_pow_in_wallets = ignore_last_pow_in_wallets; }
   void set_hardfork_height(size_t hardfork_id, uint64_t h);
+  void set_hardforks(const currency::hard_forks_descriptor& hardforks);
 
 private:
   bool m_do_pos_to_low_timestamp;
   bool m_ignore_last_pow_in_wallets;
   uint64_t m_last_found_timestamp;
   
-  uint64_t m_hardfork_01_after_heigh;
-  uint64_t m_hardfork_02_after_heigh;
-  uint64_t m_hardfork_03_after_heigh;
+  currency::hard_forks_descriptor m_hardforks;
 
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;

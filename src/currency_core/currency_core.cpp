@@ -89,6 +89,11 @@ namespace currency
     return m_blockchain_storage.get_current_blockchain_size();
   }
   //-----------------------------------------------------------------------------------------------
+  uint64_t core::get_current_tx_version() const
+  {
+    return get_tx_version(m_blockchain_storage.get_current_blockchain_size(), m_blockchain_storage.get_core_runtime_config().hard_forks);
+  }
+  //-----------------------------------------------------------------------------------------------
   uint64_t core::get_top_block_height() const
   {
     return m_blockchain_storage.get_top_block_height();
@@ -504,9 +509,9 @@ namespace currency
     {
       uint64_t h = get_block_height(b);
       auto& crc = m_blockchain_storage.get_core_runtime_config();
-      if (h == crc.hard_fork_01_starts_after_height + 1)
+      if (h == crc.hard_forks.hard_fork_01_starts_after_height + 1)
       { LOG_PRINT_GREEN("Hardfork 1 activated at height " << h, LOG_LEVEL_0); }
-      else if (h == crc.hard_fork_02_starts_after_height + 1)
+      else if (h == crc.hard_forks.hard_fork_02_starts_after_height + 1)
       { LOG_PRINT_GREEN("Hardfork 2 activated at height " << h, LOG_LEVEL_0); }
 
       if (h == m_stop_after_height)

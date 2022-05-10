@@ -521,7 +521,8 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(tx_destination_entry(new_amount, miner_acc.get_public_address())); // no cashback, just payment
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  uint64_t tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, tx_version, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1);
 
@@ -531,7 +532,8 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   // use the same destinations
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_2, 0);
+  tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_2, tx_version, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_2);
   

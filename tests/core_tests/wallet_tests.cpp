@@ -1381,8 +1381,8 @@ bool gen_wallet_transfers_and_chain_switch::generate(std::vector<test_event_entr
 gen_wallet_decrypted_attachments::gen_wallet_decrypted_attachments()
   : m_on_transfer2_called(false)
 {
-  m_hardfork_01_height = 0;
-  m_hardfork_02_height = 0; // tx_payer requires HF2
+    m_hardforks.hard_fork_01_starts_after_height = 0;
+    m_hardforks.hard_fork_02_starts_after_height = 0; // tx_payer requires HF2
 }
 
 bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& events) const
@@ -1562,8 +1562,8 @@ void gen_wallet_decrypted_attachments::on_transfer2(const tools::wallet_public::
 
 gen_wallet_alias_and_unconfirmed_txs::gen_wallet_alias_and_unconfirmed_txs()
 {
-  m_hardfork_01_height = 0;
-  m_hardfork_02_height = 0;
+  m_hardforks.hard_fork_01_starts_after_height = 0;
+  m_hardforks.hard_fork_02_starts_after_height = 0;
 
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c1);
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c2);
@@ -1711,8 +1711,8 @@ bool gen_wallet_alias_and_unconfirmed_txs::c3(currency::core& c, size_t ev_index
 gen_wallet_alias_via_special_wallet_funcs::gen_wallet_alias_via_special_wallet_funcs()
 {
   // start hardfork from block 0 in order to use extra_alias_entry (allowed only since HF2)
-  m_hardfork_01_height = 0;
-  m_hardfork_02_height = 0;
+  m_hardforks.hard_fork_01_starts_after_height = 0;
+  m_hardforks.hard_fork_02_starts_after_height = 0;
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_via_special_wallet_funcs, c1);
 }
 

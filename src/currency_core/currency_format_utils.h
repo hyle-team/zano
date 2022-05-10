@@ -229,6 +229,7 @@ namespace currency
     const std::vector<tx_destination_entry>& destinations, 
     const std::vector<attachment_v>& attachments,
     transaction& tx, 
+    uint64_t tx_version,
     uint64_t unlock_time, 
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
     bool shuffle = true);
@@ -238,6 +239,7 @@ namespace currency
     const std::vector<extra_v>& extra,
     const std::vector<attachment_v>& attachments,
     transaction& tx, 
+    uint64_t tx_version,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
@@ -250,6 +252,7 @@ namespace currency
     const std::vector<extra_v>& extra,
     const std::vector<attachment_v>& attachments,
     transaction& tx,
+    uint64_t tx_version,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     const account_public_address& crypt_account,
@@ -258,6 +261,7 @@ namespace currency
     bool shuffle = true,
     uint64_t flags = 0);
 
+  uint64_t get_tx_version(uint64_t h, const hard_forks_descriptor& hfd);
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
 
 
@@ -701,7 +705,7 @@ namespace currency
   template <typename container_t>
   void create_and_add_tx_payer_to_container_from_address(container_t& container, const account_public_address& addr, uint64_t top_block_height, const core_runtime_config& crc)
   {
-    if (top_block_height > crc.hard_fork_02_starts_after_height)
+    if (top_block_height > crc.hard_forks.hard_fork_02_starts_after_height)
     {
       // after hardfork 2
       tx_payer result = AUTO_VAL_INIT(result);
@@ -723,7 +727,7 @@ namespace currency
   template <typename container_t>
   void create_and_add_tx_receiver_to_container_from_address(container_t& container, const account_public_address& addr, uint64_t top_block_height, const core_runtime_config& crc)
   {
-    if (top_block_height > crc.hard_fork_02_starts_after_height)
+    if (top_block_height > crc.hard_forks.hard_fork_02_starts_after_height)
     {
       // after hardfork 2
       tx_receiver result = AUTO_VAL_INIT(result);

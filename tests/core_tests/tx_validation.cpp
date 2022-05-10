@@ -775,8 +775,8 @@ gen_crypted_attachments::gen_crypted_attachments()
   REGISTER_CALLBACK("check_offers_count_befor_cancel", gen_crypted_attachments::check_offers_count_befor_cancel);
   REGISTER_CALLBACK("check_offers_count_after_cancel", gen_crypted_attachments::check_offers_count_after_cancel);
 
-  m_hardfork_01_height = 0;
-  m_hardfork_02_height = 0; // tx_payer is allowed only after HF2
+  m_hardforks.hard_fork_01_starts_after_height = 0;
+  m_hardforks.hard_fork_02_starts_after_height = 0; // tx_payer is allowed only after HF2
 }
 
 bool gen_crypted_attachments::generate(std::vector<test_event_entry>& events) const
@@ -989,8 +989,8 @@ bool gen_tx_extra_double_entry::configure_core(currency::core& c, size_t ev_inde
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_fork_01_starts_after_height = 0;
-  pc.hard_fork_02_starts_after_height = 0;
+  pc.hard_forks.hard_fork_01_starts_after_height = 0;
+  pc.hard_forks.hard_fork_02_starts_after_height = 0;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
