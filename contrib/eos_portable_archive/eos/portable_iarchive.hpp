@@ -88,6 +88,13 @@
 
 // basic headers
 #include <boost/version.hpp>
+
+// The following four lines disable annoying message in Boost 1.70 (The use of BOOST_*_ENDIAN and BOOST_BYTE_ORDER is deprecated.)
+#if BOOST_VERSION == 107000
+# define BOOST_PREDEF_DETAIL_ENDIAN_COMPAT_H
+# include <boost/predef/other/endian.h>
+#endif
+
 #include <boost/utility/enable_if.hpp>
 #include <boost/archive/basic_binary_iprimitive.hpp>
 #include <boost/archive/basic_binary_iarchive.hpp>
