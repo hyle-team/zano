@@ -26,7 +26,7 @@
 
 namespace crypto
 {
-  struct bpp_signature_serialized : public crypto::bppe_signature
+  struct bpp_signature_serialized : public crypto::bpp_signature
   {
     BEGIN_SERIALIZE_OBJECT()
       FIELD(L)
