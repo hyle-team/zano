@@ -1,5 +1,5 @@
-// Copyright (c) 2020-2021 Zano Project
-// Copyright (c) 2020-2021 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2020-2022 Zano Project
+// Copyright (c) 2020-2022 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -125,7 +125,7 @@ namespace crypto
   t_pod_type parse_tpod_from_hex_string(const std::string& hex_str)
   {
     t_pod_type t_pod = AUTO_VAL_INIT(t_pod);
-    parse_tpod_from_hex_string(hex_str, t_pod);
+    crypto::parse_tpod_from_hex_string(hex_str, t_pod); // using fully qualified name to avoid Argument-Dependent Lookup issues
     return t_pod;
   }
 

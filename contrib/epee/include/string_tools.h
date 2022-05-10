@@ -207,7 +207,7 @@ namespace string_tools
   t_pod_type parse_tpod_from_hex_string(const std::string& str_hash)
   {
     t_pod_type t_pod = AUTO_VAL_INIT(t_pod);
-    parse_tpod_from_hex_string(str_hash, t_pod);
+    epee::string_tools::parse_tpod_from_hex_string(str_hash, t_pod); // using fully qualified name to avoid Argument-Dependent Lookup issues
     return t_pod;
   }
   //----------------------------------------------------------------------------
