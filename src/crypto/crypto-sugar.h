@@ -205,12 +205,12 @@ namespace crypto
 
     crypto::secret_key &as_secret_key()
     {
-      return *(crypto::secret_key*)&m_s[0];
+      return *reinterpret_cast<crypto::secret_key*>(&m_s[0]);
     }
 
     const crypto::secret_key& as_secret_key() const
     {
-      return *(const crypto::secret_key*)&m_s[0];
+      return *reinterpret_cast<const crypto::secret_key*>(&m_s[0]);
     }
 
     operator crypto::secret_key() const
