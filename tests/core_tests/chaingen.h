@@ -777,8 +777,8 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
     if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].second))
     {
       LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-        << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-        << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
+        << epst::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
+        << epst::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
       return false;
     }
 
@@ -979,7 +979,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
   {                                                                                   \
     callback_entry ce = AUTO_VAL_INIT(ce);                                            \
     ce.callback_name = CB_NAME;                                                       \
-    ce.callback_params = epee::string_tools::pod_to_hex(PARAMS_POD_OBJ);              \
+    ce.callback_params = epst::pod_to_hex(PARAMS_POD_OBJ);                            \
     VEC_EVENTS.push_back(ce);                                                         \
     PRINT_EVENT_NO(VEC_EVENTS);                                                       \
   }
