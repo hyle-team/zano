@@ -107,7 +107,7 @@ namespace currency
       std::stringstream conn_ss;
       time_t livetime = time(NULL) - cntxt.m_started;
       conn_ss << std::setw(29) << std::left << std::string(cntxt.m_is_income ? "[INC]":"[OUT]") + 
-        epee::string_tools::get_ip_string_from_int32(cntxt.m_remote_ip) + ":" + std::to_string(cntxt.m_remote_port) 
+        epst::get_ip_string_from_int32(cntxt.m_remote_ip) + ":" + std::to_string(cntxt.m_remote_port) 
         << std::setw(20) << std::hex << peer_id
         << std::setw(25) << std::to_string(cntxt.m_recv_cnt)+ "(" + std::to_string(time(NULL) - cntxt.m_last_recv) + ")" + "/" + std::to_string(cntxt.m_send_cnt) + "(" + std::to_string(time(NULL) - cntxt.m_last_send) + ")"
         << std::setw(25) << get_protocol_state_string(cntxt.m_state)
@@ -523,7 +523,7 @@ namespace currency
       if(!parse_and_validate_block_from_blob(block_entry.block, b))
       {
         LOG_ERROR_CCONTEXT("sent wrong block: failed to parse and validate block: \r\n" 
-          << epee::string_tools::buff_to_hex_nodelimer(block_entry.block) << "\r\n dropping connection");
+          << epst::buff_to_hex_nodelimer(block_entry.block) << "\r\n dropping connection");
         m_p2p->drop_connection(context);
         m_p2p->add_ip_fail(context.m_remote_ip);
         return 1;
@@ -547,14 +547,14 @@ namespace currency
       auto req_it = context.m_priv.m_requested_objects.find(get_block_hash(b));
       if(req_it == context.m_priv.m_requested_objects.end())
       {
-        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epee::string_tools::pod_to_hex(get_blob_hash(block_entry.block)) 
+        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epst::pod_to_hex(get_blob_hash(block_entry.block)) 
           << " wasn't requested, dropping connection");
         m_p2p->drop_connection(context);
         return 1;
       }
       if(b.tx_hashes.size() != block_entry.txs.size()) 
       {
-        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epee::string_tools::pod_to_hex(get_blob_hash(block_entry.block)) 
+        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epst::pod_to_hex(get_blob_hash(block_entry.block)) 
           << ", tx_hashes.size()=" << b.tx_hashes.size() << " mismatch with block_complete_entry.m_txs.size()=" << block_entry.txs.size() << ", dropping connection");
         m_p2p->drop_connection(context);
         return 1;
@@ -593,7 +593,7 @@ namespace currency
           if (!parse_and_validate_tx_from_blob(tx_blob, tx, tx_id))
           {
             LOG_ERROR_CCONTEXT("failed to parse tx: " 
-              << epee::string_tools::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
+              << epst::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
             m_p2p->drop_connection(context);
             return 1;
           }
@@ -919,7 +919,7 @@ namespace currency
   void t_currency_protocol_handler<t_core>::set_to_debug_mode(uint32_t ip)
   {
     m_debug_ip_address = ip;
-    LOG_PRINT_L0("debug mode is set for IP " << epee::string_tools::get_ip_string_from_int32(m_debug_ip_address));
+    LOG_PRINT_L0("debug mode is set for IP " << epst::get_ip_string_from_int32(m_debug_ip_address));
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
@@ -944,7 +944,7 @@ namespace currency
     if(!m_core.have_block(arg.m_block_ids.front().h))
     {
       LOG_ERROR_CCONTEXT("sent m_block_ids starting from unknown id: "
-                                              << epee::string_tools::pod_to_hex(arg.m_block_ids.front()) << " , dropping connection");
+                                              << epst::pod_to_hex(arg.m_block_ids.front()) << " , dropping connection");
       m_p2p->drop_connection(context);
       m_p2p->add_ip_fail(context.m_remote_ip);
       return 1;

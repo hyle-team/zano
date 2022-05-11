@@ -793,4 +793,7 @@ POP_GCC_WARNINGS
 #endif
 } // namespace stringtools
 } // namwspace epee
+
+namespace epst = epee::string_tools; // EPshort alias for convenience
+
 #endif //_STRING_TOOLS_H_
