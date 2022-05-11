@@ -633,7 +633,7 @@ bool offer_removing_and_selected_output::generate(std::vector<test_event_entry>&
   std::vector<tx_source_entry> sources;
   r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), destinations_amount + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);                                   
@@ -751,7 +751,7 @@ bool offers_and_stuck_txs::generate(std::vector<test_event_entry>& events) const
   bc_services::put_offer_into_attachment(co, attachments);
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   uint64_t fee = 7 * TESTS_DEFAULT_FEE;
-  r = construct_tx_to_key(events, tx_2, blk_1, miner_acc, miner_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
+  r = construct_tx_to_key(m_hardforks, events, tx_2, blk_1, miner_acc, miner_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_2);
 
@@ -776,7 +776,7 @@ bool offers_and_stuck_txs::generate(std::vector<test_event_entry>& events) const
   bc_services::put_offer_into_attachment(uo, attachments);
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
   fee = 90 * TESTS_DEFAULT_FEE;
-  r = construct_tx_to_key(events, tx_3, blk_2, miner_acc, miner_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
+  r = construct_tx_to_key(m_hardforks, events, tx_3, blk_2, miner_acc, miner_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_3);
 
@@ -821,11 +821,11 @@ bool offers_updating_hack::generate(std::vector<test_event_entry>& events) const
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
   
   transaction tx_a = AUTO_VAL_INIT(tx_a);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 1000, 10, TESTS_DEFAULT_FEE, tx_a);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 1000, 10, TESTS_DEFAULT_FEE, tx_a);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_a);
   transaction tx_b = AUTO_VAL_INIT(tx_b);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 1000, 10, TESTS_DEFAULT_FEE, tx_b);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 1000, 10, TESTS_DEFAULT_FEE, tx_b);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_b);
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_a, tx_b }));
@@ -854,7 +854,7 @@ bool offers_updating_hack::generate(std::vector<test_event_entry>& events) const
   bc_services::put_offer_into_attachment(uo, attachments);
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   uint64_t fee = 90 * TESTS_DEFAULT_FEE;
-  r = construct_tx_to_key(events, tx_2, blk_2, alice_acc, alice_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
+  r = construct_tx_to_key(m_hardforks, events, tx_2, blk_2, alice_acc, alice_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_2);
   CHECK_AND_ASSERT_MES(get_tx_fee(tx_2) == fee, false, "Incorrect fee: " << print_money_brief(get_tx_fee(tx_2)) << ", expected: " << print_money_brief(fee));
@@ -1058,7 +1058,7 @@ bool offers_multiple_update::generate(std::vector<test_event_entry>& events) con
   bc_services::put_offer_into_attachment(uo, attachments);
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   uint64_t fee = 14 * TESTS_DEFAULT_FEE;
-  r = construct_tx_to_key(events, tx_2, blk_2, miner_acc, miner_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
+  r = construct_tx_to_key(m_hardforks, events, tx_2, blk_2, miner_acc, miner_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_2);
 
@@ -1070,7 +1070,7 @@ bool offers_multiple_update::generate(std::vector<test_event_entry>& events) con
   bc_services::put_offer_into_attachment(uo, attachments);
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
   fee = 19 * TESTS_DEFAULT_FEE;
-  r = construct_tx_to_key(events, tx_3, blk_2, miner_acc, miner_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
+  r = construct_tx_to_key(m_hardforks, events, tx_3, blk_2, miner_acc, miner_acc, TESTS_DEFAULT_FEE, fee, 0, 0, empty_extra, attachments);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_3);
 

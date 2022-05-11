@@ -110,8 +110,8 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
   // Problem 2. total_fee overflow, block_reward overflow
   std::list<currency::transaction> txs_1;
   // Create txs with huge fee
-  txs_1.push_back(construct_tx_with_fee(events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
-  txs_1.push_back(construct_tx_with_fee(events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
+  txs_1.push_back(construct_tx_with_fee(m_hardforks, events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
+  txs_1.push_back(construct_tx_with_fee(m_hardforks, events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3r, miner_account, txs_1);
 
   return true;
@@ -154,7 +154,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
 
   currency::transaction tx_1;
   std::vector<currency::attachment_v> attachments;
-  if (!construct_tx(miner_account.get_keys(), sources, destinations, attachments, tx_1, 0))
+  if (!construct_tx(miner_account.get_keys(), sources, destinations, attachments, tx_1, get_tx_version_from_events(events), 0))
     return false;
   events.push_back(tx_1);
 
@@ -181,7 +181,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
 
   currency::transaction tx_2;
   std::vector<currency::attachment_v> attachments2;
-  if (!construct_tx(bob_account.get_keys(), sources, destinations, attachments2, tx_2, 0))
+  if (!construct_tx(bob_account.get_keys(), sources, destinations, attachments2, tx_2, get_tx_version_from_events(events), 0))
     return false;
   events.push_back(tx_2);
 

@@ -733,7 +733,7 @@ bool escrow_proposal_expiration::generate(std::vector<test_event_entry>& events)
   destinations.push_back(tx_destination_entry(amount, bob_acc.get_public_address()));
   destinations.push_back(tx_destination_entry(amount, bob_acc.get_public_address()));
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_to_key(events, tx_1, blk_0r, miner_acc, destinations);
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_0r, miner_acc, destinations);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
@@ -951,11 +951,11 @@ bool escrow_proposal_and_accept_expiration::generate(std::vector<test_event_entr
 
   // send few coins to Alice and Bob
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 50, 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 50, 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 50, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 50, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1 }));
@@ -1126,7 +1126,7 @@ bool escrow_incorrect_proposal_acceptance::generate(std::vector<test_event_entry
   destinations.push_back(tx_destination_entry(big_chunk_amount, bob_acc.get_public_address()));
   destinations.push_back(tx_destination_entry(big_chunk_amount, bob_acc.get_public_address()));
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_to_key(events, tx_1, blk_0r, miner_acc, destinations);
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_0r, miner_acc, destinations);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_1);
   m_alice_bob_start_amount = big_chunk_amount * 2;
@@ -1207,7 +1207,7 @@ bool escrow_incorrect_proposal_acceptance::generate(std::vector<test_event_entry
   for(size_t i = 0; i < 15; ++i)
     destinations.push_back(tx_destination_entry(m_cpd.amount_b_pledge + m_bob_fee_release + bob_fee_acceptance, bob_acc.get_public_address()));
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx_to_key(events, tx_2, blk_7c, miner_acc, destinations);
+  r = construct_tx_to_key(m_hardforks, events, tx_2, blk_7c, miner_acc, destinations);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_2);
   MAKE_NEXT_BLOCK_TX1(events, blk_8c, blk_7c, miner_acc, tx_2);
@@ -1495,7 +1495,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
   }
   // no change back to the miner - it will become a fee
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   events.push_back(tx_1);
@@ -1948,7 +1948,7 @@ bool escrow_incorrect_cancel_proposal::generate(std::vector<test_event_entry>& e
   }
   // no change back to the miner - it will become a fee
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   events.push_back(tx_1);
@@ -2346,12 +2346,12 @@ bool escrow_cancellation_and_tx_order::generate(std::vector<test_event_entry>& e
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -2546,12 +2546,12 @@ bool escrow_cancellation_proposal_expiration::generate(std::vector<test_event_en
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -2793,12 +2793,12 @@ bool escrow_cancellation_acceptance_expiration::generate(std::vector<test_event_
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(100), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(100), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(100), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(100), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -2960,12 +2960,12 @@ bool escrow_proposal_acceptance_in_alt_chain::generate(std::vector<test_event_en
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -3037,12 +3037,12 @@ bool escrow_zero_amounts::generate(std::vector<test_event_entry>& events) const
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -3139,12 +3139,12 @@ bool escrow_balance::generate(std::vector<test_event_entry>& events) const
   m_alice_bob_start_chunk_amount = m_alice_bob_start_amount / 10;
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_bob_start_amount, 10, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_bob_start_amount, 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), m_alice_bob_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), m_alice_bob_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 

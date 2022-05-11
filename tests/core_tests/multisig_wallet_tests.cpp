@@ -876,7 +876,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 4);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx = AUTO_VAL_INIT(tx);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r == false, false, "construct_tx was expected to fail, but successed");
 
 
@@ -889,7 +889,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1);
 
@@ -913,7 +913,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
 
   // Transaction should be successfully created, but rejected by the core
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_2, 0);
+  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_2, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   bool tx_fully_signed = false;
   r = sign_multisig_input_in_tx(tx_2, 0, bob_acc.get_keys(), tx_1, &tx_fully_signed);
@@ -943,7 +943,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = 2;
 
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
-  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address()) }), empty_attachment, tx_3, 0);
+  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address()) }), empty_attachment, tx_3, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   r = sign_multisig_input_in_tx(tx_3, 0, bob_acc.get_keys(), tx_1, &tx_fully_signed);
   CHECK_AND_ASSERT_MES(r && !tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed : " << tx_fully_signed);
@@ -962,7 +962,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_4 = AUTO_VAL_INIT(tx_4);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_4, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_4, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_4);
 
@@ -980,7 +980,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = 3;
 
   transaction tx_5 = AUTO_VAL_INIT(tx_5);
-  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_5, 0);
+  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_5, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   // use sign_multisig_input_in_tx_custom to create tx with more signatures (3) than minimum_sigs (1)
@@ -1005,7 +1005,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_6 = AUTO_VAL_INIT(tx_6);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_6, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_6, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_6);
 
@@ -1024,7 +1024,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = 4;
 
   transaction tx_7 = AUTO_VAL_INIT(tx_7);
-  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_7, 0);
+  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_7, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   // use sign_multisig_input_in_tx_custom to create tx with more signatures (4) than minimum_sigs (1)
@@ -1047,7 +1047,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_8 = AUTO_VAL_INIT(tx_8);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_8, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_8, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_8);
 
@@ -1067,7 +1067,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.ms_sigs_count = redundant_keys_count;
 
   transaction tx_9 = AUTO_VAL_INIT(tx_9);
-  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_9, 0);
+  r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_9, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   tx_9.signatures[0].resize(redundant_keys_count, invalid_signature);
@@ -1270,7 +1270,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   crypto::secret_key stub_key = AUTO_VAL_INIT(stub_key);
   etc_tx_details_expiration_time extra_expiration_time = AUTO_VAL_INIT(extra_expiration_time);
   extra_expiration_time.v = expiration_time;
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ extra_expiration_time }), empty_attachment, tx_4, stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ extra_expiration_time }), empty_attachment, tx_4, get_tx_version_from_events(events), stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   CHECK_AND_ASSERT_MES(get_tx_expiration_time(tx_4) == expiration_time, false, "Expiration time was not correctly set");
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -1278,7 +1278,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
 
   // add similar tx (same sources and destinations) with no expiration_time - should be accepted by the core
   transaction tx_5 = AUTO_VAL_INIT(tx_5);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_5, stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_5, get_tx_version_from_events(events), stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_5);
 
@@ -1305,7 +1305,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   extra_expiration_time = AUTO_VAL_INIT(extra_expiration_time);
   extra_expiration_time.v = expiration_time;
   transaction tx_6 = AUTO_VAL_INIT(tx_6);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ extra_expiration_time }), empty_attachment, tx_6, stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ extra_expiration_time }), empty_attachment, tx_6, get_tx_version_from_events(events), stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   CHECK_AND_ASSERT_MES(get_tx_expiration_time(tx_6) == expiration_time, false, "Expiration time was not correctly set");
   r = sign_multisig_input_in_tx(tx_6, tx_5_ms_out_idx, miner_acc.get_keys(), tx_5, &tx_fully_signed);
@@ -1418,7 +1418,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
   destinations.assign({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address()) });
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   bool fully_signed_tx = false;
   r = sign_multisig_input_in_tx(tx_1, 0, alice_acc.get_keys(), blk_1.miner_tx, &fully_signed_tx);
@@ -1482,7 +1482,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
 
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }),
-    empty_attachment, tx_2, 0);
+    empty_attachment, tx_2, get_tx_version_from_events(events), 0);
 
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   r = sign_multisig_input_in_tx(tx_2, 0, alice_acc.get_keys(), blk_3.miner_tx, &fully_signed_tx);
@@ -2248,7 +2248,7 @@ bool multisig_n_participants_seq_signing::generate(std::vector<test_event_entry>
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, ms_amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, m_minimum_signs_to_spend);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   events.push_back(tx_1);
 
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
@@ -2278,7 +2278,7 @@ bool multisig_n_participants_seq_signing::generate(std::vector<test_event_entry>
 
   // construct a transaction (no participants keys are provided, thus no signs for ms input are created)
   transaction tx = AUTO_VAL_INIT(tx);
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx, 0);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   // sign the transaction by (m_minimum_signs_to_spend) participants in random order

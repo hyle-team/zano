@@ -64,13 +64,13 @@ bool escrow_altchain_meta_impl::generate(std::vector<test_event_entry>& events) 
 
   // give Alice and Bob 'm_etd.alice_bob_start_amoun' coins for pocket money
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_etd.alice_bob_start_amount, m_etd.start_amount_outs_count, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_etd.alice_bob_start_amount, m_etd.start_amount_outs_count, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
 
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx_with_many_outputs(events, blk_1, miner_acc.get_keys(), bob_acc.get_public_address(), m_etd.alice_bob_start_amount, m_etd.start_amount_outs_count, TESTS_DEFAULT_FEE, tx_2);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_1, miner_acc.get_keys(), bob_acc.get_public_address(), m_etd.alice_bob_start_amount, m_etd.start_amount_outs_count, TESTS_DEFAULT_FEE, tx_2);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_2);
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx_2);

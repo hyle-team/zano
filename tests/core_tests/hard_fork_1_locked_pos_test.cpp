@@ -48,7 +48,7 @@ bool hard_fork_1_locked_mining_test::generate(std::vector<test_event_entry>& eve
   crypto::secret_key stub;
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   uint64_t unlock_time = get_block_height(blk_0r) + 2000;
-  r = construct_tx(miner_acc.get_keys(), sources_1, destinations, extra, empty_attachment, tx_1, stub, unlock_time);
+  r = construct_tx(miner_acc.get_keys(), sources_1, destinations, extra, empty_attachment, tx_1, get_tx_version_from_events(events), stub, unlock_time);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1); // push it to the pool  
 

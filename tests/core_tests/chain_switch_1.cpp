@@ -646,7 +646,7 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
 
   // send batch of 10 x 5 test coins to Alice for easier tx_1 construction (and to generate free decoys)
   transaction tx_0;
-  r = construct_tx_with_many_outputs(events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
     TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
@@ -713,7 +713,7 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
 
   // send batch of 10 x 5 test coins to Alice for easier tx_0 construction
   transaction tx_0;
-  r = construct_tx_with_many_outputs(events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
     TESTS_DEFAULT_FEE, tx_0, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
 
@@ -739,7 +739,7 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(tx_destination_entry(MK_TEST_COINS(4), bob_acc.get_public_address()));
   size_t nmix = 3;
-  r = construct_tx_to_key(events, tx_1, blk_2a, alice_acc, destinations, TESTS_DEFAULT_FEE, nmix, 0, empty_extra, empty_attachment, true, true, true);
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_2a, alice_acc, destinations, TESTS_DEFAULT_FEE, nmix, 0, empty_extra, empty_attachment, true, true, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
   // make sure tx_1 really use ref_by_id

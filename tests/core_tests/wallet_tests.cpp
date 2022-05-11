@@ -1319,7 +1319,7 @@ bool gen_wallet_transfers_and_chain_switch::generate(std::vector<test_event_entr
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(30) * 2, 2, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(30) * 2, 2, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
@@ -3051,11 +3051,11 @@ bool wallet_unconfirmed_tx_expiration::generate(std::vector<test_event_entry>& e
 
   bool r = false;
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 20, 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 20, 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs");
   events.push_back(tx_0);
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 20, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 20, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1 }));

@@ -818,7 +818,7 @@ bool gen_crypted_attachments::generate(std::vector<test_event_entry>& events) co
   fill_test_offer_(od);
   bc_services::put_offer_into_attachment(od, attachments2);
   bc_services::put_offer_into_attachment(od, attachments2);
-  construct_tx_to_key(events, tx, blk_6, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<currency::extra_v>(), attachments2);
+  construct_tx_to_key(m_hardforks, events, tx, blk_6, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<currency::extra_v>(), attachments2);
   txs_list2.push_back(tx);
   events.push_back(tx);
 
@@ -868,7 +868,7 @@ bool gen_crypted_attachments::generate(std::vector<test_event_entry>& events) co
 //                              currency::get_tx_pub_key_from_extra(tx), 
 //                              off_key_pair.sec, co.sig);
   bc_services::put_offer_into_attachment(co, attachments3);
-  construct_tx_to_key(events, tx, blk_7, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<currency::extra_v>(), attachments3);
+  construct_tx_to_key(m_hardforks, events, tx, blk_7, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<currency::extra_v>(), attachments3);
   txs_list3.push_back(tx);
   events.push_back(tx);
 
@@ -1193,7 +1193,7 @@ bool tx_expiration_time::generate(std::vector<test_event_entry>& events) const
   // transfer to Alice some coins in chunks
   uint64_t alice_amount = MK_TEST_COINS(10);
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), alice_amount, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), alice_amount, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);

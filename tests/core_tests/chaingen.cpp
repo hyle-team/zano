@@ -1469,7 +1469,8 @@ bool construct_miner_tx_manually(size_t height, uint64_t already_generated_coins
 }
 
 
-bool construct_tx_to_key(const std::vector<test_event_entry>& events, 
+bool construct_tx_to_key(const currency::hard_forks_descriptor& hf, 
+                         const std::vector<test_event_entry>& events,
                          currency::transaction& tx, 
                          const block& blk_head,
                          const currency::account_base& from, 
@@ -1484,8 +1485,9 @@ bool construct_tx_to_key(const std::vector<test_event_entry>& events,
                          bool check_for_unlocktime)
 {
   crypto::secret_key sk = AUTO_VAL_INIT(sk);
-  return construct_tx_to_key(events,
-                      tx, 
+  return construct_tx_to_key(hf, 
+                         events,
+                         tx, 
                          blk_head,
                          from, 
                          to, 
@@ -1500,7 +1502,8 @@ bool construct_tx_to_key(const std::vector<test_event_entry>& events,
                          check_for_unlocktime);
 }
 
-bool construct_tx_to_key(const std::vector<test_event_entry>& events, 
+bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
+                         const std::vector<test_event_entry>& events, 
                          currency::transaction& tx, 
                          const block& blk_head,
                          const currency::account_base& from, 
@@ -1519,11 +1522,12 @@ bool construct_tx_to_key(const std::vector<test_event_entry>& events,
   std::vector<tx_destination_entry> destinations;
   if (!fill_tx_sources_and_destinations(events, blk_head, from.get_keys(), to.get_public_address(), amount, fee, nmix, sources, destinations, check_for_spends, check_for_unlocktime))
     return false;
-  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_head), m_hardforks);
-  return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, sk, 0, mix_attr);
+  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_head), hf);
+  return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, tx_version, sk, 0, mix_attr);
 }
 
-bool construct_tx_to_key(const std::vector<test_event_entry>& events, 
+bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
+                         const std::vector<test_event_entry>& events, 
                          currency::transaction& tx, 
                          const currency::block& blk_head,
                          const currency::account_base& from,
@@ -1546,28 +1550,29 @@ bool construct_tx_to_key(const std::vector<test_event_entry>& events,
   if (!fill_tx_sources(sources, events, blk_head, from.get_keys(), spending_amount, nmix, check_for_spends, check_for_unlocktime, use_ref_by_id))
     return false;
 
+  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_head), hf);
   boost::multiprecision::int128_t change = get_sources_total_amount(sources);
   change -= spending_amount;
   if (change < 0)
     return false; // should never happen if fill_tx_sources succeded
   if (change == 0)
-    return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, sk, 0, mix_attr);
+    return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, tx_version, sk, 0, mix_attr);
   std::vector<tx_destination_entry> local_dst = destinations;
   local_dst.push_back(tx_destination_entry(change.convert_to<uint64_t>(), from.get_public_address()));
-  return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, sk, 0, mix_attr);
+  return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, tx_version, sk, 0, mix_attr);
 }
 
 
-transaction construct_tx_with_fee(std::vector<test_event_entry>& events, const block& blk_head,
+transaction construct_tx_with_fee(const currency::hard_forks_descriptor& hf, std::vector<test_event_entry>& events, const block& blk_head,
                                   const account_base& acc_from, const account_base& acc_to, uint64_t amount, uint64_t fee)
 {
   transaction tx;
-  construct_tx_to_key(events, tx, blk_head, acc_from, acc_to, amount, fee, 0);
+  construct_tx_to_key(hf, events, tx, blk_head, acc_from, acc_to, amount, fee, 0);
   events.push_back(tx);
   return tx;
 }
 
-bool construct_tx_with_many_outputs(std::vector<test_event_entry>& events, const currency::block& blk_head,
+bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, std::vector<test_event_entry>& events, const currency::block& blk_head,
   const currency::account_keys& keys_from, const currency::account_public_address& addr_to,
   uint64_t total_amount, size_t outputs_count, uint64_t fee, currency::transaction& tx, bool use_ref_by_id /* = false */)
 {
@@ -1583,8 +1588,8 @@ bool construct_tx_with_many_outputs(std::vector<test_event_entry>& events, const
   uint64_t sources_amount = get_sources_total_amount(sources);
   if (sources_amount > total_amount + fee)
     destinations.push_back(tx_destination_entry(sources_amount - (total_amount + fee), keys_from.account_address)); // change
-
-  return construct_tx(keys_from, sources, destinations, empty_attachment, tx, 0);
+  uint64_t tx_version = currency::get_tx_version(currency::get_block_height(blk_head), hf);
+  return construct_tx(keys_from, sources, destinations, empty_attachment, tx, tx_version, 0);
 }
 
 uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log) {
@@ -2085,6 +2090,19 @@ bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, c
 void test_chain_unit_base::register_callback(const std::string& cb_name, verify_callback cb)
 {
   m_callbacks[cb_name] = cb;
+}
+
+uint64_t test_chain_unit_base::get_tx_version_from_events(const std::vector<test_event_entry> &events)const
+{
+  for (auto it = events.rbegin(); it!= events.rend(); it++)
+  {
+    if(it->type() == typeid(currency::block))
+    {
+      const currency::block& b = boost::get<currency::block>(*it);
+      return currency::get_tx_version(get_block_height(b), m_hardforks);
+    }
+  }
+  return currency::get_tx_version(0, m_hardforks);
 }
 
 bool test_chain_unit_base::verify(const std::string& cb_name, currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)

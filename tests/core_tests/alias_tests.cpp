@@ -18,7 +18,8 @@ using namespace currency;
 #define FIFTH_NAME         "fifth--01234567890"
 #define SIX_NAME           "sixsix-double--01234567890"
 
-bool put_alias_via_tx_to_list(std::vector<test_event_entry>& events,
+bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
+  std::vector<test_event_entry>& events,
   std::list<currency::transaction>& tx_set,
   const block& head_block,
   const std::string& alias_name,
@@ -30,10 +31,11 @@ bool put_alias_via_tx_to_list(std::vector<test_event_entry>& events,
   ai2.m_alias = alias_name;
   ai2.m_address = alias_acc.get_keys().account_address;
   ai2.m_text_comment = "ssdss";
-  return put_alias_via_tx_to_list(events, tx_set, head_block, miner_acc, ai2, generator);
+  return put_alias_via_tx_to_list(hf, events, tx_set, head_block, miner_acc, ai2, generator);
 }
 
-bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events, 
+bool put_next_block_with_alias_in_tx(const currency::hard_forks_descriptor& hf, 
+                                     std::vector<test_event_entry>& events,
                                      block& b, 
                                      const block& head_block, 
                                      const account_base& miner_acc, 
@@ -41,7 +43,7 @@ bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events,
                                      test_generator& generator)
 {
   std::list<currency::transaction> txs_0;
-  if (!put_alias_via_tx_to_list(events, txs_0, head_block, miner_acc, ai, generator))
+  if (!put_alias_via_tx_to_list(hf, events, txs_0, head_block, miner_acc, ai, generator))
     return false;
     
   MAKE_NEXT_BLOCK_TX_LIST(events, blk, head_block, miner_acc, txs_0);
@@ -50,7 +52,7 @@ bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events,
 }
 
 
-bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events,
+bool put_next_block_with_alias_in_tx(const currency::hard_forks_descriptor& hf, std::vector<test_event_entry>& events,
   block& b,
   const block& head_block,
   const std::string& alias_name,
@@ -63,16 +65,16 @@ bool put_next_block_with_alias_in_tx(std::vector<test_event_entry>& events,
   ai2.m_address = alias_acc.get_keys().account_address;
   ai2.m_text_comment = "ssdss";
 
-  return put_next_block_with_alias_in_tx(events, b, head_block, miner_acc, ai2, generator);
+  return put_next_block_with_alias_in_tx(hf, events, b, head_block, miner_acc, ai2, generator);
 }
 
 #define MAKE_BLOCK_WITH_ALIAS_IN_TX(EVENTS, NAME, HEAD, ALIAS_NAME) \
   block NAME; \
-  put_next_block_with_alias_in_tx(EVENTS, NAME, HEAD, ALIAS_NAME, miner_account, second_acc, generator)
+  put_next_block_with_alias_in_tx(m_hardforks, EVENTS, NAME, HEAD, ALIAS_NAME, miner_account, second_acc, generator)
 
 #define MAKE_BLOCK_WITH_ALIAS_INFO_IN_TX(EVENTS, NAME, HEAD, MINER_ACCOUNT, ALIAS_INFO) \
   block NAME; \
-  put_next_block_with_alias_in_tx(EVENTS, NAME, HEAD, MINER_ACCOUNT, ALIAS_INFO, generator)
+  put_next_block_with_alias_in_tx(m_hardforks, EVENTS, NAME, HEAD, MINER_ACCOUNT, ALIAS_INFO, generator)
 
 //------------------------------------------------------------------------------
 
@@ -113,7 +115,7 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
 
   size_t small_outs_to_transfer = MAX_ALIAS_PER_BLOCK + 10;
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  bool r = construct_tx_with_many_outputs(events, blk_0, preminer_account.get_keys(), miner_account.get_public_address(), small_outs_to_transfer * TESTS_DEFAULT_FEE * 11, small_outs_to_transfer, TESTS_DEFAULT_FEE, tx_1);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0, preminer_account.get_keys(), miner_account.get_public_address(), small_outs_to_transfer * TESTS_DEFAULT_FEE * 11, small_outs_to_transfer, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);                                                                                              // 2N+5
   MAKE_NEXT_BLOCK_TX1(events, blk_a, blk_0r, miner_account, tx_1);                                                     // 2N+6
@@ -164,7 +166,7 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   CHECK_AND_ASSERT_MES(r, false, "failed to sign update_alias");
   ai_upd_fake.m_text_comment = "changed alias haha - fake"; // changed text, signature became wrong
   std::list<currency::transaction> tx_list;
-  r = put_alias_via_tx_to_list(events, tx_list, blk_6, miner_account, ai_upd_fake, generator);                         // 4N+24
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_6, miner_account, ai_upd_fake, generator);                         // 4N+24
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list");
   DO_CALLBACK(events, "mark_invalid_block");                                                                           // 4N+25
   // EXPECTED: blk_7 is rejected as containing incorrect tx (wrong alias sig)
@@ -174,7 +176,7 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   account_base someone;
   someone.generate();
   block blk_8;
-  r = put_next_block_with_alias_in_tx(events, blk_8, blk_6, THIRD_ALIAS_NAME, miner_account, someone, generator);      // 4N+28,4N+29
+  r = put_next_block_with_alias_in_tx(m_hardforks, events, blk_8, blk_6, THIRD_ALIAS_NAME, miner_account, someone, generator);      // 4N+28,4N+29
   CHECK_AND_ASSERT_MES(r, false, "put_next_block_with_alias_in_tx failed");
 
   MAKE_NEXT_BLOCK(events, blk_9, blk_8, miner_account);                                                                // 4N+30
@@ -187,7 +189,7 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   tx_list.clear();
   DO_CALLBACK(events, "mark_invalid_tx");                                                                              // 4N+32
   // EXPECTED: tx is rejected, because alias is already registered
-  r = put_alias_via_tx_to_list(events, tx_list, blk_9, miner_account, ai, generator);                                  // 4N+33
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_9, miner_account, ai, generator);                                  // 4N+33
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list");
   DO_CALLBACK(events, "check_alias_not_changed");                                                                      // 4N+34
 
@@ -196,11 +198,11 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   //check notmal tx in tx pool
   MAKE_TX_LIST_START(events, txs_0, miner_account, miner_account, MK_TEST_COINS(1), blk_9);                            // 4N+36
 
-  if (!put_alias_via_tx_to_list(events, txs_0, blk_9, FOURTH_NAME, miner_account, miner_account, generator))           // 4N+37
+  if (!put_alias_via_tx_to_list(m_hardforks, events, txs_0, blk_9, FOURTH_NAME, miner_account, miner_account, generator))           // 4N+37
     return false;
 
   someone.generate();
-  if (!put_alias_via_tx_to_list(events, txs_0, blk_9, FIFTH_NAME, miner_account, someone, generator))                  // 4N+38
+  if (!put_alias_via_tx_to_list(m_hardforks, events, txs_0, blk_9, FIFTH_NAME, miner_account, someone, generator))                  // 4N+38
     return false;
 
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_13, blk_9, miner_account, txs_0);                                                // 4N+39
@@ -210,11 +212,11 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   MAKE_TX_LIST_START(events, txs_2, miner_account, miner_account, MK_TEST_COINS(1), blk_13);                           // 4N+41
 
   someone.generate();
-  if (!put_alias_via_tx_to_list(events, txs_2, blk_13, SIX_NAME, miner_account, someone, generator))                   // 4N+42
+  if (!put_alias_via_tx_to_list(m_hardforks, events, txs_2, blk_13, SIX_NAME, miner_account, someone, generator))                   // 4N+42
     return false;
   DO_CALLBACK(events, "mark_invalid_tx");                                                                              // 4N+43
   // EXPECTED: the next tx is rejected, because alias is already registered
-  if (!put_alias_via_tx_to_list(events, txs_2, blk_13, SIX_NAME, miner_account, miner_account, generator))             // 4N+44
+  if (!put_alias_via_tx_to_list(m_hardforks, events, txs_2, blk_13, SIX_NAME, miner_account, miner_account, generator))             // 4N+44
     return false;
 
   DO_CALLBACK(events, "mark_invalid_block");                                                                           // 4N+45
@@ -400,7 +402,7 @@ bool gen_alias_strange_data::generate(std::vector<test_event_entry>& events) con
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_text_comment = "";
   ai.m_address = m_alice.get_public_address();
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);
   
@@ -424,7 +426,7 @@ bool gen_alias_strange_data::generate(std::vector<test_event_entry>& events) con
   ai.m_text_comment = std::string(255, 'c');
   ai.m_address = m_alice.get_public_address();
   ai.m_view_key.push_back(m_alice.get_keys().view_secret_key);
-  r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2, miner_acc, tx_list);
 
@@ -432,7 +434,7 @@ bool gen_alias_strange_data::generate(std::vector<test_event_entry>& events) con
   ai.m_text_comment = std::string(255, '\0');
   r = sign_extra_alias_entry(ai, m_alice.get_public_address().spend_public_key, m_alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
-  r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3, miner_acc, tx_list);
 
@@ -477,14 +479,14 @@ bool gen_alias_concurrency_with_switch::generate(std::vector<test_event_entry>& 
   ai.m_address = miner_acc.get_public_address();
   //ai.m_address = *reinterpret_cast<currency::account_public_address*>(invalid_addr);
   ai.m_view_key.push_back(miner_acc.get_keys().view_secret_key);
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   // 2nd
   std::list<currency::transaction> tx_list2;
   ai.m_address.spend_public_key = null_pkey, ai.m_address.view_public_key = null_pkey;
   DO_CALLBACK(events, "mark_invalid_tx"); // because tx with a duplicate alias request (?)
-  r = put_alias_via_tx_to_list(events, tx_list2, blk_0r, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list2, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   //  0  .. 10    11    12      <- height
@@ -539,14 +541,14 @@ bool gen_alias_same_alias_in_tx_pool::generate(std::vector<test_event_entry>& ev
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = miner_acc.get_public_address();
   ai.m_view_key.push_back(miner_acc.get_keys().view_secret_key);
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   ai.m_address.spend_public_key = null_pkey, ai.m_address.view_public_key = null_pkey;
   r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   DO_CALLBACK(events, "mark_invalid_tx"); // because tx with a duplicate alias request
-  r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   tx_list.pop_back(); // 'cause it's invalid
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
@@ -559,14 +561,14 @@ bool gen_alias_same_alias_in_tx_pool::generate(std::vector<test_event_entry>& ev
   ai.m_address.spend_public_key = miner_acc.get_public_address().spend_public_key;
   r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
-  r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   ai.m_text_comment = "Oops, I forgot a comment!";
   r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
   DO_CALLBACK(events, "mark_invalid_tx"); // because tx with a duplicate alias request
-  r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   tx_list.pop_back(); // 'cause it's invalid
 
@@ -615,7 +617,7 @@ bool gen_alias_switch_and_tx_pool::generate(std::vector<test_event_entry>& event
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = miner_acc.get_public_address();
   ai.m_view_key.push_back(miner_acc.get_keys().view_secret_key);
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   // add a block to clear the tx pool
@@ -627,7 +629,7 @@ bool gen_alias_switch_and_tx_pool::generate(std::vector<test_event_entry>& event
   ai.m_address.spend_public_key = null_pkey, ai.m_address.view_public_key = null_pkey;
   r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
-  r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   // add one more block to bring the tx to life (i.e. blockchain)
@@ -645,7 +647,7 @@ bool gen_alias_switch_and_tx_pool::generate(std::vector<test_event_entry>& event
   ai.m_address = alice.get_public_address();
   ai.m_view_key.push_back(alice.get_keys().view_secret_key);
   DO_CALLBACK(events, "mark_invalid_tx"); // tx is rejected, because tx pool already has tx with reg/upd this alias
-  r = put_alias_via_tx_to_list(events, tx_list, blk_4, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_4, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   
@@ -692,7 +694,7 @@ bool gen_alias_update_after_addr_changed::generate(std::vector<test_event_entry>
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = miner_acc.get_public_address();
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);
@@ -703,7 +705,7 @@ bool gen_alias_update_after_addr_changed::generate(std::vector<test_event_entry>
   ai.m_address = alice.get_public_address();
   r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
-  r = put_alias_via_tx_to_list(events, tx_list, blk_1, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_1, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);
@@ -713,7 +715,7 @@ bool gen_alias_update_after_addr_changed::generate(std::vector<test_event_entry>
   ai.m_text_comment = "upd2";
   r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
-  r = put_alias_via_tx_to_list(events, tx_list, blk_2, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_2, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   // the next block will be rejected as invalid, as cantaining tx with invalid alias sign
   DO_CALLBACK(events, "mark_invalid_block");
@@ -728,7 +730,7 @@ bool gen_alias_update_after_addr_changed::generate(std::vector<test_event_entry>
   ai.m_address = miner_acc.get_public_address();
   r = sign_extra_alias_entry(ai, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
-  r = put_alias_via_tx_to_list(events, tx_list, blk_2, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_2, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
 
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2, miner_acc, tx_list);
@@ -738,7 +740,7 @@ bool gen_alias_update_after_addr_changed::generate(std::vector<test_event_entry>
   ai.m_text_comment = "upd3";
   r = sign_extra_alias_entry(ai, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
-  r = put_alias_via_tx_to_list(events, tx_list, blk_3, miner_acc, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_3, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   // the next block will be rejected as invalid, as cantaining tx with invalid alias sign
   DO_CALLBACK(events, "mark_invalid_block");
@@ -786,7 +788,7 @@ bool gen_alias_blocking_reg_by_invalid_tx::generate(std::vector<test_event_entry
   ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "sweet.name";
   ai.m_address = alice.get_public_address();
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_1, alice, ai, generator);
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_1, alice, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);
   tx_list.clear();
@@ -824,7 +826,7 @@ bool gen_alias_blocking_update_by_invalid_tx::generate(std::vector<test_event_en
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "sweet.name";
   ai.m_address = alice.get_public_address();
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_1, alice, ai, generator);
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_1, alice, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);
   tx_list.clear();
@@ -834,7 +836,7 @@ bool gen_alias_blocking_update_by_invalid_tx::generate(std::vector<test_event_en
   ai.m_alias = "sweet.name";
   ai.m_address = attacker.get_public_address();
   ai.m_sign.push_back(invalid_signature);
-  r = put_alias_via_tx_to_list(events, tx_list, blk_2, attacker, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_2, attacker, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   
   // Obviously, miner can't add it to his next block, because it turns out to be invalid.
@@ -850,7 +852,7 @@ bool gen_alias_blocking_update_by_invalid_tx::generate(std::vector<test_event_en
   ai.m_text_comment = "alice@mail.com";
   r = sign_extra_alias_entry(ai, alice.get_public_address().spend_public_key, alice.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
-  r = put_alias_via_tx_to_list(events, tx_list, blk_2, alice, ai, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_2, alice, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2, miner_acc, tx_list);
   tx_list.clear();
@@ -1026,7 +1028,7 @@ bool gen_alias_too_small_reward::generate(std::vector<test_event_entry>& events)
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), 3 * aliases_count * TESTS_DEFAULT_FEE * 100, 3 * aliases_count, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), 3 * aliases_count * TESTS_DEFAULT_FEE * 100, 3 * aliases_count, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
@@ -1111,9 +1113,9 @@ bool gen_alias_too_small_reward::make_tx_reg_alias(std::vector<test_event_entry>
   if (sources_amount > alias_reward + TESTS_DEFAULT_FEE)
     destinations.push_back(tx_destination_entry(sources_amount - (alias_reward + TESTS_DEFAULT_FEE), miner_acc.get_public_address())); // change
   
-  crypto::secret_key stub;
+  crypto::secret_key stub = AUTO_VAL_INIT(stub);
   uint64_t tx_version = get_tx_version(get_block_height(prev_block), m_hardforks);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx, tx_version, stub, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx, tx_version, stub, uint64_t(0));
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx);
 
@@ -1222,7 +1224,7 @@ bool gen_alias_switch_and_check_block_template::generate(std::vector<test_event_
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'x');
   ai.m_address = alice.get_public_address();
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_1, alice, ai, generator);                           // 2N+5
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_1, alice, ai, generator);                           // 2N+5
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");                                         
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);                                         // 2N+6
   tx_list.clear();
@@ -1407,7 +1409,7 @@ bool gen_alias_update_for_free::generate(std::vector<test_event_entry>& events) 
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a');
   ai.m_address = miner_acc.get_public_address();
-  bool r = put_alias_via_tx_to_list(events, tx_list, blk_0r, miner_acc, ai, generator);
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_0r, miner_acc, ai, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);
   tx_list.clear();

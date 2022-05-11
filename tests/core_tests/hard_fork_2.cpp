@@ -803,7 +803,7 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
 
   std::list<transaction> tx_set;
   DO_CALLBACK(events, "mark_invalid_tx");
-  r = put_alias_via_tx_to_list(events, tx_set, blk_2, miner_acc, alias_entry, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_set, blk_2, miner_acc, alias_entry, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   transaction tx_2 = tx_set.front();
 
@@ -818,7 +818,7 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   alias_entry_old.m_alias = "alicealice";
 
   tx_set.clear();
-  r = put_alias_via_tx_to_list(events, tx_set, blk_2, miner_acc, alias_entry_old, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_set, blk_2, miner_acc, alias_entry_old, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   transaction tx_2_old = tx_set.front();
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_2_old);
@@ -889,7 +889,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::generate(std::vector<test_
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
@@ -1165,7 +1165,7 @@ bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::generate(std::vector<te
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
@@ -1281,7 +1281,7 @@ bool hard_fork_2_incorrect_alias_update<before_hf_2>::generate(std::vector<test_
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
