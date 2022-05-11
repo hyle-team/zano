@@ -15,7 +15,7 @@ namespace crypto {
   {
 
     dword         MDbuf[RMDsize / 32] = {0};   /* contains (A, B, C, D(, E))   */
-    byte*         hashcode = (byte*)&h;        /* hashcode[RMDsize / 8]; /* for final hash-value         */
+    byte*         hashcode = (byte*)&h;        /* hashcode[RMDsize / 8];          for final hash-value         */
     dword         X[16] = {0};                 /* current 16-word chunk        */
     unsigned int  i = 0;                       /* counter                      */
     dword         length = static_cast<dword>(length_size_t);                  /* length in bytes of message   */
