@@ -136,8 +136,9 @@ namespace crypto
   {
     union
     {
-      uint64_t      m_u64[4];
-      unsigned char m_s[32];
+      uint64_t            m_u64[4];
+      unsigned char       m_s[32];
+      crypto::secret_key  m_sk;
     };
 
     scalar_t()
@@ -205,28 +206,22 @@ namespace crypto
 
     crypto::secret_key &as_secret_key()
     {
-      return *reinterpret_cast<crypto::secret_key*>(&m_s[0]);
+      return m_sk;
     }
 
     const crypto::secret_key& as_secret_key() const
     {
-      return *reinterpret_cast<const crypto::secret_key*>(&m_s[0]);
+      return m_sk;
     }
 
     operator crypto::secret_key() const
     {
-      crypto::secret_key result;
-      memcpy(result.data, &m_s, sizeof result.data);
-      return result;
+      return m_sk;
     }
 
     void from_secret_key(const crypto::secret_key& sk)
     {
-      uint64_t *p_sk64 = (uint64_t*)&sk;
-      m_u64[0] = p_sk64[0];
-      m_u64[1] = p_sk64[1];
-      m_u64[2] = p_sk64[2];
-      m_u64[3] = p_sk64[3];
+      m_sk = sk;
       // assuming secret key is correct (< L), so we don't need to call reduce here
     }
 

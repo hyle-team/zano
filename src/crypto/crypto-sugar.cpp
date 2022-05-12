@@ -24,4 +24,6 @@ namespace crypto
   const point_t  c_point_H2       = { 0x70c8d1ab9dbf1cc0, 0xc561bb12639a8516, 0x3cfff1def9e5b268, 0xe0936386f3bcce1a };  // == Hp("h2_generator"), cheched in bpp_basics
   const point_t  c_point_0        = point_t(point_t::tag_zero());
 
+  static_assert(sizeof(scalar_t::m_sk) == sizeof(scalar_t::m_u64) && sizeof(scalar_t::m_u64) == sizeof(scalar_t::m_s), "size missmatch");
+
 } // namespace crypto
