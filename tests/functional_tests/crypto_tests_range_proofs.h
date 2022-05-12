@@ -139,7 +139,7 @@ TEST(bpp, power_256)
   std::vector<std::vector<point_t>> commitments_vector;
   commitments_vector.reserve(10);
 
-  std::vector<bpp_sig_commit_ref_t> sig_ñommit_refs;
+  std::vector<bpp_sig_commit_ref_t> sig_commit_refs;
   uint8_t err = 0;
   bool r = false;
 
@@ -152,10 +152,10 @@ TEST(bpp, power_256)
     scalar_vec_t values = { 5 };
     scalar_vec_t masks = { scalar_t(77 + 256 * 77) };
 
-    r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments, &err);
+    r = bpp_gen<bpp_crypto_trait_zano<N>>(values, masks, bpp_sig, commitments, &err);
     ASSERT_TRUE(r);
 
-    sig_ñommit_refs.emplace_back(bpp_sig, commitments);
+    sig_commit_refs.emplace_back(bpp_sig, commitments);
   }
 
   {
@@ -170,10 +170,10 @@ TEST(bpp, power_256)
     r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments, &err);
     ASSERT_TRUE(r);
 
-    sig_ñommit_refs.emplace_back(bpp_sig, commitments);
+    sig_commit_refs.emplace_back(bpp_sig, commitments);
   }
 
-  r = bpp_verify<bpp_crypto_trait_zano<>>(sig_ñommit_refs, &err);
+  r = bpp_verify<bpp_crypto_trait_zano<N>>(sig_commit_refs, &err);
   ASSERT_TRUE(r);
 
 
