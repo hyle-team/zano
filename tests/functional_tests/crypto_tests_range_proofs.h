@@ -152,7 +152,7 @@ TEST(bpp, power_256)
     scalar_vec_t values = { 5 };
     scalar_vec_t masks = { scalar_t(77 + 256 * 77) };
 
-    r = bpp_gen<bpp_crypto_trait_zano<N>>(values, masks, bpp_sig, commitments, &err);
+    r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments, &err);
     ASSERT_TRUE(r);
 
     sig_commit_refs.emplace_back(bpp_sig, commitments);
@@ -173,7 +173,7 @@ TEST(bpp, power_256)
     sig_commit_refs.emplace_back(bpp_sig, commitments);
   }
 
-  r = bpp_verify<bpp_crypto_trait_zano<N>>(sig_commit_refs, &err);
+  r = bpp_verify<bpp_crypto_trait_zano<>>(sig_commit_refs, &err);
   ASSERT_TRUE(r);
 
 

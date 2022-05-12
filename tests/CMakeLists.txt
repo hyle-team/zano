@@ -29,9 +29,6 @@ add_executable(net_load_tests_srv net_load_tests/srv.cpp)
 add_dependencies(coretests version)
 
 target_link_libraries(coretests rpc wallet currency_core common crypto zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-if (UNIX AND NOT APPLE)
-  target_link_libraries(coretests dl)
-endif()
 target_link_libraries(functional_tests rpc wallet currency_core crypto common zlibstatic ethash libminiupnpc-static ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 target_link_libraries(hash-tests crypto ethash)
 target_link_libraries(hash-target-tests crypto currency_core ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
@@ -46,6 +43,8 @@ if(NOT MSVC)
   if(APPLE)
     set_property(TARGET gtest gtest_main APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-unused-private-field")
   endif()
+  target_link_libraries(coretests dl)
+  target_link_libraries(functional_tests dl)
 endif()
 
 
