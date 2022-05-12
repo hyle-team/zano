@@ -2208,7 +2208,7 @@ bool gen_wallet_offers_size_limit::generate(std::vector<test_event_entry>& event
 }
 
 // generates such an offer so that result tx will most like have its size within the giving limits
-bool generate_oversized_offer(size_t min_size, size_t max_size, bc_services::offer_details_ex& result)
+bool generate_oversized_offer(size_t min_size, size_t max_size, bc_services::offer_details_ex& result, uint64_t tx_version)
 {
   bc_services::offer_details_ex r = AUTO_VAL_INIT(r);
   result = r;
@@ -2226,7 +2226,7 @@ bool generate_oversized_offer(size_t min_size, size_t max_size, bc_services::off
     // construct fake tx to estimate it's size
     transaction tx = AUTO_VAL_INIT(tx);
     crypto::secret_key one_time_secret_key;
-    if (!construct_tx(account_keys(), std::vector<tx_source_entry>(), std::vector<tx_destination_entry>(), empty_extra, att_container, tx, one_time_secret_key, 0, 0, true, 0))
+    if (!construct_tx(account_keys(), std::vector<tx_source_entry>(), std::vector<tx_destination_entry>(), empty_extra, att_container, tx, tx_version, one_time_secret_key, 0, 0, true, 0))
       return false;
 
     size_t sz = get_object_blobsize(tx);
@@ -2257,12 +2257,12 @@ bool gen_wallet_offers_size_limit::c1(currency::core& c, size_t ev_index, const 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
   bc_services::offer_details_ex od_normal = AUTO_VAL_INIT(od_normal);
-  bool r = generate_oversized_offer(CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 2048, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1024, od_normal); // generate biggest offer but within tx size limits
+  bool r = generate_oversized_offer(CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 2048, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1024, od_normal, c.get_current_tx_version()); // generate biggest offer but within tx size limits
   CHECK_AND_ASSERT_MES(r, false, "generate_oversized_offer failed");
   od_normal.fee = TESTS_DEFAULT_FEE;
 
   bc_services::offer_details_ex od_oversized = AUTO_VAL_INIT(od_oversized);
-  r = generate_oversized_offer(CURRENCY_MAX_TRANSACTION_BLOB_SIZE, CURRENCY_MAX_TRANSACTION_BLOB_SIZE + 1024, od_oversized);
+  r = generate_oversized_offer(CURRENCY_MAX_TRANSACTION_BLOB_SIZE, CURRENCY_MAX_TRANSACTION_BLOB_SIZE + 1024, od_oversized, c.get_current_tx_version());
   CHECK_AND_ASSERT_MES(r, false, "generate_oversized_offer failed");
   od_oversized.fee = TESTS_DEFAULT_FEE;
 

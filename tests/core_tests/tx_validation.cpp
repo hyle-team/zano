@@ -1221,7 +1221,7 @@ bool tx_expiration_time::generate(std::vector<test_event_entry>& events) const
   r = fill_tx_sources_and_destinations(events, blk_2, alice_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_2  = AUTO_VAL_INIT(tx_2);
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, 0);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, get_tx_version_from_events(events),  0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   set_tx_expiration_time(tx_2, ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 1); // one second greather than minimum allowed
   r = resign_tx(alice_acc.get_keys(), sources, tx_2);
@@ -1239,7 +1239,7 @@ bool tx_expiration_time::generate(std::vector<test_event_entry>& events) const
   r = fill_tx_sources_and_destinations(events, blk_3, alice_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_3  = AUTO_VAL_INIT(tx_3);
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3, 0);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   set_tx_expiration_time(tx_3, ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 0); // exact expiration time, should not pass (see core condition above)
   r = resign_tx(alice_acc.get_keys(), sources, tx_3);
@@ -1304,7 +1304,7 @@ bool tx_expiration_time_and_block_template::generate(std::vector<test_event_entr
   bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1  = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   uint64_t tx_1_expiration_time = ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 1;  // one second greather than minimum allowed
   set_tx_expiration_time(tx_1, tx_1_expiration_time);
@@ -1376,7 +1376,7 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_0  = AUTO_VAL_INIT(tx_0);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   uint64_t tx_0_expiration_time = ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 0;  // one second less than minimum allowed (see condition above)
   set_tx_expiration_time(tx_0, tx_0_expiration_time);
@@ -1497,7 +1497,7 @@ bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events)
   r = fill_tx_sources_and_destinations(events, blk_0r, m_miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_0  = AUTO_VAL_INIT(tx_0);
-  r = construct_tx(m_miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(m_miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   LOG_PRINT_YELLOW("tx_0 = " << get_transaction_hash(tx_0), LOG_LEVEL_0);
   // do not push tx_0 into events yet
