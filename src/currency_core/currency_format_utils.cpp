@@ -81,6 +81,7 @@ namespace currency
     const account_public_address &miner_address,
     const account_public_address &stakeholder_address,
     transaction& tx,
+    uint64_t tx_version,
     const blobdata& extra_nonce,
     size_t max_outs,
     bool pos,
@@ -130,7 +131,7 @@ namespace currency
     }
       
 
-    return construct_miner_tx(height, median_size, already_generated_coins, current_block_size, fee, destinations, tx, extra_nonce, max_outs, pos, pe);
+    return construct_miner_tx(height, median_size, already_generated_coins, current_block_size, fee, destinations, tx, tx_version, extra_nonce, max_outs, pos, pe);
   }
   //------------------------------------------------------------------
   bool apply_unlock_time(const std::vector<tx_destination_entry>& destinations, transaction& tx)
@@ -159,6 +160,7 @@ namespace currency
     uint64_t fee,
     const std::vector<tx_destination_entry>& destinations,
     transaction& tx,
+    uint64_t tx_version,
     const blobdata& extra_nonce,
     size_t max_outs,
     bool pos,
@@ -208,7 +210,7 @@ namespace currency
     }
     
 
-    tx.version = CURRENT_TRANSACTION_VERSION;
+    tx.version = tx_version;
     if (!have_type_in_variant_container<etc_tx_details_unlock_time2>(tx.extra))
     {
       //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
@@ -1214,7 +1216,7 @@ namespace currency
   {
     //extra copy operation, but creating transaction is not sensitive to this
     finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-    ftp.tx_version = CURRENT_TRANSACTION_VERSION;
+    ftp.tx_version = tx_version;
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;
     ftp.extra = extra;

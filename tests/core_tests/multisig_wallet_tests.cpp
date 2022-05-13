@@ -1198,7 +1198,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   uint64_t unlock_time_2 = blk_0r.timestamp + DIFFICULTY_TOTAL_TARGET * 6 + CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS;
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, unlock_time, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), unlock_time, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   CHECK_AND_ASSERT_MES(get_tx_max_unlock_time(tx_1) == unlock_time, false, "Unlock time was not correctly set");
   events.push_back(tx_1);
@@ -1448,7 +1448,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
     r = fill_tx_sources_and_destinations(events, prev_block, miner_acc.get_keys(), ms_addr_list, blk_2_reward, TESTS_DEFAULT_FEE, 0, sources, destinations, false, false, 1);
     CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
     transaction miner_tx = AUTO_VAL_INIT(miner_tx);
-    r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, miner_tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW, CURRENCY_TO_KEY_OUT_RELAXED, true);
+    r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, miner_tx, get_tx_version_from_events(events), height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW, CURRENCY_TO_KEY_OUT_RELAXED, true);
     CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
     // replace vin with coinbase input
@@ -1628,7 +1628,7 @@ multisig_and_checkpoints::multisig_and_checkpoints()
 bool multisig_and_checkpoints::set_cp(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   currency::checkpoints checkpoints;
-  checkpoints.add_checkpoint(15, "6f9194c144afd73077478e7f04e947c50160b5673558e6f696a4f662a3ca261e");
+  checkpoints.add_checkpoint(15, "e2a1b0d51c4de81a79caafb28ba3c2f2ef3f53f7a728932b4d7e2a81a3fc2cc0");
   c.set_checkpoints(std::move(checkpoints));
 
   return true;

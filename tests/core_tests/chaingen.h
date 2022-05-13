@@ -746,7 +746,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   tx.signatures.clear();
   tx.extra = extra;
 
-  tx.version = CURRENT_TRANSACTION_VERSION;
+  tx.version = TRANSACTION_VERSION_PRE_HF4;
   set_tx_unlock_time(tx, unlock_time);
 
   currency::keypair txkey = currency::keypair::generate();
@@ -892,7 +892,7 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
   size_t height = get_block_height(prev_block) + 1;
   //size_t current_block_size = get_object_blobsize(miner_tx);
 
-  r = construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0, acc.get_public_address(), acc.get_public_address(), miner_tx, currency::blobdata(), 1);
+  r = construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0, acc.get_public_address(), acc.get_public_address(), miner_tx, get_tx_version(height, m_hardforks), currency::blobdata(), 1);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
   if (!cb(miner_tx))

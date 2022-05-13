@@ -1487,7 +1487,9 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    fee, 
                                                    miner_address, 
                                                    stakeholder_address,
-                                                   b.miner_tx, ex_nonce, 
+                                                   b.miner_tx,
+                                                   get_tx_version(height, m_core_runtime_config.hard_forks),
+                                                   ex_nonce, 
                                                    CURRENCY_MINER_TX_MAX_OUTS, 
                                                    pos,
                                                    pe);

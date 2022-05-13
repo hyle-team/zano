@@ -14,10 +14,10 @@ namespace currency
   
   struct hard_forks_descriptor
   {
-    uint64_t hard_fork_01_starts_after_height;
-    uint64_t hard_fork_02_starts_after_height;
-    uint64_t hard_fork_03_starts_after_height;
-    uint64_t hard_fork_04_starts_after_height;
+    uint64_t hard_fork_01_starts_after_height = 0;
+    uint64_t hard_fork_02_starts_after_height = 0;
+    uint64_t hard_fork_03_starts_after_height = 0;
+    uint64_t hard_fork_04_starts_after_height = UINT64_MAX;
   };
 
   struct core_runtime_config

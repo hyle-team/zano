@@ -304,6 +304,7 @@ bool test_generator::construct_block(currency::block& blk,
                                     miner_acc.get_keys().account_address, 
                                     miner_acc.get_keys().account_address,
                                     blk.miner_tx, 
+                                    get_tx_version(height, m_hardforks),
                                     blobdata(),
                                     test_generator::get_test_gentime_settings().miner_tx_max_outs,
                                     static_cast<bool>(coin_stake_sources.size()), 
@@ -897,7 +898,7 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
   {
     size_t current_block_size = txs_sizes + get_object_blobsize(blk.miner_tx);
     // TODO: This will work, until size of constructed block is less then CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE
-    if (!construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, current_block_size, 0, miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, blobdata(), 1))
+    if (!construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, current_block_size, 0, miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, get_tx_version(height, m_hardforks), blobdata(), 1))
       return false;
   }
 
@@ -1462,7 +1463,7 @@ bool construct_miner_tx_manually(size_t height, uint64_t already_generated_coins
   out.target = txout_to_key(out_eph_public_key);
   tx.vout.push_back(out);
 
-  tx.version = CURRENT_TRANSACTION_VERSION;
+  tx.version = TRANSACTION_VERSION_PRE_HF4;
   currency::set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   return true;

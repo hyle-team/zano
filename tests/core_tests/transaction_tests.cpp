@@ -40,17 +40,17 @@ bool test_transaction_generation_and_ring_signature()
   account_base rv_acc2;
   rv_acc2.generate();
   transaction tx_mine_1;
-  construct_miner_tx(0, 0, 0, 10, 0, miner_acc1.get_keys().account_address, miner_acc1.get_keys().account_address, tx_mine_1);
+  construct_miner_tx(0, 0, 0, 10, 0, miner_acc1.get_keys().account_address, miner_acc1.get_keys().account_address, tx_mine_1, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_2;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc2.get_keys().account_address, miner_acc2.get_keys().account_address, tx_mine_2);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc2.get_keys().account_address, miner_acc2.get_keys().account_address, tx_mine_2, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_3;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc3.get_keys().account_address, miner_acc3.get_keys().account_address, tx_mine_3);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc3.get_keys().account_address, miner_acc3.get_keys().account_address, tx_mine_3, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_4;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc4.get_keys().account_address, miner_acc4.get_keys().account_address, tx_mine_4);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc4.get_keys().account_address, miner_acc4.get_keys().account_address, tx_mine_4, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_5;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc5.get_keys().account_address, miner_acc5.get_keys().account_address, tx_mine_5);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc5.get_keys().account_address, miner_acc5.get_keys().account_address, tx_mine_5, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_6;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc6.get_keys().account_address, miner_acc6.get_keys().account_address, tx_mine_6);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc6.get_keys().account_address, miner_acc6.get_keys().account_address, tx_mine_6, TRANSACTION_VERSION_PRE_HF4);
 
   //fill inputs entry
   typedef tx_source_entry::output_entry tx_output_entry;
@@ -135,7 +135,7 @@ bool test_block_creation()
   bool r = get_account_address_from_str(adr, "ZxDLGBGXbjo5w51tJkvxEPHFRr7Xft4hf33N8EkJPndoGCqocQF1mzpZqYwXByx5gMbfQuPAAB9vj79EFR6Jwkgu1o3aMQPwJ");
   CHECK_AND_ASSERT_MES(r, false, "failed to import");
   block b;
-  r = construct_miner_tx(90, epee::misc_utils::median(szs), 3553616528562147, 33094, 10000000, adr, adr, b.miner_tx);
+  r = construct_miner_tx(90, epee::misc_utils::median(szs), 3553616528562147, 33094, 10000000, adr, adr, b.miner_tx, TRANSACTION_VERSION_PRE_HF4);
   return r;
 }
 

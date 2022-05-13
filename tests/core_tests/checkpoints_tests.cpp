@@ -628,6 +628,8 @@ gen_no_attchments_in_coinbase::gen_no_attchments_in_coinbase()
 
   REGISTER_CALLBACK_METHOD(gen_no_attchments_in_coinbase, c1);
   REGISTER_CALLBACK_METHOD(gen_no_attchments_in_coinbase, init_config_set_cp);
+
+  m_hardforks.hard_fork_04_starts_after_height = UINT64_MAX;
 }
 
 bool gen_no_attchments_in_coinbase::generate(std::vector<test_event_entry>& events) const
