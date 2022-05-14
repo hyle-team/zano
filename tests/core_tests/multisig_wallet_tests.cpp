@@ -1228,7 +1228,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   // tx_2 should be created ok, but rejected by the core, as one of input refers to a locked tx
   // Note: tx_2 has unlock_time_2 specified
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, unlock_time_2, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, get_tx_version_from_events(events), unlock_time_2, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   bool tx_fully_signed = false;
