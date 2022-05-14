@@ -43,6 +43,8 @@ if(NOT MSVC)
   if(APPLE)
     set_property(TARGET gtest gtest_main APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-unused-private-field")
   endif()
+  target_link_libraries(coretests dl)
+  target_link_libraries(functional_tests dl)
 endif()
 
 

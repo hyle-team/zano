@@ -1177,7 +1177,7 @@ TEST(crypto, neg_identity)
   // also do zero-byte pub key / key image checks
 
   public_key zzz_pk;
-  memset(&zzz_pk, 0, sizeof public_key);
+  memset(&zzz_pk, 0, sizeof(public_key));
 
   ASSERT_TRUE(check_key(zzz_pk));
 
@@ -1186,7 +1186,7 @@ TEST(crypto, neg_identity)
   ASSERT_FALSE(zzz.is_in_main_subgroup());
 
   key_image zzz_ki;
-  memset(&zzz_ki, 0, sizeof key_image);
+  memset(&zzz_ki, 0, sizeof(key_image));
 
   ASSERT_FALSE(validate_key_image(zzz_ki));
 
@@ -1280,12 +1280,12 @@ TEST(ml2s, hs)
     scalar_t x, y;
     crypto::generate_random_bytes(32, y.m_s);
     x = y;
-    memset(x.m_s + 18, 0xff, 13);
+    memset(x.m_s + 20, 0xff, 11);
     sc_reduce32(x.m_s);
-    uint64_t lo = *(uint64_t*)(x.m_s + 18);
-    uint64_t hi = *(uint64_t*)(x.m_s + 26) & 0xffffffffff;
+    uint64_t lo = *(uint64_t*)(x.m_s + 20);
+    uint64_t hi = *(uint64_t*)(x.m_s + 28) & 0xffffff;
     ASSERT_EQ(lo, 0xffffffffffffffff);
-    ASSERT_EQ(hi, 0xffffffffff);
+    ASSERT_EQ(hi, 0xffffff);
   }
 
 
@@ -1820,12 +1820,6 @@ TEST(crypto, sc_get_bit)
   for (size_t n = 0; n < 256; ++n)
   {
     ASSERT_EQ(v.get_bit(static_cast<uint8_t>(n)), true);
-  }
-
-  // bits out of the [0; 255] range supposed to be always 0
-  for (size_t n = 256; n < 2048; ++n)
-  {
-    ASSERT_EQ(v.get_bit(static_cast<uint8_t>(n)), false);
   }
 
   // check random value

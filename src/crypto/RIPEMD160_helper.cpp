@@ -1,9 +1,6 @@
 // Copyright (c) 2020 The Zano developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-#pragma once
-
 #include "RIPEMD160_helper.h"
 #include "auto_val_init.h"
 extern "C" {
@@ -18,7 +15,7 @@ namespace crypto {
   {
 
     dword         MDbuf[RMDsize / 32] = {0};   /* contains (A, B, C, D(, E))   */
-    byte*         hashcode = (byte*)&h;        /* hashcode[RMDsize / 8]; /* for final hash-value         */
+    byte*         hashcode = (byte*)&h;        /* hashcode[RMDsize / 8];          for final hash-value         */
     dword         X[16] = {0};                 /* current 16-word chunk        */
     unsigned int  i = 0;                       /* counter                      */
     dword         length = static_cast<dword>(length_size_t);                  /* length in bytes of message   */

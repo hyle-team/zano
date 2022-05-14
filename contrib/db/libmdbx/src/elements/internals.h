@@ -54,7 +54,7 @@
 #endif
 #if MDBX_DISABLE_GNU_SOURCE
 #undef _GNU_SOURCE
-#elif defined(__linux__) || defined(__gnu_linux__)
+#elif ( defined(__linux__) || defined(__gnu_linux__) ) && !defined(_GNU_SOURCE)
 #define _GNU_SOURCE
 #endif
 

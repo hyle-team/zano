@@ -26,7 +26,7 @@
 #include "include_base_utils.h"
 
 #include "serialization/binary_archive.h"
-#include "serialization/crypto.h"
+#include "common/crypto_serialization.h"
 #include "serialization/stl_containers.h"
 #include "serialization/serialization.h"
 #include "serialization/variant.h"
@@ -37,6 +37,7 @@
 #include "currency_config.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
+#include "crypto/range_proofs.h"
 #include "misc_language.h"
 #include "block_flags.h"
 #include "etc_custom_serialization.h"

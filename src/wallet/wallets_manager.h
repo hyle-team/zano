@@ -15,8 +15,6 @@ DISABLE_VS_WARNINGS(4503)
 #include "include_base_utils.h"
 #include "version.h"
 
-using namespace epee;
-
 #include "console_handler.h"
 #include "p2p/net_node.h"
 #include "currency_core/checkpoints_create.h"

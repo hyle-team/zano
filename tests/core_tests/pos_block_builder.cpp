@@ -6,6 +6,7 @@
 #include "chaingen.h"
 #include "pos_block_builder.h"
 
+using namespace epee;
 using namespace currency;
 
 pos_block_builder::pos_block_builder()

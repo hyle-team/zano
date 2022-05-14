@@ -395,7 +395,7 @@ namespace currency
           missed_bs.push_back(bl_id);
         else
         {
-          CHECK_AND_ASSERT_MES(*block_ind_ptr < m_db_blocks.size(), false, "Internal error: bl_id=" << string_tools::pod_to_hex(bl_id)
+          CHECK_AND_ASSERT_MES(*block_ind_ptr < m_db_blocks.size(), false, "Internal error: bl_id=" << epst::pod_to_hex(bl_id)
             << " have index record with offset=" << *block_ind_ptr << ", bigger then m_db_blocks.size()=" << m_db_blocks.size());
           blocks.push_back(m_db_blocks[*block_ind_ptr]->bl);
         }
@@ -531,9 +531,9 @@ namespace currency
 
 
 
-    mutable critical_section m_invalid_blocks_lock;
+    mutable epee::critical_section m_invalid_blocks_lock;
     blocks_ext_by_hash m_invalid_blocks;     // crypto::hash -> block_extended_info
-    mutable critical_section m_alternative_chains_lock;
+    mutable epee::critical_section m_alternative_chains_lock;
     alt_chain_container m_alternative_chains; // crypto::hash -> alt_block_extended_info
     std::unordered_map<crypto::hash, size_t> m_alternative_chains_txs; // tx_id -> how many alt blocks it related to (always >= 1)
     std::unordered_map<crypto::key_image, std::list<crypto::hash>> m_altblocks_keyimages; // key image -> list of alt blocks hashes where it appears in inputs
@@ -557,7 +557,7 @@ namespace currency
     mutable wide_difficulty_type m_cached_next_pow_difficulty;
     mutable wide_difficulty_type m_cached_next_pos_difficulty;
 
-    mutable critical_section m_targetdata_cache_lock;
+    mutable epee::critical_section m_targetdata_cache_lock;
     mutable std::list <std::pair<wide_difficulty_type, uint64_t>> m_pos_targetdata_cache;
     mutable std::list <std::pair<wide_difficulty_type, uint64_t>> m_pow_targetdata_cache;
     //work like a cache to avoid recalculation on read operations
@@ -758,7 +758,7 @@ namespace currency
       }
       TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_find_tx);
       auto tx_ptr = m_db_transactions.find(tx_id);
-      CHECK_AND_ASSERT_MES(tx_ptr, false, "Wrong transaction id in output indexes: " << string_tools::pod_to_hex(tx_id));
+      CHECK_AND_ASSERT_MES(tx_ptr, false, "Wrong transaction id in output indexes: " << epst::pod_to_hex(tx_id));
       CHECK_AND_ASSERT_MES(n < tx_ptr->tx.vout.size(), false,
         "Wrong index in transaction outputs: " << n << ", expected less then " << tx_ptr->tx.vout.size());
       //check mix_attr

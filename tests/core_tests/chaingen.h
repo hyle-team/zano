@@ -781,8 +781,8 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
     if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].second))
     {
       LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-        << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-        << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
+        << epst::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
+        << epst::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
       return false;
     }
 
@@ -892,7 +892,7 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
   size_t height = get_block_height(prev_block) + 1;
   //size_t current_block_size = get_object_blobsize(miner_tx);
 
-  r = construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0, acc.get_public_address(), acc.get_public_address(), miner_tx, get_tx_version(height, m_hardforks), currency::blobdata(), 1);
+  r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0, acc.get_public_address(), acc.get_public_address(), miner_tx, get_tx_version(height, m_hardforks), currency::blobdata(), 1);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
   if (!cb(miner_tx))
@@ -983,7 +983,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
   {                                                                                   \
     callback_entry ce = AUTO_VAL_INIT(ce);                                            \
     ce.callback_name = CB_NAME;                                                       \
-    ce.callback_params = epee::string_tools::pod_to_hex(PARAMS_POD_OBJ);              \
+    ce.callback_params = epst::pod_to_hex(PARAMS_POD_OBJ);                            \
     VEC_EVENTS.push_back(ce);                                                         \
     PRINT_EVENT_NO(VEC_EVENTS);                                                       \
   }

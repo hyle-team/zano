@@ -711,4 +711,4 @@ namespace epee
 #define  EXCLUSIVE_CRITICAL_REGION_BEGIN(x) { EXCLUSIVE_CRITICAL_REGION_LOCAL(x)
 #define  EXCLUSIVE_CRITICAL_REGION_END() }
 
-}
+} // namespace epee

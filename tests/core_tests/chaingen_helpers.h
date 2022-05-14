@@ -199,13 +199,13 @@ struct log_level_scope_changer
 {
   log_level_scope_changer(int desired_log_level)
   {
-    m_original_log_level = log_space::get_set_log_detalisation_level();
-    log_space::get_set_log_detalisation_level(true, desired_log_level);
+    m_original_log_level = epee::log_space::get_set_log_detalisation_level();
+    epee::log_space::get_set_log_detalisation_level(true, desired_log_level);
   }
 
   ~log_level_scope_changer()
   {
-    log_space::get_set_log_detalisation_level(true, m_original_log_level);
+    epee::log_space::get_set_log_detalisation_level(true, m_original_log_level);
   }
 
   int m_original_log_level;

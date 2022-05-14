@@ -1,5 +1,5 @@
-// Copyright (c) 2020-2021 Zano Project
-// Copyright (c) 2020-2021 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2020-2022 Zano Project
+// Copyright (c) 2020-2022 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -125,7 +125,7 @@ namespace crypto
   t_pod_type parse_tpod_from_hex_string(const std::string& hex_str)
   {
     t_pod_type t_pod = AUTO_VAL_INIT(t_pod);
-    parse_tpod_from_hex_string(hex_str, t_pod);
+    crypto::parse_tpod_from_hex_string(hex_str, t_pod); // using fully qualified name to avoid Argument-Dependent Lookup issues
     return t_pod;
   }
 
@@ -136,8 +136,9 @@ namespace crypto
   {
     union
     {
-      uint64_t      m_u64[4];
-      unsigned char m_s[32];
+      uint64_t            m_u64[4];
+      unsigned char       m_s[32];
+      crypto::secret_key  m_sk;
     };
 
     scalar_t()
@@ -205,28 +206,22 @@ namespace crypto
 
     crypto::secret_key &as_secret_key()
     {
-      return *(crypto::secret_key*)&m_s[0];
+      return m_sk;
     }
 
     const crypto::secret_key& as_secret_key() const
     {
-      return *(const crypto::secret_key*)&m_s[0];
+      return m_sk;
     }
 
     operator crypto::secret_key() const
     {
-      crypto::secret_key result;
-      memcpy(result.data, &m_s, sizeof result.data);
-      return result;
+      return m_sk;
     }
 
     void from_secret_key(const crypto::secret_key& sk)
     {
-      uint64_t *p_sk64 = (uint64_t*)&sk;
-      m_u64[0] = p_sk64[0];
-      m_u64[1] = p_sk64[1];
-      m_u64[2] = p_sk64[2];
-      m_u64[3] = p_sk64[3];
+      m_sk = sk;
       // assuming secret key is correct (< L), so we don't need to call reduce here
     }
 
