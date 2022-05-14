@@ -3373,11 +3373,11 @@ bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& sta
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_mining_history(wallet_public::mining_history& hist)
+void wallet2::get_mining_history(wallet_public::mining_history& hist, uint64_t timestamp_from)
 {
   for (auto& tr : m_transfer_history)
   {
-    if (currency::is_coinbase(tr.tx) && tr.tx.vin.size() == 2)
+    if (currency::is_coinbase(tr.tx) && tr.tx.vin.size() == 2 && tr.timestamp > timestamp_from)
     {
       tools::wallet_public::mining_history_entry mhe = AUTO_VAL_INIT(mhe);
       mhe.a = tr.amount;
