@@ -39,5 +39,5 @@ jobs:
         with:
           context: .
           file: utils/docker/Dockerfile
-          push: true
+          push: false
           tags: zano:testnet
