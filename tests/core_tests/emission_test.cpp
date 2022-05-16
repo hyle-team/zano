@@ -176,7 +176,7 @@ bool pos_emission_test::generate(std::vector<test_event_entry> &events)
     destinations.push_back(tx_destination_entry(pos_entry_amount, alice_acc.get_public_address()));
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);

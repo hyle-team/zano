@@ -26,8 +26,8 @@
 #define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8 // auditable addresses start with 'aZx'
 #define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49 // auditable integrated addresses start with 'aiZX'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
-#define CURRENT_TRANSACTION_VERSION                     1
-#define CURRENT_TRANSACTION_VERSION_HF4                 2
+#define CURRENT_TRANSACTION_VERSION                     2
+#define TRANSACTION_VERSION_PRE_HF4                     1
 #define HF1_BLOCK_MAJOR_VERSION                         1
 #define CURRENT_BLOCK_MAJOR_VERSION                     2
 
@@ -243,10 +243,12 @@
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   999999999
 #else
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   1440
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   1800
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1801
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   999999999
 #endif
 
 

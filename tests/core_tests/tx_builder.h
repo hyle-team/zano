@@ -7,7 +7,7 @@
 
 struct tx_builder
 {
-  void step1_init(size_t version = CURRENT_TRANSACTION_VERSION, uint64_t unlock_time = 0)
+  void step1_init(size_t version = TRANSACTION_VERSION_PRE_HF4, uint64_t unlock_time = 0)
   {
     m_tx = AUTO_VAL_INIT(m_tx);
     m_in_contexts.clear();
@@ -126,7 +126,7 @@ struct tx_builder
     fill_tx_sources_and_destinations(events, blk_head, from, to, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, check_for_unlock_time);
 
     tx_builder builder;
-    builder.step1_init(CURRENT_TRANSACTION_VERSION, unlock_time);
+    builder.step1_init(TRANSACTION_VERSION_PRE_HF4, unlock_time);
     builder.step2_fill_inputs(from.get_keys(), sources);
     builder.step3_fill_outputs(destinations);
     builder.step4_calc_hash();

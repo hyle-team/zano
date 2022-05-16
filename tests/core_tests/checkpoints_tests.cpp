@@ -628,6 +628,8 @@ gen_no_attchments_in_coinbase::gen_no_attchments_in_coinbase()
 
   REGISTER_CALLBACK_METHOD(gen_no_attchments_in_coinbase, c1);
   REGISTER_CALLBACK_METHOD(gen_no_attchments_in_coinbase, init_config_set_cp);
+
+  m_hardforks.hard_fork_04_starts_after_height = UINT64_MAX;
 }
 
 bool gen_no_attchments_in_coinbase::generate(std::vector<test_event_entry>& events) const
@@ -871,7 +873,7 @@ bool gen_checkpoints_and_invalid_tx_to_pool::generate(std::vector<test_event_ent
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");  
   
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   // invalidate tx_0 signature

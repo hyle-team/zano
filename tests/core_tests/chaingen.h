@@ -234,9 +234,11 @@ public:
 
   bool need_core_proxy() const { return false; }  // tests can override this in order to obtain core proxy (e.g. for wallet)
   void set_core_proxy(std::shared_ptr<tools::i_core_proxy>) { /* do nothing */ }
-
+  uint64_t get_tx_version_from_events(const std::vector<test_event_entry> &events) const;
 private:
   callbacks_map m_callbacks;
+protected: 
+  currency::hard_forks_descriptor m_hardforks;
 };
 
 struct offers_count_param
@@ -310,6 +312,8 @@ public:
   bool check_offers_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_hardfork_active(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
+
+
 protected:
   struct params_top_block
   {
@@ -324,9 +328,7 @@ protected:
   size_t m_orphan_block_index;
 
   // the following members is intended to be set by coretests with specific HF-related needs 
-  uint64_t m_hardfork_01_height;
-  uint64_t m_hardfork_02_height;
-  uint64_t m_hardfork_03_height;
+  //currency::hard_forks_descriptor m_hardforks;
 };
 
 struct wallet_test_core_proxy;
@@ -530,15 +532,14 @@ public:
   void set_pos_to_low_timestamp(bool do_pos_to_low_timestamp) { m_do_pos_to_low_timestamp = do_pos_to_low_timestamp; }
   void set_ignore_last_pow_in_wallets(bool ignore_last_pow_in_wallets) { m_ignore_last_pow_in_wallets = ignore_last_pow_in_wallets; }
   void set_hardfork_height(size_t hardfork_id, uint64_t h);
+  void set_hardforks(const currency::hard_forks_descriptor& hardforks);
 
 private:
   bool m_do_pos_to_low_timestamp;
   bool m_ignore_last_pow_in_wallets;
   uint64_t m_last_found_timestamp;
   
-  uint64_t m_hardfork_01_after_heigh;
-  uint64_t m_hardfork_02_after_heigh;
-  uint64_t m_hardfork_03_after_heigh;
+  currency::hard_forks_descriptor m_hardforks;
 
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;
@@ -556,7 +557,8 @@ bool construct_miner_tx_manually(size_t height, uint64_t already_generated_coins
                                  const currency::account_public_address& miner_address, currency::transaction& tx,
                                  uint64_t fee, currency::keypair* p_txkey = 0);
 
-bool construct_tx_to_key(const std::vector<test_event_entry>& events, 
+bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
+                         const std::vector<test_event_entry>& events, 
                          currency::transaction& tx,
                          const currency::block& blk_head, 
                          const currency::account_base& from, 
@@ -571,7 +573,8 @@ bool construct_tx_to_key(const std::vector<test_event_entry>& events,
                          bool check_for_unlocktime = true);
 
 
-bool construct_tx_to_key(const std::vector<test_event_entry>& events, 
+bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
+                         const std::vector<test_event_entry>& events, 
                          currency::transaction& tx,
                          const currency::block& blk_head, 
                          const currency::account_base& from, 
@@ -586,7 +589,8 @@ bool construct_tx_to_key(const std::vector<test_event_entry>& events,
                          bool check_for_spends = true,
                          bool check_for_unlocktime = true);
 
-bool construct_tx_to_key(const std::vector<test_event_entry>& events, 
+bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
+                         const std::vector<test_event_entry>& events, 
                          currency::transaction& tx, 
                          const currency::block& blk_head,
                          const currency::account_base& from,
@@ -600,11 +604,11 @@ bool construct_tx_to_key(const std::vector<test_event_entry>& events,
                          bool check_for_unlocktime = true,
                          bool use_ref_by_id = false);
 
-currency::transaction construct_tx_with_fee(std::vector<test_event_entry>& events, const currency::block& blk_head,
+currency::transaction construct_tx_with_fee(const currency::hard_forks_descriptor& hf, std::vector<test_event_entry>& events, const currency::block& blk_head,
                                             const currency::account_base& acc_from, const currency::account_base& acc_to,
                                             uint64_t amount, uint64_t fee);
 
-bool construct_tx_with_many_outputs(std::vector<test_event_entry>& events, const currency::block& blk_head,
+bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, std::vector<test_event_entry>& events, const currency::block& blk_head,
                                             const currency::account_keys& keys_from, const currency::account_public_address& addr_to,
                                             uint64_t total_amount, size_t outputs_count, uint64_t fee, currency::transaction& tx, bool use_ref_by_id = false);
 
@@ -742,7 +746,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   tx.signatures.clear();
   tx.extra = extra;
 
-  tx.version = CURRENT_TRANSACTION_VERSION;
+  tx.version = TRANSACTION_VERSION_PRE_HF4;
   set_tx_unlock_time(tx, unlock_time);
 
   currency::keypair txkey = currency::keypair::generate();
@@ -888,7 +892,7 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
   size_t height = get_block_height(prev_block) + 1;
   //size_t current_block_size = get_object_blobsize(miner_tx);
 
-  r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0, acc.get_public_address(), acc.get_public_address(), miner_tx, currency::blobdata(), 1);
+  r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0, acc.get_public_address(), acc.get_public_address(), miner_tx, get_tx_version(height, m_hardforks), currency::blobdata(), 1);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
   if (!cb(miner_tx))
@@ -1096,7 +1100,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define MAKE_TX_MIX_ATTR_EXTRA(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, EXTRA, CHECK_SPENDS)                   \
   currency::transaction TX_NAME;                                                                                      \
   { \
-    bool txr = construct_tx_to_key(VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS);  \
+    bool txr = construct_tx_to_key(m_hardforks, VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS);  \
     CHECK_AND_ASSERT_THROW_MES(txr, "failed to construct transaction"); \
   } \
   VEC_EVENTS.push_back(TX_NAME); \
@@ -1105,7 +1109,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define MAKE_TX_FEE_MIX_ATTR_EXTRA(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, FEE, NMIX, HEAD, MIX_ATTR, EXTRA, CHECK_SPENDS) \
   currency::transaction TX_NAME; \
   { \
-    bool txr = construct_tx_to_key(VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS); \
+    bool txr = construct_tx_to_key(m_hardforks, VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS); \
     CHECK_AND_ASSERT_THROW_MES(txr, "failed to construct transaction"); \
   } \
   VEC_EVENTS.push_back(TX_NAME); \
@@ -1129,7 +1133,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, EXTRA, ATTACH)    \
   {                                                                                                \
     currency::transaction t;                                                                       \
-    bool r = construct_tx_to_key(VEC_EVENTS, t, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, ATTACH); \
+    bool r = construct_tx_to_key(m_hardforks, VEC_EVENTS, t, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, ATTACH); \
     if (!r) { LOG_PRINT_YELLOW("ERROR in tx @ EVENT #" << VEC_EVENTS.size(), LOG_LEVEL_0); }       \
     CHECK_AND_ASSERT_THROW_MES(r, "failed to construct transaction");                              \
     SET_NAME.push_back(t);                                                                         \
@@ -1160,7 +1164,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 #define MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, ATTACH)   \
   currency::transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                           \
-  CHECK_AND_ASSERT_MES(construct_tx_to_key(EVENTS, TX_VAR, HEAD, FROM, TO, AMOUNT, FEE, 0, generator.last_tx_generated_secret_key, CURRENCY_TO_KEY_OUT_RELAXED, empty_extra, ATTACH), false, "construct_tx_to_key failed"); \
+  CHECK_AND_ASSERT_MES(construct_tx_to_key(m_hardforks, EVENTS, TX_VAR, HEAD, FROM, TO, AMOUNT, FEE, 0, generator.last_tx_generated_secret_key, CURRENCY_TO_KEY_OUT_RELAXED, empty_extra, ATTACH), false, "construct_tx_to_key failed"); \
   EVENTS.push_back(TX_VAR)
 
 #define MAKE_TX_ATTACH(EVENTS, TX_VAR, FROM, TO, AMOUNT, HEAD, ATTACH) MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, HEAD, ATTACH)

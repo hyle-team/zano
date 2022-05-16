@@ -1319,7 +1319,7 @@ bool gen_wallet_transfers_and_chain_switch::generate(std::vector<test_event_entr
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(30) * 2, 2, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(30) * 2, 2, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
@@ -1381,8 +1381,8 @@ bool gen_wallet_transfers_and_chain_switch::generate(std::vector<test_event_entr
 gen_wallet_decrypted_attachments::gen_wallet_decrypted_attachments()
   : m_on_transfer2_called(false)
 {
-  m_hardfork_01_height = 0;
-  m_hardfork_02_height = 0; // tx_payer requires HF2
+    m_hardforks.hard_fork_01_starts_after_height = 0;
+    m_hardforks.hard_fork_02_starts_after_height = 0; // tx_payer requires HF2
 }
 
 bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& events) const
@@ -1562,8 +1562,8 @@ void gen_wallet_decrypted_attachments::on_transfer2(const tools::wallet_public::
 
 gen_wallet_alias_and_unconfirmed_txs::gen_wallet_alias_and_unconfirmed_txs()
 {
-  m_hardfork_01_height = 0;
-  m_hardfork_02_height = 0;
+  m_hardforks.hard_fork_01_starts_after_height = 0;
+  m_hardforks.hard_fork_02_starts_after_height = 0;
 
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c1);
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c2);
@@ -1711,8 +1711,8 @@ bool gen_wallet_alias_and_unconfirmed_txs::c3(currency::core& c, size_t ev_index
 gen_wallet_alias_via_special_wallet_funcs::gen_wallet_alias_via_special_wallet_funcs()
 {
   // start hardfork from block 0 in order to use extra_alias_entry (allowed only since HF2)
-  m_hardfork_01_height = 0;
-  m_hardfork_02_height = 0;
+  m_hardforks.hard_fork_01_starts_after_height = 0;
+  m_hardforks.hard_fork_02_starts_after_height = 0;
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_via_special_wallet_funcs, c1);
 }
 
@@ -2208,7 +2208,7 @@ bool gen_wallet_offers_size_limit::generate(std::vector<test_event_entry>& event
 }
 
 // generates such an offer so that result tx will most like have its size within the giving limits
-bool generate_oversized_offer(size_t min_size, size_t max_size, bc_services::offer_details_ex& result)
+bool generate_oversized_offer(size_t min_size, size_t max_size, bc_services::offer_details_ex& result, uint64_t tx_version)
 {
   bc_services::offer_details_ex r = AUTO_VAL_INIT(r);
   result = r;
@@ -2226,7 +2226,7 @@ bool generate_oversized_offer(size_t min_size, size_t max_size, bc_services::off
     // construct fake tx to estimate it's size
     transaction tx = AUTO_VAL_INIT(tx);
     crypto::secret_key one_time_secret_key;
-    if (!construct_tx(account_keys(), std::vector<tx_source_entry>(), std::vector<tx_destination_entry>(), empty_extra, att_container, tx, one_time_secret_key, 0, 0, true, 0))
+    if (!construct_tx(account_keys(), std::vector<tx_source_entry>(), std::vector<tx_destination_entry>(), empty_extra, att_container, tx, tx_version, one_time_secret_key, 0, 0, true, 0))
       return false;
 
     size_t sz = get_object_blobsize(tx);
@@ -2257,12 +2257,12 @@ bool gen_wallet_offers_size_limit::c1(currency::core& c, size_t ev_index, const 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
   bc_services::offer_details_ex od_normal = AUTO_VAL_INIT(od_normal);
-  bool r = generate_oversized_offer(CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 2048, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1024, od_normal); // generate biggest offer but within tx size limits
+  bool r = generate_oversized_offer(CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 2048, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1024, od_normal, c.get_current_tx_version()); // generate biggest offer but within tx size limits
   CHECK_AND_ASSERT_MES(r, false, "generate_oversized_offer failed");
   od_normal.fee = TESTS_DEFAULT_FEE;
 
   bc_services::offer_details_ex od_oversized = AUTO_VAL_INIT(od_oversized);
-  r = generate_oversized_offer(CURRENCY_MAX_TRANSACTION_BLOB_SIZE, CURRENCY_MAX_TRANSACTION_BLOB_SIZE + 1024, od_oversized);
+  r = generate_oversized_offer(CURRENCY_MAX_TRANSACTION_BLOB_SIZE, CURRENCY_MAX_TRANSACTION_BLOB_SIZE + 1024, od_oversized, c.get_current_tx_version());
   CHECK_AND_ASSERT_MES(r, false, "generate_oversized_offer failed");
   od_oversized.fee = TESTS_DEFAULT_FEE;
 
@@ -3051,11 +3051,11 @@ bool wallet_unconfirmed_tx_expiration::generate(std::vector<test_event_entry>& e
 
   bool r = false;
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 20, 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 20, 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs");
   events.push_back(tx_0);
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 20, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 20, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1 }));

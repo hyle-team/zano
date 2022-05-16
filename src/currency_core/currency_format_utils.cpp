@@ -81,6 +81,7 @@ namespace currency
     const account_public_address &miner_address,
     const account_public_address &stakeholder_address,
     transaction& tx,
+    uint64_t tx_version,
     const blobdata& extra_nonce,
     size_t max_outs,
     bool pos,
@@ -130,7 +131,7 @@ namespace currency
     }
       
 
-    return construct_miner_tx(height, median_size, already_generated_coins, current_block_size, fee, destinations, tx, extra_nonce, max_outs, pos, pe);
+    return construct_miner_tx(height, median_size, already_generated_coins, current_block_size, fee, destinations, tx, tx_version, extra_nonce, max_outs, pos, pe);
   }
   //------------------------------------------------------------------
   bool apply_unlock_time(const std::vector<tx_destination_entry>& destinations, transaction& tx)
@@ -159,6 +160,7 @@ namespace currency
     uint64_t fee,
     const std::vector<tx_destination_entry>& destinations,
     transaction& tx,
+    uint64_t tx_version,
     const blobdata& extra_nonce,
     size_t max_outs,
     bool pos,
@@ -208,7 +210,7 @@ namespace currency
     }
     
 
-    tx.version = CURRENT_TRANSACTION_VERSION;
+    tx.version = tx_version;
     if (!have_type_in_variant_container<etc_tx_details_unlock_time2>(tx.extra))
     {
       //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
@@ -741,15 +743,18 @@ namespace currency
     eai.cnt = attachment.size();
   }
   //---------------------------------------------------------------
-  bool construct_tx(const account_keys& sender_account_keys, const std::vector<tx_source_entry>& sources,
+  bool construct_tx(const account_keys& sender_account_keys, 
+    const std::vector<tx_source_entry>& sources,
     const std::vector<tx_destination_entry>& destinations,
-    const std::vector<attachment_v>& attachments,
+    const std::vector<attachment_v>& attachments,    
     transaction& tx,
+    uint64_t tx_version,
     uint64_t unlock_time,
-    uint8_t tx_outs_attr, bool shuffle)
+    uint8_t tx_outs_attr, 
+    bool shuffle)
   {
     crypto::secret_key one_time_secret_key = AUTO_VAL_INIT(one_time_secret_key);
-    return construct_tx(sender_account_keys, sources, destinations, std::vector<extra_v>(), attachments, tx, one_time_secret_key, unlock_time, tx_outs_attr, shuffle);
+    return construct_tx(sender_account_keys, sources, destinations, std::vector<extra_v>(), attachments, tx, tx_version, one_time_secret_key, unlock_time, tx_outs_attr, shuffle);
   }
   //---------------------------------------------------------------
   struct encrypt_attach_visitor : public boost::static_visitor<void>
@@ -1174,6 +1179,7 @@ namespace currency
     const std::vector<extra_v>& extra,
     const std::vector<attachment_v>& attachments,
     transaction& tx,
+    uint64_t tx_version,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     uint8_t tx_outs_attr,
@@ -1186,7 +1192,7 @@ namespace currency
     //in case if there is no real targets we use sender credentials to encrypt attachments
     account_public_address crypt_destination_addr = get_crypt_address_from_destinations(sender_account_keys, destinations);
 
-    return construct_tx(sender_account_keys, sources, destinations, extra, attachments, tx, one_time_secret_key, unlock_time,
+    return construct_tx(sender_account_keys, sources, destinations, extra, attachments, tx, tx_version, one_time_secret_key, unlock_time,
       crypt_destination_addr,
       0,
       tx_outs_attr,
@@ -1199,6 +1205,7 @@ namespace currency
     const std::vector<extra_v>& extra,
     const std::vector<attachment_v>& attachments,
     transaction& tx,
+    uint64_t tx_version,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     const account_public_address& crypt_destination_addr,
@@ -1209,7 +1216,7 @@ namespace currency
   {
     //extra copy operation, but creating transaction is not sensitive to this
     finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-    ftp.tx_version = CURRENT_TRANSACTION_VERSION;
+    ftp.tx_version = tx_version;
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;
     ftp.extra = extra;
@@ -1220,6 +1227,7 @@ namespace currency
     ftp.tx_outs_attr = tx_outs_attr;
     ftp.shuffle = shuffle;
     ftp.flags = flags;
+    ftp.tx_version;
 
     finalized_tx ft = AUTO_VAL_INIT(ft);
     ft.tx = tx;
@@ -1434,7 +1442,6 @@ namespace currency
       }
 
     }
-
     // "Shuffle" outs
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
     if (shuffle)
@@ -1560,6 +1567,15 @@ namespace currency
     LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
 
     return true;
+  }
+  //---------------------------------------------------------------
+  uint64_t get_tx_version(uint64_t h, const hard_forks_descriptor& hfd)
+  {
+    if (h <= hfd.hard_fork_04_starts_after_height)
+    {
+      return TRANSACTION_VERSION_PRE_HF4;
+    }
+    return CURRENT_TRANSACTION_VERSION;
   }
   //---------------------------------------------------------------
   uint64_t get_reward_from_miner_tx(const transaction& tx)

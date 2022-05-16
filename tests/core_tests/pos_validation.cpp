@@ -771,14 +771,14 @@ bool pos_wallet_big_block_test::generate(std::vector<test_event_entry>& events) 
 
   crypto::secret_key stub;
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources_1, destinations, extra, empty_attachment, tx_1, stub, 0);
+  r = construct_tx(miner_acc.get_keys(), sources_1, destinations, extra, empty_attachment, tx_1, get_tx_version_from_events(events), stub, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   size_t tx_size = get_object_blobsize(tx_1);
   CHECK_AND_ASSERT_MES(tx_size > padding_size, false, "Tx size is: " << tx_size << ", expected to be bigger than: " << padding_size);
   events.push_back(tx_1); // push it to the pool
 
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx(miner_acc.get_keys(), sources_2, destinations, extra, empty_attachment, tx_2, stub, 0);
+  r = construct_tx(miner_acc.get_keys(), sources_2, destinations, extra, empty_attachment, tx_2, get_tx_version_from_events(events), stub, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   tx_size = get_object_blobsize(tx_2);
   CHECK_AND_ASSERT_MES(tx_size > padding_size, false, "Tx size is: " << tx_size << ", expected to be bigger than: " << padding_size);
@@ -1044,7 +1044,7 @@ bool pos_minting_tx_packing::pos_minting_tx_packing::generate(std::vector<test_e
   // 10 outputs each of (CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size) coins
   
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
 
   events.push_back(tx_1);

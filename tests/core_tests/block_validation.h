@@ -13,6 +13,11 @@ class gen_block_verification_base : public test_chain_unit_base
 public:
   gen_block_verification_base()
   {
+    m_hardforks.hard_fork_01_starts_after_height = 0;
+    m_hardforks.hard_fork_02_starts_after_height = 0;
+    m_hardforks.hard_fork_03_starts_after_height = 0;
+    m_hardforks.hard_fork_04_starts_after_height = 0;
+
     REGISTER_CALLBACK("check_block_purged", gen_block_verification_base<invalid_block_idx>::check_block_purged);
   }
 
@@ -33,6 +38,7 @@ public:
 
     return true;
   }
+  currency::hard_forks_descriptor m_hardforks;
 };
 
 template<size_t expected_blockchain_height>

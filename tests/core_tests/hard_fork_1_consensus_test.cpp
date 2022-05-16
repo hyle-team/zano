@@ -62,7 +62,7 @@ bool hard_fork_1_cumulative_difficulty_base::configure_core(currency::core& c, s
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
-  pc.hard_fork_01_starts_after_height = get_hardfork_height();
+  pc.hard_forks.hard_fork_01_starts_after_height = get_hardfork_height();
 
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;

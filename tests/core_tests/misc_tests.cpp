@@ -238,7 +238,7 @@ bool block_template_vs_invalid_txs_from_pool::generate(std::vector<test_event_en
   r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), de.amount + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_1m = AUTO_VAL_INIT(tx_1m);
-  r = construct_tx(miner_acc.get_keys(), sources, std::vector<tx_destination_entry>({ de }), empty_attachment, tx_1m, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, std::vector<tx_destination_entry>({ de }), empty_attachment, tx_1m, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1m);
 
@@ -271,7 +271,7 @@ bool block_template_vs_invalid_txs_from_pool::generate(std::vector<test_event_en
   se.ms_sigs_count = 1;
   transaction tx_2m = AUTO_VAL_INIT(tx_2m);
   r = construct_tx(bob_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, miner_acc.get_public_address()) }),
-    empty_attachment, tx_2m, 0);
+    empty_attachment, tx_2m, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   bool input_fully_signed = false;
   r = sign_multisig_input_in_tx(tx_2m, 0, bob_acc.get_keys(), tx_1m, &input_fully_signed);
@@ -280,7 +280,7 @@ bool block_template_vs_invalid_txs_from_pool::generate(std::vector<test_event_en
 
   transaction tx_2ma = AUTO_VAL_INIT(tx_2ma);
   r = construct_tx(bob_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, miner_acc.get_public_address()) }),
-    empty_attachment, tx_2ma, 0);
+    empty_attachment, tx_2ma, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   input_fully_signed = false;
   r = sign_multisig_input_in_tx(tx_2ma, 0, bob_acc.get_keys(), tx_1m, &input_fully_signed);
@@ -437,7 +437,7 @@ bool test_blockchain_vs_spent_multisig_outs::generate(std::vector<test_event_ent
     sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
 
@@ -458,7 +458,7 @@ bool test_blockchain_vs_spent_multisig_outs::generate(std::vector<test_event_ent
   destinations.clear();
   destinations.push_back(tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, miner_acc.get_public_address()));
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   bool is_fully_signed = false;
   r = sign_multisig_input_in_tx(tx_1, 0, miner_acc.get_keys(), tx_0, &is_fully_signed);

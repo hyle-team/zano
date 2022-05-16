@@ -35,7 +35,7 @@ bool hard_fork_1_base_test::configure_core(currency::core& c, size_t ev_index, c
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_fork_01_starts_after_height = m_hardfork_height;
+  pc.hard_forks.hard_fork_01_starts_after_height = m_hardfork_height;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
@@ -78,7 +78,7 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
   crypto::secret_key tx_sec_key;
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   // tx_0 shouldn't be accepted
   DO_CALLBACK(events, "mark_invalid_tx"); 
@@ -92,7 +92,7 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
 
   // make another tx with the same inputs and extra (tx_0 was rejected so inputs can be reused)
   transaction tx_0a = AUTO_VAL_INIT(tx_0a);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0a, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0a, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   // tx_0a shouldn't be accepted as well
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -132,7 +132,7 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
   extra.push_back(ut2);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_1, tx_sec_key, 0 /* unlock time 1 is zero and not set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_1, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and not set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1);
 
@@ -151,7 +151,7 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
   extra.push_back(ut2);
   
   transaction tx_1a = AUTO_VAL_INIT(tx_1a);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_1a, tx_sec_key, 0 /* unlock time 1 is zero and not set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_1a, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and not set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1a);
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
@@ -339,7 +339,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   extra.push_back(ut2);
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
   crypto::secret_key tx_sec_key;
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   // tx_0 should be accepted
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_0 goes with blk_1_bad
@@ -433,7 +433,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(MK_TEST_COINS(90) - TESTS_DEFAULT_FEE, miner_acc.get_public_address()) },
-    empty_attachment, tx_1, stake_lock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+    empty_attachment, tx_1, get_tx_version_from_events(events), stake_lock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -506,7 +506,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
     destinations.push_back(tx_destination_entry(unique_amount_alice, alice_acc.get_public_address()));
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_to_key(events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  r = construct_tx_to_key(m_hardforks, events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
 
@@ -523,7 +523,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   ut2.unlock_time_array.push_back(ut2_unlock_time);
   extra.push_back(ut2);
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_to_key(events, tx_1, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_1);
@@ -725,7 +725,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   destinations.push_back(tx_destination_entry(stake_amount, bob_acc.get_public_address()));
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_to_key(events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  r = construct_tx_to_key(m_hardforks, events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
 
@@ -877,7 +877,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(stake_amount / 2, miner_acc.get_public_address()) },
-    empty_attachment, tx_1, stake_unlock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+    empty_attachment, tx_1, get_tx_version_from_events(events), stake_unlock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   DO_CALLBACK(events, "mark_invalid_tx");

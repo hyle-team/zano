@@ -166,6 +166,7 @@ enum escrow_custom_config_field
 inline bool build_custom_escrow_template(const std::vector<test_event_entry>& events, const block& head, const account_keys& a_keys,
   bc_services::contract_private_details& cpd, uint64_t unlock_time, uint64_t expiration_time, size_t nmix, uint64_t b_fee_release,
   uint64_t custom_config_mask,
+  uint64_t tx_version,
   transaction& escrow_template_tx,           /* OUT */
   crypto::secret_key& tx_key_sec,            /* OUT */
   std::vector<tx_source_entry>& used_sources /* IN/OUT */)
@@ -230,7 +231,7 @@ inline bool build_custom_escrow_template(const std::vector<test_event_entry>& ev
   if (custom_config_mask & eccf_template_additional_attach)
     attachments.push_back(tx_comment({ get_random_text(1024) }));
 
-  r = construct_tx(a_keys, sources, destinations, extra, attachments, escrow_template_tx, tx_key_sec, unlock_time, crypt_addr, expiration_time, CURRENCY_TO_KEY_OUT_RELAXED, true, flags);
+  r = construct_tx(a_keys, sources, destinations, extra, attachments, escrow_template_tx, tx_version, tx_key_sec, unlock_time, crypt_addr, expiration_time, CURRENCY_TO_KEY_OUT_RELAXED, true, flags);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   if (custom_config_mask & eccf_template_no_tx_flags)
@@ -264,6 +265,7 @@ inline bool build_custom_escrow_proposal(const std::vector<test_event_entry>& ev
   bc_services::contract_private_details& cpd, uint64_t unlock_time, uint64_t expiration_time, uint64_t template_unlock_time, uint64_t template_expiration_time, size_t nmix,
   uint64_t a_fee_proposal, uint64_t b_fee_release,
   uint64_t custom_config_mask,
+  uint64_t tx_version,
   transaction& escrow_proposal_tx,           /* OUT */
   std::vector<tx_source_entry>& used_sources,/* IN/OUT */
   bc_services::proposal_body* p_pb = nullptr /* OUT */ )
@@ -281,7 +283,7 @@ inline bool build_custom_escrow_proposal(const std::vector<test_event_entry>& ev
     p_pb = &local_pb;
   if (~custom_config_mask & eccf_proposal_sa_empty_body)
   {
-    r = build_custom_escrow_template(events, head, a_keys, cpd, template_unlock_time, template_expiration_time, nmix, b_fee_release, custom_config_mask, p_pb->tx_template, p_pb->tx_onetime_secret_key, used_sources);
+    r = build_custom_escrow_template(events, head, a_keys, cpd, template_unlock_time, template_expiration_time, nmix, b_fee_release, custom_config_mask, tx_version, p_pb->tx_template, p_pb->tx_onetime_secret_key, used_sources);
     CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_template failed");
   }
 
@@ -307,7 +309,7 @@ inline bool build_custom_escrow_proposal(const std::vector<test_event_entry>& ev
   account_public_address crypt_addr = cpd.b_addr;
 
   crypto::secret_key tx_key_sec; // stub, not used
-  r = construct_tx(a_keys, sources, destinations, empty_extra, attachments, escrow_proposal_tx, tx_key_sec, unlock_time, crypt_addr, expiration_time, 0, true, (~custom_config_mask & eccf_proposal_inv_flags) ? 0 : TX_FLAG_SIGNATURE_MODE_SEPARATE);
+  r = construct_tx(a_keys, sources, destinations, empty_extra, attachments, escrow_proposal_tx, tx_version, tx_key_sec, unlock_time, crypt_addr, expiration_time, 0, true, (~custom_config_mask & eccf_proposal_inv_flags) ? 0 : TX_FLAG_SIGNATURE_MODE_SEPARATE);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   append_vector_by_another_vector(used_sources, sources);
@@ -319,6 +321,7 @@ inline bool build_custom_escrow_release_template(
   const account_keys& b_keys,
   const bc_services::contract_private_details& cpd,
   uint64_t unlock_time, uint64_t expiration_time,
+  uint64_t tx_version, 
   const transaction& escrow_template_tx, /* IN  (needed for ms output, tx pub key) */
   uint64_t custom_config_mask,           /* IN */
   transaction& tx                        /* OUT */
@@ -417,7 +420,7 @@ inline bool build_custom_escrow_release_template(
 
   crypto::secret_key one_time_secret_key = AUTO_VAL_INIT(one_time_secret_key);
   account_public_address crypt_address = AUTO_VAL_INIT(crypt_address);
-  bool r = construct_tx(b_keys, sources, destinations, extra, attachments, tx, one_time_secret_key, unlock_time, crypt_address, expiration_time, 0, true, tx_flags);
+  bool r = construct_tx(b_keys, sources, destinations, extra, attachments, tx, tx_version, one_time_secret_key, unlock_time, crypt_address, expiration_time, 0, true, tx_flags);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   bool tx_fully_signed = false;
   r = sign_multisig_input_in_tx(tx, 0, b_keys, escrow_template_tx, &tx_fully_signed);
@@ -466,6 +469,7 @@ inline bool build_custom_escrow_accept_proposal(
   uint64_t b_fee_accept, uint64_t b_fee_release,
   uint64_t custom_config_mask,                        /* IN */
   crypto::secret_key one_time_secret_key,             /* IN */
+  uint64_t tx_version,                                /* IN */
   transaction& tx,                                    /* IN (escrow template), OUT */
   std::vector<tx_source_entry>& used_sources          /* IN/OUT */
 )
@@ -492,9 +496,9 @@ inline bool build_custom_escrow_accept_proposal(
 
   // generate release templates
   bc_services::escrow_relese_templates_body rtb = AUTO_VAL_INIT(rtb);
-  r = build_custom_escrow_release_template(BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_NORMAL, b_keys, cpd, release_unlock_time, release_expiration_time, tx, custom_config_mask, rtb.tx_normal_template);
+  r = build_custom_escrow_release_template(BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_NORMAL, b_keys, cpd, release_unlock_time, release_expiration_time, tx_version, tx, custom_config_mask, rtb.tx_normal_template);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_release_template(normal) failed");
-  r = build_custom_escrow_release_template(BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_BURN,   b_keys, cpd, release_unlock_time, release_expiration_time, tx, custom_config_mask, rtb.tx_burn_template);
+  r = build_custom_escrow_release_template(BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_BURN,   b_keys, cpd, release_unlock_time, release_expiration_time, tx_version, tx, custom_config_mask, rtb.tx_burn_template);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_release_template(burn) failed");
 
   // put release templates into the extra
@@ -525,7 +529,7 @@ inline bool build_custom_escrow_accept_proposal(
   sources.back().separately_signed_tx_complete = true;
 
   account_public_address crypt_address = AUTO_VAL_INIT(crypt_address);
-  r = construct_tx(b_keys, sources, destinations, extra, attachments, tx, one_time_secret_key, 0, crypt_address, 0, 0, true, tx_flags); // see comment above regarding unlock_time and expiration_time
+  r = construct_tx(b_keys, sources, destinations, extra, attachments, tx, tx_version, one_time_secret_key, 0, crypt_address, 0, 0, true, tx_flags); // see comment above regarding unlock_time and expiration_time
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   return true;
@@ -540,6 +544,7 @@ inline bool build_custom_escrow_cancel_proposal(
   uint64_t a_fee_cancellation_request,
   uint64_t custom_config_mask,                        /* IN */
   const transaction& escrow_template_tx,              /* IN */
+  uint64_t tx_version,                                /* IN */
   transaction& tx,                                    /* OUT */
   std::vector<tx_source_entry>& used_sources          /* IN/OUT */
 )
@@ -563,7 +568,7 @@ inline bool build_custom_escrow_cancel_proposal(
 
   // generate cancel release template
   bc_services::escrow_cancel_templates_body ctb = AUTO_VAL_INIT(ctb);
-  r = build_custom_escrow_release_template(BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_CANCEL, a_keys, cpd, release_unlock_time, release_expiration_time, escrow_template_tx, custom_config_mask, ctb.tx_cancel_template);
+  r = build_custom_escrow_release_template(BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_CANCEL, a_keys, cpd, release_unlock_time, release_expiration_time, tx_version, escrow_template_tx, custom_config_mask, ctb.tx_cancel_template);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_release_template(cancel) failed");
 
   // put release templates into the extra
@@ -588,7 +593,7 @@ inline bool build_custom_escrow_cancel_proposal(
   if (~custom_config_mask & eccf_cancellation_inv_crypt_address)
     crypt_address = cpd.b_addr;
   crypto::secret_key one_time_secret_key = AUTO_VAL_INIT(one_time_secret_key);
-  r = construct_tx(a_keys, sources, destinations, extra, attachments, tx, one_time_secret_key, unlock_time, crypt_address, expiration_time, 0, true, tx_flags);
+  r = construct_tx(a_keys, sources, destinations, extra, attachments, tx, tx_version, one_time_secret_key, unlock_time, crypt_address, expiration_time, 0, true, tx_flags);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   return true;

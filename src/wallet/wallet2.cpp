@@ -844,6 +844,7 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
 
   //build transaction
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.tx_version = this->get_current_tx_version();
   prepare_transaction(construct_param, ftp, tx);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
 
@@ -862,7 +863,12 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
   if (p_acceptance_tx != nullptr)
     *p_acceptance_tx = tx;
 }
-//---------------------------
+//---------------------------------------------------------------------------------
+uint64_t wallet2::get_current_tx_version()
+{
+  return currency::get_tx_version(this->get_top_block_height(), this->m_core_runtime_config.hard_forks);
+}
+//---------------------------------------------------------------------------------
 void wallet2::finish_contract(const crypto::hash& contract_id, const std::string& release_type, currency::transaction* p_release_tx /* = nullptr */)
 {
   auto contr_it = m_contracts.find(contract_id);
@@ -974,6 +980,7 @@ void wallet2::request_cancel_contract(const crypto::hash& contract_id, uint64_t 
   construct_param.split_strategy_id = detail::ssi_digit;
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.tx_version = this->get_current_tx_version();
   prepare_transaction(construct_param, ftp);
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::secret_key sk = AUTO_VAL_INIT(sk);
@@ -3696,7 +3703,7 @@ bool wallet2::is_transfer_unlocked(const transfer_details& td, bool for_pos_mini
   
 
   uint64_t unlock_time = get_tx_unlock_time(td.m_ptx_wallet_info->m_tx, td.m_internal_output_index);
-  if (for_pos_mining && get_blockchain_current_size() > m_core_runtime_config.hard_fork_01_starts_after_height)
+  if (for_pos_mining && get_blockchain_current_size() > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
   {
     //allowed of staking locked coins with 
     stake_lock_time = unlock_time;
@@ -3782,7 +3789,7 @@ void wallet2::update_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, con
 //----------------------------------------------------------------------------------------------------
 void wallet2::push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra)
 {
-  if (get_top_block_height() > m_core_runtime_config.hard_fork_02_starts_after_height)
+  if (get_top_block_height() > m_core_runtime_config.hard_forks.hard_fork_02_starts_after_height)
   {
     // after HF2
     extra.push_back(ai);
@@ -3979,6 +3986,7 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   construct_params.extra.push_back(tsa);
   {
     currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    ftp.tx_version = this->get_current_tx_version();
     prepare_transaction(construct_params, ftp);
     crypto::secret_key sk = AUTO_VAL_INIT(sk);
     finalize_transaction(ftp, tx_release_template, sk, false);
@@ -3995,6 +4003,7 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   construct_params.extra.push_back(tsa);
   {
     currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    ftp.tx_version = this->get_current_tx_version();
     prepare_transaction(construct_params, ftp);
     crypto::secret_key sk = AUTO_VAL_INIT(sk);
     finalize_transaction(ftp, tx_burn_template, sk, false);
@@ -4015,6 +4024,7 @@ void wallet2::build_escrow_cancel_template(crypto::hash multisig_id,
 
   construct_tx_param construct_params = AUTO_VAL_INIT(construct_params);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.tx_version = this->get_current_tx_version();
   construct_params.fee = it->second.amount() - (ecrow_details.amount_a_pledge + ecrow_details.amount_to_pay + ecrow_details.amount_b_pledge);
   construct_params.multisig_id = multisig_id;
   construct_params.split_strategy_id = detail::ssi_digit;
@@ -4097,6 +4107,7 @@ void wallet2::build_escrow_template(const bc_services::contract_private_details&
   }
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.tx_version = this->get_current_tx_version();
   prepare_transaction(ctp, ftp, tx);
 
   selected_transfers = ftp.selected_transfers;
@@ -4229,6 +4240,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   ctp.unlock_time = unlock_time;
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.tx_version = this->get_current_tx_version();
   try
   {
       prepare_transaction(ctp, ftp);
@@ -5465,6 +5477,7 @@ void wallet2::transfer(construct_tx_param& ctp,
 
   TIME_MEASURE_START(prepare_transaction_time);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.tx_version = this->get_current_tx_version();
   prepare_transaction(ctp, ftp);
   TIME_MEASURE_FINISH(prepare_transaction_time);
 
@@ -5571,6 +5584,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   }
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.tx_version = this->get_current_tx_version();
   if (!payment_id.empty())
     set_payment_id_to_tx(ftp.attachments, payment_id);
   // put encrypted payer info into the extra

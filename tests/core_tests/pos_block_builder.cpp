@@ -194,7 +194,7 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
   boost::value_initialized<transaction> new_tx;
   tx = new_tx;
 
-  tx.version = CURRENT_TRANSACTION_VERSION;
+  tx.version = TRANSACTION_VERSION_PRE_HF4;
   set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // calculate block reward
