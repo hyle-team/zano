@@ -213,6 +213,37 @@ std::string t_serializable_object_to_blob(const t_object& to)
   return b;
 }
 
+
+template<bool IsSaving, typename destination_t>
+struct transition_t {};
+
+template<typename destination_t>
+struct transition_t<true, destination_t>
+{
+  template <typename archive, typename origin_type>
+  static bool chain_serialize(archive &ar, const origin_type& origin_tx)
+  {
+    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
+    transition_convert(origin_tx, dst_tx);
+    return dst_tx.do_serialize(ar);
+  }
+};
+
+template<typename destination_t>
+struct transition_t<false, destination_t>
+{
+  template <typename archive, typename origin_type>
+  static bool chain_serialize(archive &ar, origin_type& origin_tx)
+  {
+    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
+    bool r = dst_tx.do_serialize(ar);
+    if (!r) return r;
+    return transition_convert(dst_tx, origin_tx);
+  }
+};
+
+#define CHAIN_TRANSITION_VER(tx_version, old_type)   if (tx_version == version) return transition_t<W, old_type>::chain_serialize(ar, *this);
+
 #include "serialize_basic_types.h"
 #include "string.h"
 #include "multiprecision.h"

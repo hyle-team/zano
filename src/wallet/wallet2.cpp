@@ -4523,7 +4523,7 @@ bool wallet2::prepare_tx_sources(crypto::hash multisig_id, std::vector<currency:
   THROW_IF_FALSE_WALLET_INT_ERR_EX(!it->second.is_spent(), "output with multisig_id: " + epee::string_tools::pod_to_hex(multisig_id) + " has already been spent by other party at height " + epee::string_tools::num_to_string_fast(it->second.m_spent_height));
 
   THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second.m_internal_output_index < it->second.m_ptx_wallet_info->m_tx.vout.size(), "it->second.m_internal_output_index < it->second.m_tx.vout.size()");
-  const tx_out& out = it->second.m_ptx_wallet_info->m_tx.vout[it->second.m_internal_output_index];
+  const tx_out_old& out = it->second.m_ptx_wallet_info->m_tx.vout[it->second.m_internal_output_index];
   THROW_IF_FALSE_WALLET_INT_ERR_EX(out.target.type() == typeid(txout_multisig), "ms out target type is " << out.target.type().name() << ", expected: txout_multisig");
   const txout_multisig& ms_out = boost::get<txout_multisig>(out.target);
 

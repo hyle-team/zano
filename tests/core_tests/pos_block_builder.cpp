@@ -230,7 +230,7 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
       CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
     }
 
-    tx_out out;
+    tx_out_old out;
     out.amount = out_amounts[output_index];
     out.target = tk;
     tx.vout.push_back(out);
@@ -249,7 +249,7 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
       CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
     }
 
-    tx_out out;
+    tx_out_old out;
     out.amount = pos_stake_amount;
     out.target = tk;
     tx.vout.push_back(out);

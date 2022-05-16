@@ -124,7 +124,7 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
       pos_coins += gen_coins;
 
       // update stakes queue: pop used one from the front and push output of this PoS block to the back
-      size_t biggest_output_idx = std::max_element(pb.m_block.miner_tx.vout.begin(), pb.m_block.miner_tx.vout.end(), [](const currency::tx_out& l, const currency::tx_out& r){ return l.amount < r.amount;}) - pb.m_block.miner_tx.vout.begin();
+      size_t biggest_output_idx = std::max_element(pb.m_block.miner_tx.vout.begin(), pb.m_block.miner_tx.vout.end(), [](const currency::tx_out_old& l, const currency::tx_out_old& r){ return l.amount < r.amount;}) - pb.m_block.miner_tx.vout.begin();
       stake_tx_outs.pop_front();
       stake_tx_outs.push_back(std::make_pair(get_transaction_hash(pb.m_block.miner_tx), biggest_output_idx));
 

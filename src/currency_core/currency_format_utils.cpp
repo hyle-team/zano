@@ -511,7 +511,7 @@ namespace currency
   {
     //std::vector<txin_v> vin;
     crypto::public_key onetime_key;
-    std::vector<tx_out> vout;
+    std::vector<tx_out_old> vout;
 
     BEGIN_SERIALIZE()
       //FIELD(vin)
@@ -637,7 +637,7 @@ namespace currency
       target_keys.push_back(out_eph_public_key);
     }
 
-    tx_out out;
+    tx_out_old out;
     out.amount = de.amount;
     if (de.htlc_options.expiration != 0)
     {
@@ -1067,7 +1067,7 @@ namespace currency
     else
       x.fee = 0;
     x.show_sender = currency::is_showing_sender_addres(x.tx);
-    tx_out htlc_out = AUTO_VAL_INIT(htlc_out);
+    tx_out_old htlc_out = AUTO_VAL_INIT(htlc_out);
     txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
 
     x.tx_type = get_tx_type_ex(x.tx, htlc_out, htlc_in);
@@ -1079,7 +1079,7 @@ namespace currency
   }
 
   //---------------------------------------------------------------
-  uint64_t get_tx_type_ex(const transaction& tx, tx_out& htlc_out, txin_htlc& htlc_in)
+  uint64_t get_tx_type_ex(const transaction& tx, tx_out_old& htlc_out, txin_htlc& htlc_in)
   {
     if (is_coinbase(tx))
       return GUI_TX_TYPE_COIN_BASE;
@@ -1145,12 +1145,12 @@ namespace currency
   //---------------------------------------------------------------
   uint64_t get_tx_type(const transaction& tx)
   {
-    tx_out htlc_out = AUTO_VAL_INIT(htlc_out);
+    tx_out_old htlc_out = AUTO_VAL_INIT(htlc_out);
     txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
     return get_tx_type_ex(tx, htlc_out, htlc_in);
   }
   //---------------------------------------------------------------
-  size_t get_multisig_out_index(const std::vector<tx_out>& outs)
+  size_t get_multisig_out_index(const std::vector<tx_out_old>& outs)
   {
     size_t n = 0;
     for (; n != outs.size(); n++)
@@ -1799,7 +1799,7 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool check_outs_valid(const transaction& tx)
   {
-    for(const tx_out& out : tx.vout)
+    for(const tx_out_old& out : tx.vout)
     {
       CHECK_AND_NO_ASSERT_MES(0 < out.amount, false, "zero amount output in transaction id=" << get_transaction_hash(tx));
       if (out.target.type() == typeid(txout_to_key))
@@ -1992,7 +1992,7 @@ namespace currency
       return true;
 
     size_t i = 0;
-    for(const tx_out& o : tx.vout)
+    for(const tx_out_old& o : tx.vout)
     {
       if (o.target.type() == typeid(txout_to_key))
       {

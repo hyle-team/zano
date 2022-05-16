@@ -380,7 +380,7 @@ namespace tools
       uint32_t m_flags;
 
       uint64_t amount() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index].amount; }
-      const currency::tx_out& output() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index]; }
+      const currency::tx_out_old& output() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index]; }
       uint8_t mix_attr() const { return output().target.type() == typeid(currency::txout_to_key) ? boost::get<const currency::txout_to_key&>(output().target).mix_attr : UINT8_MAX; }
       crypto::hash tx_hash() const { return get_transaction_hash(m_ptx_wallet_info->m_tx); }
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }

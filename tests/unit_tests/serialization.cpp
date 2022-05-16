@@ -478,3 +478,83 @@ TEST(Serialization, serializes_transacion_signatures_correctly)
   ASSERT_FALSE(serialization::parse_binary(blob, tx1));
   */
 }
+
+
+
+void validate_tx_serialisation(currency::transaction& tx)
+{
+  currency::transaction tx1;
+  string blob;
+  ASSERT_TRUE(serialization::dump_binary(tx, blob));
+  ASSERT_TRUE(serialization::parse_binary(blob, tx1));
+  if (!(tx == tx1))
+  {
+    ASSERT_TRUE(false);
+  }
+  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+}
+
+TEST(Serialization, serializes_transacion_versions)
+{
+
+  using namespace currency;
+
+  transaction tx;
+
+
+  // Empty tx
+  /*
+  tx = AUTO_VAL_INIT(tx);
+  ASSERT_TRUE(serialization::dump_binary(tx, blob));
+  ASSERT_EQ(6, blob.size()); // 5 bytes + 0 bytes extra + 0 bytes signatures
+  ASSERT_TRUE(serialization::parse_binary(blob, tx1));
+  if (!(tx == tx1))
+  {
+    ASSERT_TRUE(false);
+  }
+  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+  */
+
+  txin_gen txin_gen1;
+  txin_gen1.height = 0;
+  tx.vin.push_back(txin_gen1);
+  txin_to_key txin_key = AUTO_VAL_INIT(txin_key);
+  txin_key.amount = 11111;
+  txin_key.k_image = epee::string_tools::parse_tpod_from_hex_string<crypto::key_image>("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  signed_parts sp = { 1, 2 };
+  txin_key.etc_details.push_back(sp);
+  ref_by_id rid = AUTO_VAL_INIT(rid);
+  rid.tx_id = epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("11608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  rid.n = 99999999;
+  txin_key.key_offsets.push_back(rid);
+  rid.n = 999999;
+  txin_key.key_offsets.push_back(rid);
+  tx.vin.push_back(txin_key);
+  tx_out_old vout = AUTO_VAL_INIT(vout);
+  vout.amount = 11111;
+  txout_to_key totk = AUTO_VAL_INIT(totk);
+  totk.key = epee::string_tools::parse_tpod_from_hex_string<crypto::public_key>("22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  totk.mix_attr = 22;
+  vout.target = totk;
+  tx.vout.push_back(vout);
+  tx.vout.push_back(vout);
+
+  tx_comment c;
+  c.comment = "sdcwdcwcewdcecevthbtg";
+  tx.extra.push_back(c);
+  extra_alias_entry eae = AUTO_VAL_INIT(eae);
+  currency::get_account_address_from_str(eae.m_address, "ZxDcDWmA7Yj32srfjMHAY6WPzBB8uqpvzKxEsAjDZU6NRg1yZsRfmr87mLXCvMRHXd5n2kdRWhbqA3WWTbEW4jLd1XxL46tnv");
+  eae.m_alias = "eokcmeockme";
+  eae.m_text_comment = "sdssccsc";
+  tx.extra.push_back(eae); 
+  tx.signatures.resize(2);
+  crypto::signature sig = epee::string_tools::parse_tpod_from_hex_string<crypto::signature>("22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab9985222608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  tx.signatures[0].push_back(sig);
+  tx.signatures[0].push_back(sig);
+  tx.signatures[1].push_back(sig);
+  tx.signatures[1].push_back(sig);
+  
+  tx.version = TRANSACTION_VERSION_INITAL;
+
+  validate_tx_serialisation(tx);
+}

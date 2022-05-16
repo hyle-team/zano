@@ -450,7 +450,7 @@ bool gen_block_miner_tx_has_out_to_alice::generate(std::vector<test_event_entry>
   crypto::generate_key_derivation(alice.get_keys().account_address.view_public_key, txkey.sec, derivation);
   crypto::derive_public_key(derivation, 1, alice.get_keys().account_address.spend_public_key, out_eph_public_key);
 
-  tx_out out_to_alice;
+  tx_out_old out_to_alice;
   out_to_alice.amount = miner_tx.vout[0].amount / 2;
   miner_tx.vout[0].amount -= out_to_alice.amount;
   out_to_alice.target = txout_to_key(out_eph_public_key);
@@ -495,14 +495,14 @@ bool gen_block_is_too_big::generate(std::vector<test_event_entry>& events) const
   miner_tx.vout.clear();
   for (size_t i = 0; i < tx_out_count; ++i)
   {
-    tx_out o;
+    tx_out_old o;
     o.amount = portion;
     o.target = target;
     miner_tx.vout.push_back(o);
   }
   if (0 < remainder)
   {
-    tx_out o;
+    tx_out_old o;
     o.amount = remainder;
     o.target = target;
     miner_tx.vout.push_back(o);

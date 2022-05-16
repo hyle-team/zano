@@ -283,7 +283,7 @@ namespace currency
   typedef boost::variant<txout_to_key, txout_multisig, txout_htlc> txout_target_v;
 
   //typedef std::pair<uint64_t, txout> out_t;
-  struct tx_out
+  struct tx_out_old
   {
     uint64_t amount;
     txout_target_v target;
@@ -318,7 +318,7 @@ namespace currency
   };
 #pragma pack(pop)
 
-  typedef boost::variant<tx_out, tx_out_zarcanum> tx_out_v;
+  typedef boost::variant<tx_out_old, tx_out_zarcanum> tx_out_v;
 
 
   struct tx_comment
@@ -595,21 +595,25 @@ namespace currency
   typedef payload_items_v attachment_v;
 
 
+  //include backward compatibility defintions
+  #include "currency_basic_backward_comp.inl"
+
   class transaction_prefix
   {
   public:
     // tx version information
     uint64_t   version{};
     //extra
-    std::vector<extra_v> extra;  
+    std::vector<extra_v> extra;
     std::vector<txin_v> vin;
-    std::vector<tx_out> vout;//std::vector<tx_out> vout;
+    std::vector<tx_out_old> vout;//std::vector<tx_out> vout;
 
     BEGIN_SERIALIZE()
       VARINT_FIELD(version)
+      CHAIN_TRANSITION_VER(TRANSACTION_VERSION_INITAL, transaction_prefix_v1)
+      CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_prefix_v1)
       if(CURRENT_TRANSACTION_VERSION < version) return false;
       FIELD(vin)
-      //if(version <= 1)
       FIELD(vout)
       FIELD(extra)
     END_SERIALIZE()
