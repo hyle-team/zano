@@ -707,8 +707,6 @@ namespace currency
       FIELD(signatures)
       FIELD(attachment)
     END_SERIALIZE()
-
-
   };
 
   
