@@ -209,16 +209,21 @@ namespace currency
 
   typedef boost::variant<signed_parts, extra_attachment_info> txin_etc_details_v;
 
-  struct txin_to_key
+
+  struct referring_input
+  {
+    std::vector<txout_ref_v> key_offsets;
+  };
+
+  struct txin_to_key : public referring_input
   {
     uint64_t amount;
-    std::vector<txout_ref_v> key_offsets;
     crypto::key_image k_image;                    // double spending protection
     std::vector<txin_etc_details_v> etc_details;  //this flag used when TX_FLAG_SIGNATURE_MODE_SEPARATE flag is set, point to which amount of outputs(starting from zero) used in signature
 
     BEGIN_SERIALIZE_OBJECT()
       VARINT_FIELD(amount)
-      FIELD(key_offsets)
+      FIELD(key_offsets) // from referring_input
       FIELD(k_image)
       FIELD(etc_details)
     END_SERIALIZE()
@@ -247,6 +252,36 @@ namespace currency
       FIELD(etc_details)
     END_SERIALIZE()
   };
+
+#pragma pack(push, 1)
+  struct tx_in_zarcanum : public referring_input
+  {
+    tx_in_zarcanum() {}
+
+    // Boost's Assignable concept
+    tx_in_zarcanum(const tx_in_zarcanum&)           = default;
+    tx_in_zarcanum& operator=(const tx_in_zarcanum&)= default;
+
+    crypto::key_image               key_image;
+    crypto::public_key              real_out_amount_commitment;
+    std::vector<txin_etc_details_v> etc_details;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(key_image)
+      FIELD(real_out_amount_commitment)
+      FIELD(key_offsets) // referring_input
+      FIELD(etc_details)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(key_image)
+      BOOST_SERIALIZE(real_out_amount_commitment)
+      BOOST_SERIALIZE(key_offsets) // referring_input
+      BOOST_SERIALIZE(etc_details)
+    END_BOOST_SERIALIZATION()
+  };
+#pragma pack(pop)
+
 
   struct txout_multisig
   {
@@ -308,13 +343,23 @@ namespace currency
     crypto::public_key  concealing_point;
     crypto::public_key  commitment;
     uint64_t            encrypted_amount;
+    uint64_t            token_id = 0;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(stealth_address)
       FIELD(concealing_point)
       FIELD(commitment)
       FIELD(encrypted_amount)
+      FIELD(token_id)
     END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(stealth_address)
+      BOOST_SERIALIZE(concealing_point)
+      BOOST_SERIALIZE(commitment)
+      BOOST_SERIALIZE(encrypted_amount)
+      BOOST_SERIALIZE(token_id)
+    END_BOOST_SERIALIZATION()
   };
 #pragma pack(pop)
 
@@ -595,6 +640,23 @@ namespace currency
   typedef payload_items_v attachment_v;
 
 
+  struct zarcanum_tx_data_v1
+  {
+    uint64_t fee;
+    std::vector<crypto::bpp_signature_serialized> range_proofs_for_outputs;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(fee)
+      FIELD(range_proofs_for_outputs)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(fee)
+      BOOST_SERIALIZE(range_proofs_for_outputs)
+    END_BOOST_SERIALIZATION()
+  };
+
+
   //include backward compatibility defintions
   #include "currency_basic_backward_comp.inl"
 
@@ -846,7 +908,11 @@ SET_VARIANT_TAGS(currency::txin_htlc, 34, "txin_htlc");
 SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 
 // Zarcanum
-SET_VARIANT_TAGS(currency::tx_out_zarcanum, 36, "tx_out_zarcanum");
+SET_VARIANT_TAGS(currency::tx_in_zarcanum, 36, "tx_in_zarcanum");
+SET_VARIANT_TAGS(currency::tx_out_zarcanum, 37, "tx_out_zarcanum");
+SET_VARIANT_TAGS(currency::zarcanum_tx_data_v1, 38, "zarcanum_tx_data_v1");
+SET_VARIANT_TAGS(crypto::bpp_signature_serialized, 39, "bpp_signature_serialized");
+SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 40, "bppe_signature_serialized");
 
 
 #undef SET_VARIANT_TAGS

@@ -50,6 +50,33 @@ namespace crypto
       BOOST_SERIALIZE(delta)
     END_BOOST_SERIALIZATION()
   };
+
+  struct bppe_signature_serialized : public crypto::bppe_signature
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(L)
+      FIELD(R)
+      FIELD(A0)
+      FIELD(A)
+      FIELD(B)
+      FIELD(r)
+      FIELD(s)
+      FIELD(delta_1)
+      FIELD(delta_2)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(L)
+      BOOST_SERIALIZE(R)
+      BOOST_SERIALIZE(A0)
+      BOOST_SERIALIZE(A)
+      BOOST_SERIALIZE(B)
+      BOOST_SERIALIZE(r)
+      BOOST_SERIALIZE(s)
+      BOOST_SERIALIZE(delta_1)
+      BOOST_SERIALIZE(delta_2)
+    END_BOOST_SERIALIZATION()
+  };
 }
 
 BLOB_SERIALIZER(crypto::chacha8_iv);

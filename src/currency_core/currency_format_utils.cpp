@@ -545,6 +545,8 @@ namespace currency
     return derive_public_key_from_target_address(destination_addr, tx_sec_key, index, out_eph_public_key, derivation);
   }
   //---------------------------------------------------------------
+  // derivation = 8 * tx_sec_key * destination_addr.view_public_key
+  // out_eph_public_key = destination_addr.spend_public_key + Hs(derivation, index) * G
   bool derive_public_key_from_target_address(const account_public_address& destination_addr, const crypto::secret_key& tx_sec_key, size_t index, crypto::public_key& out_eph_public_key, crypto::key_derivation& derivation)
   {    
     bool r = crypto::generate_key_derivation(destination_addr.view_public_key, tx_sec_key, derivation);
