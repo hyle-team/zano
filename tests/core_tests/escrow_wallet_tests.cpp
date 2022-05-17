@@ -108,7 +108,7 @@ bool escrow_wallet_test::prepare_proposal_accepted_test(currency::core& c, const
   cpd.title = "Afterlife? If I thought I had to live another life, I'd kill myself right now!";
   wallet_buyer->send_escrow_proposal(cpd, 0, 0, 3600, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, "", escrow_proposal_tx, escrow_template_tx);
 
-  auto it = std::find_if(escrow_template_tx.vout.begin(), escrow_template_tx.vout.end(), [](const tx_out_old& o){
+  auto it = std::find_if(escrow_template_tx.vout.begin(), escrow_template_tx.vout.end(), [](const tx_out_bare& o){
     if (o.target.type() == typeid(txout_multisig))
       return true;
     return false;

@@ -25,12 +25,12 @@ namespace
 
     miner_tx.vout.clear();
 
-    tx_out_old out1;
+    tx_out_bare out1;
     out1.amount = amount_1;
     out1.target = target;
     miner_tx.vout.push_back(out1);
 
-    tx_out_old out2;
+    tx_out_bare out2;
     out2.amount = amount_2;
     out2.target = target;
     miner_tx.vout.push_back(out2);

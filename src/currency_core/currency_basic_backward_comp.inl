@@ -12,7 +12,7 @@ public:
   //extra
   std::vector<extra_v> extra;
   std::vector<txin_v> vin;
-  std::vector<tx_out_old> vout;//std::vector<tx_out> vout;
+  std::vector<tx_out_bare> vout;//std::vector<tx_out> vout;
 
   BEGIN_SERIALIZE()
     //VARINT_FIELD(version) <-- this already unserialized

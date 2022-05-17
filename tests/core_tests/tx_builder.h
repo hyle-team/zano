@@ -49,7 +49,7 @@ struct tx_builder
     {
       CHECK_AND_ASSERT_MES(!dst_entr.addr.empty(), void(0), "Destination entry #" << output_index << " contains empty addr list");
 
-      currency::tx_out_old out = AUTO_VAL_INIT(out);
+      currency::tx_out_bare out = AUTO_VAL_INIT(out);
       out.amount = dst_entr.amount;
 
       if (dst_entr.addr.size() == 1)

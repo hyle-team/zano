@@ -299,7 +299,7 @@ bool multisig_wallet_test_many_dst::c1(currency::core& c, size_t ev_index, const
   miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
   TMP_LOG_RESTORE;
 
-  auto it = std::find_if(result_tx.vout.begin(), result_tx.vout.end(), [](tx_out_old& o) { return o.target.type() == typeid(txout_multisig); });
+  auto it = std::find_if(result_tx.vout.begin(), result_tx.vout.end(), [](tx_out_bare& o) { return o.target.type() == typeid(txout_multisig); });
   CHECK_AND_ASSERT_MES(it != result_tx.vout.end(), false, "Can't find output txout_multisig");
   size_t multisig_index = it - result_tx.vout.begin();
 
@@ -1383,7 +1383,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
         CHECK_AND_ASSERT_MES(r, false, "derive_public_key failed");
         ms_out_target.keys.push_back(key);
       }
-      tx_out_old ms_out = AUTO_VAL_INIT(ms_out);
+      tx_out_bare ms_out = AUTO_VAL_INIT(ms_out);
       ms_out.amount = get_outs_money_amount(miner_tx); // get amount from vout before clearing
       miner_tx.vout.clear();
       ms_out.target = ms_out_target;
@@ -1457,9 +1457,9 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
     miner_tx.vin.assign({ in_gen });
 
     // remove all outputs except the multisig
-    auto it = std::find_if(miner_tx.vout.begin(), miner_tx.vout.end(), [](const tx_out_old& o) {return o.target.type() == typeid(txout_multisig); });
+    auto it = std::find_if(miner_tx.vout.begin(), miner_tx.vout.end(), [](const tx_out_bare& o) {return o.target.type() == typeid(txout_multisig); });
     CHECK_AND_ASSERT_MES(it != miner_tx.vout.end(), false, "construct_tx didn't create multisig output as expected");
-    tx_out_old ms_out = *it;
+    tx_out_bare ms_out = *it;
     miner_tx.vout.assign({ ms_out });
     CHECK_AND_ASSERT_MES(ms_out.amount == blk_2_reward, false, "unexpected amount for found ms output");
 

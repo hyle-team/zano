@@ -104,7 +104,7 @@ namespace boost
     }
 
     template <class Archive>
-    inline void serialize(Archive &a, currency::tx_out_old &x, const boost::serialization::version_type ver)
+    inline void serialize(Archive &a, currency::tx_out_bare &x, const boost::serialization::version_type ver)
     {
       a & x.amount;
       a & x.target;
