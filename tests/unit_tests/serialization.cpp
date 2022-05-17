@@ -479,11 +479,137 @@ TEST(Serialization, serializes_transacion_signatures_correctly)
   */
 }
 
+using namespace currency;
 
-
-void validate_tx_serialisation(currency::transaction& tx)
+class transaction_prefix_old_tests
 {
-  currency::transaction tx1;
+public:
+  // tx version information
+  uint64_t   version{};
+  //extra
+  std::vector<extra_v> extra;
+  std::vector<txin_v> vin;
+  std::vector<tx_out_old> vout;//std::vector<tx_out> vout;
+
+  BEGIN_SERIALIZE()
+    VARINT_FIELD(version)
+    if (TRANSACTION_VERSION_PRE_HF4 < version) return false;
+    FIELD(vin)
+    FIELD(vout)
+    FIELD(extra)
+  END_SERIALIZE()
+};
+
+class transaction_old_tests : public transaction_prefix_old_tests
+{
+public:
+  std::vector<std::vector<crypto::signature> > signatures; //count signatures  always the same as inputs count
+  std::vector<attachment_v> attachment;
+
+
+  BEGIN_SERIALIZE_OBJECT()
+    FIELDS(*static_cast<transaction_prefix_old_tests *>(this))
+    FIELD(signatures)
+    FIELD(attachment)
+  END_SERIALIZE()
+};
+
+
+template<typename transaction_prefix_current_t>
+bool transition_convert(const transaction_prefix_current_t& from, transaction_prefix_old_tests& to)
+{
+  to.version = from.version;
+  to.extra = from.extra;
+  to.vin = from.vin;
+  for (const auto& v : from.vout)
+  {
+    if (v.type() == typeid(tx_out_old))
+    {
+      to.vout.push_back(boost::get<tx_out_old>(v));
+    }
+    else {
+      throw std::runtime_error("Unexpected type in tx_out_v");
+    }
+  }
+  return true;
+}
+template<typename transaction_prefix_current_t>
+bool transition_convert(const transaction_prefix_old_tests& from, transaction_prefix_current_t& to)
+{
+  to.version = from.version;
+  to.extra = from.extra;
+  to.vin = from.vin;
+  for (const auto& v : from.vout)
+  {
+    to.vout.push_back(v);
+  }
+  return true;
+}
+
+class transaction_prefix_new_tests
+{
+public:
+  // tx version information
+  uint64_t   version{};
+  //extra
+  std::vector<extra_v> extra;
+  std::vector<txin_v> vin;
+  std::vector<tx_out_v> vout;//std::vector<tx_out> vout;
+
+  BEGIN_SERIALIZE()
+    VARINT_FIELD(version)
+    CHAIN_TRANSITION_VER(TRANSACTION_VERSION_INITAL, transaction_prefix_old_tests)
+    CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_prefix_old_tests)
+    if (CURRENT_TRANSACTION_VERSION < version) return false;
+    FIELD(vin)
+    FIELD(vout)
+    FIELD(extra)
+  END_SERIALIZE()
+
+protected:
+  transaction_prefix_new_tests() {}
+};
+
+
+class transaction_new_tests : public transaction_prefix_new_tests
+{
+public:
+  std::vector<std::vector<crypto::signature> > signatures; //count signatures  always the same as inputs count
+  std::vector<attachment_v> attachment;
+
+  transaction_new_tests();
+
+  BEGIN_SERIALIZE_OBJECT()
+    FIELDS(*static_cast<transaction_prefix_new_tests *>(this))
+    FIELD(signatures)
+    FIELD(attachment)
+    END_SERIALIZE()
+};
+
+inline
+transaction_new_tests::transaction_new_tests()
+{
+  version = 0;
+  vin.clear();
+  vout.clear();
+  extra.clear();
+  signatures.clear();
+  attachment.clear();
+
+}
+
+bool operator ==(const transaction_new_tests& a, const transaction_new_tests& b) {
+  return a.attachment == b.attachment &&
+    a.extra == b.extra &&
+    a.vin == b.vin &&
+    a.vout == b.vout &&
+    a.signatures == b.signatures;
+}
+
+
+void validate_tx_serialisation(transaction_new_tests& tx)
+{
+  transaction_new_tests tx1;
   string blob;
   ASSERT_TRUE(serialization::dump_binary(tx, blob));
   ASSERT_TRUE(serialization::parse_binary(blob, tx1));
@@ -492,6 +618,8 @@ void validate_tx_serialisation(currency::transaction& tx)
     ASSERT_TRUE(false);
   }
   ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+
+  
 }
 
 TEST(Serialization, serializes_transacion_versions)
@@ -499,7 +627,7 @@ TEST(Serialization, serializes_transacion_versions)
 
   using namespace currency;
 
-  transaction tx;
+  transaction_new_tests tx;
 
 
   // Empty tx
