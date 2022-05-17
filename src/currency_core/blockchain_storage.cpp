@@ -4368,7 +4368,7 @@ struct outputs_visitor
     , m_source_max_unlock_time_for_pos_coinbase(source_max_unlock_time_for_pos_coinbase)
     , m_scan_context(scan_context)
   {}
-  bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out& out, uint64_t out_i)
+  bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_bare& out, uint64_t out_i)
   {
     //check tx unlock time
     uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
@@ -4521,7 +4521,7 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
   LOC_CHK(is_tx_spendtime_unlocked(unlock_time), "Source transaction is LOCKED! unlock_time: " << unlock_time << ", now is " << m_core_runtime_config.get_core_time() << ", blockchain size is " << get_current_blockchain_size());
 
   LOC_CHK(source_tx.vout.size() > out_n, "internal error: out_n==" << out_n << " is out-of-bounds of source_tx.vout, size=" << source_tx.vout.size());
-  const tx_out& source_tx_out = source_tx.vout[out_n];
+  const tx_out_bare& source_tx_out = source_tx.vout[out_n];
   const txout_multisig& source_ms_out_target = boost::get<txout_multisig>(source_tx_out.target);
 
   LOC_CHK(txin.sigs_count == source_ms_out_target.minimum_sigs,
@@ -6689,7 +6689,7 @@ bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx
 
       for (size_t out_n = 0; out_n < tx.vout.size(); ++out_n)
       {
-        const tx_out& out = tx.vout[out_n];
+        const tx_out_bare& out = tx.vout[out_n];
         if (out.target.type() == typeid(txout_multisig))
         {
           const crypto::hash& ms_out_id = get_multisig_out_id(tx, out_n);

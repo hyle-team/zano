@@ -478,3 +478,241 @@ TEST(Serialization, serializes_transacion_signatures_correctly)
   ASSERT_FALSE(serialization::parse_binary(blob, tx1));
   */
 }
+
+using namespace currency;
+
+class transaction_prefix_old_tests
+{
+public:
+  // tx version information
+  uint64_t   version{};
+  //extra
+  std::vector<extra_v> extra;
+  std::vector<txin_v> vin;
+  std::vector<tx_out_bare> vout;//std::vector<tx_out> vout;
+
+  BEGIN_SERIALIZE()
+    VARINT_FIELD(version)
+    if (TRANSACTION_VERSION_PRE_HF4 < version) return false;
+    FIELD(vin)
+    FIELD(vout)
+    FIELD(extra)
+  END_SERIALIZE()
+};
+
+class transaction_prefix_old_tests_chain
+{
+public:
+  // tx version information
+  uint64_t   version{};
+  //extra
+  std::vector<extra_v> extra;
+  std::vector<txin_v> vin;
+  std::vector<tx_out_bare> vout;//std::vector<tx_out> vout;
+
+  BEGIN_SERIALIZE()
+    //VARINT_FIELD(version)
+    if (TRANSACTION_VERSION_PRE_HF4 < version) return false;
+    FIELD(vin)
+    FIELD(vout)
+    FIELD(extra)
+    END_SERIALIZE()
+};
+
+class transaction_old_tests : public transaction_prefix_old_tests
+{
+public:
+  std::vector<std::vector<crypto::signature> > signatures; //count signatures  always the same as inputs count
+  std::vector<attachment_v> attachment;
+
+
+  BEGIN_SERIALIZE_OBJECT()
+    FIELDS(*static_cast<transaction_prefix_old_tests *>(this))
+    FIELD(signatures)
+    FIELD(attachment)
+  END_SERIALIZE()
+};
+
+
+template<typename transaction_prefix_current_t>
+bool transition_convert(const transaction_prefix_current_t& from, transaction_prefix_old_tests_chain& to)
+{
+  to.version = from.version;
+  to.extra = from.extra;
+  to.vin = from.vin;
+  for (const auto& v : from.vout)
+  {
+    if (v.type() == typeid(tx_out_bare))
+    {
+      to.vout.push_back(boost::get<tx_out_bare>(v));
+    }
+    else {
+      throw std::runtime_error("Unexpected type in tx_out_v");
+    }
+  }
+  return true;
+}
+template<typename transaction_prefix_current_t>
+bool transition_convert(const transaction_prefix_old_tests_chain& from, transaction_prefix_current_t& to)
+{
+  to.version = from.version;
+  to.extra = from.extra;
+  to.vin = from.vin;
+  for (const auto& v : from.vout)
+  {
+    to.vout.push_back(v);
+  }
+  return true;
+}
+
+class transaction_prefix_new_tests
+{
+public:
+  // tx version information
+  uint64_t   version{};
+  //extra
+  std::vector<extra_v> extra;
+  std::vector<txin_v> vin;
+  std::vector<tx_out_v> vout;//std::vector<tx_out> vout;
+
+  BEGIN_SERIALIZE()
+    VARINT_FIELD(version)
+    CHAIN_TRANSITION_VER(TRANSACTION_VERSION_INITAL, transaction_prefix_old_tests_chain)
+    CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_prefix_old_tests_chain)
+    if (CURRENT_TRANSACTION_VERSION < version) return false;
+    FIELD(vin)
+    FIELD(vout)
+    FIELD(extra)
+  END_SERIALIZE()
+
+protected:
+  transaction_prefix_new_tests() {}
+};
+
+
+class transaction_new_tests : public transaction_prefix_new_tests
+{
+public:
+  std::vector<std::vector<crypto::signature> > signatures; //count signatures  always the same as inputs count
+  std::vector<attachment_v> attachment;
+
+  transaction_new_tests();
+
+  BEGIN_SERIALIZE_OBJECT()
+    FIELDS(*static_cast<transaction_prefix_new_tests *>(this))
+    FIELD(signatures)
+    FIELD(attachment)
+    END_SERIALIZE()
+};
+
+inline
+transaction_new_tests::transaction_new_tests()
+{
+  version = 0;
+  vin.clear();
+  vout.clear();
+  extra.clear();
+  signatures.clear();
+  attachment.clear();
+
+}
+
+bool operator ==(const transaction_new_tests& a, const transaction_new_tests& b) {
+  return true; a.attachment.size() == b.attachment.size() &&
+    a.extra.size() == b.extra.size() &&
+    a.vin.size() == b.vin.size() &&
+    a.vout.size() == b.vout.size() &&
+    a.signatures.size() == b.signatures.size();
+}
+
+bool operator ==(const transaction_new_tests& a, const transaction_old_tests& b) {
+  return true; a.attachment.size() == b.attachment.size() &&
+    a.extra.size() == b.extra.size() &&
+    a.vin.size() == b.vin.size() &&
+    a.vout.size() == b.vout.size() &&
+    a.signatures.size() == b.signatures.size();
+}
+
+void validate_tx_serialisation(transaction_new_tests& tx)
+{
+  transaction_new_tests tx1;
+  string blob;
+  ASSERT_TRUE(serialization::dump_binary(tx, blob));
+  ASSERT_TRUE(serialization::parse_binary(blob, tx1));
+  if (!(tx == tx1))
+  {
+    ASSERT_TRUE(false);
+  }
+  
+  transaction_old_tests tx2;
+  ASSERT_TRUE(serialization::parse_binary(blob, tx2));
+  if (!(tx == tx2))
+  {
+    ASSERT_TRUE(false);
+  }
+}
+
+TEST(Serialization, serializes_transacion_versions)
+{
+
+  using namespace currency;
+
+  transaction_new_tests tx;
+
+
+  // Empty tx
+  /*
+  tx = AUTO_VAL_INIT(tx);
+  ASSERT_TRUE(serialization::dump_binary(tx, blob));
+  ASSERT_EQ(6, blob.size()); // 5 bytes + 0 bytes extra + 0 bytes signatures
+  ASSERT_TRUE(serialization::parse_binary(blob, tx1));
+  if (!(tx == tx1))
+  {
+    ASSERT_TRUE(false);
+  }
+  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+  */
+
+  txin_gen txin_gen1;
+  txin_gen1.height = 0;
+  tx.vin.push_back(txin_gen1);
+  txin_to_key txin_key = AUTO_VAL_INIT(txin_key);
+  txin_key.amount = 11111;
+  txin_key.k_image = epee::string_tools::parse_tpod_from_hex_string<crypto::key_image>("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  signed_parts sp = { 1, 2 };
+  txin_key.etc_details.push_back(sp);
+  ref_by_id rid = AUTO_VAL_INIT(rid);
+  rid.tx_id = epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("11608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  rid.n = 99999999;
+  txin_key.key_offsets.push_back(rid);
+  rid.n = 999999;
+  txin_key.key_offsets.push_back(rid);
+  tx.vin.push_back(txin_key);
+  tx_out_bare vout = AUTO_VAL_INIT(vout);
+  vout.amount = 11111;
+  txout_to_key totk = AUTO_VAL_INIT(totk);
+  totk.key = epee::string_tools::parse_tpod_from_hex_string<crypto::public_key>("22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  totk.mix_attr = 22;
+  vout.target = totk;
+  tx.vout.push_back(vout);
+  tx.vout.push_back(vout);
+
+  tx_comment c;
+  c.comment = "sdcwdcwcewdcecevthbtg";
+  tx.extra.push_back(c);
+  extra_alias_entry eae = AUTO_VAL_INIT(eae);
+  currency::get_account_address_from_str(eae.m_address, "ZxDcDWmA7Yj32srfjMHAY6WPzBB8uqpvzKxEsAjDZU6NRg1yZsRfmr87mLXCvMRHXd5n2kdRWhbqA3WWTbEW4jLd1XxL46tnv");
+  eae.m_alias = "eokcmeockme";
+  eae.m_text_comment = "sdssccsc";
+  tx.extra.push_back(eae); 
+  tx.signatures.resize(2);
+  crypto::signature sig = epee::string_tools::parse_tpod_from_hex_string<crypto::signature>("22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab9985222608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  tx.signatures[0].push_back(sig);
+  tx.signatures[0].push_back(sig);
+  tx.signatures[1].push_back(sig);
+  tx.signatures[1].push_back(sig);
+  
+  tx.version = TRANSACTION_VERSION_INITAL;
+
+  validate_tx_serialisation(tx);
+}

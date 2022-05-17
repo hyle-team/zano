@@ -999,7 +999,7 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
           derive_ephemeral_key_helper(acc.get_keys(), get_tx_pub_key_from_extra(miner_tx), miner_tx.vout.size(), kp);
           txout_to_key otk = AUTO_VAL_INIT(otk);
           otk.key = null_out_key ? null_pkey : kp.pub;
-          miner_tx.vout.push_back(tx_out({ amount, otk }));
+          miner_tx.vout.push_back(tx_out_bare({ amount, otk }));
         };
         decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD, f, f);
         null_out_key = true;
@@ -1093,7 +1093,7 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
 
       for (size_t j = 0; j < tx.vout.size(); ++j)
       {
-        const tx_out &out = tx.vout[j];
+        const tx_out_bare &out = tx.vout[j];
         output_index oi(out.target, out.amount, boost::get<txin_gen>(*blk.miner_tx.vin.begin()).height, i, j, &blk, vtx[i]);
 
         if (out.target.type() == typeid(txout_to_key))
@@ -1458,7 +1458,7 @@ bool construct_miner_tx_manually(size_t height, uint64_t already_generated_coins
   crypto::generate_key_derivation(miner_address.view_public_key, txkey.sec, derivation);
   crypto::derive_public_key(derivation, 0, miner_address.spend_public_key, out_eph_public_key);
 
-  tx_out out;
+  tx_out_bare out;
   out.amount = block_reward;
   out.target = txout_to_key(out_eph_public_key);
   tx.vout.push_back(out);
@@ -1773,7 +1773,7 @@ bool find_global_index_for_output(const std::vector<test_event_entry>& events, c
   auto process_tx = [&reference_tx, &reference_tx_out_index, &global_outputs](const currency::transaction& tx) -> uint64_t
   {
     for (size_t tx_out_index = 0; tx_out_index < tx.vout.size(); ++tx_out_index) {
-      const tx_out &out = tx.vout[tx_out_index];
+      const tx_out_bare &out = tx.vout[tx_out_index];
       if (out.target.type() == typeid(txout_to_key)) {
         uint64_t global_out_index = global_outputs[out.amount]++;
 

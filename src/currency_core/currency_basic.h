@@ -318,7 +318,7 @@ namespace currency
   typedef boost::variant<txout_to_key, txout_multisig, txout_htlc> txout_target_v;
 
   //typedef std::pair<uint64_t, txout> out_t;
-  struct tx_out
+  struct tx_out_bare
   {
     uint64_t amount;
     txout_target_v target;
@@ -363,7 +363,7 @@ namespace currency
   };
 #pragma pack(pop)
 
-  typedef boost::variant<tx_out, tx_out_zarcanum> tx_out_v;
+  typedef boost::variant<tx_out_bare, tx_out_zarcanum> tx_out_v;
 
 
   struct tx_comment
@@ -656,21 +656,26 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
+
+  //include backward compatibility defintions
+  #include "currency_basic_backward_comp.inl"
+
   class transaction_prefix
   {
   public:
     // tx version information
     uint64_t   version{};
     //extra
-    std::vector<extra_v> extra;  
+    std::vector<extra_v> extra;
     std::vector<txin_v> vin;
-    std::vector<tx_out> vout;//std::vector<tx_out> vout;
+    std::vector<tx_out_bare> vout;//std::vector<tx_out> vout;
 
     BEGIN_SERIALIZE()
       VARINT_FIELD(version)
+      CHAIN_TRANSITION_VER(TRANSACTION_VERSION_INITAL, transaction_prefix_v1)
+      CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_prefix_v1)
       if(CURRENT_TRANSACTION_VERSION < version) return false;
       FIELD(vin)
-      //if(version <= 1)
       FIELD(vout)
       FIELD(extra)
     END_SERIALIZE()
@@ -702,8 +707,6 @@ namespace currency
       FIELD(signatures)
       FIELD(attachment)
     END_SERIALIZE()
-
-
   };
 
   
@@ -902,12 +905,17 @@ SET_VARIANT_TAGS(currency::extra_alias_entry, 33, "alias_entry2");
 SET_VARIANT_TAGS(currency::txin_htlc, 34, "txin_htlc");
 SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 
+SET_VARIANT_TAGS(currency::tx_out_bare, 36, "tx_out_bare");
+
 // Zarcanum
-SET_VARIANT_TAGS(currency::tx_in_zarcanum, 36, "tx_in_zarcanum");
-SET_VARIANT_TAGS(currency::tx_out_zarcanum, 37, "tx_out_zarcanum");
-SET_VARIANT_TAGS(currency::zarcanum_tx_data_v1, 38, "zarcanum_tx_data_v1");
-SET_VARIANT_TAGS(crypto::bpp_signature_serialized, 39, "bpp_signature_serialized");
-SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 40, "bppe_signature_serialized");
+SET_VARIANT_TAGS(currency::tx_in_zarcanum, 37, "tx_in_zarcanum");
+SET_VARIANT_TAGS(currency::tx_out_zarcanum, 38, "tx_out_zarcanum");
+SET_VARIANT_TAGS(currency::zarcanum_tx_data_v1, 39, "zarcanum_tx_data_v1");
+SET_VARIANT_TAGS(crypto::bpp_signature_serialized, 40, "bpp_signature_serialized");
+SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 41, "bppe_signature_serialized");
+
+
+
 
 
 #undef SET_VARIANT_TAGS

@@ -300,8 +300,8 @@ namespace currency
   bool is_address_like_wrapped(const std::string& addr);
   void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x);
   uint64_t get_tx_type(const transaction& tx);
-  uint64_t get_tx_type_ex(const transaction& tx, tx_out& htlc_out, txin_htlc& htlc_in);
-  size_t get_multisig_out_index(const std::vector<tx_out>& outs);
+  uint64_t get_tx_type_ex(const transaction& tx, tx_out_bare& htlc_out, txin_htlc& htlc_in);
+  size_t get_multisig_out_index(const std::vector<tx_out_bare>& outs);
   size_t get_multisig_in_index(const std::vector<txin_v>& inputs);
 
   uint64_t get_reward_from_miner_tx(const transaction& tx);

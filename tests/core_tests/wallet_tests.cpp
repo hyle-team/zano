@@ -22,7 +22,7 @@ const std::string g_wallet_password = "dofatibmzibeziyekigo";
 const currency::account_base null_account = AUTO_VAL_INIT(null_account);
 
 
-POD_MAKE_COMPARABLE(currency, tx_out);
+POD_MAKE_COMPARABLE(currency, tx_out_bare);
 
 // Determines which output is real and actually spent in tx inputs, when there are fake outputs.
 bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx, const currency::account_keys& keys, std::vector<size_t>& real_inputs)
@@ -36,7 +36,7 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
       , m_found(false)
     {}
 
-    bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out& out, uint64_t out_i)
+    bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_bare& out, uint64_t out_i)
     {
       CHECK_AND_ASSERT_MES(!m_found, false, "Internal error: m_found is true but the visitor is still being applied");
       auto it = std::find(validated_tx.vout.begin(), validated_tx.vout.end(), out);
