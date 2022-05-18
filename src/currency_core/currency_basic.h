@@ -541,8 +541,7 @@ namespace currency
     extra_alias_entry(const extra_alias_entry_old& old)
       : extra_alias_entry_base(old)
       , m_alias(old.m_alias)
-    {
-    }
+    {}
     
     std::string m_alias;
 
@@ -656,6 +655,26 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
+  //classic CryptoNote signature by Nicolas Van Saberhagen
+  struct NLSAG_sig
+  {
+    std::vector<std::vector<crypto::signature> > s;
+  };
+
+  struct zarcanum_sig
+  {
+    //TODO:
+  };
+
+  struct void_sig
+  {
+    //TODO:
+  };
+
+  typedef boost::variant<void_sig, NLSAG_sig, zarcanum_sig> signature_v;
+
+
+
 
   //include backward compatibility defintions
   #include "currency_basic_backward_comp.inl"
@@ -668,7 +687,7 @@ namespace currency
     //extra
     std::vector<extra_v> extra;
     std::vector<txin_v> vin;
-    std::vector<tx_out_bare> vout;//std::vector<tx_out> vout;
+    std::vector<tx_out_v> vout;
 
     BEGIN_SERIALIZE()
       VARINT_FIELD(version)
@@ -697,14 +716,16 @@ namespace currency
   class transaction: public transaction_prefix
   {
   public:
-    std::vector<std::vector<crypto::signature> > signatures; //count signatures  always the same as inputs count
+    signature_v signature;
     std::vector<attachment_v> attachment;
 
     transaction();
 
     BEGIN_SERIALIZE_OBJECT()
       FIELDS(*static_cast<transaction_prefix *>(this))
-      FIELD(signatures)
+      CHAIN_TRANSITION_VER(TRANSACTION_VERSION_INITAL, transaction_v1)
+      CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_v1)
+      FIELD(signature)
       FIELD(attachment)
     END_SERIALIZE()
   };
@@ -913,6 +934,9 @@ SET_VARIANT_TAGS(currency::tx_out_zarcanum, 38, "tx_out_zarcanum");
 SET_VARIANT_TAGS(currency::zarcanum_tx_data_v1, 39, "zarcanum_tx_data_v1");
 SET_VARIANT_TAGS(crypto::bpp_signature_serialized, 40, "bpp_signature_serialized");
 SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 41, "bppe_signature_serialized");
+SET_VARIANT_TAGS(currency::NLSAG_sig, 42, "NLSAG_sig");
+SET_VARIANT_TAGS(currency::zarcanum_sig, 43, "zarcanum_sig");
+SET_VARIANT_TAGS(currency::void_sig, 43, "void_sig");
 
 
 

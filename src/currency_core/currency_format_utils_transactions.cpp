@@ -32,6 +32,15 @@ namespace currency
     return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
   }
   //---------------------------------------------------------------
+
+
+#define VARIANT_SWITCH_BEGIN(v_type_obj) {decltype(v_type_obj)& local_reference_eokcmeokmeokcm = v_type_obj; if(false) {;
+#define VARIANT_CASE(v_type) } else if(local_reference_eokcmeokmeokcm.type() == typeid(v_type)) { v_type& v_type_obj##_typed = boost::get<v_type>(local_reference_eokcmeokmeokcm);
+#define VARIANT_CASE_OTHER(v_type) } else { 
+#define VARIANT_SWITCH_END() } }
+
+
+
   uint64_t get_burned_amount(const transaction& tx)
   {
     uint64_t res = 0;
