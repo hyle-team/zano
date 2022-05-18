@@ -8,6 +8,7 @@
 #include "serialization/serialization.h"
 #include "currency_format_utils.h"
 #include "currency_format_utils_abstract.h"
+#include "variant_helper.h"
 
 namespace currency
 {
@@ -34,10 +35,6 @@ namespace currency
   //---------------------------------------------------------------
 
 
-#define VARIANT_SWITCH_BEGIN(v_type_obj) {decltype(v_type_obj)& local_reference_eokcmeokmeokcm = v_type_obj; if(false) {;
-#define VARIANT_CASE(v_type) } else if(local_reference_eokcmeokmeokcm.type() == typeid(v_type)) { v_type& v_type_obj##_typed = boost::get<v_type>(local_reference_eokcmeokmeokcm);
-#define VARIANT_CASE_OTHER(v_type) } else { 
-#define VARIANT_SWITCH_END() } }
 
 
 
@@ -46,11 +43,17 @@ namespace currency
     uint64_t res = 0;
     for (auto& o : tx.vout)
     {
-      if (o.target.type() == typeid(txout_to_key))
-      {
-        if (boost::get<txout_to_key>(o.target).key == null_pkey)
-          res += o.amount;
-      }
+      VARIANT_SWITCH_BEGIN(o);
+      VARIANT_CASE(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_to_key))
+        {
+          if (boost::get<txout_to_key>(o.target).key == null_pkey)
+            res += o.amount;
+        }
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@
+      VARIANT_CASE_THROW_ON_OTHER();        
+      VARIANT_SWITCH_END();
     }
     return res;
   }

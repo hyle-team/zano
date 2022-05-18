@@ -525,8 +525,9 @@ namespace currency
     //msg.vin = tx.vin;
     msg.onetime_key = get_tx_pub_key_from_extra(tx);
     CHECK_AND_ASSERT_MES(tx.vout.size() > n, null_hash, "tx.vout.size() > n condition failed ");
-    CHECK_AND_ASSERT_MES(tx.vout[n].target.type() == typeid(txout_multisig), null_hash, "tx.vout[n].target.type() == typeid(txout_multisig) condition failed");
-    msg.vout.push_back(tx.vout[n]);
+    CHECK_AND_ASSERT_MES(tx.vout[n].type() == typeid(tx_out_bare), null_hash, "Unexpected type of out:" << tx.vout[n].type().name());
+    CHECK_AND_ASSERT_MES(boost::get<tx_out_bare>(tx.vout[n]).target.type() == typeid(txout_multisig), null_hash, "tx.vout[n].target.type() == typeid(txout_multisig) condition failed");
+    msg.vout.push_back(boost::get<tx_out_bare>(tx.vout[n]));
     return get_object_hash(msg);
   }
   //---------------------------------------------------------------
@@ -1127,13 +1128,17 @@ namespace currency
     if (bc_services::get_first_service_attachment_by_id(tx, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_CANCEL_PROPOSAL, tsa))
       return GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL;
 
-    for (auto o : tx.vout)
+    for (auto ov : tx.vout)
     {
-      if (o.target.type() == typeid(txout_htlc))
-      {
-        htlc_out = o;
-        return GUI_TX_TYPE_HTLC_DEPOSIT;
-      }
+      VARIANT_SWITCH_BEGIN(ov);
+      VARIANT_CASE(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_htlc))
+        {
+          htlc_out = o;
+          return GUI_TX_TYPE_HTLC_DEPOSIT;
+        }
+      VARIANT_SWITCH_END();
+
     }
 
     if (get_type_in_variant_container(tx.vin, htlc_in))
@@ -1272,7 +1277,7 @@ namespace currency
     {
       tx.vin.clear();
       tx.vout.clear();
-      tx.signatures.clear();
+      tx.signature.clear();
       tx.extra = extra;
 
       tx.version = ftp.tx_version;
@@ -1597,7 +1602,12 @@ namespace currency
     uint64_t reward = 0;
     for (auto& out : tx.vout)
     {
-      reward += out.amount;
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE(tx_out_bare, o)
+        reward += o.amount;
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     reward -= income;
     return reward;
@@ -1648,14 +1658,20 @@ namespace currency
     size_t ms_out_index = SIZE_MAX;
     for (size_t i = 0; i < source_tx.vout.size(); ++i)
     {
-      if (source_tx.vout[i].target.type() == typeid(txout_multisig) && ms_in.multisig_out_id == get_multisig_out_id(source_tx, i))
-      {
-        ms_out_index = i;
-        break;
-      }
+
+      VARIANT_SWITCH_BEGIN(source_tx.vout[i]);
+      VARIANT_CASE(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_multisig) && ms_in.multisig_out_id == get_multisig_out_id(source_tx, i))
+        {
+          ms_out_index = i;
+          break;
+        }
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     LOC_CHK(ms_out_index != SIZE_MAX, "failed to find ms output in source tx " << get_transaction_hash(source_tx) << " by ms id " << ms_in.multisig_out_id);
-    const txout_multisig& out_ms = boost::get<txout_multisig>(source_tx.vout[ms_out_index].target);
+    const txout_multisig& out_ms = boost::get<txout_multisig>( boost::get<tx_out_bare>(source_tx.vout[ms_out_index]).target);
 
     crypto::public_key source_tx_pub_key = get_tx_pub_key_from_extra(source_tx);
 
@@ -1667,7 +1683,7 @@ namespace currency
     LOC_CHK(participant_index < out_ms.keys.size(), "Can't find given participant's ms key in ms output keys list");
     LOC_CHK(ms_input_index < tx.signatures.size(), "transaction does not have signatures vectory entry for ms input #" << ms_input_index);
 
-    auto& sigs = tx.signatures[ms_input_index];
+    auto& sigs = tx.signature[ms_input_index];
     LOC_CHK(!sigs.empty(), "empty signatures container");
 
     bool extra_signature_expected = (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE) && ms_input_index == tx.vin.size() - 1;
@@ -1801,36 +1817,37 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool check_outs_valid(const transaction& tx)
   {
-    for(const tx_out_bare& out : tx.vout)
+    for(const auto& vo : tx.vout)
     {
-      CHECK_AND_NO_ASSERT_MES(0 < out.amount, false, "zero amount output in transaction id=" << get_transaction_hash(tx));
-      if (out.target.type() == typeid(txout_to_key))
+
+      VARIANT_SWITCH_BEGIN(vo);
+      VARIANT_CASE(tx_out_bare, out)
       {
-        if (!check_key(boost::get<txout_to_key>(out.target).key))
-          return false;
+        CHECK_AND_NO_ASSERT_MES(0 < out.amount, false, "zero amount output in transaction id=" << get_transaction_hash(tx));
+        
+        VARIANT_SWITCH_BEGIN(out.target);
+        VARIANT_CASE(txout_to_key, tk)
+          if (!check_key(tk.key))
+            return false;
+        VARIANT_CASE(txout_htlc, htlc)
+          if (!check_key(htlc.pkey_redeem))
+            return false;
+          if (!check_key(htlc.pkey_refund))
+            return false;
+        VARIANT_CASE(txout_multisig, ms)
+          if (!(ms.keys.size() > 0 && ms.minimum_sigs > 0 && ms.minimum_sigs <= ms.keys.size()))
+          {
+            LOG_ERROR("wrong multisig in transaction id=" << get_transaction_hash(tx));
+            return false;
+          }
+        VARIANT_CASE_OTHER()
+          LOG_ERROR("wrong variant type: " << out.target.type().name() << ", expected " << typeid(txout_to_key).name()
+            << ", in transaction id=" << get_transaction_hash(tx));
+        VARIANT_SWITCH_END();
       }
-      else if (out.target.type() == typeid(txout_htlc))
-      {
-        const txout_htlc& htlc = boost::get<txout_htlc>(out.target);
-        if (!check_key(htlc.pkey_redeem))
-          return false;
-        if (!check_key(htlc.pkey_refund))
-          return false;
-      }
-      else if (out.target.type() == typeid(txout_multisig))
-      {
-        const txout_multisig& ms = boost::get<txout_multisig>(out.target);
-        if (!(ms.keys.size() > 0 && ms.minimum_sigs > 0 && ms.minimum_sigs <= ms.keys.size()))
-        {
-          LOG_ERROR("wrong multisig in transaction id=" << get_transaction_hash(tx));
-          return false;
-        }
-      }
-      else
-      {
-        LOG_ERROR("wrong variant type: " << out.target.type().name() << ", expected " << typeid(txout_to_key).name()
-          << ", in transaction id=" << get_transaction_hash(tx));
-      }
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     return true;
   }
@@ -1878,9 +1895,14 @@ namespace currency
     uint64_t money = 0;
     BOOST_FOREACH(const auto& o, tx.vout)
     {
-      if (money > o.amount + money)
-        return false;
-      money += o.amount;
+      VARIANT_SWITCH_BEGIN(o);
+      VARIANT_CASE(tx_out_bare, o)
+        if (money > o.amount + money)
+          return false;
+        money += o.amount;
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     return true;
   }
@@ -1888,8 +1910,15 @@ namespace currency
   uint64_t get_outs_money_amount(const transaction& tx)
   {
     uint64_t outputs_amount = 0;
-    for(const auto& o : tx.vout)
-      outputs_amount += o.amount;
+    for (const auto& o : tx.vout)
+    {
+      VARIANT_SWITCH_BEGIN(o);
+      VARIANT_CASE(tx_out_bare, o)
+        outputs_amount += o.amount;
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@      
+      VARIANT_SWITCH_END();
+    }
     return outputs_amount;
   }
   //---------------------------------------------------------------
@@ -1962,7 +1991,10 @@ namespace currency
       return true;
 
     CHECK_AND_ASSERT_MES(offset < tx.vout.size(), false, "condition failed: offset(" << offset << ") < tx.vout.size() (" << tx.vout.size() << ")");
-    auto& o = tx.vout[offset];
+    auto& ov = tx.vout[offset];
+    CHECK_AND_ASSERT_MES(ov.type() == typeid(tx_out_bare), false, "unexpected type id in lookup_acc_outs_genesis:" << ov.type().name());
+    const tx_out_bare& o = boost::get<tx_out_bare>(ov);
+
     CHECK_AND_ASSERT_MES(o.target.type() == typeid(txout_to_key), false, "condition failed: o.target.type() == typeid(txout_to_key)");
     if (is_out_to_acc(acc, boost::get<txout_to_key>(o.target), derivation, offset))
     {
@@ -1994,46 +2026,46 @@ namespace currency
       return true;
 
     size_t i = 0;
-    for(const tx_out_bare& o : tx.vout)
+    for(const auto& ov : tx.vout)
     {
-      if (o.target.type() == typeid(txout_to_key))
+      VARIANT_SWITCH_BEGIN(ov);
+      VARIANT_CASE(tx_out_bare, o)
       {
-        if (is_out_to_acc(acc, boost::get<txout_to_key>(o.target), derivation, i))
-        {
-          outs.push_back(i);
-          money_transfered += o.amount;
-        }
+        VARIANT_SWITCH_BEGIN(o.target);
+        VARIANT_CASE(txout_to_key, t)
+          if (is_out_to_acc(acc, t, derivation, i))
+          {
+            outs.push_back(i);
+            money_transfered += o.amount;
+          }
+        VARIANT_CASE(txout_multisig, t)
+          if (is_out_to_acc(acc, t, derivation, i))
+          {
+            outs.push_back(i);
+            //don't count this money
+          }
+        VARIANT_CASE(txout_htlc, htlc)
+          htlc_info hi = AUTO_VAL_INIT(hi);
+          if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, i))
+          {
+            hi.hltc_our_out_is_before_expiration = true;
+            htlc_info_list.push_back(hi);
+            outs.push_back(i);
+          }
+          else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, i))
+          {
+            hi.hltc_our_out_is_before_expiration = false;
+            htlc_info_list.push_back(hi);
+            outs.push_back(i);
+          }
+        VARIANT_CASE_OTHER()
+          LOG_ERROR("Wrong type at lookup_acc_outs, unexpected type is: " << o.target.type().name());
+          return false;
+        VARIANT_SWITCH_END();
       }
-      else if (o.target.type() == typeid(txout_multisig))
-      {
-        if (is_out_to_acc(acc, boost::get<txout_multisig>(o.target), derivation, i))
-        {
-          outs.push_back(i);
-          //don't count this money
-        }
-      }
-      else if (o.target.type() == typeid(txout_htlc))
-      {
-        htlc_info hi = AUTO_VAL_INIT(hi);
-        const txout_htlc& htlc = boost::get<txout_htlc>(o.target);
-        if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, i))
-        {
-          hi.hltc_our_out_is_before_expiration = true;
-          htlc_info_list.push_back(hi);
-          outs.push_back(i);
-        }
-        else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, i))
-        {
-          hi.hltc_our_out_is_before_expiration = false;
-          htlc_info_list.push_back(hi);
-          outs.push_back(i);
-        }
-      }
-      else
-      {
-        LOG_ERROR("Wrong type at lookup_acc_outs, unexpected type is: " << o.target.type().name());
-        return false;
-      }
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@  
+      VARIANT_SWITCH_END();
       i++;
     }
     return true;

@@ -667,8 +667,8 @@ namespace currency
     bool is_after_hardfork_2_zone(uint64_t height)const;
     bool is_after_hardfork_3_zone()const;
     bool is_after_hardfork_3_zone(uint64_t height)const;
-//    bool is_after_hardfork_4_zone()const;
-//    bool is_after_hardfork_4_zone(uint64_t height)const;
+    bool is_after_hardfork_4_zone()const;
+    bool is_after_hardfork_4_zone(uint64_t height)const;
 
 
 
@@ -776,55 +776,65 @@ namespace currency
       TO_KEY   |  TO_KEY | YES
       */
 
-      bool r = is_output_allowed_for_input(tx_ptr->tx.vout[n].target, verified_input, get_current_blockchain_size() - tx_ptr->m_keeper_block_height);
-      CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
-
-      if (tx_ptr->tx.vout[n].target.type() == typeid(txout_to_key))
+      VARIANT_SWITCH_BEGIN(tx_ptr->tx.vout[n]);
+      VARIANT_CASE(tx_out_bare, o)
       {
-        CHECKED_GET_SPECIFIC_VARIANT(tx_ptr->tx.vout[n].target, const txout_to_key, outtk, false);
-        //fix for burned money
-        patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
+        bool r = is_output_allowed_for_input(o.target, verified_input, get_current_blockchain_size() - tx_ptr->m_keeper_block_height);
+        CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
 
-        bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, key_offsets.size() - 1);
-        CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
-      }
-      else if (tx_ptr->tx.vout[n].target.type() == typeid(txout_htlc))
-      {
-        //check for spend flags
-        CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() > n, false, 
-          "Internal error: tx_ptr->m_spent_flags.size(){" << tx_ptr->m_spent_flags.size() << "} > n{" << n << "}");
-        CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags[n] == false, false, "HTLC out already spent, double spent attempt detected");
-
-        const txout_htlc& htlc_out = boost::get<txout_htlc>(tx_ptr->tx.vout[n].target);
-        if (htlc_out.expiration > get_current_blockchain_size() - tx_ptr->m_keeper_block_height)
+        if (o.target.type() == typeid(txout_to_key))
         {
-          //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
-          scan_context.htlc_is_expired = false;
-        }
-        else 
-        {
-          //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
-          scan_context.htlc_is_expired = true; 
-        }
-      }else
-      {
-        LOG_ERROR("[scan_outputkeys_for_indexes]: Wrong output type in : " << tx_ptr->tx.vout[n].target.type().name());
-        return false;
-      }
+          CHECKED_GET_SPECIFIC_VARIANT(o.target, const txout_to_key, outtk, false);
+          //fix for burned money
+          patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
 
-      
-      TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-      if (!vis.handle_output(tx_ptr->tx, validated_tx, tx_ptr->tx.vout[n], n))
-      {
-        LOG_PRINT_L0("Failed to handle_output for output id = " << tx_id << ", no " << n);
-        return false;
+          bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, key_offsets.size() - 1);
+          CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+        }
+        else if (o.target.type() == typeid(txout_htlc))
+        {
+          //check for spend flags
+          CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() > n, false,
+            "Internal error: tx_ptr->m_spent_flags.size(){" << tx_ptr->m_spent_flags.size() << "} > n{" << n << "}");
+          CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags[n] == false, false, "HTLC out already spent, double spent attempt detected");
+
+          const txout_htlc& htlc_out = boost::get<txout_htlc>(o.target);
+          if (htlc_out.expiration > get_current_blockchain_size() - tx_ptr->m_keeper_block_height)
+          {
+            //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
+            scan_context.htlc_is_expired = false;
+          }
+          else
+          {
+            //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
+            scan_context.htlc_is_expired = true;
+          }
+        }
+        else
+        {
+          LOG_ERROR("[scan_outputkeys_for_indexes]: Wrong output type in : " << o.target.type().name());
+          return false;
+        }
+
+
+        TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
+        if (!vis.handle_output(tx_ptr->tx, validated_tx, tx_ptr->tx.vout[n], n))
+        {
+          LOG_PRINT_L0("Failed to handle_output for output id = " << tx_id << ", no " << n);
+          return false;
+        }
       }
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@
+      VARIANT_CASE_THROW_ON_OTHER();
+      VARIANT_SWITCH_END();
+
+
       TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
 
-        if (max_related_block_height < tx_ptr->m_keeper_block_height)
-          max_related_block_height = tx_ptr->m_keeper_block_height;
-
-      
+      if (max_related_block_height < tx_ptr->m_keeper_block_height)
+        max_related_block_height = tx_ptr->m_keeper_block_height;
+  
       ++output_index;
     }
     TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop);
