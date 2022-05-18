@@ -820,7 +820,7 @@ namespace tools
     bool reset_history();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
-    void get_mining_history(wallet_public::mining_history& hist);
+    void get_mining_history(wallet_public::mining_history& hist, uint64_t timestamp_from = 0);
     void set_core_runtime_config(const currency::core_runtime_config& pc);  
     currency::core_runtime_config& get_core_runtime_config();
     bool backup_keys(const std::string& path);
