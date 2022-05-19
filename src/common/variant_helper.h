@@ -19,13 +19,18 @@ usage:
 
 
       VARIANT_SWITCH_BEGIN(o);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE(tx_out_bare, o);
         
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_TV(tx_out_zarcanum);
         //@#@      
       VARIANT_SWITCH_END();
 
 
+      VARIANT_SWITCH_BEGIN(o);
+      VARIANT_CASE(txout_to_key, o)
+      VARIANT_CASE_TV(txout_multisig)
+      VARIANT_CASE_TV(txout_htlc)
+      VARIANT_SWITCH_END();
 
 
       VARIANT_SWITCH_BEGIN(o);

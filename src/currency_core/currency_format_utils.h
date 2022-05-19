@@ -698,7 +698,13 @@ namespace currency
     uint64_t operator()(const t_input& i) const{return i.amount;}
     uint64_t operator()(const txin_gen& i) const {return 0;}
   };
-
+  //---------------------------------------------------------------
+  const tx_out_bare& get_tx_out_bare_from_out_v(const tx_out_v& o)
+  {
+    //this function will throw if type is not matching
+    return boost::get<tx_out_bare>(o);
+  }
+  //---------------------------------------------------------------
   inline uint64_t get_amount_from_variant(const txin_v& v)
   {
     return boost::apply_visitor(input_amount_getter(), v);

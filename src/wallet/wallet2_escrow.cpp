@@ -74,20 +74,28 @@ bool wallet2::validate_escrow_proposal(const wallet_public::wallet_transfer_info
   size_t ms_out_index = SIZE_MAX;
   for (size_t i = 0; i != prop.tx_template.vout.size(); ++i)
   {
-    if (prop.tx_template.vout[i].target.type() == typeid(txout_multisig))
+    VARIANT_SWITCH_BEGIN(prop.tx_template.vout[i]);
+    VARIANT_CASE(tx_out_bare, o)
     {
-      LOC_CHK(ms_out_index == SIZE_MAX, "template has more than one multisig output");
-      ms_out_index = i;
+      if (o.target.type() == typeid(txout_multisig))
+      {
+        LOC_CHK(ms_out_index == SIZE_MAX, "template has more than one multisig output");
+        ms_out_index = i;
+      }
+      else if (o.target.type() == typeid(txout_to_key))
+        to_key_outputs_amount += o.amount;
+      else
+        LOC_CHK(false, "Invalid output type: " << o.target.type().name());
     }
-    else if (prop.tx_template.vout[i].target.type() == typeid(txout_to_key))
-      to_key_outputs_amount += prop.tx_template.vout[i].amount;
-    else
-      LOC_CHK(false, "Invalid output type: " << prop.tx_template.vout[i].target.type().name());
+    VARIANT_CASE_TV(tx_out_zarcanum);
+    //@#@      
+    VARIANT_SWITCH_END();
   }
   LOC_CHK(ms_out_index != SIZE_MAX, "template has no multisig outputs");
   ms_id = currency::get_multisig_out_id(prop.tx_template, ms_out_index);
-  uint64_t ms_amount = prop.tx_template.vout[ms_out_index].amount;
-  const txout_multisig& ms = boost::get<txout_multisig>(prop.tx_template.vout[ms_out_index].target);
+  // @#@ using of get_tx_out_bare_from_out_v might be not safe, TODO: review this code
+  uint64_t ms_amount = currency::get_tx_out_bare_from_out_v(prop.tx_template.vout[ms_out_index]).amount;
+  const txout_multisig& ms = boost::get<txout_multisig>(currency::get_tx_out_bare_from_out_v(prop.tx_template.vout[ms_out_index]).target);
   LOC_CHK(ms.minimum_sigs == 2, "template has multisig output with wrong minimum_sigs==" << ms.minimum_sigs);
   LOC_CHK(ms.keys.size() == 2, "template has multisig output with wrong keys size: " << ms.keys.size());
 
@@ -138,7 +146,8 @@ bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_n
   LOC_CHK(ms.multisig_out_id == ms_id, "multisig input references to wrong ms output: " << ms.multisig_out_id << ", expected: " << ms_id);
   LOC_CHK(source_ms_out.minimum_sigs == 2, "multisig output has wrong minimim_sigs: " <<source_ms_out.minimum_sigs << ", expected: 2");
   LOC_CHK(ms.sigs_count == source_ms_out.minimum_sigs, "multisig input has wrong sig_count: " << ms.sigs_count << ", expected: " << source_ms_out.minimum_sigs);
-  LOC_CHK(ms.amount == source_tx.vout[source_ms_out_index].amount, "multisig input amount: " << ms.amount << " does not match with source tx out amount: " << source_tx.vout[source_ms_out_index].amount);
+  LOC_CHK(source_tx.vout[source_ms_out_index].type() == typeid(tx_out_bare), "multisig input has wrong output type:");
+  LOC_CHK(ms.amount == currency::get_tx_out_bare_from_out_v(source_tx.vout[source_ms_out_index]).amount, "multisig input amount: " << ms.amount << " does not match with source tx out amount: " << currency::get_tx_out_bare_from_out_v(source_tx.vout[source_ms_out_index]).amount);
   
   uint64_t min_ms_amount = cpd.amount_a_pledge + cpd.amount_b_pledge + cpd.amount_to_pay + TX_DEFAULT_FEE;
   LOC_CHK(ms.amount >= min_ms_amount, "multisig input amount " << ms.amount << " is less than contract expected value: " << min_ms_amount << ", a_pledge=" << cpd.amount_a_pledge << ", b_pledge=" << cpd.amount_b_pledge << ", amount_to_pay=" << cpd.amount_to_pay);
@@ -181,20 +190,27 @@ bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_n
   uint64_t total_outputs_amount = 0, outputs_to_A_amount = 0, outputs_to_null_addr_amount = 0;
   for (size_t i = 0; i != tx.vout.size(); ++i)
   {
-    if (tx.vout[i].target.type() == typeid(txout_to_key))
+    VARIANT_SWITCH_BEGIN(tx.vout[i]);
+    VARIANT_CASE(tx_out_bare, o);
     {
-      total_outputs_amount += tx.vout[i].amount;
-      const txout_to_key& otk = boost::get<txout_to_key>(tx.vout[i].target);
-      crypto::public_key ephemeral_pub_key = AUTO_VAL_INIT(ephemeral_pub_key);
-      r = crypto::derive_public_key(der, i, cpd.a_addr.spend_public_key, ephemeral_pub_key);
-      LOC_CHK(r, "derive_public_key failed for output #" << i);
-      if (otk.key == ephemeral_pub_key)
-        outputs_to_A_amount += tx.vout[i].amount;
-      else if (otk.key == null_pkey)
-        outputs_to_null_addr_amount += tx.vout[i].amount;
+      if (o.target.type() == typeid(txout_to_key))
+      {
+        total_outputs_amount += o.amount;
+        const txout_to_key& otk = boost::get<txout_to_key>(o.target);
+        crypto::public_key ephemeral_pub_key = AUTO_VAL_INIT(ephemeral_pub_key);
+        r = crypto::derive_public_key(der, i, cpd.a_addr.spend_public_key, ephemeral_pub_key);
+        LOC_CHK(r, "derive_public_key failed for output #" << i);
+        if (otk.key == ephemeral_pub_key)
+          outputs_to_A_amount += o.amount;
+        else if (otk.key == null_pkey)
+          outputs_to_null_addr_amount += o.amount;
+      }
+      else
+        LOC_CHK(false, "Invalid output type: " << o.target.type().name());
     }
-    else
-      LOC_CHK(false, "Invalid output type: " << tx.vout[i].target.type().name());
+    VARIANT_CASE(tx_out_zarcanum, o)
+      LOC_CHK(false, "Invalid output type: " << o.type().name());       
+    VARIANT_SWITCH_END();
   }
 
   if (release_type_normal)
@@ -258,7 +274,7 @@ bool wallet2::validate_escrow_contract(const wallet_public::wallet_transfer_info
   LOC_CHK(n < wti.tx.vout.size(), "multisig output was not found");
   ms_id = currency::get_multisig_out_id(wti.tx, n);
   LOC_CHK(ms_id != null_hash, "failed to obtain ms output id");
-  const txout_multisig& ms = boost::get<txout_multisig>(wti.tx.vout[n].target);
+  const txout_multisig& ms = boost::get<txout_multisig>( boost::get<tx_out_bare>(wti.tx.vout[n]).target);
 
   tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
   r = bc_services::get_first_service_attachment_by_id(decrypted_items, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_TEMPLATES, tsa);
@@ -318,11 +334,11 @@ bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, co
   LOC_CHK(tx.vin.back().type() == typeid(txin_multisig), "input 0 is not txin_multisig");
   const txin_multisig& ms = boost::get<txin_multisig>(tx.vin.back());
   LOC_CHK(source_ms_out_index < source_tx.vout.size(), "internal invariant failed: source_ms_out_index is out of bounds: " << source_ms_out_index);
-  const txout_multisig& source_ms_out = boost::get<txout_multisig>(source_tx.vout[source_ms_out_index].target);
+  const txout_multisig& source_ms_out = boost::get<txout_multisig>(currency::get_tx_out_bare_from_out_v(source_tx.vout[source_ms_out_index]).target);
   LOC_CHK(ms.multisig_out_id == ms_id, "multisig input references to wrong ms output: " << ms.multisig_out_id << ", expected: " << ms_id);
   LOC_CHK(source_ms_out.minimum_sigs == 2, "source multisig output has wrong minimim_sigs: " <<source_ms_out.minimum_sigs << ", expected: 2");
   LOC_CHK(ms.sigs_count == source_ms_out.minimum_sigs, "multisig input has wrong sig_count: " << ms.sigs_count << ", expected: " << source_ms_out.minimum_sigs);
-  LOC_CHK(ms.amount == source_tx.vout[source_ms_out_index].amount, "multisig input amount: " << ms.amount << " does not match with source tx out amount: " << source_tx.vout[source_ms_out_index].amount);
+  LOC_CHK(ms.amount == currency::get_tx_out_bare_from_out_v(source_tx.vout[source_ms_out_index]).amount, "multisig input amount: " << ms.amount << " does not match with source tx out amount: " << currency::get_tx_out_bare_from_out_v(source_tx.vout[source_ms_out_index]).amount);
   
 
   uint64_t min_ms_amount = cpd.amount_a_pledge + cpd.amount_b_pledge + cpd.amount_to_pay + minimum_release_fee;
@@ -363,18 +379,23 @@ bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, co
   uint64_t total_outputs_amount = 0, outputs_to_B_amount = 0;
   for (size_t i = 0; i != tx.vout.size(); ++i)
   {
-    if (tx.vout[i].target.type() == typeid(txout_to_key))
-    {
-      total_outputs_amount += tx.vout[i].amount;
-      const txout_to_key& otk = boost::get<txout_to_key>(tx.vout[i].target);
-      crypto::public_key ephemeral_pub_key = AUTO_VAL_INIT(ephemeral_pub_key);
-      r = crypto::derive_public_key(der, i, cpd.b_addr.spend_public_key, ephemeral_pub_key);
-      LOC_CHK(r, "derive_public_key failed for output #" << i);
-      if (otk.key == ephemeral_pub_key)
-        outputs_to_B_amount += tx.vout[i].amount;
-    }
-    else
-      LOC_CHK(false, "Invalid output type: " << tx.vout[i].target.type().name());
+    VARIANT_SWITCH_BEGIN(tx.vout[i]);
+    VARIANT_CASE(tx_out_bare, o)
+      if (o.target.type() == typeid(txout_to_key))
+      {
+        total_outputs_amount += o.amount;
+        const txout_to_key& otk = boost::get<txout_to_key>(o.target);
+        crypto::public_key ephemeral_pub_key = AUTO_VAL_INIT(ephemeral_pub_key);
+        r = crypto::derive_public_key(der, i, cpd.b_addr.spend_public_key, ephemeral_pub_key);
+        LOC_CHK(r, "derive_public_key failed for output #" << i);
+        if (otk.key == ephemeral_pub_key)
+          outputs_to_B_amount += o.amount;
+      }
+      else
+        LOC_CHK(false, "Invalid output type: " << o.target.type().name());
+    VARIANT_CASE_TV(tx_out_zarcanum)
+      LOC_CHK(false, "Invalid output type: " << tv.type().name());
+    VARIANT_SWITCH_END();
   }
 
   LOC_CHK(outputs_to_B_amount >= cpd.amount_b_pledge, "B-addressed outs total amount: " << print_money(outputs_to_B_amount) << " is less than b_pledge: " << print_money(cpd.amount_b_pledge));

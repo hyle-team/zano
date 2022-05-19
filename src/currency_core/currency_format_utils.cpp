@@ -2536,12 +2536,18 @@ namespace currency
     uint64_t found_alias_reward = 0;
     for (const auto& out : tx.vout)
     {
-      if (out.target.type() != typeid(txout_to_key))
-        continue;
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE(tx_out_bare, out)
+        if (out.target.type() != typeid(txout_to_key))
+          continue;
 
-      const txout_to_key& o = boost::get<txout_to_key>(out.target);
-      if (o.key == null_pkey)
-        found_alias_reward += out.amount;
+        const txout_to_key& o = boost::get<txout_to_key>(out.target);
+        if (o.key == null_pkey)
+          found_alias_reward += out.amount;
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@      
+      VARIANT_SWITCH_END();
+
     }
     return found_alias_reward;
   }
@@ -2776,35 +2782,34 @@ namespace currency
     for (auto& out : tx.vout)
     {
       tei.outs.push_back(tx_out_rpc_entry());
-      tei.outs.back().amount = out.amount;
       tei.outs.back().is_spent = ptce ? ptce->m_spent_flags[i] : false;
       tei.outs.back().global_index = ptce ? ptce->m_global_output_indexes[i] : 0;
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE(tx_out_bare, out)
+      {
+        tei.outs.back().amount = out.amount;
 
-      if (out.target.type() == typeid(txout_to_key))
-      {
-        const txout_to_key& otk = boost::get<txout_to_key>(out.target);
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.key));
-        if (otk.mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-          tei.outs.back().pub_keys.back() += "(FORCED_NO_MIX)";
-        if (otk.mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
-          tei.outs.back().pub_keys.back() += std::string("(FORCED_MIX_LOWER_BOUND: ") + std::to_string(otk.mix_attr) + ")";
+        VARIANT_SWITCH_BEGIN(out.target);
+        VARIANT_CASE(txout_to_key, otk)
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.key));
+          if (otk.mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+            tei.outs.back().pub_keys.back() += "(FORCED_NO_MIX)";
+          if (otk.mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
+            tei.outs.back().pub_keys.back() += std::string("(FORCED_MIX_LOWER_BOUND: ") + std::to_string(otk.mix_attr) + ")";
+        VARIANT_CASE(txout_multisig, otm)
+          for (auto& k : otm.keys)
+          {
+            tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(k));
+          }
+          tei.outs.back().minimum_sigs = otm.minimum_sigs;
+        VARIANT_CASE(txout_htlc, otk)
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_redeem) + "(htlc_pkey_redeem)");
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_refund) + "(htlc_pkey_refund)");
+        VARIANT_SWITCH_END();
       }
-      else if (out.target.type() == typeid(txout_multisig))
-      {
-        const txout_multisig& otm = boost::get<txout_multisig>(out.target);
-        for (auto& k : otm.keys)
-        {
-          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(k));
-        }
-        tei.outs.back().minimum_sigs = otm.minimum_sigs;
-      }
-      else if (out.target.type() == typeid(txout_htlc))
-      {
-        const txout_htlc& otk = boost::get<txout_htlc>(out.target);
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_redeem) + "(htlc_pkey_redeem)");
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_refund) + "(htlc_pkey_refund)");
-      }
-
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@      
+      VARIANT_SWITCH_END();
       ++i;
     }
     return true;
@@ -2912,11 +2917,16 @@ namespace currency
   {
     for (size_t n = 0; n < tx.vout.size(); ++n)
     {
-      if (tx.vout[n].target.type() == typeid(txout_to_key) || tx.vout[n].target.type() == typeid(txout_htlc))
-      {
-        uint64_t amount = tx.vout[n].amount;
-        gindices[amount] += 1;
-      }
+      VARIANT_SWITCH_BEGIN(tx.vout[n]);
+      VARIANT_CASE(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_to_key) || o.target.type() == typeid(txout_htlc))
+        {
+          uint64_t amount = o.amount;
+          gindices[amount] += 1;
+        }
+      VARIANT_CASE_TV(tx_out_zarcanum)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
   }
   //---------------------------------------------------------------
