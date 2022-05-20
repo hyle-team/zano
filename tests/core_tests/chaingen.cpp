@@ -620,8 +620,8 @@ bool test_generator::build_outputs_indext_for_chain(const blockchain_vector& blo
     std::vector<uint64_t>& coinbase_outs = txs_outs[currency::get_transaction_hash(blocks[h]->b.miner_tx)];
     for (size_t out_i = 0; out_i != blocks[h]->b.miner_tx.vout.size(); out_i++)
     {
-      coinbase_outs.push_back(index[blocks[h]->b.miner_tx.vout[out_i].amount].size());
-      index[blocks[h]->b.miner_tx.vout[out_i].amount].push_back(std::tuple<size_t, size_t, size_t>(h, 0, out_i));
+      coinbase_outs.push_back(index[blocks[h]->b.boost::get<currency::tx_out_bare>(miner_tx.vout[out_i]).amount].size());
+      index[blocks[h]->b.boost::get<currency::tx_out_bare>(miner_tx.vout[out_i]).amount].push_back(std::tuple<size_t, size_t, size_t>(h, 0, out_i));
     }
 
     for (size_t tx_index = 0; tx_index != blocks[h]->m_transactions.size(); tx_index++)
@@ -629,8 +629,8 @@ bool test_generator::build_outputs_indext_for_chain(const blockchain_vector& blo
       std::vector<uint64_t>& tx_outs_indx = txs_outs[currency::get_transaction_hash(blocks[h]->m_transactions[tx_index])];
       for (size_t out_i = 0; out_i != blocks[h]->m_transactions[tx_index].vout.size(); out_i++)
       {
-        tx_outs_indx.push_back(index[blocks[h]->m_transactions[tx_index].vout[out_i].amount].size());
-        index[blocks[h]->m_transactions[tx_index].vout[out_i].amount].push_back(std::tuple<size_t, size_t, size_t>(h, tx_index + 1, out_i));
+        tx_outs_indx.push_back(index[blocks[h]->m_transactions[tx_index]boost::get<currency::tx_out_bare>(.vout[out_i]).amount].size());
+        index[blocks[h]->m_transactions[tx_index]boost::get<currency::tx_out_bare>(.vout[out_i]).amount].push_back(std::tuple<size_t, size_t, size_t>(h, tx_index + 1, out_i));
       }
     }
   }
@@ -664,10 +664,10 @@ bool test_generator::get_output_details_by_global_index(const test_generator::bl
 
   tx_pub_key = get_tx_pub_key_from_extra(*tx);
   CHECK_AND_ASSERT_THROW_MES(tx->vout[tx_out_index].target.type() == typeid(currency::txout_to_key),
-    "blck_chain[h]->m_transactions[tx_index].vout[tx_out_index].target.type() == typeid(currency::txout_to_key)");
+    "blck_chain[h]->m_transactions[tx_index]boost::get<currency::tx_out_bare>(.vout[tx_out_index]).target.type() == typeid(currency::txout_to_key)");
 
   CHECK_AND_ASSERT_THROW_MES(tx->vout[tx_out_index].amount == amount,
-    "blck_chain[h]->m_transactions[tx_index].vout[tx_out_index].amount == amount");
+    "blck_chain[h]->m_transactions[tx_index]boost::get<currency::tx_out_bare>(.vout[tx_out_index]).amount == amount");
 
   output_key = boost::get<currency::txout_to_key>(tx->vout[tx_out_index].target).key;
   return true;
@@ -1806,7 +1806,7 @@ bool find_global_index_for_output(const std::vector<test_event_entry>& events, c
 size_t get_tx_out_index_by_amount(const currency::transaction& tx, const uint64_t amount)
 {
   for (size_t i = 0; i < tx.vout.size(); ++i)
-    if (tx.vout[i].amount == amount)
+    if (boost::get<currency::tx_out_bare>(tx.vout[i]).amount == amount)
       return i;
 
   return SIZE_MAX;
@@ -1827,14 +1827,14 @@ bool sign_multisig_input_in_tx_custom(currency::transaction& tx, size_t ms_input
   size_t ms_out_index = SIZE_MAX;
   for (size_t i = 0; i < source_tx.vout.size(); ++i)
   {
-    if (source_tx.vout[i].target.type() == typeid(txout_multisig) && ms_in.multisig_out_id == get_multisig_out_id(source_tx, i))
+    if (boost::get<currency::tx_out_bare>(source_tx.vout[i]).target.type() == typeid(txout_multisig) && ms_in.multisig_out_id == get_multisig_out_id(source_tx, i))
     {
       ms_out_index = i;
       break;
     }
   }
   LOC_CHK(ms_out_index != SIZE_MAX, "failed to find ms output in source tx " << get_transaction_hash(source_tx) << " by ms id " << ms_in.multisig_out_id);
-  const txout_multisig& out_ms = boost::get<txout_multisig>(source_tx.vout[ms_out_index].target);
+  const txout_multisig& out_ms = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(source_tx.vout[ms_out_index]).target);
 
   crypto::public_key source_tx_pub_key = get_tx_pub_key_from_extra(source_tx);
 
@@ -1904,11 +1904,11 @@ bool make_tx_multisig_to_key(const currency::transaction& source_tx,
   CHECK_AND_ASSERT_MES(source_tx_out_idx < source_tx.vout.size(), false, "tx " << se.real_output << " has " << source_tx.vout.size() << " outputs, #" << source_tx_out_idx << " specified");
   se.real_output_in_tx_index = source_tx_out_idx;
   se.multisig_id = get_multisig_out_id(source_tx, se.real_output_in_tx_index);
-  CHECK_AND_ASSERT_MES(source_tx.vout[se.real_output_in_tx_index].target.type() == typeid(txout_multisig), false, "tx " << se.real_output << " output #" << source_tx_out_idx << " is not a txout_multisig");
-  const txout_multisig& ms_out = boost::get<txout_multisig>(source_tx.vout[se.real_output_in_tx_index].target);
+  CHECK_AND_ASSERT_MES(boost::get<currency::tx_out_bare>(source_tx.vout[se.real_output_in_tx_index]).target.type() == typeid(txout_multisig), false, "tx " << se.real_output << " output #" << source_tx_out_idx << " is not a txout_multisig");
+  const txout_multisig& ms_out = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(source_tx.vout[se.real_output_in_tx_index]).target);
   se.ms_keys_count = ms_out.keys.size();
   se.ms_sigs_count = ms_out.minimum_sigs;
-  se.amount = source_tx.vout[se.real_output_in_tx_index].amount;
+  se.amount =boost::get<currency::tx_out_bare>( source_tx.vout[se.real_output_in_tx_index]).amount;
 
   tx_destination_entry de(se.amount - fee, target_address);
 
@@ -2002,11 +2002,11 @@ bool generate_pos_block_with_given_coinstake(test_generator& generator, const st
       bool r = find_global_index_for_output(events, prev_id, stake_tx, stake_output_idx, stake_output_gidx);
       CHECK_AND_ASSERT_MES(r, false, "find_global_index_for_output failed");
     }
-    uint64_t stake_output_amount = stake_tx.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake_tx.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake_tx.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake_tx.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);

@@ -25,11 +25,19 @@ usage:
         //@#@      
       VARIANT_SWITCH_END();
 
-
       VARIANT_SWITCH_BEGIN(o);
-      VARIANT_CASE(txout_to_key, o)
-      VARIANT_CASE_TV(txout_multisig)
-      VARIANT_CASE_TV(txout_htlc)
+      VARIANT_CASE(txout_to_key, o);
+      VARIANT_CASE_TV(txout_multisig);
+      VARIANT_CASE_TV(txout_htlc);
+      VARIANT_SWITCH_END();
+
+ 
+
+      VARIANT_SWITCH_BEGIN(s);
+      VARIANT_CASE(void_sig, v);
+      VARIANT_CASE(NLSAG_sig, signatures);
+      VARIANT_CASE(zarcanum_sig, s);
+      //@#@
       VARIANT_SWITCH_END();
 
 

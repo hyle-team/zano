@@ -59,9 +59,9 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
   keypair ephemeral = AUTO_VAL_INIT(ephemeral);
   r = generate_key_image_helper(miner_acc.get_keys(), get_tx_pub_key_from_extra(blk_0.miner_tx), 0, ephemeral, ki);
   CHECK_AND_ASSERT_MES(r, false, "generate_key_image_helper failed");
-  CHECK_AND_ASSERT_MES(boost::get<txout_to_key>(blk_0.miner_tx.vout[0].target).key == ephemeral.pub, false, "ephemeral.pub doesn't match with output key");
+  CHECK_AND_ASSERT_MES(boost::get<txout_to_key>(blk_0.boost::get<currency::tx_out_bare>(miner_tx.vout[0]).target).key == ephemeral.pub, false, "ephemeral.pub doesn't match with output key");
   pos_entry pe = AUTO_VAL_INIT(pe);
-  pe.amount = blk_0.miner_tx.vout[0].amount;
+  pe.amount = blk_0.boost::get<currency::tx_out_bare>(miner_tx.vout[0]).amount;
   pe.block_timestamp = UINT64_MAX; // doesn't matter
   pe.index = 0; // global index
   pe.keyimage = ki;

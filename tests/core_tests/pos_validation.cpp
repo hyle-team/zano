@@ -71,11 +71,11 @@ bool gen_pos_coinstake_already_spent::generate(std::vector<test_event_entry>& ev
   uint64_t stake_output_gidx = 0;
   bool r = find_global_index_for_output(events, prev_id, stake, stake_output_idx, stake_output_gidx);
   CHECK_AND_ASSERT_MES(r, false, "find_global_index_for_output failed");
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
   pb.step1_init_header(height, prev_id);
@@ -122,11 +122,11 @@ bool gen_pos_incorrect_timestamp::generate(std::vector<test_event_entry>& events
   crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
   size_t stake_output_idx = 0;
   size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
   pb.step1_init_header(height, prev_id);
@@ -239,11 +239,11 @@ bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
   crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
   size_t stake_output_idx = 0;
   size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
   pb.step1_init_header(height, prev_id);
@@ -293,11 +293,11 @@ bool gen_pos_min_allowed_height::generate(std::vector<test_event_entry>& events)
   crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
   size_t stake_output_idx = 0;
   size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
   pb.step1_init_header(height, prev_id);
@@ -345,11 +345,11 @@ bool gen_pos_invalid_coinbase::generate(std::vector<test_event_entry>& events) c
   crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
   size_t stake_output_idx = 0;
   size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
   pb.step1_init_header(height, prev_id);
@@ -881,7 +881,7 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   // select stake_tx_out_id as an output with the biggest amount
   for (size_t i = 1; i < stake_tx.vout.size(); ++i)
   {
-    if (stake_tx.vout[i].amount > stake_tx.vout[stake_tx_out_id].amount)
+    if (boost::get<currency::tx_out_bare>(stake_tx.vout[i]).amount >boost::get<currency::tx_out_bare>( stake_tx.vout[stake_tx_out_id]).amount)
       stake_tx_out_id = i;
   }
 
