@@ -330,7 +330,7 @@ TEST(Serialization, serializes_transacion_signatures_correctly)
     ASSERT_TRUE(false);
   }
   
-  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+  ASSERT_EQ(linearize_vector2(boost::get<currency::NLSAG_sig>(tx.signature).s), linearize_vector2(boost::get<currency::NLSAG_sig>(tx1.signature).s));
 
   // Miner tx without signatures
   txin_gen txin_gen1;
@@ -344,10 +344,10 @@ TEST(Serialization, serializes_transacion_signatures_correctly)
   {
     ASSERT_TRUE(false);
   }
-  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+  ASSERT_EQ(linearize_vector2(boost::get<currency::NLSAG_sig>(tx.signature).s), linearize_vector2(boost::get<currency::NLSAG_sig>(tx1.signature).s));
 
   // Miner tx with empty signatures 2nd vector
-  tx.signatures.resize(1);
+  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(1);
   ASSERT_TRUE(serialization::dump_binary(tx, blob));
   ASSERT_EQ(9, blob.size()); // 5 bytes + 2 bytes vin[0] + 0 bytes extra + 0 bytes signatures + counter
   ASSERT_TRUE(serialization::parse_binary(blob, tx1));
@@ -355,29 +355,29 @@ TEST(Serialization, serializes_transacion_signatures_correctly)
   {
     ASSERT_TRUE(false);
   }
-  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+  ASSERT_EQ(linearize_vector2(boost::get<currency::NLSAG_sig>(tx.signature).s), linearize_vector2(boost::get<currency::NLSAG_sig>(tx1.signature).s));
 
   //TX VALIDATION REMOVED FROM SERIALIZATION
   /*
   // Miner tx with one signature
-  tx.signatures[0].resize(1);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[0].resize(1);
   ASSERT_FALSE(serialization::dump_binary(tx, blob));
 
   // Miner tx with 2 empty vectors
-  tx.signatures.resize(2);
-  tx.signatures[0].resize(0);
-  tx.signatures[1].resize(0);
+  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[0].resize(0);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[1].resize(0);
   ASSERT_FALSE(serialization::dump_binary(tx, blob));
 
   // Miner tx with 2 signatures
-  tx.signatures[0].resize(1);
-  tx.signatures[1].resize(1);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[0].resize(1);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[1].resize(1);
   ASSERT_FALSE(serialization::dump_binary(tx, blob));
   */
 
   // Two txin_gen, no signatures
   tx.vin.push_back(txin_gen1);
-  tx.signatures.resize(0);
+  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(0);
   ASSERT_TRUE(serialization::dump_binary(tx, blob));
   ASSERT_EQ(10, blob.size()); // 5 bytes + 2 * 2 bytes vins + 0 bytes extra + 0 bytes signatures
   ASSERT_TRUE(serialization::parse_binary(blob, tx1));
@@ -385,14 +385,14 @@ TEST(Serialization, serializes_transacion_signatures_correctly)
   {
     ASSERT_TRUE(false);
   }
-  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+  ASSERT_EQ(linearize_vector2(boost::get<currency::NLSAG_sig>(tx.signature).s), linearize_vector2(boost::get<currency::NLSAG_sig>(tx1.signature).s));
 
   // Two txin_gen, signatures vector contains only one empty element
-  //tx.signatures.resize(1);
+  //signatures.resize(1);
   //ASSERT_FALSE(serialization::dump_binary(tx, blob));
 
   // Two txin_gen, signatures vector contains two empty elements
-  tx.signatures.resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(2);
   ASSERT_TRUE(serialization::dump_binary(tx, blob));
   ASSERT_EQ(12, blob.size()); // 5 bytes + 2 * 2 bytes vins + 0 bytes extra + 0 bytes signatures
   ASSERT_TRUE(serialization::parse_binary(blob, tx1));
@@ -400,22 +400,22 @@ TEST(Serialization, serializes_transacion_signatures_correctly)
   {
     ASSERT_TRUE(false);
   }
-  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+  ASSERT_EQ(linearize_vector2(boost::get<currency::NLSAG_sig>(tx.signature).s), linearize_vector2(boost::get<currency::NLSAG_sig>(tx1.signature).s));
 
   // Two txin_gen, signatures vector contains three empty elements
-  //tx.signatures.resize(3);
+  //signatures.resize(3);
   //ASSERT_FALSE(serialization::dump_binary(tx, blob));
 
   // Two txin_gen, signatures vector contains two non empty elements
-  //tx.signatures.resize(2);
-  //tx.signatures[0].resize(1);
-  //tx.signatures[1].resize(1);
+  //signatures.resize(2);
+  //signatures[0].resize(1);
+  //signatures[1].resize(1);
   //ASSERT_FALSE(serialization::dump_binary(tx, blob));
 
   // A few bytes instead of signature
   tx.vin.clear();
   tx.vin.push_back(txin_gen1);
-  tx.signatures.clear();
+  boost::get<currency::NLSAG_sig>(tx.signature).s.clear();
   ASSERT_TRUE(serialization::dump_binary(tx, blob));
   blob.append(std::string(sizeof(crypto::signature) / 2, 'x'));
   ASSERT_FALSE(serialization::parse_binary(blob, tx1));
@@ -430,40 +430,40 @@ TEST(Serialization, serializes_transacion_signatures_correctly)
   //tx.vin.clear();
   //tx.vin.push_back(txin_to_key1);
   //tx.vin.push_back(txin_to_key1);
-  //tx.signatures.resize(1);
-  //tx.signatures[0].resize(2);
+  //signatures.resize(1);
+  //signatures[0].resize(2);
   //ASSERT_FALSE(serialization::dump_binary(tx, blob));
   
   
   
   /*
   // Too much signatures for two inputs
-  tx.signatures.resize(3);
-  tx.signatures[0].resize(2);
-  tx.signatures[1].resize(2);
-  tx.signatures[2].resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(3);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[0].resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[1].resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[2].resize(2);
   ASSERT_FALSE(serialization::dump_binary(tx, blob));
 
   // First signatures vector contains too little elements
-  tx.signatures.resize(2);
-  tx.signatures[0].resize(1);
-  tx.signatures[1].resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[0].resize(1);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[1].resize(2);
   ASSERT_FALSE(serialization::dump_binary(tx, blob));
 
   // First signatures vector contains too much elements
-  tx.signatures.resize(2);
-  tx.signatures[0].resize(3);
-  tx.signatures[1].resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[0].resize(3);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[1].resize(2);
   ASSERT_FALSE(serialization::dump_binary(tx, blob));
 
   // There are signatures for each input
-  tx.signatures.resize(2);
-  tx.signatures[0].resize(2);
-  tx.signatures[1].resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[0].resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[1].resize(2);
   ASSERT_TRUE(serialization::dump_binary(tx, blob));
   ASSERT_TRUE(serialization::parse_binary(blob, tx1));
   ASSERT_EQ(tx, tx1);
-  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+  ASSERT_EQ(linearize_vector2(boost::get<currency::NLSAG_sig>(tx.signature).s), linearize_vector2(boost::get<currency::NLSAG_sig>(tx1.signature).s));
 
   // Blob doesn't contain enough data
   blob.resize(blob.size() - sizeof(crypto::signature) / 2);
@@ -622,7 +622,7 @@ bool operator ==(const transaction_new_tests& a, const transaction_new_tests& b)
     a.extra.size() == b.extra.size() &&
     a.vin.size() == b.vin.size() &&
     a.vout.size() == b.vout.size() &&
-    a.signatures.size() == b.signatures.size();
+    boost::get<currency::NLSAG_sig>(a.signature).s.size() == boost::get<currency::NLSAG_sig>(b.signature).s.size();
 }
 
 bool operator ==(const transaction_new_tests& a, const transaction_old_tests& b) {
@@ -630,7 +630,7 @@ bool operator ==(const transaction_new_tests& a, const transaction_old_tests& b)
     a.extra.size() == b.extra.size() &&
     a.vin.size() == b.vin.size() &&
     a.vout.size() == b.vout.size() &&
-    a.signatures.size() == b.signatures.size();
+    boost::get<currency::NLSAG_sig>(a.signature).s.size() == boost::get<currency::NLSAG_sig>(b.signature).s.size();
 }
 
 void validate_tx_serialisation(transaction_new_tests& tx)
@@ -670,7 +670,7 @@ TEST(Serialization, serializes_transacion_versions)
   {
     ASSERT_TRUE(false);
   }
-  ASSERT_EQ(linearize_vector2(tx.signatures), linearize_vector2(tx1.signatures));
+  ASSERT_EQ(linearize_vector2(boost::get<currency::NLSAG_sig>(tx.signature).s), linearize_vector2(boost::get<currency::NLSAG_sig>(tx1.signature).s));
   */
 
   txin_gen txin_gen1;
@@ -705,12 +705,12 @@ TEST(Serialization, serializes_transacion_versions)
   eae.m_alias = "eokcmeockme";
   eae.m_text_comment = "sdssccsc";
   tx.extra.push_back(eae); 
-  tx.signatures.resize(2);
+  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(2);
   crypto::signature sig = epee::string_tools::parse_tpod_from_hex_string<crypto::signature>("22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab9985222608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
-  tx.signatures[0].push_back(sig);
-  tx.signatures[0].push_back(sig);
-  tx.signatures[1].push_back(sig);
-  tx.signatures[1].push_back(sig);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[0].push_back(sig);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[0].push_back(sig);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[1].push_back(sig);
+  boost::get<currency::NLSAG_sig>(tx.signature).s[1].push_back(sig);
   
   tx.version = TRANSACTION_VERSION_INITAL;
 

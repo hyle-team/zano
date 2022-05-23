@@ -253,8 +253,8 @@ inline bool build_custom_escrow_template(const std::vector<test_event_entry>& ev
 
   if (custom_config_mask & eccf_template_no_a_sigs)
   {
-    escrow_template_tx.signatures.clear();
-    escrow_template_tx.signatures.push_back(std::vector<crypto::signature>());
+    boost::get<currency::NLSAG_sig>(escrow_template_tx.signature).s.clear();
+    boost::get<currency::NLSAG_sig>(escrow_template_tx.signature).s.push_back(std::vector<crypto::signature>());
   }
 
   append_vector_by_another_vector(used_sources, sources);

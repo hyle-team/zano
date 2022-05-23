@@ -36,11 +36,11 @@ namespace currency
     {
       switch (hardfork_id)
       {
-      case 0: return true;
-      case 1: return height > hard_forks.hard_fork_01_starts_after_height;
-      case 2: return height > hard_forks.hard_fork_02_starts_after_height;
-      case 3: return height > hard_forks.hard_fork_03_starts_after_height;
-      case 4: return height > hard_forks.hard_fork_04_starts_after_height;
+      case ZANO_HARDFORK_00_INITAL: return true;
+      case ZANO_HARDFORK_01: return height > hard_forks.hard_fork_01_starts_after_height;
+      case ZANO_HARDFORK_02: return height > hard_forks.hard_fork_02_starts_after_height;
+      case ZANO_HARDFORK_03: return height > hard_forks.hard_fork_03_starts_after_height;
+      case ZANO_HARDFORK_04_ZARCANUM: return height > hard_forks.hard_fork_04_starts_after_height;
       default: return false;
       }
     }

@@ -1528,7 +1528,7 @@ bool blockchain_storage::print_transactions_statistics() const
 //     {
 //       total_full_blob += get_object_blobsize<transaction>(tx_entry.second.tx);
 //       transaction tx = tx_entry.second.tx;
-//       tx.signatures.clear();
+//       signatures.clear();
 //       total_cropped_blob += get_object_blobsize<transaction>(tx);
 //     }    
 //   }
@@ -4295,11 +4295,11 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   {
     if (!m_is_in_checkpoint_zone)
     {
-      VARIANT_SWITCH_BEGIN(tx.signatures);
+      VARIANT_SWITCH_BEGIN(tx.signature);
       VARIANT_CASE(void_sig, v);
       VARIANT_CASE(NLSAG_sig, signatures);
       {
-        CHECK_AND_ASSERT_MES(sig_index < tx.signatures.s.size(), false, "Wrong transaction: missing signature entry for input #" << sig_index << " tx: " << tx_prefix_hash);
+        CHECK_AND_ASSERT_MES(sig_index < signatures.s.size(), false, "Wrong transaction: missing signature entry for input #" << sig_index << " tx: " << tx_prefix_hash);
         psig = &signatures.s[sig_index];
       }
       VARIANT_CASE(zarcanum_sig, s);
@@ -4366,7 +4366,15 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   TIME_MEASURE_START_PD(tx_check_inputs_attachment_check);
   if (!m_is_in_checkpoint_zone)
   {
-    CHECK_AND_ASSERT_MES(tx.signatures.size() == sig_index, false, "tx signatures count differs from inputs");
+    VARIANT_SWITCH_BEGIN(tx.signature);
+    VARIANT_CASE(NLSAG_sig, signatures)
+    {
+      CHECK_AND_ASSERT_MES(signatures.size() == sig_index, false, "tx signatures count differs from inputs");
+    }
+    VARIANT_CASE(zarcanum_sig, s);
+    //@#@
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
     if (!(get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE))
     {
       bool r = validate_attachment_info(tx.extra, tx.attachment, false);
@@ -4607,7 +4615,7 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
   VARIANT_CASE(void_sig, v);
   VARIANT_CASE(NLSAG_sig, signatures)
   {
-    LOC_CHK(tx.signatures.size() > in_index, "ms input index is out of signatures container bounds, tx.signatures.size() = " << tx.signatures.size());
+    LOC_CHK(signatures.size() > in_index, "ms input index is out of signatures container bounds, signatures.size() = " << signatures.size());
     const std::vector<crypto::signature>& input_signatures = signatures.s[in_index];
 
     size_t expected_signatures_count = txin.sigs_count;
@@ -7005,7 +7013,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
     if (tx.signature.type() == typeid(NLSAG_sig))
     {
-      CHECK_AND_ASSERT_MES(boost::get<NLSAG_sig>(tx.signature).s.size() == tx.vin.size(), false, "invalid tx: tx.signatures.size() == " << boost::get<NLSAG_sig>(tx.signature).s.size() << ", tx.vin.size() == " << tx.vin.size());
+      CHECK_AND_ASSERT_MES(boost::get<NLSAG_sig>(tx.signature).s.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " << boost::get<NLSAG_sig>(tx.signature).s.size() << ", tx.vin.size() == " << tx.vin.size());
     }
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {

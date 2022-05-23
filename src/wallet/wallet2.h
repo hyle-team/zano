@@ -1014,6 +1014,7 @@ private:
     uint64_t detach_from_block_ids(uint64_t height);
     uint64_t get_wallet_minimum_height();
     uint64_t get_directly_spent_transfer_id_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
+    bool is_in_hardfork_zone(uint64_t hardfork_index);
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);

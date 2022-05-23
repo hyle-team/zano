@@ -358,7 +358,7 @@ bool gen_pos_invalid_coinbase::generate(std::vector<test_event_entry>& events) c
   pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), alice_acc.get_public_address());
   pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner_acc);
 
-  pb.m_block.miner_tx.signatures.clear(); // remove signatures
+  boost::get<currency::NLSAG_sig>(pb.m_block.miner_tx.signature).s.clear(); // remove signatures
 
   block blk_1 = pb.m_block;
 

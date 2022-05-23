@@ -25,8 +25,8 @@ struct ev_visitor : public boost::static_visitor<bool>
   {
     size_t real_bloc_size = t_serializable_object_to_blob(t).size();
 
-    std::cout << "prunging sigs: " << t.signatures.size() << ENDL;
-    t.signatures.clear();
+    std::cout << "prunging sigs: " << boost::get<currency::NLSAG_sig>(t.signature).s.size() << ENDL;
+    boost::get<currency::NLSAG_sig>(t.signature).s.clear();
 
     //check tx pruning correctnes
     if (real_bloc_size != get_object_blobsize(t))

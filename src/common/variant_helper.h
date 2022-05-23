@@ -38,6 +38,7 @@ usage:
       VARIANT_CASE(NLSAG_sig, signatures);
       VARIANT_CASE(zarcanum_sig, s);
       //@#@
+      VARIANT_CASE_THROW_ON_OTHER();
       VARIANT_SWITCH_END();
 
 

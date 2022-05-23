@@ -1034,7 +1034,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r && !tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed : " << tx_fully_signed);
   r = sign_multisig_input_in_tx_custom(tx_7, ms_6_out_idx, miner_acc.get_keys(), tx_6, &tx_fully_signed, false);
   CHECK_AND_ASSERT_MES(r && !tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed : " << tx_fully_signed);
-  tx_7.signatures[0].push_back(invalid_signature);   // instead of 4th sig just add invalid sig
+  boost::get<currency::NLSAG_sig>(tx_7.signature).s[0].push_back(invalid_signature);   // instead of 4th sig just add invalid sig
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_7);
@@ -1070,7 +1070,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_9, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
-  tx_9.signatures[0].resize(redundant_keys_count, invalid_signature);
+  boost::get<currency::NLSAG_sig>(tx_9.signature).s[0].resize(redundant_keys_count, invalid_signature);
 
   r = sign_multisig_input_in_tx_custom(tx_9, ms_8_out_idx, bob_acc.get_keys(), tx_8, &tx_fully_signed, false);
   CHECK_AND_ASSERT_MES(r && !tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed : " << tx_fully_signed);
@@ -1844,7 +1844,7 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   r = make_tx_multisig_to_key(tx_1, get_tx_out_index_by_amount(tx_1, amount), std::list<account_keys>({ alice_acc.get_keys() }), bob_acc.get_public_address(), tx_2);
   CHECK_AND_ASSERT_MES(r, false, "make_tx_multisig_to_key failed");
-  tx_2.signatures.resize(10);
+  boost::get<currency::NLSAG_sig>(tx_2.signature).s.resize(10);
   boost::get<txin_multisig>(tx_2.vin[0]).sigs_count = 10;
 
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -1860,7 +1860,7 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
   r = make_tx_multisig_to_key(tx_1, get_tx_out_index_by_amount(tx_1, amount), std::list<account_keys>({ alice_acc.get_keys() }), bob_acc.get_public_address(), tx_3);
   CHECK_AND_ASSERT_MES(r, false, "make_tx_multisig_to_key failed");
-  tx_3.signatures.clear();
+  boost::get<currency::NLSAG_sig>(tx_3.signature).s.clear();
   boost::get<txin_multisig>(tx_3.vin[0]).sigs_count = 0;
 
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
@@ -1892,7 +1892,7 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   boost::get<txout_multisig>(txb.boost::get<currency::tx_out_bare>(m_tx.vout[0]).target).keys.resize(1500, k);
   txb.step4_calc_hash();
   txb.step5_sign(sources);
-  txb.m_tx.signatures.clear();
+  boost::get<currency::NLSAG_sig>(txb.m_tx.signature).s.clear();
   transaction tx_6 = txb.m_tx;
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   events.push_back(tx_6);
@@ -2113,7 +2113,7 @@ bool ref_by_id_basics::generate(std::vector<test_event_entry>& events) const
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx");
 
-  r = check_ring_signature_at_gen_time(events, get_block_hash(blk_0r), boost::get<txin_to_key>(tx_1.vin[0]), get_transaction_hash(tx_1), tx_1.signatures[0]);
+  r = check_ring_signature_at_gen_time(events, get_block_hash(blk_0r), boost::get<txin_to_key>(tx_1.vin[0]), get_transaction_hash(tx_1), boost::get<currency::NLSAG_sig>(tx_1.signature).s[0]);
   CHECK_AND_ASSERT_MES(r, false, "check_ring_signature_at_gen_time failed");
 
   events.push_back(tx_1);

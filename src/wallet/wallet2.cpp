@@ -3462,6 +3462,12 @@ bool wallet2::get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index)
+{
+  const currency::core_runtime_config& rtc = get_core_runtime_config();
+  return rtc.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_and_sign_pos_block(currency::block& b, 
                                          const currency::pos_entry& pos_info, 
                                          const crypto::public_key& source_tx_pub_key, 
@@ -3473,43 +3479,51 @@ bool wallet2::prepare_and_sign_pos_block(currency::block& b,
   WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(currency::txin_to_key), false, "Wrong output input in transaction");
   auto& txin = boost::get<currency::txin_to_key>(b.miner_tx.vin[1]);
   txin.k_image = pos_info.keyimage;
-  WLT_CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 && b.miner_tx.signatures[0].size() == txin.key_offsets.size(),
-    false, "Wrong signatures amount in coinbase transacton");
+
+  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
+  {
+    //@#@ TODO: add proper support of Zarcanum
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "ZRCANUM BLOCKS NOT IMPLEMENTED YET");
+  }else
+  {
+    NLSAG_sig& signatures = boost::get<NLSAG_sig>(b.miner_tx.signature);
+    WLT_CHECK_AND_ASSERT_MES(signatures.size() == 1 && signatures[0].size() == txin.key_offsets.size(),
+      false, "Wrong signatures amount in coinbase transacton");
 
 
+    //derive secret key
+    crypto::key_derivation pos_coin_derivation = AUTO_VAL_INIT(pos_coin_derivation);
+    bool r = crypto::generate_key_derivation(source_tx_pub_key,
+      m_account.get_keys().view_secret_key,
+      pos_coin_derivation);
 
-  //derive secret key
-  crypto::key_derivation pos_coin_derivation = AUTO_VAL_INIT(pos_coin_derivation);
-  bool r = crypto::generate_key_derivation(source_tx_pub_key,
-    m_account.get_keys().view_secret_key,
-    pos_coin_derivation);
+    WLT_CHECK_AND_ASSERT_MES(r, false, "internal error: pos coin base generator: failed to generate_key_derivation("
+      << source_tx_pub_key
+      << ", view secret key: " << m_account.get_keys().view_secret_key << ")");
 
-  WLT_CHECK_AND_ASSERT_MES(r, false, "internal error: pos coin base generator: failed to generate_key_derivation("
-    <<  source_tx_pub_key
-    << ", view secret key: " << m_account.get_keys().view_secret_key << ")");
+    crypto::secret_key derived_secret_ephemeral_key = AUTO_VAL_INIT(derived_secret_ephemeral_key);
+    crypto::derive_secret_key(pos_coin_derivation,
+      in_tx_output_index,
+      m_account.get_keys().spend_secret_key,
+      derived_secret_ephemeral_key);
 
-  crypto::secret_key derived_secret_ephemeral_key = AUTO_VAL_INIT(derived_secret_ephemeral_key);
-  crypto::derive_secret_key(pos_coin_derivation,
-    in_tx_output_index,
-    m_account.get_keys().spend_secret_key,
-    derived_secret_ephemeral_key);
+    // sign block actually in coinbase transaction
+    crypto::hash block_hash = currency::get_block_hash(b);
 
-  // sign block actually in coinbase transaction
-  crypto::hash block_hash = currency::get_block_hash(b);
+    crypto::generate_ring_signature(block_hash,
+      txin.k_image,
+      keys_ptrs,
+      derived_secret_ephemeral_key,
+      0,
+      &signatures[0][0]);
 
-  crypto::generate_ring_signature(block_hash,
-    txin.k_image,
-    keys_ptrs,
-    derived_secret_ephemeral_key,
-    0,
-    &b.miner_tx.signatures[0][0]);
+    WLT_LOG_L4("GENERATED RING SIGNATURE: block_id " << block_hash
+      << "txin.k_image" << txin.k_image
+      << "key_ptr:" << *keys_ptrs[0]
+      << "signature:" << signatures[0][0]);
 
-  WLT_LOG_L4("GENERATED RING SIGNATURE: block_id " << block_hash
-    << "txin.k_image" << txin.k_image
-    << "key_ptr:" << *keys_ptrs[0]
-    << "signature:" << b.miner_tx.signatures[0][0]);
-
-  return true;
+    return true;
+  }
 }
 //------------------------------------------------------------------
 bool wallet2::build_kernel(const pos_entry& pe, const stake_modifier_type& stake_modifier, const uint64_t timestamp, stake_kernel& kernel)
