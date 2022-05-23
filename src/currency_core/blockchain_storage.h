@@ -39,7 +39,7 @@
 #include "dispatch_core_events.h"
 #include "bc_attachments_service_manager.h"
 #include "common/median_db_cache.h"
-
+#include "common/variant_helper.h"
 
 
 MARK_AS_POD_C11(crypto::key_image);
@@ -286,25 +286,24 @@ namespace currency
     uint64_t get_aliases_count()const;
     uint64_t get_block_h_older_then(uint64_t timestamp) const;
     bool validate_tx_service_attachmens_in_services(const tx_service_attachment& a, size_t i, const transaction& tx)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const signature_v& sig, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const signature_v& sig, uint64_t& max_related_block_height)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, const signature_v& sig, uint64_t& max_related_block_height)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
-    bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const signature_v& sig, const transaction& source_tx, size_t out_n) const;
+    bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
-    bool check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
+    bool check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
     bool check_input_signature(const transaction& tx, 
       size_t in_index, 
       uint64_t in_amount, 
       const crypto::key_image& k_image,
       const std::vector<txin_etc_details_v>& in_etc_details,
       const crypto::hash& tx_prefix_hash, 
-      const std::vector<crypto::signature>& sig, 
       const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
 
     uint64_t get_current_comulative_blocksize_limit()const;
@@ -597,7 +596,6 @@ namespace currency
       const crypto::hash& bl_id, 
       const crypto::hash& input_tx_hash, 
       size_t input_index, 
-      const signature_v& input_sigs, //const std::vector<crypto::signature>& input_sigs, 
       uint64_t split_height, 
       const alt_chain_type& alt_chain, 
       const std::unordered_set<crypto::hash>& alt_chain_block_ids, 
@@ -782,7 +780,7 @@ namespace currency
       */
 
       VARIANT_SWITCH_BEGIN(tx_ptr->tx.vout[n]);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
       {
         bool r = is_output_allowed_for_input(o.target, verified_input, get_current_blockchain_size() - tx_ptr->m_keeper_block_height);
         CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
@@ -821,21 +819,22 @@ namespace currency
           return false;
         }
 
-
         TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-        if (!vis.handle_output(tx_ptr->tx, validated_tx, tx_ptr->tx.vout[n], n))
+
+        if (!vis.handle_output(tx_ptr->tx, validated_tx, o, n))
         {
           LOG_PRINT_L0("Failed to handle_output for output id = " << tx_id << ", no " << n);
           return false;
         }
+        TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       }
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, oz)
         //@#@
+        return false;
       VARIANT_CASE_THROW_ON_OTHER();
       VARIANT_SWITCH_END();
 
 
-      TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
 
       if (max_related_block_height < tx_ptr->m_keeper_block_height)
         max_related_block_height = tx_ptr->m_keeper_block_height;

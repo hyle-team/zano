@@ -75,7 +75,8 @@ bool transition_convert(const transaction_prefix_v1& from, transaction_prefix_cu
 }
 
 
-class transaction_v1: 
+
+class transaction_v1
 {
 public:
   std::vector<std::vector<crypto::signature> > signatures; //count signatures  always the same as inputs count

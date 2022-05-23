@@ -659,16 +659,24 @@ namespace currency
   struct NLSAG_sig
   {
     std::vector<std::vector<crypto::signature> > s;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(s)
+    END_SERIALIZE()
   };
 
   struct zarcanum_sig
   {
     //TODO:
+    BEGIN_SERIALIZE_OBJECT()
+    END_SERIALIZE()
   };
 
   struct void_sig
   {
     //TODO:
+    BEGIN_SERIALIZE_OBJECT()
+    END_SERIALIZE()
   };
 
   typedef boost::variant<void_sig, NLSAG_sig, zarcanum_sig> signature_v;
@@ -740,7 +748,7 @@ namespace currency
     vin.clear();
     vout.clear();
     extra.clear();
-    signatures.clear();
+    signature = void_sig();
     attachment.clear();
     
   }

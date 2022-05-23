@@ -4,7 +4,8 @@
 
 #pragma once
 
-#define VARIANT_SWITCH_BEGIN(v_type_obj) {decltype(v_type_obj)& local_reference_eokcmeokmeokcm = v_type_obj; if(false) {;
+#define VARIANT_SWITCH_BEGIN(v_type_obj) {auto & local_reference_eokcmeokmeokcm = v_type_obj; if(false) {;
+#define VARIANT_CASE_CONST(v_type, typed_name) } else if(local_reference_eokcmeokmeokcm.type() == typeid(v_type)) {  const v_type& typed_name = boost::get<v_type>(local_reference_eokcmeokmeokcm);
 #define VARIANT_CASE(v_type, typed_name) } else if(local_reference_eokcmeokmeokcm.type() == typeid(v_type)) {  v_type& typed_name = boost::get<v_type>(local_reference_eokcmeokmeokcm);
 #define VARIANT_CASE_TV(v_type) VARIANT_CASE(v_type, tv) 
 #define VARIANT_CASE_OTHER() } else { 
@@ -26,9 +27,10 @@ usage:
       VARIANT_SWITCH_END();
 
       VARIANT_SWITCH_BEGIN(o);
-      VARIANT_CASE(txout_to_key, o);
-      VARIANT_CASE_TV(txout_multisig);
-      VARIANT_CASE_TV(txout_htlc);
+      VARIANT_CASE_CONST(txout_to_key, o);
+      VARIANT_CASE_CONST(txout_multisig, ms);
+      VARIANT_CASE_CONST(txout_htlc, htlc);
+      VARIANT_CASE_THROW_ON_OTHER();
       VARIANT_SWITCH_END();
 
  
