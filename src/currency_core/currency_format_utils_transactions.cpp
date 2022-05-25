@@ -8,7 +8,7 @@
 #include "serialization/serialization.h"
 #include "currency_format_utils.h"
 #include "currency_format_utils_abstract.h"
-#include "variant_helper.h"
+#include "common/variant_helper.h"
 
 namespace currency
 {
@@ -44,13 +44,13 @@ namespace currency
     for (auto& o : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(o);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(txout_to_key))
         {
           if (boost::get<txout_to_key>(o.target).key == null_pkey)
             res += o.amount;
         }
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@
       VARIANT_CASE_THROW_ON_OTHER();        
       VARIANT_SWITCH_END();

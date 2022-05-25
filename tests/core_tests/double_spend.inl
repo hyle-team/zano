@@ -71,7 +71,7 @@ bool gen_double_spend_in_tx<txs_kept_by_block>::generate(std::vector<test_event_
   // find correct output by amount (selecting random or fixed one can be possibly mistaken with changeback)
   for (auto out : tx_0.vout)
   {
-    se.amount = out.amount;
+    se.amount = boost::get<currency::tx_out_bare>(out).amount;
     if (se.amount == send_amount)
       break;
     ++se.real_output_in_tx_index;

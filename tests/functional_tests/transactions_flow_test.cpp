@@ -196,7 +196,7 @@ uint64_t got_money_in_first_transfers(const tools::wallet2::transfer_container& 
   size_t count = 0;
   BOOST_FOREACH(const tools::wallet2::transfer_details& td, incoming_transfers)
   {
-    summ += td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].amount;
+    summ += boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).amount;
     if(++count >= n_transfers)
       return summ;
   }
@@ -459,9 +459,9 @@ bool transactions_flow_test(
 
         ++count;
         currency::transaction tx_s;
-        if (w1.unlocked_balance() >= td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].amount)
+        if (w1.unlocked_balance() >= boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).amount)
         {
-          bool r = do_send_money_by_fractions(w1, w1, 0, td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].amount - TX_DEFAULT_FEE, tx_s, transfer_size);
+          bool r = do_send_money_by_fractions(w1, w1, 0, boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).amount - TX_DEFAULT_FEE, tx_s, transfer_size);
           CHECK_AND_ASSERT_MES(r, false, "Failed to send starter tx " << get_transaction_hash(tx_s));
         }
         else

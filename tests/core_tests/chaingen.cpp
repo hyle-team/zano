@@ -620,8 +620,8 @@ bool test_generator::build_outputs_indext_for_chain(const blockchain_vector& blo
     std::vector<uint64_t>& coinbase_outs = txs_outs[currency::get_transaction_hash(blocks[h]->b.miner_tx)];
     for (size_t out_i = 0; out_i != blocks[h]->b.miner_tx.vout.size(); out_i++)
     {
-      coinbase_outs.push_back(index[blocks[h]->b.boost::get<currency::tx_out_bare>(miner_tx.vout[out_i]).amount].size());
-      index[blocks[h]->b.boost::get<currency::tx_out_bare>(miner_tx.vout[out_i]).amount].push_back(std::tuple<size_t, size_t, size_t>(h, 0, out_i));
+      coinbase_outs.push_back(index[boost::get<currency::tx_out_bare>(blocks[h]->b.miner_tx.vout[out_i]).amount].size());
+      index[boost::get<currency::tx_out_bare>(blocks[h]->b.miner_tx.vout[out_i]).amount].push_back(std::tuple<size_t, size_t, size_t>(h, 0, out_i));
     }
 
     for (size_t tx_index = 0; tx_index != blocks[h]->m_transactions.size(); tx_index++)
@@ -629,8 +629,8 @@ bool test_generator::build_outputs_indext_for_chain(const blockchain_vector& blo
       std::vector<uint64_t>& tx_outs_indx = txs_outs[currency::get_transaction_hash(blocks[h]->m_transactions[tx_index])];
       for (size_t out_i = 0; out_i != blocks[h]->m_transactions[tx_index].vout.size(); out_i++)
       {
-        tx_outs_indx.push_back(index[blocks[h]->m_transactions[tx_index]boost::get<currency::tx_out_bare>(.vout[out_i]).amount].size());
-        index[blocks[h]->m_transactions[tx_index]boost::get<currency::tx_out_bare>(.vout[out_i]).amount].push_back(std::tuple<size_t, size_t, size_t>(h, tx_index + 1, out_i));
+        tx_outs_indx.push_back(index[boost::get<currency::tx_out_bare>(blocks[h]->m_transactions[tx_index].vout[out_i]).amount].size());
+        index[boost::get<currency::tx_out_bare>(blocks[h]->m_transactions[tx_index].vout[out_i]).amount].push_back(std::tuple<size_t, size_t, size_t>(h, tx_index + 1, out_i));
       }
     }
   }
@@ -663,13 +663,13 @@ bool test_generator::get_output_details_by_global_index(const test_generator::bl
   CHECK_AND_ASSERT_THROW_MES(tx_out_index < tx->vout.size(), "tx_index < blck_chain[h].m_transactions.size()");
 
   tx_pub_key = get_tx_pub_key_from_extra(*tx);
-  CHECK_AND_ASSERT_THROW_MES(tx->vout[tx_out_index].target.type() == typeid(currency::txout_to_key),
+  CHECK_AND_ASSERT_THROW_MES(boost::get<tx_out_bare>(tx->vout[tx_out_index]).target.type() == typeid(currency::txout_to_key),
     "blck_chain[h]->m_transactions[tx_index]boost::get<currency::tx_out_bare>(.vout[tx_out_index]).target.type() == typeid(currency::txout_to_key)");
 
-  CHECK_AND_ASSERT_THROW_MES(tx->vout[tx_out_index].amount == amount,
+  CHECK_AND_ASSERT_THROW_MES(boost::get<tx_out_bare>(tx->vout[tx_out_index]).amount == amount,
     "blck_chain[h]->m_transactions[tx_index]boost::get<currency::tx_out_bare>(.vout[tx_out_index]).amount == amount");
 
-  output_key = boost::get<currency::txout_to_key>(tx->vout[tx_out_index].target).key;
+  output_key = boost::get<currency::txout_to_key>(boost::get<tx_out_bare>(tx->vout[tx_out_index]).target).key;
   return true;
 }
 //------------------------------------------------------------------
@@ -1093,7 +1093,7 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
 
       for (size_t j = 0; j < tx.vout.size(); ++j)
       {
-        const tx_out_bare &out = tx.vout[j];
+        const tx_out_bare &out = boost::get<tx_out_bare>(tx.vout[j]);
         output_index oi(out.target, out.amount, boost::get<txin_gen>(*blk.miner_tx.vin.begin()).height, i, j, &blk, vtx[i]);
 
         if (out.target.type() == typeid(txout_to_key))
@@ -1773,7 +1773,7 @@ bool find_global_index_for_output(const std::vector<test_event_entry>& events, c
   auto process_tx = [&reference_tx, &reference_tx_out_index, &global_outputs](const currency::transaction& tx) -> uint64_t
   {
     for (size_t tx_out_index = 0; tx_out_index < tx.vout.size(); ++tx_out_index) {
-      const tx_out_bare &out = tx.vout[tx_out_index];
+      const tx_out_bare &out = boost::get<tx_out_bare>(tx.vout[tx_out_index]);
       if (out.target.type() == typeid(txout_to_key)) {
         uint64_t global_out_index = global_outputs[out.amount]++;
 
@@ -2053,7 +2053,7 @@ bool check_ring_signature_at_gen_time(const std::vector<test_event_entry>& event
       auto it = mtx.find(rbi.tx_id);
       CHECK_AND_ASSERT_MES(it != mtx.end(), false, "it == end");
       CHECK_AND_ASSERT_MES(rbi.n < it->second->vout.size(), false, "FAIL: rbi.n < it->second->vout.size()");
-      auto& pub_key = boost::get<txout_to_key>(it->second->vout[rbi.n].target).key;
+      auto& pub_key = boost::get<txout_to_key>(boost::get<tx_out_bare>(it->second->vout[rbi.n]).target).key;
 
       pub_keys.push_back(pub_key);
       pub_keys_ptrs.push_back(&pub_keys.back());

@@ -1132,7 +1132,7 @@ namespace currency
     for (auto ov : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(ov);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(txout_htlc))
         {
           htlc_out = o;
@@ -1158,13 +1158,18 @@ namespace currency
     return get_tx_type_ex(tx, htlc_out, htlc_in);
   }
   //---------------------------------------------------------------
-  size_t get_multisig_out_index(const std::vector<tx_out_bare>& outs)
+  size_t get_multisig_out_index(const std::vector<tx_out_v>& outs)
   {
     size_t n = 0;
     for (; n != outs.size(); n++)
     {
-      if (outs[n].target.type() == typeid(txout_multisig))
-        break;
+      VARIANT_SWITCH_BEGIN(outs[n]);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_multisig))
+          break;
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@
+      VARIANT_SWITCH_END();
     }
     return n;
   }
@@ -1278,7 +1283,7 @@ namespace currency
     {
       tx.vin.clear();
       tx.vout.clear();
-      tx.signature.clear();
+      tx.signature = NLSAG_sig();
       tx.extra = extra;
 
       tx.version = ftp.tx_version;
@@ -1604,9 +1609,9 @@ namespace currency
     for (auto& out : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(out);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
         reward += o.amount;
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@      
       VARIANT_SWITCH_END();
     }
@@ -1661,13 +1666,13 @@ namespace currency
     {
 
       VARIANT_SWITCH_BEGIN(source_tx.vout[i]);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(txout_multisig) && ms_in.multisig_out_id == get_multisig_out_id(source_tx, i))
         {
           ms_out_index = i;
           break;
         }
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@      
       VARIANT_SWITCH_END();
     }
@@ -1826,20 +1831,20 @@ namespace currency
     {
 
       VARIANT_SWITCH_BEGIN(vo);
-      VARIANT_CASE(tx_out_bare, out)
+      VARIANT_CASE_CONST(tx_out_bare, out)
       {
         CHECK_AND_NO_ASSERT_MES(0 < out.amount, false, "zero amount output in transaction id=" << get_transaction_hash(tx));
         
         VARIANT_SWITCH_BEGIN(out.target);
-        VARIANT_CASE(txout_to_key, tk)
+        VARIANT_CASE_CONST(txout_to_key, tk)
           if (!check_key(tk.key))
             return false;
-        VARIANT_CASE(txout_htlc, htlc)
+        VARIANT_CASE_CONST(txout_htlc, htlc)
           if (!check_key(htlc.pkey_redeem))
             return false;
           if (!check_key(htlc.pkey_refund))
             return false;
-        VARIANT_CASE(txout_multisig, ms)
+        VARIANT_CASE_CONST(txout_multisig, ms)
           if (!(ms.keys.size() > 0 && ms.minimum_sigs > 0 && ms.minimum_sigs <= ms.keys.size()))
           {
             LOG_ERROR("wrong multisig in transaction id=" << get_transaction_hash(tx));
@@ -1850,7 +1855,7 @@ namespace currency
             << ", in transaction id=" << get_transaction_hash(tx));
         VARIANT_SWITCH_END();
       }
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@      
       VARIANT_SWITCH_END();
     }
@@ -1901,11 +1906,11 @@ namespace currency
     BOOST_FOREACH(const auto& o, tx.vout)
     {
       VARIANT_SWITCH_BEGIN(o);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
         if (money > o.amount + money)
           return false;
         money += o.amount;
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@      
       VARIANT_SWITCH_END();
     }
@@ -1918,9 +1923,9 @@ namespace currency
     for (const auto& o : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(o);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
         outputs_amount += o.amount;
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@      
       VARIANT_SWITCH_END();
     }
@@ -2034,22 +2039,22 @@ namespace currency
     for(const auto& ov : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(ov);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
       {
         VARIANT_SWITCH_BEGIN(o.target);
-        VARIANT_CASE(txout_to_key, t)
+        VARIANT_CASE_CONST(txout_to_key, t)
           if (is_out_to_acc(acc, t, derivation, i))
           {
             outs.push_back(i);
             money_transfered += o.amount;
           }
-        VARIANT_CASE(txout_multisig, t)
+        VARIANT_CASE_CONST(txout_multisig, t)
           if (is_out_to_acc(acc, t, derivation, i))
           {
             outs.push_back(i);
             //don't count this money
           }
-        VARIANT_CASE(txout_htlc, htlc)
+        VARIANT_CASE_CONST(txout_htlc, htlc)
           htlc_info hi = AUTO_VAL_INIT(hi);
           if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, i))
           {
@@ -2068,7 +2073,7 @@ namespace currency
           return false;
         VARIANT_SWITCH_END();
       }
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@  
       VARIANT_SWITCH_END();
       i++;
@@ -2542,14 +2547,14 @@ namespace currency
     for (const auto& out : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(out);
-      VARIANT_CASE(tx_out_bare, out)
+      VARIANT_CASE_CONST(tx_out_bare, out)
         if (out.target.type() != typeid(txout_to_key))
           continue;
 
         const txout_to_key& o = boost::get<txout_to_key>(out.target);
         if (o.key == null_pkey)
           found_alias_reward += out.amount;
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@      
       VARIANT_SWITCH_END();
 
@@ -2790,29 +2795,29 @@ namespace currency
       tei.outs.back().is_spent = ptce ? ptce->m_spent_flags[i] : false;
       tei.outs.back().global_index = ptce ? ptce->m_global_output_indexes[i] : 0;
       VARIANT_SWITCH_BEGIN(out);
-      VARIANT_CASE(tx_out_bare, out)
+      VARIANT_CASE_CONST(tx_out_bare, out)
       {
         tei.outs.back().amount = out.amount;
 
         VARIANT_SWITCH_BEGIN(out.target);
-        VARIANT_CASE(txout_to_key, otk)
+        VARIANT_CASE_CONST(txout_to_key, otk)
           tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.key));
           if (otk.mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
             tei.outs.back().pub_keys.back() += "(FORCED_NO_MIX)";
           if (otk.mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
             tei.outs.back().pub_keys.back() += std::string("(FORCED_MIX_LOWER_BOUND: ") + std::to_string(otk.mix_attr) + ")";
-        VARIANT_CASE(txout_multisig, otm)
+        VARIANT_CASE_CONST(txout_multisig, otm)
           for (auto& k : otm.keys)
           {
             tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(k));
           }
           tei.outs.back().minimum_sigs = otm.minimum_sigs;
-        VARIANT_CASE(txout_htlc, otk)
+        VARIANT_CASE_CONST(txout_htlc, otk)
           tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_redeem) + "(htlc_pkey_redeem)");
           tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_refund) + "(htlc_pkey_refund)");
         VARIANT_SWITCH_END();
       }
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@      
       VARIANT_SWITCH_END();
       ++i;
@@ -2923,13 +2928,13 @@ namespace currency
     for (size_t n = 0; n < tx.vout.size(); ++n)
     {
       VARIANT_SWITCH_BEGIN(tx.vout[n]);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(txout_to_key) || o.target.type() == typeid(txout_htlc))
         {
           uint64_t amount = o.amount;
           gindices[amount] += 1;
         }
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@      
       VARIANT_SWITCH_END();
     }
@@ -3019,6 +3024,15 @@ namespace currency
       return false;
 
     if (tx.vin[0].type() != typeid(txin_gen))
+      return false;
+
+    return true;
+  }
+  //-----------------------------------------------------------------------
+  bool is_pos_coinbase(const transaction& tx)
+  {
+    bool pos = false;
+    if (!is_coinbase(tx, pos) || !pos)
       return false;
 
     return true;

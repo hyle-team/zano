@@ -4526,8 +4526,13 @@ bool blockchain_storage::check_input_signature(const transaction& tx,
 
   CHECK_AND_ASSERT_MES(tx.signature.type() == typeid(NLSAG_sig), false, "Unexpected type of sig in check_input_signature: " << tx.signature.type().name());
   auto s = boost::get<NLSAG_sig>(tx.signature).s;
-  CHECK_AND_ASSERT_MES(s.size() > in_index, false, "Failed to check s.size(){" << s.size() << "} > in_index {" << in_index <<  "}" );
-  const std::vector<crypto::signature>& sig = s[in_index];
+  uint64_t actual_sig_index = in_index;
+  if (is_pos_coinbase(tx))
+  {
+    actual_sig_index = 0;
+  }
+  CHECK_AND_ASSERT_MES(s.size() > actual_sig_index, false, "Failed to check s.size(){" << s.size() << "} > actual_sig_index {" << actual_sig_index <<  "}" );
+  const std::vector<crypto::signature>& sig = s[actual_sig_index];
   if (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE)
   {
     // check attachments, mentioned directly in this input
@@ -4585,7 +4590,7 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
   LOC_CHK(is_tx_spendtime_unlocked(unlock_time), "Source transaction is LOCKED! unlock_time: " << unlock_time << ", now is " << m_core_runtime_config.get_core_time() << ", blockchain size is " << get_current_blockchain_size());
 
   LOC_CHK(source_tx.vout.size() > out_n, "internal error: out_n==" << out_n << " is out-of-bounds of source_tx.vout, size=" << source_tx.vout.size());
-  LOC_CHK(source_tx.vout[out_n].type() != typeid(tx_out_bare), "internal error: out_n==" << out_n << " has unexpected type: " << source_tx.vout[out_n].type().name());
+  LOC_CHK(source_tx.vout[out_n].type() == typeid(tx_out_bare), "internal error: out_n==" << out_n << " has unexpected type: " << source_tx.vout[out_n].type().name());
 
   const tx_out_bare& source_tx_out = boost::get<tx_out_bare>(source_tx.vout[out_n]);
   const txout_multisig& source_ms_out_target = boost::get<txout_multisig>(source_tx_out.target);
@@ -4697,7 +4702,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   auto source_tx_ptr = m_db_transactions.find(source_tx_id);
   LOC_CHK(source_tx_ptr, "Can't find source transaction");
   LOC_CHK(source_tx_ptr->tx.vout.size() > n, "ms output index is incorrect, source tx's vout size is " << source_tx_ptr->tx.vout.size());
-  LOC_CHK(source_tx_ptr->tx.vout[n].type() != typeid(tx_out_bare), "internal error: out_n==" << n << " has unexpected type: " << source_tx_ptr->tx.vout[n].type().name());
+  LOC_CHK(source_tx_ptr->tx.vout[n].type() == typeid(tx_out_bare), "internal error: out_n==" << n << " has unexpected type: " << source_tx_ptr->tx.vout[n].type().name());
   LOC_CHK(boost::get<tx_out_bare>(source_tx_ptr->tx.vout[n]).target.type() == typeid(txout_multisig), "ms output has wrong type, txout_multisig expected");
   LOC_CHK(source_tx_ptr->m_spent_flags.size() > n, "Internal error, m_spent_flags size (" << source_tx_ptr->m_spent_flags.size() << ") less then expected, n: " << n);
   LOC_CHK(source_tx_ptr->m_spent_flags[n] == false, "Internal error, ms output is already spent"); // should never happen as multisig_ptr->spent_height is checked above

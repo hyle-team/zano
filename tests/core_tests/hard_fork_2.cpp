@@ -653,9 +653,9 @@ bool hard_fork_2_auditable_addresses_basics::generate(std::vector<test_event_ent
   // make sure all Bob's outputs has mix_attr = 1
   for (auto& out : tx_1.vout)
   {
-    if (out.amount != MK_TEST_COINS(5))
+    if (boost::get<tx_out_bare>(out).amount != MK_TEST_COINS(5))
       continue; // skip change
-    uint8_t mix_attr = boost::get<txout_to_key>(out.target).mix_attr;
+    uint8_t mix_attr = boost::get<txout_to_key>(boost::get<tx_out_bare>(out).target).mix_attr;
     CHECK_AND_ASSERT_MES(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, false, "Incorrect mix_attr in tx_1: " << mix_attr);
   }
   
@@ -686,9 +686,9 @@ bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_ind
   // make sure all Bob's outputs has mix_attr = 1
   for (auto& out : tx.vout)
   {
-    if (out.amount != MK_TEST_COINS(1))
+    if (boost::get<tx_out_bare>(out).amount != MK_TEST_COINS(1))
       continue; // skip change
-    uint8_t mix_attr = boost::get<txout_to_key>(out.target).mix_attr;
+    uint8_t mix_attr = boost::get<txout_to_key>(boost::get<tx_out_bare>(out).target).mix_attr;
     CHECK_AND_ASSERT_MES(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, false, "Incorrect mix_attr in tx: " << mix_attr);
   }
 
@@ -711,9 +711,9 @@ bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_ind
   // make sure all Bob's outputs has mix_attr = 1
   for (auto& out : tx.vout)
   {
-    if (out.amount != MK_TEST_COINS(1))
+    if (boost::get<tx_out_bare>(out).amount != MK_TEST_COINS(1))
       continue; // skip change
-    uint8_t mix_attr = boost::get<txout_to_key>(out.target).mix_attr;
+    uint8_t mix_attr = boost::get<txout_to_key>(boost::get<tx_out_bare>(out).target).mix_attr;
     CHECK_AND_ASSERT_MES(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, false, "Incorrect mix_attr in tx: " << mix_attr);
   }
 

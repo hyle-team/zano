@@ -134,7 +134,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   std::vector<currency::tx_source_entry> sources;
   for (size_t i = 0; i < blk_0.miner_tx.vout.size(); ++i)
   {
-    if (TESTS_DEFAULT_FEE < blk_0.boost::get<currency::tx_out_bare>(miner_tx.vout[i]).amount)
+    if (TESTS_DEFAULT_FEE < boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[i]).amount)
     {
       append_tx_source_entry(sources, blk_0.miner_tx, i);
       break;
@@ -165,7 +165,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   sources.clear();
   for (size_t i = 0; i < tx_1.vout.size(); ++i)
   {
-    auto& tx_1_out = tx_1.vout[i];
+    auto& tx_1_out = boost::get<tx_out_bare>(tx_1.vout[i]);
     if (tx_1_out.amount < TX_MAX_TRANSFER_AMOUNT - 1)
       continue;
 

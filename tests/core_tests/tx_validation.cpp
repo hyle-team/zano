@@ -494,7 +494,7 @@ bool gen_tx_txout_to_key_has_invalid_key::generate(std::vector<test_event_entry>
   builder.step2_fill_inputs(miner_account.get_keys(), sources);
   builder.step3_fill_outputs(destinations);
 
-  txout_to_key& out_to_key =  boost::get<txout_to_key>(builder.m_tx.vout.front().target);
+  txout_to_key& out_to_key =  boost::get<txout_to_key>(boost::get<tx_out_bare>(builder.m_tx.vout.front()).target);
   out_to_key.key = tx_builder::generate_invalid_pub_key();
 
   builder.step4_calc_hash();
@@ -523,7 +523,7 @@ bool gen_tx_output_with_zero_amount::generate(std::vector<test_event_entry>& eve
   builder.step2_fill_inputs(miner_account.get_keys(), sources);
   builder.step3_fill_outputs(destinations);
 
-  builder.m_tx.vout.front().amount = 0;
+  boost::get<tx_out_bare>(builder.m_tx.vout.front()).amount = 0;
 
   builder.step4_calc_hash();
   builder.step5_sign(sources);

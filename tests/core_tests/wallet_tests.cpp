@@ -21,7 +21,7 @@ const std::wstring g_wallet_filename = L"~coretests.wallet.file.tmp";
 const std::string g_wallet_password = "dofatibmzibeziyekigo";
 const currency::account_base null_account = AUTO_VAL_INIT(null_account);
 
-
+//@#@: TODO: need refactoring, unsafe operations
 POD_MAKE_COMPARABLE(currency, tx_out_bare);
 
 // Determines which output is real and actually spent in tx inputs, when there are fake outputs.
@@ -39,7 +39,8 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
     bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_bare& out, uint64_t out_i)
     {
       CHECK_AND_ASSERT_MES(!m_found, false, "Internal error: m_found is true but the visitor is still being applied");
-      auto it = std::find(validated_tx.vout.begin(), validated_tx.vout.end(), out);
+      auto is_even = [&](const tx_out_v& v) { return boost::get<tx_out_bare>(v) == out; };
+      auto it = std::find_if(validated_tx.vout.begin(), validated_tx.vout.end(), is_even);
       if (it == validated_tx.vout.end())
         return false;
       size_t output_tx_index = it - validated_tx.vout.begin();

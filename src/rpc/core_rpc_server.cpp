@@ -973,9 +973,9 @@ namespace currency
     BOOST_FOREACH(const auto& out, blk.miner_tx.vout)
     {
       VARIANT_SWITCH_BEGIN(out);
-      VARIANT_CASE(tx_out_bare, out)
+      VARIANT_CASE_CONST(tx_out_bare, out)
         reward += out.amount;
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, out)
         //@#@      
       VARIANT_SWITCH_END();
     }

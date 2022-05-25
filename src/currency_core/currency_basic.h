@@ -663,6 +663,10 @@ namespace currency
     BEGIN_SERIALIZE_OBJECT()
       FIELD(s)
     END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(s)
+    END_BOOST_SERIALIZATION()
   };
 
   struct zarcanum_sig
@@ -670,6 +674,9 @@ namespace currency
     //TODO:
     BEGIN_SERIALIZE_OBJECT()
     END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION()
   };
 
   struct void_sig
@@ -677,9 +684,12 @@ namespace currency
     //TODO:
     BEGIN_SERIALIZE_OBJECT()
     END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION()
   };
 
-  typedef boost::variant<void_sig, NLSAG_sig, zarcanum_sig> signature_v;
+  typedef boost::variant<NLSAG_sig, void_sig, zarcanum_sig> signature_v;
 
 
 
@@ -748,7 +758,7 @@ namespace currency
     vin.clear();
     vout.clear();
     extra.clear();
-    signature = void_sig();
+    signature = NLSAG_sig();
     attachment.clear();
     
   }

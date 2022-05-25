@@ -1331,11 +1331,11 @@ namespace currency
     for (const auto& out : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(out);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(txout_multisig))
           result.push_back(ms_out_info({ get_multisig_out_id(tx, idx), idx, false }));
 
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@
       VARIANT_CASE_THROW_ON_OTHER();
       VARIANT_SWITCH_END();
@@ -1355,10 +1355,10 @@ namespace currency
     for (const auto& out : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(out);
-      VARIANT_CASE(tx_out_bare, o)
+      VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(txout_multisig) && get_multisig_out_id(tx, idx) == multisig_id)
           return true;
-      VARIANT_CASE_TV(tx_out_zarcanum)
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@
       VARIANT_SWITCH_END();
       ++idx;

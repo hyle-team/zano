@@ -46,7 +46,6 @@ public:
 template<typename transaction_prefix_current_t>
 bool transition_convert(const transaction_prefix_current_t& from, transaction_prefix_v1& to)
 {
-  to.version = from.version;
   to.extra = from.extra;
   to.vin = from.vin;
   for (const auto& v : from.vout)
@@ -64,7 +63,6 @@ bool transition_convert(const transaction_prefix_current_t& from, transaction_pr
 template<typename transaction_prefix_current_t>
 bool transition_convert(const transaction_prefix_v1& from, transaction_prefix_current_t& to)
 {
-  to.version = from.version;
   to.extra = from.extra;
   to.vin = from.vin;
   for (const auto& v : from.vout)
