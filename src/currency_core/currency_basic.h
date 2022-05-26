@@ -954,7 +954,7 @@ SET_VARIANT_TAGS(crypto::bpp_signature_serialized, 40, "bpp_signature_serialized
 SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 41, "bppe_signature_serialized");
 SET_VARIANT_TAGS(currency::NLSAG_sig, 42, "NLSAG_sig");
 SET_VARIANT_TAGS(currency::zarcanum_sig, 43, "zarcanum_sig");
-SET_VARIANT_TAGS(currency::void_sig, 43, "void_sig");
+SET_VARIANT_TAGS(currency::void_sig, 44, "void_sig");
 
 
 
