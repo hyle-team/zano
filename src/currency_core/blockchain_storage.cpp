@@ -3363,7 +3363,7 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
         global_indexes.push_back(m_db_outputs.get_item_size(ot.amount) - 1);
         if (ot.target.type() == typeid(txout_htlc) && !is_hardfork_active(3))
         {
-          LOG_ERROR("Error: Transaction with txout_htlc before is_after_hardfork_3_zone(before height " << m_core_runtime_config.hard_forks.hard_fork_03_starts_after_height << ")");
+          LOG_ERROR("Error: Transaction with txout_htlc before hardfork 3 (before height " << m_core_runtime_config.hard_forks.get_str_height_the_hardfork_active_after(3) << ")");
           return false;
         }
       }
@@ -5874,18 +5874,6 @@ bool blockchain_storage::update_next_comulative_size_limit()
 bool blockchain_storage::is_hardfork_active(size_t hardfork_id) const
 {
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_id, m_db_blocks.size()); // note using m_db_blocks.size() ( == top_block_height + 1 )
-}
-//------------------------------------------------------------------
-bool blockchain_storage::is_after_hardfork_4_zone()const
-{
-  return is_after_hardfork_4_zone(m_db_blocks.size());
-}
-//------------------------------------------------------------------
-bool blockchain_storage::is_after_hardfork_4_zone(uint64_t height)const
-{
-  if (height > m_core_runtime_config.hard_forks.hard_fork_04_starts_after_height)
-    return true;
-  return false;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_block(const block& bl)
