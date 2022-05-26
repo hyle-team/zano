@@ -960,42 +960,44 @@ void append_vector_by_another_vector(U& dst, const V& src)
 //--------------------------------------------------------------------------
 
 
-#define PRINT_EVENT_NO(VEC_EVENTS) std::cout << concolor::yellow << "+EVENT # " << VEC_EVENTS.size()-1 << ": line " << STR(__LINE__) << concolor::normal << std::endl;
+#define PRINT_EVENT_N(VEC_EVENTS)            std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << concolor::normal << std::endl
+#define PRINT_EVENT_N_TEXT(VEC_EVENTS, text) std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << "  " << text << concolor::normal << std::endl
 
 
-#define GENERATE_ACCOUNT(account) \
-  currency::account_base account; \
-  account.generate();
+#define GENERATE_ACCOUNT(account)                                                     \
+  currency::account_base account;                                                     \
+  account.generate()
 
-#define MAKE_ACCOUNT(VEC_EVENTS, account) \
-  currency::account_base account; \
-  account.generate(); \
-  VEC_EVENTS.push_back(account);
+#define MAKE_ACCOUNT(VEC_EVENTS, account)                                             \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_ACCOUNT(" << #account << ")");                 \
+  currency::account_base account;                                                     \
+  account.generate();                                                                 \
+  VEC_EVENTS.push_back(account)
 
 #define DO_CALLBACK(VEC_EVENTS, CB_NAME) \
-    { \
-  callback_entry CALLBACK_ENTRY; \
-  CALLBACK_ENTRY.callback_name = CB_NAME; \
-  VEC_EVENTS.push_back(CALLBACK_ENTRY); \
-  PRINT_EVENT_NO(VEC_EVENTS); \
-    }
+  {                                                                                   \
+    PRINT_EVENT_N_TEXT(VEC_EVENTS, "DO_CALLBACK(" << #CB_NAME << ")");                \
+    callback_entry CALLBACK_ENTRY;                                                    \
+    CALLBACK_ENTRY.callback_name = CB_NAME;                                           \
+    VEC_EVENTS.push_back(CALLBACK_ENTRY);                                             \
+  }
 
 #define DO_CALLBACK_PARAMS(VEC_EVENTS, CB_NAME, PARAMS_POD_OBJ)                       \
   {                                                                                   \
+    PRINT_EVENT_N_TEXT(VEC_EVENTS, "DO_CALLBACK_PARAMS(" << #CB_NAME << ")");         \
     callback_entry ce = AUTO_VAL_INIT(ce);                                            \
     ce.callback_name = CB_NAME;                                                       \
     ce.callback_params = epst::pod_to_hex(PARAMS_POD_OBJ);                            \
     VEC_EVENTS.push_back(ce);                                                         \
-    PRINT_EVENT_NO(VEC_EVENTS);                                                       \
   }
 
 #define DO_CALLBACK_PARAMS_STR(VEC_EVENTS, CB_NAME, STR_PARAMS)                       \
   {                                                                                   \
+    PRINT_EVENT_N_TEXT(VEC_EVENTS, "DO_CALLBACK_PARAMS_STR(" << #CB_NAME << ")");     \
     callback_entry ce = AUTO_VAL_INIT(ce);                                            \
     ce.callback_name = CB_NAME;                                                       \
     ce.callback_params = STR_PARAMS;                                                  \
     VEC_EVENTS.push_back(ce);                                                         \
-    PRINT_EVENT_NO(VEC_EVENTS);                                                       \
   }
 
 
@@ -1008,113 +1010,113 @@ void append_vector_by_another_vector(U& dst, const V& src)
   register_callback(#METHOD, boost::bind(&CLASS::METHOD, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3))
 
 #define MAKE_GENESIS_BLOCK(VEC_EVENTS, BLK_NAME, MINER_ACC, TS)                       \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_GENESIS_BLOCK(" << #BLK_NAME << ")");          \
   test_generator generator;                                                           \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_genesis_block(BLK_NAME, MINER_ACC, TS);                         \
-  VEC_EVENTS.push_back(BLK_NAME);                                                     \
-  PRINT_EVENT_NO(VEC_EVENTS);
+  VEC_EVENTS.push_back(BLK_NAME)
 
 #define MAKE_NEXT_BLOCK(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC)                  \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_BLOCK(" << #BLK_NAME << ")");             \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC);             \
-  VEC_EVENTS.push_back(BLK_NAME);                                                     \
-  PRINT_EVENT_NO(VEC_EVENTS);
+  VEC_EVENTS.push_back(BLK_NAME)
 
 
 
-#define MAKE_NEXT_BLOCK_TIMESTAMP_ADJUSTMENT(ADJ, VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC)                  \
+#define MAKE_NEXT_BLOCK_TIMESTAMP_ADJUSTMENT(ADJ, VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC) \
+  PRINT_EVENT_N(VEC_EVENTS);                                                          \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
-  generator.construct_block(ADJ, VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC);             \
-  VEC_EVENTS.push_back(BLK_NAME);                                                     \
-  PRINT_EVENT_NO(VEC_EVENTS);
+  generator.construct_block(ADJ, VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC);        \
+  VEC_EVENTS.push_back(BLK_NAME)
 
-#define MAKE_NEXT_POS_BLOCK(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, MINERS_ACC_LIST)         \
+#define MAKE_NEXT_POS_BLOCK(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, MINERS_ACC_LIST) \
+  PRINT_EVENT_N(VEC_EVENTS);                                                          \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
-  generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, std::list<currency::transaction>(), MINERS_ACC_LIST);  \
-  VEC_EVENTS.push_back(BLK_NAME);                                                     \
-  PRINT_EVENT_NO(VEC_EVENTS)
+  generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, std::list<currency::transaction>(), MINERS_ACC_LIST); \
+  VEC_EVENTS.push_back(BLK_NAME)
 
 #define MAKE_NEXT_POS_BLOCK_TX1(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, MINERS_ACC_LIST, TX_1)         \
+  PRINT_EVENT_N(VEC_EVENTS);                                                                                \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                                       \
   {                                                                                                         \
     std::list<currency::transaction>tx_list;                                                                \
     tx_list.push_back(TX_1);                                                                                \
     generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, tx_list, MINERS_ACC_LIST);       \
   }                                                                                                         \
-  VEC_EVENTS.push_back(BLK_NAME);                                                                           \
-  PRINT_EVENT_NO(VEC_EVENTS)
+  VEC_EVENTS.push_back(BLK_NAME)
 
 #define MAKE_NEXT_BLOCK_NO_ADD(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC)           \
+  PRINT_EVENT_N(VEC_EVENTS);                                                          \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC);             \
-  VEC_EVENTS.push_back(event_special_block(BLK_NAME, event_special_block::flag_skip)); \
-  PRINT_EVENT_NO(VEC_EVENTS)
+  VEC_EVENTS.push_back(event_special_block(BLK_NAME, event_special_block::flag_skip))
 
 #define ADD_BLOCK(VEC_EVENTS, BLK_NAME)                                               \
-  VEC_EVENTS.push_back(BLK_NAME);                                                     \
-  PRINT_EVENT_NO(VEC_EVENTS)
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "ADD_BLOCK(" << #BLK_NAME << ")");                   \
+  VEC_EVENTS.push_back(BLK_NAME)
 
 #define MAKE_NEXT_BLOCK_TX1(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, TX1)         \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_BLOCK_TX1(" << #BLK_NAME << ")");         \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
-    {                                                                                   \
-  std::list<currency::transaction> tx_list;                                         \
-  tx_list.push_back(TX1);                                                           \
-  generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, tx_list);              \
-    }                                                                                   \
-  VEC_EVENTS.push_back(BLK_NAME);                                                   \
-  PRINT_EVENT_NO(VEC_EVENTS)
+  {                                                                                   \
+    std::list<currency::transaction> tx_list;                                         \
+    tx_list.push_back(TX1);                                                           \
+    generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, tx_list);  \
+  }                                                                                   \
+  VEC_EVENTS.push_back(BLK_NAME)
 
 
 #define MAKE_NEXT_BLOCK_TX_LIST(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, TXLIST)  \
+  PRINT_EVENT_N(VEC_EVENTS);                                                          \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, TXLIST);     \
-  VEC_EVENTS.push_back(BLK_NAME);                                                     \
-  PRINT_EVENT_NO(VEC_EVENTS)
+  VEC_EVENTS.push_back(BLK_NAME)
 
 #define REWIND_BLOCKS_N(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, COUNT)           \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
-    {                                                                                   \
-  currency::block blk_last = PREV_BLOCK;                                            \
-  for (size_t i = 0; i < COUNT; ++i)                                                \
+  {                                                                                   \
+    currency::block blk_last = PREV_BLOCK;                                            \
+    for (size_t i = 0; i < COUNT; ++i)                                                \
     {                                                                                 \
-  MAKE_NEXT_BLOCK(VEC_EVENTS, blk, blk_last, MINER_ACC);                          \
-  blk_last = blk;                                                                 \
+      MAKE_NEXT_BLOCK(VEC_EVENTS, blk, blk_last, MINER_ACC);                          \
+      blk_last = blk;                                                                 \
     }                                                                                 \
-  BLK_NAME = blk_last;                                                              \
-    }
+    BLK_NAME = blk_last;                                                              \
+  }
 
 #define REWIND_BLOCKS_N_WITH_TIME(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, COUNT) \
   currency::block BLK_NAME = PREV_BLOCK;                                              \
   for (size_t i = 0; i < COUNT; ++i)                                                  \
   {                                                                                   \
+    PRINT_EVENT_N_TEXT(VEC_EVENTS, "REWIND_BLOCKS_N_WITH_TIME(" << #BLK_NAME << ", " << #PREV_BLOCK << ", " << #MINER_ACC << ", " << #COUNT << ")"); \
     currency::block next_block = AUTO_VAL_INIT(next_block);                           \
     generator.construct_block(VEC_EVENTS, next_block, BLK_NAME, MINER_ACC);           \
     VEC_EVENTS.push_back(event_core_time(next_block.timestamp - 10));                 \
     VEC_EVENTS.push_back(next_block);                                                 \
     BLK_NAME = next_block;                                                            \
-    PRINT_EVENT_NO(VEC_EVENTS)                                                        \
   }                                                                                 
 
 #define REWIND_BLOCKS(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC) REWIND_BLOCKS_N(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
 
 
-#define MAKE_TX_MIX_ATTR_EXTRA(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, EXTRA, CHECK_SPENDS)                   \
-  currency::transaction TX_NAME;                                                                                      \
-  { \
-    bool txr = construct_tx_to_key(m_hardforks, VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS);  \
-    CHECK_AND_ASSERT_THROW_MES(txr, "failed to construct transaction"); \
-  } \
-  VEC_EVENTS.push_back(TX_NAME); \
-  PRINT_EVENT_NO(VEC_EVENTS)
+#define MAKE_TX_MIX_ATTR_EXTRA(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, EXTRA, CHECK_SPENDS) \
+  PRINT_EVENT_N(VEC_EVENTS);                                                           \
+  currency::transaction TX_NAME;                                                       \
+  {                                                                                    \
+    bool txr = construct_tx_to_key(generator.get_hardforks(), VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS);  \
+    CHECK_AND_ASSERT_THROW_MES(txr, "failed to construct transaction");                \
+  }                                                                                    \
+  VEC_EVENTS.push_back(TX_NAME)
 
 #define MAKE_TX_FEE_MIX_ATTR_EXTRA(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, FEE, NMIX, HEAD, MIX_ATTR, EXTRA, CHECK_SPENDS) \
-  currency::transaction TX_NAME; \
-  { \
-    bool txr = construct_tx_to_key(m_hardforks, VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS); \
-    CHECK_AND_ASSERT_THROW_MES(txr, "failed to construct transaction"); \
-  } \
-  VEC_EVENTS.push_back(TX_NAME); \
-  PRINT_EVENT_NO(VEC_EVENTS)
+  PRINT_EVENT_N(VEC_EVENTS);                                                           \
+  currency::transaction TX_NAME;                                                       \
+  {                                                                                    \
+    bool txr = construct_tx_to_key(generator.get_hardforks(), VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS); \
+    CHECK_AND_ASSERT_THROW_MES(txr, "failed to construct transaction");                \
+  }                                                                                    \
+  VEC_EVENTS.push_back(TX_NAME)
 
 #define MAKE_TX_MIX_ATTR(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, CHECK_SPENDS) \
   MAKE_TX_MIX_ATTR_EXTRA(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, std::vector<currency::extra_v>(), CHECK_SPENDS);
@@ -1131,15 +1133,15 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define MAKE_TX_FEE(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, FEE, HEAD) MAKE_TX_FEE_MIX(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, FEE, 0, HEAD)
 
 
-#define MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, EXTRA, ATTACH)    \
+#define MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, EXTRA, ATTACH) \
   {                                                                                                \
+    PRINT_EVENT_N(VEC_EVENTS);                                                                     \
     currency::transaction t;                                                                       \
-    bool r = construct_tx_to_key(m_hardforks, VEC_EVENTS, t, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, ATTACH); \
+    bool r = construct_tx_to_key(generator.get_hardforks(), VEC_EVENTS, t, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, ATTACH); \
     if (!r) { LOG_PRINT_YELLOW("ERROR in tx @ EVENT #" << VEC_EVENTS.size(), LOG_LEVEL_0); }       \
     CHECK_AND_ASSERT_THROW_MES(r, "failed to construct transaction");                              \
     SET_NAME.push_back(t);                                                                         \
     VEC_EVENTS.push_back(t);                                                                       \
-    PRINT_EVENT_NO(VEC_EVENTS)                                                                     \
   }
 
 #define MAKE_TX_MIX_LIST_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, ATTACH)    \
@@ -1157,15 +1159,16 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 #define MAKE_TX_LIST_START_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, HEAD, MIX_ATTR, ATTACHS) \
     std::list<currency::transaction> SET_NAME; \
-    MAKE_TX_MIX_LIST_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, 0, HEAD, MIX_ATTR, ATTACHS);
+    MAKE_TX_MIX_LIST_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, 0, HEAD, MIX_ATTR, ATTACHS)
 
 #define MAKE_TX_LIST_START(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, HEAD) MAKE_TX_LIST_START_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, HEAD, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<currency::attachment_v>())
 
 #define MAKE_TX_LIST_START_WITH_ATTACHS(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, HEAD, ATTACHS) MAKE_TX_LIST_START_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, HEAD, CURRENCY_TO_KEY_OUT_RELAXED, ATTACHS)
 
-#define MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, ATTACH)   \
-  currency::transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                           \
-  CHECK_AND_ASSERT_MES(construct_tx_to_key(m_hardforks, EVENTS, TX_VAR, HEAD, FROM, TO, AMOUNT, FEE, 0, generator.last_tx_generated_secret_key, CURRENCY_TO_KEY_OUT_RELAXED, empty_extra, ATTACH), false, "construct_tx_to_key failed"); \
+#define MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, ATTACH)        \
+  PRINT_EVENT_N(EVENTS);                                                               \
+  currency::transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                \
+  CHECK_AND_ASSERT_MES(construct_tx_to_key(generator.get_hardforks(), EVENTS, TX_VAR, HEAD, FROM, TO, AMOUNT, FEE, 0, generator.last_tx_generated_secret_key, CURRENCY_TO_KEY_OUT_RELAXED, empty_extra, ATTACH), false, "construct_tx_to_key failed"); \
   EVENTS.push_back(TX_VAR)
 
 #define MAKE_TX_ATTACH(EVENTS, TX_VAR, FROM, TO, AMOUNT, HEAD, ATTACH) MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, HEAD, ATTACH)
@@ -1187,8 +1190,9 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define CHECK_V_EQ_EXPECTED_AND_ASSERT(value, expected) CHECK_AND_ASSERT_MES((value) == (expected), false, QUOTEME(value) << " has wrong value: " << value << ", expected: " << expected)
 
 // Adjust gentime and playtime "time" at once
-#define ADJUST_TEST_CORE_TIME(desired_time)            \
-  test_core_time::adjust(desired_time);                \
+#define ADJUST_TEST_CORE_TIME(desired_time)                                            \
+  PRINT_EVENT_N(events);                                                               \
+  test_core_time::adjust(desired_time);                                                \
   events.push_back(event_core_time(desired_time))
 
 // --- gentime wallet helpers -----------------------------------------------------------------------
@@ -1203,28 +1207,31 @@ void append_vector_by_another_vector(U& dst, const V& src)
     CHECK_AND_ASSERT_MES(r, false, "refresh_test_wallet failed"); \
   }
 
-#define MAKE_TEST_WALLET_TX(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC) \
-  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR); \
-  {                   \
+#define MAKE_TEST_WALLET_TX(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC)              \
+  PRINT_EVENT_N(EVENTS_VEC);                                                           \
+  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                          \
+  {                                                                                    \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
     WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>(), TX_VAR); \
-  } \
+  }                                                                                    \
   EVENTS_VEC.push_back(TX_VAR)
 
 #define MAKE_TEST_WALLET_TX_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, ATTACH) \
-  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR); \
-  {                   \
+  PRINT_EVENT_N(EVENTS_VEC);                                                           \
+  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                          \
+  {                                                                                    \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
     WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), ATTACH, TX_VAR); \
-  } \
+  }                                                                                    \
   EVENTS_VEC.push_back(TX_VAR)
 
 #define MAKE_TEST_WALLET_TX_EXTRA(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, EXTRA) \
-  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR); \
-  {                   \
+  PRINT_EVENT_N(EVENTS_VEC);                                                           \
+  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                          \
+  {                                                                                    \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
     WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, EXTRA, std::vector<attachment_v>(), TX_VAR); \
-  } \
+  }                                                                                    \
   EVENTS_VEC.push_back(TX_VAR)
 
 #define CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(WLT_WAR, TOTAL_BALANCE) \

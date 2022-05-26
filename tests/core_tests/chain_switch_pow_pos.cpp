@@ -81,7 +81,7 @@ bool gen_chain_switch_pow_pos::generate(std::vector<test_event_entry>& events) c
   block plk_2 = AUTO_VAL_INIT(plk_2);
   generator.construct_block(events, plk_2, blk_1, miner_acc, std::list<transaction>(1, tx_2), miner_stake_sources);
   events.push_back(plk_2);                                                                    // N+10
-  PRINT_EVENT_NO(events);
+  PRINT_EVENT_N(events);
 
   /* legend: (n) - PoW block, !m! - PoS block
      0....10    11    12   <-- blockchain height
