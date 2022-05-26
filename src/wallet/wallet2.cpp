@@ -3703,7 +3703,7 @@ bool wallet2::is_transfer_unlocked(const transfer_details& td, bool for_pos_mini
   
 
   uint64_t unlock_time = get_tx_unlock_time(td.m_ptx_wallet_info->m_tx, td.m_internal_output_index);
-  if (for_pos_mining && get_blockchain_current_size() > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
+  if (for_pos_mining && m_core_runtime_config.is_hardfork_active_for_height(1, get_blockchain_current_size()))
   {
     //allowed of staking locked coins with 
     stake_lock_time = unlock_time;
@@ -3789,7 +3789,7 @@ void wallet2::update_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, con
 //----------------------------------------------------------------------------------------------------
 void wallet2::push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra)
 {
-  if (get_top_block_height() > m_core_runtime_config.hard_forks.hard_fork_02_starts_after_height)
+  if (m_core_runtime_config.is_hardfork_active_for_height(2, get_top_block_height()))
   {
     // after HF2
     extra.push_back(ai);

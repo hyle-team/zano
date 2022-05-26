@@ -281,7 +281,7 @@ inline std::string gen_random_alias(size_t len)
 }
 
 template<typename alias_entry_t>
-inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf,
+inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, // <-- TODO: remove this
     std::vector<test_event_entry>& events,
     std::list<currency::transaction>& tx_set,
     const currency::block& head_block,
@@ -289,7 +289,6 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf,
     const alias_entry_t& ae,
     test_generator& generator)
 {
-  const currency::hard_forks_descriptor& m_hardforks = hf; //a name to feed macro MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR
   std::vector<currency::extra_v> ex;
   ex.push_back(ae);
   currency::account_base reward_acc;

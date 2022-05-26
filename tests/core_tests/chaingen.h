@@ -235,8 +235,10 @@ public:
   bool need_core_proxy() const { return false; }  // tests can override this in order to obtain core proxy (e.g. for wallet)
   void set_core_proxy(std::shared_ptr<tools::i_core_proxy>) { /* do nothing */ }
   uint64_t get_tx_version_from_events(const std::vector<test_event_entry> &events) const;
+
 private:
   callbacks_map m_callbacks;
+
 protected: 
   currency::hard_forks_descriptor m_hardforks;
 };
@@ -326,9 +328,6 @@ protected:
   size_t m_invalid_tx_index;
   size_t m_unverifiable_tx_index;
   size_t m_orphan_block_index;
-
-  // the following members is intended to be set by coretests with specific HF-related needs 
-  //currency::hard_forks_descriptor m_hardforks;
 };
 
 struct wallet_test_core_proxy;
@@ -533,6 +532,8 @@ public:
   void set_ignore_last_pow_in_wallets(bool ignore_last_pow_in_wallets) { m_ignore_last_pow_in_wallets = ignore_last_pow_in_wallets; }
   void set_hardfork_height(size_t hardfork_id, uint64_t h);
   void set_hardforks(const currency::hard_forks_descriptor& hardforks);
+  const currency::hard_forks_descriptor& get_hardforks() const { return m_hardforks; }
+
 
 private:
   bool m_do_pos_to_low_timestamp;
@@ -544,7 +545,7 @@ private:
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;
   static test_gentime_settings m_test_gentime_settings_default;
-};
+}; // class class test_generator
 
 extern const crypto::signature invalid_signature; // invalid non-null signature for test purpose
 static const std::vector<currency::extra_v> empty_extra;

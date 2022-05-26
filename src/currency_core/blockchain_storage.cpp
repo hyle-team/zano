@@ -1147,7 +1147,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
   TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
   TIME_MEASURE_START_PD(target_calculating_calc);
-  if (m_db_blocks.size() > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
+  if (m_core_runtime_config.is_hardfork_active_for_height(1, m_db_blocks.size()))
   {
     dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
   }
@@ -1186,7 +1186,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
   enum_blockchain(cb, alt_chain, split_height);
 
   wide_difficulty_type diff = 0;
-  if(abei.height > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
+  if(m_core_runtime_config.is_hardfork_active_for_height(1, abei.height))
     diff = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
   else
     diff = next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
@@ -1266,7 +1266,7 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
     CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "coinstake transaction in the block has the wrong type");
   }
 
-  if (height > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
+  if (m_core_runtime_config.is_hardfork_active_for_height(1, height))
   {
     // new rules that allow different unlock time in coinbase outputs
     uint64_t max_unlock_time = 0;
@@ -1286,7 +1286,8 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
     bool r = get_tx_max_min_unlock_time(b.miner_tx, max_unlock_time, min_unlock_time);
     CHECK_AND_ASSERT_MES(r && max_unlock_time == min_unlock_time && min_unlock_time == height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW,
       false,
-      "coinbase transaction has wrong min_unlock_time: " << min_unlock_time << ", expected: " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+      "coinbase transaction has wrong min_unlock_time: " << min_unlock_time << " or max_unlock_time: " << max_unlock_time <<
+      ", expected: " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   }
 
 
@@ -1437,9 +1438,9 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   boost::multiprecision::uint128_t already_generated_coins;
   CRITICAL_REGION_BEGIN(m_read_lock);
   height = m_db_blocks.size();
-  if(height <= m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
+  if(!m_core_runtime_config.is_hardfork_active_for_height(1, height))
     b.major_version = BLOCK_MAJOR_VERSION_INITIAL;
-  else if(height <= m_core_runtime_config.hard_forks.hard_fork_03_starts_after_height)
+  else if(!m_core_runtime_config.is_hardfork_active_for_height(3, height))
     b.major_version = HF1_BLOCK_MAJOR_VERSION;
   else
     b.major_version = CURRENT_BLOCK_MAJOR_VERSION;
@@ -1836,7 +1837,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     if (abei.height >= m_core_runtime_config.pos_minimum_heigh)
       cumulative_diff_delta = correct_difficulty_with_sequence_factor(sequence_factor, cumulative_diff_delta);
 
-    if (abei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && abei.height <= m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height && pos_block && sequence_factor > BLOCK_POS_STRICT_SEQUENCE_LIMIT)
+    if (abei.height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && !m_core_runtime_config.is_hardfork_active_for_height(1, abei.height) && pos_block && sequence_factor > BLOCK_POS_STRICT_SEQUENCE_LIMIT)
     {
       LOG_PRINT_RED_L0("Alternative block " << id << " @ " << abei.height << " has too big sequence factor: " << sequence_factor << ", rejected");
       bvc.m_verification_failed = true;
@@ -1961,9 +1962,9 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
   const block_extended_info& alt_chain_bei = alt_chain.back()->second;
   const block_extended_info& connection_point = alt_chain.front()->second;
 
-  if (connection_point.height <= m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
+  if (!m_core_runtime_config.is_hardfork_active_for_height(1, connection_point.height))
   {
-    //use pre-hard fork, old-style comparing
+    //use pre-hard fork #1, old-style comparing
     if (main_chain_bei.cumulative_diff_adjusted < alt_chain_bei.cumulative_diff_adjusted)
       return true;
     else if (main_chain_bei.cumulative_diff_adjusted > alt_chain_bei.cumulative_diff_adjusted)
@@ -1982,7 +1983,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       return true;
     }
   }
-  else if (alt_chain_bei.height > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
+  else if (m_core_runtime_config.is_hardfork_active_for_height(1, alt_chain_bei.height))
   {
     //new rules, applied after HARD_FORK_1
     //to learn this algo please read https://github.com/hyle-team/docs/blob/master/zano/PoS_Analysis_and_improvements_proposal.pdf
@@ -3335,9 +3336,9 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
     {
       m_db_outputs.push_back_item(ot.amount, global_output_entry::construct(tx_id, i));
       global_indexes.push_back(m_db_outputs.get_item_size(ot.amount) - 1);
-      if (ot.target.type() == typeid(txout_htlc) && !is_after_hardfork_3_zone())
+      if (ot.target.type() == typeid(txout_htlc) && !is_hardfork_active(3))
       {
-        LOG_ERROR("Error: Transaction with txout_htlc before is_after_hardfork_3_zone(before height " << m_core_runtime_config.hard_forks.hard_fork_03_starts_after_height <<")");
+        LOG_ERROR("Error: Transaction with txout_htlc before hardfork 3 (before height " << m_core_runtime_config.hard_forks.get_str_height_the_hardfork_active_after(3) <<")");
         return false;
       }
     }
@@ -3856,9 +3857,9 @@ namespace currency
     }
     bool operator()(const txin_htlc& in) const
     {
-      if (!m_bcs.is_after_hardfork_3_zone())
+      if (!m_bcs.is_hardfork_active(3))
       {
-        LOG_ERROR("Error: Transaction with txin_htlc before is_after_hardfork_3_zone(before height " << m_bcs.get_core_runtime_config().hard_forks.hard_fork_03_starts_after_height << ")");
+        LOG_ERROR("Error: Transaction with txin_htlc before hardfork 3 (before height " << m_bcs.get_core_runtime_config().hard_forks.get_str_height_the_hardfork_active_after(3) << ")");
         return false;
       }
       return this->operator()(static_cast<const txin_to_key&>(in));
@@ -4286,9 +4287,9 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
     }
     else if (txin.type() == typeid(txin_htlc))
     {
-      if (!is_after_hardfork_3_zone())
+      if (!is_hardfork_active(3))
       {
-        LOG_ERROR("Error: Transaction with txin_htlc before is_after_hardfork_3_zone(before height " << m_core_runtime_config.hard_forks.hard_fork_03_starts_after_height << ")");
+        LOG_ERROR("Error: Transaction with txin_htlc before hardfork 3 (before height " << m_core_runtime_config.hard_forks.get_str_height_the_hardfork_active_after(3) << ")");
         return false;
       }
 
@@ -4955,9 +4956,9 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     return true;
   };
 
-  bool var_is_after_hardfork_1_zone = is_after_hardfork_1_zone(block_height);
-  bool var_is_after_hardfork_2_zone = is_after_hardfork_2_zone(block_height);
-  bool var_is_after_hardfork_3_zone = is_after_hardfork_3_zone(block_height);
+  bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
+  bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
+  bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
   
   //inputs
   for (const auto in : tx.vin)
@@ -5010,11 +5011,13 @@ bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transactio
       return true;
   }
   
-  CHECK_AND_ASSERT_MES(get_block_height(miner_tx) > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height, false, "error in block [" << get_block_height(miner_tx) << "] etc_tx_details_unlock_time2 can exist only after hard fork point : " << m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height);
+  uint64_t block_height = get_block_height(miner_tx);
+  CHECK_AND_ASSERT_MES(m_core_runtime_config.is_hardfork_active_for_height(1, block_height), false, "error in block [" << block_height << "]: etc_tx_details_unlock_time was not found but etc_tx_details_unlock_time2 can exist only after hard fork 1 at height " << m_core_runtime_config.hard_forks.get_str_height_the_hardfork_active_after(1));
 
   //etc_tx_details_unlock_time2 can be kept only after hard_fork_1 point
   etc_tx_details_unlock_time2 ut2 = AUTO_VAL_INIT(ut2);
-  get_type_in_variant_container(miner_tx.extra, ut2);
+  bool found = get_type_in_variant_container(miner_tx.extra, ut2);
+  CHECK_AND_ASSERT_MES(found, false, "etc_tx_details_unlock_time2 was not found in tx extra");
   CHECK_AND_ASSERT_MES(ut2.unlock_time_array.size() == miner_tx.vout.size(), false, "ut2.unlock_time_array.size()<" << ut2.unlock_time_array.size() 
     << "> != miner_tx.vout.size()<" << miner_tx.vout.size() << ">");
   
@@ -5116,7 +5119,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
     r = check_tx_input(b.miner_tx, 1, coinstake_in, id, b.miner_tx.signatures[0], max_related_block_height, source_max_unlock_time_for_pos_coinbase);
     CHECK_AND_ASSERT_MES(r, false, "Failed to validate coinstake input in miner tx, block_id = " << get_block_hash(b));
 
-    if (get_block_height(b) > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
+    if (m_core_runtime_config.is_hardfork_active_for_height(1, get_block_height(b)))
     {
       uint64_t last_pow_h = get_last_x_block_height(false);
       CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_h, false, "Failed to validate coinbase in PoS block, condition failed: max_related_block_height(" << max_related_block_height << ") <= last_pow_h(" << last_pow_h << ")");
@@ -5744,53 +5747,23 @@ bool blockchain_storage::update_next_comulative_size_limit()
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::is_after_hardfork_1_zone()const
+bool blockchain_storage::is_hardfork_active(size_t hardfork_id) const
 {
-  return is_after_hardfork_1_zone(m_db_blocks.size());
-}
-//------------------------------------------------------------------
-bool blockchain_storage::is_after_hardfork_1_zone(uint64_t height)const
-{
-  if (height > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
-    return true;
-  return false;
-}
-//------------------------------------------------------------------
-bool blockchain_storage::is_after_hardfork_2_zone()const
-{
-  return is_after_hardfork_2_zone(m_db_blocks.size());
-}
-//------------------------------------------------------------------
-bool blockchain_storage::is_after_hardfork_3_zone()const
-{
-  return is_after_hardfork_3_zone(m_db_blocks.size());
-}
-//------------------------------------------------------------------
-bool blockchain_storage::is_after_hardfork_2_zone(uint64_t height)const
-{
-  if (height > m_core_runtime_config.hard_forks.hard_fork_02_starts_after_height)
-    return true;
-  return false;
-}
-//------------------------------------------------------------------
-bool blockchain_storage::is_after_hardfork_3_zone(uint64_t height)const
-{
-  if (height > m_core_runtime_config.hard_forks.hard_fork_03_starts_after_height)
-    return true;
-  return false;
+  return m_core_runtime_config.is_hardfork_active_for_height(hardfork_id, m_db_blocks.size()); // note using m_db_blocks.size() ( == top_block_height + 1 )
 }
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_block(const block& bl)
 {
+  uint64_t block_height = get_block_height(bl);
+
   //before hard_fork1
-  if (bl.major_version == BLOCK_MAJOR_VERSION_INITIAL && get_block_height(bl) <= m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height)
+  if (bl.major_version == BLOCK_MAJOR_VERSION_INITIAL && !m_core_runtime_config.is_hardfork_active_for_height(1, block_height))
     return true;
 
 
   //after hard_fork1 and before hard_fork3
-  if ( get_block_height(bl) > m_core_runtime_config.hard_forks.hard_fork_01_starts_after_height  &&
-       get_block_height(bl) <= m_core_runtime_config.hard_forks.hard_fork_03_starts_after_height
-    )
+  if ( m_core_runtime_config.is_hardfork_active_for_height(1, block_height) &&
+      !m_core_runtime_config.is_hardfork_active_for_height(3, block_height))
   {
     if (bl.major_version <= HF1_BLOCK_MAJOR_VERSION )
       return true;

@@ -29,9 +29,9 @@ bool hard_fork_2_base_test::configure_core(currency::core& c, size_t ev_index, c
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_forks.hard_fork_01_starts_after_height = m_hardfork_01_height;
-  pc.hard_forks.hard_fork_02_starts_after_height = m_hardfork_02_height;
-  pc.hard_forks.hard_fork_03_starts_after_height = m_hardfork_03_height;
+  pc.hard_forks.set_hardfork_height(1, m_hardfork_01_height);
+  pc.hard_forks.set_hardfork_height(2, m_hardfork_02_height);
+  pc.hard_forks.set_hardfork_height(3, m_hardfork_03_height);
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }

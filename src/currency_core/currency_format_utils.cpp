@@ -1573,7 +1573,7 @@ namespace currency
   //---------------------------------------------------------------
   uint64_t get_tx_version(uint64_t h, const hard_forks_descriptor& hfd)
   {
-    if (h <= hfd.hard_fork_04_starts_after_height)
+    if (!hfd.is_hardfork_active_for_height(4, h))
     {
       return TRANSACTION_VERSION_PRE_HF4;
     }
