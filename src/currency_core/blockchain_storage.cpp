@@ -38,6 +38,7 @@
 #include "crypto/RIPEMD160_helper.h"
 #include "crypto/bitcoin/sha256_helper.h"
 
+
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "core"
 ENABLE_CHANNEL_BY_DEFAULT("core");
@@ -609,9 +610,18 @@ bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, 
       "is mot equal to height = " << height << " in blockchain index, for block on height = " << height);
     
     transaction_chain_entry lolcal_chain_entry = *it;
-    signatures_pruned += lolcal_chain_entry.tx.signatures.size();
+    VARIANT_SWITCH_BEGIN(lolcal_chain_entry.tx.signature);
+    VARIANT_CASE_CONST(void_sig, v);
+    VARIANT_CASE(NLSAG_sig, signatures)
+    {
+      signatures_pruned += signatures.s.size();
+      signatures.s.clear();
+    }
+    VARIANT_CASE_CONST(zarcanum_sig, s);
+    //@#@
+    VARIANT_SWITCH_END();
+    
     attachments_pruned += lolcal_chain_entry.tx.attachment.size();
-    lolcal_chain_entry.tx.signatures.clear();
     lolcal_chain_entry.tx.attachment.clear();
 
     //reassign to db
@@ -1520,7 +1530,7 @@ bool blockchain_storage::print_transactions_statistics() const
 //     {
 //       total_full_blob += get_object_blobsize<transaction>(tx_entry.second.tx);
 //       transaction tx = tx_entry.second.tx;
-//       tx.signatures.clear();
+//       signatures.clear();
 //       total_cropped_blob += get_object_blobsize<transaction>(tx);
 //     }    
 //   }
@@ -2479,42 +2489,50 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
     << out_ptr->out_no << " more than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
   
   const transaction& tx = tx_ptr->tx;
-  if (tx.vout[out_ptr->out_no].target.type() == typeid(txout_htlc))
+  VARIANT_SWITCH_BEGIN(tx.vout[out_ptr->out_no]);
+  VARIANT_CASE_CONST(tx_out_bare, o)
   {
-    //silently return false, it's ok
-    return false;
+    if (o.target.type() == typeid(txout_htlc))
+    {
+      //silently return false, it's ok
+      return false;
+    }
+    CHECK_AND_ASSERT_MES(o.target.type() == typeid(txout_to_key), false, "unknown tx out type");
+    const txout_to_key& otk = boost::get<txout_to_key>(o.target);
+
+    CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() == tx.vout.size(), false, "internal error");
+
+    //do not use outputs that obviously spent for mixins
+    if (tx_ptr->m_spent_flags[out_ptr->out_no])
+      return false;
+
+    // do not use burned coins
+    if (otk.key == null_pkey)
+      return false;
+
+    //check if transaction is unlocked
+    if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
+      return false;
+
+    //use appropriate mix_attr out 
+    uint8_t mix_attr = otk.mix_attr;
+
+    if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+      return false; //COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS call means that ring signature will have more than one entry.
+    else if (use_only_forced_to_mix && mix_attr == CURRENCY_TO_KEY_OUT_RELAXED)
+      return false; //relaxed not allowed
+    else if (mix_attr != CURRENCY_TO_KEY_OUT_RELAXED && mix_attr > mix_count)
+      return false;//mix_attr set to specific minimum, and mix_count is less then desired count
+
+
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
+    oen.global_amount_index = i;
+    oen.out_key = otk.key;
   }
-  CHECK_AND_ASSERT_MES(tx.vout[out_ptr->out_no].target.type() == typeid(txout_to_key), false, "unknown tx out type");
-  const txout_to_key& otk = boost::get<txout_to_key>(tx.vout[out_ptr->out_no].target);
+  VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+    //@#@
+  VARIANT_SWITCH_END();
 
-  CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() == tx.vout.size(), false, "internal error");
-
-  //do not use outputs that obviously spent for mixins
-  if (tx_ptr->m_spent_flags[out_ptr->out_no])
-    return false;
-
-  // do not use burned coins
-  if (otk.key == null_pkey)
-    return false;
-
-  //check if transaction is unlocked
-  if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
-    return false;
-
-  //use appropriate mix_attr out 
-  uint8_t mix_attr = otk.mix_attr;
-  
-  if(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-    return false; //COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS call means that ring signature will have more than one entry.
-  else if(use_only_forced_to_mix && mix_attr == CURRENCY_TO_KEY_OUT_RELAXED)
-    return false; //relaxed not allowed
-  else if(mix_attr != CURRENCY_TO_KEY_OUT_RELAXED && mix_attr > mix_count)
-    return false;//mix_attr set to specific minimum, and mix_count is less then desired count
-
-
-  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
-  oen.global_amount_index = i;
-  oen.out_key = otk.key;
   return true;
 }
 //------------------------------------------------------------------
@@ -3015,10 +3033,15 @@ void blockchain_storage::print_blockchain_outs_stats() const
     if (!spent)
       ++stat.unspent;
       
-    if (!spent && p_tx->tx.vout[output_entry.out_no].target.type() == typeid(txout_to_key))
+    if (!spent)// && p_tx->tx.vout[output_entry.out_no].target.type() == typeid(txout_to_key))
     {
-      if (boost::get<txout_to_key>(p_tx->tx.vout[output_entry.out_no].target).mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-        ++stat.mixable;
+      VARIANT_SWITCH_BEGIN(p_tx->tx.vout[output_entry.out_no]);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (boost::get<txout_to_key>(o.target).mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+          ++stat.mixable;
+      VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     return true;
   };
@@ -3330,28 +3353,33 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   size_t i = 0;
-  BOOST_FOREACH(const auto& ot, tx.vout)
+  BOOST_FOREACH(const auto& otv, tx.vout)
   {
-    if (ot.target.type() == typeid(txout_to_key) || ot.target.type() == typeid(txout_htlc))
-    {
-      m_db_outputs.push_back_item(ot.amount, global_output_entry::construct(tx_id, i));
-      global_indexes.push_back(m_db_outputs.get_item_size(ot.amount) - 1);
-      if (ot.target.type() == typeid(txout_htlc) && !is_hardfork_active(3))
+    VARIANT_SWITCH_BEGIN(otv);
+    VARIANT_CASE_CONST(tx_out_bare, ot)
+      if (ot.target.type() == typeid(txout_to_key) || ot.target.type() == typeid(txout_htlc))
       {
-        LOG_ERROR("Error: Transaction with txout_htlc before hardfork 3 (before height " << m_core_runtime_config.hard_forks.get_str_height_the_hardfork_active_after(3) <<")");
-        return false;
+        m_db_outputs.push_back_item(ot.amount, global_output_entry::construct(tx_id, i));
+        global_indexes.push_back(m_db_outputs.get_item_size(ot.amount) - 1);
+        if (ot.target.type() == typeid(txout_htlc) && !is_hardfork_active(3))
+        {
+          LOG_ERROR("Error: Transaction with txout_htlc before is_after_hardfork_3_zone(before height " << m_core_runtime_config.hard_forks.hard_fork_03_starts_after_height << ")");
+          return false;
+        }
       }
-    }
-    else if (ot.target.type() == typeid(txout_multisig))
-    {
+      else if (ot.target.type() == typeid(txout_multisig))
+      {
 
-      crypto::hash multisig_out_id = get_multisig_out_id(tx, i);
-      CHECK_AND_ASSERT_MES(multisig_out_id != null_hash, false, "internal error during handling get_multisig_out_id() with tx id " << tx_id);
-      CHECK_AND_ASSERT_MES(!m_db_multisig_outs.find(multisig_out_id), false, "Internal error: already have multisig_out_id " << multisig_out_id << "in multisig outs index");
-      m_db_multisig_outs.set(multisig_out_id, ms_output_entry::construct(tx_id, i));
-      global_indexes.push_back(0); // just stub to make other code easier
-    }
-
+        crypto::hash multisig_out_id = get_multisig_out_id(tx, i);
+        CHECK_AND_ASSERT_MES(multisig_out_id != null_hash, false, "internal error during handling get_multisig_out_id() with tx id " << tx_id);
+        CHECK_AND_ASSERT_MES(!m_db_multisig_outs.find(multisig_out_id), false, "Internal error: already have multisig_out_id " << multisig_out_id << "in multisig outs index");
+        m_db_multisig_outs.set(multisig_out_id, ms_output_entry::construct(tx_id, i));
+        global_indexes.push_back(0); // just stub to make other code easier
+      }
+    VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+      //@#@
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
     ++i;
   }
   return true;
@@ -3379,13 +3407,20 @@ bool blockchain_storage::get_outs(uint64_t amount, std::list<crypto::public_key>
     CHECK_AND_ASSERT_MES(tx_ptr, false, "transactions outs global index consistency broken: can't find tx " << out_entry_ptr->tx_id << " in DB, for amount: " << amount << ", gindex: " << i);
     CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() > out_entry_ptr->out_no, false, "transactions outs global index consistency broken: index in tx_outx == " << out_entry_ptr->out_no << " is greather than tx.vout size == " << tx_ptr->tx.vout.size() << ", for amount: " << amount << ", gindex: " << i);
     //CHECK_AND_ASSERT_MES(tx_ptr->tx.vout[out_entry_ptr->out_no].target.type() == typeid(txout_to_key), false, "transactions outs global index consistency broken: out #" << out_entry_ptr->out_no << " in tx " << out_entry_ptr->tx_id << " has wrong type, for amount: " << amount << ", gindex: " << i);
-    if (tx_ptr->tx.vout[out_entry_ptr->out_no].target.type() == typeid(txout_to_key))
-    {
-      pkeys.push_back(boost::get<txout_to_key>(tx_ptr->tx.vout[out_entry_ptr->out_no].target).key);
-    }else if(tx_ptr->tx.vout[out_entry_ptr->out_no].target.type() == typeid(txout_htlc))
-    {
-      pkeys.push_back(boost::get<txout_htlc>(tx_ptr->tx.vout[out_entry_ptr->out_no].target).pkey_redeem);
-    }
+    VARIANT_SWITCH_BEGIN(tx_ptr->tx.vout[out_entry_ptr->out_no]);
+    VARIANT_CASE_CONST(tx_out_bare, o)
+      if (o.target.type() == typeid(txout_to_key))
+      {
+        pkeys.push_back(boost::get<txout_to_key>(o.target).key);
+      }
+      else if (o.target.type() == typeid(txout_htlc))
+      {
+        pkeys.push_back(boost::get<txout_htlc>(o.target).pkey_redeem);
+      }
+    VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+      //@#@
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
   }
 
   return true;
@@ -3395,26 +3430,32 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   size_t i = tx.vout.size()-1;
-  BOOST_REVERSE_FOREACH(const auto& ot, tx.vout)
+  BOOST_REVERSE_FOREACH(const auto& otv, tx.vout)
   {
-    if (ot.target.type() == typeid(txout_to_key) || ot.target.type() == typeid(txout_htlc))
-    {
-      uint64_t sz= m_db_outputs.get_item_size(ot.amount);
-      CHECK_AND_ASSERT_MES(sz, false, "transactions outs global index: empty index for amount: " << ot.amount);
-      auto back_item = m_db_outputs.get_subitem(ot.amount, sz - 1);
-      CHECK_AND_ASSERT_MES(back_item->tx_id == tx_id, false, "transactions outs global index consistency broken: tx id missmatch");
-      CHECK_AND_ASSERT_MES(back_item->out_no == i, false, "transactions outs global index consistency broken: in transaction index missmatch");
-      m_db_outputs.pop_back_item(ot.amount);
-      //if (!it->second.size())
-      //  m_db_outputs.erase(it);
-    }
-    else if (ot.target.type() == typeid(txout_multisig))
-    {
-      crypto::hash multisig_out_id = get_multisig_out_id(tx, i);
-      CHECK_AND_ASSERT_MES(multisig_out_id != null_hash, false, "internal error during handling get_multisig_out_id() with tx id " << tx_id);
-      bool res = m_db_multisig_outs.erase_validate(multisig_out_id);
-      CHECK_AND_ASSERT_MES(res, false, "Internal error: multisig out not found, multisig_out_id " << multisig_out_id << "in multisig outs index");
-    }
+    VARIANT_SWITCH_BEGIN(otv);
+    VARIANT_CASE_CONST(tx_out_bare, ot)
+      if (ot.target.type() == typeid(txout_to_key) || ot.target.type() == typeid(txout_htlc))
+      {
+        uint64_t sz = m_db_outputs.get_item_size(ot.amount);
+        CHECK_AND_ASSERT_MES(sz, false, "transactions outs global index: empty index for amount: " << ot.amount);
+        auto back_item = m_db_outputs.get_subitem(ot.amount, sz - 1);
+        CHECK_AND_ASSERT_MES(back_item->tx_id == tx_id, false, "transactions outs global index consistency broken: tx id missmatch");
+        CHECK_AND_ASSERT_MES(back_item->out_no == i, false, "transactions outs global index consistency broken: in transaction index missmatch");
+        m_db_outputs.pop_back_item(ot.amount);
+        //if (!it->second.size())
+        //  m_db_outputs.erase(it);
+      }
+      else if (ot.target.type() == typeid(txout_multisig))
+      {
+        crypto::hash multisig_out_id = get_multisig_out_id(tx, i);
+        CHECK_AND_ASSERT_MES(multisig_out_id != null_hash, false, "internal error during handling get_multisig_out_id() with tx id " << tx_id);
+        bool res = m_db_multisig_outs.erase_validate(multisig_out_id);
+        CHECK_AND_ASSERT_MES(res, false, "Internal error: multisig out not found, multisig_out_id " << multisig_out_id << "in multisig outs index");
+      }
+    VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+      //@#@
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
     --i;
   }
   return true;
@@ -4148,12 +4189,15 @@ bool blockchain_storage::print_tx_outputs_lookup(const crypto::hash& tx_id)const
   CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() == tx_ptr->m_global_output_indexes.size(), false, "Internal error: output size missmatch");
   for (uint64_t i = 0; i!= tx_ptr->tx.vout.size();i++)
   {
-    strm_tx << "[" << i << "]: " << print_money(tx_ptr->tx.vout[i].amount) << ENDL;
-    if (tx_ptr->tx.vout[i].target.type() != typeid(currency::txout_to_key))
-      continue;
-    
-    usage_stat[tx_ptr->tx.vout[i].amount][tx_ptr->m_global_output_indexes[i]];
-
+    VARIANT_SWITCH_BEGIN(tx_ptr->tx.vout[i]);
+    VARIANT_CASE_CONST(tx_out_bare, o)
+      strm_tx << "[" << i << "]: " << print_money(o.amount) << ENDL;
+      if (o.target.type() != typeid(currency::txout_to_key))
+        continue;
+      usage_stat[o.amount][tx_ptr->m_global_output_indexes[i]];
+    VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+      //@#@      
+    VARIANT_SWITCH_END();
   }
   
   LOG_PRINT_L0("Lookup in all transactions....");
@@ -4253,14 +4297,22 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   {
     if (!m_is_in_checkpoint_zone)
     {
-      CHECK_AND_ASSERT_MES(sig_index < tx.signatures.size(), false, "Wrong transaction: missing signature entry for input #" << sig_index << " tx: " << tx_prefix_hash);
-      psig = &tx.signatures[sig_index];
+      VARIANT_SWITCH_BEGIN(tx.signature);
+      VARIANT_CASE_CONST(void_sig, v);
+      VARIANT_CASE_CONST(NLSAG_sig, signatures);
+      {
+        CHECK_AND_ASSERT_MES(sig_index < signatures.s.size(), false, "Wrong transaction: missing signature entry for input #" << sig_index << " tx: " << tx_prefix_hash);
+        psig = &signatures.s[sig_index];
+      }
+      VARIANT_CASE_CONST(zarcanum_sig, s);
+      //@#@
+      VARIANT_SWITCH_END();
+
     }
 
-    if (txin.type() == typeid(txin_to_key))
+    VARIANT_SWITCH_BEGIN(txin);
+    VARIANT_CASE_CONST(txin_to_key, in_to_key)
     {
-      const txin_to_key& in_to_key = boost::get<txin_to_key>(txin);
-
       CHECK_AND_ASSERT_MES(in_to_key.key_offsets.size(), false, "Empty in_to_key.key_offsets for input #" << sig_index << " tx: " << tx_prefix_hash);
       TIME_MEASURE_START_PD(tx_check_inputs_loop_kimage_check);
       if (have_tx_keyimg_as_spent(in_to_key.k_image))
@@ -4270,22 +4322,21 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
       }
       TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_kimage_check);
       uint64_t max_unlock_time = 0;
-      if (!check_tx_input(tx, sig_index, in_to_key, tx_prefix_hash, *psig, max_used_block_height, max_unlock_time))
+      if (!check_tx_input(tx, sig_index, in_to_key, tx_prefix_hash, max_used_block_height, max_unlock_time))
       {
         LOG_ERROR("Failed to validate input #" << sig_index << " tx: " << tx_prefix_hash);
         return false;
       }
     }
-    else if (txin.type() == typeid(txin_multisig))
+    VARIANT_CASE_CONST(txin_multisig, in_ms)
     {
-      const txin_multisig& in_ms = boost::get<txin_multisig>(txin);
-      if (!check_tx_input(tx, sig_index, in_ms, tx_prefix_hash, *psig, max_used_block_height))
+      if (!check_tx_input(tx, sig_index, in_ms, tx_prefix_hash, max_used_block_height))
       {
         LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << in_ms.multisig_out_id << ") in tx: " << tx_prefix_hash);
         return false;
       }
     }
-    else if (txin.type() == typeid(txin_htlc))
+    VARIANT_CASE_CONST(txin_htlc, in_htlc)
     {
       if (!is_hardfork_active(3))
       {
@@ -4293,7 +4344,6 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
         return false;
       }
 
-      const txin_htlc& in_htlc = boost::get<txin_htlc>(txin);
       CHECK_AND_ASSERT_MES(in_htlc.key_offsets.size(), false, "Empty in_to_key.key_offsets for input #" << sig_index << " tx: " << tx_prefix_hash);
       TIME_MEASURE_START_PD(tx_check_inputs_loop_kimage_check);
       if (have_tx_keyimg_as_spent(in_htlc.k_image))
@@ -4302,12 +4352,15 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
         return false;
       }
       TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_kimage_check);
-      if (!check_tx_input(tx, sig_index, in_htlc, tx_prefix_hash, *psig, max_used_block_height))
+      if (!check_tx_input(tx, sig_index, in_htlc, tx_prefix_hash, max_used_block_height))
       {
         LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << obj_to_json_str(in_htlc) << ") in tx: " << tx_prefix_hash);
         return false;
       }
     }
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
+
     sig_index++;
   }
   TIME_MEASURE_FINISH_PD(tx_check_inputs_loop);
@@ -4315,7 +4368,15 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   TIME_MEASURE_START_PD(tx_check_inputs_attachment_check);
   if (!m_is_in_checkpoint_zone)
   {
-    CHECK_AND_ASSERT_MES(tx.signatures.size() == sig_index, false, "tx signatures count differs from inputs");
+    VARIANT_SWITCH_BEGIN(tx.signature);
+    VARIANT_CASE_CONST(NLSAG_sig, signatures)
+    {
+      CHECK_AND_ASSERT_MES(signatures.s.size() == sig_index, false, "tx signatures count differs from inputs");
+    }
+    VARIANT_CASE_CONST(zarcanum_sig, s);
+    //@#@
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
     if (!(get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE))
     {
       bool r = validate_attachment_info(tx.extra, tx.attachment, false);
@@ -4331,7 +4392,7 @@ bool blockchain_storage::is_tx_spendtime_unlocked(uint64_t unlock_time) const
   return currency::is_tx_spendtime_unlocked(unlock_time, get_current_blockchain_size(), m_core_runtime_config.get_core_time());
 }
 //------------------------------------------------------------------
-bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
@@ -4351,7 +4412,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   for (auto& ptr : output_keys)
     output_keys_ptrs.push_back(&ptr);
 
-  return check_input_signature(tx, in_index, txin, tx_prefix_hash, sig, output_keys_ptrs);
+  return check_input_signature(tx, in_index, txin, tx_prefix_hash, output_keys_ptrs);
 }
 //----------------------------------------------------------------
 struct outputs_visitor
@@ -4438,7 +4499,7 @@ bool blockchain_storage::get_output_keys_for_input_with_checks(const transaction
 //------------------------------------------------------------------
 // Note: this function can be used for checking to_key inputs against either main chain or alt chain, that's why it has output_keys_ptrs parameter
 // Doesn't check spent flags, the caller must check it.
-bool blockchain_storage::check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const
+bool blockchain_storage::check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<const crypto::public_key*>& output_keys_ptrs) const
 {
   if (txin.key_offsets.size() != output_keys_ptrs.size())
   {
@@ -4446,7 +4507,7 @@ bool blockchain_storage::check_input_signature(const transaction& tx, size_t in_
     return false;
   }
 
-  return check_input_signature(tx, in_index, /*txin.key_offsets,*/ txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, sig, output_keys_ptrs);
+  return check_input_signature(tx, in_index, /*txin.key_offsets,*/ txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, output_keys_ptrs);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::check_input_signature(const transaction& tx,
@@ -4455,7 +4516,6 @@ bool blockchain_storage::check_input_signature(const transaction& tx,
   const crypto::key_image& in_k_image,
   const std::vector<txin_etc_details_v>& in_etc_details,
   const crypto::hash& tx_prefix_hash,
-  const std::vector<crypto::signature>& sig,
   const std::vector<const crypto::public_key*>& output_keys_ptrs) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -4465,6 +4525,15 @@ bool blockchain_storage::check_input_signature(const transaction& tx,
   if(m_is_in_checkpoint_zone)
     return true;
 
+  CHECK_AND_ASSERT_MES(tx.signature.type() == typeid(NLSAG_sig), false, "Unexpected type of sig in check_input_signature: " << tx.signature.type().name());
+  auto s = boost::get<NLSAG_sig>(tx.signature).s;
+  uint64_t actual_sig_index = in_index;
+  if (is_pos_coinbase(tx))
+  {
+    actual_sig_index = 0;
+  }
+  CHECK_AND_ASSERT_MES(s.size() > actual_sig_index, false, "Failed to check s.size(){" << s.size() << "} > actual_sig_index {" << actual_sig_index <<  "}" );
+  const std::vector<crypto::signature>& sig = s[actual_sig_index];
   if (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE)
   {
     // check attachments, mentioned directly in this input
@@ -4513,7 +4582,7 @@ bool blockchain_storage::check_input_signature(const transaction& tx,
 //------------------------------------------------------------------
 // Note: this function doesn't check spent flags by design (to be able to use either for main chain and alt chains).
 // The caller MUST check spent flags.
-bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const transaction& source_tx, size_t out_n) const
+bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const
 {
 #define LOC_CHK(cond, msg) CHECK_AND_ASSERT_MES(cond, false, "ms input check failed: ms_id: " << txin.multisig_out_id << ", input #" << in_index << " in tx " << tx_prefix_hash << ", refers to ms output #" << out_n << " in source tx " << get_transaction_hash(source_tx) << ENDL << msg)
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -4522,7 +4591,9 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
   LOC_CHK(is_tx_spendtime_unlocked(unlock_time), "Source transaction is LOCKED! unlock_time: " << unlock_time << ", now is " << m_core_runtime_config.get_core_time() << ", blockchain size is " << get_current_blockchain_size());
 
   LOC_CHK(source_tx.vout.size() > out_n, "internal error: out_n==" << out_n << " is out-of-bounds of source_tx.vout, size=" << source_tx.vout.size());
-  const tx_out_bare& source_tx_out = source_tx.vout[out_n];
+  LOC_CHK(source_tx.vout[out_n].type() == typeid(tx_out_bare), "internal error: out_n==" << out_n << " has unexpected type: " << source_tx.vout[out_n].type().name());
+
+  const tx_out_bare& source_tx_out = boost::get<tx_out_bare>(source_tx.vout[out_n]);
   const txout_multisig& source_ms_out_target = boost::get<txout_multisig>(source_tx_out.target);
 
   LOC_CHK(txin.sigs_count == source_ms_out_target.minimum_sigs,
@@ -4549,48 +4620,65 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
     // make sure normal tx does not have extra_attachment_info in etc_details
     LOC_CHK(!have_type_in_variant_container<extra_attachment_info>(txin.etc_details), "Incorrect using of extra_attachment_info in etc_details in input #" << in_index << " for tx " << tx_prefix_hash);
   }
-
-  LOC_CHK(tx.signatures.size() > in_index, "ms input index is out of signatures container bounds, tx.signatures.size() = " << tx.signatures.size());
-  const std::vector<crypto::signature>& input_signatures = tx.signatures[in_index];
-
-  size_t expected_signatures_count = txin.sigs_count;
   bool need_to_check_extra_sign = false;
-  if (get_tx_flags(tx)&TX_FLAG_SIGNATURE_MODE_SEPARATE && in_index == tx.vin.size() - 1) // last input in TX_FLAG_SIGNATURE_MODE_SEPARATE must contain one more signature to ensure that tx was completed by an authorized subject
+  VARIANT_SWITCH_BEGIN(tx.signature);
+  VARIANT_CASE_CONST(void_sig, v);
+  VARIANT_CASE_CONST(NLSAG_sig, signatures)
   {
-    expected_signatures_count++;
-    need_to_check_extra_sign = true;
-  }
+    LOC_CHK(signatures.s.size() > in_index, "ms input index is out of signatures container bounds, signatures.size() = " << signatures.s.size());
+    const std::vector<crypto::signature>& input_signatures = signatures.s[in_index];
 
-  LOC_CHK(expected_signatures_count == input_signatures.size(), "Invalid input's signatures count: " << input_signatures.size() << ", expected: " << expected_signatures_count);
-
-  crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, in_index, tx_prefix_hash);
-  LOC_CHK(tx_hash_for_signature != null_hash, "prepare_prefix_hash_for_sign failed");
-
-  LOC_CHK(txin.sigs_count <= source_ms_out_target.keys.size(), "source tx invariant failed: ms output's minimum sigs == ms input's sigs_count (" << txin.sigs_count << ") is GREATHER than keys.size() = " << source_ms_out_target.keys.size()); // NOTE: sig_count == minimum_sigs as checked above
-  size_t out_key_index = 0; // index in source_ms_out_target.keys
-  for (size_t i = 0; i != txin.sigs_count; /* nothing */)
-  {
-    // if we run out of keys for this signature, then it's invalid signature
-    LOC_CHK(out_key_index < source_ms_out_target.keys.size(), "invalid signature #" << i << ": " << input_signatures[i]);
-
-    // check signature #i against ms output key #out_key_index
-    if (crypto::check_signature(tx_hash_for_signature, source_ms_out_target.keys[out_key_index], input_signatures[i]))
+    size_t expected_signatures_count = txin.sigs_count;
+    if (get_tx_flags(tx)&TX_FLAG_SIGNATURE_MODE_SEPARATE && in_index == tx.vin.size() - 1) // last input in TX_FLAG_SIGNATURE_MODE_SEPARATE must contain one more signature to ensure that tx was completed by an authorized subject
     {
-      // match: go for the next signature and the next key
-      i++;
-      out_key_index++;
+      expected_signatures_count++;
+      need_to_check_extra_sign = true;
     }
-    else
+
+    LOC_CHK(expected_signatures_count == input_signatures.size(), "Invalid input's signatures count: " << input_signatures.size() << ", expected: " << expected_signatures_count);
+
+    crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, in_index, tx_prefix_hash);
+    LOC_CHK(tx_hash_for_signature != null_hash, "prepare_prefix_hash_for_sign failed");
+
+    LOC_CHK(txin.sigs_count <= source_ms_out_target.keys.size(), "source tx invariant failed: ms output's minimum sigs == ms input's sigs_count (" << txin.sigs_count << ") is GREATHER than keys.size() = " << source_ms_out_target.keys.size()); // NOTE: sig_count == minimum_sigs as checked above
+    size_t out_key_index = 0; // index in source_ms_out_target.keys
+    for (size_t i = 0; i != txin.sigs_count; /* nothing */)
     {
-      // missmatch: go for the next key for this signature
-      out_key_index++;
+      // if we run out of keys for this signature, then it's invalid signature
+      LOC_CHK(out_key_index < source_ms_out_target.keys.size(), "invalid signature #" << i << ": " << input_signatures[i]);
+
+      // check signature #i against ms output key #out_key_index
+      if (crypto::check_signature(tx_hash_for_signature, source_ms_out_target.keys[out_key_index], input_signatures[i]))
+      {
+        // match: go for the next signature and the next key
+        i++;
+        out_key_index++;
+      }
+      else
+      {
+        // missmatch: go for the next key for this signature
+        out_key_index++;
+      }
     }
   }
+  VARIANT_CASE_CONST(zarcanum_sig, s);
+  //@#@
+  VARIANT_SWITCH_END();
+
   if (need_to_check_extra_sign)
   {
-    //here we check extra signature to validate that transaction was finilized by authorized subject
-    bool r = crypto::check_signature(tx_prefix_hash, get_tx_pub_key_from_extra(tx), tx.signatures[in_index].back());
-    LOC_CHK(r, "failed to check extra signature for last out with TX_FLAG_SIGNATURE_MODE_SEPARATE");
+    VARIANT_SWITCH_BEGIN(tx.signature);
+    VARIANT_CASE_CONST(void_sig, v);
+    VARIANT_CASE_CONST(NLSAG_sig, signatures)
+    {
+      //here we check extra signature to validate that transaction was finilized by authorized subject
+      bool r = crypto::check_signature(tx_prefix_hash, get_tx_pub_key_from_extra(tx), signatures.s[in_index].back());
+      LOC_CHK(r, "failed to check extra signature for last out with TX_FLAG_SIGNATURE_MODE_SEPARATE");
+    }
+    VARIANT_CASE_CONST(zarcanum_sig, s);
+    //@#@
+    VARIANT_SWITCH_END();
+
   }
 
   return true;
@@ -4598,7 +4686,7 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
 }
 
 //------------------------------------------------------------------
-bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height) const
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
@@ -4615,11 +4703,12 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   auto source_tx_ptr = m_db_transactions.find(source_tx_id);
   LOC_CHK(source_tx_ptr, "Can't find source transaction");
   LOC_CHK(source_tx_ptr->tx.vout.size() > n, "ms output index is incorrect, source tx's vout size is " << source_tx_ptr->tx.vout.size());
-  LOC_CHK(source_tx_ptr->tx.vout[n].target.type() == typeid(txout_multisig), "ms output has wrong type, txout_multisig expected");
+  LOC_CHK(source_tx_ptr->tx.vout[n].type() == typeid(tx_out_bare), "internal error: out_n==" << n << " has unexpected type: " << source_tx_ptr->tx.vout[n].type().name());
+  LOC_CHK(boost::get<tx_out_bare>(source_tx_ptr->tx.vout[n]).target.type() == typeid(txout_multisig), "ms output has wrong type, txout_multisig expected");
   LOC_CHK(source_tx_ptr->m_spent_flags.size() > n, "Internal error, m_spent_flags size (" << source_tx_ptr->m_spent_flags.size() << ") less then expected, n: " << n);
   LOC_CHK(source_tx_ptr->m_spent_flags[n] == false, "Internal error, ms output is already spent"); // should never happen as multisig_ptr->spent_height is checked above
 
-  if (!check_ms_input(tx, in_index, txin, tx_prefix_hash, sig, source_tx_ptr->tx, n))
+  if (!check_ms_input(tx, in_index, txin, tx_prefix_hash, source_tx_ptr->tx, n))
     return false;
 
   max_related_block_height = source_tx_ptr->m_keeper_block_height;
@@ -4628,7 +4717,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 #undef LOC_CHK
 } 
 //------------------------------------------------------------------
-bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
@@ -4673,8 +4762,19 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
     output_keys_ptrs.push_back(&ptr);
 
   CHECK_AND_ASSERT_THROW_MES(output_keys_ptrs.size() == 1, "Internal error: output_keys_ptrs.size() is not equal 1  for HTLC");
-
-  return check_input_signature(tx, in_index, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, sig, output_keys_ptrs);
+  
+  VARIANT_SWITCH_BEGIN(tx.signature);
+  VARIANT_CASE_CONST(NLSAG_sig, signatures);
+  {
+    CHECK_AND_ASSERT_MES(signatures.s.size() > in_index, false, "Unexpeted number of singatures in NLSAG_sig: " << signatures.s.size() << ", expected at least: " << in_index);
+    return check_input_signature(tx, in_index, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, output_keys_ptrs);
+  }
+  VARIANT_CASE_CONST(zarcanum_sig, s);
+  //@#@ TODO
+  return false;
+  VARIANT_CASE_THROW_ON_OTHER();
+  VARIANT_SWITCH_END();
+  return false;
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_adjusted_time() const
@@ -4959,6 +5059,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
   bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
   bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
+  bool var_is_after_hardfork_4_zone = m_core_runtime_config.is_hardfork_active_for_height(4, block_height);
   
   //inputs
   for (const auto in : tx.vin)
@@ -4972,11 +5073,17 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   //outputs
   for (const auto out : tx.vout)
   {
-    if (out.target.type() == typeid(txout_htlc))
-    {
-      if (!var_is_after_hardfork_3_zone)
+    VARIANT_SWITCH_BEGIN(out);
+    VARIANT_CASE_CONST(tx_out_bare, o)
+      if (o.target.type() == typeid(txout_htlc))
+      {
+        if (!var_is_after_hardfork_3_zone)
+          return false;
+      }
+    VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+      if (!var_is_after_hardfork_4_zone)
         return false;
-    }
+    VARIANT_SWITCH_END();
   }
 
   //extra
@@ -5028,7 +5135,14 @@ bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transactio
     uint64_t unlock_value = ut2.unlock_time_array[i];
     CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(unlock_value), false, "output #" << i << " is locked by time, not buy height, which is not allowed for PoS coinbase");
     if (unlock_value >= source_max_unlock_time)
-      amount_of_coins_in_unlock_in_range += miner_tx.vout[i].amount;
+    {
+      VARIANT_SWITCH_BEGIN(miner_tx.vout[i]);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        amount_of_coins_in_unlock_in_range += o.amount;
+      VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+        //@#@      
+      VARIANT_SWITCH_END();
+    }
   }
   
   if (amount_of_coins_in_unlock_in_range >= staked_amount)
@@ -5107,16 +5221,18 @@ bool blockchain_storage::validate_pos_block(const block& b,
     return false;
   }
 
+
+
   //validate signature
   uint64_t max_related_block_height = 0;
   const txin_to_key& coinstake_in = boost::get<txin_to_key>(b.miner_tx.vin[1]);
-  CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1, false, "PoS block's miner_tx has incorrect signatures size = " << b.miner_tx.signatures.size() << ", block_id = " << get_block_hash(b));
+
   if (!for_altchain)
   {
     // Do coinstake input validation for main chain only.
     // Txs in alternative PoS blocks (including miner_tx) are validated by validate_alt_block_txs()
     uint64_t source_max_unlock_time_for_pos_coinbase = 0;
-    r = check_tx_input(b.miner_tx, 1, coinstake_in, id, b.miner_tx.signatures[0], max_related_block_height, source_max_unlock_time_for_pos_coinbase);
+    r = check_tx_input(b.miner_tx, 1, coinstake_in, id, max_related_block_height, source_max_unlock_time_for_pos_coinbase);
     CHECK_AND_ASSERT_MES(r, false, "Failed to validate coinstake input in miner tx, block_id = " << get_block_hash(b));
 
     if (m_core_runtime_config.is_hardfork_active_for_height(1, get_block_height(b)))
@@ -5125,7 +5241,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
       CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_h, false, "Failed to validate coinbase in PoS block, condition failed: max_related_block_height(" << max_related_block_height << ") <= last_pow_h(" << last_pow_h << ")");
       //let's check that coinbase amount and unlock time
       r = validate_pos_coinbase_outs_unlock_time(b.miner_tx, coinstake_in.amount, source_max_unlock_time_for_pos_coinbase);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to validate_pos_coinbase_outs_unlock_time() in miner tx, block_id = " << get_block_hash(b) 
+      CHECK_AND_ASSERT_MES(r, false, "Failed to validate_pos_coinbase_outs_unlock_time() in miner tx, block_id = " << get_block_hash(b)
         << "source_max_unlock_time_for_pos_coinbase=" << source_max_unlock_time_for_pos_coinbase);
     }
     else
@@ -5133,6 +5249,8 @@ bool blockchain_storage::validate_pos_block(const block& b,
       CHECK_AND_ASSERT_MES(is_tx_spendtime_unlocked(source_max_unlock_time_for_pos_coinbase), false, "Failed to validate coinbase in PoS block, condition failed: is_tx_spendtime_unlocked(source_max_unlock_time_for_pos_coinbase)(" << source_max_unlock_time_for_pos_coinbase << ")");
     }
   }
+
+
 
   uint64_t block_height = for_altchain ? split_height + alt_chain.size() : m_db_blocks.size();
   uint64_t coinstake_age = block_height - max_related_block_height - 1;
@@ -5434,7 +5552,13 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     //If we under checkpoints, ring signatures should be pruned    
     if(m_is_in_checkpoint_zone)
     {
-      tx.signatures.clear();
+      VARIANT_SWITCH_BEGIN(tx.signature);
+      VARIANT_CASE(NLSAG_sig, signatures)
+        signatures.s.clear();
+      VARIANT_CASE_CONST(zarcanum_sig, s);
+      //@#@
+      VARIANT_SWITCH_END();
+      
       tx.attachment.clear();
     }
     TIME_MEASURE_START_PD(tx_add_one_tx_time);
@@ -5750,6 +5874,18 @@ bool blockchain_storage::update_next_comulative_size_limit()
 bool blockchain_storage::is_hardfork_active(size_t hardfork_id) const
 {
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_id, m_db_blocks.size()); // note using m_db_blocks.size() ( == top_block_height + 1 )
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_after_hardfork_4_zone()const
+{
+  return is_after_hardfork_4_zone(m_db_blocks.size());
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_after_hardfork_4_zone(uint64_t height)const
+{
+  if (height > m_core_runtime_config.hard_forks.hard_fork_04_starts_after_height)
+    return true;
+  return false;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_block(const block& bl)
@@ -6204,12 +6340,11 @@ void blockchain_storage::calculate_local_gindex_lookup_table_for_height(uint64_t
 }
 //------------------------------------------------------------------
 bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
-  std::unordered_set<crypto::key_image>& collected_keyimages, 
+  std::unordered_set<crypto::key_image>& collected_keyimages,
   const txs_by_id_and_height_altchain& alt_chain_tx_ids,
-  const crypto::hash& bl_id, 
-  const crypto::hash& input_tx_hash, 
+  const crypto::hash& bl_id,
+  const crypto::hash& input_tx_hash,
   size_t input_index,
-  const std::vector<crypto::signature>& input_sigs, 
   uint64_t split_height, 
   const alt_chain_type& alt_chain, 
   const std::unordered_set<crypto::hash>& alt_chain_block_ids, 
@@ -6248,6 +6383,8 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     *p_max_related_block_height = 0;
 
   CHECK_AND_ASSERT_MES(input_index < input_tx.vin.size(), false, "invalid input index: " << input_index);
+
+
   const txin_v& input_v = input_tx.vin[input_index];
   const txin_to_key& input_to_key = get_to_key_input_from_txin_v(input_v);
 
@@ -6412,105 +6549,119 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
         uint64_t height_of_source_block = it->second.second;
         CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
         
-        /*
-        here we do validation against compatibility of input and output type
-
-        TxOutput | TxInput | Allowed
-        ----------------------------
-        HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
-        HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
-        TO_KEY   |  HTLC   | NOT
-        TO_KEY   |  TO_KEY | YES
-        */
-
         //source tx found in altchain
         CHECK_AND_ASSERT_MES(it->second.first.vout.size() > out_n, false, "Internal error: out_n(" << out_n << ") >= it->second.vout.size()(" << it->second.first.vout.size() << ")");
-        txout_target_v out_target_v = it->second.first.vout[out_n].target;
 
-        bool r = is_output_allowed_for_input(out_target_v, input_v, height_of_current_alt_block - height_of_source_block);
-        CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+        VARIANT_SWITCH_BEGIN(it->second.first.vout[out_n]);
+        VARIANT_CASE_CONST(tx_out_bare, o)
+        {
+          /*
+          here we do validation against compatibility of input and output type
 
+          TxOutput | TxInput | Allowed
+          ----------------------------
+          HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
+          HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
+          TO_KEY   |  HTLC   | NOT
+          TO_KEY   |  TO_KEY | YES
+          */
+          txout_target_v out_target_v = o.target;
 
-        if (out_target_v.type() == typeid(txout_htlc))
-        {
-          //source is hltc out
-          const txout_htlc& htlc = boost::get<txout_htlc>(out_target_v);          
-          bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
-          pk = htlc_expired ? htlc.pkey_refund : htlc.pkey_redeem;
-          pub_key_pointers.push_back(&pk);
-          continue;
+          bool r = is_output_allowed_for_input(out_target_v, input_v, height_of_current_alt_block - height_of_source_block);
+          CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+          if (out_target_v.type() == typeid(txout_htlc))
+          {
+            //source is hltc out
+            const txout_htlc& htlc = boost::get<txout_htlc>(out_target_v);
+            bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
+            pk = htlc_expired ? htlc.pkey_refund : htlc.pkey_redeem;
+            pub_key_pointers.push_back(&pk);
+            continue;
+          }
+          else if (out_target_v.type() == typeid(txout_to_key))
+          {
+            //source is to_key out
+            pk = boost::get<txout_to_key>(out_target_v).key;
+            pub_key_pointers.push_back(&pk);
+            continue;
+          }
+          else
+          {
+            ASSERT_MES_AND_THROW("Unexpected out type for tx_in in altblock: " << out_target_v.type().name());
+          }
         }
-        else if (out_target_v.type() == typeid(txout_to_key))
-        {
-          //source is to_key out
-          pk = boost::get<txout_to_key>(out_target_v).key;
-          pub_key_pointers.push_back(&pk);
-          continue;
-        }
-        else
-        {
-          ASSERT_MES_AND_THROW("Unexpected out type for tx_in in altblock: " << out_target_v.type().name());
-        }
+        VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+          //@#@      
+        VARIANT_SWITCH_END();
       }
 
     }
 
     auto p = m_db_transactions.get(tx_id);
     CHECK_AND_ASSERT_MES(p != nullptr && out_n < p->tx.vout.size(), false, "can't find output #" << out_n << " for tx " << tx_id << " referred by offset #" << pk_n);
-    auto &t = p->tx.vout[out_n].target;
-    
-    /*
-    here we do validation against compatibility of input and output type
 
-    TxOutput | TxInput | Allowed
-    ----------------------------
-    HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
-    HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
-    TO_KEY   |  HTLC   | NOT
-    TO_KEY   |  TO_KEY | YES
-    */
-    uint64_t height_of_source_block = p->m_keeper_block_height;
-    CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
-    bool r = is_output_allowed_for_input(t, input_v,   height_of_current_alt_block - height_of_source_block);
-    CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
-
-    if (t.type() == typeid(txout_to_key))
+    VARIANT_SWITCH_BEGIN(p->tx.vout[out_n]);
+    VARIANT_CASE_CONST(tx_out_bare, o)
     {
-      const txout_to_key& out_tk = boost::get<txout_to_key>(t);
-      pk = out_tk.key;
+      auto &t = o.target;
 
-      bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(out_tk.mix_attr, abs_key_offsets.size() - 1);
-      CHECK_AND_ASSERT_MES(mixattr_ok, false, "input offset #" << pk_n << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(out_tk.mix_attr) << ", input's key_offsets.size = " << abs_key_offsets.size());
+      /*
+      here we do validation against compatibility of input and output type
 
+      TxOutput | TxInput | Allowed
+      ----------------------------
+      HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
+      HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
+      TO_KEY   |  HTLC   | NOT
+      TO_KEY   |  TO_KEY | YES
+      */
+      uint64_t height_of_source_block = p->m_keeper_block_height;
+      CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
+      bool r = is_output_allowed_for_input(t, input_v, height_of_current_alt_block - height_of_source_block);
+      CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+
+      if (t.type() == typeid(txout_to_key))
+      {
+        const txout_to_key& out_tk = boost::get<txout_to_key>(t);
+        pk = out_tk.key;
+
+        bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(out_tk.mix_attr, abs_key_offsets.size() - 1);
+        CHECK_AND_ASSERT_MES(mixattr_ok, false, "input offset #" << pk_n << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(out_tk.mix_attr) << ", input's key_offsets.size = " << abs_key_offsets.size());
+
+      }
+      else if (t.type() == typeid(txout_htlc))
+      {
+        const txout_htlc& htlc = boost::get<txout_htlc>(t);
+        bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
+        pk = htlc_expired ? htlc.pkey_refund : htlc.pkey_redeem;
+      }
+
+      // case b4 (make sure source tx in the main chain is preceding split point, otherwise this referece is invalid)
+      CHECK_AND_ASSERT_MES(p->m_keeper_block_height < split_height, false, "input offset #" << pk_n << " refers to main chain tx " << tx_id << " at height " << p->m_keeper_block_height << " while split height is " << split_height);
+
+      if (p_max_related_block_height != nullptr && *p_max_related_block_height < p->m_keeper_block_height)
+        *p_max_related_block_height = p->m_keeper_block_height;
+
+      // TODO: consider checking p->tx for unlock time validity as it's checked in get_output_keys_for_input_with_checks()
+      // make sure it was actually found
+
+      // let's disable this check due to missing equal check in main chain validation code
+      //TODO: implement more strict validation with next hard fork
+      //CHECK_AND_ASSERT_MES(pk != null_pkey, false, "Can't determine output public key for offset " << pk_n << " in related tx: " << tx_id << ", out_n = " << out_n);
+      pub_key_pointers.push_back(&pk);
     }
-    else if (t.type() == typeid(txout_htlc))
-    {
-      const txout_htlc& htlc = boost::get<txout_htlc>(t);
-      bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
-      pk = htlc_expired ? htlc.pkey_refund : htlc.pkey_redeem;
-    }
-
-    // case b4 (make sure source tx in the main chain is preceding split point, otherwise this referece is invalid)
-    CHECK_AND_ASSERT_MES(p->m_keeper_block_height < split_height, false, "input offset #" << pk_n << " refers to main chain tx " << tx_id << " at height " << p->m_keeper_block_height << " while split height is " << split_height);
-
-    if (p_max_related_block_height != nullptr && *p_max_related_block_height < p->m_keeper_block_height)
-      *p_max_related_block_height = p->m_keeper_block_height;
-
-    // TODO: consider checking p->tx for unlock time validity as it's checked in get_output_keys_for_input_with_checks()
-    // make sure it was actually found
-    
-    // let's disable this check due to missing equal check in main chain validation code
-    //TODO: implement more strict validation with next hard fork
-    //CHECK_AND_ASSERT_MES(pk != null_pkey, false, "Can't determine output public key for offset " << pk_n << " in related tx: " << tx_id << ", out_n = " << out_n);
-    pub_key_pointers.push_back(&pk);
+    VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+      //@#@      
+    VARIANT_SWITCH_END();
   }
 
+
   // do input checks (attachment_info, ring signature and extra signature, etc.)
-  r = check_input_signature(input_tx, input_index, input_to_key, input_tx_hash, input_sigs, pub_key_pointers);
+  r = check_input_signature(input_tx, input_index, input_to_key, input_tx_hash, pub_key_pointers);
   CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
 
-  // TODO: consider checking input_tx for valid extra attachment info as it's checked in check_tx_inputs()
 
+  // TODO: consider checking input_tx for valid extra attachment info as it's checked in check_tx_inputs()
   return true;
 }
 //------------------------------------------------------------------
@@ -6581,7 +6732,7 @@ bool blockchain_storage::is_output_allowed_for_input(const output_key_or_htlc_v&
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx, const crypto::hash& input_tx_hash, size_t input_index, const std::vector<crypto::signature>& input_sigs, uint64_t split_height, const alt_chain_type& alt_chain) const
+bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx, const crypto::hash& input_tx_hash, size_t input_index, const signature_v& input_sigs_v, uint64_t split_height, const alt_chain_type& alt_chain) const
 {
   // Main and alt chain outline:
   //
@@ -6610,10 +6761,12 @@ bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx
 
   CRITICAL_REGION_LOCAL(m_read_lock);
   bool r = false;
-
-  CHECK_AND_ASSERT_MES(input_index < input_tx.vin.size() && input_tx.vin[input_index].type() == typeid(txin_multisig), false, "invalid ms input index: " << input_index << " or type");
+  CHECK_AND_ASSERT_MES(input_index < input_tx.vin.size() 
+    && input_tx.vin[input_index].type() == typeid(txin_multisig) 
+    && input_tx.signature.type() == typeid(NLSAG_sig), false, "invalid ms input index: " << input_index << " or type");
   const txin_multisig& input = boost::get<txin_multisig>(input_tx.vin[input_index]);
 
+  //const std::vector<crypto::signature>& input_sigs = boost::get<NLSAG_sig>(input_tx.signature).s[input_index];
   // check corresponding ms out in the main chain
   auto p = m_db_multisig_outs.get(input.multisig_out_id);
   if (p != nullptr)
@@ -6628,7 +6781,7 @@ bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx
     if (p_source_tx->m_keeper_block_height < split_height)
     {
       // cases g1, g2
-      return check_ms_input(input_tx, input_index, input, input_tx_hash, input_sigs, p_source_tx->tx, p->out_no);
+      return check_ms_input(input_tx, input_index, input, input_tx_hash, p_source_tx->tx, p->out_no);
     }
     
     // p_source_tx is above split_height in main chain B, so it can't be a source for this input
@@ -6662,17 +6815,22 @@ bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx
 
       for (size_t out_n = 0; out_n < tx.vout.size(); ++out_n)
       {
-        const tx_out_bare& out = tx.vout[out_n];
-        if (out.target.type() == typeid(txout_multisig))
-        {
-          const crypto::hash& ms_out_id = get_multisig_out_id(tx, out_n);
-          if (ms_out_id == input.multisig_out_id)
+        VARIANT_SWITCH_BEGIN(tx.vout[out_n]);
+        VARIANT_CASE_CONST(tx_out_bare, o)
+          const tx_out_bare& out = o;
+          if (out.target.type() == typeid(txout_multisig))
           {
-            // cases g3, g4, g5
-            output_found = true;
-            return check_ms_input(input_tx, input_index, input, input_tx_hash, input_sigs, tx, out_n);
+            const crypto::hash& ms_out_id = get_multisig_out_id(tx, out_n);
+            if (ms_out_id == input.multisig_out_id)
+            {
+              // cases g3, g4, g5
+              output_found = true;
+              return check_ms_input(input_tx, input_index, input, input_tx_hash, tx, out_n);
+            }
           }
-        }
+        VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+          //@#@      
+        VARIANT_SWITCH_END();
       }
       return true;
     };
@@ -6720,29 +6878,34 @@ bool blockchain_storage::get_transaction_from_pool_or_db(const crypto::hash& tx_
 bool blockchain_storage::update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei) const 
 {
   //add tx outputs to gindex_lookup_table
-  for (auto o : tx.vout)
+  for (auto ov : tx.vout)
   {
-    if (o.target.type() == typeid(txout_to_key) || o.target.type() == typeid(txout_htlc))
-    {
-      //LOG_PRINT_MAGENTA("ALT_OUT KEY ON H[" << abei.height << "] AMOUNT: " << o.amount, LOG_LEVEL_0);
-      // first, look at local gindexes tables
-      if (abei.gindex_lookup_table.find(o.amount) == abei.gindex_lookup_table.end())
+    VARIANT_SWITCH_BEGIN(ov);
+    VARIANT_CASE_CONST(tx_out_bare, o)
+      if (o.target.type() == typeid(txout_to_key) || o.target.type() == typeid(txout_htlc))
       {
-        // amount was not found in altchain gindexes container, start indexing from current main chain gindex
-        abei.gindex_lookup_table[o.amount] = m_db_outputs.get_item_size(o.amount);
-        //LOG_PRINT_MAGENTA("FIRST TOUCH: size=" << abei.gindex_lookup_table[o.amount], LOG_LEVEL_0);
+        //LOG_PRINT_MAGENTA("ALT_OUT KEY ON H[" << abei.height << "] AMOUNT: " << o.amount, LOG_LEVEL_0);
+        // first, look at local gindexes tables
+        if (abei.gindex_lookup_table.find(o.amount) == abei.gindex_lookup_table.end())
+        {
+          // amount was not found in altchain gindexes container, start indexing from current main chain gindex
+          abei.gindex_lookup_table[o.amount] = m_db_outputs.get_item_size(o.amount);
+          //LOG_PRINT_MAGENTA("FIRST TOUCH: size=" << abei.gindex_lookup_table[o.amount], LOG_LEVEL_0);
+        }
+        if (o.target.type() == typeid(txout_to_key))
+        {
+          abei.outputs_pub_keys[o.amount].push_back(boost::get<txout_to_key>(o.target).key);
+        }
+        else
+        {
+          abei.outputs_pub_keys[o.amount].push_back(boost::get<txout_htlc>(o.target));
+        }
+
+        //TODO: At the moment we ignore check of mix_attr again mixing to simplify alt chain check, but in future consider it for stronger validation
       }
-      if (o.target.type() == typeid(txout_to_key))
-      {
-        abei.outputs_pub_keys[o.amount].push_back(boost::get<txout_to_key>(o.target).key);
-      }
-      else
-      {
-        abei.outputs_pub_keys[o.amount].push_back(boost::get<txout_htlc>(o.target));
-      }
-      
-      //TODO: At the moment we ignore check of mix_attr again mixing to simplify alt chain check, but in future consider it for stronger validation
-    }
+    VARIANT_CASE_CONST(tx_out_zarcanum, toz)
+      //@#@      
+    VARIANT_SWITCH_END();
   }
   return true;
 }
@@ -6791,12 +6954,22 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
 
   if (is_pos_block(b))
   {
-    // check PoS block miner tx in a special way
-    CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 && b.miner_tx.vin.size() == 2, false, "invalid PoS block's miner_tx, signatures size = " << b.miner_tx.signatures.size() << ", miner_tx.vin.size() = " << b.miner_tx.vin.size());
     uint64_t max_related_block_height = 0;
     uint64_t ki_lookup = 0;
-    r = validate_alt_block_input(b.miner_tx, collected_keyimages, alt_chain_tx_ids, id, get_block_hash(b), 1, b.miner_tx.signatures[0], split_height, alt_chain, alt_chain_block_ids, ki_lookup, &max_related_block_height);
-    CHECK_AND_ASSERT_MES(r, false, "miner tx " << get_transaction_hash(b.miner_tx) << ": validation failed");
+
+    // check PoS block miner tx in a special way
+    VARIANT_SWITCH_BEGIN(b.miner_tx.signature);
+    VARIANT_CASE_CONST(void_sig, v);
+    VARIANT_CASE_CONST(NLSAG_sig, signatures);
+    {
+      CHECK_AND_ASSERT_MES(signatures.s.size() == 1 && b.miner_tx.vin.size() == 2, false, "invalid PoS block's miner_tx, signatures size = " << signatures.s.size() << ", miner_tx.vin.size() = " << b.miner_tx.vin.size());
+      r = validate_alt_block_input(b.miner_tx, collected_keyimages, alt_chain_tx_ids, id, get_block_hash(b), 1, split_height, alt_chain, alt_chain_block_ids, ki_lookup, &max_related_block_height);
+      CHECK_AND_ASSERT_MES(r, false, "miner tx " << get_transaction_hash(b.miner_tx) << ": validation failed");
+    }
+    VARIANT_CASE_CONST(zarcanum_sig, s);
+    //@#@
+    VARIANT_SWITCH_END();
+
     ki_lookup_time_total += ki_lookup;
     // check stake age
     uint64_t coinstake_age = height - max_related_block_height - 1;
@@ -6816,19 +6989,22 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
       CHECK_AND_ASSERT_MES(get_transaction_from_pool_or_db(tx_id, tx_ptr, split_height), false, "failed to get alt block tx " << tx_id << " with split_height == " << split_height);
     }
     const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
-    CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid tx: tx.signatures.size() == " << tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
+    if (tx.signature.type() == typeid(NLSAG_sig))
+    {
+      CHECK_AND_ASSERT_MES(boost::get<NLSAG_sig>(tx.signature).s.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " << boost::get<NLSAG_sig>(tx.signature).s.size() << ", tx.vin.size() == " << tx.vin.size());
+    }
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {
       if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
       {
         uint64_t ki_lookup = 0;
-        r = validate_alt_block_input(tx, collected_keyimages, alt_chain_tx_ids, id, tx_id, n, tx.signatures[n], split_height, alt_chain, alt_chain_block_ids, ki_lookup);
+        r = validate_alt_block_input(tx, collected_keyimages, alt_chain_tx_ids, id, tx_id, n, split_height, alt_chain, alt_chain_block_ids, ki_lookup);
         CHECK_AND_ASSERT_MES(r, false, "tx " << tx_id << ", input #" << n << ": validation failed");
         ki_lookup_time_total += ki_lookup;
       }
       else if (tx.vin[n].type() == typeid(txin_multisig))
       {
-        r = validate_alt_block_ms_input(tx, tx_id, n, tx.signatures[n], split_height, alt_chain);
+        r = validate_alt_block_ms_input(tx, tx_id, n, tx.signature, split_height, alt_chain);
         CHECK_AND_ASSERT_MES(r, false, "tx " << tx_id << ", input #" << n << " (multisig): validation failed");
       }
       else if (tx.vin[n].type() == typeid(txin_gen))

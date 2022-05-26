@@ -21,7 +21,7 @@ namespace
   {
     uint64_t total_amount = get_outs_money_amount(miner_tx);
     uint64_t amount_2 = total_amount - amount_1;
-    txout_target_v target = miner_tx.vout[0].target;
+    txout_target_v target =boost::get<currency::tx_out_bare>( miner_tx.vout[0]).target;
 
     miner_tx.vout.clear();
 
@@ -39,8 +39,8 @@ namespace
   void append_tx_source_entry(std::vector<currency::tx_source_entry>& sources, const transaction& tx, size_t out_idx)
   {
     currency::tx_source_entry se = AUTO_VAL_INIT(se);
-    se.amount = tx.vout[out_idx].amount;
-    se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(tx.vout[out_idx].target).key));
+    se.amount =boost::get<currency::tx_out_bare>( tx.vout[out_idx]).amount;
+    se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(tx.vout[out_idx]).target).key));
     se.real_output = 0;
     se.real_out_tx_key = get_tx_pub_key_from_extra(tx);
     se.real_output_in_tx_index = out_idx;
@@ -134,7 +134,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   std::vector<currency::tx_source_entry> sources;
   for (size_t i = 0; i < blk_0.miner_tx.vout.size(); ++i)
   {
-    if (TESTS_DEFAULT_FEE < blk_0.miner_tx.vout[i].amount)
+    if (TESTS_DEFAULT_FEE < boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[i]).amount)
     {
       append_tx_source_entry(sources, blk_0.miner_tx, i);
       break;
@@ -165,7 +165,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   sources.clear();
   for (size_t i = 0; i < tx_1.vout.size(); ++i)
   {
-    auto& tx_1_out = tx_1.vout[i];
+    auto& tx_1_out = boost::get<tx_out_bare>(tx_1.vout[i]);
     if (tx_1_out.amount < TX_MAX_TRANSFER_AMOUNT - 1)
       continue;
 

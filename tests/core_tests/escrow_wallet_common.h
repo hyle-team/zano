@@ -253,8 +253,8 @@ inline bool build_custom_escrow_template(const std::vector<test_event_entry>& ev
 
   if (custom_config_mask & eccf_template_no_a_sigs)
   {
-    escrow_template_tx.signatures.clear();
-    escrow_template_tx.signatures.push_back(std::vector<crypto::signature>());
+    boost::get<currency::NLSAG_sig>(escrow_template_tx.signature).s.clear();
+    boost::get<currency::NLSAG_sig>(escrow_template_tx.signature).s.push_back(std::vector<crypto::signature>());
   }
 
   append_vector_by_another_vector(used_sources, sources);
@@ -338,11 +338,11 @@ inline bool build_custom_escrow_release_template(
   // inputs
   // create multisig (A-B) source, add keys from B
   tx_source_entry se = AUTO_VAL_INIT(se);
-  se.amount = (~custom_config_mask & eccf_rel_template_inv_ms_amount) ? escrow_template_tx.vout[ms_idx].amount : escrow_template_tx.vout[ms_idx].amount + 10 * TESTS_DEFAULT_FEE;
+  se.amount = (~custom_config_mask & eccf_rel_template_inv_ms_amount) ?boost::get<currency::tx_out_bare>( escrow_template_tx.vout[ms_idx]).amount :boost::get<currency::tx_out_bare>( escrow_template_tx.vout[ms_idx]).amount + 10 * TESTS_DEFAULT_FEE;
   se.multisig_id = ms_id;
   se.real_output_in_tx_index = ms_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(escrow_template_tx);
-  se.ms_keys_count = boost::get<txout_multisig>(escrow_template_tx.vout[ms_idx].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(escrow_template_tx.vout[ms_idx]).target).keys.size();
   se.ms_sigs_count = (~custom_config_mask & eccf_rel_template_inv_sigs_count) ? 2 : 1;
   std::vector<tx_source_entry> sources({ se });
 

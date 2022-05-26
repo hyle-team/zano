@@ -301,7 +301,7 @@ namespace currency
   void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x);
   uint64_t get_tx_type(const transaction& tx);
   uint64_t get_tx_type_ex(const transaction& tx, tx_out_bare& htlc_out, txin_htlc& htlc_in);
-  size_t get_multisig_out_index(const std::vector<tx_out_bare>& outs);
+  size_t get_multisig_out_index(const std::vector<tx_out_v>& outs);
   size_t get_multisig_in_index(const std::vector<txin_v>& inputs);
 
   uint64_t get_reward_from_miner_tx(const transaction& tx);
@@ -418,6 +418,7 @@ namespace currency
   bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id);
   bool is_coinbase(const transaction& tx);
   bool is_coinbase(const transaction& tx, bool& pos_coinbase);
+  bool is_pos_coinbase(const transaction& tx);
   bool have_attachment_service_in_container(const std::vector<attachment_v>& av, const std::string& service_id, const std::string& instruction);
   crypto::hash prepare_prefix_hash_for_sign(const transaction& tx, uint64_t in_index, const crypto::hash& tx_id);
 
@@ -698,7 +699,13 @@ namespace currency
     uint64_t operator()(const t_input& i) const{return i.amount;}
     uint64_t operator()(const txin_gen& i) const {return 0;}
   };
-
+  //---------------------------------------------------------------
+  inline const tx_out_bare& get_tx_out_bare_from_out_v(const tx_out_v& o)
+  {
+    //this function will throw if type is not matching
+    return boost::get<tx_out_bare>(o);
+  }
+  //---------------------------------------------------------------
   inline uint64_t get_amount_from_variant(const txin_v& v)
   {
     return boost::apply_visitor(input_amount_getter(), v);

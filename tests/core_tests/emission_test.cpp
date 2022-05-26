@@ -98,11 +98,11 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
       const transaction& stake = tce_ptr->tx;
       crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
       size_t stake_output_gidx = tce_ptr->m_global_output_indexes[stake_output_idx];
-      uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+      uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
       crypto::key_image stake_output_key_image;
       keypair kp;
       generate_key_image_helper(m_miner_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-      crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+      crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
       difficulty = c.get_blockchain_storage().get_next_diff_conditional(true);
       //size_t median_size = 0; // little hack: we're using small blocks (only coinbase tx), so we're in CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE - don't need to calc median size
@@ -124,7 +124,12 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
       pos_coins += gen_coins;
 
       // update stakes queue: pop used one from the front and push output of this PoS block to the back
-      size_t biggest_output_idx = std::max_element(pb.m_block.miner_tx.vout.begin(), pb.m_block.miner_tx.vout.end(), [](const currency::tx_out_bare& l, const currency::tx_out_bare& r){ return l.amount < r.amount;}) - pb.m_block.miner_tx.vout.begin();
+      size_t biggest_output_idx = std::max_element(pb.m_block.miner_tx.vout.begin(), pb.m_block.miner_tx.vout.end(),
+        [](const currency::tx_out_v& l, const currency::tx_out_v& r)
+      {
+        return boost::get<tx_out_bare>(l).amount < boost::get<tx_out_bare>(r).amount;
+      }) - pb.m_block.miner_tx.vout.begin();
+
       stake_tx_outs.pop_front();
       stake_tx_outs.push_back(std::make_pair(get_transaction_hash(pb.m_block.miner_tx), biggest_output_idx));
 

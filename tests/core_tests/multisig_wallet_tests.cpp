@@ -168,7 +168,7 @@ bool multisig_wallet_test::c1(currency::core& c, size_t ev_index, const std::vec
   size_t i = 0;
   for (; i != result_tx.vout.size(); i++)
   {
-    if (result_tx.vout[i].target.type() == typeid(txout_multisig))
+    if (boost::get<currency::tx_out_bare>(result_tx.vout[i]).target.type() == typeid(txout_multisig))
       break;
   }
   CHECK_AND_ASSERT_MES(i != result_tx.vout.size(), false, "Incorrect txs outs");
@@ -299,7 +299,10 @@ bool multisig_wallet_test_many_dst::c1(currency::core& c, size_t ev_index, const
   miner_wlt->transfer(std::vector<tx_destination_entry>({ de }), 0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>(), std::vector<currency::attachment_v>(), tools::detail::ssi_digit, tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
   TMP_LOG_RESTORE;
 
-  auto it = std::find_if(result_tx.vout.begin(), result_tx.vout.end(), [](tx_out_bare& o) { return o.target.type() == typeid(txout_multisig); });
+  auto it = std::find_if(result_tx.vout.begin(), result_tx.vout.end(), [](tx_out_v& o) 
+  {
+    return boost::get<tx_out_bare>(o).target.type() == typeid(txout_multisig);
+  });
   CHECK_AND_ASSERT_MES(it != result_tx.vout.end(), false, "Can't find output txout_multisig");
   size_t multisig_index = it - result_tx.vout.begin();
 
@@ -906,7 +909,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.multisig_id = ms_id;
   se.real_output_in_tx_index = ms_out_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_1);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_1.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 2;
 
   tx_destination_entry de(se.amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
@@ -939,7 +942,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.multisig_id = ms_id;
   se.real_output_in_tx_index = ms_out_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_1);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_1.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 2;
 
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
@@ -976,7 +979,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.multisig_id = ms_4_id;
   se.real_output_in_tx_index = ms_4_out_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_4);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_4.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_4.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 3;
 
   transaction tx_5 = AUTO_VAL_INIT(tx_5);
@@ -1020,7 +1023,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.multisig_id = ms_6_id;
   se.real_output_in_tx_index = ms_6_out_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_6);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_6.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_6.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 4;
 
   transaction tx_7 = AUTO_VAL_INIT(tx_7);
@@ -1034,7 +1037,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r && !tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed : " << tx_fully_signed);
   r = sign_multisig_input_in_tx_custom(tx_7, ms_6_out_idx, miner_acc.get_keys(), tx_6, &tx_fully_signed, false);
   CHECK_AND_ASSERT_MES(r && !tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed : " << tx_fully_signed);
-  tx_7.signatures[0].push_back(invalid_signature);   // instead of 4th sig just add invalid sig
+  boost::get<currency::NLSAG_sig>(tx_7.signature).s[0].push_back(invalid_signature);   // instead of 4th sig just add invalid sig
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_7);
@@ -1062,7 +1065,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   se.multisig_id = ms_8_id;
   se.real_output_in_tx_index = ms_8_out_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_8);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_8.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_8.vout[se.real_output_in_tx_index]).target).keys.size();
   static const size_t redundant_keys_count = 7000;
   se.ms_sigs_count = redundant_keys_count;
 
@@ -1070,7 +1073,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   r = construct_tx(miner_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address()) }), empty_attachment, tx_9, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
-  tx_9.signatures[0].resize(redundant_keys_count, invalid_signature);
+  boost::get<currency::NLSAG_sig>(tx_9.signature).s[0].resize(redundant_keys_count, invalid_signature);
 
   r = sign_multisig_input_in_tx_custom(tx_9, ms_8_out_idx, bob_acc.get_keys(), tx_8, &tx_fully_signed, false);
   CHECK_AND_ASSERT_MES(r && !tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed : " << tx_fully_signed);
@@ -1138,7 +1141,7 @@ bool multisig_and_fake_outputs::generate(std::vector<test_event_entry>& events) 
   // Second, correctly set up multisig part
   tx_source_entry& se = sources.back();
   se.multisig_id = tx_1_ms_out_id;
-  se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[tx_1_ms_out_idx].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_1.vout[tx_1_ms_out_idx]).target).keys.size();
   se.ms_sigs_count = 1;
   se.real_output_in_tx_index = tx_1_ms_out_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_1);
@@ -1217,7 +1220,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   se.multisig_id = tx_1_ms_out_id;
   se.real_output_in_tx_index = tx_1_ms_out_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_1);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[tx_1_ms_out_idx].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_1.vout[tx_1_ms_out_idx]).target).keys.size();
   se.ms_sigs_count = 1;
   sources.assign({ se });
 
@@ -1295,7 +1298,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   se.multisig_id = tx_5_ms_out_id;
   se.real_output_in_tx_index = tx_5_ms_out_idx;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_5);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_5.vout[tx_5_ms_out_idx].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_5.vout[tx_5_ms_out_idx]).target).keys.size();
   se.ms_sigs_count = 1;
   sources.assign({ se });
 
@@ -1351,11 +1354,11 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(miner_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
     keypair tx_key = keypair::generate();
 
     pos_block_builder pb;
@@ -1411,7 +1414,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
   se.multisig_id = get_multisig_out_id(blk_1.miner_tx, se.real_output_in_tx_index);
   //se.participants.push_back(alice_acc.get_keys());
   se.real_out_tx_key = get_tx_pub_key_from_extra(blk_1.miner_tx);
-  se.ms_keys_count = boost::get<txout_multisig>(blk_1.miner_tx.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(blk_1.miner_tx.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 1;
   sources.assign({ se });
 
@@ -1457,9 +1460,9 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
     miner_tx.vin.assign({ in_gen });
 
     // remove all outputs except the multisig
-    auto it = std::find_if(miner_tx.vout.begin(), miner_tx.vout.end(), [](const tx_out_bare& o) {return o.target.type() == typeid(txout_multisig); });
+    auto it = std::find_if(miner_tx.vout.begin(), miner_tx.vout.end(), [](const tx_out_v& o) {return boost::get<tx_out_bare>(o).target.type() == typeid(txout_multisig); });
     CHECK_AND_ASSERT_MES(it != miner_tx.vout.end(), false, "construct_tx didn't create multisig output as expected");
-    tx_out_bare ms_out = *it;
+    tx_out_bare ms_out = boost::get<tx_out_bare>(*it);
     miner_tx.vout.assign({ ms_out });
     CHECK_AND_ASSERT_MES(ms_out.amount == blk_2_reward, false, "unexpected amount for found ms output");
 
@@ -1477,7 +1480,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
   se.multisig_id = get_multisig_out_id(blk_3.miner_tx, 0);
   se.real_output_in_tx_index = 0;
   se.real_out_tx_key = get_tx_pub_key_from_extra(blk_3.miner_tx);
-  se.ms_keys_count= boost::get<txout_multisig>(blk_3.miner_tx.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count= boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(blk_3.miner_tx.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 1;
 
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
@@ -1582,7 +1585,7 @@ bool multisig_with_same_id_in_pool::generate(std::vector<test_event_entry>& even
   se.multisig_id = tx_1_ms_id;
   se.real_output_in_tx_index = get_tx_out_index_by_amount(tx_1, amount);
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_1);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_1.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 1;
 
   tx_destination_entry de(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
@@ -1693,7 +1696,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   se.real_output_in_tx_index = get_tx_out_index_by_amount(tx_1, amount);
   se.multisig_id = get_multisig_out_id(tx_1, se.real_output_in_tx_index);
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_1);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_1.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 1;
 
   tx_destination_entry de(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
@@ -1736,7 +1739,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   se.real_output_in_tx_index = get_tx_out_index_by_amount(tx_3, amount);
   se.multisig_id = get_multisig_out_id(tx_3, se.real_output_in_tx_index);
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_3);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_3.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_3.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 1;
 
   de = tx_destination_entry(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
@@ -1767,7 +1770,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   se.real_output_in_tx_index = get_tx_out_index_by_amount(tx_5, amount);
   se.multisig_id = get_multisig_out_id(tx_5, se.real_output_in_tx_index);
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_5);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_5.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_5.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 1;
 
   de = tx_destination_entry(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
@@ -1844,7 +1847,7 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   r = make_tx_multisig_to_key(tx_1, get_tx_out_index_by_amount(tx_1, amount), std::list<account_keys>({ alice_acc.get_keys() }), bob_acc.get_public_address(), tx_2);
   CHECK_AND_ASSERT_MES(r, false, "make_tx_multisig_to_key failed");
-  tx_2.signatures.resize(10);
+  boost::get<currency::NLSAG_sig>(tx_2.signature).s.resize(10);
   boost::get<txin_multisig>(tx_2.vin[0]).sigs_count = 10;
 
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -1860,7 +1863,7 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
   r = make_tx_multisig_to_key(tx_1, get_tx_out_index_by_amount(tx_1, amount), std::list<account_keys>({ alice_acc.get_keys() }), bob_acc.get_public_address(), tx_3);
   CHECK_AND_ASSERT_MES(r, false, "make_tx_multisig_to_key failed");
-  tx_3.signatures.clear();
+  boost::get<currency::NLSAG_sig>(tx_3.signature).s.clear();
   boost::get<txin_multisig>(tx_3.vin[0]).sigs_count = 0;
 
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
@@ -1874,7 +1877,7 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   txb.step1_init();
   txb.step2_fill_inputs(miner_acc.get_keys(), sources);
   txb.step3_fill_outputs(destinations, 0, 1);
-  boost::get<txout_multisig>(txb.m_tx.vout[0].target).keys.clear(); // zero keys
+  boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(txb.m_tx.vout[0]).target).keys.clear(); // zero keys
   txb.step4_calc_hash();
   txb.step5_sign(sources);
   transaction tx_4 = txb.m_tx;
@@ -1888,11 +1891,11 @@ bool multisig_and_checkpoints_bad_txs::generate(std::vector<test_event_entry>& e
   txb.step1_init();
   txb.step2_fill_inputs(miner_acc.get_keys(), sources);
   txb.step3_fill_outputs(destinations, 0, 1);
-  crypto::public_key k = boost::get<txout_multisig>(txb.m_tx.vout[0].target).keys[0];
-  boost::get<txout_multisig>(txb.m_tx.vout[0].target).keys.resize(1500, k);
+  crypto::public_key k = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(txb.m_tx.vout[0]).target).keys[0];
+  boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(txb.m_tx.vout[0]).target).keys.resize(1500, k);
   txb.step4_calc_hash();
   txb.step5_sign(sources);
-  txb.m_tx.signatures.clear();
+  boost::get<currency::NLSAG_sig>(txb.m_tx.signature).s.clear();
   transaction tx_6 = txb.m_tx;
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
   events.push_back(tx_6);
@@ -2113,7 +2116,7 @@ bool ref_by_id_basics::generate(std::vector<test_event_entry>& events) const
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx");
 
-  r = check_ring_signature_at_gen_time(events, get_block_hash(blk_0r), boost::get<txin_to_key>(tx_1.vin[0]), get_transaction_hash(tx_1), tx_1.signatures[0]);
+  r = check_ring_signature_at_gen_time(events, get_block_hash(blk_0r), boost::get<txin_to_key>(tx_1.vin[0]), get_transaction_hash(tx_1), boost::get<currency::NLSAG_sig>(tx_1.signature).s[0]);
   CHECK_AND_ASSERT_MES(r, false, "check_ring_signature_at_gen_time failed");
 
   events.push_back(tx_1);
@@ -2262,7 +2265,7 @@ bool multisig_n_participants_seq_signing::generate(std::vector<test_event_entry>
   size_t ms_out_index = get_multisig_out_index(tx_1.vout);
   CHECK_AND_ASSERT_MES(ms_out_index != tx_1.vout.size(), false, "Can't find ms out index in tx_1");
   tx_source_entry se = AUTO_VAL_INIT(se);
-  se.amount = tx_1.vout[ms_out_index].amount;
+  se.amount =boost::get<currency::tx_out_bare>( tx_1.vout[ms_out_index]).amount;
   se.multisig_id = get_multisig_out_id(tx_1, ms_out_index);
   se.ms_sigs_count = m_minimum_signs_to_spend;
   // se.outputs -- not used for ms-outs
@@ -2270,7 +2273,7 @@ bool multisig_n_participants_seq_signing::generate(std::vector<test_event_entry>
   se.real_output_in_tx_index = ms_out_index;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_1);
   // se.separately_signed_tx_complete -- not a separately-signed tx
-  se.ms_keys_count = boost::get<txout_multisig>(tx_1.vout[ms_out_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_1.vout[ms_out_index]).target).keys.size();
   sources.push_back(se);
 
   tx_destination_entry de(ms_amount - TESTS_DEFAULT_FEE, alice_acc.get_public_address());

@@ -318,6 +318,12 @@ namespace wallet_public
     END_KV_SERIALIZE_MAP()
   };
 
+  struct COMMAND_RPC_GET_MINING_HISTORY
+  {
+    typedef currency::struct_with_one_t_type<uint64_t> request;
+    typedef wallet_public::mining_history response;
+  };
+
 
 #define ORDER_FROM_BEGIN_TO_END        "FROM_BEGIN_TO_END"
 #define ORDER_FROM_FROM_END_TO_BEGIN   "FROM_END_TO_BEGIN"

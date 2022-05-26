@@ -741,6 +741,11 @@ namespace tools
 
     return true;
   }
+  bool wallet_rpc_server::on_get_mining_history(const wallet_public::COMMAND_RPC_GET_MINING_HISTORY::request& req, wallet_public::COMMAND_RPC_GET_MINING_HISTORY::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    m_wallet.get_mining_history(res, req.v);
+    return true;
+  }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_contracts_send_proposal(const wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::request& req, wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {

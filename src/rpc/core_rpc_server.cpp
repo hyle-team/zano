@@ -970,9 +970,14 @@ namespace currency
   uint64_t core_rpc_server::get_block_reward(const block& blk)
   {
     uint64_t reward = 0;
-    BOOST_FOREACH(const tx_out_bare& out, blk.miner_tx.vout)
+    BOOST_FOREACH(const auto& out, blk.miner_tx.vout)
     {
-      reward += out.amount;
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE_CONST(tx_out_bare, out)
+        reward += out.amount;
+      VARIANT_CASE_CONST(tx_out_zarcanum, out)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     return reward;
   }

@@ -227,7 +227,7 @@ namespace boost
       a & x.vin;
       a & x.vout;
       a & x.extra;
-      a & x.signatures;
+      a & x.signature;
       a & x.attachment;
     }
 

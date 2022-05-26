@@ -311,8 +311,8 @@ bool gen_block_miner_tx_has_2_in::generate(std::vector<test_event_entry>& events
   GENERATE_ACCOUNT(alice);
 
   tx_source_entry se = AUTO_VAL_INIT(se);
-  se.amount = blk_0.miner_tx.vout[0].amount;
-  se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<txout_to_key>(blk_0.miner_tx.vout[0].target).key));
+  se.amount = boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).amount;
+  se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).target).key));
   se.real_output = 0;
   se.real_out_tx_key = get_tx_pub_key_from_extra(blk_0.miner_tx);
   se.real_output_in_tx_index = 0;
@@ -356,8 +356,8 @@ bool gen_block_miner_tx_with_txin_to_key::generate(std::vector<test_event_entry>
   REWIND_BLOCKS(events, blk_1r, blk_1, miner_account);
 
   tx_source_entry se = AUTO_VAL_INIT(se);
-  se.amount = blk_1.miner_tx.vout[0].amount;
-  se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<txout_to_key>(blk_1.miner_tx.vout[0].target).key));
+  se.amount = boost::get<currency::tx_out_bare>(blk_1.miner_tx.vout[0]).amount;
+  se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(blk_1.miner_tx.vout[0]).target).key));
   se.real_output = 0;
   se.real_out_tx_key = get_tx_pub_key_from_extra(blk_1.miner_tx);
   se.real_output_in_tx_index = 0;
@@ -393,7 +393,7 @@ bool gen_block_miner_tx_out_is_small::generate(std::vector<test_event_entry>& ev
   BLOCK_VALIDATION_INIT_GENERATE();
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
-  miner_tx.vout[0].amount /= 2;
+boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount /= 2;
 
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_miner_tx, 0, 0, 0, crypto::hash(), 0, miner_tx);
@@ -409,7 +409,7 @@ bool gen_block_miner_tx_out_is_big::generate(std::vector<test_event_entry>& even
   BLOCK_VALIDATION_INIT_GENERATE();
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
-  miner_tx.vout[0].amount *= 2;
+boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount *= 2;
 
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_miner_tx, 0, 0, 0, crypto::hash(), 0, miner_tx);
@@ -451,8 +451,8 @@ bool gen_block_miner_tx_has_out_to_alice::generate(std::vector<test_event_entry>
   crypto::derive_public_key(derivation, 1, alice.get_keys().account_address.spend_public_key, out_eph_public_key);
 
   tx_out_bare out_to_alice;
-  out_to_alice.amount = miner_tx.vout[0].amount / 2;
-  miner_tx.vout[0].amount -= out_to_alice.amount;
+  out_to_alice.amount =boost::get<currency::tx_out_bare>( miner_tx.vout[0]).amount / 2;
+boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount -= out_to_alice.amount;
   out_to_alice.target = txout_to_key(out_eph_public_key);
   miner_tx.vout.push_back(out_to_alice);
 
@@ -491,7 +491,7 @@ bool gen_block_is_too_big::generate(std::vector<test_event_entry>& events) const
   uint64_t amount = get_outs_money_amount(miner_tx);
   uint64_t portion = amount / tx_out_count;
   uint64_t remainder = amount % tx_out_count;
-  txout_target_v target = miner_tx.vout[0].target;
+  txout_target_v target =boost::get<currency::tx_out_bare>( miner_tx.vout[0]).target;
   miner_tx.vout.clear();
   for (size_t i = 0; i < tx_out_count; ++i)
   {

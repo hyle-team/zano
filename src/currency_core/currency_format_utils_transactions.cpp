@@ -8,6 +8,7 @@
 #include "serialization/serialization.h"
 #include "currency_format_utils.h"
 #include "currency_format_utils_abstract.h"
+#include "common/variant_helper.h"
 
 namespace currency
 {
@@ -32,16 +33,27 @@ namespace currency
     return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
   }
   //---------------------------------------------------------------
+
+
+
+
+
   uint64_t get_burned_amount(const transaction& tx)
   {
     uint64_t res = 0;
     for (auto& o : tx.vout)
     {
-      if (o.target.type() == typeid(txout_to_key))
-      {
-        if (boost::get<txout_to_key>(o.target).key == null_pkey)
-          res += o.amount;
-      }
+      VARIANT_SWITCH_BEGIN(o);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_to_key))
+        {
+          if (boost::get<txout_to_key>(o.target).key == null_pkey)
+            res += o.amount;
+        }
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@
+      VARIANT_CASE_THROW_ON_OTHER();        
+      VARIANT_SWITCH_END();
     }
     return res;
   }

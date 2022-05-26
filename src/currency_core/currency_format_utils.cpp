@@ -196,8 +196,9 @@ namespace currency
       posin.k_image = pe.keyimage;
       tx.vin.push_back(posin);
       //reserve place for ring signature
-      tx.signatures.resize(1);
-      tx.signatures[0].resize(posin.key_offsets.size());
+      tx.signature = NLSAG_sig();
+      boost::get<NLSAG_sig>(tx.signature).s.resize(1);
+      boost::get<NLSAG_sig>(tx.signature).s[0].resize(posin.key_offsets.size());
     }
 
     uint64_t no = 0;
@@ -525,8 +526,9 @@ namespace currency
     //msg.vin = tx.vin;
     msg.onetime_key = get_tx_pub_key_from_extra(tx);
     CHECK_AND_ASSERT_MES(tx.vout.size() > n, null_hash, "tx.vout.size() > n condition failed ");
-    CHECK_AND_ASSERT_MES(tx.vout[n].target.type() == typeid(txout_multisig), null_hash, "tx.vout[n].target.type() == typeid(txout_multisig) condition failed");
-    msg.vout.push_back(tx.vout[n]);
+    CHECK_AND_ASSERT_MES(tx.vout[n].type() == typeid(tx_out_bare), null_hash, "Unexpected type of out:" << tx.vout[n].type().name());
+    CHECK_AND_ASSERT_MES(boost::get<tx_out_bare>(tx.vout[n]).target.type() == typeid(txout_multisig), null_hash, "tx.vout[n].target.type() == typeid(txout_multisig) condition failed");
+    msg.vout.push_back(boost::get<tx_out_bare>(tx.vout[n]));
     return get_object_hash(msg);
   }
   //---------------------------------------------------------------
@@ -1127,13 +1129,17 @@ namespace currency
     if (bc_services::get_first_service_attachment_by_id(tx, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_CANCEL_PROPOSAL, tsa))
       return GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL;
 
-    for (auto o : tx.vout)
+    for (auto ov : tx.vout)
     {
-      if (o.target.type() == typeid(txout_htlc))
-      {
-        htlc_out = o;
-        return GUI_TX_TYPE_HTLC_DEPOSIT;
-      }
+      VARIANT_SWITCH_BEGIN(ov);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_htlc))
+        {
+          htlc_out = o;
+          return GUI_TX_TYPE_HTLC_DEPOSIT;
+        }
+      VARIANT_SWITCH_END();
+
     }
 
     if (get_type_in_variant_container(tx.vin, htlc_in))
@@ -1152,13 +1158,18 @@ namespace currency
     return get_tx_type_ex(tx, htlc_out, htlc_in);
   }
   //---------------------------------------------------------------
-  size_t get_multisig_out_index(const std::vector<tx_out_bare>& outs)
+  size_t get_multisig_out_index(const std::vector<tx_out_v>& outs)
   {
     size_t n = 0;
     for (; n != outs.size(); n++)
     {
-      if (outs[n].target.type() == typeid(txout_multisig))
-        break;
+      VARIANT_SWITCH_BEGIN(outs[n]);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_multisig))
+          break;
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@
+      VARIANT_SWITCH_END();
     }
     return n;
   }
@@ -1272,7 +1283,7 @@ namespace currency
     {
       tx.vin.clear();
       tx.vout.clear();
-      tx.signatures.clear();
+      tx.signature = NLSAG_sig();
       tx.extra = extra;
 
       tx.version = ftp.tx_version;
@@ -1525,8 +1536,8 @@ namespace currency
       crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, input_index, tx_prefix_hash);
       CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "failed to  prepare_prefix_hash_for_sign");
 
-      tx.signatures.push_back(std::vector<crypto::signature>());
-      std::vector<crypto::signature>& sigs = tx.signatures.back();
+      boost::get<NLSAG_sig>(tx.signature).s.push_back(std::vector<crypto::signature>());
+      std::vector<crypto::signature>& sigs = boost::get<NLSAG_sig>(tx.signature).s.back();
 
       if(src_entr.is_multisig())
       {
@@ -1597,7 +1608,12 @@ namespace currency
     uint64_t reward = 0;
     for (auto& out : tx.vout)
     {
-      reward += out.amount;
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        reward += o.amount;
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     reward -= income;
     return reward;
@@ -1648,14 +1664,20 @@ namespace currency
     size_t ms_out_index = SIZE_MAX;
     for (size_t i = 0; i < source_tx.vout.size(); ++i)
     {
-      if (source_tx.vout[i].target.type() == typeid(txout_multisig) && ms_in.multisig_out_id == get_multisig_out_id(source_tx, i))
-      {
-        ms_out_index = i;
-        break;
-      }
+
+      VARIANT_SWITCH_BEGIN(source_tx.vout[i]);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_multisig) && ms_in.multisig_out_id == get_multisig_out_id(source_tx, i))
+        {
+          ms_out_index = i;
+          break;
+        }
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     LOC_CHK(ms_out_index != SIZE_MAX, "failed to find ms output in source tx " << get_transaction_hash(source_tx) << " by ms id " << ms_in.multisig_out_id);
-    const txout_multisig& out_ms = boost::get<txout_multisig>(source_tx.vout[ms_out_index].target);
+    const txout_multisig& out_ms = boost::get<txout_multisig>( boost::get<tx_out_bare>(source_tx.vout[ms_out_index]).target);
 
     crypto::public_key source_tx_pub_key = get_tx_pub_key_from_extra(source_tx);
 
@@ -1665,9 +1687,13 @@ namespace currency
 
     size_t participant_index = std::find(out_ms.keys.begin(), out_ms.keys.end(), ms_in_ephemeral_key.pub) - out_ms.keys.begin();
     LOC_CHK(participant_index < out_ms.keys.size(), "Can't find given participant's ms key in ms output keys list");
-    LOC_CHK(ms_input_index < tx.signatures.size(), "transaction does not have signatures vectory entry for ms input #" << ms_input_index);
+    
+    //@#@
+    LOC_CHK(tx.signature.type() == typeid(NLSAG_sig), "Wrong type of signature");
 
-    auto& sigs = tx.signatures[ms_input_index];
+    LOC_CHK(ms_input_index <  boost::get<NLSAG_sig>(tx.signature).s.size(), "transaction does not have signatures vector entry for ms input #" << ms_input_index);
+
+    auto& sigs = boost::get<NLSAG_sig>(tx.signature).s[ms_input_index];
     LOC_CHK(!sigs.empty(), "empty signatures container");
 
     bool extra_signature_expected = (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE) && ms_input_index == tx.vin.size() - 1;
@@ -1801,36 +1827,37 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool check_outs_valid(const transaction& tx)
   {
-    for(const tx_out_bare& out : tx.vout)
+    for(const auto& vo : tx.vout)
     {
-      CHECK_AND_NO_ASSERT_MES(0 < out.amount, false, "zero amount output in transaction id=" << get_transaction_hash(tx));
-      if (out.target.type() == typeid(txout_to_key))
+
+      VARIANT_SWITCH_BEGIN(vo);
+      VARIANT_CASE_CONST(tx_out_bare, out)
       {
-        if (!check_key(boost::get<txout_to_key>(out.target).key))
-          return false;
+        CHECK_AND_NO_ASSERT_MES(0 < out.amount, false, "zero amount output in transaction id=" << get_transaction_hash(tx));
+        
+        VARIANT_SWITCH_BEGIN(out.target);
+        VARIANT_CASE_CONST(txout_to_key, tk)
+          if (!check_key(tk.key))
+            return false;
+        VARIANT_CASE_CONST(txout_htlc, htlc)
+          if (!check_key(htlc.pkey_redeem))
+            return false;
+          if (!check_key(htlc.pkey_refund))
+            return false;
+        VARIANT_CASE_CONST(txout_multisig, ms)
+          if (!(ms.keys.size() > 0 && ms.minimum_sigs > 0 && ms.minimum_sigs <= ms.keys.size()))
+          {
+            LOG_ERROR("wrong multisig in transaction id=" << get_transaction_hash(tx));
+            return false;
+          }
+        VARIANT_CASE_OTHER()
+          LOG_ERROR("wrong variant type: " << out.target.type().name() << ", expected " << typeid(txout_to_key).name()
+            << ", in transaction id=" << get_transaction_hash(tx));
+        VARIANT_SWITCH_END();
       }
-      else if (out.target.type() == typeid(txout_htlc))
-      {
-        const txout_htlc& htlc = boost::get<txout_htlc>(out.target);
-        if (!check_key(htlc.pkey_redeem))
-          return false;
-        if (!check_key(htlc.pkey_refund))
-          return false;
-      }
-      else if (out.target.type() == typeid(txout_multisig))
-      {
-        const txout_multisig& ms = boost::get<txout_multisig>(out.target);
-        if (!(ms.keys.size() > 0 && ms.minimum_sigs > 0 && ms.minimum_sigs <= ms.keys.size()))
-        {
-          LOG_ERROR("wrong multisig in transaction id=" << get_transaction_hash(tx));
-          return false;
-        }
-      }
-      else
-      {
-        LOG_ERROR("wrong variant type: " << out.target.type().name() << ", expected " << typeid(txout_to_key).name()
-          << ", in transaction id=" << get_transaction_hash(tx));
-      }
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     return true;
   }
@@ -1878,9 +1905,14 @@ namespace currency
     uint64_t money = 0;
     BOOST_FOREACH(const auto& o, tx.vout)
     {
-      if (money > o.amount + money)
-        return false;
-      money += o.amount;
+      VARIANT_SWITCH_BEGIN(o);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (money > o.amount + money)
+          return false;
+        money += o.amount;
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
     return true;
   }
@@ -1888,8 +1920,15 @@ namespace currency
   uint64_t get_outs_money_amount(const transaction& tx)
   {
     uint64_t outputs_amount = 0;
-    for(const auto& o : tx.vout)
-      outputs_amount += o.amount;
+    for (const auto& o : tx.vout)
+    {
+      VARIANT_SWITCH_BEGIN(o);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        outputs_amount += o.amount;
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@      
+      VARIANT_SWITCH_END();
+    }
     return outputs_amount;
   }
   //---------------------------------------------------------------
@@ -1962,7 +2001,10 @@ namespace currency
       return true;
 
     CHECK_AND_ASSERT_MES(offset < tx.vout.size(), false, "condition failed: offset(" << offset << ") < tx.vout.size() (" << tx.vout.size() << ")");
-    auto& o = tx.vout[offset];
+    auto& ov = tx.vout[offset];
+    CHECK_AND_ASSERT_MES(ov.type() == typeid(tx_out_bare), false, "unexpected type id in lookup_acc_outs_genesis:" << ov.type().name());
+    const tx_out_bare& o = boost::get<tx_out_bare>(ov);
+
     CHECK_AND_ASSERT_MES(o.target.type() == typeid(txout_to_key), false, "condition failed: o.target.type() == typeid(txout_to_key)");
     if (is_out_to_acc(acc, boost::get<txout_to_key>(o.target), derivation, offset))
     {
@@ -1994,46 +2036,46 @@ namespace currency
       return true;
 
     size_t i = 0;
-    for(const tx_out_bare& o : tx.vout)
+    for(const auto& ov : tx.vout)
     {
-      if (o.target.type() == typeid(txout_to_key))
+      VARIANT_SWITCH_BEGIN(ov);
+      VARIANT_CASE_CONST(tx_out_bare, o)
       {
-        if (is_out_to_acc(acc, boost::get<txout_to_key>(o.target), derivation, i))
-        {
-          outs.push_back(i);
-          money_transfered += o.amount;
-        }
+        VARIANT_SWITCH_BEGIN(o.target);
+        VARIANT_CASE_CONST(txout_to_key, t)
+          if (is_out_to_acc(acc, t, derivation, i))
+          {
+            outs.push_back(i);
+            money_transfered += o.amount;
+          }
+        VARIANT_CASE_CONST(txout_multisig, t)
+          if (is_out_to_acc(acc, t, derivation, i))
+          {
+            outs.push_back(i);
+            //don't count this money
+          }
+        VARIANT_CASE_CONST(txout_htlc, htlc)
+          htlc_info hi = AUTO_VAL_INIT(hi);
+          if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, i))
+          {
+            hi.hltc_our_out_is_before_expiration = true;
+            htlc_info_list.push_back(hi);
+            outs.push_back(i);
+          }
+          else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, i))
+          {
+            hi.hltc_our_out_is_before_expiration = false;
+            htlc_info_list.push_back(hi);
+            outs.push_back(i);
+          }
+        VARIANT_CASE_OTHER()
+          LOG_ERROR("Wrong type at lookup_acc_outs, unexpected type is: " << o.target.type().name());
+          return false;
+        VARIANT_SWITCH_END();
       }
-      else if (o.target.type() == typeid(txout_multisig))
-      {
-        if (is_out_to_acc(acc, boost::get<txout_multisig>(o.target), derivation, i))
-        {
-          outs.push_back(i);
-          //don't count this money
-        }
-      }
-      else if (o.target.type() == typeid(txout_htlc))
-      {
-        htlc_info hi = AUTO_VAL_INIT(hi);
-        const txout_htlc& htlc = boost::get<txout_htlc>(o.target);
-        if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, i))
-        {
-          hi.hltc_our_out_is_before_expiration = true;
-          htlc_info_list.push_back(hi);
-          outs.push_back(i);
-        }
-        else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, i))
-        {
-          hi.hltc_our_out_is_before_expiration = false;
-          htlc_info_list.push_back(hi);
-          outs.push_back(i);
-        }
-      }
-      else
-      {
-        LOG_ERROR("Wrong type at lookup_acc_outs, unexpected type is: " << o.target.type().name());
-        return false;
-      }
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@  
+      VARIANT_SWITCH_END();
       i++;
     }
     return true;
@@ -2504,12 +2546,18 @@ namespace currency
     uint64_t found_alias_reward = 0;
     for (const auto& out : tx.vout)
     {
-      if (out.target.type() != typeid(txout_to_key))
-        continue;
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE_CONST(tx_out_bare, out)
+        if (out.target.type() != typeid(txout_to_key))
+          continue;
 
-      const txout_to_key& o = boost::get<txout_to_key>(out.target);
-      if (o.key == null_pkey)
-        found_alias_reward += out.amount;
+        const txout_to_key& o = boost::get<txout_to_key>(out.target);
+        if (o.key == null_pkey)
+          found_alias_reward += out.amount;
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@      
+      VARIANT_SWITCH_END();
+
     }
     return found_alias_reward;
   }
@@ -2744,35 +2792,34 @@ namespace currency
     for (auto& out : tx.vout)
     {
       tei.outs.push_back(tx_out_rpc_entry());
-      tei.outs.back().amount = out.amount;
       tei.outs.back().is_spent = ptce ? ptce->m_spent_flags[i] : false;
       tei.outs.back().global_index = ptce ? ptce->m_global_output_indexes[i] : 0;
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE_CONST(tx_out_bare, out)
+      {
+        tei.outs.back().amount = out.amount;
 
-      if (out.target.type() == typeid(txout_to_key))
-      {
-        const txout_to_key& otk = boost::get<txout_to_key>(out.target);
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.key));
-        if (otk.mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-          tei.outs.back().pub_keys.back() += "(FORCED_NO_MIX)";
-        if (otk.mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
-          tei.outs.back().pub_keys.back() += std::string("(FORCED_MIX_LOWER_BOUND: ") + std::to_string(otk.mix_attr) + ")";
+        VARIANT_SWITCH_BEGIN(out.target);
+        VARIANT_CASE_CONST(txout_to_key, otk)
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.key));
+          if (otk.mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+            tei.outs.back().pub_keys.back() += "(FORCED_NO_MIX)";
+          if (otk.mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
+            tei.outs.back().pub_keys.back() += std::string("(FORCED_MIX_LOWER_BOUND: ") + std::to_string(otk.mix_attr) + ")";
+        VARIANT_CASE_CONST(txout_multisig, otm)
+          for (auto& k : otm.keys)
+          {
+            tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(k));
+          }
+          tei.outs.back().minimum_sigs = otm.minimum_sigs;
+        VARIANT_CASE_CONST(txout_htlc, otk)
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_redeem) + "(htlc_pkey_redeem)");
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_refund) + "(htlc_pkey_refund)");
+        VARIANT_SWITCH_END();
       }
-      else if (out.target.type() == typeid(txout_multisig))
-      {
-        const txout_multisig& otm = boost::get<txout_multisig>(out.target);
-        for (auto& k : otm.keys)
-        {
-          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(k));
-        }
-        tei.outs.back().minimum_sigs = otm.minimum_sigs;
-      }
-      else if (out.target.type() == typeid(txout_htlc))
-      {
-        const txout_htlc& otk = boost::get<txout_htlc>(out.target);
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_redeem) + "(htlc_pkey_redeem)");
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_refund) + "(htlc_pkey_refund)");
-      }
-
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@      
+      VARIANT_SWITCH_END();
       ++i;
     }
     return true;
@@ -2819,8 +2866,8 @@ namespace currency
         txin_multisig& tms = boost::get<txin_multisig>(in);
         tei.ins.back().amount = tms.amount;
         tei.ins.back().kimage_or_ms_id = epee::string_tools::pod_to_hex(tms.multisig_out_id);
-        if (tx.signatures.size() >= tei.ins.size())
-          tei.ins.back().multisig_count = tx.signatures[tei.ins.size() - 1].size();
+        if (tx.signature.type() == typeid(NLSAG_sig) && boost::get<NLSAG_sig>(tx.signature).s.size() >= tei.ins.size())
+          tei.ins.back().multisig_count = boost::get<NLSAG_sig>(tx.signature).s[tei.ins.size() - 1].size();
       }
     }
     return true;
@@ -2880,11 +2927,16 @@ namespace currency
   {
     for (size_t n = 0; n < tx.vout.size(); ++n)
     {
-      if (tx.vout[n].target.type() == typeid(txout_to_key) || tx.vout[n].target.type() == typeid(txout_htlc))
-      {
-        uint64_t amount = tx.vout[n].amount;
-        gindices[amount] += 1;
-      }
+      VARIANT_SWITCH_BEGIN(tx.vout[n]);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_to_key) || o.target.type() == typeid(txout_htlc))
+        {
+          uint64_t amount = o.amount;
+          gindices[amount] += 1;
+        }
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@      
+      VARIANT_SWITCH_END();
     }
   }
   //---------------------------------------------------------------
@@ -2972,6 +3024,15 @@ namespace currency
       return false;
 
     if (tx.vin[0].type() != typeid(txin_gen))
+      return false;
+
+    return true;
+  }
+  //-----------------------------------------------------------------------
+  bool is_pos_coinbase(const transaction& tx)
+  {
+    bool pos = false;
+    if (!is_coinbase(tx, pos) || !pos)
       return false;
 
     return true;

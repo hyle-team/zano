@@ -1330,8 +1330,15 @@ namespace currency
     idx = 0;
     for (const auto& out : tx.vout)
     {
-      if (out.target.type() == typeid(txout_multisig))
-        result.push_back(ms_out_info({ get_multisig_out_id(tx, idx), idx, false }));
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_multisig))
+          result.push_back(ms_out_info({ get_multisig_out_id(tx, idx), idx, false }));
+
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@
+      VARIANT_CASE_THROW_ON_OTHER();
+      VARIANT_SWITCH_END();
       ++idx;
     }
   }
@@ -1347,8 +1354,13 @@ namespace currency
     size_t idx = 0;
     for (const auto& out : tx.vout)
     {
-      if (out.target.type() == typeid(txout_multisig) && get_multisig_out_id(tx, idx) == multisig_id)
-        return true;
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_multisig) && get_multisig_out_id(tx, idx) == multisig_id)
+          return true;
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@
+      VARIANT_SWITCH_END();
       ++idx;
     }
 

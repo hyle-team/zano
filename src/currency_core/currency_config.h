@@ -253,6 +253,13 @@
 #endif
 
 
+#define ZANO_HARDFORK_00_INITAL                         0
+#define ZANO_HARDFORK_01                                1
+#define ZANO_HARDFORK_02                                2
+#define ZANO_HARDFORK_03                                3
+#define ZANO_HARDFORK_04_ZARCANUM                       4
+
+
 
 
 static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner tx must obey normal tx max outs limit");

@@ -59,9 +59,9 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
   keypair ephemeral = AUTO_VAL_INIT(ephemeral);
   r = generate_key_image_helper(miner_acc.get_keys(), get_tx_pub_key_from_extra(blk_0.miner_tx), 0, ephemeral, ki);
   CHECK_AND_ASSERT_MES(r, false, "generate_key_image_helper failed");
-  CHECK_AND_ASSERT_MES(boost::get<txout_to_key>(blk_0.miner_tx.vout[0].target).key == ephemeral.pub, false, "ephemeral.pub doesn't match with output key");
+  CHECK_AND_ASSERT_MES(boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).target).key == ephemeral.pub, false, "ephemeral.pub doesn't match with output key");
   pos_entry pe = AUTO_VAL_INIT(pe);
-  pe.amount = blk_0.miner_tx.vout[0].amount;
+  pe.amount = boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).amount;
   pe.block_timestamp = UINT64_MAX; // doesn't matter
   pe.index = 0; // global index
   pe.keyimage = ki;
@@ -100,7 +100,7 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
       r = bcs.validate_miner_transaction(b, cumulative_block_size, g_block_txs_fee, base_reward, bcs.total_coins());
       CHECK_AND_ASSERT_MES(r, false, "validate_miner_transaction failed, txs_total_size = " << txs_total_size);
 
-      uint64_t generated_coins = get_outs_money_amount(b.miner_tx) - (is_pos != 0 ? b.miner_tx.vout.back().amount : 0) - g_block_txs_fee / 2;
+      uint64_t generated_coins = get_outs_money_amount(b.miner_tx) - (is_pos != 0 ? boost::get<tx_out_bare>(b.miner_tx.vout.back()).amount : 0) - g_block_txs_fee / 2;
       uint64_t base_block_reward = is_pos != 0 ? base_block_reward_pos : base_block_reward_pow;
 
       if (txs_total_size % 1000 == 0)

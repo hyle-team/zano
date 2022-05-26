@@ -379,8 +379,10 @@ namespace tools
       uint64_t m_spent_height;
       uint32_t m_flags;
 
-      uint64_t amount() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index].amount; }
-      const currency::tx_out_bare& output() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index]; }
+      // @#@ will throw if type is not tx_out_bare, TODO: change according to new model, 
+      // need to replace all get_tx_out_bare_from_out_v() to proper code
+      uint64_t amount() const { return currency::get_tx_out_bare_from_out_v(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]).amount; } 
+      const currency::tx_out_bare& output() const { return currency::get_tx_out_bare_from_out_v(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]); }
       uint8_t mix_attr() const { return output().target.type() == typeid(currency::txout_to_key) ? boost::get<const currency::txout_to_key&>(output().target).mix_attr : UINT8_MAX; }
       crypto::hash tx_hash() const { return get_transaction_hash(m_ptx_wallet_info->m_tx); }
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
@@ -820,7 +822,7 @@ namespace tools
     bool reset_history();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
-    void get_mining_history(wallet_public::mining_history& hist);
+    void get_mining_history(wallet_public::mining_history& hist, uint64_t timestamp_from = 0);
     void set_core_runtime_config(const currency::core_runtime_config& pc);  
     currency::core_runtime_config& get_core_runtime_config();
     bool backup_keys(const std::string& path);
@@ -1012,6 +1014,7 @@ private:
     uint64_t detach_from_block_ids(uint64_t height);
     uint64_t get_wallet_minimum_height();
     uint64_t get_directly_spent_transfer_id_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
+    bool is_in_hardfork_zone(uint64_t hardfork_index);
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);

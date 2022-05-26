@@ -119,12 +119,21 @@ bool gen_chain_switch_pow_pos::generate(std::vector<test_event_entry>& events) c
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0, i = 0;
     uint64_t stake_output_amount = 0;
-    std::for_each(stake.vout.begin(), stake.vout.end(), [&stake_output_amount, &stake_output_idx, &i](const tx_out_bare& o){ if (o.amount > stake_output_amount) { stake_output_amount = o.amount; stake_output_idx = i; } ++i; });
+    std::for_each(stake.vout.begin(), stake.vout.end(), [&stake_output_amount, &stake_output_idx, &i](const tx_out_v& o_)
+      {
+      auto& o = boost::get<currency::tx_out_bare>(o_);
+        if (o.amount > stake_output_amount) 
+        {
+          stake_output_amount = o.amount; 
+          stake_output_idx = i; 
+        } 
+        ++i; 
+      });
     size_t stake_output_gidx = generator.get_tx_out_gindex(prev_id, currency::get_transaction_hash(stake), stake_output_idx);
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(alice.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
     pb.step1_init_header(height, prev_id);

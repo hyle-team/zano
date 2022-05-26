@@ -209,7 +209,7 @@ bool mix_in_spent_outs::generate(std::vector<test_event_entry>& events) const
   m_test_amount = MK_TEST_COINS(6);
   for(auto& o : blk_0.miner_tx.vout)
   {
-    CHECK_AND_ASSERT_MES(o.amount != m_test_amount, false, "Premine surprisingly has test amount output, change m_test_amount");
+    CHECK_AND_ASSERT_MES(boost::get<tx_out_bare>(o).amount != m_test_amount, false, "Premine surprisingly has test amount output, change m_test_amount");
   }
   
   MAKE_TX_LIST_START(events, txs, miner_acc, alice_acc, m_test_amount, blk_0r);

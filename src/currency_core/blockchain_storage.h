@@ -39,7 +39,7 @@
 #include "dispatch_core_events.h"
 #include "bc_attachments_service_manager.h"
 #include "common/median_db_cache.h"
-
+#include "common/variant_helper.h"
 
 
 MARK_AS_POD_C11(crypto::key_image);
@@ -286,25 +286,24 @@ namespace currency
     uint64_t get_aliases_count()const;
     uint64_t get_block_h_older_then(uint64_t timestamp) const;
     bool validate_tx_service_attachmens_in_services(const tx_service_attachment& a, size_t i, const transaction& tx)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, uint64_t& max_related_block_height)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
-    bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const transaction& source_tx, size_t out_n) const;
+    bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const;
-    bool check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<crypto::signature>& sig, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
+    bool check_input_signature(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
     bool check_input_signature(const transaction& tx, 
       size_t in_index, 
       uint64_t in_amount, 
       const crypto::key_image& k_image,
       const std::vector<txin_etc_details_v>& in_etc_details,
       const crypto::hash& tx_prefix_hash, 
-      const std::vector<crypto::signature>& sig, 
       const std::vector<const crypto::public_key*>& output_keys_ptrs) const;
 
     uint64_t get_current_comulative_blocksize_limit()const;
@@ -597,13 +596,17 @@ namespace currency
       const crypto::hash& bl_id, 
       const crypto::hash& input_tx_hash, 
       size_t input_index, 
-      const std::vector<crypto::signature>& input_sigs, 
       uint64_t split_height, 
       const alt_chain_type& alt_chain, 
       const std::unordered_set<crypto::hash>& alt_chain_block_ids, 
       uint64_t& ki_lookuptime, 
       uint64_t* p_max_related_block_height = nullptr) const;
-    bool validate_alt_block_ms_input(const transaction& input_tx, const crypto::hash& input_tx_hash, size_t input_index, const std::vector<crypto::signature>& input_sigs, uint64_t split_height, const alt_chain_type& alt_chain) const;
+    bool validate_alt_block_ms_input(const transaction& input_tx, 
+      const crypto::hash& input_tx_hash, 
+      size_t input_index, 
+      const signature_v& input_sigs,//const std::vector<crypto::signature>& input_sigs, 
+      uint64_t split_height, 
+      const alt_chain_type& alt_chain) const;
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::unordered_set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;
     bool update_alt_out_indexes_for_tx_in_block(const transaction& tx, alt_block_extended_info& abei)const;
     bool get_transaction_from_pool_or_db(const crypto::hash& tx_id, std::shared_ptr<transaction>& tx_ptr, uint64_t min_allowed_block_height = 0) const;
@@ -771,55 +774,66 @@ namespace currency
       TO_KEY   |  TO_KEY | YES
       */
 
-      bool r = is_output_allowed_for_input(tx_ptr->tx.vout[n].target, verified_input, get_current_blockchain_size() - tx_ptr->m_keeper_block_height);
-      CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
-
-      if (tx_ptr->tx.vout[n].target.type() == typeid(txout_to_key))
+      VARIANT_SWITCH_BEGIN(tx_ptr->tx.vout[n]);
+      VARIANT_CASE_CONST(tx_out_bare, o)
       {
-        CHECKED_GET_SPECIFIC_VARIANT(tx_ptr->tx.vout[n].target, const txout_to_key, outtk, false);
-        //fix for burned money
-        patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
+        bool r = is_output_allowed_for_input(o.target, verified_input, get_current_blockchain_size() - tx_ptr->m_keeper_block_height);
+        CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
 
-        bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, key_offsets.size() - 1);
-        CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
-      }
-      else if (tx_ptr->tx.vout[n].target.type() == typeid(txout_htlc))
-      {
-        //check for spend flags
-        CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() > n, false, 
-          "Internal error: tx_ptr->m_spent_flags.size(){" << tx_ptr->m_spent_flags.size() << "} > n{" << n << "}");
-        CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags[n] == false, false, "HTLC out already spent, double spent attempt detected");
-
-        const txout_htlc& htlc_out = boost::get<txout_htlc>(tx_ptr->tx.vout[n].target);
-        if (htlc_out.expiration > get_current_blockchain_size() - tx_ptr->m_keeper_block_height)
+        if (o.target.type() == typeid(txout_to_key))
         {
-          //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
-          scan_context.htlc_is_expired = false;
+          CHECKED_GET_SPECIFIC_VARIANT(o.target, const txout_to_key, outtk, false);
+          //fix for burned money
+          patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
+
+          bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, key_offsets.size() - 1);
+          CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
         }
-        else 
+        else if (o.target.type() == typeid(txout_htlc))
         {
-          //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
-          scan_context.htlc_is_expired = true; 
+          //check for spend flags
+          CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() > n, false,
+            "Internal error: tx_ptr->m_spent_flags.size(){" << tx_ptr->m_spent_flags.size() << "} > n{" << n << "}");
+          CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags[n] == false, false, "HTLC out already spent, double spent attempt detected");
+
+          const txout_htlc& htlc_out = boost::get<txout_htlc>(o.target);
+          if (htlc_out.expiration > get_current_blockchain_size() - tx_ptr->m_keeper_block_height)
+          {
+            //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
+            scan_context.htlc_is_expired = false;
+          }
+          else
+          {
+            //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
+            scan_context.htlc_is_expired = true;
+          }
         }
-      }else
-      {
-        LOG_ERROR("[scan_outputkeys_for_indexes]: Wrong output type in : " << tx_ptr->tx.vout[n].target.type().name());
-        return false;
+        else
+        {
+          LOG_ERROR("[scan_outputkeys_for_indexes]: Wrong output type in : " << o.target.type().name());
+          return false;
+        }
+
+        TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
+
+        if (!vis.handle_output(tx_ptr->tx, validated_tx, o, n))
+        {
+          LOG_PRINT_L0("Failed to handle_output for output id = " << tx_id << ", no " << n);
+          return false;
+        }
+        TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       }
-
-      
-      TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-      if (!vis.handle_output(tx_ptr->tx, validated_tx, tx_ptr->tx.vout[n], n))
-      {
-        LOG_PRINT_L0("Failed to handle_output for output id = " << tx_id << ", no " << n);
+      VARIANT_CASE_CONST(tx_out_zarcanum, oz)
+        //@#@
         return false;
-      }
-      TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
+      VARIANT_CASE_THROW_ON_OTHER();
+      VARIANT_SWITCH_END();
 
-        if (max_related_block_height < tx_ptr->m_keeper_block_height)
-          max_related_block_height = tx_ptr->m_keeper_block_height;
 
-      
+
+      if (max_related_block_height < tx_ptr->m_keeper_block_height)
+        max_related_block_height = tx_ptr->m_keeper_block_height;
+  
       ++output_index;
     }
     TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop);

@@ -267,7 +267,7 @@ bool block_template_vs_invalid_txs_from_pool::generate(std::vector<test_event_en
   se.multisig_id = get_multisig_out_id(tx_1m, 0);
   se.real_output_in_tx_index = 0;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_1m);
-  se.ms_keys_count = boost::get<txout_multisig>(tx_1m.vout[se.real_output_in_tx_index].target).keys.size();
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_1m.vout[se.real_output_in_tx_index]).target).keys.size();
   se.ms_sigs_count = 1;
   transaction tx_2m = AUTO_VAL_INIT(tx_2m);
   r = construct_tx(bob_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ tx_destination_entry(se.amount - TESTS_DEFAULT_FEE, miner_acc.get_public_address()) }),
@@ -447,8 +447,8 @@ bool test_blockchain_vs_spent_multisig_outs::generate(std::vector<test_event_ent
   // tx_1: txin_multisig -> txout_to_key
   size_t ms_out_idx = 0;
   tx_source_entry se = AUTO_VAL_INIT(se);
-  se.amount = tx_0.vout[ms_out_idx].amount;
-  se.ms_keys_count = boost::get<txout_multisig>(tx_0.vout[ms_out_idx].target).keys.size();
+  se.amount =boost::get<currency::tx_out_bare>( tx_0.vout[ms_out_idx]).amount;
+  se.ms_keys_count = boost::get<txout_multisig>(boost::get<currency::tx_out_bare>(tx_0.vout[ms_out_idx]).target).keys.size();
   se.ms_sigs_count = 1;
   se.multisig_id = get_multisig_out_id(tx_0, ms_out_idx);
   se.real_output_in_tx_index = ms_out_idx;
