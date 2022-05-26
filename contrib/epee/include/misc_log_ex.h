@@ -556,8 +556,11 @@ namespace log_space
       else
         m_have_to_kill_console = false;
 
-      ::AllocConsole();
-      freopen("CONOUT$", "w", stdout);
+      if (m_have_to_kill_console)
+      {
+        ::AllocConsole();
+        freopen("CONOUT$", "w", stdout);
+      }
       std::cout.clear();
 #endif
     }
