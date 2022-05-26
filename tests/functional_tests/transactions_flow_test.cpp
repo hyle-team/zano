@@ -17,6 +17,8 @@ using namespace epee;
 #include "wallet/wallet2.h"
 #include "string_coding.h"
 #include "math_helper.h"
+#include "common/variant_helper.h"
+
 using namespace currency;
 
 #define TESTS_DEFAULT_FEE                   TX_DEFAULT_FEE 
@@ -451,11 +453,16 @@ bool transactions_flow_test(
         if (td.is_spent())
           continue;
 
-        if (td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].amount <= transfer_size + TX_DEFAULT_FEE)
-        {
-          ++prepared_transfers;
-          continue;
-        }
+        VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
+        VARIANT_CASE(currency::tx_out_bare, ob);
+          if (ob.amount <= transfer_size + TX_DEFAULT_FEE)
+          {
+            ++prepared_transfers;
+            continue;
+          }
+        VARIANT_CASE(currency::tx_out_zarcanum, oz);
+          // @#@
+        VARIANT_SWITCH_END();
 
         ++count;
         currency::transaction tx_s;
