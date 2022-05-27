@@ -622,7 +622,7 @@ bool operator ==(const transaction_new_tests& a, const transaction_new_tests& b)
     a.extra.size() == b.extra.size() &&
     a.vin.size() == b.vin.size() &&
     a.vout.size() == b.vout.size() &&
-    boost::get<currency::NLSAG_sig>(a.signature).s.size() == boost::get<currency::NLSAG_sig>(b.signature).s.size();
+    a.signatures.size() == b.signatures.size();
 }
 
 bool operator ==(const transaction_new_tests& a, const transaction_old_tests& b) {
@@ -630,7 +630,7 @@ bool operator ==(const transaction_new_tests& a, const transaction_old_tests& b)
     a.extra.size() == b.extra.size() &&
     a.vin.size() == b.vin.size() &&
     a.vout.size() == b.vout.size() &&
-    boost::get<currency::NLSAG_sig>(a.signature).s.size() == boost::get<currency::NLSAG_sig>(b.signature).s.size();
+    a.signatures.size() == b.signatures.size();
 }
 
 void validate_tx_serialisation(transaction_new_tests& tx)
@@ -705,12 +705,12 @@ TEST(Serialization, serializes_transacion_versions)
   eae.m_alias = "eokcmeockme";
   eae.m_text_comment = "sdssccsc";
   tx.extra.push_back(eae); 
-  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(2);
+  tx.signatures.resize(2);
   crypto::signature sig = epee::string_tools::parse_tpod_from_hex_string<crypto::signature>("22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab9985222608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
-  boost::get<currency::NLSAG_sig>(tx.signature).s[0].push_back(sig);
-  boost::get<currency::NLSAG_sig>(tx.signature).s[0].push_back(sig);
-  boost::get<currency::NLSAG_sig>(tx.signature).s[1].push_back(sig);
-  boost::get<currency::NLSAG_sig>(tx.signature).s[1].push_back(sig);
+  tx.signatures[0].push_back(sig);
+  tx.signatures[0].push_back(sig);
+  tx.signatures[1].push_back(sig);
+  tx.signatures[1].push_back(sig);
   
   tx.version = TRANSACTION_VERSION_INITAL;
 
