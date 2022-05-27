@@ -4289,27 +4289,9 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   size_t sig_index = 0;
   max_used_block_height = 0;
   
-  std::vector<crypto::signature> sig_stub;
-  const std::vector<crypto::signature>* psig = &sig_stub;
-
   TIME_MEASURE_START_PD(tx_check_inputs_loop);
   for(const auto& txin : tx.vin)
   {
-    if (!m_is_in_checkpoint_zone)
-    {
-      VARIANT_SWITCH_BEGIN(tx.signature);
-      VARIANT_CASE_CONST(void_sig, v);
-      VARIANT_CASE_CONST(NLSAG_sig, signatures);
-      {
-        CHECK_AND_ASSERT_MES(sig_index < signatures.s.size(), false, "Wrong transaction: missing signature entry for input #" << sig_index << " tx: " << tx_prefix_hash);
-        psig = &signatures.s[sig_index];
-      }
-      VARIANT_CASE_CONST(zarcanum_sig, s);
-      //@#@
-      VARIANT_SWITCH_END();
-
-    }
-
     VARIANT_SWITCH_BEGIN(txin);
     VARIANT_CASE_CONST(txin_to_key, in_to_key)
     {
