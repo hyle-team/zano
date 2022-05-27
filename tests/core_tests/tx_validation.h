@@ -125,7 +125,7 @@ struct gen_tx_extra_double_entry : test_chain_unit_enchanced
 {
   gen_tx_extra_double_entry();
   bool generate(std::vector<test_event_entry>& events) const;
-  bool gen_tx_extra_double_entry::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
 struct gen_tx_double_key_image : test_chain_unit_enchanced
