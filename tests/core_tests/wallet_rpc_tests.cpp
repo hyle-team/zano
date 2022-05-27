@@ -216,9 +216,9 @@ bool wallet_rpc_transfer::generate(std::vector<test_event_entry>& events) const
 bool wallet_rpc_transfer::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.hard_forks.hard_fork_01_starts_after_height = 1;
-  pc.hard_forks.hard_fork_02_starts_after_height = 1;
-  pc.hard_forks.hard_fork_03_starts_after_height = 1;
+  pc.hard_forks.set_hardfork_height(1, 1);
+  pc.hard_forks.set_hardfork_height(2, 1);
+  pc.hard_forks.set_hardfork_height(3, 1);
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }

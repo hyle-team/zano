@@ -72,9 +72,10 @@ bool atomic_base_test::configure_core(currency::core& c, size_t ev_index, const 
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
-  pc.hard_forks.hard_fork_01_starts_after_height = 10;
-  pc.hard_forks.hard_fork_02_starts_after_height = 11;
-  pc.hard_forks.hard_fork_03_starts_after_height = 12;
+
+  pc.hard_forks.set_hardfork_height(1, 10);
+  pc.hard_forks.set_hardfork_height(2, 11);
+  pc.hard_forks.set_hardfork_height(3, 12);
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
@@ -635,9 +636,9 @@ bool atomic_test_check_hardfork_rules::configure_core(currency::core& c, size_t 
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
-  pc.hard_forks.hard_fork_01_starts_after_height = 10;
-  pc.hard_forks.hard_fork_02_starts_after_height = 10;
-  pc.hard_forks.hard_fork_03_starts_after_height = 10;
+  pc.hard_forks.set_hardfork_height(1, 10);
+  pc.hard_forks.set_hardfork_height(2, 10);
+  pc.hard_forks.set_hardfork_height(3, 10);
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
@@ -668,9 +669,9 @@ bool atomic_test_check_hardfork_rules::c1(currency::core& c, size_t ev_index, co
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
-  pc.hard_forks.hard_fork_01_starts_after_height = 10;
-  pc.hard_forks.hard_fork_02_starts_after_height = 10;
-  pc.hard_forks.hard_fork_03_starts_after_height = 30;
+  pc.hard_forks.set_hardfork_height(1, 10);
+  pc.hard_forks.set_hardfork_height(2, 10);
+  pc.hard_forks.set_hardfork_height(3, 30);
   c.get_blockchain_storage().set_core_runtime_config(pc);
 
   bool r = mine_next_pow_block_in_playtime(m_mining_accunt.get_public_address(), c);

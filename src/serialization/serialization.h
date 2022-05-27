@@ -235,6 +235,7 @@ struct transition_t<false, destination_t>
   template <typename archive, typename origin_type>
   static bool chain_serialize(archive &ar, origin_type& origin_tx)
   {
+    // TODO: consider using move semantic for temporary 'dst_tx'
     destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
     bool r = dst_tx.do_serialize(ar);
     if (!r) return r;

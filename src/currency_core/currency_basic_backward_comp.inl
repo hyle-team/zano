@@ -100,11 +100,12 @@ bool transition_convert(const transaction_current_t& from, transaction_v1& to)
   }
   return true;
 }
+
 template<typename transaction_current_t>
 bool transition_convert(const transaction_v1& from, transaction_current_t& to)
 {
+  // TODO: consider using move semantic for 'from'
   to.attachment = from.attachment;
-  to.signature = NLSAG_sig();
-  boost::get<NLSAG_sig>(to.signature).s = from.signatures;
+  to.signature = NLSAG_sig({from.signatures});
   return true;
 }

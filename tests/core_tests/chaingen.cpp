@@ -53,10 +53,6 @@ test_generator::test_generator()
   , m_ignore_last_pow_in_wallets(false)
   , m_last_found_timestamp(0)
 {
-  m_hardforks.hard_fork_01_starts_after_height = CURRENCY_MAX_BLOCK_NUMBER;
-  m_hardforks.hard_fork_02_starts_after_height = CURRENCY_MAX_BLOCK_NUMBER;
-  m_hardforks.hard_fork_03_starts_after_height = CURRENCY_MAX_BLOCK_NUMBER;
-  m_hardforks.hard_fork_04_starts_after_height = CURRENCY_MAX_BLOCK_NUMBER;
 }
 
 
@@ -67,14 +63,7 @@ void test_generator::set_hardforks(const currency::hard_forks_descriptor& hardfo
 
 void test_generator::set_hardfork_height(size_t hardfork_id, uint64_t h)
 {
-  switch (hardfork_id)
-  {
-  case 1: m_hardforks.hard_fork_01_starts_after_height = h; break;
-  case 2: m_hardforks.hard_fork_02_starts_after_height = h; break;
-  case 3: m_hardforks.hard_fork_03_starts_after_height = h; break;
-  case 4: m_hardforks.hard_fork_04_starts_after_height = h; break;
-  default: CHECK_AND_ASSERT_THROW_MES(false, "invalid hardfork id: " << hardfork_id)
-  }
+  m_hardforks.set_hardfork_height(hardfork_id, h);
 }
 
 void test_generator::get_block_chain(std::vector<const block_info*>& blockchain, const crypto::hash& head, size_t n) const
@@ -168,7 +157,8 @@ void test_generator::add_block(const currency::block& blk,
   uint64_t block_reward;
   get_block_reward(is_pos_block(blk), misc_utils::median(block_sizes), block_size, already_generated_coins, block_reward, currency::get_block_height(blk));
 
-  m_blocks_info[get_block_hash(blk)] = block_info(blk, already_generated_coins + block_reward, block_size, cum_diff, tx_list, ks_hash);
+  crypto::hash block_hash = get_block_hash(blk);
+  m_blocks_info[block_hash] = block_info(blk, already_generated_coins + block_reward, block_size, cum_diff, tx_list, ks_hash);
  
   
   std::stringstream ss_tx_hashes;
@@ -177,7 +167,7 @@ void test_generator::add_block(const currency::block& blk,
     ss_tx_hashes << "    [tx]: " << h << ENDL;
   }
 
-  LOG_PRINT_MAGENTA("ADDED_BLOCK[" << get_block_hash(blk) << "][" << (is_pos_block(blk)? "PoS":"PoW") <<"][" << get_block_height(blk) << "][cumul_diff:" << cum_diff << "]" << ENDL << ss_tx_hashes.str(), LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("ADDED_BLOCK[" << block_hash << "][" << (is_pos_block(blk)? "PoS":"PoW") <<"][" << get_block_height(blk) << "][cumul_diff:" << cum_diff << "]" << ENDL << ss_tx_hashes.str(), LOG_LEVEL_0);
 }
 
 void test_generator::add_block_info(const block_info& bi)
@@ -232,9 +222,9 @@ bool test_generator::construct_block(currency::block& blk,
 //   else
 //     blk.major_version = BLOCK_MAJOR_VERSION_INITIAL;
 
-  if (height <= m_hardforks.hard_fork_01_starts_after_height)
+  if (!m_hardforks.is_hardfork_active_for_height(1, height))
     blk.major_version = BLOCK_MAJOR_VERSION_INITIAL;
-  else if (height <= m_hardforks.hard_fork_03_starts_after_height)
+  else if (!m_hardforks.is_hardfork_active_for_height(3, height))
     blk.major_version = HF1_BLOCK_MAJOR_VERSION;
   else
     blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
@@ -523,7 +513,7 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
   uint64_t& found_timestamp,
   crypto::hash& found_kh)
 {
-  bool is_after_hardfork_01 = blck_chain.size() > m_hardforks.hard_fork_01_starts_after_height ? true : false;
+  //bool is_after_hardfork_01 = m_hardforks.is_hardfork_active_for_height(1, blck_chain.size());
   uint64_t median_timestamp = get_timestamps_median(blck_chain);
   wide_difficulty_type basic_diff = 0;
 
@@ -845,7 +835,7 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
   std::vector<currency::block> blockchain;
   map_hash2tx_t mtx;
   bool r = find_block_chain(events, blockchain, mtx, get_block_hash(blk_prev));
-  CHECK_AND_ASSERT_MES(r, false, "can't find a blockchain up from given blk_prev");
+  CHECK_AND_ASSERT_MES(r, false, "can't find a blockchain up from given blk_prev with hash " << get_block_hash(blk_prev) << " @ height " << get_block_height(blk_prev));
   bool pos_bl = coin_stake_sources.size();
   bool adjust_timestamp_finished = have_n_blocks_of_type(blockchain, pos_bl);
   uint64_t diff_up_timestamp_delta = POW_DIFF_UP_TIMESTAMP_DELTA;
@@ -1647,14 +1637,17 @@ void get_confirmed_txs(const std::vector<currency::block>& blockchain, const map
   }
 }
 
-bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head) {
+bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head)
+{
   std::unordered_map<crypto::hash, const block*> block_index;
-  BOOST_FOREACH(const test_event_entry& ev, events)
+  for(size_t i = 0, sz = events.size(); i < sz; ++i)
   {
+    const test_event_entry& ev = events[i];
     if (typeid(currency::block) == ev.type())
     {
       const block* blk = &boost::get<block>(ev);
-      block_index[get_block_hash(*blk)] = blk;
+      crypto::hash h = get_block_hash(*blk);
+      block_index[h] = blk;
     }
     else if (typeid(event_special_block) == ev.type())
     {
@@ -2125,11 +2118,6 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   , m_invalid_tx_index(std::numeric_limits<size_t>::max())
   , m_unverifiable_tx_index(std::numeric_limits<size_t>::max())
 {
-  m_hardforks.hard_fork_01_starts_after_height = CURRENCY_MAX_BLOCK_NUMBER;
-  m_hardforks.hard_fork_01_starts_after_height = CURRENCY_MAX_BLOCK_NUMBER;
-  m_hardforks.hard_fork_01_starts_after_height = CURRENCY_MAX_BLOCK_NUMBER;
-  m_hardforks.hard_fork_01_starts_after_height = CURRENCY_MAX_BLOCK_NUMBER;
-
 
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, configure_core);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, mark_invalid_tx);

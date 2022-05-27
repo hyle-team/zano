@@ -664,14 +664,9 @@ namespace currency
     bool is_output_allowed_for_input(const output_key_or_htlc_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const;
     bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
-    bool is_after_hardfork_1_zone()const;
-    bool is_after_hardfork_1_zone(uint64_t height)const;
-    bool is_after_hardfork_2_zone()const;
-    bool is_after_hardfork_2_zone(uint64_t height)const;
-    bool is_after_hardfork_3_zone()const;
-    bool is_after_hardfork_3_zone(uint64_t height)const;
-    bool is_after_hardfork_4_zone()const;
-    bool is_after_hardfork_4_zone(uint64_t height)const;
+
+    // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
+    bool is_hardfork_active(size_t hardfork_id) const;
 
 
 

@@ -626,9 +626,9 @@ bool gen_block_wrong_version_agains_hardfork::c1(currency::core& c, size_t ev_in
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
-  pc.hard_forks.hard_fork_01_starts_after_height = 10;
-  pc.hard_forks.hard_fork_02_starts_after_height = 10;
-  pc.hard_forks.hard_fork_03_starts_after_height = 10;
+  pc.hard_forks.set_hardfork_height(1, 10);
+  pc.hard_forks.set_hardfork_height(2, 10);
+  pc.hard_forks.set_hardfork_height(3, 10);
   c.get_blockchain_storage().set_core_runtime_config(pc);
 
   currency::account_base mining_accunt;
@@ -645,9 +645,9 @@ bool gen_block_wrong_version_agains_hardfork::c1(currency::core& c, size_t ev_in
   };
 
   //between 1 and 2 hardforks
-  pc.hard_forks.hard_fork_01_starts_after_height = 1;
-  pc.hard_forks.hard_fork_02_starts_after_height = 10;
-  pc.hard_forks.hard_fork_03_starts_after_height = 20;
+  pc.hard_forks.set_hardfork_height(1, 1);
+  pc.hard_forks.set_hardfork_height(2, 10);
+  pc.hard_forks.set_hardfork_height(3, 20);
   c.get_blockchain_storage().set_core_runtime_config(pc);
 
   //major unknown
@@ -663,9 +663,9 @@ bool gen_block_wrong_version_agains_hardfork::c1(currency::core& c, size_t ev_in
   CHECK_TEST_CONDITION(r);
 
   //between 1 and 2 hardforks
-  pc.hard_forks.hard_fork_01_starts_after_height = 1;
-  pc.hard_forks.hard_fork_02_starts_after_height = 1;
-  pc.hard_forks.hard_fork_03_starts_after_height = 1;
+  pc.hard_forks.set_hardfork_height(1, 1);
+  pc.hard_forks.set_hardfork_height(2, 1);
+  pc.hard_forks.set_hardfork_height(3, 1);
   c.get_blockchain_storage().set_core_runtime_config(pc);
 
 

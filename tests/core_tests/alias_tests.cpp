@@ -96,8 +96,8 @@ gen_alias_tests::gen_alias_tests()
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_height_changed);
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_too_many_aliases_registration);
 
-  m_hardforks.hard_fork_01_starts_after_height = 0;
-  m_hardforks.hard_fork_02_starts_after_height = 0;
+  m_hardforks.set_hardfork_height(1, 0);
+  m_hardforks.set_hardfork_height(2, 0);
 }
 
 bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
