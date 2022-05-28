@@ -299,7 +299,7 @@ namespace db_test
     }
 
     // class i_db_visitor
-    virtual bool on_enum_item(size_t i, const void* key_data, size_t key_size, const void* value_data, size_t value_size) override
+    virtual bool on_enum_item(uint64_t i, const void* key_data, uint64_t key_size, const void* value_data, uint64_t value_size) override
     {
       CHECK_AND_ASSERT_MES(key_size == sizeof(crypto::hash), false, "invalid key size: " << key_size);
       const crypto::hash *p_key = reinterpret_cast<const crypto::hash*>(key_data);
