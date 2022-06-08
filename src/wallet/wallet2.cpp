@@ -3242,7 +3242,7 @@ bool wallet2::is_consolidating_transaction(const wallet_public::wallet_transfer_
     for (uint64_t r : wti.td.rcv){income += r;}
     uint64_t spend = 0;
     for (uint64_t s : wti.td.spn) { spend += s; }
-    if (get_tx_fee(wti.tx) + spend = income)
+    if (get_tx_fee(wti.tx) + spend == income)
       return true;
   }
   return false;
@@ -3257,7 +3257,7 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
   
     if (exclude_mining_txs)
     {
-      if (currency::is_coinbase(wti.tx))
+      if (currency::is_coinbase(wti.tx) || is_consolidating_transaction(wti))
         return true;
     }
     trs.push_back(wti);
