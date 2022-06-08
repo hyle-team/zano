@@ -3277,6 +3277,20 @@ bool enum_container(iterator_t it_begin, iterator_t it_end, callback_t cb)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::is_consolidating_transaction(const wallet_public::wallet_transfer_info& wti)
+{
+  if (!wti.is_income)
+  {
+    uint64_t income = 0;
+    for (uint64_t r : wti.td.rcv){income += r;}
+    uint64_t spend = 0;
+    for (uint64_t s : wti.td.spn) { spend += s; }
+    if (get_tx_fee(wti.tx) + spend = income)
+      return true;
+  }
+  return false;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs, bool start_from_end)
 {
   if (!count || offset >= m_transfer_history.size())
