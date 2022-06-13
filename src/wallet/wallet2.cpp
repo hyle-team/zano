@@ -3285,7 +3285,7 @@ bool wallet2::is_consolidating_transaction(const wallet_public::wallet_transfer_
     for (uint64_t r : wti.td.rcv){income += r;}
     uint64_t spend = 0;
     for (uint64_t s : wti.td.spn) { spend += s; }
-    if (get_tx_fee(wti.tx) + spend == income)
+    if (get_tx_fee(wti.tx) + income == spend)
       return true;
   }
   return false;
