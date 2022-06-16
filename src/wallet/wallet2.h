@@ -1160,7 +1160,7 @@ namespace boost
       a & x.is_income;
       a & x.td;
       a & x.tx;
-      a & x.recipients_aliases;
+      a & x.remote_aliases;
       a & x.comment;
       a & x.contract;
       a & x.selected_indicies;

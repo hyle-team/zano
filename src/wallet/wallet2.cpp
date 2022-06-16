@@ -314,8 +314,8 @@ void wallet2::fetch_tx_global_indixes(const std::list<std::reference_wrapper<con
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
-  std::vector<std::string> recipients, recipients_aliases;
-  process_unconfirmed(tx, recipients, recipients_aliases);
+  std::vector<std::string> recipients, remote_aliases;
+  process_unconfirmed(tx, recipients, remote_aliases);
   std::vector<size_t> outs;
   uint64_t tx_money_got_in_outs = 0;
   crypto::public_key tx_pub_key = null_pkey;
@@ -682,7 +682,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   {//this actually is transfer transaction, notify about spend
     if (tx_money_spent_in_ins > tx_money_got_in_outs)
     {//usual transfer 
-      handle_money_spent2(b, tx, tx_money_spent_in_ins - (tx_money_got_in_outs+get_tx_fee(tx)), mtd, recipients, recipients_aliases);
+      handle_money_spent2(b, tx, tx_money_spent_in_ins - (tx_money_got_in_outs+get_tx_fee(tx)), mtd, recipients, remote_aliases);
     }
     else
     {//strange transfer, seems that in one transaction have transfers from different wallets.
@@ -705,7 +705,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     else if (mtd.spent_indices.size())
     {
       // multisig spend detected
-      handle_money_spent2(b, tx, 0, mtd, recipients, recipients_aliases);
+      handle_money_spent2(b, tx, 0, mtd, recipients, remote_aliases);
     }
   }
 }
@@ -1314,27 +1314,27 @@ void wallet2::handle_money_spent2(const currency::block& b,
                                   uint64_t amount, 
                                   const money_transfer2_details& td, 
                                   const std::vector<std::string>& recipients, 
-                                  const std::vector<std::string>& recipients_aliases)
+                                  const std::vector<std::string>& remote_aliases)
 {
   m_transfer_history.push_back(AUTO_VAL_INIT(wallet_public::wallet_transfer_info()));
   wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
   wti.is_income = false;
 
   wti.remote_addresses = recipients;
-  wti.recipients_aliases = recipients_aliases;
+  wti.remote_aliases = remote_aliases;
   prepare_wti(wti, get_block_height(b), get_block_datetime(b), in_tx, amount, td);
   WLT_LOG_L1("[MONEY SPENT]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<std::string>& recipients, std::vector<std::string>& recipients_aliases)
+void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<std::string>& recipients, std::vector<std::string>& remote_aliases)
 {
   auto unconf_it = m_unconfirmed_txs.find(get_transaction_hash(tx));
   if (unconf_it != m_unconfirmed_txs.end())
   {
     wallet_public::wallet_transfer_info& wti = unconf_it->second;
     recipients = wti.remote_addresses;
-    recipients_aliases = wti.recipients_aliases;
+    remote_aliases = wti.remote_aliases;
 
     m_unconfirmed_txs.erase(unconf_it);
   }
@@ -3267,7 +3267,7 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
 
     if (wti.remote_addresses.size() == 1)
     {
-      wti.recipients_aliases = get_aliases_for_address(wti.remote_addresses[0]);
+      wti.remote_aliases = get_aliases_for_address(wti.remote_addresses[0]);
     }
 
     if (trs.size() >= count)
@@ -3300,7 +3300,7 @@ void wallet2::wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_tra
   ss << wti.tx_blob_size << ",";
   ss << epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) << ",";
   ss << "[";
-  std::copy(wti.recipients_aliases.begin(), wti.recipients_aliases.end(), std::ostream_iterator<std::string>(ss, " "));
+  std::copy(wti.remote_aliases.begin(), wti.remote_aliases.end(), std::ostream_iterator<std::string>(ss, " "));
   ss << "]" << ",";
   ss << (wti.is_income ? "in" : "out") << ",";
   ss << (wti.is_service ? "[SERVICE]" : "") << (wti.is_mixing ? "[MIXINS]" : "") << (wti.is_mining ? "[MINING]" : "") << ",";
@@ -5081,7 +5081,7 @@ void wallet2::add_sent_unconfirmed_tx(const currency::transaction& tx,
   //unconfirmed_wti.tx = tx;
   unconfirmed_wti.remote_addresses = recipients;
   for (auto addr : recipients)
-    unconfirmed_wti.recipients_aliases.push_back(get_alias_for_address(addr));
+    unconfirmed_wti.remote_aliases.push_back(get_alias_for_address(addr));
   unconfirmed_wti.is_income = false;
   unconfirmed_wti.selected_indicies = selected_indicies;
   /*TODO: add selected_indicies to read_money_transfer2_details_from_tx in case of performance problems*/
