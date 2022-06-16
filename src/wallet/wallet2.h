@@ -539,7 +539,7 @@ namespace tools
     void push_offer(const bc_services::offer_details_ex& od, currency::transaction& res_tx);
     void cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, uint64_t fee, currency::transaction& tx);
     void update_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, const bc_services::offer_details_ex& od, currency::transaction& res_tx);
-    void request_alias_registration(const currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
+    void request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key = currency::null_skey);
     void request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
     bool check_available_sources(std::list<uint64_t>& amounts);
     
@@ -865,7 +865,7 @@ namespace tools
     void set_use_deffered_global_outputs(bool use);
     construct_tx_param get_default_construct_tx_param_inital();
     void set_disable_tor_relay(bool disable);
-
+    uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
     
     /*
@@ -930,6 +930,7 @@ private:
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
     std::string get_alias_for_address(const std::string& addr);
+    std::vector<std::string> get_aliases_for_address(const std::string& addr);
     static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, const uint64_t timestamp, currency::stake_kernel& kernel);
     bool is_connected_to_net();
     bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time);
@@ -1015,6 +1016,7 @@ private:
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
+    uint64_t get_alias_cost(const std::string& alias);
 
     static void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
     static void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);

@@ -1069,11 +1069,11 @@ namespace currency
     struct response
     {
       //std::string alias;
-      alias_rpc_details alias_info;
+      std::vector<alias_rpc_details> alias_info_list;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(alias_info)
+        KV_SERIALIZE(alias_info_list)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };
