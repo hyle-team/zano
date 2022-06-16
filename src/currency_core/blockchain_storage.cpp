@@ -3506,6 +3506,17 @@ std::string blockchain_storage::get_alias_by_address(const account_public_addres
   return "";
 }
 //------------------------------------------------------------------
+std::set<std::string> blockchain_storage::get_aliases_by_address(const account_public_address& addr)const
+{
+  auto alias_ptr = m_db_addr_to_alias.find(addr);
+  if (alias_ptr && alias_ptr->size())
+  {
+    return *(alias_ptr);
+  }
+
+  return std::set<std::string>();
+}
+//------------------------------------------------------------------
 bool blockchain_storage::pop_alias_info(const extra_alias_entry& ai)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -3694,15 +3705,6 @@ uint64_t blockchain_storage::validate_alias_reward(const transaction& tx, const 
   
   //validate the price had been paid
   uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx);
-
-  //@#@ 
-  //work around for net 68's generation
-#if CURRENCY_FORMATION_VERSION == 68
-  if (alias == "bhrfrrrtret" && get_transaction_hash(tx) == epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("760b85546678d2235a1843e18d8a016a2e4d9b8273cc4d7c09bebff1f6fa7eaf")  )
-    return true; 
-  if (alias == "test-420" &&    get_transaction_hash(tx) == epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("10f8a2539b2551bd0919bf7e3b1dfbae7553eca63e58cd2264ae60f90030edf8"))
-    return true;
-#endif
 
   CHECK_AND_ASSERT_MES(found_alias_reward >= fee_for_alias, false, "registration of alias '" 
     << alias << "' goes with a reward of " << print_money(found_alias_reward) << " which is less than expected: " << print_money(fee_for_alias) 

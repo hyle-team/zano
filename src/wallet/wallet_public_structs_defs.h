@@ -377,7 +377,28 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_RPC_REGISTER_ALIAS
+  {
+    struct request
+    {
+      currency::alias_rpc_details al;
+      crypto::secret_key authority_key;
 
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(al)
+        KV_SERIALIZE_POD_AS_HEX_STRING(authority_key)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      crypto::hash tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   
   struct transfer_destination

@@ -3308,6 +3308,11 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
     last_item_index = offset + local_offset;
     trs.back().transfer_internal_index = last_item_index;
 
+    if (wti.remote_addresses.size() == 1)
+    {
+      wti.recipients_aliases = get_aliases_for_address(wti.remote_addresses[0]);
+    }
+
     if (trs.size() >= count)
     {
       return false;
@@ -3872,11 +3877,54 @@ void wallet2::push_alias_info_to_extra_according_to_hf_status(const currency::ex
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::request_alias_registration(const currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)
+uint64_t wallet2::get_alias_cost(const std::string& alias)
+{
+  currency::COMMAND_RPC_GET_ALIAS_REWARD::request req = AUTO_VAL_INIT(req);
+  currency::COMMAND_RPC_GET_ALIAS_REWARD::response rsp = AUTO_VAL_INIT(rsp);
+  req.alias = alias;
+  if (!m_core_proxy->call_COMMAND_RPC_GET_ALIAS_REWARD(req, rsp))
+  {
+    throw std::runtime_error(std::string("Failed to get alias cost"));
+  }
+ 
+  return rsp.reward + rsp.reward / 10; //add 10% of price to be sure;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key)
 {
   if (!validate_alias_name(ai.m_alias))
   {
     throw std::runtime_error(std::string("wrong alias characters: ") + ai.m_alias);
+  }
+
+  if (ai.m_alias.size() < ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED)
+  {
+    if (authority_key == currency::null_skey)
+    {
+      throw std::runtime_error(std::string("Short aliases is not allowed without authority key: ") + ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY);
+    }
+    crypto::public_key authority_pub = AUTO_VAL_INIT(authority_pub);
+    bool r = crypto::secret_key_to_public_key(authority_key, authority_pub);
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate pub key from secrete authority key");
+
+    if (string_tools::pod_to_hex(authority_pub) != ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY)
+    {
+      throw std::runtime_error(std::string("Short aliases is not allowed to register by this authority key"));
+    }
+    r = currency::sign_extra_alias_entry(ai, authority_pub, authority_key);
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to sign alias update");
+    WLT_LOG_L2("Generated update alias info: " << ENDL
+      << "alias: " << ai.m_alias << ENDL
+      << "signature: " << currency::print_t_array(ai.m_sign) << ENDL
+      << "signed(owner) pub key: " << m_account.get_keys().account_address.spend_public_key << ENDL
+      << "to address: " << get_account_address_as_str(ai.m_address) << ENDL
+      << "sign_buff_hash: " << currency::get_sign_buff_hash_for_alias_update(ai)
+    );
+  }
+
+  if (!reward)
+  {
+    reward = get_alias_cost(ai.m_alias);
   }
 
   std::vector<currency::tx_destination_entry> destinations;
@@ -5148,15 +5196,28 @@ void wallet2::add_sent_unconfirmed_tx(const currency::transaction& tx,
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_alias_for_address(const std::string& addr)
 {
+  std::vector<std::string> aliases = get_aliases_for_address(addr);
+  if (aliases.size())
+    return aliases.front();
+  return "";
+}
+//----------------------------------------------------------------------------------------------------
+std::vector<std::string> wallet2::get_aliases_for_address(const std::string& addr)
+{
   PROFILE_FUNC("wallet2::get_alias_for_address");
   currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request req = addr;
   currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response res = AUTO_VAL_INIT(res);
+  std::vector<std::string> aliases;
   if (!m_core_proxy->call_COMMAND_RPC_GET_ALIASES_BY_ADDRESS(req, res))
   {
     WLT_LOG_L0("Failed to COMMAND_RPC_GET_ALIASES_BY_ADDRESS");
-    return "";
+    return aliases;
   }
-  return res.alias_info.alias;
+  for (auto& e : res.alias_info_list)
+  {
+    aliases.push_back(e.alias);
+  }
+  return aliases;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts, size_t fake_outputs_count,
