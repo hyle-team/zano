@@ -173,7 +173,7 @@ set installer_path=%BUILDS_PATH%\builds\%installer_file%
 %ZANO_SIGN_CMD% %installer_path%
 IF %ERRORLEVEL% NEQ 0 (
   @echo "failed to sign installer"
-  goto error
+  rem goto error
 )
 
 @echo "   UPLOADING TO SERVER ...."
