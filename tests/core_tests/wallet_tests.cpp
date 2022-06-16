@@ -1781,7 +1781,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
   uint64_t biggest_alias_reward = get_alias_coast_from_fee("a", TESTS_DEFAULT_FEE);
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
     [biggest_alias_reward](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      return std::count(wti.recipients_aliases.begin(), wti.recipients_aliases.end(), "minerminer") == 1 &&
+      return std::count(wti.remote_aliases.begin(), wti.remote_aliases.end(), "minerminer") == 1 &&
         wti.amount == biggest_alias_reward;
     }
   ));
