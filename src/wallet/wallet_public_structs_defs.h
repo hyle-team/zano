@@ -97,7 +97,7 @@ namespace wallet_public
     uint32_t      tx_blob_size;
     std::string   payment_id;
     std::vector<std::string> remote_addresses;  //optional
-    std::vector<std::string> recipients_aliases; //optional
+    std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
     std::string   comment;
     bool          is_income;
     bool          is_service;
@@ -127,7 +127,7 @@ namespace wallet_public
       KV_SERIALIZE(tx_blob_size)
       KV_SERIALIZE_BLOB_AS_HEX_STRING(payment_id)
       KV_SERIALIZE(remote_addresses)      
-      KV_SERIALIZE(recipients_aliases)
+      KV_SERIALIZE(remote_aliases)
       KV_SERIALIZE(comment)
       KV_SERIALIZE(is_income)
       KV_SERIALIZE(timestamp)
