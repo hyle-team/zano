@@ -196,9 +196,10 @@ namespace currency
       posin.k_image = pe.keyimage;
       tx.vin.push_back(posin);
       //reserve place for ring signature
-      tx.signature = NLSAG_sig();
-      boost::get<NLSAG_sig>(tx.signature).s.resize(1);
-      boost::get<NLSAG_sig>(tx.signature).s[0].resize(posin.key_offsets.size());
+      //tx.signature = NLSAG_sig();
+      tx.signatures.resize(1);
+      tx.signatures[0] = NLSAG_sig();
+      boost::get<NLSAG_sig>(tx.signatures[0]).s.resize(posin.key_offsets.size());
     }
 
     uint64_t no = 0;
@@ -1283,7 +1284,6 @@ namespace currency
     {
       tx.vin.clear();
       tx.vout.clear();
-      tx.signature = NLSAG_sig();
       tx.extra = extra;
 
       tx.version = ftp.tx_version;
@@ -1536,8 +1536,8 @@ namespace currency
       crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, input_index, tx_prefix_hash);
       CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "failed to  prepare_prefix_hash_for_sign");
 
-      boost::get<NLSAG_sig>(tx.signature).s.push_back(std::vector<crypto::signature>());
-      std::vector<crypto::signature>& sigs = boost::get<NLSAG_sig>(tx.signature).s.back();
+      tx.signatures.push_back(NLSAG_sig());
+      std::vector<crypto::signature>& sigs = boost::get<NLSAG_sig>(tx.signatures.back()).s;
 
       if(src_entr.is_multisig())
       {
@@ -1688,12 +1688,13 @@ namespace currency
     size_t participant_index = std::find(out_ms.keys.begin(), out_ms.keys.end(), ms_in_ephemeral_key.pub) - out_ms.keys.begin();
     LOC_CHK(participant_index < out_ms.keys.size(), "Can't find given participant's ms key in ms output keys list");
     
-    //@#@
-    LOC_CHK(tx.signature.type() == typeid(NLSAG_sig), "Wrong type of signature");
 
-    LOC_CHK(ms_input_index <  boost::get<NLSAG_sig>(tx.signature).s.size(), "transaction does not have signatures vector entry for ms input #" << ms_input_index);
 
-    auto& sigs = boost::get<NLSAG_sig>(tx.signature).s[ms_input_index];
+    //@#@   
+    LOC_CHK(ms_input_index <  tx.signatures.size(), "transaction does not have signatures vector entry for ms input #" << ms_input_index);
+    
+    LOC_CHK(tx.signatures[ms_input_index].type() == typeid(NLSAG_sig), "Wrong type of signature");
+    auto& sigs = boost::get<NLSAG_sig>(tx.signatures[ms_input_index]);
     LOC_CHK(!sigs.empty(), "empty signatures container");
 
     bool extra_signature_expected = (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE) && ms_input_index == tx.vin.size() - 1;
@@ -2866,8 +2867,12 @@ namespace currency
         txin_multisig& tms = boost::get<txin_multisig>(in);
         tei.ins.back().amount = tms.amount;
         tei.ins.back().kimage_or_ms_id = epee::string_tools::pod_to_hex(tms.multisig_out_id);
-        if (tx.signature.type() == typeid(NLSAG_sig) && boost::get<NLSAG_sig>(tx.signature).s.size() >= tei.ins.size())
-          tei.ins.back().multisig_count = boost::get<NLSAG_sig>(tx.signature).s[tei.ins.size() - 1].size();
+        if (tx.signatures.size() >= tei.ins.size() &&
+          tx.signatures[tei.ins.size() - 1].type() == typeid(NLSAG_sig))
+        {
+          tei.ins.back().multisig_count = boost::get<NLSAG_sig>(tx.signatures[tei.ins.size() - 1]).s.size();
+        }
+          
       }
     }
     return true;

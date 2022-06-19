@@ -308,7 +308,7 @@ public:
       return; // skip certainly invalid txs
 
     bool b_cp = c.get_blockchain_storage().is_in_checkpoint_zone();
-    if (b_cp && boost::get<currency::NLSAG_sig>(tx.signature).s.empty() && tx.attachment.empty())
+    if (b_cp && tx.signatures.empty() && tx.attachment.empty())
       return; // skip pruned txs in CP zone
 
     size_t tx_expected_blob_size = get_object_blobsize(tx);
@@ -328,7 +328,7 @@ public:
     {
       // tx seems to be correct (  tx_expected_blob_size == blob.size()  ) or BCS is in CP zone, prune sigs and attachments and check again
       currency::transaction pruned_tx = tx;
-      boost::get<currency::NLSAG_sig>(pruned_tx.signature).s.clear();
+      pruned_tx.signatures.clear();
       pruned_tx.attachment.clear();
       size_t pruned_tx_expected_blob_size = get_object_blobsize(pruned_tx);
 

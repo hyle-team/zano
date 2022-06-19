@@ -121,7 +121,7 @@ bool gen_checkpoints_attachments_basic::check_tx(currency::core& c, size_t ev_in
   bool r = c.get_transaction(m_tx_hash, tx);
   CHECK_AND_ASSERT_MES(r, false, "can't get transaction");
 
-  CHECK_AND_ASSERT_MES(boost::get<currency::NLSAG_sig>(tx.signature).s.empty(), false, "tx has non-empty sig");
+  CHECK_AND_ASSERT_MES(tx.signatures.empty(), false, "tx has non-empty sig");
   CHECK_AND_ASSERT_MES(tx.attachment.empty(), false, "tx has non-empty attachments");
   return true;
 }
@@ -443,12 +443,12 @@ bool gen_checkpoints_prun_txs_after_blockchain_load::check_txs(currency::core& c
   transaction tx_0, tx_1;
   bool r = c.get_transaction(m_tx0_id, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "can't get transaction tx_0");
-  CHECK_AND_ASSERT_MES(boost::get<currency::NLSAG_sig>(tx_0.signature).s.empty(), false, "tx_0 has non-empty sig");
+  CHECK_AND_ASSERT_MES(tx_0.signatures.empty(), false, "tx_0 has non-empty sig");
   CHECK_AND_ASSERT_MES(tx_0.attachment.empty(), false, "tx_0 has non-empty attachments");
 
   r = c.get_transaction(m_tx1_id, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "can't get transaction tx_1");
-  CHECK_AND_ASSERT_MES(!boost::get<currency::NLSAG_sig>(tx_1.signature).s.empty(), false, "tx_1 has empty sig");
+  CHECK_AND_ASSERT_MES(!tx_1.signatures.empty(), false, "tx_1 has empty sig");
   CHECK_AND_ASSERT_MES(!tx_1.attachment.empty(), false, "tx_1 has empty attachments");
 
   return true;
@@ -595,7 +595,7 @@ bool gen_checkpoints_pos_validation_on_altchain::generate(std::vector<test_event
     
     // don't sign at all
     //pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner_acc);
-    boost::get<currency::NLSAG_sig>(pb.m_block.miner_tx.signature).s[0].clear(); // just to make sure
+    boost::get<currency::NLSAG_sig>(pb.m_block.miner_tx.signatures[0]).s.clear(); // just to make sure
 
     blk_2 = pb.m_block;
   }
@@ -875,7 +875,7 @@ bool gen_checkpoints_and_invalid_tx_to_pool::generate(std::vector<test_event_ent
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   // invalidate tx_0 signature
-  boost::get<currency::NLSAG_sig>(tx_0.signature).s.clear();
+  tx_0.signatures.clear();
 
   DO_CALLBACK(events, "mark_unverifiable_tx");
   events.push_back(tx_0);

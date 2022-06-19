@@ -1835,9 +1835,9 @@ bool sign_multisig_input_in_tx_custom(currency::transaction& tx, size_t ms_input
   bool r = currency::derive_ephemeral_key_helper(keys, source_tx_pub_key, ms_out_index, ms_in_ephemeral_key);
   LOC_CHK(r, "derive_ephemeral_key_helper failed");
 
-  LOC_CHK(ms_input_index < boost::get<currency::NLSAG_sig>(tx.signature).s.size(), "transaction does not have signatures vectory entry for ms input #" << ms_input_index);
+  LOC_CHK(ms_input_index < tx.signatures.size(), "transaction does not have signatures vectory entry for ms input #" << ms_input_index);
 
-  auto& sigs = boost::get<currency::NLSAG_sig>(tx.signature).s[ms_input_index];
+  auto& sigs = boost::get<currency::NLSAG_sig>(tx.signatures[ms_input_index]).s;
   LOC_CHK(!sigs.empty(), "empty signatures container");
   bool extra_signature_expected = (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE) && ms_input_index == tx.vin.size() - 1;
   size_t allocated_sigs_for_participants = extra_signature_expected ? sigs.size() - 1 : sigs.size();

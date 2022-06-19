@@ -610,17 +610,9 @@ bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, 
       "is mot equal to height = " << height << " in blockchain index, for block on height = " << height);
     
     transaction_chain_entry lolcal_chain_entry = *it;
-    VARIANT_SWITCH_BEGIN(lolcal_chain_entry.tx.signature);
-    VARIANT_CASE_CONST(void_sig, v);
-    VARIANT_CASE(NLSAG_sig, signatures)
-    {
-      signatures_pruned += signatures.s.size();
-      signatures.s.clear();
-    }
-    VARIANT_CASE_CONST(zarcanum_sig, s);
-    //@#@
-    VARIANT_SWITCH_END();
-    
+    signatures_pruned = lolcal_chain_entry.tx.signatures.size();
+    lolcal_chain_entry.tx.signatures.clear();
+        
     attachments_pruned += lolcal_chain_entry.tx.attachment.size();
     lolcal_chain_entry.tx.attachment.clear();
 
@@ -4352,15 +4344,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   TIME_MEASURE_START_PD(tx_check_inputs_attachment_check);
   if (!m_is_in_checkpoint_zone)
   {
-    VARIANT_SWITCH_BEGIN(tx.signature);
-    VARIANT_CASE_CONST(NLSAG_sig, signatures)
-    {
-      CHECK_AND_ASSERT_MES(signatures.s.size() == sig_index, false, "tx signatures count differs from inputs");
-    }
-    VARIANT_CASE_CONST(zarcanum_sig, s);
-    //@#@
-    VARIANT_CASE_THROW_ON_OTHER();
-    VARIANT_SWITCH_END();
+    CHECK_AND_ASSERT_MES(tx.signatures.s.size() == sig_index, false, "tx signatures count differs from inputs");
     if (!(get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE))
     {
       bool r = validate_attachment_info(tx.extra, tx.attachment, false);
@@ -4509,15 +4493,19 @@ bool blockchain_storage::check_input_signature(const transaction& tx,
   if(m_is_in_checkpoint_zone)
     return true;
 
-  CHECK_AND_ASSERT_MES(tx.signature.type() == typeid(NLSAG_sig), false, "Unexpected type of sig in check_input_signature: " << tx.signature.type().name());
-  auto s = boost::get<NLSAG_sig>(tx.signature).s;
   uint64_t actual_sig_index = in_index;
   if (is_pos_coinbase(tx))
   {
     actual_sig_index = 0;
   }
-  CHECK_AND_ASSERT_MES(s.size() > actual_sig_index, false, "Failed to check s.size(){" << s.size() << "} > actual_sig_index {" << actual_sig_index <<  "}" );
-  const std::vector<crypto::signature>& sig = s[actual_sig_index];
+
+
+
+  CHECK_AND_ASSERT_MES(tx.signatures.size() > actual_sig_index, false, "Failed to check s.size(){" << tx.signatures.size() << "} > actual_sig_index {" << actual_sig_index <<  "}" );
+  
+  CHECK_AND_ASSERT_MES(tx.signatures[actual_sig_index].type() == typeid(NLSAG_sig), false, "Unexpected type of sig in check_input_signature: " << tx.signatures[actual_sig_index].type().name());
+  const std::vector<crypto::signature>& sig = boost::get<NLSAG_sig>(tx.signatures[actual_sig_index]).s;
+
   if (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE)
   {
     // check attachments, mentioned directly in this input
@@ -4605,12 +4593,15 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
     LOC_CHK(!have_type_in_variant_container<extra_attachment_info>(txin.etc_details), "Incorrect using of extra_attachment_info in etc_details in input #" << in_index << " for tx " << tx_prefix_hash);
   }
   bool need_to_check_extra_sign = false;
-  VARIANT_SWITCH_BEGIN(tx.signature);
+
+  LOC_CHK(tx.signatures.size() > in_index, "ms input index is out of signatures container bounds, signatures.size() = " << tx.signatures.size());
+
+  //@#@
+  VARIANT_SWITCH_BEGIN(tx.signatures[in_index]);
   VARIANT_CASE_CONST(void_sig, v);
-  VARIANT_CASE_CONST(NLSAG_sig, signatures)
-  {
-    LOC_CHK(signatures.s.size() > in_index, "ms input index is out of signatures container bounds, signatures.size() = " << signatures.s.size());
-    const std::vector<crypto::signature>& input_signatures = signatures.s[in_index];
+  VARIANT_CASE_CONST(NLSAG_sig, sig)
+  {    
+    const std::vector<crypto::signature>& input_signatures = sig.s;
 
     size_t expected_signatures_count = txin.sigs_count;
     if (get_tx_flags(tx)&TX_FLAG_SIGNATURE_MODE_SEPARATE && in_index == tx.vin.size() - 1) // last input in TX_FLAG_SIGNATURE_MODE_SEPARATE must contain one more signature to ensure that tx was completed by an authorized subject
@@ -4644,24 +4635,19 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
         out_key_index++;
       }
     }
+
+    if (need_to_check_extra_sign)
+    {
+      //here we check extra signature to validate that transaction was finilized by authorized subject
+      bool r = crypto::check_signature(tx_prefix_hash, get_tx_pub_key_from_extra(tx), input_signatures.back());
+      LOC_CHK(r, "failed to check extra signature for last out with TX_FLAG_SIGNATURE_MODE_SEPARATE");
+    }
   }
   VARIANT_CASE_CONST(zarcanum_sig, s);
   //@#@
+  //TODO: don't forget about need_to_check_extra_sign
   VARIANT_SWITCH_END();
 
-  if (need_to_check_extra_sign)
-  {
-    VARIANT_SWITCH_BEGIN(tx.signature);
-    VARIANT_CASE_CONST(void_sig, v);
-    VARIANT_CASE_CONST(NLSAG_sig, signatures)
-    {
-      //here we check extra signature to validate that transaction was finilized by authorized subject
-      bool r = crypto::check_signature(tx_prefix_hash, get_tx_pub_key_from_extra(tx), signatures.s[in_index].back());
-      LOC_CHK(r, "failed to check extra signature for last out with TX_FLAG_SIGNATURE_MODE_SEPARATE");
-    }
-    VARIANT_CASE_CONST(zarcanum_sig, s);
-    //@#@
-    VARIANT_SWITCH_END();
 
   }
 
@@ -4738,7 +4724,6 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   //TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
 
-  
 
   std::vector<const crypto::public_key *> output_keys_ptrs;
   output_keys_ptrs.reserve(output_keys.size());
@@ -4746,19 +4731,9 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
     output_keys_ptrs.push_back(&ptr);
 
   CHECK_AND_ASSERT_THROW_MES(output_keys_ptrs.size() == 1, "Internal error: output_keys_ptrs.size() is not equal 1  for HTLC");
-  
-  VARIANT_SWITCH_BEGIN(tx.signature);
-  VARIANT_CASE_CONST(NLSAG_sig, signatures);
-  {
-    CHECK_AND_ASSERT_MES(signatures.s.size() > in_index, false, "Unexpeted number of singatures in NLSAG_sig: " << signatures.s.size() << ", expected at least: " << in_index);
-    return check_input_signature(tx, in_index, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, output_keys_ptrs);
-  }
-  VARIANT_CASE_CONST(zarcanum_sig, s);
-  //@#@ TODO
-  return false;
-  VARIANT_CASE_THROW_ON_OTHER();
-  VARIANT_SWITCH_END();
-  return false;
+
+
+  return check_input_signature(tx, in_index, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, output_keys_ptrs);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_adjusted_time() const
@@ -5536,13 +5511,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     //If we under checkpoints, ring signatures should be pruned    
     if(m_is_in_checkpoint_zone)
     {
-      VARIANT_SWITCH_BEGIN(tx.signature);
-      VARIANT_CASE(NLSAG_sig, signatures)
-        signatures.s.clear();
-      VARIANT_CASE_CONST(zarcanum_sig, s);
-      //@#@
-      VARIANT_SWITCH_END();
-      
+      tx.signatures.clear();
       tx.attachment.clear();
     }
     TIME_MEASURE_START_PD(tx_add_one_tx_time);
@@ -6734,11 +6703,9 @@ bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx
   CRITICAL_REGION_LOCAL(m_read_lock);
   bool r = false;
   CHECK_AND_ASSERT_MES(input_index < input_tx.vin.size() 
-    && input_tx.vin[input_index].type() == typeid(txin_multisig) 
-    && input_tx.signature.type() == typeid(NLSAG_sig), false, "invalid ms input index: " << input_index << " or type");
+    && input_tx.vin[input_index].type() == typeid(txin_multisig), false, "invalid ms input index: " << input_index << " or type");
   const txin_multisig& input = boost::get<txin_multisig>(input_tx.vin[input_index]);
 
-  //const std::vector<crypto::signature>& input_sigs = boost::get<NLSAG_sig>(input_tx.signature).s[input_index];
   // check corresponding ms out in the main chain
   auto p = m_db_multisig_outs.get(input.multisig_out_id);
   if (p != nullptr)
@@ -6930,17 +6897,10 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     uint64_t ki_lookup = 0;
 
     // check PoS block miner tx in a special way
-    VARIANT_SWITCH_BEGIN(b.miner_tx.signature);
-    VARIANT_CASE_CONST(void_sig, v);
-    VARIANT_CASE_CONST(NLSAG_sig, signatures);
-    {
-      CHECK_AND_ASSERT_MES(signatures.s.size() == 1 && b.miner_tx.vin.size() == 2, false, "invalid PoS block's miner_tx, signatures size = " << signatures.s.size() << ", miner_tx.vin.size() = " << b.miner_tx.vin.size());
-      r = validate_alt_block_input(b.miner_tx, collected_keyimages, alt_chain_tx_ids, id, get_block_hash(b), 1, split_height, alt_chain, alt_chain_block_ids, ki_lookup, &max_related_block_height);
-      CHECK_AND_ASSERT_MES(r, false, "miner tx " << get_transaction_hash(b.miner_tx) << ": validation failed");
-    }
-    VARIANT_CASE_CONST(zarcanum_sig, s);
-    //@#@
-    VARIANT_SWITCH_END();
+    CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 && b.miner_tx.vin.size() == 2, false, "invalid PoS block's miner_tx, signatures size = " << b.miner_tx.signatures.size() << ", miner_tx.vin.size() = " << b.miner_tx.vin.size());
+
+    r = validate_alt_block_input(b.miner_tx, collected_keyimages, alt_chain_tx_ids, id, get_block_hash(b), 1, split_height, alt_chain, alt_chain_block_ids, ki_lookup, &max_related_block_height);
+    CHECK_AND_ASSERT_MES(r, false, "miner tx " << get_transaction_hash(b.miner_tx) << ": validation failed");
 
     ki_lookup_time_total += ki_lookup;
     // check stake age
@@ -6961,10 +6921,8 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
       CHECK_AND_ASSERT_MES(get_transaction_from_pool_or_db(tx_id, tx_ptr, split_height), false, "failed to get alt block tx " << tx_id << " with split_height == " << split_height);
     }
     const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
-    if (tx.signature.type() == typeid(NLSAG_sig))
-    {
-      CHECK_AND_ASSERT_MES(boost::get<NLSAG_sig>(tx.signature).s.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " << boost::get<NLSAG_sig>(tx.signature).s.size() << ", tx.vin.size() == " << tx.vin.size());
-    }
+
+    CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {
       if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
@@ -6976,7 +6934,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
       }
       else if (tx.vin[n].type() == typeid(txin_multisig))
       {
-        r = validate_alt_block_ms_input(tx, tx_id, n, tx.signature, split_height, alt_chain);
+        r = validate_alt_block_ms_input(tx, tx_id, n, split_height, alt_chain);
         CHECK_AND_ASSERT_MES(r, false, "tx " << tx_id << ", input #" << n << " (multisig): validation failed");
       }
       else if (tx.vin[n].type() == typeid(txin_gen))
