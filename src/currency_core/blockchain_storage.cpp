@@ -6673,7 +6673,7 @@ bool blockchain_storage::is_output_allowed_for_input(const output_key_or_htlc_v&
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx, const crypto::hash& input_tx_hash, size_t input_index, const signature_v& input_sigs_v, uint64_t split_height, const alt_chain_type& alt_chain) const
+bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx, const crypto::hash& input_tx_hash, size_t input_index, uint64_t split_height, const alt_chain_type& alt_chain) const
 {
   // Main and alt chain outline:
   //

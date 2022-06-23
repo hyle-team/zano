@@ -196,7 +196,6 @@ namespace currency
       posin.k_image = pe.keyimage;
       tx.vin.push_back(posin);
       //reserve place for ring signature
-      //tx.signature = NLSAG_sig();
       tx.signatures.resize(1);
       tx.signatures[0] = NLSAG_sig();
       boost::get<NLSAG_sig>(tx.signatures[0]).s.resize(posin.key_offsets.size());

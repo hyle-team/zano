@@ -759,7 +759,7 @@ namespace currency
       FIELDS(*static_cast<transaction_prefix *>(this))
       CHAIN_TRANSITION_VER(TRANSACTION_VERSION_INITAL, transaction_v1)
       CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_v1)
-      FIELD(signature)
+      FIELD(signatures)
       FIELD(attachment)
     END_SERIALIZE()
   };
@@ -774,7 +774,7 @@ namespace currency
     vin.clear();
     vout.clear();
     extra.clear();
-    signature = NLSAG_sig();
+    signatures.clear();
     attachment.clear();
     
   }

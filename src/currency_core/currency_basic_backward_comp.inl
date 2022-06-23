@@ -90,13 +90,15 @@ template<typename transaction_current_t>
 bool transition_convert(const transaction_current_t& from, transaction_v1& to)
 {
   to.attachment = from.attachment;
-  if (from.signature.type() == typeid(NLSAG_sig))
+  for (const auto& s : from.signatures)
   {
-    to.signatures = boost::get<NLSAG_sig>(from.signature).s;
-  }
-  else
-  {
-    throw std::runtime_error("Unexpected type in signature_v");
+    if (s.type() == typeid(NLSAG_sig))
+    {
+      to.signatures.push_back(boost::get<NLSAG_sig>(s).s);      ;
+    }else
+    {
+      throw std::runtime_error("Unexpected type in signature_v");
+    }
   }
   return true;
 }
@@ -106,6 +108,10 @@ bool transition_convert(const transaction_v1& from, transaction_current_t& to)
 {
   // TODO: consider using move semantic for 'from'
   to.attachment = from.attachment;
-  to.signature = NLSAG_sig({from.signatures});
+  to.signatures.resize(from.signatures.size());
+  for (size_t i = 0; i != from.signatures.size(); i++)
+  {
+    boost::get<NLSAG_sig>(to.signatures[i]).s = from.signatures[i];
+  }
   return true;
 }
