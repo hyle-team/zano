@@ -667,6 +667,7 @@ namespace currency
       size_t operator()(const txin_to_key& txin) const    { return txin.key_offsets.size(); }
       size_t operator()(const txin_multisig& txin) const  { return txin.sigs_count; }
       size_t operator()(const txin_htlc& txin) const      { return 1; }
+      size_t operator()(const tx_in_zarcanum& txin) const { throw std::runtime_error("Not implemented yet"); return 0; } //@#@
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(), tx_in);

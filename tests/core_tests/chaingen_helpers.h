@@ -234,7 +234,7 @@ inline bool resign_tx(const currency::account_keys& sender_keys, const std::vect
       return false;
     crypto::derive_secret_key(recv_derivation, se.real_output_in_tx_index, sender_keys.spend_secret_key, in_ephemeral_sec);
 
-    tx.signatures.push_back(currency::NLSAG_sig(std::vector<crypto::signature>()));
+    tx.signatures.push_back(currency::NLSAG_sig());
     std::vector<crypto::signature>& sigs = boost::get<currency::NLSAG_sig>(tx.signatures.back()).s;
 
     if (se.is_multisig())

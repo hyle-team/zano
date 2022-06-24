@@ -1693,7 +1693,7 @@ namespace currency
     LOC_CHK(ms_input_index <  tx.signatures.size(), "transaction does not have signatures vector entry for ms input #" << ms_input_index);
     
     LOC_CHK(tx.signatures[ms_input_index].type() == typeid(NLSAG_sig), "Wrong type of signature");
-    auto& sigs = boost::get<NLSAG_sig>(tx.signatures[ms_input_index]);
+    auto& sigs = boost::get<NLSAG_sig>(tx.signatures[ms_input_index]).s;
     LOC_CHK(!sigs.empty(), "empty signatures container");
 
     bool extra_signature_expected = (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE) && ms_input_index == tx.vin.size() - 1;

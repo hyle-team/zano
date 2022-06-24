@@ -4344,7 +4344,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   TIME_MEASURE_START_PD(tx_check_inputs_attachment_check);
   if (!m_is_in_checkpoint_zone)
   {
-    CHECK_AND_ASSERT_MES(tx.signatures.s.size() == sig_index, false, "tx signatures count differs from inputs");
+    CHECK_AND_ASSERT_MES(tx.signatures.size() == sig_index, false, "tx signatures count differs from inputs");
     if (!(get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE))
     {
       bool r = validate_attachment_info(tx.extra, tx.attachment, false);
@@ -4649,7 +4649,7 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
   VARIANT_SWITCH_END();
 
 
-  }
+ 
 
   return true;
 #undef LOC_CHK

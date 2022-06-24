@@ -660,7 +660,7 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
 
   // Tx with nmix = 0 have a few inputs, and too many signatures (2/2)
   broken_tx = tx_0;
-  broken_tx.signatures.push_back(currency::NLSAG_sig(std::vector<crypto::signature>()));
+  broken_tx.signatures.push_back(currency::NLSAG_sig());
   boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
@@ -677,7 +677,7 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
 
   // Tx with nmix = 1 have not enough signatures (2/2)
   broken_tx = tx_1;
-  broken_tx.signatures.back().resize(boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.size() - 1);
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.resize(boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.size() - 1);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 1 have too many signatures (1/2)
@@ -687,7 +687,7 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
 
   // Tx with nmix = 1 have too many signatures (2/2)
   broken_tx = tx_1;
-  broken_tx.signatures.push_back(currency::NLSAG_sig(std::vector<crypto::signature>()));
+  broken_tx.signatures.push_back(currency::NLSAG_sig());
   boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 

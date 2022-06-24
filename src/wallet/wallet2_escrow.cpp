@@ -237,8 +237,9 @@ bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_n
   LOC_CHK(tx.signatures.size() == 1, "invalid singatures size: " << tx.signatures.size()); // only 1 input means only 1 signature vector
 
   VARIANT_SWITCH_BEGIN(tx.signatures[0]);
-  VARIANT_CASE_CONST(NLSAG_sig, signature)
+  VARIANT_CASE_CONST(NLSAG_sig, signature_NLSAG)
   {
+    auto& signature = signature_NLSAG.s;
     // As we don't have b_keys we can't be sure which signature is B's and which is reserved for A (should be a null-placeholder, if present).
     // Having a_keys, we determine index of A key in multisig output keys array.
     // Thus it's possible to determine the order of signatures (A, B or B, A), and, eventually, validate B signature.
@@ -420,9 +421,9 @@ bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, co
   // (5/5) signatures
   LOC_CHK(tx.signatures.size() == 1, "invalid singatures size: " << tx.signatures.size()); // only 1 input means only 1 signature vector
   VARIANT_SWITCH_BEGIN(tx.signatures[0]);
-  VARIANT_CASE_CONST(NLSAG_sig, signatures)
+  VARIANT_CASE_CONST(NLSAG_sig, signature_NLSAG)
   {
-
+    auto& signature = signature_NLSAG.s;
     LOC_CHK(signature.size() == 2, "invalid signature[0] size: " << signature.size()); // it's expected to contain A-party signature and null-sig placeholder
     LOC_CHK(source_ms_out.keys.size() == 2, "internal error: invalid source ms output keys array, size: " << source_ms_out.keys.size());
 

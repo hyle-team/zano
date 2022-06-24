@@ -846,7 +846,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
       ss_ring_s << o.second << ENDL;
     }
 
-    tx.signatures.push_back(currency::NLSAG_sig(std::vector<crypto::signature>()));
+    tx.signatures.push_back(currency::NLSAG_sig());
     std::vector<crypto::signature>& sigs = boost::get<currency::NLSAG_sig>(tx.signatures.back()).s;
     sigs.resize(src_entr.outputs.size());
     crypto::generate_ring_signature(tx_prefix_hash, boost::get<currency::txin_to_key>(tx.vin[i]).k_image, keys_ptrs, in_contexts[i].in_ephemeral.sec, src_entr.real_output, sigs.data());
