@@ -605,7 +605,7 @@ namespace currency
     bool validate_alt_block_ms_input(const transaction& input_tx, 
       const crypto::hash& input_tx_hash, 
       size_t input_index, 
-      const signature_v& input_sigs,//const std::vector<crypto::signature>& input_sigs, 
+      //const signature_v& input_sigs,//const std::vector<crypto::signature>& input_sigs, 
       uint64_t split_height, 
       const alt_chain_type& alt_chain) const;
     bool validate_alt_block_txs(const block& b, const crypto::hash& id, std::unordered_set<crypto::key_image>& collected_keyimages, alt_block_extended_info& abei, const alt_chain_type& alt_chain, uint64_t split_height, uint64_t& ki_lookup_time_total) const;

@@ -370,9 +370,9 @@ bool gen_tx_key_image_not_derive_from_tx_key::generate(std::vector<test_event_en
   builder.step4_calc_hash();
 
   // Tx with invalid key image can't be subscribed, so create empty signature
-  boost::get<currency::NLSAG_sig>(builder.m_tx.signature).s.resize(1);
-  boost::get<currency::NLSAG_sig>(builder.m_tx.signature).s[0].resize(1);
-  boost::get<currency::NLSAG_sig>(builder.m_tx.signature).s[0][0] = boost::value_initialized<crypto::signature>();
+  builder.m_tx.signatures.resize(1);
+  boost::get<currency::NLSAG_sig>(builder.m_tx.signatures[0]).s.resize(1);
+  boost::get<currency::NLSAG_sig>(builder.m_tx.signatures[0]).s[0] = boost::value_initialized<crypto::signature>();
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(builder.m_tx);
@@ -404,9 +404,9 @@ bool gen_tx_key_image_is_invalid::generate(std::vector<test_event_entry>& events
   builder.step4_calc_hash();
 
   // Tx with invalid key image can't be subscribed, so create empty signature
-  boost::get<currency::NLSAG_sig>(builder.m_tx.signature).s.resize(1);
-  boost::get<currency::NLSAG_sig>(builder.m_tx.signature).s[0].resize(1);
-  boost::get<currency::NLSAG_sig>(builder.m_tx.signature).s[0][0] = boost::value_initialized<crypto::signature>();
+  builder.m_tx.signatures.resize(1);
+  boost::get<currency::NLSAG_sig>(builder.m_tx.signatures[0]).s.resize(1);
+  boost::get<currency::NLSAG_sig>(builder.m_tx.signatures[0]).s[0] = boost::value_initialized<crypto::signature>();
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(builder.m_tx);
@@ -633,62 +633,62 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
   // create reference transaction tx_0, Carol->Alice, nmix=0
   MAKE_TX(events, tx_0, carol_account, alice_account, amount, blk_1r_f);
   events.pop_back();
-  CHECK_AND_ASSERT_MES(tx_0.vin.size() > 1 && tx_0.vout.size() > 1 && boost::get<currency::NLSAG_sig>(tx_0.signature).s.size() > 1, false, "tx_0 is incorrect"); // need > 1 for this test
+  CHECK_AND_ASSERT_MES(tx_0.vin.size() > 1 && tx_0.vout.size() > 1 && tx_0.signatures.size() > 1, false, "tx_0 is incorrect"); // need > 1 for this test
 
   // create reference transaction tx_1, Dan->Alice, nmix=1
   MAKE_TX_MIX(events, tx_1, dan_account, alice_account, amount, 1, blk_1r_f);
   events.pop_back();
-  CHECK_AND_ASSERT_MES(tx_1.vin.size() > 1 && tx_1.vout.size() > 1 && boost::get<currency::NLSAG_sig>(tx_1.signature).s.size() > 1, false, "tx_1 is incorrect"); // need > 1 for this test
+  CHECK_AND_ASSERT_MES(tx_1.vin.size() > 1 && tx_1.vout.size() > 1 && tx_1.signatures.size() > 1, false, "tx_1 is incorrect"); // need > 1 for this test
 
   const block& prev_block = blk_1r_f;
   transaction broken_tx;
 
   // Tx with nmix = 0 without signatures
   broken_tx = tx_0;
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.clear();
+  broken_tx.signatures.clear();
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 0 have a few inputs, and not enough signatures
   broken_tx = tx_0;
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.resize(boost::get<currency::NLSAG_sig>(broken_tx.signature).s.size() - 1);
+  broken_tx.signatures.resize(broken_tx.signatures.size() - 1);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 0 have a few inputs, and too many signatures (1/2)
   broken_tx = tx_0;
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.back().push_back(invalid_signature);
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 0 have a few inputs, and too many signatures (2/2)
   broken_tx = tx_0;
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.push_back(std::vector<crypto::signature>());
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.back().push_back(invalid_signature);
+  broken_tx.signatures.push_back(currency::NLSAG_sig());
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
 
   // Tx with nmix = 1 without signatures
   broken_tx = tx_1;
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.clear();
+  broken_tx.signatures.clear();
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 1 have not enough signatures (1/2)
   broken_tx = tx_1;
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.resize(boost::get<currency::NLSAG_sig>(broken_tx.signature).s.size() - 1);
+  broken_tx.signatures.resize(broken_tx.signatures.size() - 1);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 1 have not enough signatures (2/2)
   broken_tx = tx_1;
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.back().resize(boost::get<currency::NLSAG_sig>(broken_tx.signature).s.back().size() - 1);
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.resize(boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.size() - 1);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 1 have too many signatures (1/2)
   broken_tx = tx_1;
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.back().push_back(invalid_signature);
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 1 have too many signatures (2/2)
   broken_tx = tx_1;
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.push_back(std::vector<crypto::signature>());
-  boost::get<currency::NLSAG_sig>(broken_tx.signature).s.back().push_back(invalid_signature);
+  broken_tx.signatures.push_back(currency::NLSAG_sig());
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
 

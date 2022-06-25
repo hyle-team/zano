@@ -3507,8 +3507,9 @@ bool wallet2::prepare_and_sign_pos_block(currency::block& b,
     return false; // to get rid of warning
   }else
   {
-    NLSAG_sig& signatures = boost::get<NLSAG_sig>(b.miner_tx.signature);
-    WLT_CHECK_AND_ASSERT_MES(signatures.s.size() == 1 && signatures.s[0].size() == txin.key_offsets.size(),
+    WLT_CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 &&
+      b.miner_tx.signatures[0].type() == typeid(NLSAG_sig) &&
+      boost::get<NLSAG_sig>(b.miner_tx.signatures[0]).s.size() == txin.key_offsets.size(),
       false, "Wrong signatures amount in coinbase transacton");
 
 
@@ -3536,12 +3537,12 @@ bool wallet2::prepare_and_sign_pos_block(currency::block& b,
       keys_ptrs,
       derived_secret_ephemeral_key,
       0,
-      &signatures.s[0][0]);
+      &boost::get<NLSAG_sig>(b.miner_tx.signatures[0]).s[0]);
 
     WLT_LOG_L4("GENERATED RING SIGNATURE: block_id " << block_hash
       << "txin.k_image" << txin.k_image
       << "key_ptr:" << *keys_ptrs[0]
-      << "signature:" << signatures.s[0][0]);
+      << "signature:" << boost::get<NLSAG_sig>(b.miner_tx.signatures[0]).s);
 
     return true;
   }

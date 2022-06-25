@@ -658,7 +658,7 @@ namespace currency
   //classic CryptoNote signature by Nicolas Van Saberhagen
   struct NLSAG_sig
   {
-    std::vector<std::vector<crypto::signature> > s;
+    std::vector<crypto::signature> s;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(s)
@@ -679,6 +679,21 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
+  //TODO: @val, should we call it something like schnorr_sig ? 
+  struct simple_sig
+  {
+    crypto::signature s;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(s)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(s)
+    END_BOOST_SERIALIZATION()
+  };
+
+
   struct void_sig
   {
     //TODO:
@@ -688,6 +703,7 @@ namespace currency
     BEGIN_BOOST_SERIALIZATION()
     END_BOOST_SERIALIZATION()
   };
+
 
   typedef boost::variant<NLSAG_sig, void_sig, zarcanum_sig> signature_v;
 
@@ -734,7 +750,7 @@ namespace currency
   class transaction: public transaction_prefix
   {
   public:
-    signature_v signature;
+    std::vector<signature_v> signatures;
     std::vector<attachment_v> attachment;
 
     transaction();
@@ -743,7 +759,7 @@ namespace currency
       FIELDS(*static_cast<transaction_prefix *>(this))
       CHAIN_TRANSITION_VER(TRANSACTION_VERSION_INITAL, transaction_v1)
       CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_v1)
-      FIELD(signature)
+      FIELD(signatures)
       FIELD(attachment)
     END_SERIALIZE()
   };
@@ -758,7 +774,7 @@ namespace currency
     vin.clear();
     vout.clear();
     extra.clear();
-    signature = NLSAG_sig();
+    signatures.clear();
     attachment.clear();
     
   }

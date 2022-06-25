@@ -173,7 +173,7 @@ void pos_block_builder::step5_sign(const crypto::public_key& stake_tx_pub_key, s
   // sign block actually in coinbase transaction
   crypto::hash block_hash = currency::get_block_hash(m_block);
   std::vector<const crypto::public_key*> keys_ptrs(1, &stake_tx_out_pub_key);
-  crypto::generate_ring_signature(block_hash, m_stake_kernel.kimage, keys_ptrs, derived_secret_ephemeral_key, 0, &boost::get<currency::NLSAG_sig>(m_block.miner_tx.signature).s[0][0]);
+  crypto::generate_ring_signature(block_hash, m_stake_kernel.kimage, keys_ptrs, derived_secret_ephemeral_key, 0, &boost::get<currency::NLSAG_sig>(m_block.miner_tx.signatures[0]).s[0]);
 
   m_step = 5;
 }
@@ -272,8 +272,8 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
   posin.k_image = pos_stake_keyimage;
   tx.vin.push_back(posin);
   //reserve place for ring signature
-  boost::get<currency::NLSAG_sig>(tx.signature).s.resize(1);
-  boost::get<currency::NLSAG_sig>(tx.signature).s[0].resize(posin.key_offsets.size());
+  tx.signatures.resize(1);
+  boost::get<currency::NLSAG_sig>(tx.signatures[0]).s.resize(posin.key_offsets.size());
 
   return true;
 }

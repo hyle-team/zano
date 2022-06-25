@@ -56,7 +56,9 @@ namespace currency
   bool operator ==(const currency::transaction& a, const currency::transaction& b);
   bool operator ==(const currency::block& a, const currency::block& b);
   bool operator ==(const currency::extra_attachment_info& a, const currency::extra_attachment_info& b);
-
+  bool operator ==(const currency::NLSAG_sig& a, const currency::NLSAG_sig& b);
+  bool operator ==(const currency::void_sig& a, const currency::void_sig& b);
+  bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
 
   typedef boost::multiprecision::uint128_t uint128_tl;
 
@@ -665,6 +667,7 @@ namespace currency
       size_t operator()(const txin_to_key& txin) const    { return txin.key_offsets.size(); }
       size_t operator()(const txin_multisig& txin) const  { return txin.sigs_count; }
       size_t operator()(const txin_htlc& txin) const      { return 1; }
+      size_t operator()(const tx_in_zarcanum& txin) const { throw std::runtime_error("Not implemented yet"); return 0; } //@#@
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(), tx_in);

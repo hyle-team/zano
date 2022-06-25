@@ -98,7 +98,7 @@ struct tx_builder
 
   void step5_sign(const std::vector<currency::tx_source_entry>& sources)
   {
-    boost::get<currency::NLSAG_sig>(m_tx.signature).s.clear();
+    m_tx.signatures.clear();
 
     size_t i = 0;
     for(const currency::tx_source_entry& src_entr : sources)
@@ -109,8 +109,8 @@ struct tx_builder
         keys_ptrs.push_back(&o.second);
       }
 
-      boost::get<currency::NLSAG_sig>(m_tx.signature).s.push_back(std::vector<crypto::signature>());
-      std::vector<crypto::signature>& sigs = boost::get<currency::NLSAG_sig>(m_tx.signature).s.back();
+      m_tx.signatures.push_back(currency::NLSAG_sig());
+      std::vector<crypto::signature>& sigs = boost::get<currency::NLSAG_sig>(m_tx.signatures.back()).s;
       sigs.resize(src_entr.outputs.size());
       generate_ring_signature(m_tx_prefix_hash, boost::get<currency::txin_to_key>(m_tx.vin[i]).k_image, keys_ptrs, m_in_contexts[i].sec, src_entr.real_output, sigs.data());
       i++;

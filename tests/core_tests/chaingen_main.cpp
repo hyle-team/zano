@@ -308,14 +308,16 @@ public:
       return; // skip certainly invalid txs
 
     bool b_cp = c.get_blockchain_storage().is_in_checkpoint_zone();
-    if (b_cp && boost::get<currency::NLSAG_sig>(tx.signature).s.empty() && tx.attachment.empty())
+    if (b_cp && tx.signatures.empty() && tx.attachment.empty())
       return; // skip pruned txs in CP zone
 
     size_t tx_expected_blob_size = get_object_blobsize(tx);
     if (!b_cp && tx_expected_blob_size != blob.size())
     {
+
       size_t prefix_blobsize = currency::get_object_blobsize(static_cast<const currency::transaction_prefix&>(tx));
       currency::blobdata prefix_blob = t_serializable_object_to_blob(static_cast<const currency::transaction_prefix&>(tx));
+      currency::blobdata full_blob_test = t_serializable_object_to_blob(tx);
 
       std::stringstream s;
       s << "CP zone: " << b_cp << ", transaction: " << get_transaction_hash(tx) << ENDL <<
@@ -328,7 +330,7 @@ public:
     {
       // tx seems to be correct (  tx_expected_blob_size == blob.size()  ) or BCS is in CP zone, prune sigs and attachments and check again
       currency::transaction pruned_tx = tx;
-      boost::get<currency::NLSAG_sig>(pruned_tx.signature).s.clear();
+      pruned_tx.signatures.clear();
       pruned_tx.attachment.clear();
       size_t pruned_tx_expected_blob_size = get_object_blobsize(pruned_tx);
 
