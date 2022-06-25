@@ -1284,6 +1284,7 @@ namespace currency
       tx.vin.clear();
       tx.vout.clear();
       tx.extra = extra;
+      tx.signatures.clear();
 
       tx.version = ftp.tx_version;
       if (unlock_time != 0)

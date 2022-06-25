@@ -237,7 +237,7 @@ namespace currency
         ++sig_count;                                             // count in one more signature for the last input in a complete separately signed tx
       tx_blob_size += tools::get_varint_packed_size(sig_count);  // size of transaction::signatures[i]
       tx_blob_size += sizeof(crypto::signature) * sig_count;     // size of signatures' data itself
-      tx_blob_size += sizeof(binary_archive<true>::variant_tag_type); //tools::get_varint_packed_size(variant_serialization_traits<binary_archive<true>, currency::NLSAG_sig>::get_tag()); // sizeof variant tag
+      //tx_blob_size += sizeof(binary_archive<true>::variant_tag_type); //tools::get_varint_packed_size(variant_serialization_traits<binary_archive<true>, currency::NLSAG_sig>::get_tag()); // sizeof variant tag
     }
 
     // 2. attachments (try to find extra_attachment_info in tx prefix and count it in if succeed)

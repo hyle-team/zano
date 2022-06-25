@@ -314,8 +314,10 @@ public:
     size_t tx_expected_blob_size = get_object_blobsize(tx);
     if (!b_cp && tx_expected_blob_size != blob.size())
     {
+
       size_t prefix_blobsize = currency::get_object_blobsize(static_cast<const currency::transaction_prefix&>(tx));
       currency::blobdata prefix_blob = t_serializable_object_to_blob(static_cast<const currency::transaction_prefix&>(tx));
+      currency::blobdata full_blob_test = t_serializable_object_to_blob(tx);
 
       std::stringstream s;
       s << "CP zone: " << b_cp << ", transaction: " << get_transaction_hash(tx) << ENDL <<
