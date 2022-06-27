@@ -663,16 +663,9 @@ private:
         auto ptx = bcs.get_tx(h);
         CHECK_AND_ASSERT_MES(ptx != nullptr, false, "failed to find transaction " << h << " in blockchain index, in block on height = " << height);
 
-        VARIANT_SWITCH_BEGIN(ptx->signature);
-        VARIANT_CASE(currency::NLSAG_sig, nlsag)
-        {
-          if (nlsag.s.size() == 0)
-            pruned_txs += 1;
-          signatures += nlsag.s.size();
-        }
-        VARIANT_CASE(currency::zarcanum_sig, zs);
-        // @#@
-        VARIANT_SWITCH_END();
+        if (ptx->signatures.size() == 0)
+          pruned_txs += 1;
+        signatures += ptx->signatures.size();
 
         txs += 1;
         attachments += ptx->attachment.size();
