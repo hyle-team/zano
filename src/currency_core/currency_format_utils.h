@@ -374,21 +374,21 @@ namespace currency
   std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
   uint64_t get_timstamp_from_word(std::string word, bool& password_used);
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
+
   template<class t_txin_v>
   typename std::conditional<std::is_const<t_txin_v>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type& get_txin_etc_options(t_txin_v& in)
   {
     static typename std::conditional<std::is_const<t_txin_v>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type stub;
 
-
-    //static  stub;
-
     if (in.type() == typeid(txin_to_key))
       return boost::get<txin_to_key>(in).etc_details;
-    else if (in.type() == typeid(txin_htlc))
-      return boost::get<txin_htlc>(in).etc_details;
     else if (in.type() == typeid(txin_multisig))
       return boost::get<txin_multisig>(in).etc_details;
-     else
+    else if (in.type() == typeid(txin_htlc))
+      return boost::get<txin_htlc>(in).etc_details;
+    else if (in.type() == typeid(txin_zarcanum_inputs))
+      return boost::get<txin_zarcanum_inputs>(in).etc_details;
+    else
        return stub;
   }
 
@@ -663,55 +663,47 @@ namespace currency
   {
     struct txin_signature_size_visitor : public boost::static_visitor<size_t>
     {
-      size_t operator()(const txin_gen& /*txin*/) const   { return 0; }
-      size_t operator()(const txin_to_key& txin) const    { return txin.key_offsets.size(); }
-      size_t operator()(const txin_multisig& txin) const  { return txin.sigs_count; }
-      size_t operator()(const txin_htlc& txin) const      { return 1; }
-      size_t operator()(const tx_in_zarcanum& txin) const { throw std::runtime_error("Not implemented yet"); return 0; } //@#@
+      size_t operator()(const txin_gen& /*txin*/) const           { return 0; }
+      size_t operator()(const txin_to_key& txin) const            { return txin.key_offsets.size(); }
+      size_t operator()(const txin_multisig& txin) const          { return txin.sigs_count; }
+      size_t operator()(const txin_htlc& txin) const              { return 1; }
+      size_t operator()(const txin_zarcanum_inputs& txin) const   { throw std::runtime_error("Not implemented yet"); }
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(), tx_in);
   }
   //---------------------------------------------------------------
-  inline const std::vector<txin_etc_details_v>* get_input_etc_details(const txin_v& in)
+  template<class txin_t>
+  typename std::conditional<std::is_const<txin_t>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type*
+    get_input_etc_details(txin_t& in)
   {
-    if (in.type().hash_code() == typeid(txin_to_key).hash_code())
+    if (in.type() == typeid(txin_to_key))
       return &boost::get<txin_to_key>(in).etc_details;
-    if (in.type().hash_code() == typeid(txin_htlc).hash_code())
-      return &boost::get<txin_htlc>(in).etc_details;
-    if (in.type().hash_code() == typeid(txin_multisig).hash_code())
+    if (in.type() == typeid(txin_multisig))
       return &boost::get<txin_multisig>(in).etc_details;
+    if (in.type() == typeid(txin_htlc))
+      return &boost::get<txin_htlc>(in).etc_details;
+    if (in.type() == typeid(txin_zarcanum_inputs))
+      return &boost::get<txin_zarcanum_inputs>(in).etc_details;
     return nullptr;
   }
   //---------------------------------------------------------------
-  inline std::vector<txin_etc_details_v>* get_input_etc_details(txin_v& in)
-  {
-    if (in.type().hash_code() == typeid(txin_to_key).hash_code())
-      return &boost::get<txin_to_key>(in).etc_details;
-    if (in.type().hash_code() == typeid(txin_htlc).hash_code())
-      return &boost::get<txin_htlc>(in).etc_details;
-    if (in.type().hash_code() == typeid(txin_multisig).hash_code())
-      return &boost::get<txin_multisig>(in).etc_details;
-    return nullptr;
-  }
-  //---------------------------------------------------------------
-
   struct input_amount_getter : public boost::static_visitor<uint64_t>
   {
     template<class t_input>
-    uint64_t operator()(const t_input& i) const{return i.amount;}
-    uint64_t operator()(const txin_gen& i) const {return 0;}
+    uint64_t operator()(const t_input& i)             const { return i.amount; }
+    uint64_t operator()(const txin_zarcanum_inputs&)  const { return 0; }
+    uint64_t operator()(const txin_gen& i)            const { return 0; }
   };
+  inline uint64_t get_amount_from_variant(const txin_v& v)
+  {
+    return boost::apply_visitor(input_amount_getter(), v);
+  }
   //---------------------------------------------------------------
   inline const tx_out_bare& get_tx_out_bare_from_out_v(const tx_out_v& o)
   {
     //this function will throw if type is not matching
     return boost::get<tx_out_bare>(o);
-  }
-  //---------------------------------------------------------------
-  inline uint64_t get_amount_from_variant(const txin_v& v)
-  {
-    return boost::apply_visitor(input_amount_getter(), v);
   }
   //---------------------------------------------------------------
   template <typename container_t>

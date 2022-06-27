@@ -1217,11 +1217,11 @@ namespace currency
   {
     std::string type;
     std::string short_view;
-    std::string datails_view;
+    std::string details_view;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(type)
       KV_SERIALIZE(short_view)
-      KV_SERIALIZE(datails_view)
+      KV_SERIALIZE(details_view)
     END_KV_SERIALIZE_MAP()
   };
 

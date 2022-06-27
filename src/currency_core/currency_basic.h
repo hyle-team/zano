@@ -219,7 +219,7 @@ namespace currency
   {
     uint64_t amount;
     crypto::key_image k_image;                    // double spending protection
-    std::vector<txin_etc_details_v> etc_details;  //this flag used when TX_FLAG_SIGNATURE_MODE_SEPARATE flag is set, point to which amount of outputs(starting from zero) used in signature
+    std::vector<txin_etc_details_v> etc_details;  // see also TX_FLAG_SIGNATURE_MODE_SEPARATE
 
     BEGIN_SERIALIZE_OBJECT()
       VARINT_FIELD(amount)
@@ -253,35 +253,6 @@ namespace currency
     END_SERIALIZE()
   };
 
-#pragma pack(push, 1)
-  struct tx_in_zarcanum : public referring_input
-  {
-    tx_in_zarcanum() {}
-
-    // Boost's Assignable concept
-    tx_in_zarcanum(const tx_in_zarcanum&)           = default;
-    tx_in_zarcanum& operator=(const tx_in_zarcanum&)= default;
-
-    crypto::key_image               key_image;
-    crypto::public_key              real_out_amount_commitment;
-    std::vector<txin_etc_details_v> etc_details;
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(key_image)
-      FIELD(real_out_amount_commitment)
-      FIELD(key_offsets) // referring_input
-      FIELD(etc_details)
-    END_SERIALIZE()
-
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(key_image)
-      BOOST_SERIALIZE(real_out_amount_commitment)
-      BOOST_SERIALIZE(key_offsets) // referring_input
-      BOOST_SERIALIZE(etc_details)
-    END_BOOST_SERIALIZATION()
-  };
-#pragma pack(pop)
-
 
   struct txout_multisig
   {
@@ -313,8 +284,6 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_htlc> txin_v;
-
   typedef boost::variant<txout_to_key, txout_multisig, txout_htlc> txout_target_v;
 
   //typedef std::pair<uint64_t, txout> out_t;
@@ -330,7 +299,53 @@ namespace currency
   };
 
 
-#pragma pack(push, 1)
+  /////////////////////////////////////////////////////////////////////////////
+  // Zarcanum structures
+  //
+  //#pragma pack(push, 1)
+  struct zarcanum_input : public referring_input
+  {
+    zarcanum_input() {}
+    // Boost's Assignable concept
+    zarcanum_input(const zarcanum_input&)           = default;
+    zarcanum_input& operator=(const zarcanum_input&)= default;
+
+    crypto::key_image               key_image;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(key_image)
+      FIELD(key_offsets) // referring_input
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(key_image)
+      BOOST_SERIALIZE(key_offsets) // referring_input
+    END_BOOST_SERIALIZATION()
+  };
+
+  // txin_zarcanum_inputs contains several zarcanum_input instances and corresponds to one zarcanum_sig
+  struct txin_zarcanum_inputs
+  {
+    txin_zarcanum_inputs() {}
+
+    // Boost's Assignable concept
+    txin_zarcanum_inputs(const txin_zarcanum_inputs&)             = default;
+    txin_zarcanum_inputs& operator=(const txin_zarcanum_inputs&)  = default;
+
+    std::vector<zarcanum_input>     elements;
+    std::vector<txin_etc_details_v> etc_details;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(elements)
+      FIELD(etc_details)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(elements)
+      BOOST_SERIALIZE(etc_details)
+    END_BOOST_SERIALIZATION()
+  };
+
   struct tx_out_zarcanum
   {
     tx_out_zarcanum() {}
@@ -340,28 +355,71 @@ namespace currency
     tx_out_zarcanum& operator=(const tx_out_zarcanum&) = default;
 
     crypto::public_key  stealth_address;
-    crypto::public_key  concealing_point;
-    crypto::public_key  commitment;
+    crypto::public_key  concealing_point; // group element Q, see also Zarcanum paper
+    crypto::public_key  amount_commitment;
     uint64_t            encrypted_amount;
-    uint64_t            token_id = 0;
+    //crypto::public_key  token_masked_generator;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(stealth_address)
       FIELD(concealing_point)
-      FIELD(commitment)
+      FIELD(amount_commitment)
       FIELD(encrypted_amount)
-      FIELD(token_id)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(stealth_address)
       BOOST_SERIALIZE(concealing_point)
-      BOOST_SERIALIZE(commitment)
+      BOOST_SERIALIZE(amount_commitment)
       BOOST_SERIALIZE(encrypted_amount)
-      BOOST_SERIALIZE(token_id)
     END_BOOST_SERIALIZATION()
   };
-#pragma pack(pop)
+
+  struct zarcanum_tx_data_v1
+  {
+    uint64_t fee;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(fee)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(fee)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct zarcanum_sig
+  {
+    struct input_proofs_t
+    {
+      crypto::public_key real_out_amount_commitment;
+      // crypto::public_key real_out_token_masked_generator;
+
+      BEGIN_SERIALIZE_OBJECT()
+        FIELD(real_out_amount_commitment)
+      END_SERIALIZE()
+
+      BEGIN_BOOST_SERIALIZATION()
+        BOOST_SERIALIZE(real_out_amount_commitment)
+      END_BOOST_SERIALIZATION()
+    };
+
+    crypto::bpp_signature_serialized outputs_range_proof; // aggregated range proof for some or all outputs
+    std::vector<input_proofs_t> input_proofs; // for each input
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(outputs_range_proof)
+      FIELD(input_proofs)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(outputs_range_proof)
+      BOOST_SERIALIZE(input_proofs)
+    END_BOOST_SERIALIZATION()
+  };
+//#pragma pack(pop)
+
+  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_htlc, txin_zarcanum_inputs> txin_v;
 
   typedef boost::variant<tx_out_bare, tx_out_zarcanum> tx_out_v;
 
@@ -628,10 +686,10 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector21<
+  typedef boost::mpl::vector22<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
-    tx_payer, tx_receiver, extra_alias_entry
+    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -639,21 +697,7 @@ namespace currency
   typedef payload_items_v attachment_v;
 
 
-  struct zarcanum_tx_data_v1
-  {
-    uint64_t fee;
-    std::vector<crypto::bpp_signature_serialized> range_proofs_for_outputs;
 
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(fee)
-      FIELD(range_proofs_for_outputs)
-    END_SERIALIZE()
-
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(fee)
-      BOOST_SERIALIZE(range_proofs_for_outputs)
-    END_BOOST_SERIALIZATION()
-  };
 
   //classic CryptoNote signature by Nicolas Van Saberhagen
   struct NLSAG_sig
@@ -666,16 +710,6 @@ namespace currency
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(s)
-    END_BOOST_SERIALIZATION()
-  };
-
-  struct zarcanum_sig
-  {
-    //TODO:
-    BEGIN_SERIALIZE_OBJECT()
-    END_SERIALIZE()
-
-    BEGIN_BOOST_SERIALIZATION()
     END_BOOST_SERIALIZATION()
   };
 
@@ -963,7 +997,7 @@ SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 SET_VARIANT_TAGS(currency::tx_out_bare, 36, "tx_out_bare");
 
 // Zarcanum
-SET_VARIANT_TAGS(currency::tx_in_zarcanum, 37, "tx_in_zarcanum");
+SET_VARIANT_TAGS(currency::txin_zarcanum_inputs, 37, "txin_zarcanum_inputs");
 SET_VARIANT_TAGS(currency::tx_out_zarcanum, 38, "tx_out_zarcanum");
 SET_VARIANT_TAGS(currency::zarcanum_tx_data_v1, 39, "zarcanum_tx_data_v1");
 SET_VARIANT_TAGS(crypto::bpp_signature_serialized, 40, "bpp_signature_serialized");

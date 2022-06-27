@@ -132,7 +132,7 @@ namespace crypto
   //
   // scalar_t - holds a 256-bit scalar, normally in [0..L-1]
   //
-  struct alignas(32) scalar_t
+  struct /* TODO alignas(32) */ scalar_t
   {
     union
     {

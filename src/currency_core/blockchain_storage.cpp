@@ -746,6 +746,11 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
     {
       return this->operator()(static_cast<const txin_to_key&>(inp));
     }
+    bool operator()(const txin_zarcanum_inputs& inp) const
+    {
+      // TODO: #@#@
+      return false;
+    }
   };
 
   for(const txin_v& in : tx.vin)
@@ -1619,13 +1624,13 @@ bool blockchain_storage::purge_keyimage_from_big_heap(const crypto::key_image& k
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, const crypto::hash& id)
+bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, const crypto::hash& block_id)
 {
   if (is_pos_block(b))
   {
     CHECK_AND_ASSERT_MES(b.miner_tx.vin.size()>=2, false, "paranoid check failed");
     CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "paranoid type check failed");
-    purge_keyimage_from_big_heap(boost::get<txin_to_key>(b.miner_tx.vin[1]).k_image, id);
+    purge_keyimage_from_big_heap(boost::get<txin_to_key>(b.miner_tx.vin[1]).k_image, block_id);
   }
   for (auto tx_id : b.tx_hashes)
   {
@@ -1639,7 +1644,14 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
     {
       if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
       {
-        purge_keyimage_from_big_heap(get_to_key_input_from_txin_v(tx.vin[n]).k_image, id);
+        purge_keyimage_from_big_heap(get_to_key_input_from_txin_v(tx.vin[n]).k_image, block_id);
+      }
+      else if (tx.vin[n].type() == typeid(txin_zarcanum_inputs))
+      {
+        // TODO @#@# consider refactoring
+        const txin_zarcanum_inputs& zins = boost::get<txin_zarcanum_inputs>(tx.vin[n]);
+        for(const auto& el : zins.elements)
+          purge_keyimage_from_big_heap(el.key_image, block_id);
       }
     }
   }
@@ -2622,6 +2634,9 @@ bool blockchain_storage::update_spent_tx_flags_for_input(uint64_t amount, const 
 //------------------------------------------------------------------
 bool blockchain_storage::update_spent_tx_flags_for_input(uint64_t amount, uint64_t global_index, bool spent)
 {
+  if (amount == 0)
+    return true; // fallback for hidden amounts
+
   CRITICAL_REGION_LOCAL(m_read_lock);
   uint64_t outs_count = m_db_outputs.get_item_size(amount);
   CHECK_AND_ASSERT_MES(outs_count, false, "Amount " << amount << " have not found during update_spent_tx_flags_for_input()");
@@ -3863,10 +3878,9 @@ namespace currency
       m_bl_height(bl_height), 
       m_mixins_count(mixins_count)
     {}
-    bool operator()(const txin_to_key& in) const
-    {
-      const crypto::key_image& ki = in.k_image;
 
+    bool visit(uint64_t amount, const crypto::key_image& ki, const std::vector<txout_ref_v>& key_offsets) const
+    {
       auto ki_ptr = m_db_spent_keys.get(ki);
       if (ki_ptr)
       {
@@ -3876,19 +3890,24 @@ namespace currency
       }
       m_db_spent_keys.set(ki, m_bl_height);
 
-      if (in.key_offsets.size() == 1)
+      if (key_offsets.size() == 1)
       {
         //direct spend detected
-        if (!m_bcs.update_spent_tx_flags_for_input(in.amount, in.key_offsets[0], true))
+        if (!m_bcs.update_spent_tx_flags_for_input(amount, key_offsets[0], true))
         {
           //internal error
           LOG_PRINT_RED_L0("Failed to  update_spent_tx_flags_for_input");
           return false;
         }
       }
-      if (m_mixins_count < in.key_offsets.size())
-        m_mixins_count = in.key_offsets.size();
+      if (m_mixins_count < key_offsets.size())
+        m_mixins_count = key_offsets.size();
       return true;
+    }
+
+    bool operator()(const txin_to_key& in) const
+    {
+      return visit(in.amount, in.k_image, in.key_offsets);
     }
     bool operator()(const txin_htlc& in) const
     {
@@ -3908,6 +3927,16 @@ namespace currency
         //internal error
         LOG_PRINT_RED_L0("Failed to  update_spent_tx_flags_for_input");
         return false;
+      }
+      return true;
+    }
+    bool operator()(const txin_zarcanum_inputs& in) const
+    {
+      // TODO:  @#@# should check for hardfork here?
+      for(auto& el : in.elements)
+      {
+        if (!visit(0, el.key_image, el.key_offsets))
+          return false;
       }
       return true;
     }
@@ -4259,6 +4288,15 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
     {
       if (is_multisig_output_spent(boost::get<const txin_multisig>(in).multisig_out_id))
         return true;
+    }
+    else if (in.type() == typeid(txin_zarcanum_inputs))
+    {
+      const auto& zins = boost::get<txin_zarcanum_inputs>(in);
+      for(auto& el: zins.elements)
+      {
+        if (have_tx_keyimg_as_spent(el.key_image))
+          return true;
+      }
     }
     else if (in.type() == typeid(txin_gen))
     {
@@ -4863,12 +4901,29 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
       {
         if (get_to_key_input_from_txin_v(in).k_image == ki)
         {
-          id_result = get_transaction_hash(tx_chain_entry->tx);
+          id_result = get_transaction_hash(tx_chain_entry->tx);  // ??? @#@#  why not just use tx_id ?
           return tx_chain_entry;
+        }
+      }
+      else if (in.type() == typeid(txin_zarcanum_inputs))
+      {
+        const auto& zins = boost::get<txin_zarcanum_inputs>(in);
+        for(auto& el: zins.elements)
+        {
+          if (el.key_image == ki)
+          {
+            id_result = tx_id;
+            return tx_chain_entry;
+          }
         }
       }
     }
   }
+
+  // got here, but found nothing -- log such suspicious event
+  CHECK_AND_ASSERT_THROW_MES(block_entry != nullptr, "invalid block_entry");
+  LOG_PRINT_YELLOW("find_key_image_and_related_tx: failed to find key image " << ki << " in block " << get_block_hash(block_entry->bl), LOG_LEVEL_1);
+
   return std::shared_ptr<const transaction_chain_entry>();
 }
 //------------------------------------------------------------------
@@ -5015,6 +5070,12 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     return true;
   };
 
+  auto is_allowed_before_hardfork4 = [&](const payload_items_v& el) -> bool
+  {
+    CHECK_AND_ASSERT_MES(el.type() != typeid(zarcanum_tx_data_v1), false, "tx " << tx_id << " contains zarcanum_tx_data_v1 which is not allowed on height " << block_height);
+    return true;
+  };
+
   bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
   bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
   bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
@@ -5023,17 +5084,22 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   //inputs
   for (const auto in : tx.vin)
   {
-    if (in.type() == typeid(txin_htlc))
-    {
+    VARIANT_SWITCH_BEGIN(in);
+    VARIANT_CASE_CONST(txin_htlc, in_htlc)
       if (!var_is_after_hardfork_3_zone)
         return false;
-    }
+    VARIANT_CASE_CONST(txin_zarcanum_inputs, in_zins)
+      if (!var_is_after_hardfork_4_zone)
+        return false;
+    VARIANT_SWITCH_END();
   }
   //outputs
   for (const auto out : tx.vout)
   {
     VARIANT_SWITCH_BEGIN(out);
     VARIANT_CASE_CONST(tx_out_bare, o)
+      if (var_is_after_hardfork_4_zone)
+        return false; // bare outputs are not allowed after HF4
       if (o.target.type() == typeid(txout_htlc))
       {
         if (!var_is_after_hardfork_3_zone)
@@ -5051,6 +5117,8 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     if (!var_is_after_hardfork_1_zone && !is_allowed_before_hardfork1(el))
       return false;
     if (!var_is_after_hardfork_2_zone && !is_allowed_before_hardfork2(el))
+      return false;
+    if (!var_is_after_hardfork_4_zone && !is_allowed_before_hardfork4(el))
       return false;
   }
 

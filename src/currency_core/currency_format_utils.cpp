@@ -2605,9 +2605,9 @@ namespace currency
           pfinalbuff = &deflated_buff;
         }
         if (ee.service_id == BC_PAYMENT_ID_SERVICE_ID || ee.service_id == BC_OFFERS_SERVICE_ID)
-          tv.datails_view = *pfinalbuff;
+          tv.details_view = *pfinalbuff;
         else
-          tv.datails_view = "BINARY DATA";
+          tv.details_view = "BINARY DATA";
       }
       return true;
     }
@@ -2615,7 +2615,7 @@ namespace currency
     {
       tv.type = "crypto_checksum";
       tv.short_view = std::string("derivation_hash: ") + epee::string_tools::pod_to_hex(ee.derivation_hash);
-      tv.datails_view = std::string("derivation_hash: ") + epee::string_tools::pod_to_hex(ee.derivation_hash) + "\n"
+      tv.details_view = std::string("derivation_hash: ") + epee::string_tools::pod_to_hex(ee.derivation_hash) + "\n"
         + "encrypted_key_derivation: " + epee::string_tools::pod_to_hex(ee.encrypted_key_derivation);
 
       return true;
@@ -2676,14 +2676,14 @@ namespace currency
     {
       tv.type = "attachment_info";
       tv.short_view = std::to_string(ee.sz) + " bytes";
-      tv.datails_view = currency::obj_to_json_str(ee);
+      tv.details_view = currency::obj_to_json_str(ee);
       return true;
     }
     bool operator()(const extra_alias_entry& ee)
     {
       tv.type = "alias_info";
       tv.short_view = ee.m_alias + "-->" + get_account_address_as_str(ee.m_address);
-      tv.datails_view = currency::obj_to_json_str(ee);
+      tv.details_view = currency::obj_to_json_str(ee);
 
       return true;
     }
@@ -2695,7 +2695,7 @@ namespace currency
     {
       tv.type = "user_data";
       tv.short_view = std::to_string(ee.buff.size()) + " bytes";
-      tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(ee.buff);
+      tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee.buff);
 
       return true;
     }
@@ -2704,7 +2704,7 @@ namespace currency
       tv.type = "extra_padding";
       tv.short_view = std::to_string(ee.buff.size()) + " bytes";
       if (!ee.buff.empty())
-        tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(std::string(reinterpret_cast<const char*>(&ee.buff[0]), ee.buff.size()));
+        tv.details_view = epee::string_tools::buff_to_hex_nodelimer(std::string(reinterpret_cast<const char*>(&ee.buff[0]), ee.buff.size()));
 
       return true;
     }
@@ -2712,7 +2712,7 @@ namespace currency
     {
       tv.type = "comment";
       tv.short_view = std::to_string(ee.comment.size()) + " bytes(encrypted)";
-      tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(ee.comment);
+      tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee.comment);
 
       return true;
     }
@@ -2750,7 +2750,7 @@ namespace currency
     {
       tv.type = "derivation_hint";
       tv.short_view = std::to_string(ee.msg.size()) + " bytes";
-      tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(ee.msg);
+      tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee.msg);
 
       return true;
     }
@@ -2758,7 +2758,7 @@ namespace currency
     {
       tv.type = "string";
       tv.short_view = std::to_string(ee.size()) + " bytes";
-      tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(ee);
+      tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee);
 
       return true;
     }
@@ -2766,8 +2766,15 @@ namespace currency
     {
       tv.type = "FLAGS16";
       tv.short_view = epee::string_tools::pod_to_hex(dh);
-      tv.datails_view = epee::string_tools::pod_to_hex(dh);
+      tv.details_view = epee::string_tools::pod_to_hex(dh);
 
+      return true;
+    }
+    bool operator()(const zarcanum_tx_data_v1& ztxd)
+    {
+      tv.type = "zarcanum_tx_data_v1";
+      tv.short_view = "fee = " + print_money_brief(ztxd.fee);
+      tv.details_view = tv.short_view;
       return true;
     }
   };

@@ -115,7 +115,7 @@ namespace boost
     {
       a & x.stealth_address;
       a & x.concealing_point;
-      a & x.commitment;
+      a & x.amount_commitment;
       a & x.encrypted_amount;
     }
 

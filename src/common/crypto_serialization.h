@@ -86,6 +86,9 @@ BLOB_SERIALIZER(crypto::secret_key);
 BLOB_SERIALIZER(crypto::key_derivation);
 BLOB_SERIALIZER(crypto::key_image);
 BLOB_SERIALIZER(crypto::signature);
+BLOB_SERIALIZER(crypto::scalar_t);
+BLOB_SERIALIZER(crypto::point_t);
+
 VARIANT_TAG(debug_archive, crypto::hash, "hash");
 VARIANT_TAG(debug_archive, crypto::public_key, "public_key");
 VARIANT_TAG(debug_archive, crypto::secret_key, "secret_key");
@@ -133,6 +136,16 @@ namespace boost
     inline void serialize(Archive &a, crypto::hash &x, const boost::serialization::version_type ver)
     {
       a & reinterpret_cast<char (&)[sizeof(crypto::hash)]>(x);
+    }    
+    template <class Archive>
+    inline void serialize(Archive &a, crypto::scalar_t &x, const boost::serialization::version_type ver)
+    {
+      a & reinterpret_cast<char (&)[sizeof(crypto::scalar_t)]>(x);
+    }    
+    template <class Archive>
+    inline void serialize(Archive &a, crypto::point_t &x, const boost::serialization::version_type ver)
+    {
+      a & reinterpret_cast<char (&)[sizeof(crypto::point_t)]>(x);
     }    
   } // namespace serialization
 } // namespace boost
