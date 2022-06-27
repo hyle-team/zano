@@ -3318,10 +3318,11 @@ namespace currency
   bool operator ==(const currency::transaction& a, const currency::transaction& b) {
     return currency::get_transaction_hash(a) == currency::get_transaction_hash(b);
   }
-
+  //--------------------------------------------------------------------------------
   bool operator ==(const currency::block& a, const currency::block& b) {
     return currency::get_block_hash(a) == currency::get_block_hash(b);
   }
+  //--------------------------------------------------------------------------------
   bool operator ==(const currency::extra_attachment_info& a, const currency::extra_attachment_info& b)
   {
     if (a.cnt == b.cnt && a.hsh == b.hsh && a.sz == b.sz)
@@ -3329,7 +3330,24 @@ namespace currency
     else 
       return false;
   }
-
+  //--------------------------------------------------------------------------------
+  bool operator ==(const currency::NLSAG_sig& a, const currency::NLSAG_sig& b)
+  {
+    return a.s == b.s;
+  }
+  //--------------------------------------------------------------------------------
+  bool operator ==(const currency::void_sig& a, const currency::void_sig& b)
+  {
+    //@#@
+    return false;
+  }
+  //--------------------------------------------------------------------------------
+  bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b)
+  {
+    //@#@ TODO
+    return false;
+  }
+  //--------------------------------------------------------------------------------
 
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
