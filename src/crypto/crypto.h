@@ -86,6 +86,8 @@ namespace crypto {
     friend bool secret_key_to_public_key(const secret_key &, public_key &);
     static bool generate_key_derivation(const public_key &, const secret_key &, key_derivation &);
     friend bool generate_key_derivation(const public_key &, const secret_key &, key_derivation &);
+    static void derivation_to_scalar(const key_derivation &, size_t, ec_scalar &);
+    friend void derivation_to_scalar(const key_derivation &, size_t, ec_scalar &);
     static bool derive_public_key(const key_derivation &, std::size_t, const public_key &, public_key &);
     friend bool derive_public_key(const key_derivation &, std::size_t, const public_key &, public_key &);
     static void derive_secret_key(const key_derivation &, std::size_t, const secret_key &, secret_key &);
@@ -174,6 +176,10 @@ namespace crypto {
   inline bool generate_key_derivation(const public_key &key1, const secret_key &key2, key_derivation &derivation) {
     return crypto_ops::generate_key_derivation(key1, key2, derivation);
   }
+  inline void derivation_to_scalar(const key_derivation &derivation, size_t output_index, ec_scalar &result) {
+    crypto::crypto_ops::derivation_to_scalar(derivation, output_index, result);
+  }
+
   inline bool derive_public_key(const key_derivation &derivation, std::size_t output_index,
     const public_key &base, public_key &derived_key) {
     return crypto_ops::derive_public_key(derivation, output_index, base, derived_key);
