@@ -1961,7 +1961,7 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
     if (null_pkey == tx_pub_key)
@@ -1994,7 +1994,7 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
-  bool lookup_acc_outs_genesis(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
+  bool lookup_acc_outs_genesis(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     uint64_t offset = 0;
     bool r = get_account_genesis_offset_by_address(get_account_address_as_str(acc.account_address), offset);
@@ -2015,13 +2015,13 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     std::list<htlc_info> htlc_info_list;
     return lookup_acc_outs(acc, tx, tx_pub_key, outs, money_transfered, derivation, htlc_info_list);
   }
   //---------------------------------------------------------------
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<size_t>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list)
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list)
   {
     money_transfered = 0;
     bool r = generate_key_derivation(tx_pub_key, acc.view_secret_key, derivation);

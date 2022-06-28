@@ -327,8 +327,9 @@ void wallet2::fetch_tx_global_indixes(const std::list<std::reference_wrapper<con
 void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
   std::vector<std::string> recipients, remote_aliases;
-  process_unconfirmed(tx, recipients, remote_aliases);
-  std::vector<size_t> outs;
+  process_unconfirmed(tx, recipients, remote_aliases);  
+
+  std::vector<wallet_out_info> outs;
   uint64_t tx_money_got_in_outs = 0;
   crypto::public_key tx_pub_key = null_pkey;
   bool r = parse_and_validate_tx_extra(tx, tx_pub_key);
@@ -476,7 +477,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
    
     for (size_t i_in_outs = 0; i_in_outs != outs.size(); i_in_outs++)
     {
-      size_t o = outs[i_in_outs];
+      size_t o = outs[i_in_outs].index;
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(o < tx.vout.size(), "wrong out in transaction: internal index=" << o << ", total_outs=" << tx.vout.size());
       VARIANT_SWITCH_BEGIN(tx.vout[o]);
       VARIANT_CASE_CONST(tx_out_bare, out)
@@ -1086,7 +1087,7 @@ bool wallet2::handle_proposal(wallet_public::wallet_transfer_info& wti, const bc
     scan_tx_to_key_inputs(found_transfers, prop.tx_template);
     //scan outputs to figure out amount of change in escrow
     crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-    std::vector<size_t> outs;
+    std::vector<wallet_out_info> outs;
     uint64_t tx_money_got_in_outs = 0;
     bool r = lookup_acc_outs(m_account.get_keys(), prop.tx_template, outs, tx_money_got_in_outs, derivation);
     THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to lookup_acc_outs for tx: " << get_transaction_hash(prop.tx_template));
@@ -1931,7 +1932,7 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
     }
 
     // read extra
-    std::vector<size_t> outs;
+    std::vector<wallet_out_info> outs;
     uint64_t tx_money_got_in_outs = 0;
     crypto::public_key tx_pub_key = null_pkey;
     r = parse_and_validate_tx_extra(tx, tx_pub_key);
@@ -1942,7 +1943,9 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
     THROW_IF_TRUE_WALLET_EX(!r, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
 
     //collect incomes
-    td.receive_indices = outs;
+    for (auto& o : outs)
+      td.receive_indices.push_back(o.index);
+
     bool new_multisig_spend_detected = false;
     //check if we have spendings
     uint64_t tx_money_spent_in_ins = 0;
