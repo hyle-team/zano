@@ -1961,7 +1961,7 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<std::pair<size_t, amount>>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_input_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
     crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
     if (null_pkey == tx_pub_key)
