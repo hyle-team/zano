@@ -933,9 +933,10 @@ namespace crypto
 
     struct hs_t
     {
-      hs_t()
+      hs_t(size_t size_to_reserve = 0)
       {
         static_assert(sizeof(scalar_t) == sizeof(crypto::public_key), "unexpected size of data");
+        m_elements.reserve(size_to_reserve);
       }
 
       void reserve(size_t elements_count)
@@ -1005,6 +1006,11 @@ namespace crypto
           m_elements.emplace_back(key_image_array[i]);
       }
 
+      void add_32_chars(const char(&str32)[32])
+      {
+        m_elements.emplace_back(str32);
+      }
+
       scalar_t calc_hash(bool clear = true)
       {
         size_t data_size_bytes = m_elements.size() * sizeof(item_t);
@@ -1031,17 +1037,21 @@ namespace crypto
         item_t(const scalar_t& scalar) : scalar(scalar) {}
         item_t(const crypto::public_key& pk) : pk(pk) {}
         item_t(const crypto::key_image& ki) : ki(ki) {}
+        item_t(const char(&str32)[32]) { memcpy(c, str32, sizeof c); }
         scalar_t scalar;
         crypto::public_key pk;
         crypto::key_image ki;
+        char c[32];
       };
+
+      static_assert(sizeof(item_t::c) == sizeof(item_t::pk), "size missmatch");
 
       std::vector<item_t> m_elements;
     };
 
     static scalar_t hs(const scalar_t& s, const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
     {
-      hs_t hs_calculator;
+      hs_t hs_calculator(3);
       hs_calculator.add_scalar(s);
       hs_calculator.add_points_array(ps0);
       hs_calculator.add_points_array(ps1);
@@ -1051,7 +1061,7 @@ namespace crypto
     static scalar_t hs(const crypto::hash& s, const std::vector<crypto::public_key>& ps0, const std::vector<crypto::key_image>& ps1)
     {
       static_assert(sizeof(crypto::hash) == sizeof(scalar_t), "size missmatch");
-      hs_t hs_calculator;
+      hs_t hs_calculator(3);
       hs_calculator.add_scalar(*reinterpret_cast<const scalar_t*>(&s));
       hs_calculator.add_pub_keys_array(ps0);
       hs_calculator.add_key_images_array(ps1);
@@ -1060,9 +1070,17 @@ namespace crypto
 
     static scalar_t hs(const std::vector<point_t>& ps0, const std::vector<point_t>& ps1)
     {
-      hs_t hs_calculator;
+      hs_t hs_calculator(2);
       hs_calculator.add_points_array(ps0);
       hs_calculator.add_points_array(ps1);
+      return hs_calculator.calc_hash();
+    }
+
+    static scalar_t hs(const char(&str32)[32], const scalar_t& s)
+    {
+      hs_t hs_calculator(2);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_scalar(s);
       return hs_calculator.calc_hash();
     }
 
