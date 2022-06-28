@@ -1278,6 +1278,7 @@ namespace tools
       ptc.mtd.spent_indices.push_back(ptc.i);
       remove_transfer_from_expiration_list(tr_index);
     }
+    return true;
   }
 
   template<typename idle_condition_cb_t> //do refresh as external callback
