@@ -16,7 +16,9 @@ namespace crypto
 #include "crypto/crypto-ops.h"
   } // extern "C"
 
-
+#define CRYPTO_STR_(X) #X
+#define CRYPTO_STR(X) CRYPTO_STR_(X)
+#define CRYPTO_CHECK_AND_THROW_MES(cond, msg) if (!(cond)) { throw std::runtime_error(msg " @ " __FILE__ ":" CRYPTO_STR(__LINE__)); }
 
   //
   // Helpers
@@ -480,27 +482,24 @@ namespace crypto
     {
     }
 
-    explicit point_t(const crypto::public_key& pk)
+    explicit point_t(const crypto::public_key& pk) // can throw std::runtime_error
     {
-      if (!from_public_key(pk))
-        zero();
+      CRYPTO_CHECK_AND_THROW_MES(from_public_key(pk), "invalid public key");
     }
 
-    point_t(const unsigned char(&v)[32])
-    {
-      static_assert(sizeof(crypto::public_key) == sizeof v, "size missmatch");
-      if (!from_public_key(*(const crypto::public_key*)v))
-        zero();
-    }
-
-    point_t(const uint64_t(&v)[4])
+    point_t(const unsigned char(&v)[32]) // can throw std::runtime_error
     {
       static_assert(sizeof(crypto::public_key) == sizeof v, "size missmatch");
-      if (!from_public_key(*(const crypto::public_key*)v))
-        zero();
+      CRYPTO_CHECK_AND_THROW_MES(from_public_key(*(const crypto::public_key*)v), "invalid public key (char[32])");
     }
 
-    point_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
+    point_t(const uint64_t(&v)[4]) // can throw std::runtime_error
+    {
+      static_assert(sizeof(crypto::public_key) == sizeof v, "size missmatch");
+      CRYPTO_CHECK_AND_THROW_MES(from_public_key(*(const crypto::public_key*)v), "invalid public key (uint64_t[4])");
+    }
+
+    point_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3) // can throw std::runtime_error
     {
       crypto::public_key pk;
       ((uint64_t*)&pk)[0] = a0;
@@ -508,8 +507,7 @@ namespace crypto
       ((uint64_t*)&pk)[2] = a2;
       ((uint64_t*)&pk)[3] = a3;
 
-      if (!from_public_key(pk))
-        zero();
+      CRYPTO_CHECK_AND_THROW_MES(from_public_key(pk), "invalid public key (four uint64_t)");
     }
 
     explicit point_t(tag_zero&&)
