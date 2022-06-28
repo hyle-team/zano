@@ -327,8 +327,9 @@ void wallet2::fetch_tx_global_indixes(const std::list<std::reference_wrapper<con
 void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
   std::vector<std::string> recipients, remote_aliases;
-  process_unconfirmed(tx, recipients, remote_aliases);
-  std::vector<size_t> outs;
+  process_unconfirmed(tx, recipients, remote_aliases);  
+
+  std::vector<wallet_input_info> outs;
   uint64_t tx_money_got_in_outs = 0;
   crypto::public_key tx_pub_key = null_pkey;
   bool r = parse_and_validate_tx_extra(tx, tx_pub_key);
