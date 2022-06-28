@@ -416,10 +416,15 @@ namespace tools
       crypto::key_image m_key_image; //TODO: key_image stored twice :(
       std::vector<transfer_details_extra_options_v> varian_options;
 
+      //v2
+      uint64_t m_amount; //@#@ need conversion from old files format
+
+
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(m_global_output_index)
         KV_SERIALIZE_POD_AS_HEX_STRING(m_key_image)
         KV_CHAIN_BASE(transfer_details_base)
+        KV_SERIALIZE(m_amount)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -498,6 +503,21 @@ namespace tools
         FIELD(account_data)
       END_SERIALIZE()
     };
+
+    struct process_transaction_context
+    {
+      uint64_t tx_money_spent_in_ins;
+      // check all outputs for spending (compare key images)
+      money_transfer2_details mtd;
+      bool is_pos_coinbase;
+      bool coin_base_tx;
+      //PoW block don't have change, so all outs supposed to be marked as "mined"
+      bool is_derived_from_coinbase;
+      size_t i;
+      size_t sub_i;
+      uint64_t height;
+    };
+
 
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
@@ -964,6 +984,8 @@ private:
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_public::wallet_transfer_info& wti) const;
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
     
+    template<typename input_t>
+    bool process_input_t(const input_t& in_t, wallet2::process_transaction_context& ptc, const currency::transaction& tx);
 
     const construct_tx_param& get_default_construct_tx_param();
 
@@ -1015,7 +1037,9 @@ private:
     //void check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed);
     uint64_t detach_from_block_ids(uint64_t height);
     uint64_t get_wallet_minimum_height();
-    uint64_t get_directly_spent_transfer_id_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
+    uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(uint64_t amount, const std::vector<currency::txout_ref_v> & key_offsets);
+    uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
+    uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::zarcanum_input& inzk);
     bool is_in_hardfork_zone(uint64_t hardfork_index);
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
@@ -1217,6 +1241,45 @@ namespace boost
 
 namespace tools
 {
+  template<typename input_t>
+  bool wallet2::process_input_t(const input_t& in_t, wallet2::process_transaction_context& ptc, const currency::transaction& tx)
+  {
+    // check if this input spends our output
+    uint64_t tr_index = UINT64_MAX;
+
+    if (this->is_auditable() && this->is_watch_only())
+    {
+      // tracking wallet, assuming all outputs are spent directly because of mix_attr = 1
+      tr_index = this->get_directly_spent_transfer_index_by_input_in_tracking_wallet(in_t);
+    }
+    else
+    {
+      // wallet with spend secret key -- we can calculate own key images and then search by them
+      auto it = m_key_images.find(in_t.k_image);
+      if (it != m_key_images.end())
+      {
+        tr_index = it->second;
+      }
+    }
+
+    if (tr_index != UINT64_MAX)
+    {
+      transfer_details& td = m_transfers[tr_index];
+      ptc.tx_money_spent_in_ins += td.amount();
+      uint32_t flags_before = td.m_flags;
+      td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT;
+      td.m_spent_height = ptc.height;
+      if (ptc.coin_base_tx && td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
+        ptc.is_derived_from_coinbase = true;
+      else
+        ptc.is_derived_from_coinbase = false;
+      WLT_LOG_L0("Spent key out, transfer #" << tr_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << ptc.height <<
+        "; flags: " << flags_before << " -> " << td.m_flags);
+      ptc.mtd.spent_indices.push_back(ptc.i);
+      remove_transfer_from_expiration_list(tr_index);
+    }
+  }
+
   template<typename idle_condition_cb_t> //do refresh as external callback
   bool wallet2::scan_pos(mining_context& cxt,
     std::atomic<bool>& stop,
