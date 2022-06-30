@@ -31,6 +31,7 @@ using namespace epee;
 #include "genesis_acc.h"
 #include "common/mnemonic-encoding.h"
 #include "crypto/bitcoin/sha256_helper.h"
+#include "crypto_config.h"
 
 namespace currency
 {
@@ -1960,6 +1961,33 @@ namespace currency
       return false;
     return true;
   }
+
+  bool is_out_to_acc(const account_keys& acc, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount)
+  {
+    crypto::scalar_t h = {};
+    crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(r * V, i)
+
+    crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(acc.account_address.spend_public_key); // P =? Hs(rV, i) * G + S
+    if (P_prime.to_public_key() != zo.stealth_address)
+      return false;
+    
+    crypto::point_t Q_prime = h * crypto::point_t(acc.account_address.view_public_key); // Q =? v * Hs(rv, i) * G
+    if (Q_prime.to_public_key() != zo.concealing_point)
+      return false;
+
+    crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
+    decoded_amount = zo.encrypted_amount ^ amount_mask.m_u64[0];
+
+    crypto::scalar_t blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, h)
+
+    crypto::point_t A_prime;
+    A_prime.assign_mul_plus_G(decoded_amount, crypto::c_point_H, blinding_mask); // A =? a * H + f * G
+    if (A_prime.to_public_key() != zo.amount_commitment)
+      return false;
+
+    return true;
+  }
+
   //---------------------------------------------------------------
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
   {
@@ -2009,7 +2037,7 @@ namespace currency
     CHECK_AND_ASSERT_MES(o.target.type() == typeid(txout_to_key), false, "condition failed: o.target.type() == typeid(txout_to_key)");
     if (is_out_to_acc(acc, boost::get<txout_to_key>(o.target), derivation, offset))
     {
-      outs.push_back(offset);
+      outs.emplace_back(offset, o.amount);
       money_transfered += o.amount;
     }
     return true;
@@ -2036,7 +2064,7 @@ namespace currency
     if (!check_tx_derivation_hint(tx, derivation))
       return true;
 
-    size_t i = 0;
+    size_t output_index = 0;
     for(const auto& ov : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(ov);
@@ -2044,40 +2072,44 @@ namespace currency
       {
         VARIANT_SWITCH_BEGIN(o.target);
         VARIANT_CASE_CONST(txout_to_key, t)
-          if (is_out_to_acc(acc, t, derivation, i))
+          if (is_out_to_acc(acc, t, derivation, output_index))
           {
-            outs.push_back(i);
+            outs.emplace_back(output_index, o.amount);
             money_transfered += o.amount;
           }
         VARIANT_CASE_CONST(txout_multisig, t)
-          if (is_out_to_acc(acc, t, derivation, i))
+          if (is_out_to_acc(acc, t, derivation, output_index))
           {
-            outs.push_back(i);
-            //don't count this money
+            outs.emplace_back(output_index, 0); // TODO: @#@# consider this
+            //don't cout this money
           }
         VARIANT_CASE_CONST(txout_htlc, htlc)
           htlc_info hi = AUTO_VAL_INIT(hi);
-          if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, i))
+          if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, output_index))
           {
             hi.hltc_our_out_is_before_expiration = true;
             htlc_info_list.push_back(hi);
-            outs.push_back(i);
           }
-          else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, i))
+          else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, output_index))
           {
             hi.hltc_our_out_is_before_expiration = false;
             htlc_info_list.push_back(hi);
-            outs.push_back(i);
           }
+          outs.emplace_back(output_index, o.amount);
         VARIANT_CASE_OTHER()
           LOG_ERROR("Wrong type at lookup_acc_outs, unexpected type is: " << o.target.type().name());
           return false;
         VARIANT_SWITCH_END();
       }
-      VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@  
+      VARIANT_CASE_CONST(tx_out_zarcanum, zo)
+        //@#@
+        wallet_out_info woi(output_index, 0);
+        if (is_out_to_acc(acc, zo, derivation, output_index, woi.amount))
+        {
+          outs.emplace_back(woi);
+        }
       VARIANT_SWITCH_END();
-      i++;
+      output_index++;
     }
     return true;
   }
