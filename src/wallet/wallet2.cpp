@@ -323,6 +323,61 @@ void wallet2::fetch_tx_global_indixes(const std::list<std::reference_wrapper<con
   }
 }
 
+bool out_is_to_key(const &tx_out_v out_t)
+{
+  if (out_t.type() == typeid(tx_out_bare))
+  {
+    return boost::get<tx_out_bare>(out_t).target.type() == typeid(txout_to_key);
+  }
+  return false;
+}
+
+bool out_is_to_htlc(const &currency::tx_out_v out_t)
+{
+  if (out_t.type() == typeid(currency::tx_out_bare))
+  {
+    return boost::get<currency::tx_out_bare>(out_t).target.type() == typeid(currency::txout_htlc);
+  }
+  return false;
+}
+bool out_is_to_zarcanum(const &currency::tx_out_v out_t)
+{
+  return out_t.type() == typeid(currency::tx_out_zarcanum);
+}
+
+const crypto::public_key& out_get_pub_key(const &currency::tx_out_v out_t, std::list<htlc_info>& htlc_info_list)
+{
+  if (out_t.type() == typeid(tx_out_bare))
+  {
+    const &tx_out_bare out = boost::get<currency::tx_out_bare>(out_t);
+    if (out.target.type() == typeid(txout_to_key))
+    {
+      return boost::get<currency::txout_to_key>(out.target).key;
+    }
+    else if (out.target.type() == typeid(txout_htlc))
+    {
+      THROW_IF_FALSE_WALLET_INT_ERR_EX(htlc_info_list.size() > 0, "Found txout_htlc out but htlc_info_list is empty");
+      bool hltc_our_out_is_before_expiration = htlc_info_list.front().hltc_our_out_is_before_expiration;
+      htlc_info_list.pop_front();
+      if (hltc_our_out_is_before_expiration)
+      {
+        return boost::get<currency::txout_htlc>(out.target).pkey_redeem;
+      }
+      else
+      {
+        return boost::get<currency::txout_htlc>(out.target).pkey_refund;
+      }
+    }else
+    {
+      THROW_IF_TRUE_WALLET_INT_ERR_EX(false, "Unexpected out type im wallet: " << out.target.type().name());
+    }
+  }
+  else if (out_t.type() == typeid(currency::tx_out_zarcanum))
+  {
+    return boost::get<currency::tx_out_zarcanum>(out_t).stealth_address;    
+  }
+}
+
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
@@ -453,34 +508,13 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     {
       size_t o = outs[i_in_outs].index;
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(o < tx.vout.size(), "wrong out in transaction: internal index=" << o << ", total_outs=" << tx.vout.size());
-      VARIANT_SWITCH_BEGIN(tx.vout[o]);
-      VARIANT_CASE_CONST(tx_out_bare, out)
       {
-        if (out.target.type() == typeid(txout_to_key) || out.target.type() == typeid(txout_htlc))
+        const &tx_out_v out_v = tx.vout[o];
+
+        if (out_is_to_key(out_v) || out_is_to_htlc(out_v) || out_is_to_zarcanum(out_v)) // out.target.type() == typeid(txout_to_key) || out.target.type() == typeid(txout_htlc))
         {
           bool hltc_our_out_is_before_expiration = false;
-          crypto::public_key out_key = null_pkey;
-          if (out.target.type() == typeid(txout_to_key))
-          {
-            out_key = boost::get<currency::txout_to_key>(out.target).key;
-          }
-          else if (out.target.type() == typeid(txout_htlc))
-          {
-            THROW_IF_FALSE_WALLET_INT_ERR_EX(htlc_info_list.size() > 0, "Found txout_htlc out but htlc_info_list is empty");
-            if (htlc_info_list.front().hltc_our_out_is_before_expiration)
-            {
-              out_key = boost::get<currency::txout_htlc>(out.target).pkey_redeem;
-            }
-            else
-            {
-              out_key = boost::get<currency::txout_htlc>(out.target).pkey_refund;
-            }
-            htlc_info_list.pop_front();
-          }
-          else
-          {
-            THROW_IF_TRUE_WALLET_INT_ERR_EX(false, "Unexpected out type im wallet: " << out.target.type().name());
-          }
+          crypto::public_key out_key = out_get_pub_key(out_v);
           //const currency::txout_to_key& otk = boost::get<currency::txout_to_key>(out.target);
 
           // obtain key image for this output
@@ -527,13 +561,13 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
               WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
               if (m_wcallback)
                 m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
-              WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tx_money_got_in_outs >= out.amount, "tx_money_got_in_outs: " << tx_money_got_in_outs << ", out.amount:" << out.amount);
-              tx_money_got_in_outs -= out.amount;
+              WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tx_money_got_in_outs >= outs[i_in_outs].amount, "tx_money_got_in_outs: " << tx_money_got_in_outs << ", out.amount:" << outs[i_in_outs].amount);
+              tx_money_got_in_outs -= outs[i_in_outs].amount;
               continue; // skip the output
             }
           }
 
-          if (is_auditable() && out.target.type() == typeid(txout_to_key) &&
+          if (is_auditable() && (out_is_to_key(out_v) || out_is_to_zarcanum(out_v)) &&
             boost::get<txout_to_key>(out.target).mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
           {
             std::stringstream ss;
@@ -650,9 +684,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           WLT_LOG_L0("Received multisig, multisig out id: " << multisig_id << ", amount: " << tdb.amount() << ", with tx: " << get_transaction_hash(tx));
         }
       }
-      VARIANT_CASE_CONST(tx_out_zarcanum, o);
-      //@#@      
-      VARIANT_SWITCH_END();
+
     }
   }
   
