@@ -358,6 +358,7 @@ namespace currency
     crypto::public_key  concealing_point; // group element Q, see also Zarcanum paper
     crypto::public_key  amount_commitment;
     uint64_t            encrypted_amount;
+    uint8_t             mix_attr;
     //crypto::public_key  token_masked_generator;
 
     BEGIN_SERIALIZE_OBJECT()
@@ -365,6 +366,7 @@ namespace currency
       FIELD(concealing_point)
       FIELD(amount_commitment)
       FIELD(encrypted_amount)
+      FIELD(mix_attr)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
@@ -372,6 +374,7 @@ namespace currency
       BOOST_SERIALIZE(concealing_point)
       BOOST_SERIALIZE(amount_commitment)
       BOOST_SERIALIZE(encrypted_amount)
+      BOOST_SERIALIZE(mix_attr)
     END_BOOST_SERIALIZATION()
   };
 

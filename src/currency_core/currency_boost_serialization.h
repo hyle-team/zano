@@ -117,6 +117,7 @@ namespace boost
       a & x.concealing_point;
       a & x.amount_commitment;
       a & x.encrypted_amount;
+      a & x.mix_attr;
     }
 
     template <class Archive>
