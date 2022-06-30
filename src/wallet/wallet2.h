@@ -378,10 +378,11 @@ namespace tools
       uint64_t m_internal_output_index;
       uint64_t m_spent_height;
       uint32_t m_flags;
+      uint64_t m_amount;
 
       // @#@ will throw if type is not tx_out_bare, TODO: change according to new model, 
       // need to replace all get_tx_out_bare_from_out_v() to proper code
-      uint64_t amount() const { return currency::get_tx_out_bare_from_out_v(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]).amount; } 
+      uint64_t amount() const { return m_amount; } 
       const currency::tx_out_bare& output() const { return currency::get_tx_out_bare_from_out_v(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]); }
       uint8_t mix_attr() const { return output().target.type() == typeid(currency::txout_to_key) ? boost::get<const currency::txout_to_key&>(output().target).mix_attr : UINT8_MAX; }
       crypto::hash tx_hash() const { return get_transaction_hash(m_ptx_wallet_info->m_tx); }
@@ -394,6 +395,7 @@ namespace tools
         KV_SERIALIZE(m_internal_output_index)
         KV_SERIALIZE(m_spent_height)
         KV_SERIALIZE(m_flags)
+        KV_SERIALIZE(m_amount)
         KV_SERIALIZE_EPHEMERAL_N(uint64_t, tools::wallet2::transfer_details_base_to_amount, "amount")
         KV_SERIALIZE_EPHEMERAL_N(std::string, tools::wallet2::transfer_details_base_to_tx_hash, "tx_id")
       END_KV_SERIALIZE_MAP()
@@ -417,14 +419,10 @@ namespace tools
       std::vector<transfer_details_extra_options_v> varian_options;
 
       //v2
-      uint64_t m_amount; //@#@ need conversion from old files format
-
-
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(m_global_output_index)
         KV_SERIALIZE_POD_AS_HEX_STRING(m_key_image)
         KV_CHAIN_BASE(transfer_details_base)
-        KV_SERIALIZE(m_amount)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1110,6 +1108,7 @@ private:
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
 BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 10)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 3)
+BOOST_CLASS_VERSION(tools::wallet2::transfer_details_base, 2)
 
 namespace boost
 {
@@ -1130,6 +1129,12 @@ namespace boost
       a & x.m_internal_output_index;
       a & x.m_flags;
       a & x.m_spent_height;
+      if (ver < 2)
+      {
+        x.m_amount = currency::get_tx_out_bare_from_out_v(x.m_ptx_wallet_info->m_tx.vout[x.m_internal_output_index]).amount;
+        return;
+      }
+      a & x.m_amount;
     }
 
    
