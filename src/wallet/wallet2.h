@@ -1039,6 +1039,9 @@ private:
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::zarcanum_input& inzk);
     bool is_in_hardfork_zone(uint64_t hardfork_index);
+    bool out_get_mixin_attr(const currency::tx_out_v& out_t);
+    const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);
+
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
