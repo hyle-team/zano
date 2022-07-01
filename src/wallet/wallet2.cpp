@@ -369,7 +369,7 @@ bool wallet2::out_get_mixin_attr(const currency::tx_out_v& out_t)
   }
   else if (out_t.type() == typeid(currency::tx_out_zarcanum))
   {
-    boost::get<currency::tx_out_zarcanum>(out_t).mix_attr;
+    return boost::get<currency::tx_out_zarcanum>(out_t).mix_attr;
   }
   else
   {
