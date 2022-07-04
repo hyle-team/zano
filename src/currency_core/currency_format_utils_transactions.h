@@ -16,7 +16,7 @@ namespace currency
 {
   struct tx_source_entry
   {
-    typedef serializable_pair<txout_ref_v, crypto::public_key> output_entry; // txout_v is either global output index or ref_by_id; public_key - is output ephemeral pub key
+    typedef serializable_pair<txout_ref_v, crypto::public_key> output_entry; // txout_ref_v is either global output index or ref_by_id; public_key - is output's stealth address
 
     std::vector<output_entry> outputs;  //index + key
     uint64_t real_output;               //index in outputs vector of real output_entry
