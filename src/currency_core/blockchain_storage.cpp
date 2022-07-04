@@ -3935,7 +3935,7 @@ namespace currency
       // TODO:  @#@# should check for hardfork here?
       for(auto& el : in.elements)
       {
-        if (!visit(0, el.key_image, el.key_offsets))
+        if (!visit(0, el.k_image, el.key_offsets))
           return false;
       }
       return true;

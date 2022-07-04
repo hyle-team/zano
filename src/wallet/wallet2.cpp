@@ -364,7 +364,7 @@ bool wallet2::out_get_mixin_attr(const currency::tx_out_v& out_t)
     }
     else
     {
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "Unexpected type in out_get_mixin_attr");
+      THROW_WALLET_CMN_ERR_EX("Unexpected type in out_get_mixin_attr");
     }
   }
   else if (out_t.type() == typeid(currency::tx_out_zarcanum))
@@ -373,8 +373,10 @@ bool wallet2::out_get_mixin_attr(const currency::tx_out_v& out_t)
   }
   else
   {
-    THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "Unexpected type in out_get_mixin_attr");
+    THROW_WALLET_CMN_ERR_EX("Unexpected type in out_get_mixin_attr");
   }
+  THROW_WALLET_CMN_ERR_EX("Unexpected out type im wallet: " << out_t.type().name());
+  return false;
 }
 
 bool out_is_to_zarcanum(const currency::tx_out_v& out_t)
@@ -391,8 +393,9 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
     {
       return boost::get<currency::txout_to_key>(out.target).key;
     }
-    else if (out.target.type() == typeid(currency::txout_htlc))
+    else
     {
+      THROW_IF_FALSE_WALLET_INT_ERR_EX(out.target.type() == typeid(currency::txout_htlc), "Unexpected out type in target wallet: " << out.target.type().name());
       THROW_IF_FALSE_WALLET_INT_ERR_EX(htlc_info_list.size() > 0, "Found txout_htlc out but htlc_info_list is empty");
       bool hltc_our_out_is_before_expiration = htlc_info_list.front().hltc_our_out_is_before_expiration;
       htlc_info_list.pop_front();
@@ -404,20 +407,13 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
       {
         return boost::get<currency::txout_htlc>(out.target).pkey_refund;
       }
-    }else
-    {
-      THROW_IF_TRUE_WALLET_INT_ERR_EX(false, "Unexpected out type im wallet: " << out.target.type().name());
     }
-  }
-  else if (out_t.type() == typeid(currency::tx_out_zarcanum))
-  {
-    return boost::get<currency::tx_out_zarcanum>(out_t).stealth_address;
   }
   else
   {
-    THROW_IF_TRUE_WALLET_INT_ERR_EX(false, "Unexpected out type im wallet: " << out_t.type().name());
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(out_t.type() == typeid(currency::tx_out_zarcanum), "Unexpected out type im wallet: " << out_t.type().name());
+    return boost::get<currency::tx_out_zarcanum>(out_t).stealth_address;
   }
-  
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
