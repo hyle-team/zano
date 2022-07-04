@@ -2493,6 +2493,20 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
     << out_ptr->out_no << " more than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
   
   const transaction& tx = tx_ptr->tx;
+  CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() == tx.vout.size(), false, "internal error: spent_flag.size()=" << tx_ptr->m_spent_flags.size() << ", tx.vout.size()=" << tx.vout.size());
+  
+  //do not use outputs that obviously spent for mixins
+  if (tx_ptr->m_spent_flags[out_ptr->out_no])
+    return false;
+  
+  //check if transaction is unlocked
+  if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
+    return false;
+  
+  // do not use burned coins
+  if (is_out_burned(tx.vout[out_ptr->out_no]))
+    return false;
+
   VARIANT_SWITCH_BEGIN(tx.vout[out_ptr->out_no]);
   VARIANT_CASE_CONST(tx_out_bare, o)
   {
@@ -2504,19 +2518,7 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
     CHECK_AND_ASSERT_MES(o.target.type() == typeid(txout_to_key), false, "unknown tx out type");
     const txout_to_key& otk = boost::get<txout_to_key>(o.target);
 
-    CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() == tx.vout.size(), false, "internal error");
-
-    //do not use outputs that obviously spent for mixins
-    if (tx_ptr->m_spent_flags[out_ptr->out_no])
-      return false;
-
-    // do not use burned coins
-    if (otk.key == null_pkey)
-      return false;
-
-    //check if transaction is unlocked
-    if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
-      return false;
+    // TODO #@#@ remove code duplication, make extracting mix_attr in a more generalized way
 
     //use appropriate mix_attr out 
     uint8_t mix_attr = otk.mix_attr;
@@ -2528,13 +2530,27 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
     else if (mix_attr != CURRENCY_TO_KEY_OUT_RELAXED && mix_attr > mix_count)
       return false;//mix_attr set to specific minimum, and mix_count is less then desired count
 
-
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
     oen.global_amount_index = i;
     oen.out_key = otk.key;
   }
   VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-    //@#@
+  {
+    //use appropriate mix_attr out 
+    uint8_t mix_attr = toz.mix_attr;
+
+    if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+      return false; //COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS call means that ring signature will have more than one entry.
+    else if (use_only_forced_to_mix && mix_attr == CURRENCY_TO_KEY_OUT_RELAXED)
+      return false; //relaxed not allowed
+    else if (mix_attr != CURRENCY_TO_KEY_OUT_RELAXED && mix_attr > mix_count)
+      return false;//mix_attr set to specific minimum, and mix_count is less then desired count
+
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
+    oen.global_amount_index = i;
+    oen.out_key = toz.amount_commitment;
+    // TODO @#@#  this is certainly not enough
+  }
   VARIANT_SWITCH_END();
 
   return true;
@@ -3044,10 +3060,11 @@ void blockchain_storage::print_blockchain_outs_stats() const
     {
       VARIANT_SWITCH_BEGIN(p_tx->tx.vout[output_entry.out_no]);
       VARIANT_CASE_CONST(tx_out_bare, o)
-        if (boost::get<txout_to_key>(o.target).mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+        if (o.target.type() == typeid(txout_to_key) && boost::get<txout_to_key>(o.target).mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
           ++stat.mixable;
       VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-        //@#@      
+        if (toz.mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+          ++stat.mixable;
       VARIANT_SWITCH_END();
     }
     return true;
