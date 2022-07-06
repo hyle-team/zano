@@ -31,8 +31,8 @@ namespace crypto
   if (p_err) { *p_err = err_code; } return false; }
 
 
-  template<typename CT>
-  bool bpp_gen(const scalar_vec_t& values, const scalar_vec_t& masks, bpp_signature& sig, const std::vector<crypto::public_key*>& commitments_1div8, uint8_t* p_err = nullptr)
+  template<typename CT = bpp_crypto_trait_zano<>>
+  bool bpp_gen(const scalar_vec_t& values, const scalar_vec_t& masks, const std::vector<const crypto::public_key*>& commitments_1div8, bpp_signature& sig, uint8_t* p_err = nullptr)
   {
     // Note: commitments_1div8 are supposed to be already calculated
     static_assert(CT::c_bpp_n <= 255, "too big N");
@@ -333,7 +333,7 @@ namespace crypto
   };
 
 
-  template<typename CT>
+  template<typename CT = bpp_crypto_trait_zano<>>
   bool bpp_verify(const std::vector<bpp_sig_commit_ref_t>& sigs, uint8_t* p_err = nullptr)
   {
 #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \

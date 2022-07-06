@@ -89,7 +89,7 @@ namespace crypto
     }
 
     // assumes hsc is cleared
-    static void update_transcript(hash_helper_t::hs_t& hsc, scalar_t& e, const std::vector<public_key*>& pub_keys)
+    static void update_transcript(hash_helper_t::hs_t& hsc, scalar_t& e, const std::vector<const public_key*>& pub_keys)
     {
       hsc.add_scalar(e);
       for(auto p : pub_keys)
