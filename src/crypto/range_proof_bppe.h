@@ -24,8 +24,8 @@ namespace crypto
     scalar_t delta_2;
   };
 
-#define DBG_VAL_PRINT(x) std::cout << #x ": " << x << ENDL
-#define DBG_PRINT(x) std::cout << x << ENDL
+#define DBG_VAL_PRINT(x) (void(0)) // std::cout << #x ": " << x << ENDL
+#define DBG_PRINT(x)     (void(0)) // std::cout << x << ENDL
 
   template<typename CT>
   bool bppe_gen(const scalar_vec_t& values, const scalar_vec_t& masks, const scalar_vec_t& masks2, bppe_signature& sig, std::vector<point_t>& commitments, uint8_t* p_err = nullptr)
@@ -149,7 +149,7 @@ namespace crypto
 
     // aL_hat = aL - 1*z
     scalar_vec_t aLs_hat = aLs - z;
-    // aL_hat = aR + d o y^leftarr + 1*z where y^leftarr = (y^n, y^(n-1), ..., y)  (BP+ paper, page 18, Fig. 3)
+    // aR_hat = aR + d o y^leftarr + 1*z where y^leftarr = (y^n, y^(n-1), ..., y)  (BP+ paper, page 18, Fig. 3)
     scalar_vec_t aRs_hat = aRs + z;
     for (size_t i = 0; i < c_bpp_mn; ++i)
       aRs_hat[i] += d[i] * y_powers[c_bpp_mn - i];
@@ -715,5 +715,8 @@ namespace crypto
     return result;
 #undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
   }
+
+#undef DBG_VAL_PRINT
+#undef DBG_PRINT
 
 } // namespace crypto

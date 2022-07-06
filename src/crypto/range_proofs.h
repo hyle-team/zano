@@ -88,6 +88,15 @@ namespace crypto
       e = hsc.calc_hash();
     }
 
+    // assumes hsc is cleared
+    static void update_transcript(hash_helper_t::hs_t& hsc, scalar_t& e, const std::vector<public_key*>& pub_keys)
+    {
+      hsc.add_scalar(e);
+      for(auto p : pub_keys)
+        hsc.add_pub_key(*p);
+      e = hsc.calc_hash();
+    }
+
     // TODO: refactor with proper OOB handling
     static const point_t& get_generator(bool select_H, size_t index)
     {

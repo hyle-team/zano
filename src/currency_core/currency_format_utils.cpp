@@ -2868,6 +2868,12 @@ namespace currency
       tv.details_view = tv.short_view;
       return true;
     }
+    bool operator()(const zarcanum_outs_range_proof& rp)
+    {
+      tv.type = "zarcanum_outs_range_proof";
+      tv.short_view = "outputs_count = " + std::to_string(rp.outputs_count);
+      return true;
+    }
   };
   //------------------------------------------------------------------
   template<class t_container>
