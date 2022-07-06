@@ -16,10 +16,6 @@ namespace crypto
 #include "crypto/crypto-ops.h"
   } // extern "C"
 
-#define CRYPTO_STR_(X) #X
-#define CRYPTO_STR(X) CRYPTO_STR_(X)
-#define CRYPTO_CHECK_AND_THROW_MES(cond, msg) if (!(cond)) { throw std::runtime_error(msg " @ " __FILE__ ":" CRYPTO_STR(__LINE__)); }
-
   //
   // Helpers
   //
