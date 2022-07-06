@@ -1080,6 +1080,31 @@ namespace crypto
       return hs_calculator.calc_hash();
     }
 
+    static scalar_t hs(const crypto::public_key& pk, const uint64_t i)
+    {
+      hs_t hs_calculator(2);
+      hs_calculator.add_pub_key(pk);
+      hs_calculator.add_scalar(scalar_t(i));
+      return hs_calculator.calc_hash();
+    }
+
+    static scalar_t hs(const crypto::secret_key& sk, const uint64_t i)
+    {
+      hs_t hs_calculator(2);
+      hs_calculator.add_scalar(sk);
+      hs_calculator.add_scalar(scalar_t(i));
+      return hs_calculator.calc_hash();
+    }
+
+    static scalar_t hs(const char(&str32)[32], const crypto::public_key& pk, const uint64_t i)
+    {
+      hs_t hs_calculator(3);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_pub_key(pk);
+      hs_calculator.add_scalar(scalar_t(i));
+      return hs_calculator.calc_hash();
+    }
+
     static point_t hp(const point_t& p)
     {
       point_t result;
