@@ -235,7 +235,7 @@ namespace currency
 
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& out_blinding_mask, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
   bool validate_alias_name(const std::string& al);
   bool validate_password(const std::string& password);
@@ -406,20 +406,20 @@ namespace currency
   }
 
   template<typename out_t>
-  bool is_out_burned(const out_t& out)          { CHECK_AND_ASSERT_THROW_MES(false, "incorrect out type: " << typeid(out).name()); }
-  bool is_out_burned(const tx_out_bare& o)      { return is_out_burned(o.target); }
-  bool is_out_burned(const txout_to_key& o)     { return o.key == null_pkey; }
-  bool is_out_burned(const tx_out_zarcanum& o)  { return o.stealth_address == null_pkey; }
+  inline bool is_out_burned(const out_t& out)           { CHECK_AND_ASSERT_THROW_MES(false, "incorrect out type: " << typeid(out).name()); }
+  inline bool is_out_burned(const tx_out_bare& o)       { return is_out_burned(o.target); }
+  inline bool is_out_burned(const txout_to_key& o)      { return o.key == null_pkey; }
+  inline bool is_out_burned(const tx_out_zarcanum& o)   { return o.stealth_address == null_pkey; }
   struct zz_is_out_burned_helper_visitor : boost::static_visitor<bool>
   {
     template<typename T>
     bool operator()(const T& v) const { return is_out_burned(v); }
   };
-  bool is_out_burned(const tx_out_v& v)
+  inline bool is_out_burned(const tx_out_v& v)
   {
     return boost::apply_visitor(zz_is_out_burned_helper_visitor(), v);
   }
-  bool is_out_burned(const txout_target_v& v)
+  inline bool is_out_burned(const txout_target_v& v)
   {
     return boost::apply_visitor(zz_is_out_burned_helper_visitor(), v);
   }

@@ -609,10 +609,12 @@ namespace currency
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr)
   {
     finalized_tx result = AUTO_VAL_INIT(result);
-    return construct_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, result, tx_outs_attr);
+    crypto::scalar_t out_blinding_mask = AUTO_VAL_INIT(out_blinding_mask);
+    return construct_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, out_blinding_mask, result, tx_outs_attr);
   }
   //---------------------------------------------------------------
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, finalized_tx& result, uint8_t tx_outs_attr)
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache,
+    const account_keys& self, crypto::scalar_t& out_blinding_mask, finalized_tx& result, uint8_t tx_outs_attr)
   {
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
@@ -634,8 +636,8 @@ namespace currency
         crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
       
-        crypto::scalar_t blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
-        out.amount_commitment = (de.amount * crypto::c_point_H + blinding_mask * crypto::c_point_G).to_public_key();
+        out_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        out.amount_commitment = (crypto::c_scalar_1div8 * de.amount * crypto::c_point_H + crypto::c_scalar_1div8 * out_blinding_mask * crypto::c_point_G).to_public_key();
         
         out.mix_attr = tx_outs_attr; // TODO @#@# @CZ check this
       }
@@ -648,11 +650,11 @@ namespace currency
         out.stealth_address = (h * crypto::c_point_G + crypto::point_t(apa.spend_public_key)).to_public_key();
         out.concealing_point = (crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(apa.view_public_key)).to_public_key(); // Q = Hs(domain_sep, h) * V
       
-        crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
+        crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
       
-        crypto::scalar_t blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
-        out.amount_commitment = (de.amount * crypto::c_point_H + blinding_mask * crypto::c_point_G).to_public_key();
+        out_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        out.amount_commitment = (crypto::c_scalar_1div8 * de.amount * crypto::c_point_H + crypto::c_scalar_1div8 * out_blinding_mask * crypto::c_point_G).to_public_key();
 
         if (de.addr.front().is_auditable())
           out.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
@@ -1524,11 +1526,14 @@ namespace currency
     //fill outputs
     size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
     std::set<uint16_t> deriv_cache;
+    crypto::scalar_vec_t blinding_masks(destinations.size()); // vector of secret blinging masks for each output. For range proof generation
+    crypto::scalar_vec_t amounts(destinations.size());        // vector of amounts, converted to scalars. For rnage proof generation
     for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
-      CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
-      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, result, tx_outs_attr);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to construc tx out");
+      CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
+      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, blinding_masks[output_index], result, tx_outs_attr);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
+      amounts[output_index] = dst_entr.amount;
       output_index++;
       summary_outs_money += dst_entr.amount;
     }
@@ -2868,6 +2873,12 @@ namespace currency
       tv.details_view = tv.short_view;
       return true;
     }
+    bool operator()(const zarcanum_outs_range_proof& rp)
+    {
+      tv.type = "zarcanum_outs_range_proof";
+      tv.short_view = "outputs_count = " + std::to_string(rp.outputs_count);
+      return true;
+    }
   };
   //------------------------------------------------------------------
   template<class t_container>
@@ -3446,6 +3457,57 @@ namespace currency
     return false;
   }
   //--------------------------------------------------------------------------------
+  bool generate_zarcanum_outs_range_proof(size_t out_index_start, size_t outs_count, const crypto::scalar_vec_t& amounts, const crypto::scalar_vec_t& blinding_masks,
+    const std::vector<tx_out_v>& vouts, zarcanum_outs_range_proof& result)
+  {
+    CHECK_AND_ASSERT_MES(amounts.size() == outs_count, false, "");
+    CHECK_AND_ASSERT_MES(blinding_masks.size() == outs_count, false, "");
+    CHECK_AND_ASSERT_MES(out_index_start + outs_count == vouts.size(), false, "");
+
+    std::vector<const crypto::public_key*> commitments_1div8;
+    for(size_t out_index = out_index_start, i = 0; i < outs_count; ++out_index, ++i)
+    {
+      const tx_out_zarcanum& toz = boost::get<tx_out_zarcanum>(vouts[out_index]); // may throw an exception, only zarcanum outputs are exprected
+      const crypto::public_key* p = &toz.amount_commitment;
+      commitments_1div8.push_back(p);
+    }
+
+    uint8_t err = 0;
+    bool r = crypto::bpp_gen<>(amounts, blinding_masks, commitments_1div8, result.bpp, &err);
+    CHECK_AND_ASSERT_MES(r, false, "bpp_gen failed with error " << err);
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  struct zarcanum_outs_range_proof_commit_ref_t
+  {
+    zarcanum_outs_range_proof_commit_ref_t(const zarcanum_outs_range_proof& range_proof, const std::vector<crypto::point_t>& amount_commitments)
+      : range_proof(range_proof)
+      , amount_commitments(amount_commitments)
+    {}
+    const zarcanum_outs_range_proof&    range_proof;
+    const std::vector<crypto::point_t>& amount_commitments;
+  };
+
+  bool verify_multiple_zarcanum_outs_range_proofs(const std::vector<zarcanum_outs_range_proof_commit_ref_t>& range_proofs)
+  {
+    std::vector<crypto::bpp_sig_commit_ref_t> sigs;
+    for(auto el : range_proofs)
+      sigs.emplace_back(el.range_proof.bpp, el.amount_commitments);
+
+    uint8_t err = 0;
+    bool r = crypto::bpp_verify<>(sigs, &err);
+    CHECK_AND_ASSERT_MES(r, false, "bpp_vefiry failed with error " << err);
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool generate_zarcanum_signature(const crypto::hash& prefix_hash, const std::vector<tx_source_entry>& sources, const txin_zarcanum_inputs& zins, zarcanum_sig& result)
+  {
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+ 
 
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
