@@ -614,106 +614,165 @@ namespace currency
   //---------------------------------------------------------------
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, finalized_tx& result, uint8_t tx_outs_attr)
   {
-    CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
-
-    std::vector<crypto::public_key> target_keys;
-    target_keys.reserve(de.addr.size());
-    for (auto& apa : de.addr)
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
-      crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
+      // create tx_out_zarcanum
+      CHECK_AND_ASSERT_MES(de.addr.size() == 1, false, "zarcanum multisig not implemented yet");
+      // TODO @#@# implement multisig support
+
+      tx_out_zarcanum out = AUTO_VAL_INIT(out);
+      const account_public_address& apa = de.addr.front();
       if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
       {
-        //burning money(for example alias reward)
-        out_eph_public_key = null_pkey;
+        // burn money
+        // calculate encrypted_amount and amount_commitment anyway, but using modified derivation
+        crypto::scalar_t h = crypto::hash_helper_t::hs(crypto::scalar_t(tx_sec_key), output_index); // h = Hs(r, i)
+
+        out.stealth_address = null_pkey;
+        out.concealing_point = null_pkey;
+
+        crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
+        out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
+      
+        crypto::scalar_t blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        out.amount_commitment = (de.amount * crypto::c_point_H + blinding_mask * crypto::c_point_G).to_public_key();
+        
+        out.mix_attr = tx_outs_attr; // TODO @#@# @CZ check this
       }
       else
       {
-        crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-        bool r = derive_public_key_from_target_address(apa, tx_sec_key, output_index, out_eph_public_key, derivation);
-        CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
+        // normal output
+        crypto::public_key derivation = (crypto::scalar_t(tx_sec_key) * crypto::point_t(apa.view_public_key)).modify_mul8().to_public_key(); // d = 8 * r * V
+        crypto::scalar_t h = crypto::hash_helper_t::hs(derivation, output_index);
 
-        uint16_t hint = get_derivation_hint(derivation);
+        out.stealth_address = (h * crypto::c_point_G + crypto::point_t(apa.spend_public_key)).to_public_key();
+        out.concealing_point = (crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(apa.view_public_key)).to_public_key(); // Q = Hs(domain_sep, h) * V
+      
+        crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
+        out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
+      
+        crypto::scalar_t blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        out.amount_commitment = (de.amount * crypto::c_point_H + blinding_mask * crypto::c_point_G).to_public_key();
+
+        if (de.addr.front().is_auditable())
+          out.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
+        else
+          out.mix_attr = tx_outs_attr;
+
+        uint16_t hint = get_derivation_hint(reinterpret_cast<crypto::key_derivation&>(derivation));
         if (deriv_cache.count(hint) == 0)
         {          
           tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
           deriv_cache.insert(hint);
         }
       }
-      target_keys.push_back(out_eph_public_key);
-    }
 
-    tx_out_bare out;
-    out.amount = de.amount;
-    if (de.htlc_options.expiration != 0)
-    {
-      const destination_option_htlc_out& htlc_dest = de.htlc_options;
-      //out htlc
-      CHECK_AND_ASSERT_MES(target_keys.size() == 1, false, "Unexpected htl keys count = " << target_keys.size() << ", expected ==1");
-      txout_htlc htlc = AUTO_VAL_INIT(htlc);
-      htlc.expiration = htlc_dest.expiration;
-      htlc.flags = 0; //0 - SHA256, 1 - RIPEMD160, by default leave SHA256
-      //receiver key
-      htlc.pkey_redeem = *target_keys.begin();
-      //generate refund key
-      crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-      crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
-      bool r = derive_public_key_from_target_address(self.account_address, tx_sec_key, output_index, out_eph_public_key, derivation);
-      CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
-      htlc.pkey_refund = out_eph_public_key;
-      //add derivation hint for refund address
-      uint16_t hint = get_derivation_hint(derivation);
-      if (deriv_cache.count(hint) == 0)
-      {
-        tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
-        deriv_cache.insert(hint);
-      }
-
-
-      if (htlc_dest.htlc_hash == null_hash)
-      {
-        //we use deterministic origin, to make possible access origin on different wallets copies
-        
-        result.htlc_origin = generate_origin_for_htlc(htlc, self);
-
-        //calculate hash
-        if (!htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
-        {
-          htlc.htlc_hash = crypto::sha256_hash(result.htlc_origin.data(), result.htlc_origin.size());
-        }
-        else
-        {
-          crypto::hash160 h160 = crypto::RIPEMD160_hash(result.htlc_origin.data(), result.htlc_origin.size());
-          std::memcpy(&htlc.htlc_hash, &h160, sizeof(h160));
-        }
-      }
-      else
-      {
-        htlc.htlc_hash = htlc_dest.htlc_hash;
-      }
-      out.target = htlc;
-    }
-    else if (target_keys.size() == 1)
-    {
-      //out to key
-      txout_to_key tk = AUTO_VAL_INIT(tk);
-      tk.key = target_keys.back();
-
-      if (de.addr.front().is_auditable()) // check only the first address because there's only one in this branch
-        tk.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
-      else
-        tk.mix_attr = tx_outs_attr;
-      
-      out.target = tk;
+      tx.vout.push_back(out);
     }
     else
     {
-      //multisig out
-      txout_multisig ms = AUTO_VAL_INIT(ms);
-      ms.keys = std::move(target_keys);
-      ms.minimum_sigs = de.minimum_sigs;
-      out.target = ms;
+      // create tx_out_bare, this section can be removed after HF4
+      CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
+
+      std::vector<crypto::public_key> target_keys;
+      target_keys.reserve(de.addr.size());
+      for (auto& apa : de.addr)
+      {
+        crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
+        if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
+        {
+          //burning money(for example alias reward)
+          out_eph_public_key = null_pkey;
+        }
+        else
+        {
+          crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+          bool r = derive_public_key_from_target_address(apa, tx_sec_key, output_index, out_eph_public_key, derivation);
+          CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
+
+          uint16_t hint = get_derivation_hint(derivation);
+          if (deriv_cache.count(hint) == 0)
+          {          
+            tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
+            deriv_cache.insert(hint);
+          }
+        }
+        target_keys.push_back(out_eph_public_key);
+      }
+
+      tx_out_bare out;
+      out.amount = de.amount;
+      if (de.htlc_options.expiration != 0)
+      {
+        const destination_option_htlc_out& htlc_dest = de.htlc_options;
+        //out htlc
+        CHECK_AND_ASSERT_MES(target_keys.size() == 1, false, "Unexpected htl keys count = " << target_keys.size() << ", expected ==1");
+        txout_htlc htlc = AUTO_VAL_INIT(htlc);
+        htlc.expiration = htlc_dest.expiration;
+        htlc.flags = 0; //0 - SHA256, 1 - RIPEMD160, by default leave SHA256
+        //receiver key
+        htlc.pkey_redeem = *target_keys.begin();
+        //generate refund key
+        crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+        crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
+        bool r = derive_public_key_from_target_address(self.account_address, tx_sec_key, output_index, out_eph_public_key, derivation);
+        CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
+        htlc.pkey_refund = out_eph_public_key;
+        //add derivation hint for refund address
+        uint16_t hint = get_derivation_hint(derivation);
+        if (deriv_cache.count(hint) == 0)
+        {
+          tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
+          deriv_cache.insert(hint);
+        }
+
+
+        if (htlc_dest.htlc_hash == null_hash)
+        {
+          //we use deterministic origin, to make possible access origin on different wallets copies
+        
+          result.htlc_origin = generate_origin_for_htlc(htlc, self);
+
+          //calculate hash
+          if (!htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
+          {
+            htlc.htlc_hash = crypto::sha256_hash(result.htlc_origin.data(), result.htlc_origin.size());
+          }
+          else
+          {
+            crypto::hash160 h160 = crypto::RIPEMD160_hash(result.htlc_origin.data(), result.htlc_origin.size());
+            std::memcpy(&htlc.htlc_hash, &h160, sizeof(h160));
+          }
+        }
+        else
+        {
+          htlc.htlc_hash = htlc_dest.htlc_hash;
+        }
+        out.target = htlc;
+      }
+      else if (target_keys.size() == 1)
+      {
+        //out to key
+        txout_to_key tk = AUTO_VAL_INIT(tk);
+        tk.key = target_keys.back();
+
+        if (de.addr.front().is_auditable()) // check only the first address because there's only one in this branch
+          tk.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
+        else
+          tk.mix_attr = tx_outs_attr;
+      
+        out.target = tk;
+      }
+      else
+      {
+        //multisig out
+        txout_multisig ms = AUTO_VAL_INIT(ms);
+        ms.keys = std::move(target_keys);
+        ms.minimum_sigs = de.minimum_sigs;
+        out.target = ms;
+      }
+      tx.vout.push_back(out);
     }
-    tx.vout.push_back(out);
     return true;
   }
   //---------------------------------------------------------------
@@ -1965,13 +2024,13 @@ namespace currency
   bool is_out_to_acc(const account_keys& acc, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount)
   {
     crypto::scalar_t h = {};
-    crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(r * V, i)
+    crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
 
-    crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(acc.account_address.spend_public_key); // P =? Hs(rV, i) * G + S
+    crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(acc.account_address.spend_public_key); // P =? Hs(8rV, i) * G + S
     if (P_prime.to_public_key() != zo.stealth_address)
       return false;
     
-    crypto::point_t Q_prime = h * crypto::point_t(acc.account_address.view_public_key); // Q =? v * Hs(rv, i) * G
+    crypto::point_t Q_prime = h * crypto::point_t(acc.account_address.view_public_key); // Q =? v * Hs(8rV, i) * G
     if (Q_prime.to_public_key() != zo.concealing_point)
       return false;
 
