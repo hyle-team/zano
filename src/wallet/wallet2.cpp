@@ -354,7 +354,7 @@ const currency::txout_htlc& out_get_htlc(const currency::tx_out_v& out_t)
   return boost::get<currency::txout_htlc>(boost::get<currency::tx_out_bare>(out_t).target);
 }
 
-bool wallet2::out_get_mixin_attr(const currency::tx_out_v& out_t)
+uint8_t wallet2::out_get_mixin_attr(const currency::tx_out_v& out_t)
 {
   if (out_t.type() == typeid(currency::tx_out_bare))
   {

@@ -113,7 +113,7 @@ bool test_transaction_generation_and_ring_signature()
   r = crypto::check_ring_signature(pref_hash, boost::get<txin_to_key>(tx_rc1.vin[0]).k_image, output_keys, &boost::get<currency::NLSAG_sig>(tx_rc1.signatures[0]).s[0]);
   CHECK_AND_ASSERT_MES(r, false, "failed to check ring signature");
 
-  std::vector<size_t> outs;
+  std::vector<wallet_out_info> outs;
   uint64_t money = 0;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   r = lookup_acc_outs(rv_acc.get_keys(), tx_rc1, get_tx_pub_key_from_extra(tx_rc1), outs,  money, derivation);
