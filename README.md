@@ -108,7 +108,7 @@ For instance, by adding the following lines to `~/.bashrc`
    1. Build GUI:
 
           cd zano
-          utils/build_sript_linux.sh
+          utils/build_script_linux.sh
 
 7. Look for the binaries in `build` folder
 
