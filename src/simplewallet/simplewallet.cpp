@@ -49,7 +49,7 @@ namespace
   const command_line::arg_descriptor<bool> arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
   const command_line::arg_descriptor<bool> arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
   const command_line::arg_descriptor<int> arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
-  const command_line::arg_descriptor<uint32_t> arg_log_level  ("set-log", "");
+  //const command_line::arg_descriptor<uint32_t> arg_log_level  ("set-log", "");
   const command_line::arg_descriptor<bool> arg_do_pos_mining  ( "do-pos-mining", "Do PoS mining", false);
   const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address  ( "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" );
   const command_line::arg_descriptor<std::string> arg_restore_wallet  ( "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" );
@@ -1994,7 +1994,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_daemon_host);
   command_line::add_arg(desc_params, arg_daemon_port);
   command_line::add_arg(desc_params, arg_command);
-  command_line::add_arg(desc_params, arg_log_level);
+  //command_line::add_arg(desc_params, arg_log_level);
   command_line::add_arg(desc_params, arg_dont_refresh);
   command_line::add_arg(desc_params, arg_dont_set_date);
   command_line::add_arg(desc_params, arg_do_pos_mining);
@@ -2052,11 +2052,11 @@ int main(int argc, char* argv[])
   log_space::log_singletone::add_logger(LOGGER_FILE, log_file_path.filename().string().c_str(), log_dir.c_str(), LOG_LEVEL_4);
   message_writer(epee::log_space::console_color_white, true) << CURRENCY_NAME << " wallet v" << PROJECT_VERSION_LONG;
 
-  if (command_line::has_arg(vm, arg_log_level))
-  {
-    LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, arg_log_level));
-    log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, arg_log_level));
-  }
+//   if (command_line::has_arg(vm, arg_log_level))
+//   {
+//     LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, arg_log_level));
+//     log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, arg_log_level));
+//   }
   if (command_line::has_arg(vm, command_line::arg_log_level))
   {
     LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
