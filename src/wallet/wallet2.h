@@ -155,6 +155,7 @@ namespace tools
   };
 #pragma pack(pop)
 
+
   typedef tools::pod_array_file_container<out_key_to_ki> pending_ki_file_container_t;
 
   namespace detail
