@@ -2059,8 +2059,9 @@ int main(int argc, char* argv[])
 //   }
   if (command_line::has_arg(vm, command_line::arg_log_level))
   {
-    LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
     log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, command_line::arg_log_level));
+    LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
+    message_writer(epee::log_space::console_color_white, true) << "Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level);
   }
 
 
