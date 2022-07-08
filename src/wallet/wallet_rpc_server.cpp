@@ -143,6 +143,7 @@ namespace tools
     {
       m_wallet.set_miner_text_info(command_line::get_arg(vm, arg_miner_text_info));
     }
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

@@ -56,7 +56,7 @@ namespace
   const command_line::arg_descriptor<bool> arg_offline_mode  ( "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)");
   const command_line::arg_descriptor<std::string> arg_scan_for_wallet  ( "scan-for-wallet", "");
   const command_line::arg_descriptor<std::string> arg_addr_to_compare  ( "addr-to-compare", "");
-  const command_line::arg_descriptor<bool> arg_disable_tor_relay  ( "disable-tor-relay", "Do PoS mining", false);
+  const command_line::arg_descriptor<bool> arg_disable_tor_relay  ( "disable-tor-relay", "Disable TOR relay", false);
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -2176,6 +2176,17 @@ int main(int argc, char* argv[])
         LOG_PRINT_YELLOW("PoS reward will be sent to another address: " << arg_pos_mining_reward_address_str, LOG_LEVEL_0);
       }
     }
+    
+    if (command_line::has_arg(vm, arg_disable_tor_relay))
+    {
+      wal.set_disable_tor_relay(command_line::get_arg(vm, arg_disable_tor_relay));
+    }
+    else
+    {
+      //disable TOR by default for server-mode, to avoid potential sporadic errors due to TOR connectivity fails
+      wal.set_disable_tor_relay(true);
+    }
+    
 
     tools::wallet_rpc_server wrpc(wal);
     bool r = wrpc.init(vm);
