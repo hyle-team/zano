@@ -667,6 +667,8 @@ namespace crypto
 
     friend bool operator==(const point_t& lhs, const point_t& rhs)
     {
+      // TODO: @#@# (performance) consider checking (lhs - rhs).is_zero() instead
+
       // convert to xy form, then compare components (because (x, y, z, t) representation is not unique)
       fe lrecip, lx, ly;
       fe rrecip, rx, ry;

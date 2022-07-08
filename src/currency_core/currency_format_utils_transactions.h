@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 Zano Project
+// Copyright (c) 2018-2022 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -31,6 +31,7 @@ namespace currency
     std::string htlc_origin;            //for htlc, specify origin
 
     bool is_multisig() const { return ms_sigs_count > 0; }
+    bool is_zarcanum() const { return false; }
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(outputs)

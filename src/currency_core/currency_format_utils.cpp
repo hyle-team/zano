@@ -637,7 +637,7 @@ namespace currency
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
       
         out_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
-        out.amount_commitment = (crypto::c_scalar_1div8 * de.amount * crypto::c_point_H + crypto::c_scalar_1div8 * out_blinding_mask * crypto::c_point_G).to_public_key();
+        out.amount_commitment = (crypto::c_scalar_1div8 * de.amount * crypto::c_point_H + crypto::c_scalar_1div8 * out_blinding_mask * crypto::c_point_G).to_public_key(); // A = 1/8 * a * H + 1/8 * f * G
         
         out.mix_attr = tx_outs_attr; // TODO @#@# @CZ check this
       }
@@ -648,13 +648,13 @@ namespace currency
         crypto::scalar_t h = crypto::hash_helper_t::hs(derivation, output_index);
 
         out.stealth_address = (h * crypto::c_point_G + crypto::point_t(apa.spend_public_key)).to_public_key();
-        out.concealing_point = (crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(apa.view_public_key)).to_public_key(); // Q = Hs(domain_sep, h) * V
+        out.concealing_point = (crypto::c_scalar_1div8 * crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(apa.view_public_key)).to_public_key(); // Q = 1/8 * Hs(domain_sep, h) * V
       
         crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
       
         out_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
-        out.amount_commitment = (crypto::c_scalar_1div8 * de.amount * crypto::c_point_H + crypto::c_scalar_1div8 * out_blinding_mask * crypto::c_point_G).to_public_key();
+        out.amount_commitment = (crypto::c_scalar_1div8 * de.amount * crypto::c_point_H + crypto::c_scalar_1div8 * out_blinding_mask * crypto::c_point_G).to_public_key(); // A = 1/8 * a * H + 1/8 * f * G
 
         if (de.addr.front().is_auditable())
           out.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
@@ -2028,15 +2028,14 @@ namespace currency
 
   bool is_out_to_acc(const account_keys& acc, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount)
   {
-    crypto::scalar_t h = {};
-    crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
+    crypto::scalar_t h = crypto::hash_helper_t::hs(reinterpret_cast<const crypto::public_key&>(derivation), output_index); // h = Hs(8 * r * V, i)
 
     crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(acc.account_address.spend_public_key); // P =? Hs(8rV, i) * G + S
     if (P_prime.to_public_key() != zo.stealth_address)
       return false;
     
-    crypto::point_t Q_prime = h * crypto::point_t(acc.account_address.view_public_key); // Q =? v * Hs(8rV, i) * G
-    if (Q_prime.to_public_key() != zo.concealing_point)
+    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(acc.account_address.view_public_key); // Q' * 8 =? Hs(domain_sep, h) * V
+    if (Q_prime != crypto::point_t(zo.concealing_point).modify_mul8())
       return false;
 
     crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
@@ -2045,8 +2044,8 @@ namespace currency
     crypto::scalar_t blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, h)
 
     crypto::point_t A_prime;
-    A_prime.assign_mul_plus_G(decoded_amount, crypto::c_point_H, blinding_mask); // A =? a * H + f * G
-    if (A_prime.to_public_key() != zo.amount_commitment)
+    A_prime.assign_mul_plus_G(decoded_amount, crypto::c_point_H, blinding_mask); // A' * 8 =? a * H + f * G
+    if (A_prime != crypto::point_t(zo.amount_commitment).modify_mul8())
       return false;
 
     return true;
