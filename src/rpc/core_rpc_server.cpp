@@ -353,7 +353,7 @@ namespace currency
   bool core_rpc_server::on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
-    res.status = "Failed";
+    res.status = API_RETURN_CODE_FAIL;
     if(!m_core.get_random_outs_for_amounts(req, res))
     {
       return true;

@@ -3459,7 +3459,8 @@ namespace currency
   //--------------------------------------------------------------------------------
   bool generate_zarcanum_outs_range_proof(size_t out_index_start, size_t outs_count, const crypto::scalar_vec_t& amounts, const crypto::scalar_vec_t& blinding_masks,
     const std::vector<tx_out_v>& vouts, zarcanum_outs_range_proof& result)
-  {
+  { 
+    //TODO: review for Andre
     CHECK_AND_ASSERT_MES(amounts.size() == outs_count, false, "");
     CHECK_AND_ASSERT_MES(blinding_masks.size() == outs_count, false, "");
     CHECK_AND_ASSERT_MES(out_index_start + outs_count == vouts.size(), false, "");
