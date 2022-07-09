@@ -425,16 +425,13 @@ namespace currency
       END_BOOST_SERIALIZATION()
     };
 
-    crypto::bpp_signature_serialized outputs_range_proof; // aggregated range proof for some or all outputs
     std::vector<input_proofs_t> input_proofs; // for each input
 
     BEGIN_SERIALIZE_OBJECT()
-      FIELD(outputs_range_proof)
       FIELD(input_proofs)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(outputs_range_proof)
       BOOST_SERIALIZE(input_proofs)
     END_BOOST_SERIALIZATION()
   };
