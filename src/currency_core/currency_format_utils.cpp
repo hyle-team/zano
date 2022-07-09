@@ -1402,27 +1402,31 @@ namespace currency
       tx.extra.insert(tx.extra.end(), extra_local.begin(), extra_local.end());
     }
 
-    //first: separate zarcanum inputs and regular one
-    const std::vector<tx_source_entry&> zc_sources;
-    const std::vector<tx_source_entry&> NLSAG_sources;
+//    //first: separate zarcanum inputs and regular one
+//     const std::vector<tx_source_entry&> zc_sources;
+//     const std::vector<tx_source_entry&> NLSAG_sources;
+// 
+//     BOOST_FOREACH(const tx_source_entry& src_entr, sources)
+//     {
+//       if (src_entr.is_zarcanum())
+//       {
+//         zc_sources.push_back(src_entr);
+//       }
+//       else
+//       {
+//         NLSAG_sources.push_back(src_entr);
+//       }
+//     }
 
-    BOOST_FOREACH(const tx_source_entry& src_entr, sources)
-    {
-      if (src_entr.is_zarcanum())
-      {
-        zc_sources.push_back(src_entr);
-      }
-      else
-      {
-        NLSAG_sources.push_back(src_entr);
-      }
-    }
 
-    std::vector<input_generation_context_data> in_contexts;
+    std::vector<input_generation_context_data> in_contexts;    
+
+    //we'll aggregate Zarcanum outs into one txin_zarcanum_inputs
+    txin_zarcanum_inputs ins_zc = AUTO_VAL_INIT(ins_zc);
 
     size_t input_starter_index = tx.vin.size();
     uint64_t summary_inputs_money = 0;
-    //fill inputs NLSAG
+    //fill inputs NLSAG and Zarcanum 
     for (const tx_source_entry& src_entr : NLSAG_sources)
     {
       in_contexts.push_back(input_generation_context_data());
@@ -1528,81 +1532,26 @@ namespace currency
           input_to_key.key_offsets.push_back(out_entry.first);
 
         input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
-        tx.vin.push_back(in_v);
+        
+        //TODO: Might need some refactoring since this scheme is not the clearest one(did it this way for now to keep less changes to not broke anything)
+        if (src_entr.is_zarcanum())
+        {
+          zarcanum_input zc_in = AUTO_VAL_INIT(zc_in);
+          zc_in.k_image = img;
+          zc_in.key_offsets = input_to_key.key_offsets;
+          ins_zc.elements.push_back(zc_in);
+        }else 
+        {
+          tx.vin.push_back(in_v);
+        }        
       }
 
     }
 
-    //fill inputs Zarcanum
-    if (zc_sources.size())
+    if (ins_zc.elements.size())
     {
-      txin_zarcanum_inputs ins_zc = AUTO_VAL_INIT(ins_zc);
-
-
-      for (const tx_source_entry& src_entr : zc_sources)
-      {
-
-
-
-        //regular to key out
-        keypair& in_ephemeral = in_contexts.back().in_ephemeral;
-        //txin_to_key
-        if (src_entr.real_output >= src_entr.outputs.size())
-        {
-          LOG_ERROR("real_output index (" << src_entr.real_output << ") greater than or equal to output_keys.size()=" << src_entr.outputs.size());
-          return false;
-        }
-        summary_inputs_money += src_entr.amount;
-
-        //key_derivation recv_derivation;
-        crypto::key_image img;
-        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
-          return false;
-
-        //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].second))
-        {
-          LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-            << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
-          return false;
-        }
-
-        //put key image into tx input
-        txin_v in_v;
-        txin_to_key* ptokey = nullptr;
-        if (src_entr.htlc_origin.size())
-        {
-          //add txin_htlc
-          txin_htlc in_htlc = AUTO_VAL_INIT(in_htlc);
-          in_htlc.hltc_origin = src_entr.htlc_origin;
-          in_v = in_htlc;
-          txin_htlc& in_v_ref = boost::get<txin_htlc>(in_v);
-          ptokey = static_cast<txin_to_key*>(&in_v_ref);
-        }
-        else
-        {
-          in_v = txin_to_key();
-          txin_to_key& in_v_ref = boost::get<txin_to_key>(in_v);
-          ptokey = &in_v_ref;
-        }
-        txin_to_key& input_to_key = *ptokey;
-
-
-        input_to_key.amount = src_entr.amount;
-        input_to_key.k_image = img;
-
-        //fill outputs array and use relative offsets
-        BOOST_FOREACH(const tx_source_entry::output_entry& out_entry, src_entr.outputs)
-          input_to_key.key_offsets.push_back(out_entry.first);
-
-        input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
-        tx.vin.push_back(in_v);
-      }
+      tx.vin.push_back(ins_zc);
     }
-
-
-
 
     // "Shuffle" outs
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
@@ -1664,13 +1613,7 @@ namespace currency
       tx.attachment.push_back(range_proofs);
     }
 
-    if (!(flags & TX_FLAG_SIGNATURE_MODE_SEPARATE))
-    {
-      //take hash from attachment and put into extra
-      if (tx.attachment.size())
-        add_attachments_info_to_extra(tx.extra, tx.attachment);
-    }
-    else
+    if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
     {
       // for separately signed tx each input has to contain information about corresponding outputs, extra entries and attachments
       for (size_t in_index = input_starter_index; in_index != tx.vin.size(); in_index++)
@@ -1680,11 +1623,18 @@ namespace currency
         so.n_outs = tx.vout.size();
         so.n_extras = tx.extra.size();
         get_txin_etc_options(tx.vin[in_index]).push_back(so);
-        
+
         // put attachment extra info to each input's details (in case there are attachments)
         add_attachments_info_to_extra(get_txin_etc_options(tx.vin[in_index]), tx.attachment);
       }
     }
+    else
+    {
+      //take hash from attachment and put into extra
+      if (tx.attachment.size())
+        add_attachments_info_to_extra(tx.extra, tx.attachment);
+    }
+
 
     //generate ring signatures
     crypto::hash tx_prefix_hash;
