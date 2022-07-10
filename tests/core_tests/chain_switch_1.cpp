@@ -160,7 +160,7 @@ bool gen_chain_switch_1::check_split_not_switched(currency::core& c, size_t ev_i
   CHECK_TEST_CONDITION(r);
   CHECK_EQ(1, tx_pool.size());
 
-  std::vector<size_t> tx_outs;
+  std::vector<wallet_out_info> tx_outs;
   uint64_t transfered;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   lookup_acc_outs(m_recipient_account_4.get_keys(), tx_pool.front(), get_tx_pub_key_from_extra(tx_pool.front()), tx_outs, transfered, derivation);
@@ -223,7 +223,7 @@ bool gen_chain_switch_1::check_split_switched(currency::core& c, size_t ev_index
   CHECK_EQ(1, tx_pool.size());
   CHECK_TEST_CONDITION(!(tx_pool.front() == m_tx_pool.front()));
 
-  std::vector<size_t> tx_outs;
+  std::vector<wallet_out_info> tx_outs;
   uint64_t transfered;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   lookup_acc_outs(m_recipient_account_2.get_keys(), tx_pool.front(), tx_outs, transfered, derivation);

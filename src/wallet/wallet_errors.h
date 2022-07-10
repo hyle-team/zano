@@ -751,3 +751,10 @@ if (cond)                                                                       
     LOG_ERROR(" (" << #cond << ") is FALSE. THROW EXCEPTION: wallet_common_error");                                               \
     tools::error::throw_wallet_ex<tools::error::wallet_common_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str());    \
   }
+#define THROW_WALLET_CMN_ERR_EX(mess)                                                                              \
+  {                                                                                                                               \
+    std::stringstream ss;                                                                                                         \
+    ss << mess;                                                                                                                   \
+    LOG_ERROR("THROW EXCEPTION: wallet_common_error");                                               \
+    tools::error::throw_wallet_ex<tools::error::wallet_common_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str());    \
+  }

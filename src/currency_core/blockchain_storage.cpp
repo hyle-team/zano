@@ -1651,7 +1651,7 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
         // TODO @#@# consider refactoring
         const txin_zarcanum_inputs& zins = boost::get<txin_zarcanum_inputs>(tx.vin[n]);
         for(const auto& el : zins.elements)
-          purge_keyimage_from_big_heap(el.key_image, block_id);
+          purge_keyimage_from_big_heap(el.k_image, block_id);
       }
     }
   }
@@ -3952,7 +3952,7 @@ namespace currency
       // TODO:  @#@# should check for hardfork here?
       for(auto& el : in.elements)
       {
-        if (!visit(0, el.key_image, el.key_offsets))
+        if (!visit(0, el.k_image, el.key_offsets))
           return false;
       }
       return true;
@@ -4311,7 +4311,7 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
       const auto& zins = boost::get<txin_zarcanum_inputs>(in);
       for(auto& el: zins.elements)
       {
-        if (have_tx_keyimg_as_spent(el.key_image))
+        if (have_tx_keyimg_as_spent(el.k_image))
           return true;
       }
     }
@@ -4927,7 +4927,7 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
         const auto& zins = boost::get<txin_zarcanum_inputs>(in);
         for(auto& el: zins.elements)
         {
-          if (el.key_image == ki)
+          if (el.k_image == ki)
           {
             id_result = tx_id;
             return tx_chain_entry;

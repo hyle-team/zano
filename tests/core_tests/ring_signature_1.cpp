@@ -310,7 +310,7 @@ bool gen_ring_signature_big::check_balances_2(currency::core& c, size_t ev_index
     CHECK_EQ(balance, get_balance(an_account, chain, mtx));
   }
 
-  std::vector<size_t> tx_outs;
+  std::vector<wallet_out_info> tx_outs;
   uint64_t transfered;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   lookup_acc_outs(m_alice_account.get_keys(), boost::get<transaction>(events[events.size() - 3]), get_tx_pub_key_from_extra(boost::get<transaction>(events[events.size() - 3])), tx_outs, transfered, derivation);

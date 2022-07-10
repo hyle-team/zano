@@ -310,15 +310,15 @@ namespace currency
     zarcanum_input(const zarcanum_input&)           = default;
     zarcanum_input& operator=(const zarcanum_input&)= default;
 
-    crypto::key_image               key_image;
+    crypto::key_image               k_image;
 
     BEGIN_SERIALIZE_OBJECT()
-      FIELD(key_image)
+      FIELD(k_image)
       FIELD(key_offsets) // referring_input
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(key_image)
+      BOOST_SERIALIZE(k_image)
       BOOST_SERIALIZE(key_offsets) // referring_input
     END_BOOST_SERIALIZATION()
   };
