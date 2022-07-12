@@ -184,11 +184,10 @@ namespace tools
 //     m_plast_daemon_is_disconnected = plast_daemon_is_disconnected ? plast_daemon_is_disconnected : &m_last_daemon_is_disconnected_stub;
 //   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool default_http_core_proxy::set_connectivity(unsigned int connection_timeout, size_t repeats_count)
+  void default_http_core_proxy::set_connectivity(unsigned int connection_timeout, size_t repeats_count)
   {
     m_connection_timeout = connection_timeout;
     m_attempts_count = repeats_count;
-    return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   default_http_core_proxy::default_http_core_proxy(): //:m_plast_daemon_is_disconnected(&m_last_daemon_is_disconnected_stub),

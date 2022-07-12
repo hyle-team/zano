@@ -867,6 +867,7 @@ namespace tools
     void set_disable_tor_relay(bool disable);
     uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
+    void set_connectivity_options(unsigned int timeout);
     
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 

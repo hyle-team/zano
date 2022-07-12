@@ -57,6 +57,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_scan_for_wallet  ( "scan-for-wallet", "");
   const command_line::arg_descriptor<std::string> arg_addr_to_compare  ( "addr-to-compare", "");
   const command_line::arg_descriptor<bool> arg_disable_tor_relay  ( "disable-tor-relay", "Disable TOR relay", false);
+  const command_line::arg_descriptor<unsigned int> arg_set_timeout("set-timeout", "Set timeout for the wallet");
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -261,6 +262,29 @@ bool simple_wallet::set_log(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+void process_wallet_command_line_params(const po::variables_map& vm, tools::wallet2& wal, bool is_server_mode = true)
+{
+  if (command_line::has_arg(vm, arg_disable_tor_relay))
+  {
+    wal.set_disable_tor_relay(command_line::get_arg(vm, arg_disable_tor_relay));
+    message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) << "Notice: Relaying transactions over TOR disabled with command line parameter";
+  }
+  else
+  {
+    if (is_server_mode)
+    {
+      //disable TOR by default for server-mode, to avoid potential sporadic errors due to TOR connectivity fails
+      wal.set_disable_tor_relay(true);
+    }
+  }
+
+  if (command_line::has_arg(vm, arg_set_timeout))
+  {
+    wal.set_connectivity_options(command_line::get_arg(vm, arg_set_timeout));
+  }
+
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::init(const boost::program_options::variables_map& vm)
 {
   handle_command_line(vm);
@@ -305,7 +329,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     m_do_refresh_after_load = false;
   }
 
-
+  bool was_open = false;
   if (!m_generate_new.empty())
   {
     bool r = new_wallet(m_generate_new, pwd_container.password(), false);
@@ -356,12 +380,14 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   {
     bool r = open_wallet(m_wallet_file, pwd_container.password());
     CHECK_AND_ASSERT_MES(r, false, "could not open account");
+    was_open = true;
   }
-  if (m_disable_tor)
-  {
-    m_wallet->set_disable_tor_relay(true);
-    message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) << "Notice: Relaying transactions over TOR disabled with command line parameter";
-  }
+  process_wallet_command_line_params(vm, *m_wallet, false);
+
+  m_wallet->init(m_daemon_address);
+
+  if (was_open && (m_do_refresh_after_load && !m_offline_mode))
+    refresh(std::vector<std::string>());
 
   return true;
 }
@@ -425,9 +451,6 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
     return false;
   }
 
-  m_wallet->init(m_daemon_address);
-
-
   success_msg_writer() <<
     "**********************************************************************\n" <<
     "Your wallet has been generated.\n" <<
@@ -472,7 +495,6 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
     fail_msg_writer() << "failed to restore wallet, check your " << (tracking_wallet ? "tracking seed!" : "seed phrase!") << ENDL;
     return false;
   }
-  m_wallet->init(m_daemon_address);
 
   success_msg_writer() <<
     "**********************************************************************\n" <<
@@ -513,12 +535,6 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
       return false;
     }
   }
-
-
-  m_wallet->init(m_daemon_address);
-
-  if (m_do_refresh_after_load && !m_offline_mode)
-    refresh(std::vector<std::string>());
 
   success_msg_writer() <<
     "**********************************************************************\n" <<
@@ -1946,6 +1962,7 @@ bool search_for_wallet_file(const std::wstring &search_here/*, const std::string
   }
   return false;
 }
+
 //----------------------------------------------------------------------------------------------------
 #ifdef WIN32
 int wmain( int argc, wchar_t* argv_w[ ], wchar_t* envp[ ] )
@@ -2006,6 +2023,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_scan_for_wallet);
   command_line::add_arg(desc_params, arg_addr_to_compare);
   command_line::add_arg(desc_params, arg_disable_tor_relay);
+  command_line::add_arg(desc_params, arg_set_timeout);
+  
   
 
   tools::wallet_rpc_server::init_options(desc_params);
@@ -2148,6 +2167,7 @@ int main(int argc, char* argv[])
       try
       {
         LOG_PRINT_L0("Initializing wallet...");
+        process_wallet_command_line_params(vm, wal);
         wal.init(daemon_address);
         if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
           return EXIT_FAILURE;
@@ -2178,15 +2198,6 @@ int main(int argc, char* argv[])
       }
     }
     
-    if (command_line::has_arg(vm, arg_disable_tor_relay))
-    {
-      wal.set_disable_tor_relay(command_line::get_arg(vm, arg_disable_tor_relay));
-    }
-    else
-    {
-      //disable TOR by default for server-mode, to avoid potential sporadic errors due to TOR connectivity fails
-      wal.set_disable_tor_relay(true);
-    }
     
 
     tools::wallet_rpc_server wrpc(wal);

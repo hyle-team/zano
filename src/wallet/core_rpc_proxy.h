@@ -63,6 +63,7 @@ namespace tools
     std::shared_ptr<const proxy_diagnostic_info> get_proxy_diagnostic_info() const { return m_pdiganostic_info; }
     std::shared_ptr<proxy_diagnostic_info> get_editable_proxy_diagnostic_info() { return m_pdiganostic_info; }
     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id){ return false; }
+    virtual void set_connectivity(unsigned int connection_timeout, size_t repeats_count) {}
   protected: 
     std::shared_ptr<proxy_diagnostic_info> m_pdiganostic_info;
   };

@@ -3323,7 +3323,11 @@ void wallet2::wti_to_json_line(std::ostream& ss, const wallet_public::wallet_tra
   ss << epee::serialization::store_t_to_json(wti, 4) << ",";
 };
 
-
+//----------------------------------------------------------------------------------------------------
+void wallet2::set_connectivity_options(unsigned int timeout)
+{
+  m_core_proxy->set_connectivity(timeout, WALLET_RCP_COUNT_ATTEMNTS);
+}
 //----------------------------------------------------------------------------------------------------
 void wallet2::export_transaction_history(std::ostream& ss, const std::string& format,  bool include_pos_transactions)
 {
