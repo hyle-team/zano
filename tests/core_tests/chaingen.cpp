@@ -1240,7 +1240,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
     {
       for (const auto& s_outputs_el : s.outputs) // avoid all outputs, including fake mix-ins
       {
-        txout_ref_v sout = s_outputs_el.first;
+        txout_ref_v sout = s_outputs_el.out_reference;
         if (sout.type().hash_code() == typeid(uint64_t).hash_code())       // output by global index
         {
           uint64_t gindex = boost::get<uint64_t>(sout);

@@ -5859,7 +5859,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
         {
           if (td.m_global_output_index == daemon_oe.global_amount_index)
             continue;
-          tx_output_entry oe;
+          tx_output_entry oe = AUTO_VAL_INIT(oe);
           oe.out_reference = daemon_oe.global_amount_index;
           oe.stealth_address = daemon_oe.out_key;
           src.outputs.push_back(oe);

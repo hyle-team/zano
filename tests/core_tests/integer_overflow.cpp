@@ -40,7 +40,12 @@ namespace
   {
     currency::tx_source_entry se = AUTO_VAL_INIT(se);
     se.amount =boost::get<currency::tx_out_bare>( tx.vout[out_idx]).amount;
-    se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(tx.vout[out_idx]).target).key));
+
+    currency::tx_source_entry::output_entry oe = AUTO_VAL_INIT(oe);
+    oe.out_reference = 0;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx.vout[out_idx]).target).key;
+    se.outputs.push_back(oe);
+    //se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(tx.vout[out_idx]).target).key));
     se.real_output = 0;
     se.real_out_tx_key = get_tx_pub_key_from_extra(tx);
     se.real_output_in_tx_index = out_idx;

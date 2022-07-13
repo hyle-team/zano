@@ -885,7 +885,11 @@ bool gen_alias_reg_with_locked_money::generate(std::vector<test_event_entry>& ev
 
   currency::tx_source_entry se = AUTO_VAL_INIT(se);
   se.amount = boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).amount;
-  se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).target).key));
+  currency::tx_source_entry::output_entry oe = AUTO_VAL_INIT(oe);
+  oe.out_reference = 0;
+  oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).target).key;
+  se.outputs.push_back(oe);
+  //se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).target).key));
   se.real_output = 0;
   se.real_output_in_tx_index = 0;
   se.real_out_tx_key = currency::get_tx_pub_key_from_extra(blk_0.miner_tx);
@@ -1160,7 +1164,7 @@ bool gen_alias_tx_no_outs::generate(std::vector<test_event_entry>& events) const
 
   currency::tx_source_entry se = AUTO_VAL_INIT(se);
   se.amount = boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).amount;
-  se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).target).key));
+  se.outputs.push_back(currency::tx_source_entry::output_entry(0, boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).target).key));
   se.real_output = 0;
   se.real_output_in_tx_index = 0;
   se.real_out_tx_key = currency::get_tx_pub_key_from_extra(blk_0.miner_tx);
