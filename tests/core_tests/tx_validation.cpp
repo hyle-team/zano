@@ -273,7 +273,7 @@ bool gen_tx_key_offest_points_to_foreign_key::generate(std::vector<test_event_en
   builder.step1_init();
   builder.step2_fill_inputs(bob_account.get_keys(), sources_bob);
   txin_to_key& in_to_key = boost::get<txin_to_key>(builder.m_tx.vin.front());
-  in_to_key.key_offsets.front() = sources_alice.front().outputs.front().first;
+  in_to_key.key_offsets.front() = sources_alice.front().outputs.front().out_reference;
   builder.step3_fill_outputs(destinations_bob);
   builder.step4_calc_hash();
   builder.step5_sign(sources_bob);
@@ -329,7 +329,7 @@ bool gen_tx_mixed_key_offest_not_exist::generate(std::vector<test_event_entry>& 
   std::vector<tx_destination_entry> destinations;
   fill_tx_sources_and_destinations(events, blk_2, bob_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 1, sources, destinations);
 
-  sources.front().outputs[(sources.front().real_output + 1) % 2].first = std::numeric_limits<uint64_t>::max();
+  sources.front().outputs[(sources.front().real_output + 1) % 2].out_reference = std::numeric_limits<uint64_t>::max();
 
   tx_builder builder;
   builder.step1_init();

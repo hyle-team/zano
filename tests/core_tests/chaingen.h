@@ -779,11 +779,11 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
       return false;
 
     //check that derivated key is equal with real output key
-    if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].second))
+    if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].stealth_address))
     {
       LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
         << epst::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-        << epst::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
+        << epst::pod_to_hex(src_entr.outputs[src_entr.real_output].stealth_address));
       return false;
     }
 
@@ -794,7 +794,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
 
     //fill outputs array and use relative offsets
     BOOST_FOREACH(const currency::tx_source_entry::output_entry& out_entry, src_entr.outputs)
-      input_to_key.key_offsets.push_back(out_entry.first);
+      input_to_key.key_offsets.push_back(out_entry.out_reference);
 
     input_to_key.key_offsets = currency::absolute_output_offsets_to_relative(input_to_key.key_offsets);
     tx.vin.push_back(input_to_key);
@@ -842,8 +842,8 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
     std::vector<const crypto::public_key*> keys_ptrs;
     BOOST_FOREACH(const currency::tx_source_entry::output_entry& o, src_entr.outputs)
     {
-      keys_ptrs.push_back(&o.second);
-      ss_ring_s << o.second << ENDL;
+      keys_ptrs.push_back(&o.stealth_address);
+      ss_ring_s << o.stealth_address << ENDL;
     }
 
     tx.signatures.push_back(currency::NLSAG_sig());

@@ -3263,7 +3263,7 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
 
       const auto& src = ft.ftp.sources[i];
       THROW_IF_FALSE_WALLET_INT_ERR_EX(src.real_output < src.outputs.size(), "src.real_output is out of bounds: " << src.real_output);
-      const crypto::public_key& out_key = src.outputs[src.real_output].second;
+      const crypto::public_key& out_key = src.outputs[src.real_output].stealth_address;
 
       tri_ki_to_be_added.push_back(std::make_pair(src.transfer_index, ki));
       pk_ki_to_be_added.push_back(std::make_pair(out_key, ki));
@@ -4654,9 +4654,9 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
       {
         if (td.m_global_output_index == daemon_oe.global_amount_index)
           continue;
-        tx_output_entry oe;
-        oe.first = daemon_oe.global_amount_index;
-        oe.second = daemon_oe.out_key;
+        tx_output_entry oe = AUTO_VAL_INIT(oe);
+        oe.out_reference = daemon_oe.global_amount_index;
+        oe.stealth_address = daemon_oe.out_key;
         src.outputs.push_back(oe);
         if (src.outputs.size() >= fake_outputs_count)
           break;
@@ -4666,22 +4666,22 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
     //paste real transaction to the random index
     auto it_to_insert = std::find_if(src.outputs.begin(), src.outputs.end(), [&](const tx_output_entry& a)
     {
-      if (a.first.type().hash_code() == typeid(uint64_t).hash_code())
-        return boost::get<uint64_t>(a.first) >= td.m_global_output_index;
+      if (a.out_reference.type().hash_code() == typeid(uint64_t).hash_code())
+        return static_cast<bool>(boost::get<uint64_t>(a.out_reference) >= td.m_global_output_index);
       return false; // TODO: implement deterministics real output placement in case there're ref_by_id outs
     });
     //size_t real_index = src.outputs.size() ? (rand() % src.outputs.size() ):0;
-    tx_output_entry real_oe;
-    real_oe.first = td.m_global_output_index; // TODO: use ref_by_id when neccessary
+    tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
+    real_oe.out_reference = td.m_global_output_index; // TODO: use ref_by_id when neccessary
     //@#@
     VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
     VARIANT_CASE_CONST(tx_out_bare, o)
     {
       VARIANT_SWITCH_BEGIN(o.target);
       VARIANT_CASE_CONST(txout_to_key, o)
-        real_oe.second = o.key;
+        real_oe.stealth_address = o.key;
       VARIANT_CASE_CONST(txout_htlc, htlc)
-        real_oe.second = htlc.pkey_refund;
+        real_oe.stealth_address = htlc.pkey_refund;
       VARIANT_CASE_OTHER()
       {
         WLT_THROW_IF_FALSE_WITH_CODE(false,
@@ -4774,8 +4774,8 @@ bool wallet2::prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string
   sources.push_back(AUTO_VAL_INIT(currency::tx_source_entry()));
   currency::tx_source_entry& src = sources.back();
   tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
-  real_oe.first = td.m_global_output_index; // TODO: use ref_by_id when necessary
-  real_oe.second = htlc_out.pkey_redeem;
+  real_oe.out_reference = td.m_global_output_index; // TODO: use ref_by_id when necessary
+  real_oe.stealth_address = htlc_out.pkey_redeem;
   src.outputs.push_back(real_oe); //m_global_output_index should be prefetched
   src.amount = found_money = td.amount();
   src.real_output_in_tx_index = td.m_internal_output_index;
@@ -5380,7 +5380,7 @@ uint64_t wallet2::get_tx_expiration_median() const
 void wallet2::print_source_entry(const currency::tx_source_entry& src) const
 {
   std::ostringstream indexes;
-  std::for_each(src.outputs.begin(), src.outputs.end(), [&](const currency::tx_source_entry::output_entry& s_e) { indexes << s_e.first << " "; });
+  std::for_each(src.outputs.begin(), src.outputs.end(), [&](const currency::tx_source_entry::output_entry& s_e) { indexes << s_e.out_reference << " "; });
   WLT_LOG_L0("amount=" << currency::print_money(src.amount) << ", real_output=" << src.real_output << ", real_output_in_tx_index=" << src.real_output_in_tx_index << ", indexes: " << indexes.str());
 }
 //----------------------------------------------------------------------------------------------------
@@ -5860,8 +5860,8 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
           if (td.m_global_output_index == daemon_oe.global_amount_index)
             continue;
           tx_output_entry oe;
-          oe.first = daemon_oe.global_amount_index;
-          oe.second = daemon_oe.out_key;
+          oe.out_reference = daemon_oe.global_amount_index;
+          oe.stealth_address = daemon_oe.out_key;
           src.outputs.push_back(oe);
           if (src.outputs.size() >= fake_outs_count)
             break;
@@ -5871,17 +5871,17 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
       // insert real output into src.outputs
       auto it_to_insert = std::find_if(src.outputs.begin(), src.outputs.end(), [&](const tx_output_entry& a)
       {
-        if (a.first.type().hash_code() == typeid(uint64_t).hash_code())
-          return boost::get<uint64_t>(a.first) >= td.m_global_output_index;
+        if (a.out_reference.type().hash_code() == typeid(uint64_t).hash_code())
+          return static_cast<bool>(boost::get<uint64_t>(a.out_reference) >= td.m_global_output_index);
         return false; // TODO: implement deterministics real output placement in case there're ref_by_id outs
       });
-      tx_output_entry real_oe;
-      real_oe.first = td.m_global_output_index;
+      tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
+      real_oe.out_reference = td.m_global_output_index;
       //@#@
       if(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].type() != typeid(tx_out_bare))
         continue;
       const tx_out_bare& out_b = boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
-      real_oe.second = boost::get<txout_to_key>(out_b.target).key;
+      real_oe.stealth_address = boost::get<txout_to_key>(out_b.target).key;
       auto inserted_it = src.outputs.insert(it_to_insert, real_oe);
       src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
       src.real_output = inserted_it - src.outputs.begin();

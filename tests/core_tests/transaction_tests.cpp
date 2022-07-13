@@ -60,28 +60,28 @@ bool test_transaction_generation_and_ring_signature()
   src.amount = 70368744177663;
   {
     tx_output_entry oe;
-    oe.first = 0;
-    oe.second = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_1.vout[0]).target).key;
+    oe.out_reference = 0;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_1.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 1;
-    oe.second = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_2.vout[0]).target).key;
+    oe.out_reference = 1;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_2.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 2;
-    oe.second = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_3.vout[0]).target).key;
+    oe.out_reference = 2;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_3.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 3;
-    oe.second = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_4.vout[0]).target).key;
+    oe.out_reference = 3;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_4.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 4;
-    oe.second = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_5.vout[0]).target).key;
+    oe.out_reference = 4;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_5.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 5;
-    oe.second = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_6.vout[0]).target).key;
+    oe.out_reference = 5;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_6.vout[0]).target).key;
     src.outputs.push_back(oe);
 
     crypto::public_key tx_pub_key = null_pkey;

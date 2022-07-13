@@ -27,6 +27,13 @@ namespace currency
       crypto::public_key  stealth_address;    // a.k.a output's one-time public key
       crypto::public_key  concealing_point;   // only for zarcaum outputs
       crypto::public_key  amount_commitment;  // only for zarcaum outputs
+
+      BEGIN_SERIALIZE_OBJECT()
+        FIELD(out_reference)
+        FIELD(stealth_address)
+        FIELD(concealing_point)
+        FIELD(amount_commitment)
+      END_SERIALIZE()
     };
 
     //typedef serializable_pair<txout_ref_v, crypto::public_key> output_entry; // txout_ref_v is either global output index or ref_by_id; public_key - is output's stealth address
