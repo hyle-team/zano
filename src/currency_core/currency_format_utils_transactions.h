@@ -16,11 +16,25 @@ namespace currency
 {
   struct tx_source_entry
   {
-    typedef serializable_pair<txout_ref_v, crypto::public_key> output_entry; // txout_ref_v is either global output index or ref_by_id; public_key - is output's stealth address
+    struct output_entry
+    {
+      //output_entry(const txout_ref_v& out_reference, const crypto::public_key& stealth_address)
+      //  : out_reference(out_reference), stealth_address(stealth_address), concealing_point(null_pkey), amount_commitment(null_pkey) {}
+      //output_entry(const txout_ref_v& out_reference, const crypto::public_key& stealth_address, const crypto::public_key& concealing_point, const crypto::public_key& amount_commitment)
+      //  : out_reference(out_reference), stealth_address(stealth_address), concealing_point(concealing_point), amount_commitment(amount_commitment) {}
 
-    std::vector<output_entry> outputs;  //index + key
+      txout_ref_v         out_reference;      // either globbal output index or ref_by_id
+      crypto::public_key  stealth_address;    // a.k.a output's one-time public key
+      crypto::public_key  concealing_point;   // only for zarcaum outputs
+      crypto::public_key  amount_commitment;  // only for zarcaum outputs
+    };
+
+    //typedef serializable_pair<txout_ref_v, crypto::public_key> output_entry; // txout_ref_v is either global output index or ref_by_id; public_key - is output's stealth address
+
+    std::vector<output_entry> outputs;
     uint64_t real_output;               //index in outputs vector of real output_entry
     crypto::public_key real_out_tx_key; //real output's transaction's public key
+    crypto::scalar_t real_out_amount_blinding_mask; //blinding mask of real out's amount committment (only for zarcanum inputs, otherwise must be 0)
     size_t real_output_in_tx_index;     //index in transaction outputs vector
     uint64_t amount;                    //money
     uint64_t transfer_index;            //money
@@ -31,12 +45,13 @@ namespace currency
     std::string htlc_origin;            //for htlc, specify origin
 
     bool is_multisig() const { return ms_sigs_count > 0; }
-    bool is_zarcanum() const { return false; }
+    bool is_zarcanum() const { return !real_out_amount_blinding_mask.is_zero(); }
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(outputs)
       FIELD(real_output)
       FIELD(real_out_tx_key)
+      FIELD(real_out_amount_blinding_mask)
       FIELD(real_output_in_tx_index)
       FIELD(amount)
       FIELD(transfer_index)

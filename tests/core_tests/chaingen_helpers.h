@@ -255,7 +255,7 @@ inline bool resign_tx(const currency::account_keys& sender_keys, const std::vect
     {
       std::vector<const crypto::public_key*> keys_ptrs;
       for (const currency::tx_source_entry::output_entry& o : se.outputs)
-        keys_ptrs.push_back(&o.second);
+        keys_ptrs.push_back(&o.stealth_address);
 
       sigs.resize(se.outputs.size());
       generate_ring_signature(tx_hash_for_signature, boost::get<currency::txin_to_key>(tx.vin[i]).k_image, keys_ptrs, in_ephemeral_sec, se.real_output, sigs.data());

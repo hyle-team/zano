@@ -413,26 +413,29 @@ namespace currency
   {
     struct input_proofs_t
     {
-      crypto::public_key real_out_amount_commitment;
+      crypto::public_key pseudo_out_amount_commitment;
       // crypto::public_key real_out_token_masked_generator;
 
       BEGIN_SERIALIZE_OBJECT()
-        FIELD(real_out_amount_commitment)
+        FIELD(pseudo_out_amount_commitment)
       END_SERIALIZE()
 
       BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(real_out_amount_commitment)
+        BOOST_SERIALIZE(pseudo_out_amount_commitment)
       END_BOOST_SERIALIZATION()
     };
 
-    std::vector<input_proofs_t> input_proofs; // for each input
+    std::vector<input_proofs_t>                         input_proofs; // for each input
+    std::vector<crypto::CLSAG_GG_signature_serialized>  clsags_gg;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(input_proofs)
+      FIELD(clsags_gg)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(input_proofs)
+      BOOST_SERIALIZE(clsags_gg)
     END_BOOST_SERIALIZATION()
   };
 //#pragma pack(pop)

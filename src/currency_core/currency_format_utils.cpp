@@ -1320,23 +1320,87 @@ namespace currency
     //std::vector<keypair> participants_derived_keys;
   };
   //--------------------------------------------------------------------------------
-  bool generate_zarcanum_signature(const crypto::hash& prefix_hash, const std::vector<const tx_source_entry*>& sources, const txin_zarcanum_inputs& zins, zarcanum_sig& result)
+  bool generate_zc_sig(const crypto::hash& tx_prefix_hash, const std::vector<const tx_source_entry*>& sources, const account_keys& sender_account_keys,
+    const std::vector<input_generation_context_data>& in_contexts, const crypto::scalar_t& blinding_masks_sum, const uint64_t tx_flags, transaction& tx)
   {
+    CHECK_AND_ASSERT_MES(tx.vin.back().type() == typeid(txin_zarcanum_inputs), false, "Unexpected input type");
+    txin_zarcanum_inputs& zarcanum_inputs = boost::get<txin_zarcanum_inputs>(tx.vin.back());
+    CHECK_AND_ASSERT_MES(zarcanum_inputs.elements.size() == sources.size(), false, "sources size differs from zarcanum_inputs.elements size");
+    CHECK_AND_ASSERT_MES(zarcanum_inputs.elements.size() == in_contexts.size(), false, "in_contexts size differs from zarcanum_inputs.elements size");
+    tx.signatures.push_back(zarcanum_sig());
+    zarcanum_sig& sig = boost::get<zarcanum_sig>(tx.signatures.back());
+
+    crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, tx.vin.size() - 1, tx_prefix_hash);
+    CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
+
+    crypto::scalar_t local_blinding_masks_sum = 0;
+
+    size_t ring_size = 0;
+    for(size_t i = 0; i < sources.size(); ++i)
+    {
+      CHECK_AND_ASSERT_MES(sources[i] != nullptr, false, "sources[" << i << "] contains nullptr");
+      const tx_source_entry& se = *sources[i];
+      CHECK_AND_ASSERT_MES(se.is_zarcanum(), false, "sources[" << i << "] contains a non-zarcanum input");
+      zarcanum_input& in = zarcanum_inputs.elements[i];
+      sig.input_proofs.emplace_back();
+      zarcanum_sig::input_proofs_t zsip = sig.input_proofs.back();
+      sig.clsags_gg.emplace_back();
+      crypto::CLSAG_GG_signature& clsag_gg = sig.clsags_gg.back();
+
+      if (ring_size == 0)
+        ring_size = se.outputs.size();
+      else
+        CHECK_AND_ASSERT_MES(ring_size == se.outputs.size(), false, "sources[" << i << "] has ring size " << se.outputs.size() << ", expected: " << ring_size);
+
+#ifndef NDEBUG
+      {
+        crypto::point_t source_amount_commitment = crypto::c_scalar_1div8 * se.amount * crypto::c_point_H + crypto::c_scalar_1div8 * se.real_out_amount_blinding_mask * crypto::c_point_G;
+        CHECK_AND_ASSERT_MES(se.outputs[se.real_output].amount_commitment == source_amount_commitment.to_public_key(), false, "real output amount commitment check failed");
+      }
+#endif
+
+      crypto::scalar_t blinding_mask = 0;
+      if ((tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0 || se.separately_signed_tx_complete)
+      {
+        // either normal tx or the last signature of consolidated tx -- in both cases we need to calculate non-random blinding mask for pseudo output commitment
+        blinding_mask = blinding_masks_sum + local_blinding_masks_sum;
+      }
+      else
+      {
+        blinding_mask.make_random();
+        local_blinding_masks_sum -= blinding_mask; // pseudo out masks are taken into account with negative sign
+      }
+
+      crypto::point_t pseudo_out_amount_commitment = se.amount * crypto::c_point_H + blinding_mask * crypto::c_point_G;
+      zsip.pseudo_out_amount_commitment = (crypto::c_scalar_1div8 * pseudo_out_amount_commitment).to_public_key();
+
+      // = two-layers ring signature data outline =
+      // (j in [0, ring_size-1])
+      // layer 0 ring
+      //     se.outputs[j].stealth_address;
+      // layer 0 secret (with respect to G)
+      //     in_contexts[i].in_ephemeral.sec;
+      // layer 0 linkability
+      //     in.k_image;
+      //
+      // layer 1 ring
+      //     crypto::point_t(se.outputs[j].amount_commitment) - pseudo_out_amount_commitment;
+      // layer 1 secret (with respect to G)
+      //     se.real_out_amount_blinding_mask - blinding_mask;
+
+      std::vector<crypto::CLSAG_GG_input_ref_t> ring;
+      for(size_t j = 0; j < ring_size; ++j)
+        ring.emplace_back(se.outputs[j].stealth_address, se.outputs[j].amount_commitment);
+
+      bool r = crypto::generate_CLSAG_GG(tx_prefix_hash, ring, pseudo_out_amount_commitment, in.k_image, in_contexts[i].in_ephemeral.sec, se.real_out_amount_blinding_mask - blinding_mask, clsag_gg);
+      CHECK_AND_ASSERT_MES(r, false, "generate_CLSAG_GG failed for item " << i);
+    }
+
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool generate_zc_sig(const std::vector<const tx_source_entry*>& sources, transaction& tx, const crypto::hash& tx_prefix_hash, const account_keys& sender_account_keys)
-  {
-    //TODO: sender_account_keys is not used?
-    tx.signatures.push_back(zarcanum_sig());
-    CHECK_AND_ASSERT_THROW_MES(tx.vin.back().type() == typeid(txin_zarcanum_inputs), "Unexpected input type in generate_zc_sig");
-    crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, tx.vin.size() - 1, tx_prefix_hash);
-    CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "failed to  prepare_prefix_hash_for_sign");
-
-    return generate_zarcanum_signature(tx_hash_for_signature, sources, boost::get<txin_zarcanum_inputs>(tx.vin.back()), boost::get<zarcanum_sig>(tx.signatures.back()));
-  }
-  //--------------------------------------------------------------------------------
-  bool generate_NLSAG_sig(const std::vector<const tx_source_entry*>& sources, size_t input_starter_index, transaction& tx, const crypto::hash& tx_prefix_hash, const account_keys& sender_account_keys, const std::vector<input_generation_context_data>& in_contexts, const keypair& txkey, std::stringstream& ss_ring_s)
+  bool generate_NLSAG_sig(const std::vector<const tx_source_entry*>& sources, size_t input_starter_index, transaction& tx, const crypto::hash& tx_prefix_hash,
+    const account_keys& sender_account_keys, const std::vector<input_generation_context_data>& in_contexts, const keypair& txkey, std::stringstream& ss_ring_s)
   {
     bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
     size_t input_index = input_starter_index;
@@ -1362,8 +1426,8 @@ namespace currency
         std::vector<const crypto::public_key*> keys_ptrs;
         BOOST_FOREACH(const tx_source_entry::output_entry& o, src_entr.outputs)
         {
-          keys_ptrs.push_back(&o.second);
-          ss_ring_s << o.second << ENDL;
+          keys_ptrs.push_back(&o.stealth_address);
+          ss_ring_s << o.stealth_address << ENDL;
         }
         sigs.resize(src_entr.outputs.size());
 
@@ -1538,11 +1602,11 @@ namespace currency
           return false;
 
         //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].second))
+        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].stealth_address))
         {
           LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
             << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
+            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].stealth_address));
           return false;
         }
 
@@ -1554,7 +1618,7 @@ namespace currency
 
         //fill outputs array and use relative offsets
         BOOST_FOREACH(const tx_source_entry::output_entry& out_entry, src_entr.outputs)
-          input_to_key.key_offsets.push_back(out_entry.first);
+          input_to_key.key_offsets.push_back(out_entry.out_reference);
 
         input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
         tx.vin.push_back(input_to_key);
@@ -1577,43 +1641,20 @@ namespace currency
           return false;
 
         //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].second))
+        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].stealth_address))
         {
           LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
             << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].second));
+            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].stealth_address));
           return false;
         }
 
-        //put key image into tx input
-        txin_v in_v;
-        txin_to_key* ptokey = nullptr;
-        if (src_entr.htlc_origin.size())
-        {
-          //add txin_htlc
-          txin_htlc in_htlc = AUTO_VAL_INIT(in_htlc);
-          in_htlc.hltc_origin = src_entr.htlc_origin;
-          in_v = in_htlc;
-          txin_htlc& in_v_ref = boost::get<txin_htlc>(in_v);
-          ptokey = static_cast<txin_to_key*>(&in_v_ref);
-        }
-        else
-        {
-          in_v = txin_to_key();
-          txin_to_key& in_v_ref = boost::get<txin_to_key>(in_v);
-          ptokey = &in_v_ref;
-        }
-        txin_to_key& input_to_key = *ptokey;
+        //fill key_offsets array with relative offsets
+        std::vector<txout_ref_v> key_offsets;
+        for(const tx_source_entry::output_entry& out_entry : src_entr.outputs)
+          key_offsets.push_back(out_entry.out_reference);
 
-        
-        input_to_key.amount = src_entr.amount;
-        input_to_key.k_image = img;
-
-        //fill outputs array and use relative offsets
-        BOOST_FOREACH(const tx_source_entry::output_entry& out_entry, src_entr.outputs)
-          input_to_key.key_offsets.push_back(out_entry.first);
-
-        input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
+        key_offsets = absolute_output_offsets_to_relative(key_offsets);
         
         //TODO: Might need some refactoring since this scheme is not the clearest one(did it this way for now to keep less changes to not broke anything)
         //potentially this approach might help to support htlc and multisig without making to complicated code
@@ -1621,12 +1662,17 @@ namespace currency
         {
           zarcanum_input zc_in = AUTO_VAL_INIT(zc_in);
           zc_in.k_image = img;
-          zc_in.key_offsets = input_to_key.key_offsets;
+          zc_in.key_offsets = std::move(key_offsets);
           ins_zc.elements.push_back(zc_in);
           zc_sources.push_back(&src_entr);
-        }else 
+        }
+        else 
         {
-          tx.vin.push_back(in_v);
+          txin_to_key input_to_key = AUTO_VAL_INIT(input_to_key);
+          input_to_key.amount = src_entr.amount;
+          input_to_key.k_image = img;
+          input_to_key.key_offsets = std::move(key_offsets);
+          tx.vin.push_back(input_to_key);
           NLSAG_sources.push_back(&src_entr);
         }        
       }
@@ -1648,16 +1694,18 @@ namespace currency
     size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
     uint64_t range_proof_start_index = output_index;
     std::set<uint16_t> deriv_cache;
-    crypto::scalar_vec_t blinding_masks(destinations.size()); // vector of secret binging masks for each output. For range proof generation
-    crypto::scalar_vec_t amounts(destinations.size());        // vector of amounts, converted to scalars. For rnage proof generation
+    crypto::scalar_vec_t blinding_masks(destinations.size()); // vector of secret blinging masks for each output. For range proof generation
+    crypto::scalar_vec_t amounts(destinations.size());        // vector of amounts, converted to scalars. For ranage proof generation
+    crypto::scalar_t blinding_masks_sum = 0;
     for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
       bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, blinding_masks[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
       amounts[range_proof_start_index - output_index] = dst_entr.amount;
-      output_index++;
       summary_outs_money += dst_entr.amount;
+      blinding_masks_sum += blinding_masks[output_index];
+      output_index++;
     }
 
     //check money
@@ -1734,7 +1782,8 @@ namespace currency
 
     if (zc_sources.size())
     {
-      generate_zc_sig(zc_sources, tx, tx_prefix_hash, sender_account_keys);
+      // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
+      generate_zc_sig(tx_prefix_hash, zc_sources, sender_account_keys, in_contexts, blinding_masks_sum, flags, tx);
     }
 
 
