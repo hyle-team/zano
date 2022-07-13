@@ -1676,7 +1676,6 @@ namespace currency
           NLSAG_sources.push_back(&src_entr);
         }        
       }
-
     }
 
     if (ins_zc.elements.size())
