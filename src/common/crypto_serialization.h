@@ -18,6 +18,7 @@
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "crypto/range_proofs.h"
+#include "crypto/clsag.h"
 #include "boost_serialization_maps.h"
 
 //
@@ -26,7 +27,7 @@
 
 namespace crypto
 {
-  struct bpp_signature_serialized : public crypto::bpp_signature
+  struct bpp_signature_serialized : public bpp_signature
   {
     BEGIN_SERIALIZE_OBJECT()
       FIELD(L)
@@ -51,7 +52,7 @@ namespace crypto
     END_BOOST_SERIALIZATION()
   };
 
-  struct bppe_signature_serialized : public crypto::bppe_signature
+  struct bppe_signature_serialized : public bppe_signature
   {
     BEGIN_SERIALIZE_OBJECT()
       FIELD(L)
@@ -77,7 +78,23 @@ namespace crypto
       BOOST_SERIALIZE(delta_2)
     END_BOOST_SERIALIZATION()
   };
-}
+
+  struct CLSAG_GG_signature_serialized : public CLSAG_GG_signature
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD((std::vector<scalar_t>&)(r))
+      FIELD(K1)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(r))
+      BOOST_SERIALIZE(K1)
+    END_BOOST_SERIALIZATION()
+  };
+
+} // namespace crypto
 
 BLOB_SERIALIZER(crypto::chacha8_iv);
 BLOB_SERIALIZER(crypto::hash);
