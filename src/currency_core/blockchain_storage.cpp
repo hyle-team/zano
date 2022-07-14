@@ -5476,6 +5476,10 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zarcanum_o
       proofs_count++;
     }
   }
+  CHECK_AND_ASSERT_MES(proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " don't have range_proofs");
+  CHECK_AND_ASSERT_MES(proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
+    << " has TX_FLAG_SIGNATURE_MODE_SEPARATE but proofs_count = " << proofs_count);
+
   return false;
 }
 
