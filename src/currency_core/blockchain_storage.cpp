@@ -5449,6 +5449,40 @@ bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, tr
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zarcanum_outs_range_proof_commit_ref_t>& agregated_proofs, const transaction& tx /*, std::vector<crypto::point_t&>& tx_outs_commitments*/)
+{
+
+  if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+  {
+    return true;
+  }
+
+  //@#@ Verify somewhere(maybe here) that all outputs are covered with associated rangeproofs
+  size_t proofs_count = 0;
+  size_t current_output_start = 0; //for Consolidated Transactions we'll have multiple zarcanum_outs_range_proof entries
+  for (const auto& a : tx.attachment)
+  {
+    if (a.type() == typeid(zarcanum_outs_range_proof))
+    {
+      const zarcanum_outs_range_proof& zcrp = boost::get<zarcanum_outs_range_proof>(a);
+      agregated_proofs.emplace_back(zcrp);
+      for (uint8_t i = 0; i != zcrp.outputs_count; i++)
+      {
+        CHECK_AND_ASSERT_MES(tx.vout[i + current_output_start].type() == typeid(tx_out_zarcanum), false, "Unexpected type of out in collect_rangeproofs_data_from_tx()");
+        const tx_out_zarcanum& zc_out = boost::get<tx_out_zarcanum>(tx.vout[i + current_output_start]);
+        agregated_proofs.back().amount_commitments.emplace_back(zc_out.amount_commitment);
+      }
+      current_output_start += zcrp.outputs_count;
+      proofs_count++;
+    }
+  }
+  CHECK_AND_ASSERT_MES(proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " don't have range_proofs");
+  CHECK_AND_ASSERT_MES(proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
+    << " has TX_FLAG_SIGNATURE_MODE_SEPARATE but proofs_count = " << proofs_count);
+
+  return false;
+}
+
 bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc)
 {
   TIME_MEASURE_START_PD_MS(block_processing_time_0_ms);
@@ -5565,6 +5599,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   uint64_t burned_coins = 0;
   std::list<crypto::key_image> block_summary_kimages;
 
+  std::vector<zarcanum_outs_range_proof_commit_ref_t> range_proofs_agregated;
+
   for(const crypto::hash& tx_id : bl.tx_hashes)
   {
     transaction tx;
@@ -5599,6 +5635,20 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       tx.signatures.clear();
       tx.attachment.clear();
     }
+
+    //std::vector<crypto::point_t&> tx_outs_commitments;
+    if (!m_is_in_checkpoint_zone)
+    {
+      if (!collect_rangeproofs_data_from_tx(range_proofs_agregated, tx/*, tx_outs_commitments*/))
+      {
+        LOG_PRINT_L0("Block with id: " << id << " has at least one transaction with wrong proofs, tx_id: " << tx_id << ", collect_rangeproofs_data_from_tx failed");
+        purge_block_data_from_blockchain(bl, tx_processed_count);
+        //add_block_as_invalid(bl, id);  
+        bvc.m_verification_failed = true;
+        return false;
+      }
+    }
+
     TIME_MEASURE_START_PD(tx_add_one_tx_time);
     TIME_MEASURE_START_PD(tx_check_inputs_time);
     if(!check_tx_inputs(tx, tx_id))
@@ -5663,6 +5713,18 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
 
+  if (!m_is_in_checkpoint_zone)
+  {
+    if (!collect_rangeproofs_data_from_tx(range_proofs_agregated, bl.miner_tx))
+    {
+      LOG_PRINT_L0("Block with id: " << id
+        << " have wrong miner tx, failed to collect_rangeproofs_data_from_tx()");
+      purge_block_data_from_blockchain(bl, tx_processed_count);
+      bvc.m_verification_failed = true;
+      return false;
+    }
+  }
+
   uint64_t base_reward = 0;
   boost::multiprecision::uint128_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins:0;
   if (!validate_miner_transaction(bl, cumulative_block_size, fee_summary, base_reward, already_generated_coins))
@@ -5673,6 +5735,18 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     bvc.m_verification_failed = true;
     return false;
   }
+
+
+  //validate range proofs
+  if (!verify_multiple_zarcanum_outs_range_proofs(range_proofs_agregated))
+  {
+    LOG_PRINT_L0("Block with id: " << id
+      << " have failed to verify multiple rangeproofs");
+    purge_block_data_from_blockchain(bl, tx_processed_count);
+    bvc.m_verification_failed = true;
+    return false;
+  }
+
 
   //fill block_extended_info
   block_extended_info bei = boost::value_initialized<block_extended_info>();

@@ -3603,16 +3603,6 @@ namespace currency
   }
 
   //--------------------------------------------------------------------------------
-  struct zarcanum_outs_range_proof_commit_ref_t
-  {
-    zarcanum_outs_range_proof_commit_ref_t(const zarcanum_outs_range_proof& range_proof, const std::vector<crypto::point_t>& amount_commitments)
-      : range_proof(range_proof)
-      , amount_commitments(amount_commitments)
-    {}
-    const zarcanum_outs_range_proof&    range_proof;
-    const std::vector<crypto::point_t>& amount_commitments;
-  };
-
   bool verify_multiple_zarcanum_outs_range_proofs(const std::vector<zarcanum_outs_range_proof_commit_ref_t>& range_proofs)
   {
     std::vector<crypto::bpp_sig_commit_ref_t> sigs;
