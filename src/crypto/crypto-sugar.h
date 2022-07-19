@@ -511,6 +511,11 @@ namespace crypto
       zero();
     }
 
+    explicit point_t(const key_image& ki) // can throw std::runtime_error
+      : point_t(static_cast<const public_key&>(static_cast<const ec_point&>(ki)))
+    {
+    }
+
     // as we're using additive notation, zero means identity group element (EC point (0, 1)) here and after
     void zero()
     {
@@ -976,6 +981,11 @@ namespace crypto
         m_elements.emplace_back(pk);
       }
 
+      void add_key_image(const crypto::key_image& ki)
+      {
+        m_elements.emplace_back(ki);
+      }
+
       scalar_t& access_scalar(size_t index)
       {
         return m_elements[index].scalar;
@@ -1004,6 +1014,11 @@ namespace crypto
           m_elements.emplace_back(key_image_array[i]);
       }
 
+      void add_hash(const hash& h)
+      {
+        m_elements.emplace_back(h);
+      }
+
       void add_32_chars(const char(&str32)[32])
       {
         m_elements.emplace_back(str32);
@@ -1017,6 +1032,16 @@ namespace crypto
         if (clear)
           this->clear();
         return scalar_t(hash); // this will reduce to L
+      }
+      
+      hash calc_hash_no_reduce(bool clear = true)
+      {
+        size_t data_size_bytes = m_elements.size() * sizeof(item_t);
+        hash result;
+        crypto::cn_fast_hash(m_elements.data(), data_size_bytes, result);
+        if (clear)
+          this->clear();
+        return result;
       }
       
       void assign_calc_hash(scalar_t& result, bool clear = true)
@@ -1035,14 +1060,17 @@ namespace crypto
         item_t(const scalar_t& scalar) : scalar(scalar) {}
         item_t(const crypto::public_key& pk) : pk(pk) {}
         item_t(const crypto::key_image& ki) : ki(ki) {}
+        item_t(const crypto::hash& h) : h(h) {}
         item_t(const char(&str32)[32]) { memcpy(c, str32, sizeof c); }
         scalar_t scalar;
         crypto::public_key pk;
         crypto::key_image ki;
+        crypto::hash h;
         char c[32];
       };
 
       static_assert(sizeof(item_t::c) == sizeof(item_t::pk), "size missmatch");
+      static_assert(sizeof(item_t::h) == sizeof(item_t::pk), "size missmatch");
 
       std::vector<item_t> m_elements;
     };
