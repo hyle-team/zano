@@ -59,6 +59,7 @@ namespace currency
     bool dump_trunsfers(const std::vector<std::string>& args);
     bool dump_key_images(const std::vector<std::string>& args);
     bool show_incoming_transfers(const std::vector<std::string> &args);
+    bool show_staking_history(const std::vector<std::string>& args);
     bool show_incoming_transfers_counts(const std::vector<std::string> &args);
     bool list_outputs(const std::vector<std::string> &args);
     bool show_payments(const std::vector<std::string> &args);

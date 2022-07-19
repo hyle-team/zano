@@ -184,7 +184,8 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("start_mining", boost::bind(&simple_wallet::start_mining, this, ph::_1), "start_mining <threads_count> - Start mining in daemon");
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, ph::_1), "Stop mining in daemon");
   m_cmd_binder.set_handler("refresh", boost::bind(&simple_wallet::refresh, this, ph::_1), "Resynchronize transactions and balance");
-  m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "Show current wallet balance");
+  m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "Show current wallet balance"); 
+  m_cmd_binder.set_handler("show_staking_history", boost::bind(&simple_wallet::show_staking_history, this, ph::_1), "show_staking_history [2] - Show staking transfers, if option provided - number of days for history to display");
   m_cmd_binder.set_handler("incoming_transfers", boost::bind(&simple_wallet::show_incoming_transfers, this, ph::_1), "incoming_transfers [available|unavailable] - Show incoming transfers - all of them or filter them by availability");
   m_cmd_binder.set_handler("incoming_counts", boost::bind(&simple_wallet::show_incoming_transfers_counts, this, ph::_1), "incoming_transfers counts");
   m_cmd_binder.set_handler("list_recent_transfers", boost::bind(&simple_wallet::list_recent_transfers, this, ph::_1), "list_recent_transfers [offset] [count] - Show recent maximum 1000 transfers, offset default = 0, count default = 100 ");
@@ -908,6 +909,70 @@ bool simple_wallet::dump_key_images(const std::vector<std::string>& args)
   success_msg_writer() << "Storing text to dump_keyimages.txt....";
   file_io_utils::save_string_to_file(log_space::log_singletone::get_default_log_folder() + "/dump_keyimages.txt", ss.str());
   success_msg_writer() << "Done....";
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::show_staking_history(const std::vector<std::string>& args)
+{
+  uint64_t n_days = 0;
+  if (!args.empty())
+  {
+    if (!epee::string_tools::get_xtype_from_string(n_days, args[0]))
+    {
+      fail_msg_writer() << "Unknown amount of days to list";
+      return true;
+    }
+  }
+
+  tools::wallet2::transfer_container transfers;
+  m_wallet->get_transfers(transfers);
+
+  uint64_t timestamp = 0;
+
+  if (n_days)
+    timestamp = static_cast<uint64_t>(time(nullptr)) - (n_days * 60 * 60 * 24);
+  
+  uint64_t amount_total_staked = 0;
+  bool transfers_found = false;
+  for (auto it = transfers.rbegin(); it != transfers.rend(); it++)
+  {
+    const auto& td = *it;
+
+    if (timestamp && td.m_ptx_wallet_info->m_block_timestamp < timestamp)
+      break;
+
+    if (!(td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER))
+      continue;
+
+    bool pos_coinbase = false;
+    is_coinbase(td.m_ptx_wallet_info->m_tx, pos_coinbase);
+    if (!pos_coinbase)
+      continue;
+  
+    if (!transfers_found)
+    {
+      message_writer() << "        amount       \tspent\tglobal index\t                              tx id";
+      transfers_found = true;
+    }
+    amount_total_staked += td.amount();
+    message_writer(static_cast<bool>(td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT) ? epee::log_space::console_color_magenta : epee::log_space::console_color_green, false) <<
+      std::setw(21) << print_money(td.amount()) << '\t' <<
+      std::setw(3) << (static_cast<bool>(td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT) ? 'T' : 'F') << "  \t" <<
+      std::setw(12) << td.m_global_output_index << '\t' <<
+      get_transaction_hash(td.m_ptx_wallet_info->m_tx) << "[" << td.m_ptx_wallet_info->m_block_height << "] unlocked: " << (m_wallet->is_transfer_unlocked(td) ? 'T' : 'F');
+  }
+
+  if (!transfers_found)
+  {
+    success_msg_writer() << "No staking transactions";
+  }
+  else
+  {
+    success_msg_writer() << "Total staked: " << print_money(amount_total_staked);
+  }
+
+  
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
