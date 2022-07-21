@@ -123,22 +123,22 @@ DISABLE_VS_WARNINGS(4100)
 
 #if defined(ENABLE_LOGGING_INTERNAL)
 
-#define LOG_PRINT_CHANNEL_NO_PREFIX2(log_channel, log_name, x, y) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
+#define LOG_PRINT_CHANNEL_NO_PREFIX2(log_channel, log_name, x, y) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << x << std::endl; epee::log_space::log_singletone::do_log_message(ss________.str() , y, epee::log_space::console_color_default, false, log_name);CATCH_ALL_DO_NOTHING();}}
 
-#define LOG_PRINT_CHANNEL_NO_PREFIX_NO_POSTFIX2(log_channel, log_name, x, y) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
+#define LOG_PRINT_CHANNEL_NO_PREFIX_NO_POSTFIX2(log_channel, log_name, x, y) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << x; epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, false, log_name);CATCH_ALL_DO_NOTHING();}}
 
-#define LOG_PRINT_CHANNEL_NO_POSTFIX2(log_channel, log_name, x, y) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
+#define LOG_PRINT_CHANNEL_NO_POSTFIX2(log_channel, log_name, x, y) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x; epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, false, log_name);CATCH_ALL_DO_NOTHING();}}
 
-#define LOG_PRINT_CHANNEL2_CB(log_channel, log_name, x, y, cb) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
+#define LOG_PRINT_CHANNEL2_CB(log_channel, log_name, x, y, cb) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, false, log_name);cb(ss________.str());CATCH_ALL_DO_NOTHING();}}
 
-#define LOG_PRINT_CHANNEL_COLOR2_CB(log_channel, log_name, x, y, color, cb) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
+#define LOG_PRINT_CHANNEL_COLOR2_CB(log_channel, log_name, x, y, color, cb) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, color, false, log_name); cb(ss________.str());CATCH_ALL_DO_NOTHING();}}
 
-#define LOG_PRINT_CHANNEL_2_JORNAL(log_channel, log_name, x, y) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
+#define LOG_PRINT_CHANNEL_2_JORNAL(log_channel, log_name, x, y) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, true, log_name);CATCH_ALL_DO_NOTHING();}}
 
 #define LOG_ERROR2_CB(log_name, x, cb) { \

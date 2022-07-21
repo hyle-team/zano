@@ -2202,7 +2202,7 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
   }
   
 
-  WLT_LOG("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money(balance()) << ", unlocked: " << print_money(unlocked_balance()), blocks_fetched > 0 ? LOG_LEVEL_2 : LOG_LEVEL_3);
+  WLT_LOG("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money(balance()) << ", unlocked: " << print_money(unlocked_balance()), blocks_fetched > 0 ? LOG_LEVEL_1 : LOG_LEVEL_2);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::handle_expiration_list(uint64_t tx_expiration_ts_median)
@@ -3570,7 +3570,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     build_minted_block(ctx.sp, ctx.rsp, miner_address);
   }
 
-  WLT_LOG_L1("PoS mining: " << ctx.rsp.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
+  WLT_LOG_L0("PoS mining: " << ctx.rsp.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
 
   return true;
 }
