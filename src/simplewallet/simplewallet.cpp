@@ -2127,7 +2127,7 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
 
   //set up logging options
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
+  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   boost::filesystem::path log_file_path(command_line::get_arg(vm, command_line::arg_log_file));
   if (log_file_path.empty())
     log_file_path = log_space::log_singletone::get_default_log_file();

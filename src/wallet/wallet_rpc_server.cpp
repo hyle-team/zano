@@ -78,7 +78,7 @@ namespace tools
           size_t blocks_fetched = 0;
           bool received_money = false, ok = false;
           std::atomic<bool> stop(false);
-          LOG_PRINT_L2("wallet RPC idle: refreshing...");
+          LOG_PRINT_L1("wallet RPC idle: refreshing...");
           m_wallet.refresh(blocks_fetched, received_money, ok, stop);
           if (stop)
           {

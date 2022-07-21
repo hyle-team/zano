@@ -3570,7 +3570,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     build_minted_block(ctx.sp, ctx.rsp, miner_address);
   }
 
-  WLT_LOG_L0("PoS mining: " << ctx.rsp.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
+  WLT_LOG_L1("PoS mining: " << ctx.rsp.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
 
   return true;
 }
