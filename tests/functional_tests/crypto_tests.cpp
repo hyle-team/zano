@@ -16,6 +16,7 @@
 #include "crypto/crypto-sugar.h"
 #include "crypto/range_proofs.h"
 #include "../core_tests/random_helper.h"
+#include "crypto_torsion_elements.h"
 
 using namespace crypto;
 
@@ -490,6 +491,7 @@ struct test_keeper_t
 ////////////////////////////////////////////////////////////////////////////////
 #include "crypto_tests_ml2s.h"
 #include "crypto_tests_range_proofs.h"
+#include "crypto_tests_clsag.h"
 ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -1272,35 +1274,6 @@ TEST(crypto, calc_lsb_32)
 
 TEST(crypto, torsion_elements)
 {
-  // let ty = -sqrt((-sqrt(D+1)-1) / D), is_neg(ty) == false
-  // canonical serialization                                           sig  order  EC point
-  // 26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05  0    8      (sqrt(-1)*ty, ty)
-  // 0000000000000000000000000000000000000000000000000000000000000000  0    4      (sqrt(-1), 0)
-  // c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a  0    8      (sqrt(-1)*ty, -ty)
-  // ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f  0    2      (0, -1)
-  // c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa  1    8      (-sqrt(-1)*ty, -ty)
-  // 0000000000000000000000000000000000000000000000000000000000000080  1    4      (-sqrt(-1), 0)
-  // 26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85  1    8      (-sqrt(-1)*ty, ty)
-
-  struct canonical_torsion_elements_t
-  {
-    const char* string;
-    bool sign;
-    uint8_t order;
-    uint8_t incorrect_order_0;
-    uint8_t incorrect_order_1;
-  };
-
-  canonical_torsion_elements_t canonical_torsion_elements[] = {
-    {"26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05", false, 8, 4, 7},
-    {"0000000000000000000000000000000000000000000000000000000000000000", false, 4, 2, 3},
-    {"c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a", false, 8, 4, 7},
-    {"ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f", false, 2, 1, 3},
-    {"c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa", true,  8, 4, 7},
-    {"0000000000000000000000000000000000000000000000000000000000000080", true,  4, 2, 3},
-    {"26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85", true,  8, 4, 7}
-  };
-
   point_t tor;
 
   for (size_t i = 0, n = sizeof canonical_torsion_elements / sizeof canonical_torsion_elements[0]; i < n; ++i)
@@ -1318,16 +1291,6 @@ TEST(crypto, torsion_elements)
   }
 
   // non-canonical elements should not load at all (thanks to the checks in ge_frombytes_vartime)
-
-  const char* noncanonical_torsion_elements[] = {
-    "0100000000000000000000000000000000000000000000000000000000000080", // (-0, 1)
-    "ECFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", // (-0, -1)
-    "EEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7F", // (0, 2*255-18)
-    "EEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", // (-0, 2*255-18)
-    "EDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7F", // (sqrt(-1), 2*255-19)
-    "EDFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"  // (-sqrt(-1), 2*255-19)
-  };
-
   for (size_t i = 0, n = sizeof noncanonical_torsion_elements / sizeof noncanonical_torsion_elements[0]; i < n; ++i)
   {
     ASSERT_FALSE(tor.from_string(noncanonical_torsion_elements[i]));

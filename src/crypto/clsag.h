@@ -10,7 +10,7 @@
 
 namespace crypto
 {
-  // GG stands for double layers (ring dimentions) both with respect to group element G
+  // 2-CLSAG signature where both dimensions are with respect to the group element G (that's why 'GG')
   struct CLSAG_GG_signature
   {
     scalar_t      c;
@@ -18,6 +18,16 @@ namespace crypto
     public_key    K1; // auxiliary key image for layer 1
   };
 
+
+  inline bool operator==(const CLSAG_GG_signature& lhs, const CLSAG_GG_signature& rhs)
+  {
+    return
+      lhs.c == rhs.c &&
+      lhs.r == rhs.r &&
+      lhs.K1 == rhs.K1;
+  }
+
+  inline bool operator!=(const CLSAG_GG_signature& lhs, const CLSAG_GG_signature& rhs) { return !(lhs == rhs); }
 
   struct CLSAG_GG_input_ref_t
   {
@@ -29,6 +39,10 @@ namespace crypto
   };
 
   bool generate_CLSAG_GG(const hash& m, const std::vector<CLSAG_GG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const key_image& ki,
-    const scalar_t& secret_x, const scalar_t& secret_f, CLSAG_GG_signature& sig);
+    const scalar_t& secret_x, const scalar_t& secret_f, uint64_t secret_index, CLSAG_GG_signature& sig);
+
+  bool verify_CLSAG_GG(const hash& m, const std::vector<CLSAG_GG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment, const key_image& ki,
+    const CLSAG_GG_signature& sig);
+
 
 } // namespace crypto
