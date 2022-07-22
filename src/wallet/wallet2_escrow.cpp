@@ -261,7 +261,7 @@ bool wallet2::validate_escrow_release(const transaction& tx, bool release_type_n
     r = crypto::check_signature(tx_hash_for_signature, source_ms_out.keys[ms_out_key_b_index], signature[ms_out_key_b_index]);
     LOC_CHK(r, "B signature for multisig input is invalid");
   }
-  VARIANT_CASE_CONST(zarcanum_sig, s);
+  VARIANT_CASE_CONST(ZC_sig, s);
   //@#@
   VARIANT_CASE_THROW_ON_OTHER();
   VARIANT_SWITCH_END();
@@ -433,7 +433,7 @@ bool wallet2::validate_escrow_cancel_release(const currency::transaction& tx, co
     r = crypto::check_signature(tx_hash_for_signature, source_ms_out.keys[a_sign_index], signature[a_sign_index]);
     LOC_CHK(r, "A signature for multisig input is invalid");
   }
-  VARIANT_CASE_CONST(zarcanum_sig, s);
+  VARIANT_CASE_CONST(ZC_sig, s);
   //@#@
   VARIANT_CASE_THROW_ON_OTHER();
   VARIANT_SWITCH_END();

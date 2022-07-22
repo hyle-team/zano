@@ -1320,15 +1320,16 @@ namespace currency
     //std::vector<keypair> participants_derived_keys;
   };
   //--------------------------------------------------------------------------------
-  bool generate_zc_sig(const crypto::hash& tx_prefix_hash, const std::vector<const tx_source_entry*>& sources, const account_keys& sender_account_keys,
+  bool generate_ZC_sig(const crypto::hash& tx_prefix_hash, const std::vector<const tx_source_entry*>& sources, const account_keys& sender_account_keys,
     const std::vector<input_generation_context_data>& in_contexts, const crypto::scalar_t& blinding_masks_sum, const uint64_t tx_flags, transaction& tx)
   {
+    bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
     CHECK_AND_ASSERT_MES(tx.vin.back().type() == typeid(txin_zarcanum_inputs), false, "Unexpected input type");
     txin_zarcanum_inputs& zarcanum_inputs = boost::get<txin_zarcanum_inputs>(tx.vin.back());
     CHECK_AND_ASSERT_MES(zarcanum_inputs.elements.size() == sources.size(), false, "sources size differs from zarcanum_inputs.elements size");
     CHECK_AND_ASSERT_MES(zarcanum_inputs.elements.size() == in_contexts.size(), false, "in_contexts size differs from zarcanum_inputs.elements size");
-    tx.signatures.push_back(zarcanum_sig());
-    zarcanum_sig& sig = boost::get<zarcanum_sig>(tx.signatures.back());
+    tx.signatures.push_back(ZC_sig());
+    ZC_sig& sig = boost::get<ZC_sig>(tx.signatures.back());
 
     crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, tx.vin.size() - 1, tx_prefix_hash);
     CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
@@ -1343,9 +1344,12 @@ namespace currency
       CHECK_AND_ASSERT_MES(se.is_zarcanum(), false, "sources[" << i << "] contains a non-zarcanum input");
       zarcanum_input& in = zarcanum_inputs.elements[i];
       sig.input_proofs.emplace_back();
-      zarcanum_sig::input_proofs_t zsip = sig.input_proofs.back();
+      ZC_sig::input_proofs_t zsip = sig.input_proofs.back();
       sig.clsags_gg.emplace_back();
       crypto::CLSAG_GG_signature& clsag_gg = sig.clsags_gg.back();
+
+      if (watch_only_mode)
+        return true; // in this mode just append empty signatures
 
       if (ring_size == 0)
         ring_size = se.outputs.size();
@@ -1392,7 +1396,7 @@ namespace currency
       for(size_t j = 0; j < ring_size; ++j)
         ring.emplace_back(se.outputs[j].stealth_address, se.outputs[j].amount_commitment);
 
-      bool r = crypto::generate_CLSAG_GG(tx_prefix_hash, ring, pseudo_out_amount_commitment, in.k_image, in_contexts[i].in_ephemeral.sec, se.real_out_amount_blinding_mask - blinding_mask, clsag_gg);
+      bool r = crypto::generate_CLSAG_GG(tx_prefix_hash, ring, pseudo_out_amount_commitment, in.k_image, in_contexts[i].in_ephemeral.sec, se.real_out_amount_blinding_mask - blinding_mask, se.real_output, clsag_gg);
       CHECK_AND_ASSERT_MES(r, false, "generate_CLSAG_GG failed for item " << i);
     }
 
@@ -1782,7 +1786,7 @@ namespace currency
     if (zc_sources.size())
     {
       // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
-      generate_zc_sig(tx_prefix_hash, zc_sources, sender_account_keys, in_contexts, blinding_masks_sum, flags, tx);
+      generate_ZC_sig(tx_prefix_hash, zc_sources, sender_account_keys, in_contexts, blinding_masks_sum, flags, tx);
     }
 
 
@@ -3596,7 +3600,7 @@ namespace currency
     return false;
   }
   //--------------------------------------------------------------------------------
-  bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b)
+  bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b)
   {
     //@#@ TODO
     return false;

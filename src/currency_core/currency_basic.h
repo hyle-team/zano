@@ -323,7 +323,7 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
-  // txin_zarcanum_inputs contains several zarcanum_input instances and corresponds to one zarcanum_sig
+  // txin_zarcanum_inputs contains several zarcanum_input instances and corresponds to one ZC_sig
   struct txin_zarcanum_inputs
   {
     txin_zarcanum_inputs() {}
@@ -409,7 +409,8 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
-  struct zarcanum_sig
+  // Zarcanum-aware CLSAG signature
+  struct ZC_sig
   {
     struct input_proofs_t
     {
@@ -760,7 +761,7 @@ namespace currency
   };
 
 
-  typedef boost::variant<NLSAG_sig, void_sig, zarcanum_sig> signature_v;
+  typedef boost::variant<NLSAG_sig, void_sig, ZC_sig> signature_v;
 
 
 
@@ -1024,7 +1025,7 @@ SET_VARIANT_TAGS(currency::zarcanum_tx_data_v1, 39, "zarcanum_tx_data_v1");
 SET_VARIANT_TAGS(crypto::bpp_signature_serialized, 40, "bpp_signature_serialized");
 SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 41, "bppe_signature_serialized");
 SET_VARIANT_TAGS(currency::NLSAG_sig, 42, "NLSAG_sig");
-SET_VARIANT_TAGS(currency::zarcanum_sig, 43, "zarcanum_sig");
+SET_VARIANT_TAGS(currency::ZC_sig, 43, "ZC_sig");
 SET_VARIANT_TAGS(currency::void_sig, 44, "void_sig");
 SET_VARIANT_TAGS(currency::zarcanum_outs_range_proof, 45, "zarcanum_outs_range_proof");
 

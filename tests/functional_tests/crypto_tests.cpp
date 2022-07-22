@@ -502,7 +502,6 @@ struct test_keeper_t
 
 #include "crypto_tests_performance.h"
 
-
 TEST(crypto, ge_scalarmult_vartime_p3)
 {
   // make sure that my ge_scalarmult_vartime_p3 gives the same result as ge_scalarmul_p3

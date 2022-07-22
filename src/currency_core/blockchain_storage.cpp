@@ -4698,7 +4698,7 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
       LOC_CHK(r, "failed to check extra signature for last out with TX_FLAG_SIGNATURE_MODE_SEPARATE");
     }
   }
-  VARIANT_CASE_CONST(zarcanum_sig, s);
+  VARIANT_CASE_CONST(ZC_sig, s);
   //@#@
   //TODO: don't forget about need_to_check_extra_sign
   VARIANT_SWITCH_END();
