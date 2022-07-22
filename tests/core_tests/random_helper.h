@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#include "crypto/crypto.h"
 
 // DISCLAIMER: designed for tests puposes ONLY!
 // This class is not intended to be used neither in multi-threaded environment nor in production.
@@ -63,6 +64,16 @@ inline std::string get_random_text(size_t len)
     return result;
   }
 }
+
+// boundaries are included
+inline uint64_t random_in_range(uint64_t from, uint64_t to)
+{
+  if (from == to)
+    return from;
+  CHECK_AND_ASSERT_MES(from < to, 0, "Invalid arguments: from = " << from << ", to = " << to);
+  return crypto::rand<uint64_t>() % (to - from + 1) + from;
+}
+
 
 bool random_state_manupulation_test();
 bool random_evenness_test();

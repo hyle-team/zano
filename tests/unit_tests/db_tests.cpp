@@ -377,7 +377,7 @@ namespace db_test
     }
 
     // restore PRNG state to keep other tests unaffected
-    crypto::random_prng_get_state(prng_state, sizeof prng_state);
+    crypto::random_prng_set_state(prng_state, sizeof prng_state);
 
     ASSERT_TRUE(result);
   }

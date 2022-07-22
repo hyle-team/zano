@@ -187,13 +187,6 @@ inline bool mine_next_pos_block_in_playtime_with_wallet(tools::wallet2& w, const
   return w.build_minted_block(ctx.sp, ctx.rsp, miner_address);
 }
 
-inline uint64_t random_in_range(uint64_t from, uint64_t to)
-{
-  if (from == to)
-    return from;
-  CHECK_AND_ASSERT_MES(from < to, 0, "Invalid arguments: from = " << from << ", to = " << to);
-  return crypto::rand<uint64_t>() % (to - from + 1) + from;
-}
 
 struct log_level_scope_changer
 {

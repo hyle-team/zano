@@ -22,6 +22,7 @@ using namespace currency;
 #include "../core_tests/test_core_time.h"
 std::atomic<int64_t> test_core_time::m_time_shift;
 
+#include "../core_tests/random_helper.h"
 #include "../core_tests/test_core_proxy.h"
 #include "../core_tests/chaingen_helpers.h"
 #include "../core_tests/core_state_helper.h"
