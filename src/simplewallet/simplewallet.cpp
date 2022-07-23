@@ -2136,16 +2136,13 @@ int main(int argc, char* argv[])
   log_space::log_singletone::add_logger(LOGGER_FILE, log_file_path.filename().string().c_str(), log_dir.c_str(), LOG_LEVEL_4);
   message_writer(epee::log_space::console_color_white, true) << CURRENCY_NAME << " wallet v" << PROJECT_VERSION_LONG;
 
-//   if (command_line::has_arg(vm, arg_log_level))
-//   {
-//     LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, arg_log_level));
-//     log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, arg_log_level));
-//   }
   if (command_line::has_arg(vm, command_line::arg_log_level))
   {
-    log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, command_line::arg_log_level));
-    LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
-    message_writer(epee::log_space::console_color_white, true) << "Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level);
+    int old_log_level = log_space::get_set_log_detalisation_level(false);
+    int new_log_level = command_line::get_arg(vm, command_line::arg_log_level);
+    log_space::get_set_log_detalisation_level(true, new_log_level);
+    LOG_PRINT_L0("Log level changed: " << old_log_level << " -> " << new_log_level);
+    message_writer(epee::log_space::console_color_white, true) << "Log level changed: " << old_log_level << " -> " << new_log_level;
   }
 
 
@@ -2166,7 +2163,7 @@ int main(int argc, char* argv[])
     // runs wallet as RPC server
     log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
     sw->set_offline_mode(offline_mode);
-    LOG_PRINT_L0("Starting wallet RPC server...");
+    LOG_PRINT_L0("Starting in RPC server mode...");
 
     if (!command_line::has_arg(vm, arg_wallet_file) || command_line::get_arg(vm, arg_wallet_file).empty())
     {
@@ -2292,7 +2289,7 @@ int main(int argc, char* argv[])
     if (command_line::get_arg(vm, arg_do_pos_mining))
     { 
       // PoS mining can be turned on only in RPC server mode, please provide --rpc-bind-port to make this
-      fail_msg_writer() << "PoS mining can be turned on only in RPC server mode, please provide --rpc-bind-port=PORT_NO to enable staking in simplewallet";
+      fail_msg_writer() << "PoS mining can only be started in RPC server mode, please use command-line option --rpc-bind-port=<PORT_NUM> along with --do-pos-mining to enable staking";
       return EXIT_FAILURE;
     }
 

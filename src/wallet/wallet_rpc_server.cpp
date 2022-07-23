@@ -68,6 +68,8 @@ namespace tools
     static const uint64_t wallet_rpc_idle_work_period_ms = 2000;
 
     m_do_mint = do_mint;
+    if (m_do_mint)
+      LOG_PRINT_CYAN("PoS mining is ON", LOG_LEVEL_0);
 
     if (!offline_mode)
     {
@@ -78,7 +80,7 @@ namespace tools
           size_t blocks_fetched = 0;
           bool received_money = false, ok = false;
           std::atomic<bool> stop(false);
-          LOG_PRINT_L1("wallet RPC idle: refreshing...");
+          LOG_PRINT_L2("wallet RPC idle: refreshing...");
           m_wallet.refresh(blocks_fetched, received_money, ok, stop);
           if (stop)
           {
