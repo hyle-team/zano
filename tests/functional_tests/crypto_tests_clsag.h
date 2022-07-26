@@ -36,17 +36,21 @@ struct clsag_gg_sig_check_t
   clsag_gg_sig_check_t()
   {}
 
+  void rebuild_ring()
+  {
+    ring.clear();
+    ring.reserve(stealth_addresses.size());
+    for(size_t i = 0; i < stealth_addresses.size(); ++i)
+      ring.emplace_back(stealth_addresses[i], amount_commitments[i]);
+  }
+
   clsag_gg_sig_check_t& operator=(const clsag_gg_sig_check_t& rhs)
   {
     prefix_hash               = rhs.prefix_hash;
     ki                        = rhs.ki;
     stealth_addresses         = rhs.stealth_addresses;
     amount_commitments        = rhs.amount_commitments;
-
-    ring.clear();
-    for(size_t i = 0; i < stealth_addresses.size(); ++i)
-      ring.emplace_back(stealth_addresses[i], amount_commitments[i]);
-
+    rebuild_ring();
     pseudo_output_commitment  = rhs.pseudo_output_commitment;
     secret_x                  = rhs.secret_x;
     secret_f                  = rhs.secret_f;
@@ -149,9 +153,10 @@ TEST(clsag, bad_pub_keys)
     ASSERT_FALSE(tor.is_in_main_subgroup());
     ASSERT_FALSE(tor.is_zero());
   
+    // torsion component in ki must break the protocol
     cc = cc_orig;
     ASSERT_TRUE(cc.generate());
-    cc.ki = (point_t(cc.ki) + tor).to_key_image(); // ki not in main subgroup
+    cc.ki = (point_t(cc.ki) + tor).to_key_image(); // ki is not in main subgroup
     ASSERT_FALSE(cc.verify());
 
     // torsion component in pseudo_output_commitment should not affect protocol
@@ -172,6 +177,17 @@ TEST(clsag, bad_pub_keys)
     ASSERT_TRUE(cc.generate());
     cc.sig.K1 = (point_t(cc.sig.K1) + tor).to_public_key();
     ASSERT_TRUE(cc.verify());
+
+    // torsion component in stealth_address for secret_index (i.e. for P = xG) must break the protocol
+    // 1
+    cc = cc_orig;
+    cc.stealth_addresses[cc.secret_index] = (point_t(cc.stealth_addresses[cc.secret_index]) + tor).to_public_key();
+    ASSERT_FALSE(cc.generate());
+    // 2
+    cc = cc_orig;
+    ASSERT_TRUE(cc.generate());
+    cc.stealth_addresses[cc.secret_index] = (point_t(cc.stealth_addresses[cc.secret_index]) + tor).to_public_key();
+    ASSERT_FALSE(cc.verify());
   }
 
   return true;
