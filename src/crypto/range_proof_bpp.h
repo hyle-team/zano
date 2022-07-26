@@ -23,8 +23,8 @@ namespace crypto
     scalar_t delta;
   };
 
-#define DBG_VAL_PRINT(x) (void(0)) // std::cout << #x ": " << x << ENDL
-#define DBG_PRINT(x)     (void(0)) // std::cout << x << ENDL
+#define DBG_VAL_PRINT(x) (void(0)) //*/ std::cout << #x ": " << x << ENDL
+#define DBG_PRINT(x)     (void(0)) //*/ std::cout << x << ENDL
 
 #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
   if (!(cond)) { LOG_PRINT_RED("bpp_gen: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
@@ -36,7 +36,7 @@ namespace crypto
   {
     // Note: commitments_1div8 are supposed to be already calculated
     static_assert(CT::c_bpp_n <= 255, "too big N");
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(values.size() > 0 && values.size() <= CT::c_bpp_values_max && values.size() == masks.size(), 1);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(values.size() > 0 && values.size() <= CT::c_bpp_values_max && values.size() == masks.size() && values.size() == commitments_1div8.size(), 1);
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(masks.is_reduced(), 3);
 
     const size_t c_bpp_log2_m = constexpr_ceil_log2(values.size());
@@ -318,8 +318,26 @@ namespace crypto
     DBG_VAL_PRINT(sig.delta);
 
     return true;
-#undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
   } // bpp_gen()
+
+  
+  // convenient overload for tests 
+  template<typename CT = bpp_crypto_trait_zano<>>
+  bool bpp_gen(const scalar_vec_t& values, const scalar_vec_t& masks, bpp_signature& sig, std::vector<point_t>& commitments_1div8_to_be_generated, uint8_t* p_err = nullptr)
+  {
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(values.size() == masks.size(), 91);
+    commitments_1div8_to_be_generated.resize(values.size());
+    std::vector<crypto::public_key> commitments_1div8(values.size());
+    std::vector<const crypto::public_key*> commitments_1div8_pointers(values.size());
+    for(size_t i = 0; i < values.size(); ++i)
+    {
+      CT::calc_pedersen_commitment(c_scalar_1div8 * values[i], c_scalar_1div8 * masks[i], commitments_1div8_to_be_generated[i]);
+      commitments_1div8[i] = (commitments_1div8_to_be_generated[i]).to_public_key();
+      commitments_1div8_pointers[i] = &commitments_1div8[i];
+    }
+    return bpp_gen<CT>(values, masks, commitments_1div8_pointers, sig, p_err);
+  }
+#undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
 
 
   struct bpp_sig_commit_ref_t
@@ -329,7 +347,7 @@ namespace crypto
       , commitments(commitments)
     {}
     const bpp_signature& sig;
-    const std::vector<point_t>& commitments;
+    const std::vector<point_t>& commitments; // assumed to be premultiplied by 1/8
   };
 
 

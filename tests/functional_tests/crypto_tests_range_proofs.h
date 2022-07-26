@@ -71,11 +71,18 @@ TEST(bpp, basics)
   scalar_vec_t values = { 5 };
   scalar_vec_t masks  = { 0 };
   bpp_signature bpp_sig;
-  std::vector<point_t> commitments;
+  std::vector<point_t> commitments_1div8;
   uint8_t err = 0;
 
-  bool r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments, &err);
+  bool r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments_1div8, &err);
+  LOG_PRINT_L0("err = " << (uint16_t)err);
+  ASSERT_TRUE(r);
 
+  std::vector<bpp_sig_commit_ref_t> sigs;
+  sigs.emplace_back(bpp_sig, commitments_1div8);
+
+  r = bpp_verify<bpp_crypto_trait_zano<>>(sigs, &err);
+  LOG_PRINT_L0("err = " << (uint16_t)err);
   ASSERT_TRUE(r);
 
   return true;

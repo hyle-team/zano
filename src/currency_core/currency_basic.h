@@ -355,8 +355,8 @@ namespace currency
     tx_out_zarcanum& operator=(const tx_out_zarcanum&) = default;
 
     crypto::public_key  stealth_address;
-    crypto::public_key  concealing_point; // group element Q, see also Zarcanum paper
-    crypto::public_key  amount_commitment;
+    crypto::public_key  concealing_point;  // group element Q, see also Zarcanum paper, premultiplied by 1/8
+    crypto::public_key  amount_commitment; // premultiplied by 1/8
     uint64_t            encrypted_amount;
     uint8_t             mix_attr;
     //crypto::public_key  token_masked_generator;
