@@ -30,12 +30,20 @@
 #include "storages/portable_storage_template_helper.h"
 #include "http_base.h"
 
+
+
+template<typename typename_t>
+typename_t get_documentation_json_struct()
+{
+  return AUTO_VAL_INIT_T(typename_t);
+}
+
 template<typename request_t, typename response_t>
 bool auto_doc_t(const std::string& prefix_name, std::string& generate_reference)
 {
   if (!generate_reference.size()) return true;
-  request_t req = AUTO_VAL_INIT(req);
-  response_t res = AUTO_VAL_INIT(res);
+  request_t req = get_documentation_json_struct<request_t>();
+  response_t res = get_documentation_json_struct<response_t>();
   std::stringstream ss;
   ss << prefix_name << ENDL
     << "REQUEST: " << ENDL << epee::serialization::store_t_to_json(req) << ENDL <<  "--------------------------------" << ENDL
