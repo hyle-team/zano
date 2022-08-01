@@ -829,15 +829,13 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
   success_msg_writer() << "Unconfirmed transfers: ";
   for (auto & wti : unconfirmed)
   {
-    if (!wti.fee)
-      wti.fee = currency::get_tx_fee(wti.tx);
+    wti.fee = currency::get_tx_fee(wti.tx);
     print_wti(wti);
   }
   success_msg_writer() << "Recent transfers: ";
   for (auto & wti : recent)
   {
-    if (!wti.fee)
-      wti.fee = currency::get_tx_fee(wti.tx);
+    wti.fee = currency::get_tx_fee(wti.tx);
     print_wti(wti);
   }
   return true;
