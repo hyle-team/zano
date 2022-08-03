@@ -414,8 +414,8 @@ namespace currency
       return boost::get<txin_multisig>(in).etc_details;
     else if (in.type() == typeid(txin_htlc))
       return boost::get<txin_htlc>(in).etc_details;
-    else if (in.type() == typeid(txin_zarcanum_inputs))
-      return boost::get<txin_zarcanum_inputs>(in).etc_details;
+    else if (in.type() == typeid(txin_zc_input))
+      return boost::get<txin_zc_input>(in).etc_details;
     else
        return stub;
   }
@@ -714,7 +714,7 @@ namespace currency
       size_t operator()(const txin_to_key& txin) const            { return txin.key_offsets.size(); }
       size_t operator()(const txin_multisig& txin) const          { return txin.sigs_count; }
       size_t operator()(const txin_htlc& txin) const              { return 1; }
-      size_t operator()(const txin_zarcanum_inputs& txin) const   { throw std::runtime_error("Not implemented yet"); }
+      size_t operator()(const txin_zc_input& txin) const          { throw std::runtime_error("Not implemented yet"); }
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(), tx_in);
@@ -730,8 +730,8 @@ namespace currency
       return &boost::get<txin_multisig>(in).etc_details;
     if (in.type() == typeid(txin_htlc))
       return &boost::get<txin_htlc>(in).etc_details;
-    if (in.type() == typeid(txin_zarcanum_inputs))
-      return &boost::get<txin_zarcanum_inputs>(in).etc_details;
+    if (in.type() == typeid(txin_zc_input))
+      return &boost::get<txin_zc_input>(in).etc_details;
     return nullptr;
   }
   //---------------------------------------------------------------
@@ -739,7 +739,7 @@ namespace currency
   {
     template<class t_input>
     uint64_t operator()(const t_input& i)             const { return i.amount; }
-    uint64_t operator()(const txin_zarcanum_inputs&)  const { return 0; }
+    uint64_t operator()(const txin_zc_input&)         const { return 0; }
     uint64_t operator()(const txin_gen& i)            const { return 0; }
   };
   inline uint64_t get_amount_from_variant(const txin_v& v)

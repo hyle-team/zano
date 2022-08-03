@@ -1038,7 +1038,7 @@ private:
     uint64_t get_wallet_minimum_height();
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(uint64_t amount, const std::vector<currency::txout_ref_v> & key_offsets);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
-    uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::zarcanum_input& inzk);
+    uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_zc_input& inzc);
     bool is_in_hardfork_zone(uint64_t hardfork_index);
     uint8_t out_get_mixin_attr(const currency::tx_out_v& out_t);
     const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);

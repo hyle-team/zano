@@ -438,13 +438,10 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     {
       process_input_t(intk, ptc, tx);
     }
-    VARIANT_CASE_CONST(currency::txin_zarcanum_inputs, tinz)
+    VARIANT_CASE_CONST(currency::txin_zc_input, in_zc)
     {
-      for (const auto& e : tinz.elements)
-      {
-        process_input_t(e, ptc, tx);
-        ptc.sub_i++;
-      }      
+      process_input_t(in_zc, ptc, tx);
+      //ptc.sub_i++;
     }
     VARIANT_CASE_CONST(currency::txin_multisig, inms)
     {
@@ -1880,9 +1877,9 @@ uint64_t wallet2::get_directly_spent_transfer_index_by_input_in_tracking_wallet(
   return get_directly_spent_transfer_index_by_input_in_tracking_wallet(intk.amount, intk.key_offsets);
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::zarcanum_input& inzk)
+uint64_t wallet2::get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_zc_input& inzc)
 {
-  return get_directly_spent_transfer_index_by_input_in_tracking_wallet(0, inzk.key_offsets);
+  return get_directly_spent_transfer_index_by_input_in_tracking_wallet(0, inzc.key_offsets);
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_directly_spent_transfer_index_by_input_in_tracking_wallet(uint64_t amount,  const std::vector<currency::txout_ref_v> & key_offsets)
@@ -5219,17 +5216,14 @@ bool wallet2::read_money_transfer2_details_from_tx(const transaction& tx, const 
         wtd.spn.push_back(in_to_key.amount);
       }
     }
-    else if (i.type() == typeid(currency::txin_zarcanum_inputs))
+    else if (i.type() == typeid(currency::txin_zc_input))
     {
-      const currency::txin_zarcanum_inputs& in_to_zc = boost::get<currency::txin_zarcanum_inputs>(i);
-      for (auto& e : in_to_zc.elements)
-      {
-        auto it = m_key_images.find(e.k_image);
-        //should we panic if image not found?
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_key_images.end(), "[read_money_transfer2_details_from_tx]Unknown key image in tx: " << get_transaction_hash(tx));
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "[read_money_transfer2_details_from_tx]Index out of range for key image in tx: " << get_transaction_hash(tx));
-        wtd.spn.push_back(m_transfers[it->second].amount());
-      }
+      const currency::txin_zc_input& in_zc = boost::get<currency::txin_zc_input>(i);
+      auto it = m_key_images.find(in_zc.k_image);
+      //should we panic if image not found?
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_key_images.end(), "[read_money_transfer2_details_from_tx]Unknown key image in tx: " << get_transaction_hash(tx));
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "[read_money_transfer2_details_from_tx]Index out of range for key image in tx: " << get_transaction_hash(tx));
+      wtd.spn.push_back(m_transfers[it->second].amount());
     }
   }
   return true;

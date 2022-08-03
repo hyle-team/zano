@@ -746,7 +746,7 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
     {
       return this->operator()(static_cast<const txin_to_key&>(inp));
     }
-    bool operator()(const txin_zarcanum_inputs& inp) const
+    bool operator()(const txin_zc_input& inp) const
     {
       // TODO: #@#@
       return false;
@@ -1646,12 +1646,10 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
       {
         purge_keyimage_from_big_heap(get_to_key_input_from_txin_v(tx.vin[n]).k_image, block_id);
       }
-      else if (tx.vin[n].type() == typeid(txin_zarcanum_inputs))
+      else if (tx.vin[n].type() == typeid(txin_zc_input))
       {
-        // TODO @#@# consider refactoring
-        const txin_zarcanum_inputs& zins = boost::get<txin_zarcanum_inputs>(tx.vin[n]);
-        for(const auto& el : zins.elements)
-          purge_keyimage_from_big_heap(el.k_image, block_id);
+        const txin_zc_input& zcin = boost::get<txin_zc_input>(tx.vin[n]);
+        purge_keyimage_from_big_heap(zcin.k_image, block_id);
       }
     }
   }
@@ -3947,15 +3945,9 @@ namespace currency
       }
       return true;
     }
-    bool operator()(const txin_zarcanum_inputs& in) const
+    bool operator()(const txin_zc_input& in) const
     {
-      // TODO:  @#@# should check for hardfork here?
-      for(auto& el : in.elements)
-      {
-        if (!visit(0, el.k_image, el.key_offsets))
-          return false;
-      }
-      return true;
+      return visit(0, in.k_image, in.key_offsets);
     }
   };
 }
@@ -4309,14 +4301,11 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
       if (is_multisig_output_spent(boost::get<const txin_multisig>(in).multisig_out_id))
         return true;
     }
-    else if (in.type() == typeid(txin_zarcanum_inputs))
+    else if (in.type() == typeid(txin_zc_input))
     {
-      const auto& zins = boost::get<txin_zarcanum_inputs>(in);
-      for(auto& el: zins.elements)
-      {
-        if (have_tx_keyimg_as_spent(el.k_image))
-          return true;
-      }
+      const auto& zcin = boost::get<txin_zc_input>(in);
+      if (have_tx_keyimg_as_spent(zcin.k_image))
+        return true;
     }
     else if (in.type() == typeid(txin_gen))
     {
@@ -4340,7 +4329,19 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
 {
   size_t sig_index = 0;
   max_used_block_height = 0;
-  
+
+  auto local_check_key_image = [&](const crypto::key_image& ki) -> bool
+  {
+    TIME_MEASURE_START_PD(tx_check_inputs_loop_kimage_check);
+    if (have_tx_keyimg_as_spent(ki))
+    {
+      LOG_ERROR("Key image was already spent in blockchain: " << string_tools::pod_to_hex(ki) << " for input #" << sig_index << " tx: " << tx_prefix_hash);
+      return false;
+    }
+    TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_kimage_check);
+    return true;
+  };
+
   TIME_MEASURE_START_PD(tx_check_inputs_loop);
   for(const auto& txin : tx.vin)
   {
@@ -4348,13 +4349,9 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
     VARIANT_CASE_CONST(txin_to_key, in_to_key)
     {
       CHECK_AND_ASSERT_MES(in_to_key.key_offsets.size(), false, "Empty in_to_key.key_offsets for input #" << sig_index << " tx: " << tx_prefix_hash);
-      TIME_MEASURE_START_PD(tx_check_inputs_loop_kimage_check);
-      if (have_tx_keyimg_as_spent(in_to_key.k_image))
-      {
-        LOG_ERROR("Key image was already spent in blockchain: " << string_tools::pod_to_hex(in_to_key.k_image) << " for input #" << sig_index << " tx: " << tx_prefix_hash);
+      if (!local_check_key_image(in_to_key.k_image))
         return false;
-      }
-      TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_kimage_check);
+
       uint64_t max_unlock_time = 0;
       if (!check_tx_input(tx, sig_index, in_to_key, tx_prefix_hash, max_used_block_height, max_unlock_time))
       {
@@ -4372,23 +4369,30 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
     }
     VARIANT_CASE_CONST(txin_htlc, in_htlc)
     {
-      if (!is_hardfork_active(3))
+      if (!is_hardfork_active(3)) // @#@ CZ, consider removing this to validate_tx_for_hardfork_specific_terms
       {
         LOG_ERROR("Error: Transaction with txin_htlc before hardfork 3 (before height " << m_core_runtime_config.hard_forks.get_str_height_the_hardfork_active_after(3) << ")");
         return false;
       }
 
       CHECK_AND_ASSERT_MES(in_htlc.key_offsets.size(), false, "Empty in_to_key.key_offsets for input #" << sig_index << " tx: " << tx_prefix_hash);
-      TIME_MEASURE_START_PD(tx_check_inputs_loop_kimage_check);
-      if (have_tx_keyimg_as_spent(in_htlc.k_image))
-      {
-        LOG_ERROR("Key image was already spent in blockchain: " << string_tools::pod_to_hex(in_htlc.k_image) << " for input #" << sig_index << " tx: " << tx_prefix_hash);
+      if (!local_check_key_image(in_htlc.k_image))
         return false;
-      }
-      TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_kimage_check);
+
       if (!check_tx_input(tx, sig_index, in_htlc, tx_prefix_hash, max_used_block_height))
       {
-        LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << obj_to_json_str(in_htlc) << ") in tx: " << tx_prefix_hash);
+        LOG_ERROR("Failed to validate htlc input #" << sig_index << " in tx: " << tx_prefix_hash << ", htlc json: " << ENDL << obj_to_json_str(in_htlc));
+        return false;
+      }
+    }
+    VARIANT_CASE_CONST(txin_zc_input, in_zc)
+    {
+      if (!local_check_key_image(in_zc.k_image))
+        return false;
+
+      if (!check_tx_input(tx, sig_index, in_zc, tx_prefix_hash, max_used_block_height))
+      {
+        LOG_ERROR("Failed to validate zc input #" << sig_index << " in tx: " << tx_prefix_hash);
         return false;
       }
     }
@@ -4784,6 +4788,54 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   return check_input_signature(tx, in_index, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, output_keys_ptrs);
 }
 //------------------------------------------------------------------
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  // somehow we need to get a list<tx_out_zarcanum> this input is referring to
+  // and make sure that all of them are good (i.e. check 1) source tx unlock time validity; 2) mixin restrictions; 3) general gindex/ref_by_id corectness)
+  //
+  // get_output_keys_for_input_with_checks may be used for that, but at that time it needs refactoring
+  //
+  std::vector<crypto::public_key> output_keys; // won't be used
+  scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
+  uint64_t source_max_unlock_time_for_pos_coinbase_dummy = 0;
+  if (!get_output_keys_for_input_with_checks(tx, zc_in, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
+  {
+    LOG_PRINT_L0("get_output_keys_for_input_with_checks failed for input #" << in_index << ", key_offset.size = " << zc_in.key_offsets.size() << ")");
+    return false;
+  }
+
+  // @#@
+
+  // here we don't need to check zc_in.k_image validity because it is checked in verify_CLSAG_GG()
+
+  CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() > 0, false, "zero referenced outputs found");
+  CHECK_AND_ASSERT_MES(in_index < tx.signatures.size(), false, "tx.signatures.size (" << tx.signatures.size() << ") is less than or equal to in_index (" << in_index << ")");
+  // TODO: consider additional checks here
+
+  // build a ring of references
+  vector<crypto::CLSAG_GG_input_ref_t> ring;
+  ring.reserve(scan_contex.zc_outs.size());
+  for(auto& zc_out : scan_contex.zc_outs)
+    ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment);
+
+  // calculate corresponding tx prefix hash
+  crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, in_index, tx_prefix_hash);
+  CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
+
+  const ZC_sig& sig = boost::get<ZC_sig>(tx.signatures[in_index]);
+
+  //TIME_MEASURE_START_PD(tx_input_check_clsag_gg);
+
+  bool r = crypto::verify_CLSAG_GG(tx_hash_for_signature, ring, sig.pseudo_out_amount_commitment, zc_in.k_image, sig.clsags_gg);
+  CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GG failed");
+
+  //TIME_MEASURE_FINISH_PD(tx_input_check_clsag_gg);
+
+  return true;
+}
+//------------------------------------------------------------------
 uint64_t blockchain_storage::get_adjusted_time() const
 {
   //TODO: add collecting median time
@@ -4915,16 +4967,13 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
           return tx_chain_entry;
         }
       }
-      else if (in.type() == typeid(txin_zarcanum_inputs))
+      else if (in.type() == typeid(txin_zc_input))
       {
-        const auto& zins = boost::get<txin_zarcanum_inputs>(in);
-        for(auto& el: zins.elements)
+        const auto& zc_in = boost::get<txin_zc_input>(in);
+        if (zc_in.k_image == ki)
         {
-          if (el.k_image == ki)
-          {
-            id_result = tx_id;
-            return tx_chain_entry;
-          }
+          id_result = tx_id;
+          return tx_chain_entry;
         }
       }
     }
@@ -5098,7 +5147,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     VARIANT_CASE_CONST(txin_htlc, in_htlc)
       if (!var_is_after_hardfork_3_zone)
         return false;
-    VARIANT_CASE_CONST(txin_zarcanum_inputs, in_zins)
+    VARIANT_CASE_CONST(txin_zc_input, in_zins)
       if (!var_is_after_hardfork_4_zone)
         return false;
     VARIANT_SWITCH_END();
