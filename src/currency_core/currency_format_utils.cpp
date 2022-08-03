@@ -1699,7 +1699,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
       bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, blinding_masks[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
-      amounts[range_proof_start_index - output_index] = dst_entr.amount;
+      amounts[output_index - range_proof_start_index] = dst_entr.amount;
       summary_outs_money += dst_entr.amount;
       blinding_masks_sum += blinding_masks[output_index];
       output_index++;
