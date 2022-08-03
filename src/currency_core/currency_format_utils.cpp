@@ -3609,13 +3609,16 @@ namespace currency
   //--------------------------------------------------------------------------------
   bool verify_multiple_zarcanum_outs_range_proofs(const std::vector<zarcanum_outs_range_proof_commit_ref_t>& range_proofs)
   {
+    if (range_proofs.empty())
+      return true;
+
     std::vector<crypto::bpp_sig_commit_ref_t> sigs;
     for(auto el : range_proofs)
       sigs.emplace_back(el.range_proof.bpp, el.amount_commitments);
 
     uint8_t err = 0;
     bool r = crypto::bpp_verify<>(sigs, &err);
-    CHECK_AND_ASSERT_MES(r, false, "bpp_vefiry failed with error " << err);
+    CHECK_AND_ASSERT_MES(r, false, "bpp_verify failed with error " << err);
 
     return true;
   }
