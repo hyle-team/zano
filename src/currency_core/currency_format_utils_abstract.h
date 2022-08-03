@@ -142,7 +142,8 @@ namespace currency
       const txin_htlc& in = boost::get<txin_htlc>(in_v);
       return static_cast<const txin_to_key&>(in);
     }
-    else {
+    else
+    {
       ASSERT_MES_AND_THROW("[get_to_key_input_from_txin_v] Wrong type " << in_v.type().name());
     }
   }

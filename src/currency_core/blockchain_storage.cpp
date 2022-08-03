@@ -3886,14 +3886,14 @@ namespace currency
     const crypto::hash& m_tx_id;
     const crypto::hash& m_bl_id;
     const uint64_t m_bl_height;
-    uint64_t &m_mixins_count;
-    add_transaction_input_visitor(blockchain_storage& bcs, blockchain_storage::key_images_container& m_db_spent_keys, const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, uint64_t& mixins_count) :
+    uint64_t &m_max_mixins_count;
+    add_transaction_input_visitor(blockchain_storage& bcs, blockchain_storage::key_images_container& m_db_spent_keys, const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, uint64_t& max_mixins_count) :
       m_bcs(bcs),
       m_db_spent_keys(m_db_spent_keys),
       m_tx_id(tx_id),
       m_bl_id(bl_id),
       m_bl_height(bl_height), 
-      m_mixins_count(mixins_count)
+      m_max_mixins_count(max_mixins_count)
     {}
 
     bool visit(uint64_t amount, const crypto::key_image& ki, const std::vector<txout_ref_v>& key_offsets) const
@@ -3917,8 +3917,8 @@ namespace currency
           return false;
         }
       }
-      if (m_mixins_count < key_offsets.size())
-        m_mixins_count = key_offsets.size();
+      if (m_max_mixins_count < key_offsets.size())
+        m_max_mixins_count = key_offsets.size();
       return true;
     }
 
@@ -3928,7 +3928,7 @@ namespace currency
     }
     bool operator()(const txin_htlc& in) const
     {
-      if (!m_bcs.is_hardfork_active(3))
+      if (!m_bcs.is_hardfork_active(3)) // @#@ CZ, should we move this check to validate_tx_for_hardfork_specific_terms()? 
       {
         LOG_ERROR("Error: Transaction with txin_htlc before hardfork 3 (before height " << m_bcs.get_core_runtime_config().hard_forks.get_str_height_the_hardfork_active_after(3) << ")");
         return false;
@@ -3983,11 +3983,11 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   process_blockchain_tx_attachments(tx, bl_height, bl_id, timestamp);
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_attachment);
 
-  uint64_t mixins_count = 0;
+  uint64_t max_mixins_count = 0;
   TIME_MEASURE_START_PD(tx_process_inputs);
   for(const txin_v& in : tx.vin)
   {
-    if(!boost::apply_visitor(add_transaction_input_visitor(*this, m_db_spent_keys, tx_id, bl_id, bl_height, mixins_count), in))
+    if(!boost::apply_visitor(add_transaction_input_visitor(*this, m_db_spent_keys, tx_id, bl_id, bl_height, max_mixins_count), in))
     {
       LOG_ERROR("critical internal error: add_transaction_input_visitor failed. but key_images should be already checked");
       purge_transaction_keyimages_from_blockchain(tx, false);
@@ -4000,11 +4000,11 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
     }
   }
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_inputs);
-  if (need_to_profile && mixins_count > 0)
+  if (need_to_profile && max_mixins_count > 0)
   {
-    m_performance_data.tx_mixin_count.push(mixins_count);
+    m_performance_data.tx_mixin_count.push(max_mixins_count);
 #ifdef _DEBUG
-    LOG_PRINT_L0("[TX_MIXINS]: " <<  mixins_count);
+    LOG_PRINT_L0("[TX_MIXINS]: " <<  max_mixins_count);
 #endif
   }
 
@@ -4022,6 +4022,9 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
     return false;
   }
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_check_exist);
+
+  // all check are ok, add tx to the database
+
   TIME_MEASURE_START_PD(tx_push_global_index);
   transaction_chain_entry ch_e;
   ch_e.m_keeper_block_height = bl_height;
@@ -4074,7 +4077,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
   CRITICAL_REGION_LOCAL(m_read_lock);
   bool res = check_tx_inputs(tx, tx_prefix_hash, max_used_block_height);
   if(!res) return false;
-  CHECK_AND_ASSERT_MES(max_used_block_height < m_db_blocks.size(), false,  "internal error: max used block index=" << max_used_block_height << " is not less then blockchain size = " << m_db_blocks.size());
+  CHECK_AND_ASSERT_MES(max_used_block_height < m_db_blocks.size(), false,  "internal error: max used block index=" << max_used_block_height << " is not less than blockchain size = " << m_db_blocks.size());
   get_block_hash(m_db_blocks[max_used_block_height]->bl, max_used_block_id);
   return true;
 }
@@ -4444,6 +4447,7 @@ struct outputs_visitor
   blockchain_storage::scan_for_keys_context& m_scan_context;
   const blockchain_storage& m_bch;
   uint64_t& m_source_max_unlock_time_for_pos_coinbase;
+
   outputs_visitor(std::vector<crypto::public_key>& results_collector,
     const blockchain_storage& bch,
     uint64_t& source_max_unlock_time_for_pos_coinbase, 
@@ -4453,12 +4457,13 @@ struct outputs_visitor
     , m_source_max_unlock_time_for_pos_coinbase(source_max_unlock_time_for_pos_coinbase)
     , m_scan_context(scan_context)
   {}
+
   bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_bare& out, uint64_t out_i)
   {
     //check tx unlock time
     uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
     //let coinbase sources for PoS block to have locked inputs, the outputs supposed to be locked same way, except the reward 
-    if (is_coinbase(validated_tx) && is_pos_block(validated_tx))
+    if (is_coinbase(validated_tx) && is_pos_block(validated_tx)) // @#@ consider changing to one call to is_pos_coinbase()
     {
       CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(source_out_unlock_time), false, "source output #" << out_i << " is locked by time, not by height, which is not allowed for PoS coinbase");
       if (source_out_unlock_time > m_source_max_unlock_time_for_pos_coinbase)
@@ -4472,29 +4477,17 @@ struct outputs_visitor
         return false;
       }
     }
-    if (out.target.type() == typeid(txout_to_key))
-    {
-      crypto::public_key pk = boost::get<txout_to_key>(out.target).key;
-      m_results_collector.push_back(pk);
-    }
-    else if (out.target.type() == typeid(txout_htlc))
-    {
-      m_scan_context.htlc_outs.push_back(boost::get<txout_htlc>(out.target));
-      crypto::public_key pk = null_pkey;
-      if (m_scan_context.htlc_is_expired)
-      {
-        pk = boost::get<txout_htlc>(out.target).pkey_refund;
-      }
-      else
-      {
-        pk = boost::get<txout_htlc>(out.target).pkey_redeem;
-      }
-      m_results_collector.push_back(pk);
-    }else 
-    {
-      LOG_PRINT_L0("Output have wrong type id, which=" << out.target.which());
-      return false;
-    }   
+
+    VARIANT_SWITCH_BEGIN(out.target)
+      VARIANT_CASE_CONST(txout_to_key, out_tk)
+        m_results_collector.push_back(out_tk.key);
+      VARIANT_CASE_CONST(txout_htlc, out_htlc)
+        m_scan_context.htlc_outs.push_back(out_htlc);
+        m_results_collector.push_back(m_scan_context.htlc_is_expired ? out_htlc.pkey_refund : out_htlc.pkey_redeem);
+      VARIANT_CASE_OTHER()
+        LOG_PRINT_L0("Output have wrong type id, which=" << out.target.which());
+        return false;
+    VARIANT_SWITCH_END()
 
     return true;
   }

@@ -6,6 +6,7 @@
 #include "chaingen.h"
 #include "emission_test.h"
 #include "pos_block_builder.h"
+#include "random_helper.h"
 
 using namespace currency;
 

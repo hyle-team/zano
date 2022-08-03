@@ -7,6 +7,7 @@
 #include "chaingen.h"
 #include "alias_tests.h"
 #include "tx_builder.h"
+#include "random_helper.h"
 
 using namespace epee;
 using namespace currency;

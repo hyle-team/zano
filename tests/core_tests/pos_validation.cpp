@@ -7,6 +7,7 @@
 #include "pos_validation.h"
 #include "tx_builder.h"
 #include "pos_block_builder.h"
+#include "random_helper.h"
 
 using namespace epee;
 using namespace crypto;
