@@ -1672,8 +1672,8 @@ namespace currency
     size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
     uint64_t range_proof_start_index = output_index;
     std::set<uint16_t> deriv_cache;
-    crypto::scalar_vec_t blinding_masks(destinations.size()); // vector of secret blinging masks for each output. For range proof generation
-    crypto::scalar_vec_t amounts(destinations.size());        // vector of amounts, converted to scalars. For ranage proof generation
+    crypto::scalar_vec_t blinding_masks(tx.vout.size() + destinations.size()); // vector of secret blinging masks for each output. For range proof generation
+    crypto::scalar_vec_t amounts(tx.vout.size() + destinations.size());        // vector of amounts, converted to scalars. For ranage proof generation
     crypto::scalar_t blinding_masks_sum = 0;
     for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
@@ -2275,7 +2275,7 @@ namespace currency
         VARIANT_CASE_CONST(txout_multisig, t)
           if (is_out_to_acc(acc, t, derivation, output_index))
           {
-            outs.emplace_back(output_index, 0); // TODO: @#@# consider this
+            outs.emplace_back(output_index, o.amount); // TODO: @#@# consider this
             //don't cout this money
           }
         VARIANT_CASE_CONST(txout_htlc, htlc)

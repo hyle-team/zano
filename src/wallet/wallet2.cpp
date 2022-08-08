@@ -714,6 +714,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           transfer_details_base& tdb = m_multisig_transfers[multisig_id];
           tdb.m_ptx_wallet_info = pwallet_info;
           tdb.m_internal_output_index = o;
+          tdb.m_amount = outs[i_in_outs].amount;
           WLT_LOG_L0("Received multisig, multisig out id: " << multisig_id << ", amount: " << tdb.amount() << ", with tx: " << get_transaction_hash(tx));
         }
       }

@@ -422,23 +422,22 @@ namespace currency
 
   template<typename out_t>
   inline bool is_out_burned(const out_t& out)           { CHECK_AND_ASSERT_THROW_MES(false, "incorrect out type: " << typeid(out).name()); }
-  inline bool is_out_burned(const tx_out_bare& o)       { return is_out_burned(o.target); }
+  template<>
   inline bool is_out_burned(const txout_to_key& o)      { return o.key == null_pkey; }
+  template<>
   inline bool is_out_burned(const tx_out_zarcanum& o)   { return o.stealth_address == null_pkey; }
   struct zz_is_out_burned_helper_visitor : boost::static_visitor<bool>
   {
     template<typename T>
     bool operator()(const T& v) const { return is_out_burned(v); }
   };
-  inline bool is_out_burned(const tx_out_v& v)
-  {
-    return boost::apply_visitor(zz_is_out_burned_helper_visitor(), v);
-  }
-  inline bool is_out_burned(const txout_target_v& v)
-  {
-    return boost::apply_visitor(zz_is_out_burned_helper_visitor(), v);
-  }
-
+  template<>
+  inline bool is_out_burned(const txout_target_v& v)    { return boost::apply_visitor(zz_is_out_burned_helper_visitor(), v); }
+  template<>
+  inline bool is_out_burned(const tx_out_v& v)          { return boost::apply_visitor(zz_is_out_burned_helper_visitor(), v); }
+  template<>
+  inline bool is_out_burned(const tx_out_bare& o)       { return is_out_burned(o.target); }
+  
   template<class t_extra_container>
   bool add_attachments_info_to_extra(t_extra_container& extra_container, const std::vector<attachment_v>& attachments)
   {
