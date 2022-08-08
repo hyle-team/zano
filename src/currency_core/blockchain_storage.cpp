@@ -3926,11 +3926,6 @@ namespace currency
     }
     bool operator()(const txin_htlc& in) const
     {
-      if (!m_bcs.is_hardfork_active(3)) // @#@ CZ, should we move this check to validate_tx_for_hardfork_specific_terms()? 
-      {
-        LOG_ERROR("Error: Transaction with txin_htlc before hardfork 3 (before height " << m_bcs.get_core_runtime_config().hard_forks.get_str_height_the_hardfork_active_after(3) << ")");
-        return false;
-      }
       return this->operator()(static_cast<const txin_to_key&>(in));
     }
     bool operator()(const txin_gen& in) const { return true; }
