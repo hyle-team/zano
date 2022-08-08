@@ -5113,61 +5113,92 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   return validate_tx_for_hardfork_specific_terms(tx, tx_id, block_height);
 }
 //------------------------------------------------------------------
+
+template<typename x_type>
+struct visitor_proxy : public boost::static_visitor<const x_type*>
+{
+  const x_type* operator()(const x_type& v)const
+  {
+    return &v;
+  }
+  template<typename t_type>
+  const x_type* operator()(const t_type& v)const { return nullptr; }
+};
+
+
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
-  auto is_allowed_before_hardfork2 = [&](const payload_items_v& el) -> bool
-  {
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer), false, "tx " << tx_id << " contains tx_payer which is not allowed on height " << block_height);
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver), false, "tx " << tx_id << " contains tx_receiver which is not allowed on height " << block_height);
-    CHECK_AND_ASSERT_MES(el.type() != typeid(extra_alias_entry), false, "tx " << tx_id << " contains extra_alias_entry which is not allowed on height " << block_height);
-    return true;
-  };
+  bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
+  bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
+  bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
+  bool var_is_after_hardfork_4_zone = m_core_runtime_config.is_hardfork_active_for_height(4, block_height);
 
-  auto is_allowed_before_hardfork1 = [&](const payload_items_v& el) -> bool
+  auto is_allowed_before_hardfork1 = [&](const auto& el) -> bool
   {
     CHECK_AND_ASSERT_MES(el.type() != typeid(etc_tx_details_unlock_time2), false, "tx " << tx_id << " contains etc_tx_details_unlock_time2 which is not allowed on height " << block_height);
     return true;
   };
 
-  auto is_allowed_before_hardfork4 = [&](const payload_items_v& el) -> bool
+  auto is_allowed_before_hardfork2 = [&](const auto& el) -> bool
   {
-    CHECK_AND_ASSERT_MES(el.type() != typeid(zarcanum_tx_data_v1), false, "tx " << tx_id << " contains zarcanum_tx_data_v1 which is not allowed on height " << block_height);
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer), false, "tx " << tx_id << " contains tx_payer which is not allowed on height " << block_height);
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver), false, "tx " << tx_id << " contains tx_receiver which is not allowed on height " << block_height);
+    CHECK_AND_ASSERT_MES(el.type() != typeid(extra_alias_entry), false, "tx " << tx_id << " contains extra_alias_entry which is not allowed on height " << block_height);
+    return true;
+  }; 
+
+  auto is_allowed_before_hardfork3 = [&](const auto& el) -> bool
+  {
+    CHECK_AND_ASSERT_MES(el.type() != typeid(txin_htlc), false, "tx " << tx_id << " contains txin_htlc which is not allowed on height " << block_height);
+    const tx_out_bare* pbare = boost::apply_visitor(visitor_proxy<tx_out_bare>(), el);
+    if (pbare)
+    {
+      CHECK_AND_ASSERT_MES(pbare->target.type() != typeid(txout_htlc), false, "tx " << tx_id << " contains txout_htlc which is not allowed on height " << block_height);
+    }
     return true;
   };
 
-  bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
-  bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
-  bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
-  bool var_is_after_hardfork_4_zone = m_core_runtime_config.is_hardfork_active_for_height(4, block_height);
+  auto is_allowed_before_hardfork4 = [&](const auto& el) -> bool
+  {
+    CHECK_AND_ASSERT_MES(el.type() != typeid(zarcanum_tx_data_v1), false, "tx " << tx_id << " contains zarcanum_tx_data_v1 which is not allowed on height " << block_height);
+    CHECK_AND_ASSERT_MES(el.type() != typeid(txin_zc_input), false, "tx " << tx_id << " contains txin_zc_input which is not allowed on height " << block_height);
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_out_zarcanum), false, "tx " << tx_id << " contains tx_out_zarcanum which is not allowed on height " << block_height);
+    return true;
+  };
+
+  auto is_allowed_after_hardfork4 = [&](const auto& el) -> bool
+  {
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_out_bare), false, "tx " << tx_id << " contains tx_out_bare which is not allowed on height " << block_height);
+    return true;
+  };
   
   //inputs
   for (const auto in : tx.vin)
   {
-    VARIANT_SWITCH_BEGIN(in);
-    VARIANT_CASE_CONST(txin_htlc, in_htlc)
-      if (!var_is_after_hardfork_3_zone)
-        return false;
-    VARIANT_CASE_CONST(txin_zc_input, in_zins)
-      if (!var_is_after_hardfork_4_zone)
-        return false;
-    VARIANT_SWITCH_END();
+    if (!var_is_after_hardfork_1_zone && !is_allowed_before_hardfork1(in))
+      return false;
+    if (!var_is_after_hardfork_2_zone && !is_allowed_before_hardfork2(in))
+      return false;
+    if (!var_is_after_hardfork_3_zone && !is_allowed_before_hardfork3(in))
+      return false;
+    if (!var_is_after_hardfork_4_zone && !is_allowed_before_hardfork4(in))
+      return false;
+    if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(in))
+      return false;
   }
   //outputs
   for (const auto out : tx.vout)
   {
-    VARIANT_SWITCH_BEGIN(out);
-    VARIANT_CASE_CONST(tx_out_bare, o)
-      if (var_is_after_hardfork_4_zone)
-        return false; // bare outputs are not allowed after HF4
-      if (o.target.type() == typeid(txout_htlc))
-      {
-        if (!var_is_after_hardfork_3_zone)
-          return false;
-      }
-    VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      if (!var_is_after_hardfork_4_zone)
-        return false;
-    VARIANT_SWITCH_END();
+    if (!var_is_after_hardfork_1_zone && !is_allowed_before_hardfork1(out))
+      return false;
+    if (!var_is_after_hardfork_2_zone && !is_allowed_before_hardfork2(out))
+      return false;
+    if (!var_is_after_hardfork_3_zone && !is_allowed_before_hardfork3(out))
+      return false;
+    if (!var_is_after_hardfork_4_zone && !is_allowed_before_hardfork4(out))
+      return false;
+    if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(out))
+      return false;
   }
 
   //extra
@@ -5179,12 +5210,19 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       return false;
     if (!var_is_after_hardfork_4_zone && !is_allowed_before_hardfork4(el))
       return false;
+    if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(el))
+      return false;
   }
 
   //attachments
   for (const auto el : tx.attachment)
   {
     if (!var_is_after_hardfork_2_zone && !is_allowed_before_hardfork2(el))
+      return false;
+
+    if (!var_is_after_hardfork_4_zone && !is_allowed_before_hardfork4(el))
+      return false;
+    if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(el))
       return false;
   }
     
