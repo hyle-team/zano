@@ -170,25 +170,25 @@ namespace currency
   }
 
   //, txin_htlc, txin_zc_input
-  bool compare_varian_by_types(const txin_multisig& left, typename txin_multisig& right)
+  bool compare_variant_by_types(const txin_multisig& left, typename txin_multisig& right)
   {
     return (left.multisig_out_id < right.multisig_out_id);
   }
   //---------------------------------------------------------------
-  bool compare_varian_by_types(const txin_gen& left, typename txin_gen& right)
+  bool compare_variant_by_types(const txin_gen& left, typename txin_gen& right)
   {
     //actually this should never happen, should we leave it in case it happen in unit tests? @sowle 
     return (left.height < right.height);
   }
   //---------------------------------------------------------------
   template<typename type_with_kimage_t>
-  bool compare_varian_by_types(const type_with_kimage_t& left, typename type_with_kimage_t& right)
+  bool compare_variant_by_types(const type_with_kimage_t& left, typename type_with_kimage_t& right)
   {
     return (left.k_image < right.k_image);
   }
   //---------------------------------------------------------------
   template<typename t_type_left, typename t_type_right>
-  bool compare_varian_by_types(const t_type_left& left, const t_type_right& right)
+  bool compare_variant_by_types(const t_type_left& left, const t_type_right& right)
   {
     if (typeid(t_type_left) == typeid(t_type_right))
     {
@@ -209,7 +209,7 @@ namespace currency
     template<typename t_type_right>
     bool operator()(const t_type_right& right)const
     {
-      return compare_varian_by_types(m_rleft, right);
+      return compare_variant_by_types(m_rleft, right);
     }
   };
 
@@ -231,7 +231,7 @@ namespace currency
     //txin_gen, txin_to_key, txin_multisig, txin_htlc, txin_zc_input
     if (left.type() != right.type())
     {
-      //predefined type hierarchy based on it's tags defined in currency_basic.h, call compare_varian_by_types via 2-level visitor
+      //predefined type hierarchy based on it's tags defined in currency_basic.h, call compare_variant_by_types via 2-level visitor
       return boost::apply_visitor(left_visitor(right), left);
     }
     //compare 
