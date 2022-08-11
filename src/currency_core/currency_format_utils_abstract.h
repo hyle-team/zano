@@ -148,6 +148,96 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
+  inline
+    const crypto::key_image & get_key_image_txin_v(const txin_v& in_v)
+  {
+    if (in_v.type() == typeid(txin_to_key))
+    {
+      return boost::get<txin_to_key>(in_v).k_image;
+    }
+    else if (in_v.type() == typeid(txin_htlc))
+    {
+      return boost::get<txin_htlc>(in_v).k_image;
+    }
+    else if (in_v.type() == typeid(txin_zc_input))
+    {
+      return boost::get<txin_zc_input>(in_v).k_image;
+    }
+    else
+    {
+      ASSERT_MES_AND_THROW("[get_to_key_input_from_txin_v] Wrong type " << in_v.type().name());
+    }
+  }
+
+  //, txin_htlc, txin_zc_input
+  bool compare_varian_by_types(const txin_multisig& left, typename txin_multisig& right)
+  {
+    return (left.multisig_out_id < right.multisig_out_id);
+  }
+  //---------------------------------------------------------------
+  bool compare_varian_by_types(const txin_gen& left, typename txin_gen& right)
+  {
+    //actually this should never happen, should we leave it in case it happen in unit tests? @sowle 
+    return (left.height < right.height);
+  }
+  //---------------------------------------------------------------
+  template<typename type_with_kimage_t>
+  bool compare_varian_by_types(const type_with_kimage_t& left, typename type_with_kimage_t& right)
+  {
+    return (left.k_image < right.k_image);
+  }
+  //---------------------------------------------------------------
+  template<typename t_type_left, typename t_type_right>
+  bool compare_varian_by_types(const t_type_left& left, const t_type_right& right)
+  {
+    if (typeid(t_type_left) == typeid(t_type_right))
+    {
+      ASSERT_MES_AND_THROW("[compare_varian_by_types] Left and Right types matched type " << typeid(t_type_left).name());
+    }
+    //@sowle should we use here variant index instead? (tags takes since it's ids something more "unchangebale", but we can reconsider)
+    return (variant_serialization_traits<typename binary_archive<true>, typename t_type_left>::get_tag() < variant_serialization_traits<typename binary_archive<true>, typename t_type_right>::get_tag());
+  }
+  //---------------------------------------------------------------
+  template<typename t_type_left>
+  struct right_visitor : public boost::static_visitor<bool>
+  {
+    const t_type_left& m_rleft;
+
+    right_visitor(const t_type_left& left) : m_rleft(left)
+    {}
+    
+    template<typename t_type_right>
+    bool operator()(const t_type_right& right)const
+    {
+      return compare_varian_by_types(m_rleft, right);
+    }
+  };
+
+  struct left_visitor : public boost::static_visitor<bool>
+  {
+    const txin_v& m_rright;
+
+    left_visitor(const txin_v& right) : m_rright(right)
+    {}
+    template<typename t_type_left>
+    bool operator()(const t_type_left& left)const
+    {
+      return boost::apply_visitor(right_visitor<t_type_left>(left), m_rright);
+    }
+  };
+  //---------------------------------------------------------------
+  bool less_txin_v(const txin_v& left, const txin_v& right)
+  {
+    //txin_gen, txin_to_key, txin_multisig, txin_htlc, txin_zc_input
+    if (left.type() != right.type())
+    {
+      //predefined type hierarchy based on it's tags defined in currency_basic.h, call compare_varian_by_types via 2-level visitor
+      return boost::apply_visitor(left_visitor(right), left);
+    }
+    //compare 
+    return true;//(left < right);
+  }
+  //---------------------------------------------------------------
   template<typename variant_container_t>
   bool check_allowed_types_in_variant_container(const variant_container_t& container, const std::unordered_set<std::type_index>& allowed_types, bool elements_must_be_unique = true)
   {

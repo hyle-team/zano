@@ -5220,7 +5220,16 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(el))
       return false;
   }
-    
+  
+
+  if (var_is_after_hardfork_4_zone)
+  {
+    if(!validate_inputs_sorting(tx))
+    {
+      return false;
+    }
+  }
+
 
   return true;
 }

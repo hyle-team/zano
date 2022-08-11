@@ -153,6 +153,7 @@ namespace currency
   blobdata tx_to_blob(const transaction& b);
   bool tx_to_blob(const transaction& b, blobdata& b_blob);
   bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil);
+  bool validate_inputs_sorting(const transaction& tx);
 
 
 }

@@ -275,14 +275,27 @@ namespace currency
     std::unordered_set<crypto::key_image> ki;
     BOOST_FOREACH(const auto& in, tx.vin)
     {
-      if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
+      if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc) || in.type() == typeid(txin_zc_input))
       {
          
-        if (!ki.insert(get_to_key_input_from_txin_v(in).k_image).second)
+        if (!ki.insert(get_key_image_txin_v(in)).second)
           return false;
       }
     }
     return true;
   }
-
+  //---------------------------------------------------------------
+  bool validate_inputs_sorting(const transaction& tx)
+  {
+    size_t i = 0;
+    for(; i+1 < tx.vin.size(); i++)
+    {
+      //same less_txin_v() function should be used for sorting inputs during transacction creation
+      if (less_txin_v(tx.vin[i+1], tx.vin[i]))
+      {
+        return false;
+      }
+    }
+    return true;
+  }
 }
