@@ -228,14 +228,8 @@ namespace currency
   //---------------------------------------------------------------
   bool less_txin_v(const txin_v& left, const txin_v& right)
   {
-    //txin_gen, txin_to_key, txin_multisig, txin_htlc, txin_zc_input
-    if (left.type() != right.type())
-    {
-      //predefined type hierarchy based on it's tags defined in currency_basic.h, call compare_variant_by_types via 2-level visitor
-      return boost::apply_visitor(left_visitor(right), left);
-    }
-    //compare 
-    return true;//(left < right);
+    //predefined type hierarchy based on it's tags defined in currency_basic.h, call compare_variant_by_types via 2-level visitor
+    return boost::apply_visitor(left_visitor(right), left);
   }
   //---------------------------------------------------------------
   template<typename variant_container_t>
