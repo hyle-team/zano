@@ -75,8 +75,15 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   uint64_t transfer_amount = AMOUNT_TO_TRANSFER_ZARCANUM_BASIC + TESTS_DEFAULT_FEE;
   miner_wlt->transfer(transfer_amount, alice_wlt->get_account().get_public_address());
   LOG_PRINT_MAGENTA("Legacy-2-zarcanum transaction sent to Alice: " << transfer_amount, LOG_LEVEL_0);
+  miner_wlt->transfer(transfer_amount, alice_wlt->get_account().get_public_address());
+  LOG_PRINT_MAGENTA("Legacy-2-zarcanum transaction sent to Alice: " << transfer_amount, LOG_LEVEL_0);
+  miner_wlt->transfer(transfer_amount, alice_wlt->get_account().get_public_address());
+  LOG_PRINT_MAGENTA("Legacy-2-zarcanum transaction sent to Alice: " << transfer_amount, LOG_LEVEL_0);
+  miner_wlt->transfer(transfer_amount, alice_wlt->get_account().get_public_address());
+  LOG_PRINT_MAGENTA("Legacy-2-zarcanum transaction sent to Alice: " << transfer_amount, LOG_LEVEL_0);
 
-  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+
+  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 4, false, "Incorrect txs count in the pool");
 
 
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -122,7 +129,7 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   for(size_t i = 0; i!= CURRENCY_MINED_MONEY_UNLOCK_WINDOW+4; i++)
   {
     size_t pos_entries_count = 0;
-    if (!mine_next_pos_block_in_playtime_with_wallet(*miner_wlt.get(), staker_benefeciary_acc_wlt->get_account().get_public_address(), pos_entries_count))
+    if (!mine_next_pos_block_in_playtime_with_wallet(*alice_wlt.get(), staker_benefeciary_acc_wlt->get_account().get_public_address(), pos_entries_count))
     {
       CHECK_AND_ASSERT_MES(false, false, "Couldn't generate staking");
       return false;
