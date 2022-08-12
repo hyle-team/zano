@@ -170,12 +170,12 @@ namespace currency
   }
 
   //, txin_htlc, txin_zc_input
-  bool compare_variant_by_types(const txin_multisig& left, typename txin_multisig& right)
+  inline bool compare_variant_by_types(const txin_multisig& left, typename txin_multisig& right)
   {
     return (left.multisig_out_id < right.multisig_out_id);
   }
   //---------------------------------------------------------------
-  bool compare_variant_by_types(const txin_gen& left, typename txin_gen& right)
+  inline bool compare_variant_by_types(const txin_gen& left, typename txin_gen& right)
   {
     //actually this should never happen, should we leave it in case it happen in unit tests? @sowle 
     return (left.height < right.height);
@@ -226,7 +226,7 @@ namespace currency
     }
   };
   //---------------------------------------------------------------
-  bool less_txin_v(const txin_v& left, const txin_v& right)
+  inline bool less_txin_v(const txin_v& left, const txin_v& right)
   {
     //predefined type hierarchy based on it's tags defined in currency_basic.h, call compare_variant_by_types via 2-level visitor
     return boost::apply_visitor(left_visitor(right), left);
