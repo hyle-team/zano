@@ -222,13 +222,8 @@ bool test_generator::construct_block(currency::block& blk,
 //   else
 //     blk.major_version = BLOCK_MAJOR_VERSION_INITIAL;
 
-  if (!m_hardforks.is_hardfork_active_for_height(1, height))
-    blk.major_version = BLOCK_MAJOR_VERSION_INITIAL;
-  else if (!m_hardforks.is_hardfork_active_for_height(3, height))
-    blk.major_version = HF1_BLOCK_MAJOR_VERSION;
-  else
-    blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
-  
+  blk.major_version = m_hardforks.get_block_major_version_by_height(height);
+
   blk.minor_version = CURRENT_BLOCK_MINOR_VERSION;
   blk.timestamp = timestamp;
   blk.prev_id = prev_id;

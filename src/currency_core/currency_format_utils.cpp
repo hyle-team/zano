@@ -65,6 +65,33 @@ namespace currency
   false,
   pos_entry());
   }*/
+
+
+  //--------------------------------------------------------------------------------
+  bool generate_zarcanum_outs_range_proof(size_t out_index_start, size_t outs_count, const crypto::scalar_vec_t& amounts, const crypto::scalar_vec_t& blinding_masks,
+    const std::vector<tx_out_v>& vouts, zarcanum_outs_range_proof& result)
+  {
+    //TODO: review for Andre
+    CHECK_AND_ASSERT_MES(amounts.size() == outs_count, false, "");
+    CHECK_AND_ASSERT_MES(blinding_masks.size() == outs_count, false, "");
+    CHECK_AND_ASSERT_MES(out_index_start + outs_count == vouts.size(), false, "");
+
+    std::vector<const crypto::public_key*> commitments_1div8;
+    for (size_t out_index = out_index_start, i = 0; i < outs_count; ++out_index, ++i)
+    {
+      const tx_out_zarcanum& toz = boost::get<tx_out_zarcanum>(vouts[out_index]); // may throw an exception, only zarcanum outputs are exprected
+      const crypto::public_key* p = &toz.amount_commitment;
+      commitments_1div8.push_back(p);
+    }
+
+    result.outputs_count = outs_count;
+    uint8_t err = 0;
+    bool r = crypto::bpp_gen<>(amounts, blinding_masks, commitments_1div8, result.bpp, &err);
+    CHECK_AND_ASSERT_MES(r, false, "bpp_gen failed with error " << err);
+
+    return true;
+  }
+
   //---------------------------------------------------------------
   wide_difficulty_type correct_difficulty_with_sequence_factor(size_t sequence_factor, wide_difficulty_type diff)
   {
@@ -168,7 +195,7 @@ namespace currency
     const pos_entry& pe)
   {
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS || height == 0, false, "Too many outs (" << destinations.size() << ")! Miner tx can't be constructed.");
-
+    tx.version = tx_version;
     tx.vin.clear();
     tx.vout.clear();
     tx.extra.clear();
@@ -204,15 +231,36 @@ namespace currency
 
     uint64_t no = 0;
     std::set<uint16_t> deriv_cache;
+    uint64_t summary_outs_money = 0;
+    //fill outputs
+    finalized_tx result = AUTO_VAL_INIT(result);
+    uint8_t tx_outs_attr = 0;
+
+    size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
+    uint64_t range_proof_start_index = output_index;
+    crypto::scalar_vec_t blinding_masks(tx.vout.size() + destinations.size()); // vector of secret blinging masks for each output. For range proof generation
+    crypto::scalar_vec_t amounts(tx.vout.size() + destinations.size());        // vector of amounts, converted to scalars. For ranage proof generation
+    crypto::scalar_t blinding_masks_sum = 0;
     for (auto& d : destinations)
     {
-      bool r = construct_tx_out(d, txkey.sec, no, tx, deriv_cache, account_keys());
+
+      bool r = construct_tx_out(d, txkey.sec, no, tx, deriv_cache, account_keys(), blinding_masks[no], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to contruct miner tx out");
+      amounts[output_index - range_proof_start_index] = d.amount;
+      summary_outs_money += d.amount;
+      blinding_masks_sum += blinding_masks[output_index];
       no++;
     }
     
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    {
+      //add range proofs
+      currency::zarcanum_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
+      bool r = generate_zarcanum_outs_range_proof(range_proof_start_index, amounts.size(), amounts, blinding_masks, tx.vout, range_proofs);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to generate zarcanum_outs_range_proof()");
+      tx.attachment.push_back(range_proofs);
+    }
 
-    tx.version = tx_version;
     if (!have_type_in_variant_container<etc_tx_details_unlock_time2>(tx.extra))
     {
       //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
@@ -1429,29 +1477,6 @@ namespace currency
       sigs.resize(sigs.size() + 1);
       crypto::generate_signature(tx_prefix_hash, txkey.pub, txkey.sec, sigs.back());
     }
-
-    return true;
-  }
-  //--------------------------------------------------------------------------------
-  bool generate_zarcanum_outs_range_proof(size_t out_index_start, size_t outs_count, const crypto::scalar_vec_t& amounts, const crypto::scalar_vec_t& blinding_masks,
-    const std::vector<tx_out_v>& vouts, zarcanum_outs_range_proof& result)
-  {
-    //TODO: review for Andre
-    CHECK_AND_ASSERT_MES(amounts.size() == outs_count, false, "");
-    CHECK_AND_ASSERT_MES(blinding_masks.size() == outs_count, false, "");
-    CHECK_AND_ASSERT_MES(out_index_start + outs_count == vouts.size(), false, "");
-
-    std::vector<const crypto::public_key*> commitments_1div8;
-    for (size_t out_index = out_index_start, i = 0; i < outs_count; ++out_index, ++i)
-    {
-      const tx_out_zarcanum& toz = boost::get<tx_out_zarcanum>(vouts[out_index]); // may throw an exception, only zarcanum outputs are exprected
-      const crypto::public_key* p = &toz.amount_commitment;
-      commitments_1div8.push_back(p);
-    }
-
-    uint8_t err = 0;
-    bool r = crypto::bpp_gen<>(amounts, blinding_masks, commitments_1div8, result.bpp, &err);
-    CHECK_AND_ASSERT_MES(r, false, "bpp_gen failed with error " << err);
 
     return true;
   }

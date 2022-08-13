@@ -51,6 +51,18 @@ namespace currency
       }
       return 0;
     }
+
+    uint8_t get_block_major_version_by_height(uint64_t height)
+    {      
+      if (!this->is_hardfork_active_for_height(1, height))
+        return BLOCK_MAJOR_VERSION_INITIAL;
+      else if (!this->is_hardfork_active_for_height(3, height))
+        return HF1_BLOCK_MAJOR_VERSION;
+      else if (!this->is_hardfork_active_for_height(4, height))
+        return HF3_BLOCK_MAJOR_VERSION;
+      else
+        return CURRENT_BLOCK_MAJOR_VERSION;
+    }
   };
 
 

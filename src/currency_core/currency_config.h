@@ -30,7 +30,8 @@
 #define TRANSACTION_VERSION_INITAL                      0
 #define TRANSACTION_VERSION_PRE_HF4                     1
 #define HF1_BLOCK_MAJOR_VERSION                         1
-#define CURRENT_BLOCK_MAJOR_VERSION                     2
+#define HF3_BLOCK_MAJOR_VERSION                         2
+#define CURRENT_BLOCK_MAJOR_VERSION                     3
 
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2

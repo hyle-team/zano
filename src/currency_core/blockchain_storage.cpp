@@ -1305,7 +1305,15 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
     return false;
   }
 
-  CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
+  if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
+  {
+    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 1, false, "coinbase transaction wrong attachments number(expeted 1 - rangeproofs)");
+    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zarcanum_outs_range_proof), false, "coinbase transaction wrong attachmenttype (expeted - zarcanum_outs_range_proof)");
+  }
+  else
+  {
+    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
+  }
 
   return true;
 }
@@ -1445,12 +1453,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   boost::multiprecision::uint128_t already_generated_coins;
   CRITICAL_REGION_BEGIN(m_read_lock);
   height = m_db_blocks.size();
-  if(!m_core_runtime_config.is_hardfork_active_for_height(1, height))
-    b.major_version = BLOCK_MAJOR_VERSION_INITIAL;
-  else if(!m_core_runtime_config.is_hardfork_active_for_height(3, height))
-    b.major_version = HF1_BLOCK_MAJOR_VERSION;
-  else
-    b.major_version = CURRENT_BLOCK_MAJOR_VERSION;
+  b.major_version = m_core_runtime_config.hard_forks.get_block_major_version_by_height(height);
 
   b.minor_version = CURRENT_BLOCK_MINOR_VERSION;
   b.prev_id = get_top_block_id();
@@ -5564,7 +5567,7 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zarcanum_o
   CHECK_AND_ASSERT_MES(proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
     << " has TX_FLAG_SIGNATURE_MODE_SEPARATE but proofs_count = " << proofs_count);
 
-  return false;
+  return true;
 }
 
 bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc)
