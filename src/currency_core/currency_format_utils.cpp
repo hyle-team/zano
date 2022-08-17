@@ -1573,12 +1573,15 @@ namespace currency
 
     //we'll aggregate Zarcanum outs into one txin_zarcanum_inputs
     //txin_zarcanum_inputs ins_zc = AUTO_VAL_INIT(ins_zc);
-
+    std::vector<size_t> inputs_mapping;
+    size_t current_index = 0;
+    inputs_mapping.resize(sources.size());
     size_t input_starter_index = tx.vin.size();
     uint64_t summary_inputs_money = 0;
     //fill inputs NLSAG and Zarcanum 
     for (const tx_source_entry& src_entr : sources)
     {
+      inputs_mapping[current_index] = current_index++;
       in_contexts.push_back(input_generation_context_data());
       if(src_entr.is_multisig())
       {//multisig input
@@ -1739,6 +1742,19 @@ namespace currency
         att_count++;
       }
     }
+
+    //sort inputs and mapping if it's zarcanum hardfork
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    {
+      //1 sort mapping
+      std::sort(inputs_mapping.begin(), inputs_mapping.end(), [&](size_t a, size_t b) {
+        return less_txin_v(tx.vin[input_starter_index + a], tx.vin[input_starter_index + b]);
+      });
+
+      //2 sort the inputs in given range
+      std::sort(tx.vin.begin() + input_starter_index, tx.vin.end(), less_txin_v);
+    }
+
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
       //add range proofs
@@ -1776,10 +1792,37 @@ namespace currency
     //
     crypto::hash tx_prefix_hash;
     get_transaction_prefix_hash(tx, tx_prefix_hash);
-    size_t input_index = input_starter_index;
-    size_t in_context_index = 0;
+    //size_t input_index = input_starter_index;
+    //size_t in_context_index = 0;
     crypto::scalar_t local_blinding_masks_sum = 0; // ZC only
     bool r = false;
+    for (size_t i = 0; i != sources.size(); i++)
+    {
+      const tx_source_entry& source_entry = sources[inputs_mapping[i] + input_starter_index];
+      crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, i + input_starter_index, tx_prefix_hash);
+      CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
+      std::stringstream ss_ring_s;
+
+      if (source_entry.is_zarcanum())
+      {
+        // ZC
+        // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
+        r = generate_ZC_sig(tx_hash_for_signature, i + input_starter_index, source_entry, in_contexts[i], sender_account_keys, blinding_masks_sum, flags, local_blinding_masks_sum, tx);
+        CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
+      }
+      else
+      {
+        // NLSAG
+        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, i + input_starter_index, source_entry, sender_account_keys, in_contexts[i], txkey, flags, tx, &ss_ring_s);
+        CHECK_AND_ASSERT_MES(r, false, "generate_NLSAG_sig failed");
+      }
+
+      LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
+
+      //input_index++;
+      //in_context_index++;
+    }
+    /*
     for(const tx_source_entry& source_entry : sources)
     {
       crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, input_index, tx_prefix_hash);
@@ -1805,7 +1848,7 @@ namespace currency
       input_index++;
       in_context_index++;
     }
-
+    */
     return true;
   }
 
