@@ -6093,6 +6093,14 @@ bool blockchain_storage::prevalidate_block(const block& bl)
     else
       return false;
   }
+  //after hard_fork3 and before hard_fork4
+  else if (m_core_runtime_config.is_hardfork_active_for_height(3, block_height) &&
+    !m_core_runtime_config.is_hardfork_active_for_height(4, block_height))
+  {
+    if (bl.major_version != HF3_BLOCK_MAJOR_VERSION)
+      return false;
+  }
+
 
   //after hard_fork3
   if (bl.major_version > CURRENT_BLOCK_MAJOR_VERSION)

@@ -693,11 +693,11 @@ bool gen_block_wrong_version_agains_hardfork::c1(currency::core& c, size_t ev_in
   r = mine_next_pow_block_in_playtime(mining_accunt.get_public_address(), c, cb); // block with height 4  (won't pass)
   CHECK_TEST_CONDITION(!r);
 
-  //major  lower then norma for hf3 (do we need this half-working backward compability)
+  //major  lower then normal for hf3 (do we need this half-working backward compability? nope, hardfork 3 always put HF3_BLOCK_MAJOR_VERSION in major version )
   major_version_to_set = 0;
   minor_version_to_set = 0;
   r = mine_next_pow_block_in_playtime(mining_accunt.get_public_address(), c, cb); // block with height 4  (won't pass)
-  CHECK_TEST_CONDITION(r);
+  CHECK_TEST_CONDITION(!r);
 
   return true;
 }
