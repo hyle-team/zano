@@ -287,6 +287,10 @@ namespace currency
   //---------------------------------------------------------------
   bool validate_inputs_sorting(const transaction& tx)
   {
+    if (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE)
+      return true;
+
+
     size_t i = 0;
     for(; i+1 < tx.vin.size(); i++)
     {

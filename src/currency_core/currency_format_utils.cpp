@@ -1798,7 +1798,7 @@ namespace currency
     bool r = false;
     for (size_t i = 0; i != sources.size(); i++)
     {
-      const tx_source_entry& source_entry = sources[inputs_mapping[i] + input_starter_index];
+      const tx_source_entry& source_entry = sources[inputs_mapping[i]];
       crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, i + input_starter_index, tx_prefix_hash);
       CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
       std::stringstream ss_ring_s;
