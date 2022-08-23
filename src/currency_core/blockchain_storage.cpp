@@ -6079,26 +6079,26 @@ bool blockchain_storage::prevalidate_block(const block& bl)
 {
   uint64_t block_height = get_block_height(bl);
 
-  //before hard_fork1
-  if (bl.major_version == BLOCK_MAJOR_VERSION_INITIAL && !m_core_runtime_config.is_hardfork_active_for_height(1, block_height))
+  // HF0
+  if (!m_core_runtime_config.is_hardfork_active_for_height(1, block_height))
+  {
+    // at HF0 we do not check block version
     return true;
+  }
 
-
-  //after hard_fork1 and before hard_fork3
+  // HF1, HF2
   if ( m_core_runtime_config.is_hardfork_active_for_height(1, block_height) &&
       !m_core_runtime_config.is_hardfork_active_for_height(3, block_height))
   {
-    if (bl.major_version <= HF1_BLOCK_MAJOR_VERSION )
-      return true;
-    else
-      return false;
+    CHECK_AND_ASSERT_MES(bl.major_version <= HF1_BLOCK_MAJOR_VERSION, false, "HF1/HF2, incorrect block major version: " << (int)bl.major_version);
+    return true;
   }
-  //after hard_fork3 and before hard_fork4
-  else if (m_core_runtime_config.is_hardfork_active_for_height(3, block_height) &&
-    !m_core_runtime_config.is_hardfork_active_for_height(4, block_height))
+
+  // HF3
+  if ( m_core_runtime_config.is_hardfork_active_for_height(3, block_height) &&
+      !m_core_runtime_config.is_hardfork_active_for_height(4, block_height))
   {
-    if (bl.major_version != HF3_BLOCK_MAJOR_VERSION)
-      return false;
+    CHECK_AND_ASSERT_MES(bl.major_version == HF3_BLOCK_MAJOR_VERSION, false, "HF3, incorrect block major version: " << (int)bl.major_version);
   }
 
 
