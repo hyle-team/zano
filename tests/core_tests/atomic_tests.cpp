@@ -39,6 +39,10 @@ atomic_base_test::atomic_base_test()
 {
   REGISTER_CALLBACK_METHOD(atomic_base_test, c1);
   REGISTER_CALLBACK_METHOD(atomic_base_test, configure_core);
+
+  m_hardforks.set_hardfork_height(1, 10);
+  m_hardforks.set_hardfork_height(2, 11);
+  m_hardforks.set_hardfork_height(3, 12);
 }
 
 bool atomic_base_test::generate(std::vector<test_event_entry>& events) const
@@ -59,7 +63,8 @@ bool atomic_base_test::generate(std::vector<test_event_entry>& events) const
   block blk_0 = AUTO_VAL_INIT(blk_0);
   generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
   events.push_back(blk_0);
-  DO_CALLBACK(events, "configure_core");
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core"); // default callback will initialize core current runtime config with m_hardforks
   REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
 
   DO_CALLBACK(events, "c1");
@@ -67,18 +72,6 @@ bool atomic_base_test::generate(std::vector<test_event_entry>& events) const
   return true;
 }
 
-bool atomic_base_test::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
-  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
-
-  pc.hard_forks.set_hardfork_height(1, 10);
-  pc.hard_forks.set_hardfork_height(2, 11);
-  pc.hard_forks.set_hardfork_height(3, 12);
-  c.get_blockchain_storage().set_core_runtime_config(pc);
-  return true;
-}
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
@@ -630,18 +623,16 @@ bool atomic_test_altchain_simple::c1(currency::core& c, size_t ev_index, const s
   return true;
 }
 
+//------------------------------------------------------------------------------
 
-bool atomic_test_check_hardfork_rules::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+atomic_test_check_hardfork_rules::atomic_test_check_hardfork_rules()
 {
-  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
-  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
-  pc.hard_forks.set_hardfork_height(1, 10);
-  pc.hard_forks.set_hardfork_height(2, 10);
-  pc.hard_forks.set_hardfork_height(3, 10);
-  c.get_blockchain_storage().set_core_runtime_config(pc);
-  return true;
+  m_hardforks.clear();
+  m_hardforks.set_hardfork_height(1, 10);
+  m_hardforks.set_hardfork_height(2, 10);
+  m_hardforks.set_hardfork_height(3, 10);
 }
+
 bool atomic_test_check_hardfork_rules::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   //epee::debug::get_set_enable_assert(true, true);

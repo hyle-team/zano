@@ -19,6 +19,11 @@ zarcanum_basic_test::zarcanum_basic_test()
 {
   REGISTER_CALLBACK_METHOD(zarcanum_basic_test, configure_core);
   REGISTER_CALLBACK_METHOD(zarcanum_basic_test, c1);
+
+  m_hardforks.set_hardfork_height(1, 1);
+  m_hardforks.set_hardfork_height(2, 1);
+  m_hardforks.set_hardfork_height(3, 1);
+  m_hardforks.set_hardfork_height(4, 14);
 }
 
 bool zarcanum_basic_test::generate(std::vector<test_event_entry>& events) const
@@ -28,7 +33,7 @@ bool zarcanum_basic_test::generate(std::vector<test_event_entry>& events) const
   miner_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  DO_CALLBACK(events, "configure_core");
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
   set_hard_fork_heights_to_generator(generator);
   //TODO: Need to make sure REWIND_BLOCKS_N and other coretests codebase are capable of following hardfork4 rules
   //in this test hardfork4 moment moved to runtime section
@@ -36,17 +41,6 @@ bool zarcanum_basic_test::generate(std::vector<test_event_entry>& events) const
 
   DO_CALLBACK(events, "c1");
 
-  return true;
-}
-
-bool zarcanum_basic_test::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.hard_forks.set_hardfork_height(1, 1);
-  pc.hard_forks.set_hardfork_height(2, 1);
-  pc.hard_forks.set_hardfork_height(3, 1);
-  pc.hard_forks.set_hardfork_height(4, 14);
-  c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
 

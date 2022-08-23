@@ -194,6 +194,10 @@ wallet_rpc_transfer::wallet_rpc_transfer()
 {
   REGISTER_CALLBACK_METHOD(wallet_rpc_transfer, configure_core);
   REGISTER_CALLBACK_METHOD(wallet_rpc_transfer, c1);
+  
+  m_hardforks.set_hardfork_height(1, 1);
+  m_hardforks.set_hardfork_height(2, 1);
+  m_hardforks.set_hardfork_height(3, 1);
 }
 
 bool wallet_rpc_transfer::generate(std::vector<test_event_entry>& events) const
@@ -204,22 +208,12 @@ bool wallet_rpc_transfer::generate(std::vector<test_event_entry>& events) const
   account_base& bob_acc = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  DO_CALLBACK(events, "configure_core");
+  DO_CALLBACK(events, "configure_core"); // default callback will initialize core runtime config with m_hardforks
   set_hard_fork_heights_to_generator(generator);
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 6);
 
   DO_CALLBACK(events, "c1");
 
-  return true;
-}
-
-bool wallet_rpc_transfer::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.hard_forks.set_hardfork_height(1, 1);
-  pc.hard_forks.set_hardfork_height(2, 1);
-  pc.hard_forks.set_hardfork_height(3, 1);
-  c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
 

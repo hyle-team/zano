@@ -17,6 +17,11 @@ namespace currency
 
     hard_forks_descriptor()
     {
+      clear();
+    }
+
+    void clear()
+    {
       m_height_the_hardfork_n_active_after.fill(CURRENCY_MAX_BLOCK_NUMBER);
     }
 
