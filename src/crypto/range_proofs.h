@@ -125,12 +125,16 @@ namespace crypto
       return result;
     }
 
+    static const point_t& bpp_G; // NOTE! This notation follows original BP+ whitepaper, see mapping to Zano's generators below
     static const point_t& bpp_H;
     static const point_t& bpp_H2;
   }; // struct bpp_crypto_trait_zano
 
   template<size_t N, size_t values_max>
-  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_H = c_point_H;
+  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_G = c_point_H;
+
+  template<size_t N, size_t values_max>
+  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_H = c_point_G;
 
   template<size_t N, size_t values_max>
   const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_H2 = c_point_H2;

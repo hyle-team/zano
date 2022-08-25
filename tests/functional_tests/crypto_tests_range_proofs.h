@@ -68,22 +68,46 @@ TEST(bpp, basics)
   LOG_PRINT_L0("Zano H =  " << H << " = { " << H.to_hex_comma_separated_uint64_str() << " }");
   LOG_PRINT_L0("Zano H2 = " << H2 << " = { " << H2.to_hex_comma_separated_uint64_str() << " }");
 
-  scalar_vec_t values = { 5 };
-  scalar_vec_t masks  = { 0 };
-  bpp_signature bpp_sig;
-  std::vector<point_t> commitments_1div8;
-  uint8_t err = 0;
 
-  bool r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments_1div8, &err);
-  LOG_PRINT_L0("err = " << (uint16_t)err);
-  ASSERT_TRUE(r);
+  auto foo = [&](scalar_t v){
+    scalar_vec_t values = { v };
+    scalar_vec_t masks  = { scalar_t::random() };
+    bpp_signature bpp_sig;
+    std::vector<point_t> commitments_1div8;
+    uint8_t err = 0;
 
-  std::vector<bpp_sig_commit_ref_t> sigs;
-  sigs.emplace_back(bpp_sig, commitments_1div8);
+    bool r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments_1div8, &err);
+    if (!r)
+    {
+      LOG_PRINT_L0("bpp_gen err = " << (uint16_t)err);
+      return false;
+    }
 
-  r = bpp_verify<bpp_crypto_trait_zano<>>(sigs, &err);
-  LOG_PRINT_L0("err = " << (uint16_t)err);
-  ASSERT_TRUE(r);
+    std::vector<bpp_sig_commit_ref_t> sigs;
+    sigs.emplace_back(bpp_sig, commitments_1div8);
+
+    r = bpp_verify<bpp_crypto_trait_zano<>>(sigs, &err);
+    if (!r)
+    {
+      LOG_PRINT_L0("bpp_verify err = " << (uint16_t)err);
+      return false;
+    }
+
+    return true;
+  };
+
+  ASSERT_TRUE(foo(scalar_t(0)));
+  ASSERT_TRUE(foo(scalar_t(1)));
+  ASSERT_TRUE(foo(scalar_t(5)));
+  ASSERT_TRUE(foo(scalar_t(UINT64_MAX)));
+
+  ASSERT_FALSE(foo(scalar_t(UINT64_MAX, 1, 0, 0)));
+  ASSERT_FALSE(foo(scalar_t(0, 1, 0, 0)));
+  ASSERT_FALSE(foo(scalar_t(0, 0, 1, 0)));
+  ASSERT_FALSE(foo(scalar_t(0, 0, 0, 1)));
+  ASSERT_FALSE(foo(c_scalar_Lm1));
+  ASSERT_FALSE(foo(c_scalar_L));
+  ASSERT_FALSE(foo(c_scalar_256m1));
 
   return true;
 }
