@@ -259,6 +259,8 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     {                                                                                                      \
       failed_tests.insert(#genclass);                                                                      \
       LOCAL_ASSERT(false);                                                                                 \
+      if (stop_on_first_fail)                                                                              \
+        return 1;                                                                                          \
     }                                                                                                      \
     TIME_MEASURE_FINISH_MS(t);                                                                             \
     tests_running_time.push_back(std::make_pair(#genclass, t));                                            \
@@ -274,6 +276,8 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     {                                                                                                      \
       failed_tests.insert(testname);                                                                       \
       LOCAL_ASSERT(false);                                                                                 \
+      if (stop_on_first_fail)                                                                              \
+        return 1;                                                                                          \
     }                                                                                                      \
     TIME_MEASURE_FINISH_MS(t);                                                                             \
     tests_running_time.push_back(std::make_pair(testname, t));                                             \
@@ -745,6 +749,8 @@ int main(int argc, char* argv[])
     MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
 
 #undef MARK_TEST_AS_POSTPONED
+
+    bool stop_on_first_fail = false;
 
 
     // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
