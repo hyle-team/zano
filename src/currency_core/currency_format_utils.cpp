@@ -103,63 +103,56 @@ namespace currency
     return diff;
   }
   //------------------------------------------------------------------
-  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
-    size_t current_block_size,
-    uint64_t fee,
-    const account_public_address &miner_address,
-    const account_public_address &stakeholder_address,
-    transaction& tx,
-    uint64_t tx_version,
-    const blobdata& extra_nonce,
-    size_t max_outs,
-    bool pos,
-    const pos_entry& pe)
+  // for txs with no zc inputs (and thus no zc signatures) but with zc outputs
+  bool generate_tx_balance_proof(transaction &tx, const crypto::scalar_t& outputs_blinding_masks_sum, uint64_t block_reward_for_miner_tx = 0)
   {
-    uint64_t block_reward = 0;
-    if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward, height))
-    {
-      LOG_ERROR("Block is too big");
-      return false;
-    }
-    block_reward += fee;
-      
-    std::vector<size_t> out_amounts;
-    decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD,
-      [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
-      [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
+    CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "unsupported tx.version: " << tx.version);
+    CHECK_AND_ASSERT_MES(count_type_in_variant_container<ZC_sig>(tx.signatures) == 0, false, "");
 
-    CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
-    while (max_outs < out_amounts.size())
+    uint64_t bare_inputs_sum = block_reward_for_miner_tx;
+    // TODO: condider remove the followin cycle
+    for(auto& vin : tx.vin)
     {
-      out_amounts[out_amounts.size() - 2] += out_amounts.back();
-      out_amounts.resize(out_amounts.size() - 1);
-    }
-
-
-    std::vector<tx_destination_entry> destinations;
-    for (auto a : out_amounts)
-    {
-      tx_destination_entry de = AUTO_VAL_INIT(de);
-      de.addr.push_back(miner_address);
-      de.amount = a;
-      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
-      {
-        //this means that block is creating after hardfork_1 and unlock_time is needed to set for every destination separately
-        de.unlock_time = height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
-      }
-      destinations.push_back(de);
+      VARIANT_SWITCH_BEGIN(vin);
+      VARIANT_CASE(txin_to_key, tk)
+        bare_inputs_sum += tk.amount;
+      VARIANT_CASE(txin_htlc, foo);
+        CHECK_AND_ASSERT_MES(false, false, "unexpected txin_htlc input");
+      VARIANT_CASE(txin_multisig, ms);
+        bare_inputs_sum += ms.amount;
+      VARIANT_CASE(txin_zc_input, foo);
+        CHECK_AND_ASSERT_MES(false, false, "unexpected txin_zc_input input");
+      VARIANT_SWITCH_END();
     }
 
-    if (pos)
+    crypto::point_t outs_commitments_sum = crypto::c_point_0;
+    for(auto& vout : tx.vout)
     {
-      uint64_t stake_lock_time = 0;
-      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
-        stake_lock_time = pe.stake_unlock_time;
-      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, stake_lock_time));
+      CHECK_AND_ASSERT_MES(vout.type() == typeid(tx_out_zarcanum), false, "unexpected type in outs: " << vout.type().name());
+      const tx_out_zarcanum& ozc = boost::get<tx_out_zarcanum>(vout);
+      outs_commitments_sum += crypto::point_t(ozc.amount_commitment); // amount_commitment premultiplied by 1/8
     }
-      
+    outs_commitments_sum.modify_mul8();
 
-    return construct_miner_tx(height, median_size, already_generated_coins, current_block_size, fee, destinations, tx, tx_version, extra_nonce, max_outs, pos, pe);
+    uint64_t fee = 0;
+    CHECK_AND_ASSERT_MES(get_tx_fee(tx, fee), false, "unable to get tx fee");
+
+    // sum(bare inputs' amounts) * H + sum(pseudo outs commitments for ZC inputs) + residual * G = sum(outputs' commitments) + fee * H
+    // <=>
+    // (fee - sum(bare inputs' amounts)) * H - sum(pseudo outs commitments for ZC inputs) + sum(outputs' commitments) = residual * G
+
+    // tx doesn't have any zc inputs --> add Schnorr proof for commitment to zero
+    CHECK_AND_ASSERT_MES(count_type_in_variant_container<zc_balance_proof>(tx.attachment) == 0, false, "");
+    zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
+
+    crypto::point_t commitment_to_zero = outs_commitments_sum + (crypto::scalar_t(fee) - crypto::scalar_t(bare_inputs_sum)) * crypto::c_point_H;
+    //crypto::scalar_t witness = outputs_blinding_masks_sum;
+
+    // TODO: consider adding more data to message
+    crypto::generate_signature(null_hash, commitment_to_zero.to_public_key(), outputs_blinding_masks_sum.as_secret_key(), balance_proof.s);
+    tx.attachment.push_back(balance_proof);
+
+    return true;
   }
   //------------------------------------------------------------------
   bool apply_unlock_time(const std::vector<tx_destination_entry>& destinations, transaction& tx)
@@ -182,11 +175,12 @@ namespace currency
 
     return true;
   }
-  //------------------------------------------------------------------
+  //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
     size_t current_block_size,
     uint64_t fee,
-    const std::vector<tx_destination_entry>& destinations,
+    const account_public_address &miner_address,
+    const account_public_address &stakeholder_address,
     transaction& tx,
     uint64_t tx_version,
     const blobdata& extra_nonce,
@@ -194,6 +188,71 @@ namespace currency
     bool pos,
     const pos_entry& pe)
   {
+    CHECK_AND_ASSERT_THROW_MES(!pos || tx.version <= TRANSACTION_VERSION_PRE_HF4, "PoS miner tx is currently unsupported for HF4 -- sowle");
+
+    uint64_t block_reward = 0;
+    if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward, height))
+    {
+      LOG_ERROR("Block is too big");
+      return false;
+    }
+    block_reward += fee;
+      
+    //
+    // prepare destinations
+    //
+    // 1. split block_reward into out_amounts
+    std::vector<uint64_t> out_amounts;
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    {
+      // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs
+      // TODO: consider refactoring
+      uint64_t amount_remaining = block_reward;
+      for(size_t i = 1; i < CURRENCY_TX_MIN_ALLOWED_OUTS; ++i) // starting from 1 for one less iteration
+      {
+        uint64_t amount = crypto::rand<uint64_t>() % amount_remaining;
+        amount_remaining -= amount;
+        out_amounts.push_back(amount);
+      }
+      out_amounts.push_back(amount_remaining);
+      // std::shuffle(out_amounts.begin(), out_amounts.end(), crypto::uniform_random_bit_generator());
+    }
+    else
+    {
+      // non-hidden outs: split into digits
+      decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD,
+        [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
+        [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
+      CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
+      while (max_outs < out_amounts.size())
+      {
+        out_amounts[out_amounts.size() - 2] += out_amounts.back();
+        out_amounts.resize(out_amounts.size() - 1);
+      }
+    }
+    // 2. construct destinations using out_amounts
+    std::vector<tx_destination_entry> destinations;
+    for (auto a : out_amounts)
+    {
+      tx_destination_entry de = AUTO_VAL_INIT(de);
+      de.addr.push_back(miner_address);
+      de.amount = a;
+      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+      {
+        //this means that block is creating after hardfork_1 and unlock_time is needed to set for every destination separately
+        de.unlock_time = height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
+      }
+      destinations.push_back(de);
+    }
+
+    if (pos)
+    {
+      uint64_t stake_lock_time = 0;
+      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+        stake_lock_time = pe.stake_unlock_time;
+      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, stake_lock_time));
+    }
+
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS || height == 0, false, "Too many outs (" << destinations.size() << ")! Miner tx can't be constructed.");
     tx.version = tx_version;
     tx.vin.clear();
@@ -259,17 +318,122 @@ namespace currency
       bool r = generate_zarcanum_outs_range_proof(range_proof_start_index, amounts.size(), amounts, blinding_masks, tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zarcanum_outs_range_proof()");
       tx.attachment.push_back(range_proofs);
+
+      if (!pos)
+      {
+        r = generate_tx_balance_proof(tx, blinding_masks_sum, block_reward);
+        CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+      }
     }
+
+    if (tx.attachment.size())
+      add_attachments_info_to_extra(tx.extra, tx.attachment);
 
     if (!have_type_in_variant_container<etc_tx_details_unlock_time2>(tx.extra))
     {
       //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
       set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
     }
-    
+
     return true;
   }
-  //---------------------------------------------------------------
+  //------------------------------------------------------------------
+  bool check_tx_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx /* = 0 */)
+  {
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    {
+      size_t zc_inputs_count = 0;
+      uint64_t bare_inputs_sum = additional_inputs_amount_and_fees_for_mining_tx;
+      for(auto& vin : tx.vin)
+      {
+        VARIANT_SWITCH_BEGIN(vin);
+        VARIANT_CASE_CONST(txin_to_key, tk)
+          bare_inputs_sum += tk.amount;
+        VARIANT_CASE_CONST(txin_htlc, htlc);
+          bare_inputs_sum += htlc.amount;
+        VARIANT_CASE_CONST(txin_multisig, ms);
+          bare_inputs_sum += ms.amount;
+        VARIANT_CASE_CONST(txin_zc_input, foo);
+          ++zc_inputs_count;
+        VARIANT_SWITCH_END();
+      }
+
+      crypto::point_t outs_commitments_sum = crypto::c_point_0;
+      for(auto& vout : tx.vout)
+      {
+        CHECK_AND_ASSERT_MES(vout.type() == typeid(tx_out_zarcanum), false, "unexpected type in outs: " << vout.type().name());
+        const tx_out_zarcanum& ozc = boost::get<tx_out_zarcanum>(vout);
+        outs_commitments_sum += crypto::point_t(ozc.amount_commitment); // amount_commitment premultiplied by 1/8
+      }
+      outs_commitments_sum.modify_mul8();
+
+      uint64_t fee = 0;
+      CHECK_AND_ASSERT_MES(get_tx_fee(tx, fee), false, "unable to get tx fee");
+
+      CHECK_AND_ASSERT_MES(additional_inputs_amount_and_fees_for_mining_tx == 0 || fee == 0, false, "invalid tx: fee = " << print_money_brief(fee) <<
+        ", additional inputs + fees = " << print_money_brief(additional_inputs_amount_and_fees_for_mining_tx));
+
+      size_t zc_sigs_count = 0;
+      crypto::point_t sum_of_pseudo_out_amount_commitments = crypto::c_point_0;
+      for(auto& sig_v : tx.signatures)
+      {
+        VARIANT_SWITCH_BEGIN(sig_v);
+        VARIANT_CASE_CONST(ZC_sig, zc_sig);
+          sum_of_pseudo_out_amount_commitments += crypto::point_t(zc_sig.pseudo_out_amount_commitment); // *1/8
+          ++zc_sigs_count;
+        VARIANT_SWITCH_END();
+      }
+      sum_of_pseudo_out_amount_commitments.modify_mul8();
+
+      CHECK_AND_ASSERT_MES(zc_inputs_count == zc_sigs_count, false, "zc inputs count (" << zc_inputs_count << ") and zc sigs count (" << zc_sigs_count << ") missmatch");
+
+      if (zc_inputs_count > 0)
+      {
+        // no need for additional Schnorr proof for commitment to zero
+
+        // sum(bare inputs' amounts) * H + sum(pseudo outs commitments for ZC inputs) = sum(outputs' commitments) + fee * H
+        // <=>
+        // (sum(bare inputs' amounts) - fee) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = 0
+        crypto::point_t Z = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * crypto::c_point_H + sum_of_pseudo_out_amount_commitments - outs_commitments_sum;
+        CHECK_AND_ASSERT_MES(Z.is_zero(), false, "balace equation does not hold");
+      }
+      else
+      {
+        // no zc inputs -- there should be Schnorr proof for commitment to zero
+        zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
+        bool r = get_type_in_variant_container<zc_balance_proof>(tx.attachment, balance_proof);
+        CHECK_AND_ASSERT_MES(r, false, "no zc inputs are present, but at the same time there's no zc_balance_proof in attachment");
+
+        // (fee - sum(bare inputs' amounts)) * H + sum(outputs' commitments) = residual * G
+        crypto::point_t commitment_to_zero = (crypto::scalar_t(fee) - crypto::scalar_t(bare_inputs_sum)) * crypto::c_point_H + outs_commitments_sum;
+        r = crypto::check_signature(null_hash, commitment_to_zero.to_public_key(), balance_proof.s);
+        CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof is invalid");
+      }
+    }
+    else
+    {
+      // old fashioned tx with non-hidden amounts
+      uint64_t bare_outputs_sum = get_outs_money_amount(tx);
+      uint64_t bare_inputs_sum = get_inputs_money_amount(tx);
+
+      if (additional_inputs_amount_and_fees_for_mining_tx == 0)
+      {
+        // normal tx
+        CHECK_AND_ASSERT_MES(bare_inputs_sum >= bare_outputs_sum, false, "tx balance error: sum of inputs (" << print_money_brief(bare_inputs_sum)
+          << ") is less than or equal to sum of outputs(" << print_money_brief(bare_outputs_sum) << ")");
+      }
+      else
+      {
+        // miner tx
+        CHECK_AND_ASSERT_MES(bare_inputs_sum + additional_inputs_amount_and_fees_for_mining_tx == bare_outputs_sum, false,
+          "tx balance error: sum of inputs (" << print_money_brief(bare_inputs_sum) <<
+          ") + additional inputs and fees (" << print_money_brief(additional_inputs_amount_and_fees_for_mining_tx) <<
+          ") is less than or equal to sum of outputs(" << print_money_brief(bare_outputs_sum) << ")");
+      }
+    }
+    return true;
+  }
+  //------------------------------------------------------------------
   bool derive_ephemeral_key_helper(const account_keys& ack, const crypto::public_key& tx_public_key, size_t real_output_index, keypair& in_ephemeral)
   {
     crypto::key_derivation recv_derivation = AUTO_VAL_INIT(recv_derivation);
@@ -615,7 +779,7 @@ namespace currency
   //---------------------------------------------------------------
   bool add_tx_extra_userdata(transaction& tx, const blobdata& extra_nonce)
   {
-    CHECK_AND_ASSERT_MES(extra_nonce.size() <= 255, false, "extra nonce could be 255 bytes max");
+    CHECK_AND_ASSERT_MES(extra_nonce.size() <= 255, false, "extra nonce size exceeded (255 bytes max)");
     extra_user_data eud = AUTO_VAL_INIT(eud);
     eud.buff = extra_nonce;
     tx.extra.push_back(eud);
@@ -2037,8 +2201,6 @@ namespace currency
     for(const auto& in : tx.vin)
     {
       uint64_t this_amount = get_amount_from_variant(in);
-      if (!this_amount)
-        return false;
       money += this_amount;
     }
     return true;
@@ -2223,8 +2385,7 @@ namespace currency
       VARIANT_SWITCH_BEGIN(o);
       VARIANT_CASE_CONST(tx_out_bare, o)
         outputs_amount += o.amount;
-      VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@      
+      // ignore outputs with hidden amounts
       VARIANT_SWITCH_END();
     }
     return outputs_amount;
@@ -3110,6 +3271,11 @@ namespace currency
       tv.short_view = "outputs_count = " + std::to_string(rp.outputs_count);
       return true;
     }
+    bool operator()(const zc_balance_proof& bp)
+    {
+      tv.type = "zc_balance_proof";
+      return true;
+    }
   };
   //------------------------------------------------------------------
   template<class t_container>
@@ -3695,12 +3861,13 @@ namespace currency
       return true;
 
     std::vector<crypto::bpp_sig_commit_ref_t> sigs;
-    for(auto el : range_proofs)
+    sigs.reserve(range_proofs.size());
+    for(auto& el : range_proofs)
       sigs.emplace_back(el.range_proof.bpp, el.amount_commitments);
 
     uint8_t err = 0;
     bool r = crypto::bpp_verify<>(sigs, &err);
-    CHECK_AND_ASSERT_MES(r, false, "bpp_verify failed with error " << err);
+    CHECK_AND_ASSERT_MES(r, false, "bpp_verify failed with error " << (int)err);
 
     return true;
   }

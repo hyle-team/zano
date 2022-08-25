@@ -1307,8 +1307,9 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
 
   if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 1, false, "coinbase transaction wrong attachments number(expeted 1 - rangeproofs)");
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zarcanum_outs_range_proof), false, "coinbase transaction wrong attachmenttype (expeted - zarcanum_outs_range_proof)");
+    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 2, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
+    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zarcanum_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zarcanum_outs_range_proof)");
+    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[1].type() == typeid(zc_balance_proof), false, "coinbase transaction wrong attachmenttype #1 (expected: zc_balance_proof)");
   }
   else
   {
@@ -1325,15 +1326,6 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
                                                     const boost::multiprecision::uint128_t& already_generated_coins) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  //validate reward
-  uint64_t money_in_use = get_outs_money_amount(b.miner_tx);
-
-  uint64_t pos_income = 0;
-  if (is_pos_block(b))
-  {
-    CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "Wrong miner tx_in");
-    pos_income = boost::get<txin_to_key>(b.miner_tx.vin[1]).amount;
-  }
 
   std::vector<size_t> last_blocks_sizes;
   get_last_n_blocks_sizes(last_blocks_sizes, CURRENCY_REWARD_BLOCKS_WINDOW);
@@ -1343,9 +1335,10 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
     LOG_PRINT_L0("block size " << cumulative_block_size << " is bigger than allowed for this blockchain");
     return false;
   }
-  if (base_reward + pos_income + fee < money_in_use)
+
+  if (!check_tx_balance(b.miner_tx, base_reward + fee))
   {
-    LOG_ERROR("coinbase transaction spend too much money (" << print_money(money_in_use) << "). Block reward is " << print_money(base_reward + pos_income + fee) << "(" << print_money(base_reward) << "+" << print_money(pos_income) << "+" << print_money(fee)
+    LOG_ERROR("coinbase transaction balance check failed. Block reward is " << print_money_brief(base_reward + fee) << "(" << print_money(base_reward) << "+" << print_money(fee)
       << ", blocks_size_median = " << blocks_size_median
       << ", cumulative_block_size = " << cumulative_block_size
       << ", fee = " << fee
@@ -1354,17 +1347,7 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
     LOG_PRINT_L0(currency::obj_to_json_str(b.miner_tx));
     return false;
   }
-  if (base_reward + pos_income + fee != money_in_use)
-  {
-    LOG_ERROR("coinbase transaction doesn't use full amount of block reward:  spent: (" << print_money(money_in_use) << "). Block reward is " << print_money(base_reward + pos_income + fee) << "(" << print_money(base_reward) << "+" << print_money(pos_income) << "+" << print_money(fee)
-      << ", blocks_size_median = " << blocks_size_median
-      << ", cumulative_block_size = " << cumulative_block_size
-      << ", fee = " << fee
-      << ", already_generated_coins = " << already_generated_coins
-      << "), tx:");
-    LOG_PRINT_L0(currency::obj_to_json_str(b.miner_tx));
-    return false;
-  }
+
   LOG_PRINT_MAGENTA("Mining tx verification ok, blocks_size_median = " << blocks_size_median, LOG_LEVEL_2);
   return true;
 }
@@ -3377,15 +3360,17 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, block_verif
 bool blockchain_storage::push_transaction_to_global_outs_index(const transaction& tx, const crypto::hash& tx_id, std::vector<uint64_t>& global_indexes)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  size_t i = 0;
-  BOOST_FOREACH(const auto& otv, tx.vout)
+  size_t output_index = 0;
+  for(const auto& otv : tx.vout)
   {
     VARIANT_SWITCH_BEGIN(otv);
     VARIANT_CASE_CONST(tx_out_bare, ot)
       if (ot.target.type() == typeid(txout_to_key) || ot.target.type() == typeid(txout_htlc))
       {
-        m_db_outputs.push_back_item(ot.amount, global_output_entry::construct(tx_id, i));
+        m_db_outputs.push_back_item(ot.amount, global_output_entry::construct(tx_id, output_index));
         global_indexes.push_back(m_db_outputs.get_item_size(ot.amount) - 1);
+
+        // TODO: CZ, consider removing this check
         if (ot.target.type() == typeid(txout_htlc) && !is_hardfork_active(3))
         {
           LOG_ERROR("Error: Transaction with txout_htlc before hardfork 3 (before height " << m_core_runtime_config.hard_forks.get_str_height_the_hardfork_active_after(3) << ")");
@@ -3394,18 +3379,19 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
       }
       else if (ot.target.type() == typeid(txout_multisig))
       {
-
-        crypto::hash multisig_out_id = get_multisig_out_id(tx, i);
+        crypto::hash multisig_out_id = get_multisig_out_id(tx, output_index);
         CHECK_AND_ASSERT_MES(multisig_out_id != null_hash, false, "internal error during handling get_multisig_out_id() with tx id " << tx_id);
         CHECK_AND_ASSERT_MES(!m_db_multisig_outs.find(multisig_out_id), false, "Internal error: already have multisig_out_id " << multisig_out_id << "in multisig outs index");
-        m_db_multisig_outs.set(multisig_out_id, ms_output_entry::construct(tx_id, i));
+        m_db_multisig_outs.set(multisig_out_id, ms_output_entry::construct(tx_id, output_index));
         global_indexes.push_back(0); // just stub to make other code easier
       }
     VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      //@#@
+      // TODO: CZ, consider using separate table for hidden amounts
+      m_db_outputs.push_back_item(0, global_output_entry::construct(tx_id, output_index));
+      global_indexes.push_back(m_db_outputs.get_item_size(0) - 1);
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
-    ++i;
+    ++output_index;
   }
   return true;
 }
@@ -5538,7 +5524,6 @@ bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, tr
 //------------------------------------------------------------------
 bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zarcanum_outs_range_proof_commit_ref_t>& agregated_proofs, const transaction& tx /*, std::vector<crypto::point_t&>& tx_outs_commitments*/)
 {
-
   if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
   {
     return true;

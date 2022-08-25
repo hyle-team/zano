@@ -439,7 +439,7 @@ namespace currency
   // Zarcanum-aware CLSAG signature
   struct ZC_sig
   {
-    crypto::public_key pseudo_out_amount_commitment;
+    crypto::public_key pseudo_out_amount_commitment; // premultiplied by 1/8
     crypto::CLSAG_GG_signature_serialized clsags_gg;
     
     BEGIN_SERIALIZE_OBJECT()
@@ -452,6 +452,20 @@ namespace currency
       BOOST_SERIALIZE(clsags_gg)
     END_BOOST_SERIALIZATION()
   };
+
+  struct zc_balance_proof
+  {
+    crypto::signature s;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(s)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(s)
+    END_BOOST_SERIALIZATION()
+  };
+
 //#pragma pack(pop)
 
   typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_htlc, txin_zc_input> txin_v;
@@ -721,10 +735,10 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector23<
+  typedef boost::mpl::vector24<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
-    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zarcanum_outs_range_proof
+    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zarcanum_outs_range_proof, zc_balance_proof
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -1041,6 +1055,7 @@ SET_VARIANT_TAGS(currency::NLSAG_sig, 42, "NLSAG_sig");
 SET_VARIANT_TAGS(currency::ZC_sig, 43, "ZC_sig");
 SET_VARIANT_TAGS(currency::void_sig, 44, "void_sig");
 SET_VARIANT_TAGS(currency::zarcanum_outs_range_proof, 45, "zarcanum_outs_range_proof");
+SET_VARIANT_TAGS(currency::zc_balance_proof, 46, "zc_balance_proof");
 
 
 

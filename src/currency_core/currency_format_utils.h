@@ -223,6 +223,7 @@ namespace currency
   };
 
   bool verify_multiple_zarcanum_outs_range_proofs(const std::vector<zarcanum_outs_range_proof_commit_ref_t>& range_proofs);
+  bool check_tx_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
@@ -235,19 +236,6 @@ namespace currency
                                                              size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS, 
                                                              bool pos = false,
                                                              const pos_entry& pe = pos_entry());
-
-  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
-                                                             size_t current_block_size, 
-                                                             uint64_t fee, 
-                                                             const std::vector<tx_destination_entry>& destinations,
-                                                             transaction& tx, 
-                                                             uint64_t tx_version,
-                                                             const blobdata& extra_nonce = blobdata(),
-                                                             size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
-                                                             bool pos = false,
-                                                             const pos_entry& pe = pos_entry());
-
-
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& out_blinding_mask, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
