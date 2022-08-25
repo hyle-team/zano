@@ -94,7 +94,7 @@ namespace currency
   }
   //---------------------------------------------------------------
   template<typename specific_type_t, typename variant_t_container>
-  bool get_type_in_variant_container(const variant_t_container& av, specific_type_t& a)
+  bool get_type_in_variant_container(variant_t_container& av, specific_type_t& a)
   {
     for (auto& ai : av)
     {
@@ -105,6 +105,25 @@ namespace currency
       }
     }
     return false;
+  }
+  //---------------------------------------------------------------
+  // if cb returns true, it means "continue", false -- means "stop"
+  template<typename specific_type_t, typename variant_container_t, typename callback_t>
+  bool process_type_in_variant_container(variant_container_t& av, callback_t& cb, bool return_value_if_none_found = true)
+  {
+    bool found = false;
+    for (auto& ai : av)
+    {
+      if (ai.type() == typeid(specific_type_t))
+      {
+        found = true;
+        if (!cb(boost::get<specific_type_t>(ai)))
+          return false;
+      }
+    }
+    if (found)
+      return true;
+    return return_value_if_none_found;
   }
   //---------------------------------------------------------------
   // callback should return true to continue iterating through the container

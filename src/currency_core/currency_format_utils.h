@@ -305,6 +305,7 @@ namespace currency
   bool parse_and_validate_tx_extra(const transaction& tx, crypto::public_key& tx_pub_key);
   crypto::public_key get_tx_pub_key_from_extra(const transaction& tx);
   bool add_tx_pub_key_to_extra(transaction& tx, const crypto::public_key& tx_pub_key);
+  bool add_tx_fee_amount_to_extra(transaction& tx, uint64_t fee, bool make_sure_its_unique = true);
   bool add_tx_extra_userdata(transaction& tx, const blobdata& extra_nonce);
 
   crypto::hash get_multisig_out_id(const transaction& tx, size_t n);

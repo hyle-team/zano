@@ -418,18 +418,34 @@ namespace currency
     fee = 0;
     if (is_coinbase(tx))
       return true;
-    uint64_t amount_in = 0;
-    uint64_t amount_out = get_outs_money_amount(tx);
-   
-    BOOST_FOREACH(auto& in, tx.vin)
+
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
     {
-      amount_in += get_amount_from_variant(in);
+      // all amounts are open:  fee = sum(outputs) - sum(inputs)
+
+      uint64_t amount_in = 0;
+      uint64_t amount_out = get_outs_money_amount(tx);
+   
+      for(auto& in : tx.vin)
+        amount_in += get_amount_from_variant(in);
+
+      CHECK_AND_ASSERT_MES(amount_in >= amount_out, false, "transaction spends (" << print_money_brief(amount_in) << ") more than it has (" << print_money_brief(amount_out) << ")");
+      fee = amount_in - amount_out;
+      return true;
     }
 
+    // tx.version > TRANSACTION_VERSION_PRE_HF4
+    // all amounts are hidden with Pedersen commitments
+    // therefore fee should be explicitly stated in the extra
+    if (!process_type_in_variant_container<zarcanum_tx_data_v1>(tx.extra, [&](const zarcanum_tx_data_v1& ztd) -> bool {
+      fee += ztd.fee;
+      return true; // continue
+      }, false))
+    {
+      fee = 0;
+      return false;
+    }
 
-
-    CHECK_AND_ASSERT_MES(amount_in >= amount_out, false, "transaction spend (" << amount_in << ") more than it has (" << amount_out << ")");
-    fee = amount_in - amount_out;
     return true;
   }
   //---------------------------------------------------------------
@@ -552,6 +568,22 @@ namespace currency
   bool add_tx_pub_key_to_extra(transaction& tx, const crypto::public_key& tx_pub_key)
   {
     tx.extra.push_back(tx_pub_key);
+    return true;
+  }
+  //---------------------------------------------------------------
+  // puts explicit fee amount to tx extra, should be used only for tx.verson > TRANSACTION_VERSION_PRE_HF4
+  bool add_tx_fee_amount_to_extra(transaction& tx, uint64_t fee, bool make_sure_its_unique /* = true */)
+  {
+    if (make_sure_its_unique)
+    {
+      if (count_type_in_variant_container<zarcanum_tx_data_v1>(tx.extra) != 0)
+        return false;
+    }
+
+    zarcanum_tx_data_v1 ztd = AUTO_VAL_INIT(ztd);
+    ztd.fee = fee;
+
+    tx.extra.push_back(ztd);
     return true;
   }
   //---------------------------------------------------------------
