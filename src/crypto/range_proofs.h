@@ -66,12 +66,12 @@ namespace crypto
 
     static void calc_pedersen_commitment(const scalar_t& value, const scalar_t& mask, point_t& commitment)
     {
-      commitment = value * c_point_G + mask * c_point_H;
+      commitment = value * bpp_G + mask * bpp_H;
     }
 
     static void calc_pedersen_commitment_2(const scalar_t& value, const scalar_t& mask1, const scalar_t& mask2, point_t& commitment)
     {
-      commitment = value * c_point_G + mask1 * c_point_H + mask2 * c_point_H2;
+      commitment = value * bpp_G + mask1 * bpp_H + mask2 * bpp_H2;
     }
 
     static const scalar_t& get_initial_transcript()
