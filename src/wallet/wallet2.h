@@ -685,9 +685,13 @@ namespace tools
       currency::transaction &escrow_template_tx);
 
     bool check_connection();
+
+    // PoS mining
+    static bool do_pos_mining_iteration(mining_context& cxt, uint64_t ts, size_t pos_entry_index);
     template<typename idle_condition_cb_t> //do refresh as external callback
     static bool scan_pos(mining_context& cxt, std::atomic<bool>& stop, idle_condition_cb_t idle_condition_cb, const currency::core_runtime_config &runtime_config);
     bool fill_mining_context(mining_context& ctx);
+    
     void get_transfers(wallet2::transfer_container& incoming_transfers) const;
     std::string get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const;
 
@@ -1290,6 +1294,41 @@ namespace tools
     return true;
   }
 
+  inline bool wallet2::do_pos_mining_iteration(mining_context& cxt, uint64_t ts, size_t pos_entry_index)
+  {
+    currency::stake_kernel sk = AUTO_VAL_INIT(sk);
+    build_kernel(cxt.sp.pos_entries[pos_entry_index], cxt.sm, ts, sk);
+    
+    crypto::hash kernel_hash;
+    {
+      PROFILE_FUNC("calc_hash");
+      kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
+    }
+
+    const uint64_t stake_amount = cxt.sp.pos_entries[pos_entry_index].amount;
+    currency::wide_difficulty_type final_diff = cxt.basic_diff / stake_amount;
+
+    bool check_hash_res = false;
+    {
+      PROFILE_FUNC("check_hash");
+      check_hash_res = currency::check_hash(kernel_hash, final_diff);
+      ++cxt.rsp.iterations_processed;
+    }
+
+    if (check_hash_res)
+    {
+      LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money_brief(stake_amount) << ENDL
+        << "difficulty: " << cxt.basic_diff << ", final_diff: " << final_diff << ENDL
+        << "index: " << cxt.sp.pos_entries[pos_entry_index].index << ENDL
+        << "kernel info: " << ENDL
+        << print_stake_kernel_info(sk) << ENDL 
+        << "kernel_hash(proof): " << kernel_hash,
+        LOG_LEVEL_0);
+    }
+
+    return check_hash_res;
+  }
+
   template<typename idle_condition_cb_t> //do refresh as external callback
   bool wallet2::scan_pos(mining_context& cxt,
     std::atomic<bool>& stop,
@@ -1332,8 +1371,7 @@ namespace tools
 
       while(step <= ts_window)
       {
-
-        //check every WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL seconds if top block changes, in case - break loop 
+        //check every WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL seconds wheither top block changed, if so - break the loop 
         if (runtime_config.get_core_time() - timstamp_last_idle_call > WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL)
         {
           if (!idle_condition_cb())
@@ -1355,32 +1393,10 @@ namespace tools
         PROFILE_FUNC("general_mining_iteration");
         if (stop)
           return false;
-        currency::stake_kernel sk = AUTO_VAL_INIT(sk);
-        const uint64_t& stake_amount = cxt.sp.pos_entries[i].amount;
-        build_kernel(cxt.sp.pos_entries[i], cxt.sm, ts, sk);
-        crypto::hash kernel_hash;
-        {
-          PROFILE_FUNC("calc_hash");
-          kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
-        }
 
-        currency::wide_difficulty_type final_diff = cxt.basic_diff / stake_amount;
-        bool check_hash_res;
-        {
-          PROFILE_FUNC("check_hash");
-          check_hash_res = currency::check_hash(kernel_hash, final_diff);
-          ++cxt.rsp.iterations_processed;
-        }
-        if (check_hash_res)
+        if (do_pos_mining_iteration(cxt, ts, i))
         {
           //found kernel
-          LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money(stake_amount) << ENDL
-            << "difficulty: " << cxt.basic_diff << ", final_diff: " << final_diff << ENDL
-            << "index: " << cxt.sp.pos_entries[i].index << ENDL
-            << "kernel info: " << ENDL
-            << print_stake_kernel_info(sk) << ENDL 
-            << "kernel_hash(proof): " << kernel_hash,
-            LOG_LEVEL_0);
           cxt.rsp.index = i;
           cxt.rsp.block_timestamp = ts;
           cxt.rsp.status = API_RETURN_CODE_OK;
@@ -1388,8 +1404,6 @@ namespace tools
         }
         
         next_turn();
-        
-        
       }
     }
     cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
