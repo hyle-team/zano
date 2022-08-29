@@ -2005,7 +2005,7 @@ void wallets_manager::wallet_vs_options::worker_func()
           {
             w->get()->build_minted_block(ctx.sp, ctx.rsp);
           }
-          LOG_PRINT_L1(get_log_prefix() << " PoS mining iteration finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << currency::print_money_brief(pos_entries_amount) << ", processed: " << ctx.rsp.iterations_processed << " iter.");
+          LOG_PRINT_L1(get_log_prefix() << " PoS mining iteration finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << currency::print_money_brief(pos_entries_amount) << ", processed: " << ctx.iterations_processed << " iter.");
           return true;
         });
       }

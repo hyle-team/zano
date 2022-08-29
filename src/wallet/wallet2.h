@@ -449,6 +449,11 @@ namespace tools
       currency::COMMAND_RPC_SCAN_POS::response rsp;
       currency::wide_difficulty_type basic_diff;
       currency::stake_modifier_type sm;
+      
+      bool zarcanum;
+      crypto::scalar_t last_pow_block_id_hashed; // Zarcanum notation: f'
+
+      uint64_t iterations_processed;
     };
 
     struct expiration_entry_info
@@ -687,7 +692,8 @@ namespace tools
     bool check_connection();
 
     // PoS mining
-    static bool do_pos_mining_iteration(mining_context& cxt, uint64_t ts, size_t pos_entry_index);
+    static void do_pos_mining_prepare_entry(mining_context& cxt, size_t pos_entry_index);
+    static bool do_pos_mining_iteration(mining_context& cxt, size_t pos_entry_index, uint64_t ts);
     template<typename idle_condition_cb_t> //do refresh as external callback
     static bool scan_pos(mining_context& cxt, std::atomic<bool>& stop, idle_condition_cb_t idle_condition_cb, const currency::core_runtime_config &runtime_config);
     bool fill_mining_context(mining_context& ctx);
@@ -1294,41 +1300,6 @@ namespace tools
     return true;
   }
 
-  inline bool wallet2::do_pos_mining_iteration(mining_context& cxt, uint64_t ts, size_t pos_entry_index)
-  {
-    currency::stake_kernel sk = AUTO_VAL_INIT(sk);
-    build_kernel(cxt.sp.pos_entries[pos_entry_index], cxt.sm, ts, sk);
-    
-    crypto::hash kernel_hash;
-    {
-      PROFILE_FUNC("calc_hash");
-      kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
-    }
-
-    const uint64_t stake_amount = cxt.sp.pos_entries[pos_entry_index].amount;
-    currency::wide_difficulty_type final_diff = cxt.basic_diff / stake_amount;
-
-    bool check_hash_res = false;
-    {
-      PROFILE_FUNC("check_hash");
-      check_hash_res = currency::check_hash(kernel_hash, final_diff);
-      ++cxt.rsp.iterations_processed;
-    }
-
-    if (check_hash_res)
-    {
-      LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money_brief(stake_amount) << ENDL
-        << "difficulty: " << cxt.basic_diff << ", final_diff: " << final_diff << ENDL
-        << "index: " << cxt.sp.pos_entries[pos_entry_index].index << ENDL
-        << "kernel info: " << ENDL
-        << print_stake_kernel_info(sk) << ENDL 
-        << "kernel_hash(proof): " << kernel_hash,
-        LOG_LEVEL_0);
-    }
-
-    return check_hash_res;
-  }
-
   template<typename idle_condition_cb_t> //do refresh as external callback
   bool wallet2::scan_pos(mining_context& cxt,
     std::atomic<bool>& stop,
@@ -1337,7 +1308,7 @@ namespace tools
   {
     cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
     uint64_t timstamp_last_idle_call = runtime_config.get_core_time();
-    cxt.rsp.iterations_processed = 0;
+    cxt.iterations_processed = 0;
 
     uint64_t ts_from = cxt.rsp.starter_timestamp; // median ts of last BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW blocks
     ts_from = ts_from - (ts_from % POS_SCAN_STEP) + POS_SCAN_STEP;
@@ -1369,6 +1340,8 @@ namespace tools
         }
       };
 
+      do_pos_mining_prepare_entry(cxt, i);
+
       while(step <= ts_window)
       {
         //check every WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL seconds wheither top block changed, if so - break the loop 
@@ -1394,11 +1367,8 @@ namespace tools
         if (stop)
           return false;
 
-        if (do_pos_mining_iteration(cxt, ts, i))
+        if (do_pos_mining_iteration(cxt, i, ts))
         {
-          //found kernel
-          cxt.rsp.index = i;
-          cxt.rsp.block_timestamp = ts;
           cxt.rsp.status = API_RETURN_CODE_OK;
           return true;
         }

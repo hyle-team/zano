@@ -1138,7 +1138,6 @@ namespace currency
       uint64_t starter_timestamp;
       crypto::hash last_block_hash;
       bool     is_pos_allowed;
-      uint64_t iterations_processed;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)
@@ -1146,7 +1145,6 @@ namespace currency
         KV_SERIALIZE(block_timestamp)
         KV_SERIALIZE(height)
         KV_SERIALIZE(is_pos_allowed)
-        KV_SERIALIZE(iterations_processed)
         KV_SERIALIZE(starter_timestamp)
         KV_SERIALIZE_VAL_POD_AS_BLOB(last_block_hash);
       END_KV_SERIALIZE_MAP()

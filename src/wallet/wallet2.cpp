@@ -37,6 +37,7 @@ using namespace epee;
 
 #include "storages/levin_abstract_invoke2.h"
 #include "common/variant_helper.h"
+#include "currency_core/crypto_config.h"
 
 using namespace currency;
 
@@ -3635,10 +3636,18 @@ bool wallet2::fill_mining_context(mining_context& ctx)
     return false;
   ctx.basic_diff.assign(pos_details_resp.pos_basic_difficulty);
   ctx.sm = pos_details_resp.sm;
+
+  if (get_core_runtime_config().hard_forks.is_hardfork_active_for_height(4, get_top_block_height() + 1))
+  {
+    // Zarcanum (PoS with hidden amounts)
+    ctx.zarcanum = true;
+    ctx.last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, ctx.sm.last_pow_id);
+  }
+
   ctx.rsp.last_block_hash = pos_details_resp.last_block_hash;
-  ctx.rsp.status = API_RETURN_CODE_OK;
   ctx.rsp.is_pos_allowed = pos_details_resp.pos_mining_allowed;
   ctx.rsp.starter_timestamp = pos_details_resp.starter_timestamp;
+  ctx.rsp.status = API_RETURN_CODE_OK;
   return true;
 }
 //------------------------------------------------------------------
@@ -3679,9 +3688,63 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     build_minted_block(ctx.sp, ctx.rsp, miner_address);
   }
 
-  WLT_LOG_L0("PoS mining: " << ctx.rsp.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
+  WLT_LOG_L0("PoS mining: " << ctx.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
 
   return true;
+}
+//------------------------------------------------------------------
+void wallet2::do_pos_mining_prepare_entry(mining_context& cxt, size_t pos_entry_index)
+{
+  if (cxt.zarcanum)
+  {
+    //uint64_t pos_entry_wallet_index = cxt.sp.pos_entries[pos_entry_index].wallet_index;
+    //CHECK_AND_ASSERT_MES_NO_RET(pos_entry_wallet_index < m_transfers.size(), "invalid pos_entry_wallet_index = " << pos_entry_wallet_index << ", m_transfers: " << m_transfers.size());
+
+  }
+}
+//------------------------------------------------------------------
+bool wallet2::do_pos_mining_iteration(mining_context& cxt, size_t pos_entry_index, uint64_t ts)
+{
+  currency::stake_kernel sk = AUTO_VAL_INIT(sk);
+  build_kernel(cxt.sp.pos_entries[pos_entry_index], cxt.sm, ts, sk);
+    
+  crypto::hash kernel_hash;
+  {
+    PROFILE_FUNC("calc_hash");
+    kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
+  }
+
+  const uint64_t stake_amount = cxt.sp.pos_entries[pos_entry_index].amount;
+  bool found = false;
+
+  if (cxt.zarcanum)
+  {
+  }
+  else
+  {
+    // old PoS with non-hidden amounts
+    currency::wide_difficulty_type final_diff = cxt.basic_diff / stake_amount;
+    {
+      PROFILE_FUNC("check_hash");
+      found = currency::check_hash(kernel_hash, final_diff);
+      ++cxt.iterations_processed;
+    }
+    if (found)
+    {
+      cxt.rsp.index = pos_entry_index;
+      cxt.rsp.block_timestamp = ts;
+
+      LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money_brief(stake_amount) << ENDL
+        << "difficulty: " << cxt.basic_diff << ", final_diff: " << final_diff << ENDL
+        << "index: " << cxt.sp.pos_entries[pos_entry_index].index << ENDL
+        << "kernel info: " << ENDL
+        << print_stake_kernel_info(sk) << ENDL 
+        << "kernel_hash(proof): " << kernel_hash,
+        LOG_LEVEL_0);
+    }
+  }
+
+  return found;
 }
 //-------------------------------
 bool wallet2::reset_history()
