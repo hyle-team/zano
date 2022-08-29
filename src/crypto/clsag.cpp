@@ -148,7 +148,7 @@ namespace crypto
     }
 
     // calculate aggregate key image
-    point_t W_key_image = agg_coeff_0 * point_t(ki) + agg_coeff_1 * point_t(sig.K1).modify_mul8();
+    point_t W_key_image = agg_coeff_0 * key_image + agg_coeff_1 * point_t(sig.K1).modify_mul8();
     DBG_VAL_PRINT(W_key_image);
     
     scalar_t c_prev = sig.c;

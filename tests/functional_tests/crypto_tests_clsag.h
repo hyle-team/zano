@@ -244,3 +244,14 @@ TEST(clsag, sig_difference)
 
   return true;
 }
+
+
+TEST(clsag_ggxg, basics)
+{
+  std::string X_hash_str("X_generator");
+  point_t X = hash_helper_t::hp(X_hash_str.c_str(), X_hash_str.size());
+  LOG_PRINT_L0("X = " << X.to_hex_comma_separated_uint64_str());
+  ASSERT_EQ(X, c_point_X);
+
+  return true;
+}

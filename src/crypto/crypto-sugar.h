@@ -912,6 +912,7 @@ namespace crypto
 
   extern const point_t  c_point_H;
   extern const point_t  c_point_H2;
+  extern const point_t  c_point_X;
   extern const point_t  c_point_0;
 
   //
@@ -1132,6 +1133,14 @@ namespace crypto
       hs_calculator.add_32_chars(str32);
       hs_calculator.add_pub_key(pk);
       hs_calculator.add_scalar(scalar_t(i));
+      return hs_calculator.calc_hash();
+    }
+
+    static scalar_t hs(const char(&str32)[32], const crypto::hash& h)
+    {
+      hs_t hs_calculator(2);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_hash(h);
       return hs_calculator.calc_hash();
     }
 

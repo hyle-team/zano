@@ -34,8 +34,8 @@ namespace crypto
     CLSAG_GG_input_ref_t(const public_key& stealth_address, const public_key& amount_commitment)
       : stealth_address(stealth_address), amount_commitment(amount_commitment) {}
 
-    const public_key& stealth_address;
-    const public_key& amount_commitment;
+    const public_key& stealth_address;   // not premultiplied by 1/8, TODO @#@#: make sure it's okay
+    const public_key& amount_commitment; // multiplied by 1/8
   };
 
   bool generate_CLSAG_GG(const hash& m, const std::vector<CLSAG_GG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const key_image& ki,
