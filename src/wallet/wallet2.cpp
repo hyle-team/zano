@@ -3545,7 +3545,7 @@ bool wallet2::get_pos_entries(std::vector<currency::pos_entry>& entries)
 
     pos_entry pe = AUTO_VAL_INIT(pe);
     pe.amount = tr.amount();
-    pe.index = tr.m_global_output_index;
+    //pe.index = tr.m_global_output_index;
     pe.keyimage = tr.m_key_image;
     pe.wallet_index = i;
     pe.stake_unlock_time = stake_unlock_time;
@@ -3633,8 +3633,8 @@ bool wallet2::build_kernel(const pos_entry& pe, const stake_modifier_type& stake
 //----------------------------------------------------------------------------------------------------
 bool wallet2::fill_mining_context(mining_context& ctx)
 {
-  bool r = get_pos_entries(ctx.sp.pos_entries); // TODO: Remove this call. Transfers are filtered in scan_pos
-  WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to get_pos_entries()");
+  //bool r = get_pos_entries(ctx.sp.pos_entries); // TODO: Remove this call. Transfers are filtered in scan_pos
+  //WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to get_pos_entries()");
 
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request pos_details_req = AUTO_VAL_INIT(pos_details_req);
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::response pos_details_resp = AUTO_VAL_INIT(pos_details_resp);
@@ -3675,9 +3675,9 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     return true;
   }
 
-  uint64_t pos_entries_amount = 0;
-  for (auto& ent : ctx.sp.pos_entries)
-    pos_entries_amount += ent.amount;
+  //uint64_t pos_entries_amount = 0;
+  //for (auto& ent : ctx.sp.pos_entries)
+  //  pos_entries_amount += ent.amount;
 
   std::atomic<bool> stop(false);
   scan_pos(ctx, stop, [this](){
@@ -3696,7 +3696,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     build_minted_block(ctx, miner_address);
   }
 
-  WLT_LOG_L0("PoS mining: " << ctx.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
+  WLT_LOG_L0("PoS mining: " << ctx.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", " << ctx.total_items_checked << "  entries with total amount: " << print_money_brief(ctx.total_amount_checked));
 
   return true;
 }
@@ -3788,22 +3788,25 @@ bool wallet2::build_minted_block(const mining_context& cxt,
     //found a block, construct it, sign and push to daemon
     WLT_LOG_GREEN("Found kernel, constructing block", LOG_LEVEL_0);
 
-    CHECK_AND_NO_ASSERT_MES(cxt.rsp.index < cxt.sp.pos_entries.size(), false, "call_COMMAND_RPC_SCAN_POS returned wrong index: " << cxt.rsp.index << ", expected less then " << cxt.sp.pos_entries.size());
+    //CHECK_AND_NO_ASSERT_MES(cxt.rsp.index < cxt.sp.pos_entries.size(), false, "call_COMMAND_RPC_SCAN_POS returned wrong index: " << cxt.rsp.index << ", expected less then " << cxt.sp.pos_entries.size());
 
-    const pos_entry& pe = cxt.sp.pos_entries[cxt.rsp.index];
+    const pos_entry pe = AUTO_VAL_INIT();
+    pe.
 
     currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req = AUTO_VAL_INIT(tmpl_req);
     currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp = AUTO_VAL_INIT(tmpl_rsp);
     tmpl_req.wallet_address = get_account_address_as_str(miner_address);
     tmpl_req.stakeholder_address = get_account_address_as_str(m_account.get_public_address());
     tmpl_req.pos_block = true;
-    tmpl_req.pos_amount = pe.amount;
-    
-    tmpl_req.pos_index = pe.index; // gindex <--- this should be removed as soon as pos_entry::index is replaced with tx_id and tx_out_index
+    tmpl_req.pos_g_index = m_transfers[cxt.rsp.index].m_global_output_index;
+    tmpl_req.pos_amount = m_transfers[cxt.rsp.index].amount();//  pe.amount;    
+    tmpl_req.tx_id = m_transfers[cxt.rsp.index].tx_hash();
+    tmpl_req.tx_out_index = m_transfers[cxt.rsp.index].m_internal_output_index;
+    //tmpl_req.pos_index = pe.index; // gindex <--- this should be removed as soon as pos_entry::index is replaced with tx_id and tx_out_index
     // TODO: also fill out tx_id and tx_out_index for mining tx creation
 
     tmpl_req.extra_text = m_miner_text_info;
-    tmpl_req.stake_unlock_time = pe.stake_unlock_time;
+    tmpl_req.stake_unlock_time = cxt.rsp.stake_unlock_time;
     //generate packing tx
     transaction pack_tx = AUTO_VAL_INIT(pack_tx);
     if (generate_packing_transaction_if_needed(pack_tx, 0))
@@ -3828,15 +3831,15 @@ bool wallet2::build_minted_block(const mining_context& cxt,
     }
 
     std::vector<const crypto::public_key*> keys_ptrs;
-    WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(),
+    WLT_CHECK_AND_ASSERT_MES(cxt.rsp.index < m_transfers.size(),
         false, "Wrong wallet_index at generating coinbase transacton");
 
-    if (m_transfers[pe.wallet_index].m_ptx_wallet_info->m_tx.vout[m_transfers[pe.wallet_index].m_internal_output_index].type() != typeid(tx_out_bare))
+    if (m_transfers[cxt.rsp.index].m_ptx_wallet_info->m_tx.vout[m_transfers[cxt.rsp.index].m_internal_output_index].type() != typeid(tx_out_bare))
     {
       //@#@ review zarcanum here
       return false;
     }
-    const auto& target = boost::get<tx_out_bare>(m_transfers[pe.wallet_index].m_ptx_wallet_info->m_tx.vout[m_transfers[pe.wallet_index].m_internal_output_index]).target;
+    const auto& target = boost::get<tx_out_bare>(m_transfers[cxt.rsp.index].m_ptx_wallet_info->m_tx.vout[m_transfers[cxt.rsp.index].m_internal_output_index]).target;
     WLT_CHECK_AND_ASSERT_MES(target.type() == typeid(currency::txout_to_key), false, "wrong type_id in source transaction in coinbase tx");
 
     const currency::txout_to_key& txtokey = boost::get<currency::txout_to_key>(target);
@@ -3852,7 +3855,7 @@ bool wallet2::build_minted_block(const mining_context& cxt,
     res = prepare_and_sign_pos_block(b,
       pe,
       get_tx_pub_key_from_extra(m_transfers[pe.wallet_index].m_ptx_wallet_info->m_tx),
-      m_transfers[pe.wallet_index].m_internal_output_index,
+      m_transfers[cxt.rsp.index].m_internal_output_index,
       keys_ptrs);
     WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
     

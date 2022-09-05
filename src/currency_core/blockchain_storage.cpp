@@ -1424,7 +1424,8 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   const account_public_address& stakeholder_address = params.stakeholder_address;
   const blobdata& ex_nonce = params.ex_nonce;
   bool pos = params.pos;
-  const pos_entry& pe = params.pe;
+  const pos_entry& pe = params.pe; 
+
   fill_block_template_func_t* pcustom_fill_block_template_func = params.pcustom_fill_block_template_func;
 
   uint64_t& height = resp.height;
@@ -1435,6 +1436,17 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   size_t median_size;
   boost::multiprecision::uint128_t already_generated_coins;
   CRITICAL_REGION_BEGIN(m_read_lock);
+  if (pe.g_index == WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED)
+  {
+    std::vector<uint64_t> indexs;
+    if (!get_tx_outputs_gindexs(pe.tx_id, indexs) || pe.tx_out_index >= indexs.size())
+    {
+      CHECK_AND_ASSERT_MES(false, false, "Failed to get_tx_outputs_gindexs() for tx_id " << pe.tx_id);
+    }
+    pe.g_index = indexs[pe.tx_out_index];
+  }
+  
+
   height = m_db_blocks.size();
   b.major_version = m_core_runtime_config.hard_forks.get_block_major_version_by_height(height);
 
