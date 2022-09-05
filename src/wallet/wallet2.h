@@ -341,6 +341,7 @@ namespace tools
 //     END_SERIALIZE()
 //   };
 
+
   class wallet2: public tools::tor::t_transport_state_notifier
   {
     wallet2(const wallet2&) = delete;
@@ -445,8 +446,40 @@ namespace tools
 
     struct mining_context
     {
-      currency::COMMAND_RPC_SCAN_POS::request sp;
-      currency::COMMAND_RPC_SCAN_POS::response rsp;
+      // from struct COMMAND_RPC_SCAN_POS
+      struct request_t
+      {
+        std::vector<currency::pos_entry> pos_entries;
+
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(pos_entries)
+        END_KV_SERIALIZE_MAP()
+      };
+
+      struct response_t
+      {
+        std::string status;
+        uint64_t index; // index in pos_entries container
+        uint64_t block_timestamp;
+        uint64_t height;
+        uint64_t starter_timestamp;
+        crypto::hash last_block_hash;
+        bool     is_pos_allowed;
+
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(status)
+          KV_SERIALIZE(index)
+          KV_SERIALIZE(block_timestamp)
+          KV_SERIALIZE(height)
+          KV_SERIALIZE(is_pos_allowed)
+          KV_SERIALIZE(starter_timestamp)
+          KV_SERIALIZE_VAL_POD_AS_BLOB(last_block_hash);
+        END_KV_SERIALIZE_MAP()
+      };
+
+      request_t sp;
+      response_t rsp;
+
       currency::wide_difficulty_type basic_diff;
       currency::stake_modifier_type sm;
       
@@ -692,10 +725,10 @@ namespace tools
     bool check_connection();
 
     // PoS mining
-    static void do_pos_mining_prepare_entry(mining_context& cxt, size_t pos_entry_index);
-    static bool do_pos_mining_iteration(mining_context& cxt, size_t pos_entry_index, uint64_t ts);
+    void do_pos_mining_prepare_entry(mining_context& cxt, size_t transfer_index);
+    bool do_pos_mining_iteration(mining_context& cxt, size_t transfer_index, uint64_t ts);
     template<typename idle_condition_cb_t> //do refresh as external callback
-    static bool scan_pos(mining_context& cxt, std::atomic<bool>& stop, idle_condition_cb_t idle_condition_cb, const currency::core_runtime_config &runtime_config);
+    bool scan_pos(mining_context& cxt, std::atomic<bool>& stop, idle_condition_cb_t idle_condition_cb, const currency::core_runtime_config &runtime_config);
     bool fill_mining_context(mining_context& ctx);
     
     void get_transfers(wallet2::transfer_container& incoming_transfers) const;
@@ -846,9 +879,12 @@ namespace tools
       uint64_t height);
     void process_htlc_triggers_on_block_added(uint64_t height);
     void unprocess_htlc_triggers_on_block_removed(uint64_t height);
-    bool get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req);
-    bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, uint64_t new_block_expected_height = UINT64_MAX);
-    bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, const currency::account_public_address& miner_address, uint64_t new_block_expected_height = UINT64_MAX);
+    
+    bool get_pos_entries(std::vector<currency::pos_entry>& entries); // TODO: make it const
+    size_t get_pos_entries_count();
+
+    bool build_minted_block(const mining_context& cxt, uint64_t new_block_expected_height = UINT64_MAX);
+    bool build_minted_block(const mining_context& cxt, const currency::account_public_address& miner_address, uint64_t new_block_expected_height = UINT64_MAX);
     bool reset_history();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
@@ -965,7 +1001,7 @@ private:
     std::vector<std::string> get_aliases_for_address(const std::string& addr);
     static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, const uint64_t timestamp, currency::stake_kernel& kernel);
     bool is_connected_to_net();
-    bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time);
+    bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time) const;
     bool scan_unconfirmed_outdate_tx();
     const currency::transaction& get_transaction_by_id(const crypto::hash& tx_hash);
     void rise_on_transfer2(const wallet_public::wallet_transfer_info& wti);
@@ -1319,8 +1355,15 @@ namespace tools
     ts_middle -= ts_middle % POS_SCAN_STEP;
     uint64_t ts_window = std::min(ts_middle - ts_from, ts_to - ts_middle);
 
-    for (size_t i = 0; i != cxt.sp.pos_entries.size(); i++)
+    size_t pos_entry_index = 0;
+    for (size_t transfer_index = 0; transfer_index != m_transfers.size(); transfer_index++)
     {
+      auto& tr = m_transfers[transfer_index];
+
+      uint64_t stake_unlock_time = 0;
+      if (!is_transfer_okay_for_pos(tr, stake_unlock_time))
+        continue;
+
       bool go_past = true;
       uint64_t step = 0;
       
@@ -1340,7 +1383,7 @@ namespace tools
         }
       };
 
-      do_pos_mining_prepare_entry(cxt, i);
+      do_pos_mining_prepare_entry(cxt, transfer_index);
 
       while(step <= ts_window)
       {
@@ -1367,7 +1410,7 @@ namespace tools
         if (stop)
           return false;
 
-        if (do_pos_mining_iteration(cxt, i, ts))
+        if (do_pos_mining_iteration(cxt, transfer_index, ts))
         {
           cxt.rsp.status = API_RETURN_CODE_OK;
           return true;
@@ -1375,6 +1418,7 @@ namespace tools
         
         next_turn();
       }
+      ++pos_entry_index;
     }
     cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
     return false;

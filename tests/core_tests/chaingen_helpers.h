@@ -184,7 +184,7 @@ inline bool mine_next_pos_block_in_playtime_with_wallet(tools::wallet2& w, const
   if (ctx.rsp.status != API_RETURN_CODE_OK)
     return false;
   
-  return w.build_minted_block(ctx.sp, ctx.rsp, miner_address);
+  return w.build_minted_block(ctx, miner_address);
 }
 
 

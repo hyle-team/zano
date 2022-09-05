@@ -1997,13 +1997,13 @@ void wallets_manager::wallet_vs_options::worker_func()
           for (auto& ent : ctx.sp.pos_entries)
             pos_entries_amount += ent.amount;
 
-          tools::wallet2::scan_pos(ctx, break_mining_loop, [this](){
+          w->get()->scan_pos(ctx, break_mining_loop, [this](){
             return *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online &&  *plast_daemon_height == last_wallet_synch_height;
           }, core_conf);
 
           if (ctx.rsp.status == API_RETURN_CODE_OK)
           {
-            w->get()->build_minted_block(ctx.sp, ctx.rsp);
+            w->get()->build_minted_block(ctx);
           }
           LOG_PRINT_L1(get_log_prefix() << " PoS mining iteration finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << currency::print_money_brief(pos_entries_amount) << ", processed: " << ctx.iterations_processed << " iter.");
           return true;

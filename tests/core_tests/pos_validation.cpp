@@ -504,10 +504,10 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_0(currency::core&
 
     // check pos entries actually available
     w.w->refresh();
-    currency::COMMAND_RPC_SCAN_POS::request req = AUTO_VAL_INIT(req);
-    r = w.w->get_pos_entries(req);
+    std::vector<pos_entry> pos_entries;
+    r = w.w->get_pos_entries(pos_entries);
     CHECK_AND_ASSERT_MES(r, false, "get_pos_entries failed");
-    CHECK_AND_ASSERT_MES(req.pos_entries.size() == w.pos_entries_count, false, "incorrect pos entries count in the wallet: " << req.pos_entries.size() << ", expected: " << w.pos_entries_count);
+    CHECK_AND_ASSERT_MES(pos_entries.size() == w.pos_entries_count, false, "incorrect pos entries count in the wallet: " << pos_entries.size() << ", expected: " << w.pos_entries_count);
     uint64_t balance_unlocked = 0;
     w.w->balance(balance_unlocked);
     CHECK_AND_ASSERT_MES(balance_unlocked == m_wallet_stake_amount, false, "incorrect wallet unlocked balance: " << print_money(balance_unlocked) << ", expected: " << print_money(m_wallet_stake_amount));
@@ -515,13 +515,13 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_0(currency::core&
     // make sure all wallets has the same distribution of pos_entries
     if (i == 0)
     {
-      first_wallet_pos_entries = req.pos_entries;
+      first_wallet_pos_entries = pos_entries;
     }
     else
     {
       for(size_t i = 0; i < pos_amounts.size(); ++i)
       {
-        CHECK_AND_ASSERT_MES(req.pos_entries[i].amount == first_wallet_pos_entries[i].amount, false, "Wallet pos entry #" << i << " has incorrect amount: " << print_money(req.pos_entries[i].amount) << ", expected (as in 1st wallet): " << print_money(first_wallet_pos_entries[i].amount));
+        CHECK_AND_ASSERT_MES(pos_entries[i].amount == first_wallet_pos_entries[i].amount, false, "Wallet pos entry #" << i << " has incorrect amount: " << print_money(pos_entries[i].amount) << ", expected (as in 1st wallet): " << print_money(first_wallet_pos_entries[i].amount));
       }
     }
   }
@@ -561,10 +561,8 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_1(currency::core&
 
     // check pos entries actually available
     w.w->refresh();
-    currency::COMMAND_RPC_SCAN_POS::request req = AUTO_VAL_INIT(req);
-    r = w.w->get_pos_entries(req);
-    CHECK_AND_ASSERT_MES(r, false, "get_pos_entries failed");
-    CHECK_AND_ASSERT_MES(req.pos_entries.size() == w.pos_entries_count, false, "incorrect pos entries count in the wallet: " << req.pos_entries.size() << ", expected: " << w.pos_entries_count);
+    size_t pos_entries_count = w.w->get_pos_entries_count();
+    CHECK_AND_ASSERT_MES(pos_entries_count == w.pos_entries_count, false, "incorrect pos entries count in the wallet: " << pos_entries_count << ", expected: " << w.pos_entries_count);
     uint64_t balance_unlocked = 0;
     w.w->balance(balance_unlocked);
     CHECK_AND_ASSERT_MES(balance_unlocked == m_wallet_stake_amount, false, "incorrect wallet unlocked balance: " << print_money(balance_unlocked) << ", expected: " << print_money(m_wallet_stake_amount));

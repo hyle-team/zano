@@ -2461,9 +2461,8 @@ bool gen_wallet_selecting_pos_entries::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3 + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE - 2, false, "Incorrect numbers of blocks fetched");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
-  currency::COMMAND_RPC_SCAN_POS::request req = AUTO_VAL_INIT(req);
-  bool r = alice_wlt->get_pos_entries(req);
-  CHECK_AND_ASSERT_MES(req.pos_entries.empty(), false, "Incorrect return value and pos_entries size");
+  bool r = false;
+  CHECK_AND_ASSERT_MES(alice_wlt->get_pos_entries_count() == 0, false, "Incorrect return value and pos_entries size");
 
   tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
   r = alice_wlt->fill_mining_context(ctx); // should internally fail because there's no unlocked money to be used as pos entries
@@ -2481,9 +2480,7 @@ bool gen_wallet_selecting_pos_entries::c1(currency::core& c, size_t ev_index, co
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect number of blocks fetched");
 
-  req = AUTO_VAL_INIT(req);
-  r = alice_wlt->get_pos_entries(req);
-  CHECK_AND_ASSERT_MES(req.pos_entries.size() == 3, false, "Incorrect return value and pos_entries size");
+  CHECK_AND_ASSERT_MES(alice_wlt->get_pos_entries_count() == 3, false, "Incorrect return value and pos_entries size");
 
   r = alice_wlt->try_mint_pos(); // should really mine a block
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos returns false");
@@ -2506,9 +2503,7 @@ bool gen_wallet_selecting_pos_entries::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect number of blocks fetched");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
-  req = AUTO_VAL_INIT(req);
-  r = alice_wlt->get_pos_entries(req);
-  CHECK_AND_ASSERT_MES(req.pos_entries.size() == 0, false, "Incorrect return value and pos_entries size");
+  CHECK_AND_ASSERT_MES(alice_wlt->get_pos_entries_count() == 0, false, "Incorrect return value and pos_entries size");
 
   return true;
 }

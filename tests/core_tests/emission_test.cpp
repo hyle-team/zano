@@ -231,7 +231,6 @@ bool pos_emission_test::c1(currency::core& c, size_t ev_index, const std::vector
   bool r = false;
   block b;
   wide_difficulty_type diff = 0;
-  currency::COMMAND_RPC_SCAN_POS::request scan_pos_req = AUTO_VAL_INIT(scan_pos_req);
   bool switched_to_higher_stake_amount = false;
   size_t height_to_twice_stake_amount = 2000;
 
@@ -291,9 +290,7 @@ bool pos_emission_test::c1(currency::core& c, size_t ev_index, const std::vector
         c.get_blockchain_storage().get_top_block(b);
         //int64_t pos_block_timediff = b.timestamp - last_pos_block_ts;
         uint64_t stake_amount = boost::get<txin_to_key>(b.miner_tx.vin[1]).amount;
-        scan_pos_req.pos_entries.clear();
-        alice_wlt->get_pos_entries(scan_pos_req);
-        size_t pos_entries_count = scan_pos_req.pos_entries.size();
+        size_t pos_entries_count = alice_wlt->get_pos_entries_count();
         //s << epee::misc_utils::get_time_str_v3(boost::posix_time::from_time_t(ts)) << "(" << ts << ")\t" << get_block_height(b) << "\tPoS\t" << b.timestamp << " (" << (pos_block_timediff > 0 ? "+" : "") << pos_block_timediff << ")\t" << diff << "\tstake: " << stake_amount << " balance: " << print_money(wallet_balance) << ", mined: " << print_money(wallet_balance_mined) << ENDL;
         LOG_PRINT2("pos_emission_test_brief.log", "\t" << get_block_height(b) << "\t" << diff << "\t" << print_money(stake_amount) << "\t" << print_money(wallet_balance) << "\t" << pos_entries_count, LOG_LEVEL_0);
         //last_pos_block_ts = b.timestamp;

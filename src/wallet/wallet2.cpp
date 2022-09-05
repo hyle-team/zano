@@ -3471,7 +3471,7 @@ bool wallet2::get_transfer_address(const std::string& adr_str, currency::account
   return m_core_proxy->get_transfer_address(adr_str, addr, payment_id);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time)
+bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time) const
 {
   if (!tr.is_spendable())
     return false;
@@ -3505,7 +3505,25 @@ void wallet2::get_mining_history(wallet_public::mining_history& hist, uint64_t t
   }
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req)
+size_t wallet2::get_pos_entries_count()
+{
+  size_t counter = 0;
+
+  for (size_t i = 0, size = m_transfers.size(); i < size; i++)
+  {
+    auto& tr = m_transfers[i];
+
+    uint64_t stake_unlock_time = 0;
+    if (!is_transfer_okay_for_pos(tr, stake_unlock_time))
+      continue;
+
+    ++counter;
+  }
+
+  return counter;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::get_pos_entries(std::vector<currency::pos_entry>& entries)
 {
   for (size_t i = 0; i != m_transfers.size(); i++)
   {
@@ -3515,23 +3533,24 @@ bool wallet2::get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req)
     if (!is_transfer_okay_for_pos(tr, stake_unlock_time))
       continue;
 
-    if (tr.m_global_output_index == WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED)
-    {
-      //TODO: this code needed mostly for coretests, since in real life cases only mobile wallet supposed to 
-      //      have WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED, and mobile wallet is not supposed to do PoS mining
-      std::vector<uint64_t> indicies; indicies.push_back(i);
-      prefetch_global_indicies_if_needed(indicies);
-    }
-    //WLT_CHECK_AND_ASSERT_MES(tr.m_global_output_index != WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED, false, "Wrong output input in transaction");
+    // We don't need to prefetch PoS outputs anymore as gindex in not required and fetched in construct_miner_tx
+    // I commented this out, CZ, please, review this change -- sowle
+    //if (tr.m_global_output_index == WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED)
+    //{
+    //  //TODO: this code needed mostly for coretests, since in real life cases only mobile wallet supposed to 
+    //  //      have WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED, and mobile wallet is not supposed to do PoS mining
+    //  std::vector<uint64_t> indicies; indicies.push_back(i);
+    //  prefetch_global_indicies_if_needed(indicies);
+    //}
 
-    currency::pos_entry pe = AUTO_VAL_INIT(pe);
+    pos_entry pe = AUTO_VAL_INIT(pe);
     pe.amount = tr.amount();
     pe.index = tr.m_global_output_index;
     pe.keyimage = tr.m_key_image;
     pe.wallet_index = i;
     pe.stake_unlock_time = stake_unlock_time;
     pe.block_timestamp = tr.m_ptx_wallet_info->m_block_timestamp;
-    req.pos_entries.push_back(pe);
+    entries.push_back(pe);
   }
 
   return true;
@@ -3544,24 +3563,19 @@ bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index)
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_and_sign_pos_block(currency::block& b, 
-                                         const currency::pos_entry& pos_info, 
+                                         const pos_entry& pos_info, 
                                          const crypto::public_key& source_tx_pub_key, 
                                          uint64_t in_tx_output_index, 
                                          const std::vector<const crypto::public_key*>& keys_ptrs)
 {
-  //generate coinbase transaction
-  WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(currency::txin_gen), false, "Wrong output input in transaction");
-  WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(currency::txin_to_key), false, "Wrong output input in transaction");
-  auto& txin = boost::get<currency::txin_to_key>(b.miner_tx.vin[1]);
-  txin.k_image = pos_info.keyimage;
+  if (!is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
+  {
+    // old PoS with non-hidden amounts
+    WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(currency::txin_gen), false, "Wrong input 0 type in transaction: " << b.miner_tx.vin[0].type().name());
+    WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(currency::txin_to_key), false, "Wrong input 1 type in transaction: " << b.miner_tx.vin[1].type().name());
+    auto& txin = boost::get<currency::txin_to_key>(b.miner_tx.vin[1]);
+    txin.k_image = pos_info.keyimage;
 
-  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
-  {
-    //@#@ TODO: add proper support of Zarcanum
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "ZRCANUM BLOCKS NOT IMPLEMENTED YET");
-    return false; // to get rid of warning
-  }else
-  {
     WLT_CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 &&
       b.miner_tx.signatures[0].type() == typeid(NLSAG_sig) &&
       boost::get<NLSAG_sig>(b.miner_tx.signatures[0]).s.size() == txin.key_offsets.size(),
@@ -3601,6 +3615,10 @@ bool wallet2::prepare_and_sign_pos_block(currency::block& b,
 
     return true;
   }
+
+  // Zarcanum
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, "ZRCANUM BLOCKS NOT IMPLEMENTED YET");
+  return false; // to get rid of warning
 }
 //------------------------------------------------------------------
 bool wallet2::build_kernel(const pos_entry& pe, const stake_modifier_type& stake_modifier, const uint64_t timestamp, stake_kernel& kernel)
@@ -3615,17 +3633,7 @@ bool wallet2::build_kernel(const pos_entry& pe, const stake_modifier_type& stake
 //----------------------------------------------------------------------------------------------------
 bool wallet2::fill_mining_context(mining_context& ctx)
 {
-// #ifdef _DEBUG
-// 	currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req = AUTO_VAL_INIT(tmpl_req);
-// 	currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp = AUTO_VAL_INIT(tmpl_rsp);
-// 	tmpl_req.wallet_address = m_account.get_public_address_str();
-// 	tmpl_req.pos_block = true;
-// 	m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
-// #endif
-
-
-
-  bool r = get_pos_entries(ctx.sp);
+  bool r = get_pos_entries(ctx.sp.pos_entries); // TODO: Remove this call. Transfers are filtered in scan_pos
   WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to get_pos_entries()");
 
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request pos_details_req = AUTO_VAL_INIT(pos_details_req);
@@ -3685,7 +3693,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
   
   if (ctx.rsp.status == API_RETURN_CODE_OK)
   {
-    build_minted_block(ctx.sp, ctx.rsp, miner_address);
+    build_minted_block(ctx, miner_address);
   }
 
   WLT_LOG_L0("PoS mining: " << ctx.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
@@ -3693,7 +3701,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
   return true;
 }
 //------------------------------------------------------------------
-void wallet2::do_pos_mining_prepare_entry(mining_context& cxt, size_t pos_entry_index)
+void wallet2::do_pos_mining_prepare_entry(mining_context& cxt, size_t transfer_index)
 {
   if (cxt.zarcanum)
   {
@@ -3703,22 +3711,30 @@ void wallet2::do_pos_mining_prepare_entry(mining_context& cxt, size_t pos_entry_
   }
 }
 //------------------------------------------------------------------
-bool wallet2::do_pos_mining_iteration(mining_context& cxt, size_t pos_entry_index, uint64_t ts)
+bool wallet2::do_pos_mining_iteration(mining_context& cxt, size_t transfer_index, uint64_t ts)
 {
+  CHECK_AND_NO_ASSERT_MES(transfer_index < m_transfers.size(), false, "transfer_index is out of bounds: " << transfer_index); 
+  const transfer_details& td = m_transfers[transfer_index];
+
+  // build kernel
   currency::stake_kernel sk = AUTO_VAL_INIT(sk);
-  build_kernel(cxt.sp.pos_entries[pos_entry_index], cxt.sm, ts, sk);
-    
+  sk.kimage = td.m_key_image;
+  sk.stake_modifier = cxt.sm;
+  sk.block_timestamp = ts;
+  
+  // calculate kernel hash
   crypto::hash kernel_hash;
   {
     PROFILE_FUNC("calc_hash");
     kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
   }
 
-  const uint64_t stake_amount = cxt.sp.pos_entries[pos_entry_index].amount;
+  const uint64_t stake_amount = td.amount();
   bool found = false;
 
   if (cxt.zarcanum)
   {
+    // TODO @#@#
   }
   else
   {
@@ -3731,12 +3747,12 @@ bool wallet2::do_pos_mining_iteration(mining_context& cxt, size_t pos_entry_inde
     }
     if (found)
     {
-      cxt.rsp.index = pos_entry_index;
+      //cxt.rsp.index = pos_entry_index;
       cxt.rsp.block_timestamp = ts;
 
       LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money_brief(stake_amount) << ENDL
         << "difficulty: " << cxt.basic_diff << ", final_diff: " << final_diff << ENDL
-        << "index: " << cxt.sp.pos_entries[pos_entry_index].index << ENDL
+        << "index: " << td.m_global_output_index << ENDL
         << "kernel info: " << ENDL
         << print_stake_kernel_info(sk) << ENDL 
         << "kernel_hash(proof): " << kernel_hash,
@@ -3759,32 +3775,35 @@ bool wallet2::reset_history()
   return true;
 }
 //-------------------------------
-bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req,
-                                 const currency::COMMAND_RPC_SCAN_POS::response& rsp,
+bool wallet2::build_minted_block(const mining_context& cxt,
                                  uint64_t new_block_expected_height /* = UINT64_MAX */)
 {
-  return build_minted_block(req, rsp, m_account.get_public_address(), new_block_expected_height);
+  return build_minted_block(cxt, m_account.get_public_address(), new_block_expected_height);
 }
 
-bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, 
-                                 const currency::COMMAND_RPC_SCAN_POS::response& rsp,
+bool wallet2::build_minted_block(const mining_context& cxt,
                                  const currency::account_public_address& miner_address,
                                  uint64_t new_block_expected_height /* UINT64_MAX */)
 {
     //found a block, construct it, sign and push to daemon
     WLT_LOG_GREEN("Found kernel, constructing block", LOG_LEVEL_0);
 
-    CHECK_AND_NO_ASSERT_MES(rsp.index < req.pos_entries.size(), false, "call_COMMAND_RPC_SCAN_POS returned wrong index: " << rsp.index << ", expected less then " << req.pos_entries.size());
+    CHECK_AND_NO_ASSERT_MES(cxt.rsp.index < cxt.sp.pos_entries.size(), false, "call_COMMAND_RPC_SCAN_POS returned wrong index: " << cxt.rsp.index << ", expected less then " << cxt.sp.pos_entries.size());
+
+    const pos_entry& pe = cxt.sp.pos_entries[cxt.rsp.index];
 
     currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req = AUTO_VAL_INIT(tmpl_req);
     currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp = AUTO_VAL_INIT(tmpl_rsp);
     tmpl_req.wallet_address = get_account_address_as_str(miner_address);
     tmpl_req.stakeholder_address = get_account_address_as_str(m_account.get_public_address());
     tmpl_req.pos_block = true;
-    tmpl_req.pos_amount = req.pos_entries[rsp.index].amount;
-    tmpl_req.pos_index = req.pos_entries[rsp.index].index;
+    tmpl_req.pos_amount = pe.amount;
+    
+    tmpl_req.pos_index = pe.index; // gindex <--- this should be removed as soon as pos_entry::index is replaced with tx_id and tx_out_index
+    // TODO: also fill out tx_id and tx_out_index for mining tx creation
+
     tmpl_req.extra_text = m_miner_text_info;
-    tmpl_req.stake_unlock_time = req.pos_entries[rsp.index].stake_unlock_time;
+    tmpl_req.stake_unlock_time = pe.stake_unlock_time;
     //generate packing tx
     transaction pack_tx = AUTO_VAL_INIT(pack_tx);
     if (generate_packing_transaction_if_needed(pack_tx, 0))
@@ -3802,38 +3821,38 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     res = parse_and_validate_block_from_blob(block_blob, b);
     WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to create block template after kernel hash found!");
 
-    if (rsp.last_block_hash != b.prev_id)
+    if (cxt.rsp.last_block_hash != b.prev_id)
     {
-      WLT_LOG_YELLOW("Kernel was found but block is behindhand, b.prev_id=" << b.prev_id << ", last_block_hash=" << rsp.last_block_hash, LOG_LEVEL_0);
+      WLT_LOG_YELLOW("Kernel was found but block is behindhand, b.prev_id=" << b.prev_id << ", last_block_hash=" << cxt.rsp.last_block_hash, LOG_LEVEL_0);
       return false;
     }
 
     std::vector<const crypto::public_key*> keys_ptrs;
-    WLT_CHECK_AND_ASSERT_MES(req.pos_entries[rsp.index].wallet_index < m_transfers.size(),
+    WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(),
         false, "Wrong wallet_index at generating coinbase transacton");
 
-    if (m_transfers[req.pos_entries[rsp.index].wallet_index].m_ptx_wallet_info->m_tx.vout[m_transfers[req.pos_entries[rsp.index].wallet_index].m_internal_output_index].type() != typeid(tx_out_bare))
+    if (m_transfers[pe.wallet_index].m_ptx_wallet_info->m_tx.vout[m_transfers[pe.wallet_index].m_internal_output_index].type() != typeid(tx_out_bare))
     {
       //@#@ review zarcanum here
       return false;
     }
-    const auto& target = boost::get<tx_out_bare>(m_transfers[req.pos_entries[rsp.index].wallet_index].m_ptx_wallet_info->m_tx.vout[m_transfers[req.pos_entries[rsp.index].wallet_index].m_internal_output_index]).target;
+    const auto& target = boost::get<tx_out_bare>(m_transfers[pe.wallet_index].m_ptx_wallet_info->m_tx.vout[m_transfers[pe.wallet_index].m_internal_output_index]).target;
     WLT_CHECK_AND_ASSERT_MES(target.type() == typeid(currency::txout_to_key), false, "wrong type_id in source transaction in coinbase tx");
 
     const currency::txout_to_key& txtokey = boost::get<currency::txout_to_key>(target);
     keys_ptrs.push_back(&txtokey.key);
 
     // set a real timestamp
-    b.timestamp = rsp.block_timestamp;
+    b.timestamp = cxt.rsp.block_timestamp;
     uint64_t current_timestamp = m_core_runtime_config.get_core_time();
     set_block_datetime(current_timestamp, b);
     WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
 
     //sign block
     res = prepare_and_sign_pos_block(b,
-      req.pos_entries[rsp.index],
-      get_tx_pub_key_from_extra(m_transfers[req.pos_entries[rsp.index].wallet_index].m_ptx_wallet_info->m_tx),
-      m_transfers[req.pos_entries[rsp.index].wallet_index].m_internal_output_index,
+      pe,
+      get_tx_pub_key_from_extra(m_transfers[pe.wallet_index].m_ptx_wallet_info->m_tx),
+      m_transfers[pe.wallet_index].m_internal_output_index,
       keys_ptrs);
     WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
     

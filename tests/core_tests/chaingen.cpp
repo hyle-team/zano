@@ -547,23 +547,23 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
       if (m_ignore_last_pow_in_wallets)
         w->m_last_pow_block_h = CURRENCY_MAX_BLOCK_NUMBER;
 
-      currency::COMMAND_RPC_SCAN_POS::request scan_pos_entries;
-      bool r = w->get_pos_entries(scan_pos_entries);
+      std::vector<currency::pos_entry> pos_entries;
+      bool r = w->get_pos_entries(pos_entries);
       CHECK_AND_ASSERT_THROW_MES(r, "Failed to get_pos_entries");
 
-      for (size_t i = 0; i != scan_pos_entries.pos_entries.size(); i++)
+      for (size_t i = 0; i != pos_entries.size(); i++)
       {
 
         stake_kernel sk = AUTO_VAL_INIT(sk);
-        build_kernel(scan_pos_entries.pos_entries[i].amount,
-          scan_pos_entries.pos_entries[i].index,
-          scan_pos_entries.pos_entries[i].keyimage,
+        build_kernel(pos_entries[i].amount,
+          pos_entries[i].index,
+          pos_entries[i].keyimage,
           sk,
           blck_chain,
           indexes, 
           ts);
         crypto::hash kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
-        wide_difficulty_type this_coin_diff = basic_diff / scan_pos_entries.pos_entries[i].amount;
+        wide_difficulty_type this_coin_diff = basic_diff / pos_entries[i].amount;
         if (!check_hash(kernel_hash, this_coin_diff))
           continue;
         else
@@ -581,11 +581,11 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
           }
 
           //found kernel
-          LOG_PRINT_GREEN("Found kernel: amount=" << print_money(scan_pos_entries.pos_entries[i].amount)
-            << ", index=" << scan_pos_entries.pos_entries[i].index
-            << ", key_image" << scan_pos_entries.pos_entries[i].keyimage
+          LOG_PRINT_GREEN("Found kernel: amount=" << print_money(pos_entries[i].amount)
+            << ", index=" << pos_entries[i].index
+            << ", key_image" << pos_entries[i].keyimage
             << ", diff: " << this_coin_diff, LOG_LEVEL_0);
-          pe = scan_pos_entries.pos_entries[i];
+          pe = pos_entries[i];
           found_wallet_index = i;
           found_kh = kernel_hash;
           found_timestamp = ts;
@@ -713,11 +713,6 @@ bool test_generator::build_stake_modifier(stake_modifier_type& sm, const test_ge
 
 
   return true;
-}
-
-bool test_generator::call_COMMAND_RPC_SCAN_POS(const currency::COMMAND_RPC_SCAN_POS::request& req, currency::COMMAND_RPC_SCAN_POS::response& rsp)
-{
-  return false;
 }
 
 currency::wide_difficulty_type test_generator::get_difficulty_for_next_block(const crypto::hash& head_id, bool pow) const
