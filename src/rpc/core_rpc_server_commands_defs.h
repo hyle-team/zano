@@ -1118,39 +1118,6 @@ namespace currency
     };
   };
 
-  struct COMMAND_RPC_SCAN_POS
-  {
-    struct request
-    {
-      std::vector<pos_entry> pos_entries;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(pos_entries)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status;
-      uint64_t index;
-      uint64_t block_timestamp;
-      uint64_t height;
-      uint64_t starter_timestamp;
-      crypto::hash last_block_hash;
-      bool     is_pos_allowed;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-        KV_SERIALIZE(index)
-        KV_SERIALIZE(block_timestamp)
-        KV_SERIALIZE(height)
-        KV_SERIALIZE(is_pos_allowed)
-        KV_SERIALIZE(starter_timestamp)
-        KV_SERIALIZE_VAL_POD_AS_BLOB(last_block_hash);
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
   struct COMMAND_RPC_GET_POS_MINING_DETAILS
   {    
     struct request

@@ -6328,46 +6328,6 @@ bool blockchain_storage::build_kernel(uint64_t amount,
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::scan_pos(const COMMAND_RPC_SCAN_POS::request& sp, COMMAND_RPC_SCAN_POS::response& rsp) const
-{
-  uint64_t timstamp_start = 0;
-  wide_difficulty_type basic_diff = 0;
-  CRITICAL_REGION_BEGIN(m_read_lock);
-  timstamp_start = m_db_blocks.back()->bl.timestamp;
-  basic_diff = get_next_diff_conditional(true);
-  CRITICAL_REGION_END();
-
-  stake_modifier_type sm = AUTO_VAL_INIT(sm);
-  bool r = build_stake_modifier(sm);
-  CHECK_AND_ASSERT_MES(r, false, "failed to build_stake_modifier");
-
-  for (size_t i = 0; i != sp.pos_entries.size(); i++)
-  {
-    stake_kernel sk = AUTO_VAL_INIT(sk);
-    build_kernel(sp.pos_entries[i].amount, sp.pos_entries[i].keyimage, sk, sm, 0);
-
-    for (uint64_t ts = timstamp_start; ts < timstamp_start + POS_SCAN_WINDOW; ts++)
-    {
-      sk.block_timestamp = ts;
-      crypto::hash kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
-      wide_difficulty_type this_coin_diff = basic_diff / sp.pos_entries[i].amount;
-      if (!check_hash(kernel_hash, this_coin_diff))
-        continue;
-      else
-      {
-        //found kernel
-        LOG_PRINT_GREEN("Found kernel: amount=" << print_money(sp.pos_entries[i].amount) << ", key_image" << sp.pos_entries[i].keyimage, LOG_LEVEL_0);
-        rsp.index = i;
-        rsp.block_timestamp = ts;
-        rsp.status = API_RETURN_CODE_OK;
-        return true;
-      }
-    }
-  }
-  rsp.status = API_RETURN_CODE_NOT_FOUND;
-  return false;
-}
-//------------------------------------------------------------------
 void blockchain_storage::set_core_runtime_config(const core_runtime_config& pc) const
 {
   m_core_runtime_config = pc;

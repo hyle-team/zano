@@ -97,11 +97,6 @@ namespace tools
     return invoke_http_bin_remote_command2_update_is_disconnect("/check_keyimages.bin", req, rsp);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool default_http_core_proxy::call_COMMAND_RPC_SCAN_POS(const currency::COMMAND_RPC_SCAN_POS::request& req, currency::COMMAND_RPC_SCAN_POS::response& rsp)
-  {
-    return invoke_http_bin_remote_command2_update_is_disconnect("/scan_pos.bin", req, rsp);
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_GET_POS_MINING_DETAILS(const currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, currency::COMMAND_RPC_GET_POS_MINING_DETAILS::response& rsp)
   {
     return invoke_http_bin_remote_command2_update_is_disconnect("/get_pos_details.bin", req, rsp);

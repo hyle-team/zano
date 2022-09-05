@@ -98,11 +98,6 @@ namespace tools
       return m_rpc.on_check_keyimages(req, rsp, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
-    bool call_COMMAND_RPC_SCAN_POS(const currency::COMMAND_RPC_SCAN_POS::request& req, currency::COMMAND_RPC_SCAN_POS::response& rsp) override
-    {
-      return m_rpc.on_scan_pos(req, rsp, m_cntxt_stub);
-    }
-    //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GETBLOCKTEMPLATE(const currency::COMMAND_RPC_GETBLOCKTEMPLATE::request& req, currency::COMMAND_RPC_GETBLOCKTEMPLATE::response& rsp) override
     {
       return m_rpc.on_getblocktemplate(req, rsp, m_err_stub, m_cntxt_stub);
