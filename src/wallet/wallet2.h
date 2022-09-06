@@ -58,7 +58,7 @@
 
 
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
-const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
+
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -1390,8 +1390,8 @@ namespace tools
       };
 
       do_pos_mining_prepare_entry(cxt, transfer_index);
-      ctx.total_items_checked++;
-      ctx.total_amount_checked += tr.amount();
+      cxt.total_items_checked++;
+      cxt.total_amount_checked += tr.amount();
       while(step <= ts_window)
       {
         //check every WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL seconds wheither top block changed, if so - break the loop 

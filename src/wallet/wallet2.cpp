@@ -3790,23 +3790,26 @@ bool wallet2::build_minted_block(const mining_context& cxt,
 
     //CHECK_AND_NO_ASSERT_MES(cxt.rsp.index < cxt.sp.pos_entries.size(), false, "call_COMMAND_RPC_SCAN_POS returned wrong index: " << cxt.rsp.index << ", expected less then " << cxt.sp.pos_entries.size());
 
-    const pos_entry pe = AUTO_VAL_INIT();
-    pe.
+    pos_entry pe = AUTO_VAL_INIT(pe);
+
 
     currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req = AUTO_VAL_INIT(tmpl_req);
     currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp = AUTO_VAL_INIT(tmpl_rsp);
     tmpl_req.wallet_address = get_account_address_as_str(miner_address);
     tmpl_req.stakeholder_address = get_account_address_as_str(m_account.get_public_address());
     tmpl_req.pos_block = true;
-    tmpl_req.pos_g_index = m_transfers[cxt.rsp.index].m_global_output_index;
-    tmpl_req.pos_amount = m_transfers[cxt.rsp.index].amount();//  pe.amount;    
-    tmpl_req.tx_id = m_transfers[cxt.rsp.index].tx_hash();
-    tmpl_req.tx_out_index = m_transfers[cxt.rsp.index].m_internal_output_index;
+    pe.g_index = tmpl_req.pos_g_index = m_transfers[cxt.rsp.index].m_global_output_index;
+    pe.amount = tmpl_req.pos_amount = m_transfers[cxt.rsp.index].amount();//  pe.amount;   
+    pe.keyimage = m_transfers[cxt.rsp.index].m_key_image;
+    pe.block_timestamp = m_transfers[cxt.rsp.index].m_ptx_wallet_info->m_block_timestamp;
+    pe.stake_unlock_time = tmpl_req.stake_unlock_time = cxt.rsp.stake_unlock_time;
+    pe.tx_id = tmpl_req.tx_id = m_transfers[cxt.rsp.index].tx_hash();
+    pe.tx_out_index = tmpl_req.tx_out_index = m_transfers[cxt.rsp.index].m_internal_output_index;
+    pe.wallet_index = cxt.rsp.index;
+
     //tmpl_req.pos_index = pe.index; // gindex <--- this should be removed as soon as pos_entry::index is replaced with tx_id and tx_out_index
     // TODO: also fill out tx_id and tx_out_index for mining tx creation
-
     tmpl_req.extra_text = m_miner_text_info;
-    tmpl_req.stake_unlock_time = cxt.rsp.stake_unlock_time;
     //generate packing tx
     transaction pack_tx = AUTO_VAL_INIT(pack_tx);
     if (generate_packing_transaction_if_needed(pack_tx, 0))

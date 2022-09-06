@@ -366,7 +366,7 @@ bool test_generator::sign_block(currency::block& b,
   bool r = get_output_details_by_global_index(blocks,
     oi,
     pe.amount,
-    pe.index, 
+    pe.g_index, 
     h,
     pts,
     out_i,
@@ -556,7 +556,7 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
 
         stake_kernel sk = AUTO_VAL_INIT(sk);
         build_kernel(pos_entries[i].amount,
-          pos_entries[i].index,
+          pos_entries[i].g_index,
           pos_entries[i].keyimage,
           sk,
           blck_chain,
@@ -582,7 +582,7 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
 
           //found kernel
           LOG_PRINT_GREEN("Found kernel: amount=" << print_money(pos_entries[i].amount)
-            << ", index=" << pos_entries[i].index
+            << ", index=" << pos_entries[i].g_index
             << ", key_image" << pos_entries[i].keyimage
             << ", diff: " << this_coin_diff, LOG_LEVEL_0);
           pe = pos_entries[i];

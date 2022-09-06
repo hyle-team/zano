@@ -1424,7 +1424,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   const account_public_address& stakeholder_address = params.stakeholder_address;
   const blobdata& ex_nonce = params.ex_nonce;
   bool pos = params.pos;
-  const pos_entry& pe = params.pe; 
+  pos_entry pe = params.pe; 
 
   fill_block_template_func_t* pcustom_fill_block_template_func = params.pcustom_fill_block_template_func;
 

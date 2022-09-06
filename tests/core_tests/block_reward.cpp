@@ -63,7 +63,7 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
   pos_entry pe = AUTO_VAL_INIT(pe);
   pe.amount = boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[0]).amount;
   pe.block_timestamp = UINT64_MAX; // doesn't matter
-  pe.index = 0; // global index
+  pe.g_index = 0; // global index
   pe.keyimage = ki;
   pe.wallet_index = UINT64_MAX; // doesn't matter
 

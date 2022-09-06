@@ -14,6 +14,8 @@
 #include "currency_core/bc_escrow_service.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 
+const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
+
 namespace tools
 {
 namespace wallet_public
