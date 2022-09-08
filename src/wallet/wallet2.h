@@ -58,7 +58,7 @@
 
 
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
-const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
+
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -447,7 +447,7 @@ namespace tools
     struct mining_context
     {
       // from struct COMMAND_RPC_SCAN_POS
-      struct request_t
+      /*struct request_t
       {
         std::vector<currency::pos_entry> pos_entries;
 
@@ -455,11 +455,13 @@ namespace tools
           KV_SERIALIZE(pos_entries)
         END_KV_SERIALIZE_MAP()
       };
+      */
 
       struct response_t
       {
         std::string status;
-        uint64_t index; // index in pos_entries container
+        uint64_t index; // index in m_transfers 
+        uint64_t stake_unlock_time;
         uint64_t block_timestamp;
         uint64_t height;
         uint64_t starter_timestamp;
@@ -469,6 +471,7 @@ namespace tools
         BEGIN_KV_SERIALIZE_MAP()
           KV_SERIALIZE(status)
           KV_SERIALIZE(index)
+          KV_SERIALIZE(stake_unlock_time)
           KV_SERIALIZE(block_timestamp)
           KV_SERIALIZE(height)
           KV_SERIALIZE(is_pos_allowed)
@@ -477,7 +480,7 @@ namespace tools
         END_KV_SERIALIZE_MAP()
       };
 
-      request_t sp;
+      //request_t sp;
       response_t rsp;
 
       currency::wide_difficulty_type basic_diff;
@@ -486,7 +489,9 @@ namespace tools
       bool zarcanum;
       crypto::scalar_t last_pow_block_id_hashed; // Zarcanum notation: f'
 
-      uint64_t iterations_processed;
+      uint64_t iterations_processed = 0;
+      uint64_t total_items_checked = 0;
+      uint64_t total_amount_checked = 0;
     };
 
     struct expiration_entry_info
@@ -1364,6 +1369,7 @@ namespace tools
       if (!is_transfer_okay_for_pos(tr, stake_unlock_time))
         continue;
 
+      
       bool go_past = true;
       uint64_t step = 0;
       
@@ -1384,7 +1390,8 @@ namespace tools
       };
 
       do_pos_mining_prepare_entry(cxt, transfer_index);
-
+      cxt.total_items_checked++;
+      cxt.total_amount_checked += tr.amount();
       while(step <= ts_window)
       {
         //check every WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL seconds wheither top block changed, if so - break the loop 
@@ -1410,8 +1417,11 @@ namespace tools
         if (stop)
           return false;
 
+        cxt.iterations_processed++;
         if (do_pos_mining_iteration(cxt, transfer_index, ts))
         {
+          cxt.rsp.index = transfer_index;
+          cxt.rsp.stake_unlock_time = stake_unlock_time;
           cxt.rsp.status = API_RETURN_CODE_OK;
           return true;
         }

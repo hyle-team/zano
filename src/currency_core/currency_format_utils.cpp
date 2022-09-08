@@ -283,7 +283,7 @@ namespace currency
       posin.amount = pe.amount;
 
       // TODO: using pe.index is deprecated, get input's global index by pe.tx_id and pe.tx_out_index
-      posin.key_offsets.push_back(pe.index);
+      posin.key_offsets.push_back(pe.g_index);
 
       posin.k_image = pe.keyimage;
       tx.vin.push_back(posin);

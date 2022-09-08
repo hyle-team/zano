@@ -964,7 +964,7 @@ namespace currency
   struct pos_entry
   {
     uint64_t amount;
-    uint64_t index;              // global output index. TODO: remove, use tx_id + tx_out_index to get gindex in construct_miner_tx
+    uint64_t g_index;              // global output index. (could be WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED)
     crypto::key_image keyimage;
     uint64_t block_timestamp;
     uint64_t stake_unlock_time;
@@ -977,7 +977,7 @@ namespace currency
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
-      KV_SERIALIZE(index)
+      KV_SERIALIZE(g_index)
       KV_SERIALIZE(stake_unlock_time)
       KV_SERIALIZE(block_timestamp)
       KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(keyimage)

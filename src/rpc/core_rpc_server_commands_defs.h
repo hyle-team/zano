@@ -804,8 +804,10 @@ namespace currency
       std::string wallet_address;
       std::string stakeholder_address;
       bool pos_block;              //is pos block 
-      uint64_t pos_amount;         //
-      uint64_t pos_index;          //
+      uint64_t pos_amount;         //do we still need it?
+      uint64_t pos_g_index;        //
+      crypto::hash tx_id;
+      uint64_t tx_out_index;
       uint64_t stake_unlock_time;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -815,7 +817,9 @@ namespace currency
         KV_SERIALIZE(stakeholder_address);
         KV_SERIALIZE(pos_block)
         KV_SERIALIZE(pos_amount)
-        KV_SERIALIZE(pos_index)
+        KV_SERIALIZE(pos_g_index)
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+        KV_SERIALIZE(tx_out_index)
         KV_SERIALIZE(stake_unlock_time)
       END_KV_SERIALIZE_MAP()
     };
