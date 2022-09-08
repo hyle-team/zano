@@ -3545,7 +3545,7 @@ bool wallet2::get_pos_entries(std::vector<currency::pos_entry>& entries)
 
     pos_entry pe = AUTO_VAL_INIT(pe);
     pe.amount = tr.amount();
-    //pe.index = tr.m_global_output_index;
+    pe.g_index = tr.m_global_output_index;
     pe.keyimage = tr.m_key_image;
     pe.wallet_index = i;
     pe.stake_unlock_time = stake_unlock_time;
