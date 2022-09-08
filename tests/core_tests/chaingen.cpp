@@ -508,6 +508,8 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
   uint64_t& found_timestamp,
   crypto::hash& found_kh)
 {
+  // TODO: consiger removing this function completely in order to unify pos mining code -- sowle
+
   //bool is_after_hardfork_01 = m_hardforks.is_hardfork_active_for_height(1, blck_chain.size());
   uint64_t median_timestamp = get_timestamps_median(blck_chain);
   wide_difficulty_type basic_diff = 0;

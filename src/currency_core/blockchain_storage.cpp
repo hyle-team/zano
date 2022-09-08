@@ -5298,15 +5298,15 @@ bool blockchain_storage::validate_pos_block(const block& b,
   //check timestamp
   CHECK_AND_ASSERT_MES(b.timestamp%POS_SCAN_STEP == 0, false, "wrong timestamp in PoS block(b.timestamp%POS_SCAN_STEP == 0), b.timestamp = " <<b.timestamp);
 
-  //check keyimage
-  CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "coinstake transaction in the block has the wrong type");
-  const txin_to_key& in_to_key = boost::get<txin_to_key>(b.miner_tx.vin[1]);
-  if (!for_altchain && have_tx_keyimg_as_spent(in_to_key.k_image))
+  CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() == 2, false, "incorrect: miner_tx.vin.size() = " << b.miner_tx.vin.size());
+  CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(txin_gen), false, "incorrect input 0 type: " << b.miner_tx.vin[0].type().name());
+  CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key) || b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "incorrect input 1 type: " << b.miner_tx.vin[1].type().name());
+  const crypto::key_image& stake_key_image = get_key_image_txin_v(b.miner_tx.vin[1]);
+  //check keyimage if it's main chain candidate
+  if (!for_altchain)
   {
-      LOG_PRINT_L0("Key image in coinstake already spent in blockchain: " << string_tools::pod_to_hex(in_to_key.k_image));
-      return false;
+    CHECK_AND_ASSERT_MES(!have_tx_keyimg_as_spent(stake_key_image), false, "stake key image has been already spent in blockchain: " << stake_key_image);
   }
-
 
   // the following check is de-facto not applicable since 2021-10, but left intact to avoid consensus issues
   // PoS blocks don't use etc_tx_time anymore to store actual timestamp; instead, they use tx_service_attachment in mining tx extra
@@ -5319,73 +5319,80 @@ bool blockchain_storage::validate_pos_block(const block& b,
     return false;
   }
 
-  //check kernel
+  // build kernel and calculate hash
   stake_kernel sk = AUTO_VAL_INIT(sk);
-
   stake_modifier_type sm = AUTO_VAL_INIT(sm);
   bool r = build_stake_modifier(sm, alt_chain, split_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to build_stake_modifier");
-  amount = 0;
-  r = build_kernel(b, sk, amount, sm);
+  r = build_kernel(stake_key_image, sk, sm, b.timestamp);
   CHECK_AND_ASSERT_MES(r, false, "failed to build kernel_stake");
-  CHECK_AND_ASSERT_MES(amount!=0, false, "failed to build kernel_stake, amount == 0");
-
   proof_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
 
-  LOG_PRINT_L2("STAKE KERNEL for bl ID: " << get_block_hash(b) << ENDL
-    << print_stake_kernel_info(sk)
-    << "amount: " << print_money(amount) << ENDL
-    << "kernel_hash: " << proof_hash);
-
-
-  final_diff = basic_diff / amount;
-  if (!check_hash(proof_hash, final_diff))
+  if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
   {
-    LOG_ERROR("PoS difficulty check failed for block " << get_block_hash(b) << " @ HEIGHT " << get_block_height(b) << ":" << ENDL
-      << "  basic_diff:  " << basic_diff << ENDL
-      << "  final_diff:  " << final_diff << ENDL
-      << "  amount:      " << print_money_brief(amount) << ENDL
-      << "  kernel_hash: " << proof_hash << ENDL
-      );
-    return false;
+    return false; // not implemented yet, TODO @#@#
   }
-
-
-
-  //validate signature
-  uint64_t max_related_block_height = 0;
-  const txin_to_key& coinstake_in = boost::get<txin_to_key>(b.miner_tx.vin[1]);
-
-  if (!for_altchain)
+  else
   {
-    // Do coinstake input validation for main chain only.
-    // Txs in alternative PoS blocks (including miner_tx) are validated by validate_alt_block_txs()
-    uint64_t source_max_unlock_time_for_pos_coinbase = 0;
-    r = check_tx_input(b.miner_tx, 1, coinstake_in, id, max_related_block_height, source_max_unlock_time_for_pos_coinbase);
-    CHECK_AND_ASSERT_MES(r, false, "Failed to validate coinstake input in miner tx, block_id = " << get_block_hash(b));
+    // old PoS non-hidden amount scheme
+    CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "incorrect input 1 type: " << b.miner_tx.vin[1].type().name() << ", txin_to_key expected");
+    const txin_to_key& intk = boost::get<txin_to_key>(b.miner_tx.vin[1]);
+    amount = intk.amount;
 
-    if (m_core_runtime_config.is_hardfork_active_for_height(1, get_block_height(b)))
+    CHECK_AND_ASSERT_MES(intk.key_offsets.size(), false, "wrong miner transaction");
+
+    CHECK_AND_ASSERT_MES(amount!=0, false, "failed to build kernel_stake, amount == 0");
+
+    LOG_PRINT_L2("STAKE KERNEL for bl ID: " << get_block_hash(b) << ENDL
+      << print_stake_kernel_info(sk)
+      << "amount: " << print_money(amount) << ENDL
+      << "kernel_hash: " << proof_hash);
+
+    final_diff = basic_diff / amount;
+    if (!check_hash(proof_hash, final_diff))
     {
-      uint64_t last_pow_h = get_last_x_block_height(false);
-      CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_h, false, "Failed to validate coinbase in PoS block, condition failed: max_related_block_height(" << max_related_block_height << ") <= last_pow_h(" << last_pow_h << ")");
-      //let's check that coinbase amount and unlock time
-      r = validate_pos_coinbase_outs_unlock_time(b.miner_tx, coinstake_in.amount, source_max_unlock_time_for_pos_coinbase);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to validate_pos_coinbase_outs_unlock_time() in miner tx, block_id = " << get_block_hash(b)
-        << "source_max_unlock_time_for_pos_coinbase=" << source_max_unlock_time_for_pos_coinbase);
+      LOG_ERROR("PoS difficulty check failed for block " << get_block_hash(b) << " @ HEIGHT " << get_block_height(b) << ":" << ENDL
+        << "  basic_diff:  " << basic_diff << ENDL
+        << "  final_diff:  " << final_diff << ENDL
+        << "  amount:      " << print_money_brief(amount) << ENDL
+        << "  kernel_hash: " << proof_hash << ENDL
+        );
+      return false;
     }
-    else
+
+    //validate signature
+    uint64_t max_related_block_height = 0;
+    const txin_to_key& coinstake_in = boost::get<txin_to_key>(b.miner_tx.vin[1]);
+
+    if (!for_altchain)
     {
-      CHECK_AND_ASSERT_MES(is_tx_spendtime_unlocked(source_max_unlock_time_for_pos_coinbase), false, "Failed to validate coinbase in PoS block, condition failed: is_tx_spendtime_unlocked(source_max_unlock_time_for_pos_coinbase)(" << source_max_unlock_time_for_pos_coinbase << ")");
+      // Do coinstake input validation for main chain only.
+      // Txs in alternative PoS blocks (including miner_tx) are validated by validate_alt_block_txs()
+      uint64_t source_max_unlock_time_for_pos_coinbase = 0;
+      r = check_tx_input(b.miner_tx, 1, coinstake_in, id, max_related_block_height, source_max_unlock_time_for_pos_coinbase);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to validate coinstake input in miner tx, block_id = " << get_block_hash(b));
+
+      if (m_core_runtime_config.is_hardfork_active_for_height(1, get_block_height(b)))
+      {
+        uint64_t last_pow_h = get_last_x_block_height(false);
+        CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_h, false, "Failed to validate coinbase in PoS block, condition failed: max_related_block_height(" << max_related_block_height << ") <= last_pow_h(" << last_pow_h << ")");
+        //let's check that coinbase amount and unlock time
+        r = validate_pos_coinbase_outs_unlock_time(b.miner_tx, coinstake_in.amount, source_max_unlock_time_for_pos_coinbase);
+        CHECK_AND_ASSERT_MES(r, false, "Failed to validate_pos_coinbase_outs_unlock_time() in miner tx, block_id = " << get_block_hash(b)
+          << "source_max_unlock_time_for_pos_coinbase=" << source_max_unlock_time_for_pos_coinbase);
+      }
+      else
+      {
+        CHECK_AND_ASSERT_MES(is_tx_spendtime_unlocked(source_max_unlock_time_for_pos_coinbase), false, "Failed to validate coinbase in PoS block, condition failed: is_tx_spendtime_unlocked(source_max_unlock_time_for_pos_coinbase)(" << source_max_unlock_time_for_pos_coinbase << ")");
+      }
     }
+
+    uint64_t block_height = for_altchain ? split_height + alt_chain.size() : m_db_blocks.size();
+    uint64_t coinstake_age = block_height - max_related_block_height - 1;
+
+    CHECK_AND_ASSERT_MES(coinstake_age >= m_core_runtime_config.min_coinstake_age, false,
+      "Coinstake age is: " << coinstake_age << " is less than minimum expected: " << m_core_runtime_config.min_coinstake_age);
   }
-
-
-
-  uint64_t block_height = for_altchain ? split_height + alt_chain.size() : m_db_blocks.size();
-  uint64_t coinstake_age = block_height - max_related_block_height - 1;
-
-  CHECK_AND_ASSERT_MES(coinstake_age >= m_core_runtime_config.min_coinstake_age, false,
-    "Coinstake age is: " << coinstake_age << " is less than minimum expected: " << m_core_runtime_config.min_coinstake_age);
 
   return true;
 }
@@ -6298,7 +6305,7 @@ bool blockchain_storage::build_kernel(const block& bl, stake_kernel& kernel, uin
   CHECK_AND_ASSERT_MES(txin.key_offsets.size(), false, "wrong miner transaction");
   amount = txin.amount;
 
-  return build_kernel(txin.amount, txin.k_image, kernel, stake_modifier, bl.timestamp);
+  return build_kernel(txin.k_image, kernel, stake_modifier, bl.timestamp);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::build_stake_modifier(stake_modifier_type& sm, const alt_chain_type& alt_chain, uint64_t split_height, crypto::hash *p_last_block_hash /* = nullptr */) const
@@ -6326,8 +6333,7 @@ bool blockchain_storage::build_stake_modifier(stake_modifier_type& sm, const alt
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::build_kernel(uint64_t amount,
-                                      const crypto::key_image& ki, 
+bool blockchain_storage::build_kernel(const crypto::key_image& ki, 
                                       stake_kernel& kernel, 
                                       const stake_modifier_type& stake_modifier, 
                                       uint64_t timestamp)const 

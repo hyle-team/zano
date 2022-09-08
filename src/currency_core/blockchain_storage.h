@@ -337,11 +337,10 @@ namespace currency
     bool check_keyimages(const std::list<crypto::key_image>& images, std::list<uint64_t>& images_stat)const;//true - unspent, false - spent
     bool build_kernel(const block& bl, stake_kernel& kernel, uint64_t& amount, const stake_modifier_type& stake_modifier)const;
     // --- PoS ---  
-    bool build_kernel(uint64_t amount,
-      const crypto::key_image& ki,
+    bool build_kernel(const crypto::key_image& ki,
       stake_kernel& kernel,
       const stake_modifier_type& stake_modifier,
-      uint64_t timestamp)const;
+      uint64_t timestamp) const;
     bool build_stake_modifier(stake_modifier_type& sm, const alt_chain_type& alt_chain = alt_chain_type(), uint64_t split_height = 0, crypto::hash *p_last_block_hash = nullptr) const;
 
     bool validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const;
