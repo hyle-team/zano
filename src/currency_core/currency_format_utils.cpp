@@ -606,10 +606,16 @@ namespace currency
     // tx.version > TRANSACTION_VERSION_PRE_HF4
     // all amounts are hidden with Pedersen commitments
     // therefore fee should be explicitly stated in the extra
-    if (!process_type_in_variant_container<zarcanum_tx_data_v1>(tx.extra, [&](const zarcanum_tx_data_v1& ztd) -> bool {
+    auto cb = [&](const zarcanum_tx_data_v1& ztd) -> bool {
       fee += ztd.fee;
       return true; // continue
-      }, false))
+      };
+      
+ 
+    bool r = process_type_in_variant_container<zarcanum_tx_data_v1>(tx.extra, cb, false);
+      
+      
+    if (!r)
     {
       fee = 0;
       return false;

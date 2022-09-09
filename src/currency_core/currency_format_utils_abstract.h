@@ -109,7 +109,7 @@ namespace currency
   //---------------------------------------------------------------
   // if cb returns true, it means "continue", false -- means "stop"
   template<typename specific_type_t, typename variant_container_t, typename callback_t>
-  bool process_type_in_variant_container(variant_container_t& av, callback_t& cb, bool return_value_if_none_found = true)
+  bool process_type_in_variant_container(const variant_container_t& av, callback_t& cb, bool return_value_if_none_found = true)
   {
     bool found = false;
     for (auto& ai : av)
@@ -189,19 +189,19 @@ namespace currency
   }
 
   //, txin_htlc, txin_zc_input
-  inline bool compare_variant_by_types(const txin_multisig& left, typename txin_multisig& right)
+  inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)
   {
     return (left.multisig_out_id < right.multisig_out_id);
   }
   //---------------------------------------------------------------
-  inline bool compare_variant_by_types(const txin_gen& left, typename txin_gen& right)
+  inline bool compare_variant_by_types(const txin_gen& left, const txin_gen& right)
   {
     //actually this should never happen, should we leave it in case it happen in unit tests? @sowle 
     return (left.height < right.height);
   }
   //---------------------------------------------------------------
   template<typename type_with_kimage_t>
-  bool compare_variant_by_types(const type_with_kimage_t& left, typename type_with_kimage_t& right)
+  bool compare_variant_by_types(const type_with_kimage_t& left, const type_with_kimage_t& right)
   {
     return (left.k_image < right.k_image);
   }
@@ -213,8 +213,10 @@ namespace currency
     {
       ASSERT_MES_AND_THROW("[compare_varian_by_types] Left and Right types matched type " << typeid(t_type_left).name());
     }
-    //@sowle should we use here variant index instead? (tags takes since it's ids something more "unchangebale", but we can reconsider)
-    return (variant_serialization_traits<typename binary_archive<true>, typename t_type_left>::get_tag() < variant_serialization_traits<typename binary_archive<true>, typename t_type_right>::get_tag());
+    typedef binary_archive<true> bin_archive;
+    typedef variant_serialization_traits<bin_archive, t_type_left> traits_left;
+    typedef variant_serialization_traits<bin_archive, t_type_right> traits_right;
+    return (traits_left::get_tag() < traits_right::get_tag());
   }
   //---------------------------------------------------------------
   template<typename t_type_left>
