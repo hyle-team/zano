@@ -1987,7 +1987,7 @@ void wallets_manager::wallet_vs_options::worker_func()
         pos_minin_interval.do_call([this](){
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
           LOG_PRINT_L1(get_log_prefix() + " Starting PoS mint iteration");
-          if (!w->get()->fill_mining_context(ctx) || ctx.rsp.status != API_RETURN_CODE_OK)
+          if (!w->get()->fill_mining_context(ctx) || ctx.status != API_RETURN_CODE_OK)
           {
             LOG_PRINT_L1(get_log_prefix() + " cannot obtain PoS mining context, skip iteration");
             return true;
@@ -2001,11 +2001,11 @@ void wallets_manager::wallet_vs_options::worker_func()
             return *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online &&  *plast_daemon_height == last_wallet_synch_height;
           }, core_conf);
 
-          if (ctx.rsp.status == API_RETURN_CODE_OK)
+          if (ctx.status == API_RETURN_CODE_OK)
           {
             w->get()->build_minted_block(ctx);
           }
-          LOG_PRINT_L1(get_log_prefix() << " PoS mining iteration finished, status: " << ctx.rsp.status << ", used " << ctx.total_items_checked << " entries with total amount: " << currency::print_money_brief(ctx.total_amount_checked) << ", processed: " << ctx.iterations_processed << " iter.");
+          LOG_PRINT_L1(get_log_prefix() << " PoS mining iteration finished, status: " << ctx.status << ", used " << ctx.total_items_checked << " entries with total amount: " << currency::print_money_brief(ctx.total_amount_checked) << ", processed: " << ctx.iterations_processed << " iter.");
           return true;
         });
       }

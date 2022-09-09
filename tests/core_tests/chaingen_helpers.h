@@ -173,7 +173,7 @@ inline bool mine_next_pos_block_in_playtime_with_wallet(tools::wallet2& w, const
 {
   tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
   w.fill_mining_context(ctx);
-  if (!ctx.rsp.is_pos_allowed)
+  if (!ctx.is_pos_allowed)
     return false;
  
 
@@ -181,7 +181,7 @@ inline bool mine_next_pos_block_in_playtime_with_wallet(tools::wallet2& w, const
   w.scan_pos(ctx, stop, [&w](){size_t blocks_fetched; w.refresh(blocks_fetched); return blocks_fetched == 0; }, w.get_core_runtime_config());
   
   pos_entries_count = ctx.total_items_checked;
-  if (ctx.rsp.status != API_RETURN_CODE_OK)
+  if (ctx.status != API_RETURN_CODE_OK)
     return false;
   
   return w.build_minted_block(ctx, miner_address);

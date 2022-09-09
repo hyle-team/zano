@@ -446,52 +446,25 @@ namespace tools
 
     struct mining_context
     {
-      // from struct COMMAND_RPC_SCAN_POS
-      /*struct request_t
-      {
-        std::vector<currency::pos_entry> pos_entries;
+      std::string   status;
 
-        BEGIN_KV_SERIALIZE_MAP()
-          KV_SERIALIZE(pos_entries)
-        END_KV_SERIALIZE_MAP()
-      };
-      */
+      bool          is_pos_allowed;
+      bool          zarcanum;
 
-      struct response_t
-      {
-        std::string status;
-        uint64_t index; // index in m_transfers 
-        uint64_t stake_unlock_time;
-        uint64_t block_timestamp;
-        uint64_t height;
-        uint64_t starter_timestamp;
-        crypto::hash last_block_hash;
-        bool     is_pos_allowed;
-
-        BEGIN_KV_SERIALIZE_MAP()
-          KV_SERIALIZE(status)
-          KV_SERIALIZE(index)
-          KV_SERIALIZE(stake_unlock_time)
-          KV_SERIALIZE(block_timestamp)
-          KV_SERIALIZE(height)
-          KV_SERIALIZE(is_pos_allowed)
-          KV_SERIALIZE(starter_timestamp)
-          KV_SERIALIZE_VAL_POD_AS_BLOB(last_block_hash);
-        END_KV_SERIALIZE_MAP()
-      };
-
-      //request_t sp;
-      response_t rsp;
+      uint64_t      index; // index in m_transfers 
+      uint64_t      stake_unlock_time;
+      uint64_t      block_timestamp;
+      uint64_t      height;
+      uint64_t      starter_timestamp;
+      crypto::hash  last_block_hash;
+      crypto::scalar_t last_pow_block_id_hashed; // Zarcanum notation: f'
 
       currency::wide_difficulty_type basic_diff;
       currency::stake_modifier_type sm;
-      
-      bool zarcanum;
-      crypto::scalar_t last_pow_block_id_hashed; // Zarcanum notation: f'
 
-      uint64_t iterations_processed = 0;
-      uint64_t total_items_checked = 0;
-      uint64_t total_amount_checked = 0;
+      uint64_t      iterations_processed = 0;
+      uint64_t      total_items_checked = 0;
+      uint64_t      total_amount_checked = 0;
     };
 
     struct expiration_entry_info
@@ -1004,7 +977,6 @@ private:
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
     std::string get_alias_for_address(const std::string& addr);
     std::vector<std::string> get_aliases_for_address(const std::string& addr);
-    static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, const uint64_t timestamp, currency::stake_kernel& kernel);
     bool is_connected_to_net();
     bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time) const;
     bool scan_unconfirmed_outdate_tx();
@@ -1347,11 +1319,11 @@ namespace tools
     idle_condition_cb_t idle_condition_cb,
     const currency::core_runtime_config &runtime_config)
   {
-    cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
+    cxt.status = API_RETURN_CODE_NOT_FOUND;
     uint64_t timstamp_last_idle_call = runtime_config.get_core_time();
     cxt.iterations_processed = 0;
 
-    uint64_t ts_from = cxt.rsp.starter_timestamp; // median ts of last BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW blocks
+    uint64_t ts_from = cxt.starter_timestamp; // median ts of last BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW blocks
     ts_from = ts_from - (ts_from % POS_SCAN_STEP) + POS_SCAN_STEP;
     uint64_t ts_to = runtime_config.get_core_time() + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT - 5;
     ts_to = ts_to - (ts_to % POS_SCAN_STEP);
@@ -1400,7 +1372,7 @@ namespace tools
           if (!idle_condition_cb())
           {
             LOG_PRINT_L0("Detected new block, minting interrupted");
-            cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
+            cxt.status = API_RETURN_CODE_NOT_FOUND;
             return false;
           }
           timstamp_last_idle_call = runtime_config.get_core_time();
@@ -1420,9 +1392,9 @@ namespace tools
         cxt.iterations_processed++;
         if (do_pos_mining_iteration(cxt, transfer_index, ts))
         {
-          cxt.rsp.index = transfer_index;
-          cxt.rsp.stake_unlock_time = stake_unlock_time;
-          cxt.rsp.status = API_RETURN_CODE_OK;
+          cxt.index = transfer_index;
+          cxt.stake_unlock_time = stake_unlock_time;
+          cxt.status = API_RETURN_CODE_OK;
           return true;
         }
         
@@ -1430,7 +1402,7 @@ namespace tools
       }
       ++pos_entry_index;
     }
-    cxt.rsp.status = API_RETURN_CODE_NOT_FOUND;
+    cxt.status = API_RETURN_CODE_NOT_FOUND;
     return false;
   }
 
