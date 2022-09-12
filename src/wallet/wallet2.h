@@ -381,6 +381,7 @@ namespace tools
       uint64_t m_spent_height;
       uint32_t m_flags;
       uint64_t m_amount;
+      boost::optional<crypto::scalar_t> m_opt_blinding_mask;
 
       // @#@ will throw if type is not tx_out_bare, TODO: change according to new model, 
       // need to replace all get_tx_out_bare_from_out_v() to proper code
@@ -391,6 +392,7 @@ namespace tools
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
       bool is_spendable() const { return (m_flags & (WALLET_TRANSFER_DETAIL_FLAG_SPENT | WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION | WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION)) == 0; }
       bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
+      bool is_zc() const { return m_opt_blinding_mask != boost::none; }
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)
@@ -398,6 +400,7 @@ namespace tools
         KV_SERIALIZE(m_spent_height)
         KV_SERIALIZE(m_flags)
         KV_SERIALIZE(m_amount)
+        //KV_SERIALIZE_N(m_opt_blinding_mask, blinding_mask)
         KV_SERIALIZE_EPHEMERAL_N(uint64_t, tools::wallet2::transfer_details_base_to_amount, "amount")
         KV_SERIALIZE_EPHEMERAL_N(std::string, tools::wallet2::transfer_details_base_to_tx_hash, "tx_id")
       END_KV_SERIALIZE_MAP()
@@ -453,14 +456,18 @@ namespace tools
 
       uint64_t      index; // index in m_transfers 
       uint64_t      stake_unlock_time;
-      uint64_t      block_timestamp;
+      //uint64_t      block_timestamp;
       uint64_t      height;
       uint64_t      starter_timestamp;
       crypto::hash  last_block_hash;
-      crypto::scalar_t last_pow_block_id_hashed; // Zarcanum notation: f'
+
+      crypto::scalar_t last_pow_block_id_hashed;    // Zarcanum notation: f'
+      crypto::scalar_t secret_q;                    // Zarcanum notation: q
+      boost::multiprecision::uint256_t l_div_z_D;  // Zarcanum notation: floor( l / (z * D) )  (max possible value:  2^252 / (2^64 * 1) ~= 2^188, or 2^252 / (1 * 1) = 2^252)
 
       currency::wide_difficulty_type basic_diff;
-      currency::stake_modifier_type sm;
+      currency::stake_kernel sk;
+      //currency::stake_modifier_type sm;
 
       uint64_t      iterations_processed = 0;
       uint64_t      total_items_checked = 0;

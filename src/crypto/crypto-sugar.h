@@ -1144,6 +1144,14 @@ namespace crypto
       return hs_calculator.calc_hash();
     }
 
+    static scalar_t hs(const char(&str32)[32], const crypto::point_t& p)
+    {
+      hs_t hs_calculator(2);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_point(p);
+      return hs_calculator.calc_hash();
+    }
+
     static point_t hp(const point_t& p)
     {
       point_t result;

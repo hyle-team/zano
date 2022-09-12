@@ -350,6 +350,12 @@ bool out_is_to_htlc(const currency::tx_out_v& out_t)
   }
   return false;
 }
+
+bool out_is_zc(const currency::tx_out_v& out_t)
+{
+  return out_t.type() == typeid(currency::tx_out_zarcanum);
+}
+
 const currency::txout_htlc& out_get_htlc(const currency::tx_out_v& out_t)
 {
   return boost::get<currency::txout_htlc>(boost::get<currency::tx_out_bare>(out_t).target);
@@ -378,11 +384,6 @@ uint8_t wallet2::out_get_mixin_attr(const currency::tx_out_v& out_t)
   }
   THROW_WALLET_CMN_ERR_EX("Unexpected out type im wallet: " << out_t.type().name());
   return false;
-}
-
-bool out_is_to_zarcanum(const currency::tx_out_v& out_t)
-{
-  return out_t.type() == typeid(currency::tx_out_zarcanum);
 }
 
 const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list)
@@ -541,12 +542,15 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
    
     for (size_t i_in_outs = 0; i_in_outs != outs.size(); i_in_outs++)
     {
-      size_t o = outs[i_in_outs].index;
+      const wallet_out_info& out = outs[i_in_outs];
+      size_t o = out.index;
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(o < tx.vout.size(), "wrong out in transaction: internal index=" << o << ", total_outs=" << tx.vout.size());
       {
         const currency::tx_out_v& out_v = tx.vout[o];
 
-        if (out_is_to_key(out_v) || out_is_to_htlc(out_v) || out_is_to_zarcanum(out_v)) // out.target.type() == typeid(txout_to_key) || out.target.type() == typeid(txout_htlc))
+        bool out_type_zc = out_is_zc(out_v);
+        bool out_type_to_key = out_is_to_key(out_v);
+        if (out_type_zc || out_type_to_key || out_is_to_htlc(out_v))
         {
           crypto::public_key out_key = out_get_pub_key(out_v, htlc_info_list);
           //const currency::txout_to_key& otk = boost::get<currency::txout_to_key>(out.target);
@@ -601,7 +605,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             }
           }
 
-          if (is_auditable() && (out_is_to_key(out_v) || out_is_to_zarcanum(out_v)) &&
+          if (is_auditable() && (out_type_to_key || out_type_zc) &&
             out_get_mixin_attr(out_v) != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
           {
             std::stringstream ss;
@@ -643,6 +647,10 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
               td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER;
             }
           }
+          
+          if (out_type_zc)
+            td.m_opt_blinding_mask = out.blinding_mask;
+
           size_t transfer_index = m_transfers.size() - 1;
           if (out_is_to_htlc(out_v))
           {
@@ -699,7 +707,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           if (max_out_unlock_time < get_tx_unlock_time(tx, o))
             max_out_unlock_time = get_tx_unlock_time(tx, o);
 
-          if (out_is_to_key(out_v) || out_is_to_zarcanum(out_v))
+          if (out_type_to_key || out_type_zc)
           {
             WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
           }
@@ -3613,9 +3621,6 @@ bool wallet2::prepare_and_sign_pos_block(currency::block& b,
 //------------------------------------------------------------------
 bool wallet2::fill_mining_context(mining_context& ctx)
 {
-  //bool r = get_pos_entries(ctx.sp.pos_entries); // TODO: Remove this call. Transfers are filtered in scan_pos
-  //WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to get_pos_entries()");
-
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request pos_details_req = AUTO_VAL_INIT(pos_details_req);
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::response pos_details_resp = AUTO_VAL_INIT(pos_details_resp);
   ctx.status = API_RETURN_CODE_NOT_FOUND;
@@ -3623,13 +3628,15 @@ bool wallet2::fill_mining_context(mining_context& ctx)
   if (pos_details_resp.status != API_RETURN_CODE_OK)
     return false;
   ctx.basic_diff.assign(pos_details_resp.pos_basic_difficulty);
-  ctx.sm = pos_details_resp.sm;
+  ctx.sk = AUTO_VAL_INIT(ctx.sk);
+  ctx.sk.stake_modifier = pos_details_resp.sm;
 
-  if (get_core_runtime_config().hard_forks.is_hardfork_active_for_height(4, get_top_block_height() + 1))
+  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
   {
     // Zarcanum (PoS with hidden amounts)
     ctx.zarcanum = true;
-    ctx.last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, ctx.sm.last_pow_id);
+    ctx.last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, ctx.sk.stake_modifier.last_pow_id);
+    ctx.l_div_z_D = crypto::c_scalar_L.as_boost_mp_type<boost::multiprecision::uint256_t>() / (ctx.basic_diff);
   }
 
   ctx.last_block_hash = pos_details_resp.last_block_hash;
@@ -3655,10 +3662,6 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     return true;
   }
 
-  //uint64_t pos_entries_amount = 0;
-  //for (auto& ent : ctx.sp.pos_entries)
-  //  pos_entries_amount += ent.amount;
-
   std::atomic<bool> stop(false);
   scan_pos(ctx, stop, [this](){
     size_t blocks_fetched;
@@ -3681,61 +3684,76 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
   return true;
 }
 //------------------------------------------------------------------
-void wallet2::do_pos_mining_prepare_entry(mining_context& cxt, size_t transfer_index)
+void wallet2::do_pos_mining_prepare_entry(mining_context& context, size_t transfer_index)
 {
-  if (cxt.zarcanum)
-  {
-    //uint64_t pos_entry_wallet_index = cxt.sp.pos_entries[pos_entry_index].wallet_index;
-    //CHECK_AND_ASSERT_MES_NO_RET(pos_entry_wallet_index < m_transfers.size(), "invalid pos_entry_wallet_index = " << pos_entry_wallet_index << ", m_transfers: " << m_transfers.size());
+  CHECK_AND_ASSERT_MES_NO_RET(transfer_index < m_transfers.size(), "transfer_index is out of bounds: " << transfer_index); 
+  const transfer_details& td = m_transfers[transfer_index];
 
+  // pre build kernel
+  context.sk.kimage = td.m_key_image;
+
+  if (context.zarcanum)
+  {
+    crypto::point_t R(get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx));
+    crypto::scalar_t v = m_account.get_keys().view_secret_key;
+    context.secret_q = v * crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_SECRET_Q, v * R);
   }
 }
 //------------------------------------------------------------------
-bool wallet2::do_pos_mining_iteration(mining_context& cxt, size_t transfer_index, uint64_t ts)
+bool wallet2::do_pos_mining_iteration(mining_context& context, size_t transfer_index, uint64_t ts)
 {
   CHECK_AND_NO_ASSERT_MES(transfer_index < m_transfers.size(), false, "transfer_index is out of bounds: " << transfer_index); 
   const transfer_details& td = m_transfers[transfer_index];
 
-  // build kernel
-  currency::stake_kernel sk = AUTO_VAL_INIT(sk);
-  sk.kimage = td.m_key_image;
-  sk.stake_modifier = cxt.sm;
-  sk.block_timestamp = ts;
-  
-  // calculate kernel hash
+  // update stake kernel and calculate it's hash
+  context.sk.block_timestamp = ts;
   crypto::hash kernel_hash;
   {
     PROFILE_FUNC("calc_hash");
-    kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
+    kernel_hash = crypto::cn_fast_hash(&context.sk, sizeof(context.sk));
   }
 
   const uint64_t stake_amount = td.amount();
   bool found = false;
 
-  if (cxt.zarcanum)
+  if (context.zarcanum && td.is_zc())
   {
-    // TODO @#@#
+    PROFILE_FUNC("check_zarcanum");
+    crypto::scalar_t lhs_s = crypto::scalar_t(kernel_hash) * (*td.m_opt_blinding_mask + context.secret_q + context.last_pow_block_id_hashed); //  == h * (f + q + f') mod l
+    boost::multiprecision::uint256_t lhs = lhs_s.as_boost_mp_type<boost::multiprecision::uint256_t>();
+    boost::multiprecision::uint256_t rhs = context.l_div_z_D * stake_amount; // == floor( l / (z * D) ) * a
+
+    if (lhs < rhs)
+    {
+      found = true;
+      LOG_PRINT_GREEN("Found Zarcanum kernel: amount: " << currency::print_money_brief(stake_amount) << ", gindex: " << td.m_global_output_index << ENDL
+        << "difficulty:            " << context.basic_diff << ENDL
+        << "kernel info:           " << ENDL
+        << print_stake_kernel_info(context.sk) << ENDL 
+        << "kernel_hash:           " << kernel_hash << ENDL
+        << "lhs:                   " << lhs << ENDL
+        << "rhs:                   " << rhs
+        , LOG_LEVEL_0);
+
+    }
+    ++context.iterations_processed;
   }
   else
   {
     // old PoS with non-hidden amounts
-    currency::wide_difficulty_type final_diff = cxt.basic_diff / stake_amount;
+    currency::wide_difficulty_type final_diff = context.basic_diff / stake_amount;
     {
       PROFILE_FUNC("check_hash");
       found = currency::check_hash(kernel_hash, final_diff);
-      ++cxt.iterations_processed;
+      ++context.iterations_processed;
     }
     if (found)
     {
-      //cxt.index = pos_entry_index;
-      cxt.block_timestamp = ts;
-
-      LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money_brief(stake_amount) << ENDL
-        << "difficulty: " << cxt.basic_diff << ", final_diff: " << final_diff << ENDL
-        << "index: " << td.m_global_output_index << ENDL
-        << "kernel info: " << ENDL
-        << print_stake_kernel_info(sk) << ENDL 
-        << "kernel_hash(proof): " << kernel_hash,
+      LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money_brief(stake_amount)<< ", gindex: " << td.m_global_output_index << ENDL
+        << "difficulty:            " << context.basic_diff << ", final_diff: " << final_diff << ENDL
+        << "kernel info:           " << ENDL
+        << print_stake_kernel_info(context.sk) << ENDL 
+        << "kernel_hash(proof):    " << kernel_hash,
         LOG_LEVEL_0);
     }
   }
@@ -3828,8 +3846,8 @@ bool wallet2::build_minted_block(const mining_context& cxt,
     const currency::txout_to_key& txtokey = boost::get<currency::txout_to_key>(target);
     keys_ptrs.push_back(&txtokey.key);
 
-    // set a real timestamp
-    b.timestamp = cxt.block_timestamp;
+    // set the timestamp from stake kernel
+    b.timestamp = cxt.sk.block_timestamp;
     uint64_t current_timestamp = m_core_runtime_config.get_core_time();
     set_block_datetime(current_timestamp, b);
     WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);

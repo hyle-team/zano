@@ -202,10 +202,15 @@ namespace currency
       : index(index)
       , amount(amount)
     {}
+    wallet_out_info(size_t index, uint64_t amount, const crypto::scalar_t& blinding_mask)
+      : index(index)
+      , amount(amount)
+      , blinding_mask(blinding_mask)
+    {}
 
     size_t      index  = SIZE_MAX;
     uint64_t    amount = 0;
-    //todo: additional input info
+    crypto::scalar_t blinding_mask = 0;
   };
 
 

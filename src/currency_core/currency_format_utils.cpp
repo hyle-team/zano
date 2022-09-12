@@ -270,27 +270,31 @@ namespace currency
     //we always add extra_padding with 2 bytes length to make possible for get_block_template to adjust cumulative size
     tx.extra.push_back(extra_padding());
 
-
+    // input #0: txin_gen
     txin_gen in;
     in.height = height;
     tx.vin.push_back(in);
 
     if (pos)
     {
-      // TODO: add Zarcanum part
-
-      txin_to_key posin;
-      posin.amount = pe.amount;
-
-      // TODO: using pe.index is deprecated, get input's global index by pe.tx_id and pe.tx_out_index
-      posin.key_offsets.push_back(pe.g_index);
-
-      posin.k_image = pe.keyimage;
-      tx.vin.push_back(posin);
-      //reserve place for ring signature
-      tx.signatures.resize(1);
-      tx.signatures[0] = NLSAG_sig();
-      boost::get<NLSAG_sig>(tx.signatures[0]).s.resize(posin.key_offsets.size());
+      // input #1: stake (for PoS blocks only)
+      if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+      {
+        // TODO: add Zarcanum part
+      }
+      else
+      {
+        // old fashioned tx non-hidden amounts PoS scheme
+        txin_to_key stake_input;
+        stake_input.amount = pe.amount;
+        stake_input.key_offsets.push_back(pe.g_index);
+        stake_input.k_image = pe.keyimage;
+        tx.vin.push_back(stake_input);
+        //reserve place for ring signature
+        NLSAG_sig nlsag;
+        nlsag.s.resize(stake_input.key_offsets.size());
+        tx.signatures.push_back(nlsag); // consider using emplace_back and avoid copying
+      }
     }
 
     uint64_t no = 0;
@@ -574,10 +578,10 @@ namespace currency
   std::string print_stake_kernel_info(const stake_kernel& sk)
   {
     std::stringstream ss;
-    ss << "block_timestamp: " << sk.block_timestamp << ENDL
-      << "kimage: " << sk.kimage << ENDL
-      << "stake_modifier.last_pos_kernel_id: " << sk.stake_modifier.last_pos_kernel_id << ENDL
-      << "stake_modifier.last_pow_id: " << sk.stake_modifier.last_pow_id << ENDL;
+    ss << "block timestamp:       " << sk.block_timestamp << ENDL
+       << "key image:             " << sk.kimage << ENDL
+       << "sm.last_pos_kernel_id: " << sk.stake_modifier.last_pos_kernel_id << ENDL
+       << "sm.last_pow_id:        " << sk.stake_modifier.last_pow_id << ENDL;
     return ss.str();
   }
 
@@ -2430,7 +2434,7 @@ namespace currency
     return true;
   }
 
-  bool is_out_to_acc(const account_keys& acc, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount)
+  bool is_out_to_acc(const account_keys& acc, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::scalar_t& blinding_mask)
   {
     crypto::scalar_t h = crypto::hash_helper_t::hs(reinterpret_cast<const crypto::public_key&>(derivation), output_index); // h = Hs(8 * r * V, i)
 
@@ -2445,7 +2449,7 @@ namespace currency
     crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
     decoded_amount = zo.encrypted_amount ^ amount_mask.m_u64[0];
 
-    crypto::scalar_t blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, h)
+    blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, h)
 
     crypto::point_t A_prime;
     A_prime.assign_mul_plus_G(decoded_amount, crypto::c_point_H, blinding_mask); // A' * 8 =? a * H + f * G
@@ -2569,11 +2573,12 @@ namespace currency
         VARIANT_SWITCH_END();
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, zo)
-        //@#@
-        wallet_out_info woi(output_index, 0);
-        if (is_out_to_acc(acc, zo, derivation, output_index, woi.amount))
+        uint64_t amount = 0;
+        crypto::scalar_t blinding_mask = 0;
+        if (is_out_to_acc(acc, zo, derivation, output_index, amount, blinding_mask))
         {
-          outs.emplace_back(woi);
+          outs.emplace_back(output_index, amount, blinding_mask);
+          money_transfered += amount;
         }
       VARIANT_SWITCH_END();
       output_index++;
