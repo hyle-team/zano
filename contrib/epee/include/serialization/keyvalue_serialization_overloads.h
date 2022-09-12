@@ -429,6 +429,31 @@ namespace epee
     bool kv_unserialize(std::deque<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
       return kv_serialization_overloads_impl_is_base_serializable_types<boost::mpl::contains<base_serializable_types<t_storage>, typename std::remove_const<t_type>::type>::value>::kv_unserialize(d, stg, hparent_section, pname);
-    } 
+    }
+    //-------------------------------------------------------------------------------------------------------------------
+    //boost::optional 
+    template<class t_type, class t_storage>
+    bool kv_serialize(const boost::optional<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      if(d != boost::none)
+      {
+        return kv_serialize(*d, stg, hparent_section, pname);
+      }
+      return true;
+    }
+    //-------------------------------------------------------------------------------------------------------------------
+    template<class t_type, class t_storage>
+    bool kv_unserialize(boost::optional<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      d = t_type();
+      bool r = kv_unserialize(*d, stg, hparent_section, pname);
+      if (!r)
+      {
+        d = boost::none;
+      }
+      return r;
+    }
+
+
   }
 }

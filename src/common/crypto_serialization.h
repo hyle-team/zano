@@ -20,7 +20,7 @@
 #include "crypto/range_proofs.h"
 #include "crypto/clsag.h"
 #include "boost_serialization_maps.h"
-
+#include "serialization/keyvalue_enable_POD_serialize_as_string.h"
 //
 // binary serialization
 //
@@ -113,6 +113,12 @@ VARIANT_TAG(debug_archive, crypto::key_derivation, "key_derivation");
 VARIANT_TAG(debug_archive, crypto::key_image, "key_image");
 VARIANT_TAG(debug_archive, crypto::signature, "signature");
 
+
+//
+// Key-value serialization
+//
+
+KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::scalar_t);
 
 //
 // Boost serialization
