@@ -118,11 +118,10 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   miner_benefeciary_acc.generate();
   std::shared_ptr<tools::wallet2> miner_benefeciary_acc_wlt = init_playtime_test_wallet(events, c, miner_benefeciary_acc);
 
-
+  size_t pos_entries_count = 0;
   //do staking 
   for(size_t i = 0; i!= CURRENCY_MINED_MONEY_UNLOCK_WINDOW+4; i++)
   {
-    size_t pos_entries_count = 0;
     if (!mine_next_pos_block_in_playtime_with_wallet(*alice_wlt.get(), staker_benefeciary_acc_wlt->get_account().get_public_address(), pos_entries_count))
     {
       CHECK_AND_ASSERT_MES(false, false, "Couldn't generate staking");
@@ -156,5 +155,14 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   bob_wlt->refresh();
   balance = bob_wlt->balance(unlocked);
   CHECK_AND_ASSERT_MES(unlocked == transfer_amount2*3, false, "wrong amount");
+
+  //try to make pre-zarcanum block after hardfork 4
+  currency::core_runtime_config rc = alice_wlt->get_core_runtime_config();
+  rc.hard_forks.set_hardfork_height(4, ZANO_HARDFORK_04_AFTER_HEIGHT);
+  alice_wlt->set_core_runtime_config(rc);
+  r = mine_next_pos_block_in_playtime_with_wallet(*alice_wlt.get(), staker_benefeciary_acc_wlt->get_account().get_public_address(), pos_entries_count);
+  CHECK_AND_ASSERT_MES(!r, false, "Pre-zarcanum block accepted in post-zarcanum era");
+
+
   return true;
 }
