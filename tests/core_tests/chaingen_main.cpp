@@ -747,6 +747,7 @@ int main(int argc, char* argv[])
     MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
     MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
     MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
+    MARK_TEST_AS_POSTPONED(zarcanum_basic_test);
 
 #undef MARK_TEST_AS_POSTPONED
 
