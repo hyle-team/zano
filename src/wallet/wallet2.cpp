@@ -38,6 +38,7 @@ using namespace epee;
 #include "storages/levin_abstract_invoke2.h"
 #include "common/variant_helper.h"
 #include "currency_core/crypto_config.h"
+#include "crypto/zarcanum.h"
 
 using namespace currency;
 
@@ -3636,7 +3637,7 @@ bool wallet2::fill_mining_context(mining_context& ctx)
     // Zarcanum (PoS with hidden amounts)
     ctx.zarcanum = true;
     ctx.last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, ctx.sk.stake_modifier.last_pow_id);
-    ctx.l_div_z_D = crypto::c_scalar_L.as_boost_mp_type<boost::multiprecision::uint256_t>() / (ctx.basic_diff);
+    ctx.z_l_div_z_D = crypto::zarcanum_precalculate_z_l_div_z_D(ctx.basic_diff);
   }
 
   ctx.last_block_hash = pos_details_resp.last_block_hash;
@@ -3718,12 +3719,13 @@ bool wallet2::do_pos_mining_iteration(mining_context& context, size_t transfer_i
 
   if (context.zarcanum && td.is_zc())
   {
-    PROFILE_FUNC("check_zarcanum");
-    crypto::scalar_t lhs_s = crypto::scalar_t(kernel_hash) * (*td.m_opt_blinding_mask + context.secret_q + context.last_pow_block_id_hashed); //  == h * (f + q + f') mod l
-    boost::multiprecision::uint256_t lhs = lhs_s.as_boost_mp_type<boost::multiprecision::uint256_t>();
-    boost::multiprecision::uint256_t rhs = context.l_div_z_D * stake_amount; // == floor( l / (z * D) ) * a
-
-    if (lhs < rhs)
+    crypto::mp::uint256_t lhs, rhs;
+    {
+      PROFILE_FUNC("check_zarcanum");
+      found = crypto::zarcanum_check_main_pos_inequality(kernel_hash, *td.m_opt_blinding_mask, context.secret_q, context.last_pow_block_id_hashed, context.z_l_div_z_D, stake_amount, lhs, rhs);
+      ++context.iterations_processed;
+    }
+    if (found)
     {
       found = true;
       LOG_PRINT_GREEN("Found Zarcanum kernel: amount: " << currency::print_money_brief(stake_amount) << ", gindex: " << td.m_global_output_index << ENDL
@@ -3736,7 +3738,6 @@ bool wallet2::do_pos_mining_iteration(mining_context& context, size_t transfer_i
         , LOG_LEVEL_0);
 
     }
-    ++context.iterations_processed;
   }
   else
   {

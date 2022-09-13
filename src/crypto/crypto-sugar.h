@@ -456,6 +456,7 @@ namespace crypto
   //
 
   extern const scalar_t c_scalar_1;
+  extern const scalar_t c_scalar_2p64;
   extern const scalar_t c_scalar_L;
   extern const scalar_t c_scalar_Lm1;
   extern const scalar_t c_scalar_P;

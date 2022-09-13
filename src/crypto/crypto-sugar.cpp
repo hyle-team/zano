@@ -13,6 +13,7 @@ namespace crypto
   const point_g_t c_point_G;
 
   const scalar_t c_scalar_1       = { 1 };
+  const scalar_t c_scalar_2p64    = { 0,                  1,                  0,                  0                  };
   const scalar_t c_scalar_L       = { 0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
   const scalar_t c_scalar_Lm1     = { 0x5812631a5cf5d3ec, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
   const scalar_t c_scalar_P       = { 0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };

@@ -463,7 +463,7 @@ namespace tools
 
       crypto::scalar_t last_pow_block_id_hashed;    // Zarcanum notation: f'
       crypto::scalar_t secret_q;                    // Zarcanum notation: q
-      boost::multiprecision::uint256_t l_div_z_D;  // Zarcanum notation: floor( l / (z * D) )  (max possible value:  2^252 / (2^64 * 1) ~= 2^188, or 2^252 / (1 * 1) = 2^252)
+      boost::multiprecision::uint256_t z_l_div_z_D; // Zarcanum notation: z * floor( l / (z * D) )  (max possible value:  2^64 * 2^252 / (2^64 * 1) ~= 2^252, or 2^252 / (1 * 1) = 2^252)
 
       currency::wide_difficulty_type basic_diff;
       currency::stake_kernel sk;

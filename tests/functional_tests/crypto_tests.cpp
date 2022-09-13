@@ -863,6 +863,9 @@ TEST(crypto, scalar_basics)
   mp::uint256_t mp_p_mod_l = c_scalar_P.as_boost_mp_type<mp::uint256_t>() % c_scalar_L.as_boost_mp_type<mp::uint256_t>();
   ASSERT_EQ(p, scalar_t(mp_p_mod_l));
 
+  ASSERT_EQ(c_scalar_2p64 - c_scalar_1, scalar_t(UINT64_MAX));
+  ASSERT_EQ(c_scalar_2p64, scalar_t(UINT64_MAX) + c_scalar_1);
+
   return true;
 }
 
