@@ -251,7 +251,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if(!postponed_tests.count(#genclass) && (run_single_test.empty() || std::string::npos != std::string(#genclass).find(run_single_test)))       \
+  if((!postponed_tests.count(#genclass) && run_single_test.empty()) || std::string::npos != std::string(#genclass).find(run_single_test)) \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -1073,6 +1073,13 @@ int main(int argc, char* argv[])
     }
 
     serious_failures_count = failed_tests.size() - failed_postponed_tests_count;
+
+    if (!postponed_tests.empty())
+    {
+      std::cout << concolor::yellow << std::endl << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
+      for(auto& el : postponed_tests)
+        std::cout << "  " << el << std::endl;
+    }
     
     std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
     std::cout << "\nREPORT:\n";
