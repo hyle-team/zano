@@ -25,7 +25,7 @@
 // 
 
 #pragma once
-
+#include "serialization\keyvalue_helpers.h"
 
 
 //should be done in global namespace
