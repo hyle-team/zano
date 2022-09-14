@@ -263,7 +263,7 @@ TEST(Serialization, serializes_vector_int64_as_fixed_int)
   ASSERT_TRUE(serialization::dump_binary(v, blob));
   ASSERT_EQ(57, blob.size());
 }
-
+/*
 namespace
 {
   template<typename T>
@@ -287,8 +287,8 @@ namespace
     }
     return res;
   }
-
 }
+*/
 
 bool test_get_varint_packed_size_for_num(uint64_t n)
 {
