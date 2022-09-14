@@ -119,6 +119,7 @@ VARIANT_TAG(debug_archive, crypto::signature, "signature");
 //
 
 KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::scalar_t);
+KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::hash);
 
 //
 // Boost serialization

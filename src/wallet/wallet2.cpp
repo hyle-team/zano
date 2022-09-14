@@ -650,7 +650,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           }
           
           if (out_type_zc)
-            td.m_opt_blinding_mask = out.blinding_mask;
+            td.m_opt_blinding_mask.reset(new crypto::scalar_t(out.blinding_mask));
 
           size_t transfer_index = m_transfers.size() - 1;
           if (out_is_to_htlc(out_v))

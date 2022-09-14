@@ -12,6 +12,7 @@
 #include <boost/serialization/singleton.hpp>
 #include <boost/serialization/extended_type_info.hpp>
 #include <boost/serialization/shared_ptr.hpp>
+#include <boost/serialization/optional.hpp>
 #include <atomic>
 
 
@@ -381,7 +382,8 @@ namespace tools
       uint64_t m_spent_height;
       uint32_t m_flags;
       uint64_t m_amount;
-      boost::optional<crypto::scalar_t> m_opt_blinding_mask;
+      boost::shared_ptr<crypto::scalar_t> m_opt_blinding_mask;
+      boost::shared_ptr<crypto::hash> m_asset_id;
 
       // @#@ will throw if type is not tx_out_bare, TODO: change according to new model, 
       // need to replace all get_tx_out_bare_from_out_v() to proper code
@@ -392,7 +394,7 @@ namespace tools
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
       bool is_spendable() const { return (m_flags & (WALLET_TRANSFER_DETAIL_FLAG_SPENT | WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION | WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION)) == 0; }
       bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
-      bool is_zc() const { return m_opt_blinding_mask != boost::none; }
+      bool is_zc() const { return m_opt_blinding_mask.get(); }
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)
@@ -401,6 +403,7 @@ namespace tools
         KV_SERIALIZE(m_flags)
         KV_SERIALIZE(m_amount)
         KV_SERIALIZE_N(m_opt_blinding_mask, "blinding_mask")
+        KV_SERIALIZE(m_asset_id)
         KV_SERIALIZE_EPHEMERAL_N(uint64_t, tools::wallet2::transfer_details_base_to_amount, "amount")
         KV_SERIALIZE_EPHEMERAL_N(std::string, tools::wallet2::transfer_details_base_to_tx_hash, "tx_id")
       END_KV_SERIALIZE_MAP()
@@ -1169,6 +1172,8 @@ namespace boost
         return;
       }
       a & x.m_amount;
+      a & x.m_opt_blinding_mask;
+      a & x.m_asset_id;
     }
 
    
