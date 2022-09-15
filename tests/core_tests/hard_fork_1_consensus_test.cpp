@@ -42,7 +42,8 @@ bool hard_fork_1_cumulative_difficulty_base::generate(std::vector<test_event_ent
 
     last_block = next_blk_pow;
   }
-
+  
+  // generator.set_pos_to_low_timestamp(true); <-- this is not supported anymore -- sowle
   last_block = blk_0r; 
   for (size_t i = 0; i != 20; i++)
   {

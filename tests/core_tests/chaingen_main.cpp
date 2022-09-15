@@ -747,6 +747,11 @@ int main(int argc, char* argv[])
     MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
     MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
     MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
+
+    MARK_TEST_AS_POSTPONED(after_hard_fork_1_cumulative_difficulty); // reason: set_pos_to_low_timestamp is not supported anymore
+    MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
+    MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
+
     MARK_TEST_AS_POSTPONED(zarcanum_basic_test);
 
 #undef MARK_TEST_AS_POSTPONED
