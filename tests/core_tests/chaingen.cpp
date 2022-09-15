@@ -49,7 +49,6 @@ const crypto::signature invalid_signature = create_invalid_signature();
 
 test_generator::test_generator()
   : m_wallet_test_core_proxy(new wallet_test_core_proxy())
-  , m_do_pos_to_low_timestamp(false)
   , m_ignore_last_pow_in_wallets(false)
   , m_last_found_timestamp(0)
 {
@@ -533,8 +532,6 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
   {
     starter_timestamp -= 90;
   }
-  if (m_do_pos_to_low_timestamp)
-    starter_timestamp += 60;
 
   //adjust timestamp starting from timestamp%POS_SCAN_STEP = 0
   //starter_timestamp = starter_timestamp - POS_SCAN_WINDOW;
@@ -570,18 +567,6 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
           continue;
         else
         {
-          if (m_do_pos_to_low_timestamp)
-          {
-            if (!m_last_found_timestamp)
-            {
-              m_last_found_timestamp = ts;
-              continue;
-            }
-
-            if(m_last_found_timestamp >= ts)
-              continue;
-          }
-
           //found kernel
           LOG_PRINT_GREEN("Found kernel: amount=" << print_money(pos_entries[i].amount)
             << ", index=" << pos_entries[i].g_index
