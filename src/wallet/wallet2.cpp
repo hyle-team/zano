@@ -3009,7 +3009,7 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
   awaiting_in = 0;
   awaiting_out = 0;
   mined = 0;
-  std::unordered_map<crypto::hash, asset_balance_entry_base> balances;
+  std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances;
   balance(balances, mined);
   auto it = balances.find(currency::null_hash);
   if (it != balances.end())
@@ -3022,7 +3022,7 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
   return total;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::balance(std::unordered_map<crypto::hash, asset_balance_entry_base>& balances, uint64_t& mined) const
+bool wallet2::balance(std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const
 {
   mined = 0;
   
@@ -3030,7 +3030,7 @@ bool wallet2::balance(std::unordered_map<crypto::hash, asset_balance_entry_base>
   {
     if (td.is_spendable() || (td.is_reserved_for_escrow() && !td.is_spent()))
     {
-      asset_balance_entry_base& e = balances[td.get_asset_id()];
+      wallet_public::asset_balance_entry_base& e = balances[td.get_asset_id()];
       e.total += td.amount();
       if (is_transfer_unlocked(td))
         e.unlocked += td.amount();
@@ -3041,7 +3041,7 @@ bool wallet2::balance(std::unordered_map<crypto::hash, asset_balance_entry_base>
 
   for(auto& utx : m_unconfirmed_txs)
   {
-    asset_balance_entry_base& e = balances[utx.asset_id];
+    wallet_public::asset_balance_entry_base& e = balances[utx.second.asset_id];
     if (utx.second.is_income)
     {
       e.total += utx.second.amount;
