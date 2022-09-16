@@ -251,7 +251,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if(!postponed_tests.count(#genclass) && (run_single_test.empty() || std::string::npos != std::string(#genclass).find(run_single_test)))       \
+  if((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test))) \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -747,6 +747,11 @@ int main(int argc, char* argv[])
     MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
     MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
     MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
+
+    MARK_TEST_AS_POSTPONED(after_hard_fork_1_cumulative_difficulty); // reason: set_pos_to_low_timestamp is not supported anymore
+    MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
+    MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
+
     MARK_TEST_AS_POSTPONED(zarcanum_basic_test);
 
 #undef MARK_TEST_AS_POSTPONED
@@ -1073,6 +1078,13 @@ int main(int argc, char* argv[])
     }
 
     serious_failures_count = failed_tests.size() - failed_postponed_tests_count;
+
+    if (!postponed_tests.empty())
+    {
+      std::cout << concolor::yellow << std::endl << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
+      for(auto& el : postponed_tests)
+        std::cout << "  " << el << std::endl;
+    }
     
     std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
     std::cout << "\nREPORT:\n";

@@ -525,7 +525,6 @@ public:
   static const test_gentime_settings& get_test_gentime_settings() { return m_test_gentime_settings; }
   static void set_test_gentime_settings(const test_gentime_settings& s) { m_test_gentime_settings = s; }
   static void set_test_gentime_settings_default() { m_test_gentime_settings = m_test_gentime_settings_default; }
-  void set_pos_to_low_timestamp(bool do_pos_to_low_timestamp) { m_do_pos_to_low_timestamp = do_pos_to_low_timestamp; }
   void set_ignore_last_pow_in_wallets(bool ignore_last_pow_in_wallets) { m_ignore_last_pow_in_wallets = ignore_last_pow_in_wallets; }
   void set_hardfork_height(size_t hardfork_id, uint64_t h);
   void set_hardforks(const currency::hard_forks_descriptor& hardforks);
@@ -533,7 +532,6 @@ public:
 
 
 private:
-  bool m_do_pos_to_low_timestamp;
   bool m_ignore_last_pow_in_wallets;
   uint64_t m_last_found_timestamp;
   

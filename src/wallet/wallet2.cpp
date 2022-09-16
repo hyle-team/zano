@@ -3802,101 +3802,106 @@ bool wallet2::build_minted_block(const mining_context& cxt,
                                  const currency::account_public_address& miner_address,
                                  uint64_t new_block_expected_height /* UINT64_MAX */)
 {
-    //found a block, construct it, sign and push to daemon
-    WLT_LOG_GREEN("Found kernel, constructing block", LOG_LEVEL_0);
+  //found a block, construct it, sign and push to daemon
+  WLT_LOG_GREEN("Found kernel, constructing block", LOG_LEVEL_0);
 
-    //CHECK_AND_NO_ASSERT_MES(cxt.index < cxt.sp.pos_entries.size(), false, "call_COMMAND_RPC_SCAN_POS returned wrong index: " << cxt.index << ", expected less then " << cxt.sp.pos_entries.size());
+  WLT_CHECK_AND_ASSERT_MES(cxt.index < m_transfers.size(), false, "cxt.index = " << cxt.index << " is out of bounds");
+  const transfer_details& td = m_transfers[cxt.index];
 
-    pos_entry pe = AUTO_VAL_INIT(pe);
+  pos_entry pe = AUTO_VAL_INIT(pe);
 
+  currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req = AUTO_VAL_INIT(tmpl_req);
+  currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp = AUTO_VAL_INIT(tmpl_rsp);
+  tmpl_req.wallet_address = get_account_address_as_str(miner_address);
+  tmpl_req.stakeholder_address = get_account_address_as_str(m_account.get_public_address());
+  tmpl_req.pos_block = true;
+  pe.g_index = tmpl_req.pos_g_index = td.m_global_output_index;
+  pe.amount = tmpl_req.pos_amount = td.amount();//  pe.amount;   
+  pe.keyimage = td.m_key_image;
+  pe.block_timestamp = td.m_ptx_wallet_info->m_block_timestamp;
+  pe.stake_unlock_time = tmpl_req.stake_unlock_time = cxt.stake_unlock_time;
+  pe.tx_id = tmpl_req.tx_id = td.tx_hash();
+  pe.tx_out_index = tmpl_req.tx_out_index = td.m_internal_output_index;
+  pe.wallet_index = cxt.index;
 
-    currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req = AUTO_VAL_INIT(tmpl_req);
-    currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp = AUTO_VAL_INIT(tmpl_rsp);
-    tmpl_req.wallet_address = get_account_address_as_str(miner_address);
-    tmpl_req.stakeholder_address = get_account_address_as_str(m_account.get_public_address());
-    tmpl_req.pos_block = true;
-    pe.g_index = tmpl_req.pos_g_index = m_transfers[cxt.index].m_global_output_index;
-    pe.amount = tmpl_req.pos_amount = m_transfers[cxt.index].amount();//  pe.amount;   
-    pe.keyimage = m_transfers[cxt.index].m_key_image;
-    pe.block_timestamp = m_transfers[cxt.index].m_ptx_wallet_info->m_block_timestamp;
-    pe.stake_unlock_time = tmpl_req.stake_unlock_time = cxt.stake_unlock_time;
-    pe.tx_id = tmpl_req.tx_id = m_transfers[cxt.index].tx_hash();
-    pe.tx_out_index = tmpl_req.tx_out_index = m_transfers[cxt.index].m_internal_output_index;
-    pe.wallet_index = cxt.index;
+  //tmpl_req.pos_index = pe.index; // gindex <--- this should be removed as soon as pos_entry::index is replaced with tx_id and tx_out_index
+  // TODO: also fill out tx_id and tx_out_index for mining tx creation
+  tmpl_req.extra_text = m_miner_text_info;
+  //generate packing tx
+  transaction pack_tx = AUTO_VAL_INIT(pack_tx);
+  if (generate_packing_transaction_if_needed(pack_tx, 0))
+  {
+    tx_to_blob(pack_tx, tmpl_req.explicit_transaction);
+    WLT_LOG_GREEN("Packing inputs: " << pack_tx.vin.size() << " inputs consolidated in tx " << get_transaction_hash(pack_tx), LOG_LEVEL_0);
+  }
+  m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
+  WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == API_RETURN_CODE_OK, false, "Failed to create block template after kernel hash found!");
 
-    //tmpl_req.pos_index = pe.index; // gindex <--- this should be removed as soon as pos_entry::index is replaced with tx_id and tx_out_index
-    // TODO: also fill out tx_id and tx_out_index for mining tx creation
-    tmpl_req.extra_text = m_miner_text_info;
-    //generate packing tx
-    transaction pack_tx = AUTO_VAL_INIT(pack_tx);
-    if (generate_packing_transaction_if_needed(pack_tx, 0))
-    {
-      tx_to_blob(pack_tx, tmpl_req.explicit_transaction);
-      WLT_LOG_GREEN("Packing inputs: " << pack_tx.vin.size() << " inputs consolidated in tx " << get_transaction_hash(pack_tx), LOG_LEVEL_0);
-    }
-    m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
-    WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == API_RETURN_CODE_OK, false, "Failed to create block template after kernel hash found!");
+  currency::block b = AUTO_VAL_INIT(b);
+  currency::blobdata block_blob;
+  bool res = epee::string_tools::parse_hexstr_to_binbuff(tmpl_rsp.blocktemplate_blob, block_blob);
+  WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to create block template after kernel hash found!");
+  res = parse_and_validate_block_from_blob(block_blob, b);
+  WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to create block template after kernel hash found!");
 
-    currency::block b = AUTO_VAL_INIT(b);
-    currency::blobdata block_blob;
-    bool res = epee::string_tools::parse_hexstr_to_binbuff(tmpl_rsp.blocktemplate_blob, block_blob);
-    WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to create block template after kernel hash found!");
-    res = parse_and_validate_block_from_blob(block_blob, b);
-    WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to create block template after kernel hash found!");
+  if (cxt.last_block_hash != b.prev_id)
+  {
+    WLT_LOG_YELLOW("Kernel was found but block is behindhand, b.prev_id=" << b.prev_id << ", last_block_hash=" << cxt.last_block_hash, LOG_LEVEL_0);
+    return false;
+  }
 
-    if (cxt.last_block_hash != b.prev_id)
-    {
-      WLT_LOG_YELLOW("Kernel was found but block is behindhand, b.prev_id=" << b.prev_id << ", last_block_hash=" << cxt.last_block_hash, LOG_LEVEL_0);
-      return false;
-    }
+  // set the timestamp from stake kernel
+  b.timestamp = cxt.sk.block_timestamp;
+  uint64_t current_timestamp = m_core_runtime_config.get_core_time();
+  set_block_datetime(current_timestamp, b);
+  WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
 
-    std::vector<const crypto::public_key*> keys_ptrs;
-    WLT_CHECK_AND_ASSERT_MES(cxt.index < m_transfers.size(),
-        false, "Wrong wallet_index at generating coinbase transacton");
+  const currency::tx_out_v& stake_out_v = td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index];
+  if (cxt.zarcanum && td.is_zc())
+  {
+    // Zarcanum
+    WLT_CHECK_AND_ASSERT_MES(stake_out_v.type() == typeid(tx_out_zarcanum), false, "unexpected stake output type: " << stake_out_v.type().name() << ", expected: zarcanum");
 
-    if (m_transfers[cxt.index].m_ptx_wallet_info->m_tx.vout[m_transfers[cxt.index].m_internal_output_index].type() != typeid(tx_out_bare))
-    {
-      //@#@ review zarcanum here
-      return false;
-    }
-    const auto& target = boost::get<tx_out_bare>(m_transfers[cxt.index].m_ptx_wallet_info->m_tx.vout[m_transfers[cxt.index].m_internal_output_index]).target;
+    return false;
+  }
+  else
+  {
+    // old fashioned non-hidden amount PoS scheme
+    const auto& target = boost::get<tx_out_bare>(stake_out_v).target;
     WLT_CHECK_AND_ASSERT_MES(target.type() == typeid(currency::txout_to_key), false, "wrong type_id in source transaction in coinbase tx");
+    const currency::txout_to_key& stake_out_to_key = boost::get<currency::txout_to_key>(target);
+    std::vector<const crypto::public_key*> keys_ptrs;
+    keys_ptrs.push_back(&stake_out_to_key.key);
 
-    const currency::txout_to_key& txtokey = boost::get<currency::txout_to_key>(target);
-    keys_ptrs.push_back(&txtokey.key);
-
-    // set the timestamp from stake kernel
-    b.timestamp = cxt.sk.block_timestamp;
-    uint64_t current_timestamp = m_core_runtime_config.get_core_time();
-    set_block_datetime(current_timestamp, b);
-    WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
 
     //sign block
     res = prepare_and_sign_pos_block(b,
       pe,
       get_tx_pub_key_from_extra(m_transfers[pe.wallet_index].m_ptx_wallet_info->m_tx),
-      m_transfers[cxt.index].m_internal_output_index,
+      td.m_internal_output_index,
       keys_ptrs);
     WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
-    
-    WLT_LOG_GREEN("Block constructed <" << get_block_hash(b) << ">, sending to core...", LOG_LEVEL_0);
+  }
 
-    currency::COMMAND_RPC_SUBMITBLOCK2::request subm_req = AUTO_VAL_INIT(subm_req);
-    currency::COMMAND_RPC_SUBMITBLOCK2::response subm_rsp = AUTO_VAL_INIT(subm_rsp);
-    subm_req.b = t_serializable_object_to_blob(b);
-    if (tmpl_req.explicit_transaction.size())
-      subm_req.explicit_txs.push_back(hexemizer{ tmpl_req.explicit_transaction });
-    
-    m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
-    if (subm_rsp.status != API_RETURN_CODE_OK)
-    {
-      WLT_LOG_ERROR("Constructed block is not accepted by core, status: " << subm_rsp.status);
-      return false;
-    }    
-    WLT_LOG_GREEN("POS block generated and accepted, congrats!", LOG_LEVEL_0);
-    m_wcallback->on_pos_block_found(b);
+  crypto::hash block_hash = get_block_hash(b);
+  WLT_LOG_GREEN("Block " << print16(block_hash) << " has been constructed, sending to core...", LOG_LEVEL_0);
 
-    return true;
+  currency::COMMAND_RPC_SUBMITBLOCK2::request subm_req = AUTO_VAL_INIT(subm_req);
+  currency::COMMAND_RPC_SUBMITBLOCK2::response subm_rsp = AUTO_VAL_INIT(subm_rsp);
+  subm_req.b = t_serializable_object_to_blob(b);
+  if (tmpl_req.explicit_transaction.size())
+    subm_req.explicit_txs.push_back(hexemizer{ tmpl_req.explicit_transaction });
+    
+  m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
+  if (subm_rsp.status != API_RETURN_CODE_OK)
+  {
+    WLT_LOG_ERROR("Constructed block " << print16(block_hash) << " was rejected by the core, status: " << subm_rsp.status);
+    return false;
+  }    
+  WLT_LOG_GREEN("PoS block " << print16(block_hash) << " generated and accepted, congrats!", LOG_LEVEL_0);
+  m_wcallback->on_pos_block_found(b);
+
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs)
