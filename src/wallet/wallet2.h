@@ -128,8 +128,8 @@ namespace tools
 
   struct tx_dust_policy
   {
-    uint64_t dust_threshold;
-    bool add_to_fee;
+    uint64_t dust_threshold = 0;
+    bool add_to_fee = false;
     currency::account_public_address addr_for_dust;
 
     tx_dust_policy(uint64_t a_dust_threshold = DEFAULT_DUST_THRESHOLD, bool an_add_to_fee = true, currency::account_public_address an_addr_for_dust = currency::account_public_address())
@@ -274,25 +274,25 @@ namespace tools
   {
     // preparing data for tx
     std::vector<currency::tx_destination_entry> dsts;
-    size_t fake_outputs_count;
-    uint64_t fee;
+    size_t fake_outputs_count = 0;
+    uint64_t fee = 0;
     tx_dust_policy dust_policy;
-    crypto::hash multisig_id;
-    uint8_t flags;
-    uint8_t split_strategy_id;
-    bool mark_tx_as_complete;
+    crypto::hash multisig_id = currency::null_hash;
+    uint8_t flags = 0;
+    uint8_t split_strategy_id = 0;
+    bool mark_tx_as_complete = false;
 
     crypto::hash htlc_tx_id;
     std::string htlc_origin;
 
     // constructing tx
-    uint64_t unlock_time;
+    uint64_t unlock_time = 0;
     std::vector<currency::extra_v> extra;
     std::vector<currency::attachment_v> attachments;
     currency::account_public_address crypt_address;
-    uint8_t tx_outs_attr;
-    bool shuffle;
-    bool perform_packing;
+    uint8_t tx_outs_attr = 0;
+    bool shuffle = false;
+    bool perform_packing = false;
   };
 
 //   struct currency::finalize_tx_param
@@ -357,8 +357,8 @@ namespace tools
 
     struct transaction_wallet_info
     {
-      uint64_t m_block_height;
-      uint64_t m_block_timestamp;
+      uint64_t m_block_height = 0;
+      uint64_t m_block_timestamp = 0;
       currency::transaction m_tx;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -378,10 +378,10 @@ namespace tools
     struct transfer_details_base
     {
       std::shared_ptr<transaction_wallet_info> m_ptx_wallet_info;
-      uint64_t m_internal_output_index;
-      uint64_t m_spent_height;
-      uint32_t m_flags;
-      uint64_t m_amount;
+      uint64_t m_internal_output_index = 0;
+      uint64_t m_spent_height = 0;
+      uint32_t m_flags = 0;
+      uint64_t m_amount = 0;
       boost::shared_ptr<crypto::scalar_t> m_opt_blinding_mask;
       boost::shared_ptr<crypto::hash> m_asset_id;
 
@@ -395,6 +395,7 @@ namespace tools
       bool is_spendable() const { return (m_flags & (WALLET_TRANSFER_DETAIL_FLAG_SPENT | WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION | WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION)) == 0; }
       bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
       bool is_zc() const { return m_opt_blinding_mask.get(); }
+      const crypto::hash&  get_asset_id() const { if (m_asset_id.get()) { return *m_asset_id; } else { return currency::null_hash; } }
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)
@@ -414,7 +415,7 @@ namespace tools
     struct transfer_details_extra_option_htlc_info
     {
       std::string origin;  //this field filled only if htlc had been redeemed
-      crypto::hash redeem_tx_id;
+      crypto::hash redeem_tx_id = currency::null_hash;
     };
 
 
@@ -422,7 +423,7 @@ namespace tools
 
     struct transfer_details : public transfer_details_base
     {
-      uint64_t m_global_output_index;
+      uint64_t m_global_output_index = 0;
       crypto::key_image m_key_image; //TODO: key_image stored twice :(
       std::vector<transfer_details_extra_options_v> varian_options;
 
@@ -437,32 +438,32 @@ namespace tools
     //used in wallet 
     struct htlc_expiration_trigger
     {
-      bool is_wallet_owns_redeem; //specify if this HTLC belong to this wallet by pkey_redeem or by pkey_refund
-      uint64_t transfer_index;
+      bool is_wallet_owns_redeem = false; //specify if this HTLC belong to this wallet by pkey_redeem or by pkey_refund
+      uint64_t transfer_index = 0;
     };
 
 
     struct payment_details
     {
-      crypto::hash m_tx_hash;
-      uint64_t m_amount;
-      uint64_t m_block_height;
-      uint64_t m_unlock_time;
+      crypto::hash m_tx_hash = currency::null_hash;
+      uint64_t m_amount = 0;
+      uint64_t m_block_height = 0;
+      uint64_t m_unlock_time = 0;
     };
 
     struct mining_context
     {
       std::string   status;
 
-      bool          is_pos_allowed;
-      bool          zarcanum;
+      bool          is_pos_allowed = false;;
+      bool          zarcanum = false;
 
-      uint64_t      index; // index in m_transfers 
-      uint64_t      stake_unlock_time;
+      uint64_t      index = 0; // index in m_transfers 
+      uint64_t      stake_unlock_time = 0;
       //uint64_t      block_timestamp;
-      uint64_t      height;
-      uint64_t      starter_timestamp;
-      crypto::hash  last_block_hash;
+      uint64_t      height = 0;
+      uint64_t      starter_timestamp = 0;
+      crypto::hash  last_block_hash = currency::null_hash;
 
       crypto::scalar_t last_pow_block_id_hashed;    // Zarcanum notation: f'
       crypto::scalar_t secret_q;                    // Zarcanum notation: q
@@ -479,9 +480,9 @@ namespace tools
     struct expiration_entry_info
     {
       std::vector<uint64_t> selected_transfers;
-      uint64_t change_amount;
-      uint64_t expiration_time;
-      crypto::hash related_tx_id; // tx id which caused money lock, if any (ex: escrow proposal transport tx)
+      uint64_t change_amount = 0;
+      uint64_t expiration_time = 0;
+      crypto::hash related_tx_id = currency::null_hash; // tx id which caused money lock, if any (ex: escrow proposal transport tx)
     };
 
 
@@ -530,16 +531,16 @@ namespace tools
 
     struct process_transaction_context
     {
-      uint64_t tx_money_spent_in_ins;
+      uint64_t tx_money_spent_in_ins = 0;
       // check all outputs for spending (compare key images)
       money_transfer2_details mtd;
-      bool is_pos_coinbase;
-      bool coin_base_tx;
+      bool is_pos_coinbase = false;
+      bool coin_base_tx = false;
       //PoW block don't have change, so all outs supposed to be marked as "mined"
-      bool is_derived_from_coinbase;
-      size_t i;
-      size_t sub_i;
-      uint64_t height;
+      bool is_derived_from_coinbase = false;
+      size_t i = 0;
+      size_t sub_i = 0;
+      uint64_t height = 0;
     };
 
 
@@ -596,7 +597,9 @@ namespace tools
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
     uint64_t balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const;
+    bool balance(std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const;
     uint64_t balance(uint64_t& unloked) const;
+
     uint64_t unlocked_balance() const;
 
     void transfer(uint64_t amount, const currency::account_public_address& acc);
@@ -1142,7 +1145,7 @@ private:
 } // namespace tools
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
-BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 10)
+BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 11)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 3)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details_base, 2)
 
@@ -1240,6 +1243,9 @@ namespace boost
       if (ver < 10)
         return;
       a & x.service_entries;
+      if (ver < 11)
+        return;
+      a & x.asset_id;
     }
 
     template <class Archive>

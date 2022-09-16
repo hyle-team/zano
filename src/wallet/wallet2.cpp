@@ -3004,19 +3004,36 @@ uint64_t wallet2::balance(uint64_t& unloked) const
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const
 {
+  uint64_t total = 0;
   unlocked = 0;
-  uint64_t balance_total = 0;
   awaiting_in = 0;
   awaiting_out = 0;
+  mined = 0;
+  std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances;
+  balance(balances, mined);
+  auto it = balances.find(currency::null_hash);
+  if (it != balances.end())
+  {
+    total = it->second.total;
+    unlocked = it->second.unlocked;
+    awaiting_in = it->second.awaiting_in;
+    awaiting_out = it->second.awaiting_out;
+  }
+  return total;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::balance(std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const
+{
   mined = 0;
   
   for(auto& td : m_transfers)
   {
     if (td.is_spendable() || (td.is_reserved_for_escrow() && !td.is_spent()))
     {
-      balance_total += td.amount();
+      wallet_public::asset_balance_entry_base& e = balances[td.get_asset_id()];
+      e.total += td.amount();
       if (is_transfer_unlocked(td))
-        unlocked += td.amount();
+        e.unlocked += td.amount();
       if (td.m_flags & WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
         mined += td.amount();
     }
@@ -3024,22 +3041,23 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
 
   for(auto& utx : m_unconfirmed_txs)
   {
+    wallet_public::asset_balance_entry_base& e = balances[utx.second.asset_id];
     if (utx.second.is_income)
     {
-      balance_total += utx.second.amount;
-      awaiting_in += utx.second.amount;
+      e.total += utx.second.amount;
+      e.awaiting_in += utx.second.amount;
     }
     else
     {
       //collect change in unconfirmed outgoing transactions
       for (auto r : utx.second.td.rcv)
-        balance_total += r;
+        e.total += r;
 
-      awaiting_out += utx.second.amount;
+      e.awaiting_out += utx.second.amount;
     }
   }
 
-  return balance_total;
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::balance() const

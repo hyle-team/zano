@@ -114,6 +114,7 @@ namespace wallet_public
     std::vector<escrow_contract_details> contract;
     uint16_t      extra_flags; 
     uint64_t      transfer_internal_index;
+    crypto::hash  asset_id;
     
     
     //not included in kv serialization map
@@ -143,6 +144,33 @@ namespace wallet_public
       KV_SERIALIZE(contract)
       KV_SERIALIZE(service_entries)
       KV_SERIALIZE(transfer_internal_index)
+      KV_SERIALIZE(asset_id)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct asset_balance_entry_base
+  {
+    uint64_t total = 0;
+    uint64_t unlocked = 0;
+    uint64_t awaiting_in = 0;
+    uint64_t awaiting_out = 0;
+
+    //v2
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(total)
+      KV_SERIALIZE(unlocked)
+      KV_SERIALIZE(awaiting_in)
+      KV_SERIALIZE(awaiting_out)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct asset_balance_entry : public asset_balance_entry_base
+  {
+    crypto::hash asset_id = currency::null_hash;
+    //v2
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(asset_id)
+      KV_CHAIN_BASE(asset_balance_entry_base)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -217,6 +245,7 @@ namespace wallet_public
     {
       uint64_t 	 balance;
       uint64_t 	 unlocked_balance;
+      std::list<asset_balance_entry> balances;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(balance)

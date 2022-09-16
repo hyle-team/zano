@@ -28,6 +28,7 @@ namespace
   const command_line::arg_descriptor<bool>        arg_test_transactions            ("test-transactions", "");
   const command_line::arg_descriptor<std::string> arg_run_single_test              ("run-single-test", "" );
   const command_line::arg_descriptor<bool>        arg_enable_debug_asserts         ("enable-debug-asserts", "" );
+  const command_line::arg_descriptor<bool>        arg_stop_on_fail                 ("stop-on-fail", "");
 
   boost::program_options::variables_map g_vm;
 }
@@ -671,13 +672,14 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_test_transactions);
   command_line::add_arg(desc_options, arg_run_single_test);  
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
+  command_line::add_arg(desc_options, arg_stop_on_fail);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   command_line::add_arg(desc_options, command_line::arg_stop_after_height);
   command_line::add_arg(desc_options, command_line::arg_disable_ntp);
 
   currency::core::init_options(desc_options);
   tools::db::db_backend_selector::init_options(desc_options);
-
+  bool stop_on_first_fail = false;
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {
     po::store(po::parse_command_line(argc, argv, desc_options), g_vm);
@@ -691,6 +693,11 @@ int main(int argc, char* argv[])
   {
     std::cout << desc_options << std::endl;
     return 0;
+  }
+
+  if (command_line::has_arg(g_vm, arg_stop_on_fail))
+  {
+    stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
   }
 
   size_t tests_count = 0;
@@ -755,8 +762,6 @@ int main(int argc, char* argv[])
     MARK_TEST_AS_POSTPONED(zarcanum_basic_test);
 
 #undef MARK_TEST_AS_POSTPONED
-
-    bool stop_on_first_fail = false;
 
 
     // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
