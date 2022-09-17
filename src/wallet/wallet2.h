@@ -295,53 +295,6 @@ namespace tools
     bool perform_packing = false;
   };
 
-//   struct currency::finalize_tx_param
-//   {
-//     uint64_t unlock_time;
-//     std::vector<currency::extra_v> extra;
-//     std::vector<currency::attachment_v> attachments;
-//     currency::account_public_address crypt_address;
-//     uint8_t tx_outs_attr;
-//     bool shuffle;
-//     uint8_t flags;
-//     crypto::hash multisig_id;
-//     std::vector<currency::tx_source_entry> sources;
-//     std::vector<uint64_t> selected_transfers;
-//     std::vector<currency::tx_destination_entry> prepared_destinations;
-// 
-//     crypto::public_key spend_pub_key;  // only for validations
-// 
-//     BEGIN_SERIALIZE_OBJECT()
-//       FIELD(unlock_time)
-//       FIELD(extra)
-//       FIELD(attachments)
-//       FIELD(crypt_address)
-//       FIELD(tx_outs_attr)
-//       FIELD(shuffle)
-//       FIELD(flags)
-//       FIELD(multisig_id)
-//       FIELD(sources)
-//       FIELD(selected_transfers)
-//       FIELD(prepared_destinations)
-//       FIELD(spend_pub_key)
-//     END_SERIALIZE()
-//   };
-// 
-//   struct currency::finalized_tx
-//   {
-//     currency::transaction tx;
-//     crypto::secret_key    one_time_key;
-//     currency::finalize_tx_param     ftp;
-//     std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
-// 
-//     BEGIN_SERIALIZE_OBJECT()
-//       FIELD(tx)
-//       FIELD(one_time_key)
-//       FIELD(ftp)
-//       FIELD(outs_key_images)
-//     END_SERIALIZE()
-//   };
-
 
   class wallet2: public tools::tor::t_transport_state_notifier
   {
@@ -1002,7 +955,7 @@ private:
     bool prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     void prefetch_global_indicies_if_needed(std::vector<uint64_t>& selected_indicies);
-    uint64_t get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
+    std::unordered_map<crypto::hash, uint64_t>&& get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
     void prepare_tx_destinations(uint64_t needed_money,
       uint64_t found_money,
       detail::split_strategy_id_t destination_split_strategy_id,

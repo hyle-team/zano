@@ -4894,9 +4894,10 @@ bool wallet2::prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string
 
 }
 //----------------------------------------------------------------------------------------------------------------
-uint64_t wallet2::get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts)
+std::unordered_map<crypto::hash, uint64_t>&& wallet2::get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts)
 {
-  uint64_t needed_money = fee;
+  std::unordered_map<crypto::hash, uint64_t> amounts_map;
+  amounts_map[currency::null_hash] = fee;
   BOOST_FOREACH(auto& dt, dsts)
   {
     THROW_IF_TRUE_WALLET_EX(0 == dt.amount, error::zero_destination);
@@ -4904,10 +4905,10 @@ uint64_t wallet2::get_needed_money(uint64_t fee, const std::vector<currency::tx_
     if (dt.amount_to_provide)
       money_to_add = dt.amount_to_provide;
   
-    needed_money += money_to_add;
+    amounts_map[dt.asset_id] += money_to_add;
     THROW_IF_TRUE_WALLET_EX(needed_money < money_to_add, error::tx_sum_overflow, dsts, fee);
   }
-  return needed_money;
+  return amounts_map;
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::set_disable_tor_relay(bool disable)
@@ -5536,7 +5537,8 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
 void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate /* = currency::transaction() */)
 {
   TIME_MEASURE_START_MS(get_needed_money_time);
-  uint64_t needed_money = get_needed_money(ctp.fee, ctp.dsts);
+  std::unordered_map<crypto::hash, uint64_t> needed_money_map;
+  uint64_t needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
   if (ctp.flags & TX_FLAG_SIGNATURE_MODE_SEPARATE && tx_for_mode_separate.vout.size())
   {
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_tx_flags(tx_for_mode_separate) & TX_FLAG_SIGNATURE_MODE_SEPARATE, "tx_param.flags differs from tx.flags");
