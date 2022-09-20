@@ -882,6 +882,14 @@ namespace currency
       // TODO @#@# implement multisig support
 
       tx_out_zarcanum out = AUTO_VAL_INIT(out);
+      //@#@
+      //TODO: TEMPORARY
+      if (de.asset_id != currency::null_hash)
+      {
+        out.etc_details.push_back(txout_etc_details_v{ de.asset_id });
+      }
+      //@#@
+
       const account_public_address& apa = de.addr.front();
       if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
       {
@@ -1881,8 +1889,13 @@ namespace currency
           txin_zc_input zc_in = AUTO_VAL_INIT(zc_in);
           zc_in.k_image = img;
           zc_in.key_offsets = std::move(key_offsets);
+          //TEMPORARY 
+          if (src_entr.asset_id != currency::null_hash)
+          {
+            zc_in.etc_details.push_back(open_asset_id{ src_entr.asset_id });
+          }
           tx.vin.push_back(zc_in);
-          //zc_sources.push_back(&src_entr);
+
         }
         else 
         {
@@ -1905,6 +1918,9 @@ namespace currency
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
     if (shuffle)
       std::sort(shuffled_dsts.begin(), shuffled_dsts.end(), [](const tx_destination_entry& de1, const tx_destination_entry& de2) { return de1.amount < de2.amount; });
+
+
+    // TODO: consider "Shuffle" inputs 
 
     uint64_t summary_outs_money = 0;
     //fill outputs

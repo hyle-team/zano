@@ -41,17 +41,18 @@ namespace currency
     //typedef serializable_pair<txout_ref_v, crypto::public_key> output_entry; // txout_ref_v is either global output index or ref_by_id; public_key - is output's stealth address
 
     std::vector<output_entry> outputs;
-    uint64_t real_output;               //index in outputs vector of real output_entry
-    crypto::public_key real_out_tx_key; //real output's transaction's public key
-    crypto::scalar_t real_out_amount_blinding_mask; //blinding mask of real out's amount committment (only for zarcanum inputs, otherwise must be 0)
-    size_t real_output_in_tx_index;     //index in transaction outputs vector
-    uint64_t amount;                    //money
-    uint64_t transfer_index;            //money
-    crypto::hash multisig_id;           //if txin_multisig: multisig output id
-    size_t ms_sigs_count;               //if txin_multisig: must be equal to output's minimum_sigs
-    size_t ms_keys_count;               //if txin_multisig: must be equal to size of output's keys container
-    bool separately_signed_tx_complete; //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
-    std::string htlc_origin;            //for htlc, specify origin
+    uint64_t real_output = 0;                                 //index in outputs vector of real output_entry
+    crypto::public_key real_out_tx_key = currency::null_pkey; //real output's transaction's public key
+    crypto::scalar_t real_out_amount_blinding_mask;           //blinding mask of real out's amount committment (only for zarcanum inputs, otherwise must be 0)
+    size_t real_output_in_tx_index = 0;                       //index in transaction outputs vector
+    uint64_t amount = 0;                                      //money
+    uint64_t transfer_index = 0;                              //index in m_transfers
+    crypto::hash multisig_id = currency::null_hash;           //if txin_multisig: multisig output id
+    size_t ms_sigs_count = 0;                                 //if txin_multisig: must be equal to output's minimum_sigs
+    size_t ms_keys_count = 0;                                 //if txin_multisig: must be equal to size of output's keys container
+    bool separately_signed_tx_complete = false;               //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
+    std::string htlc_origin;                                  //for htlc, specify origin
+    crypto::hash asset_id = currency::null_hash;              //asset id
 
     bool is_multisig() const { return ms_sigs_count > 0; }
     bool is_zarcanum() const { return !real_out_amount_blinding_mask.is_zero(); }

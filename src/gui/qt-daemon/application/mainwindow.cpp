@@ -2184,6 +2184,7 @@ QString MainWindow::toggle_autostart(const QString& param)
   return MAKE_RESPONSE(default_ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+/*
 QString MainWindow::check_available_sources(const QString& param)
 {
   TRY_ENTRY();
@@ -2192,6 +2193,7 @@ QString MainWindow::check_available_sources(const QString& param)
   return m_backend.check_available_sources(sources.wallet_id, sources.req_data).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
+*/
 
 QString MainWindow::open_url_in_browser(const QString& param)
 {

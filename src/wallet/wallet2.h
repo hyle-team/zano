@@ -296,6 +296,14 @@ namespace tools
   };
 
 
+  struct selection_for_amount
+  {
+    uint64_t needed_amount = 0;
+    uint64_t found_money = 0;
+    //std::vector<uint64_t> selected_indicies;
+  };
+  typedef std::unordered_map<crypto::hash, selection_for_amount> assets_selection_context;
+
   class wallet2: public tools::tor::t_transport_state_notifier
   {
     wallet2(const wallet2&) = delete;
@@ -446,6 +454,7 @@ namespace tools
     typedef std::unordered_map<crypto::hash, transfer_details_base> multisig_transfer_container;
     typedef std::unordered_map<crypto::hash, tools::wallet_public::escrow_contract_details_basic> escrow_contracts_container;
     typedef std::map<uint64_t, std::set<size_t> > free_amounts_cache_type;
+    typedef std::unordered_map<crypto::hash, free_amounts_cache_type> free_assets_amounts_cache_type;
     typedef std::unordered_map<std::pair<uint64_t, uint64_t>, uint64_t> amount_gindex_to_transfer_id_container; // maps [amount; gindex] -> tid
 
 
@@ -800,6 +809,7 @@ namespace tools
     bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count);
+    bool select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
     //PoS
     //synchronous version of function 
@@ -912,9 +922,9 @@ private:
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized);
     void pull_blocks(size_t& blocks_added, std::atomic<bool>& stop);
     bool prepare_free_transfers_cache(uint64_t fake_outputs_count);
-    uint64_t select_transfers(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust, std::vector<uint64_t>& selected_indicies);
+    bool select_transfers(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust, std::vector<uint64_t>& selected_indicies);
     void add_transfers_to_transfers_cache(const std::vector<uint64_t>& indexs);
-    void add_transfer_to_transfers_cache(uint64_t amount, uint64_t index);
+    void add_transfer_to_transfers_cache(uint64_t amount, uint64_t index, const crypto::hash& asset_id = currency::null_hash);
     bool prepare_file_names(const std::wstring& file_path);
     void process_unconfirmed(const currency::transaction& tx, std::vector<std::string>& recipients, std::vector<std::string>& recipients_aliases);
     void add_sent_unconfirmed_tx(const currency::transaction& tx,
@@ -949,19 +959,24 @@ private:
     void rise_on_transfer2(const wallet_public::wallet_transfer_info& wti);
     void process_genesis_if_needed(const currency::block& genesis);
     bool build_escrow_proposal(bc_services::contract_private_details& ecrow_details, uint64_t fee, uint64_t unlock_time, currency::tx_service_attachment& att, std::vector<uint64_t>& selected_indicies);
-    bool prepare_tx_sources(uint64_t needed_money, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
-    bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
+    bool prepare_tx_sources(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
+    bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     void prefetch_global_indicies_if_needed(std::vector<uint64_t>& selected_indicies);
-    std::unordered_map<crypto::hash, uint64_t>&& get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
+    assets_selection_context&& get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
+    void prepare_tx_destinations(const assets_selection_context& needed_money_map,
+      detail::split_strategy_id_t destination_split_strategy_id,
+      const tx_dust_policy& dust_policy,
+      const std::vector<currency::tx_destination_entry>& dsts,
+      std::vector<currency::tx_destination_entry>& final_detinations);
     void prepare_tx_destinations(uint64_t needed_money,
       uint64_t found_money,
       detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
       const std::vector<currency::tx_destination_entry>& dsts,
-      std::vector<currency::tx_destination_entry>& final_detinations);
+      std::vector<currency::tx_destination_entry>& final_detinations, const crypto::hash& assed_id);
     bool handle_contract(wallet_public::wallet_transfer_info& wti, const bc_services::contract_private_details& cntr, const std::vector<currency::payload_items_v>& decrypted_attach);
     bool handle_release_contract(wallet_public::wallet_transfer_info& wti, const std::string& release_instruction);
     bool handle_cancel_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb, const std::vector<currency::payload_items_v>& decrypted_attach);
@@ -970,7 +985,7 @@ private:
     uint64_t get_current_tx_version();
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_public::wallet_transfer_info& wti) const;
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
-    
+    bool is_need_to_split_outputs();
     template<typename input_t>
     bool process_input_t(const input_t& in_t, wallet2::process_transaction_context& ptc, const currency::transaction& tx);
 
@@ -1083,7 +1098,7 @@ private:
     std::list<expiration_entry_info> m_money_expirations;
     //optimization for big wallets and batch tx
 
-    free_amounts_cache_type m_found_free_amounts;
+    free_assets_amounts_cache_type m_found_free_amounts;
     uint64_t m_fake_outputs_count;
     std::string m_miner_text_info;
 
