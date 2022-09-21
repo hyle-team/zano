@@ -299,7 +299,7 @@ namespace tools
   struct selection_for_amount
   {
     uint64_t needed_amount = 0;
-    uint64_t found_money = 0;
+    uint64_t found_amount = 0;
     //std::vector<uint64_t> selected_indicies;
   };
   typedef std::unordered_map<crypto::hash, selection_for_amount> assets_selection_context;
@@ -959,13 +959,13 @@ private:
     void rise_on_transfer2(const wallet_public::wallet_transfer_info& wti);
     void process_genesis_if_needed(const currency::block& genesis);
     bool build_escrow_proposal(bc_services::contract_private_details& ecrow_details, uint64_t fee, uint64_t unlock_time, currency::tx_service_attachment& att, std::vector<uint64_t>& selected_indicies);
-    bool prepare_tx_sources(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
+    bool prepare_tx_sources(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
-    void prefetch_global_indicies_if_needed(std::vector<uint64_t>& selected_indicies);
-    assets_selection_context&& get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
+    void prefetch_global_indicies_if_needed(const std::vector<uint64_t>& selected_indicies);
+    assets_selection_context get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
     void prepare_tx_destinations(const assets_selection_context& needed_money_map,
       detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
@@ -1050,6 +1050,7 @@ private:
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
     uint64_t get_alias_cost(const std::string& alias);
+    detail::split_strategy_id_t get_current_split_strategy();
 
     static void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
     static void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);

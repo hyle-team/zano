@@ -1826,7 +1826,7 @@ void wallet2::refresh(std::atomic<bool>& stop)
   refresh(n, f, stop);
 }
 //----------------------------------------------------------------------------------------------------
-split_strategy_id_t wallet2::get_current_split_strategy()
+detail::split_strategy_id_t wallet2::get_current_split_strategy()
 {
   if (is_need_to_split_outputs())
     return tools::detail::ssi_digit;
@@ -4685,7 +4685,7 @@ bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake
   if (!it->second.size())
     m_found_free_amounts[currency::null_hash].erase(it);
 
-  return prepare_tx_sources(fake_outputs_count, sources, selected_indicies, found_money);
+  return prepare_tx_sources(fake_outputs_count, sources, selected_indicies);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies)
@@ -4696,7 +4696,7 @@ bool wallet2::prepare_tx_sources(assets_selection_context& needed_money_map, siz
   return prepare_tx_sources(fake_outputs_count, sources, selected_indicies);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::prefetch_global_indicies_if_needed(std::vector<uint64_t>& selected_indicies)
+void wallet2::prefetch_global_indicies_if_needed(const std::vector<uint64_t>& selected_indicies)
 {
   std::list<std::reference_wrapper<const currency::transaction>> txs;
   std::list<uint64_t> indices_that_requested_global_indicies;
@@ -4915,7 +4915,7 @@ bool wallet2::prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string
 
 }
 //----------------------------------------------------------------------------------------------------------------
-assets_selection_context&& wallet2::get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts)
+assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts)
 {
   assets_selection_context amounts_map;
   amounts_map[currency::null_hash].needed_amount = fee;
@@ -4929,7 +4929,7 @@ assets_selection_context&& wallet2::get_needed_money(uint64_t fee, const std::ve
     amounts_map[dt.asset_id].needed_amount += money_to_add;
     THROW_IF_TRUE_WALLET_EX(amounts_map[dt.asset_id].needed_amount < money_to_add, error::tx_sum_overflow, dsts, fee);
   }
-  return amounts_map;
+  return std::move(amounts_map);
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::set_disable_tor_relay(bool disable)
@@ -5213,9 +5213,9 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
   for (auto& item : needed_money_map)
   {
     auto asset_cashe_it = m_found_free_amounts.find(item.first);
-    WLT_THROW_IF_FALSE_WALLET_EX_MES(asset_cashe_it != m_found_free_amounts.end(), error::not_enough_money, "", item.second.found_money, item.second.needed_money, 0, item.first);    
-    item.second.found_money = select_indices_for_transfer(selected_indexes, asset_cashe_it->second, item.second.needed_money, fake_outputs_count);
-    WLT_THROW_IF_FALSE_WALLET_EX_MES(item.second.found_money >= item.second.needed_money, error::not_enough_money, "", item.second.found_money, item.second.needed_money, 0, item.first);
+    WLT_THROW_IF_FALSE_WALLET_EX_MES(asset_cashe_it != m_found_free_amounts.end(), error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, item.first);
+    item.second.found_amount = select_indices_for_transfer(selected_indexes, asset_cashe_it->second, item.second.needed_amount, fake_outputs_count);
+    WLT_THROW_IF_FALSE_WALLET_EX_MES(item.second.found_amount >= item.second.needed_amount, error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, item.first);
   }
   return res;
 }
@@ -5550,7 +5550,7 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
 {
   for (auto& el: needed_money_map)
   {
-    prepare_tx_destinations(el.second.needed_money, el.second.found_money, destination_split_strategy_id, dust_policy, dsts, final_detinations, el.first);    
+    prepare_tx_destinations(el.second.needed_amount, el.second.found_amount, destination_split_strategy_id, dust_policy, dsts, final_detinations, el.first);    
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -5610,28 +5610,28 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
   if (ctp.perform_packing)
   {
-    prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, needed_money_map[currency::null_hash].found_money);
+    prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, needed_money_map[currency::null_hash].found_amount);
   }
   else if (ctp.htlc_tx_id != currency::null_hash)
   {
     //htlc
     //@#@ need to do refactoring over this part to support hidden amounts and asset_id
-    prepare_tx_sources_htlc(ctp.htlc_tx_id, ctp.htlc_origin, ftp.sources, needed_money_map[currency::null_hash].found_money);
+    prepare_tx_sources_htlc(ctp.htlc_tx_id, ctp.htlc_origin, ftp.sources, needed_money_map[currency::null_hash].found_amount);
     WLT_THROW_IF_FALSE_WITH_CODE(ctp.dsts.size() == 1,
       "htlc: unexpected ctp.dsts.size() =" << ctp.dsts.size(), API_RETURN_CODE_INTERNAL_ERROR);
 
-    WLT_THROW_IF_FALSE_WITH_CODE(needed_money_map[currency::null_hash].found_money > ctp.fee,
+    WLT_THROW_IF_FALSE_WITH_CODE(needed_money_map[currency::null_hash].found_amount > ctp.fee,
       "htlc: found money less then fee", API_RETURN_CODE_INTERNAL_ERROR);
 
     //fill amount
-    ctp.dsts.begin()->amount = needed_money_map[currency::null_hash].found_money - ctp.fee;
+    ctp.dsts.begin()->amount = needed_money_map[currency::null_hash].found_amount - ctp.fee;
     
   }
   else if (ctp.multisig_id != currency::null_hash)
   {
     //multisig
     //@#@ need to do refactoring over this part to support hidden amounts and asset_id
-    prepare_tx_sources(ctp.multisig_id, ftp.sources, needed_money_map[currency::null_hash].found_money);
+    prepare_tx_sources(ctp.multisig_id, ftp.sources, needed_money_map[currency::null_hash].found_amount);
   }
   else
   {
@@ -6062,7 +6062,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 
     // try to construct a transaction
     std::vector<currency::tx_destination_entry> dsts({ tx_destination_entry(amount_swept - fee, destination_addr) });
-    prepare_tx_destinations(0, 0, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.prepared_destinations);
+    prepare_tx_destinations(0, 0, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.prepared_destinations, currency::null_hash);
 
     currency::transaction tx = AUTO_VAL_INIT(tx);
     crypto::secret_key tx_key = AUTO_VAL_INIT(tx_key);

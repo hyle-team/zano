@@ -78,7 +78,7 @@ namespace currency
   struct destination_option_htlc_out
   {
     uint64_t expiration = 0;
-    crypto::hash htlc_hash = crypto::null_hash;
+    crypto::hash htlc_hash = currency::null_hash;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(expiration)
@@ -95,7 +95,7 @@ namespace currency
     uint64_t amount_to_provide = 0;                         //amount money that provided by initial creator of tx, used with partially created transactions
     uint64_t unlock_time = 0;
     destination_option_htlc_out htlc_options;           //htlc options    
-    crypto::hash asset_id = crypto::null_hash;
+    crypto::hash asset_id = currency::null_hash;
     
     
     tx_destination_entry() = default;
