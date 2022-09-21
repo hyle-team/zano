@@ -2594,6 +2594,11 @@ namespace currency
         if (is_out_to_acc(acc, zo, derivation, output_index, amount, blinding_mask))
         {
           outs.emplace_back(output_index, amount, blinding_mask);
+          open_asset_id v = AUTO_VAL_INIT(v);
+          if (get_type_in_variant_container(zo.etc_details, v))
+          {
+            outs.back().asset_id = v.asset_id;
+          }
           money_transfered += amount;
         }
       VARIANT_SWITCH_END();

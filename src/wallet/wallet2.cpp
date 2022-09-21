@@ -626,6 +626,10 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           td.m_ptx_wallet_info = pwallet_info;
           td.m_internal_output_index = o;
           td.m_key_image = ki;
+          if (outs[i_in_outs].asset_id != currency::null_hash)
+          {
+            td.m_asset_id.reset(new crypto::hash(outs[i_in_outs].asset_id));
+          }
           td.m_amount = outs[i_in_outs].amount;
           if (m_use_deffered_global_outputs)
           {

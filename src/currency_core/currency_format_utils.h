@@ -211,6 +211,7 @@ namespace currency
     size_t      index  = SIZE_MAX;
     uint64_t    amount = 0;
     crypto::scalar_t blinding_mask = 0;
+    crypto::hash asset_id = currency::null_hash;
   };
 
 
