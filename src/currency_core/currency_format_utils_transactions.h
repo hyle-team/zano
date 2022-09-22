@@ -41,17 +41,18 @@ namespace currency
     //typedef serializable_pair<txout_ref_v, crypto::public_key> output_entry; // txout_ref_v is either global output index or ref_by_id; public_key - is output's stealth address
 
     std::vector<output_entry> outputs;
-    uint64_t real_output;               //index in outputs vector of real output_entry
-    crypto::public_key real_out_tx_key; //real output's transaction's public key
-    crypto::scalar_t real_out_amount_blinding_mask; //blinding mask of real out's amount committment (only for zarcanum inputs, otherwise must be 0)
-    size_t real_output_in_tx_index;     //index in transaction outputs vector
-    uint64_t amount;                    //money
-    uint64_t transfer_index;            //money
-    crypto::hash multisig_id;           //if txin_multisig: multisig output id
-    size_t ms_sigs_count;               //if txin_multisig: must be equal to output's minimum_sigs
-    size_t ms_keys_count;               //if txin_multisig: must be equal to size of output's keys container
-    bool separately_signed_tx_complete; //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
-    std::string htlc_origin;            //for htlc, specify origin
+    uint64_t real_output = 0;                                 //index in outputs vector of real output_entry
+    crypto::public_key real_out_tx_key = currency::null_pkey; //real output's transaction's public key
+    crypto::scalar_t real_out_amount_blinding_mask;           //blinding mask of real out's amount committment (only for zarcanum inputs, otherwise must be 0)
+    size_t real_output_in_tx_index = 0;                       //index in transaction outputs vector
+    uint64_t amount = 0;                                      //money
+    uint64_t transfer_index = 0;                              //index in m_transfers
+    crypto::hash multisig_id = currency::null_hash;           //if txin_multisig: multisig output id
+    size_t ms_sigs_count = 0;                                 //if txin_multisig: must be equal to output's minimum_sigs
+    size_t ms_keys_count = 0;                                 //if txin_multisig: must be equal to size of output's keys container
+    bool separately_signed_tx_complete = false;               //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
+    std::string htlc_origin;                                  //for htlc, specify origin
+    crypto::hash asset_id = currency::null_hash;              //asset id
 
     bool is_multisig() const { return ms_sigs_count > 0; }
     bool is_zarcanum() const { return !real_out_amount_blinding_mask.is_zero(); }
@@ -76,8 +77,8 @@ namespace currency
   //if this struct is present, then creating htlc out, expiration -> number of blocks that htlc proposal is active
   struct destination_option_htlc_out
   {
-    uint64_t expiration;
-    crypto::hash htlc_hash;
+    uint64_t expiration = 0;
+    crypto::hash htlc_hash = currency::null_hash;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(expiration)
@@ -90,16 +91,17 @@ namespace currency
   {
     uint64_t amount;                                    //money
     std::list<account_public_address>   addr;           //destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
-    size_t   minimum_sigs;                              //if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
-    uint64_t amount_to_provide;                         //amount money that provided by initial creator of tx, used with partially created transactions
-    uint64_t unlock_time;
-    destination_option_htlc_out htlc_options;           //htlc options      
+    size_t   minimum_sigs = 0;                              //if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
+    uint64_t amount_to_provide = 0;                         //amount money that provided by initial creator of tx, used with partially created transactions
+    uint64_t unlock_time = 0;
+    destination_option_htlc_out htlc_options;           //htlc options    
+    crypto::hash asset_id = currency::null_hash;
     
     
-    tx_destination_entry() : amount(0), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc_options(destination_option_htlc_out()){}
-    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(0), htlc_options(destination_option_htlc_out()) {}
-    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), minimum_sigs(0), amount_to_provide(0), unlock_time(ut), htlc_options(destination_option_htlc_out()) {}
-    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()), amount_to_provide(0), unlock_time(0), htlc_options(destination_option_htlc_out()) {}
+    tx_destination_entry() = default;
+    tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad) {}
+    tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), unlock_time(ut) {}
+    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()) {}
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(amount)

@@ -206,8 +206,22 @@ namespace currency
     uint32_t n_extras;
   };
 
+  //!!!!this is temporary struct!!! 
+  //needed only to hold asset_id of input/output while zarcanum extension being developed
+  struct open_asset_id
+  {
+    crypto::hash asset_id;
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(asset_id) // referring_input
+    END_SERIALIZE()
 
-  typedef boost::variant<signed_parts, extra_attachment_info> txin_etc_details_v;
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(asset_id)
+    END_BOOST_SERIALIZATION()
+  };
+
+
+  typedef boost::variant<signed_parts, extra_attachment_info, open_asset_id> txin_etc_details_v;
 
 
   struct referring_input
@@ -372,6 +386,7 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
+  typedef boost::variant<open_asset_id> txout_etc_details_v;
 
   struct tx_out_zarcanum
   {
@@ -386,6 +401,7 @@ namespace currency
     crypto::public_key  amount_commitment; // premultiplied by 1/8
     uint64_t            encrypted_amount;
     uint8_t             mix_attr;
+    std::vector<txout_etc_details_v> etc_details;
     //crypto::public_key  token_masked_generator;
 
     BEGIN_SERIALIZE_OBJECT()
@@ -1063,7 +1079,7 @@ SET_VARIANT_TAGS(currency::void_sig, 44, "void_sig");
 SET_VARIANT_TAGS(currency::zarcanum_outs_range_proof, 45, "zarcanum_outs_range_proof");
 SET_VARIANT_TAGS(currency::zc_balance_proof, 46, "zc_balance_proof");
 
-
+SET_VARIANT_TAGS(currency::open_asset_id, 47, "asset_id");
 
 
 

@@ -349,7 +349,7 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct not_enough_money : public transfer_error
     {
-      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee)
+      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::hash& assset_id)
         : transfer_error(std::move(loc), "NOT_ENOUGH_MONEY")
         , m_available(availbable)
         , m_tx_amount(tx_amount)

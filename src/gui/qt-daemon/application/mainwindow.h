@@ -173,7 +173,7 @@ public:
   bool    set_is_disabled_notifications(const bool& param);
   QString export_wallet_history(const QString& param);
   QString get_log_file();
-  QString check_available_sources(const QString& param);
+  //QString check_available_sources(const QString& param);
   QString open_url_in_browser(const QString& param);
 
   void    trayIconActivated(QSystemTrayIcon::ActivationReason reason);
