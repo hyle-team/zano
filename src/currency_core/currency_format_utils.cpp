@@ -886,7 +886,7 @@ namespace currency
       //TODO: TEMPORARY
       if (de.asset_id != currency::null_hash)
       {
-        out.etc_details.push_back(txout_etc_details_v{ de.asset_id });
+        out.etc_details.push_back(open_asset_id{ de.asset_id });
       }
       //@#@
 
