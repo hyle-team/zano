@@ -6,6 +6,8 @@
 
 #define USE_INSECURE_RANDOM_RPNG_ROUTINES // turns on pseudorandom number generator manupulations for tests
 
+#include "chaingen.h"
+
 #include <vector>
 #include <iostream>
 #include <sstream>
@@ -20,7 +22,6 @@
 #include "currency_core/miner.h"
 #include "currency_core/bc_offers_service.h"
 #include "wallet/wallet2.h"
-#include "chaingen.h"
 #include "wallet_test_core_proxy.h"
 #include "pos_block_builder.h"
  
@@ -50,7 +51,6 @@ const crypto::signature invalid_signature = create_invalid_signature();
 test_generator::test_generator()
   : m_wallet_test_core_proxy(new wallet_test_core_proxy())
   , m_ignore_last_pow_in_wallets(false)
-  , m_last_found_timestamp(0)
 {
 }
 
@@ -216,6 +216,7 @@ bool test_generator::construct_block(currency::block& blk,
                                      const std::list<currency::transaction>& tx_list, 
                                      const std::list<currency::account_base>& coin_stake_sources)//in case of PoS block
 {
+  bool r  = false;
 //   if (height > m_hardfork_01_after_heigh)
 //     blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
 //   else
@@ -229,7 +230,7 @@ bool test_generator::construct_block(currency::block& blk,
 
   crypto::hash kernerl_hash = null_hash;
   blk.tx_hashes.reserve(tx_list.size());
-  BOOST_FOREACH(const transaction &tx, tx_list)
+  for(const transaction &tx : tx_list)
   {
     crypto::hash tx_hash;
     get_transaction_hash(tx, tx_hash);
@@ -238,7 +239,7 @@ bool test_generator::construct_block(currency::block& blk,
 
   uint64_t total_fee = 0;
   size_t txs_size = 0;
-  BOOST_FOREACH(auto& tx, tx_list)
+  for(auto& tx : tx_list)
   {
     uint64_t fee = 0;
     bool r = get_tx_fee(tx, fee);
@@ -281,19 +282,19 @@ bool test_generator::construct_block(currency::block& blk,
   size_t target_block_size = txs_size + 0; // zero means no cost for ordinary coinbase
   while (true)
   {
-    if (!construct_miner_tx(height, misc_utils::median(block_sizes), 
+    r = construct_miner_tx(height, misc_utils::median(block_sizes),
                                     already_generated_coins,
-                                    target_block_size, 
-                                    total_fee, 
-                                    miner_acc.get_keys().account_address, 
+                                    target_block_size,
+                                    total_fee,
                                     miner_acc.get_keys().account_address,
-                                    blk.miner_tx, 
+                                    miner_acc.get_keys().account_address,
+                                    blk.miner_tx,
                                     get_tx_version(height, m_hardforks),
                                     blobdata(),
                                     test_generator::get_test_gentime_settings().miner_tx_max_outs,
-                                    static_cast<bool>(coin_stake_sources.size()), 
-                                    pe))
-      return false;
+                                    static_cast<bool>(coin_stake_sources.size()),
+                                    pe);
+    CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
     size_t coinbase_size = get_object_blobsize(blk.miner_tx);
     if (coinbase_size <= CURRENCY_COINBASE_BLOB_RESERVED_SIZE) // if less than that constant then coinbase goes for free
@@ -381,7 +382,7 @@ bool test_generator::sign_block(currency::block& b,
   return true;
 }
 
-bool test_generator::build_wallets(const blockchain_vector& blocks, 
+bool test_generator::build_wallets(const blockchain_vector& blockchain, 
                                    const std::list<currency::account_base>& accs, 
                                    const tx_global_indexes& txs_outs,
                                    wallets_vector& wallets,
@@ -390,9 +391,14 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
   struct stub_core_proxy: public tools::i_core_proxy
   {
     const tx_global_indexes& m_txs_outs;
-    stub_core_proxy(const tx_global_indexes& txs_outs) : m_txs_outs(txs_outs)
+    const blockchain_vector& m_blockchain;
+    
+    stub_core_proxy(const blockchain_vector& blockchain, const tx_global_indexes& txs_outs)
+      : m_blockchain(blockchain)
+      , m_txs_outs(txs_outs)
     {}
-    virtual bool call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(const currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& rqt, currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& rsp)
+
+    bool call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(const currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& rqt, currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& rsp) override
     {
       rsp.tx_global_outs.resize(rqt.txids.size());
       size_t i = 0;
@@ -406,9 +412,47 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
       rsp.status = API_RETURN_CODE_OK;
       return true; 
     }
+
+    bool call_COMMAND_RPC_GET_POS_MINING_DETAILS(const currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, currency::COMMAND_RPC_GET_POS_MINING_DETAILS::response& rsp) override
+    {
+      rsp.pos_mining_allowed = true;
+      if (!rsp.pos_mining_allowed)
+      {
+        rsp.status = API_RETURN_CODE_NOT_FOUND;
+        return true;
+      }
+
+      build_stake_modifier(rsp.sm, m_blockchain);
+    
+      //rsp.pos_basic_difficulty = m_core.get_blockchain_storage().get_next_diff_conditional(true).convert_to<std::string>();
+      //rsp.starter_timestamp = m_core.get_blockchain_storage().get_last_timestamps_check_window_median();
+      //uint64_t i_last_pos_block = get_last_block_of_type(true, m_blockchain);
+      //uint64_t last_pos_block_timestamp = 0;
+      //if(i_last_pos_block)
+      //  last_pos_block_timestamp = m_blockchain[i_last_pos_block]->b.timestamp;
+      //else
+      //  last_pos_block_timestamp = m_blockchain.back()->b.timestamp - DIFFICULTY_POS_TARGET/2;
+      //uint64_t starter_timestamp = last_pos_block_timestamp + DIFFICULTY_POS_TARGET;
+      //uint64_t median_timestamp = get_timestamps_median(m_blockchain);
+      //if (starter_timestamp < median_timestamp)
+      //  starter_timestamp = median_timestamp;
+      //if (basic_diff < 10)
+      //  starter_timestamp -= 90;
+      //starter_timestamp = POS_SCAN_STEP - (starter_timestamp%POS_SCAN_STEP) + starter_timestamp;
+
+      uint64_t median_timestamp = get_timestamps_median(m_blockchain);
+      rsp.starter_timestamp = median_timestamp; // the core uses median timestamp as starter timestamp, here we mimic this behaviour -- sowle
+
+      wide_difficulty_type basic_diff = get_difficulty_for_next_block(m_blockchain, false);
+      rsp.pos_basic_difficulty = basic_diff.convert_to<std::string>();
+
+      rsp.status = API_RETURN_CODE_OK;
+      return true;
+    }
+
   };
 
-  std::shared_ptr<tools::i_core_proxy> tmp_proxy(new stub_core_proxy(txs_outs));
+  std::shared_ptr<tools::i_core_proxy> tmp_proxy(new stub_core_proxy(blockchain, txs_outs));
 
   //build wallets
   wallets.clear();
@@ -423,13 +467,15 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
     pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
     pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
     pc.hard_forks = m_hardforks;
+    pc.get_core_time = test_core_time::get_time;
+
     wallets.back()->set_core_runtime_config(pc);
   }
 
   for (auto& w : wallets)
   {
     uint64_t height = 0;
-    for (auto& b : blocks)
+    for (auto& b : blockchain)
     {
       uint64_t h = get_block_height(b->b);
       if (!h)
@@ -481,7 +527,7 @@ size_t test_generator::get_tx_out_gindex(const crypto::hash& blockchain_head, co
 }
 
 
-uint64_t test_generator::get_timestamps_median(const blockchain_vector& blck_chain, size_t window_size /* = BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW */)
+/* static */ uint64_t test_generator::get_timestamps_median(const blockchain_vector& blck_chain, size_t window_size /* = BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW */)
 {
   std::vector<uint64_t> timestamps;
   for(size_t i = blck_chain.size() - std::min(blck_chain.size(), window_size); i < blck_chain.size(); ++i)
@@ -507,65 +553,111 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
   uint64_t& found_timestamp,
   crypto::hash& found_kh)
 {
+  bool r = false;
   // TODO: consiger removing this function completely in order to unify pos mining code -- sowle
 
-  //bool is_after_hardfork_01 = m_hardforks.is_hardfork_active_for_height(1, blck_chain.size());
-  uint64_t median_timestamp = get_timestamps_median(blck_chain);
-  wide_difficulty_type basic_diff = 0;
-
+  /*
   uint64_t i_last_pos_block = get_last_block_of_type(true, blck_chain);
-  
   uint64_t last_pos_block_timestamp = 0;
   if(i_last_pos_block)
     last_pos_block_timestamp = blck_chain[i_last_pos_block]->b.timestamp;
   else
     last_pos_block_timestamp = blck_chain.back()->b.timestamp - DIFFICULTY_POS_TARGET/2;
-  
   uint64_t starter_timestamp = last_pos_block_timestamp + DIFFICULTY_POS_TARGET;
-
+  uint64_t median_timestamp = get_timestamps_median(blck_chain);
   if (starter_timestamp < median_timestamp)
     starter_timestamp = median_timestamp;
-
-  m_last_found_timestamp = 0;
-  basic_diff = get_difficulty_for_next_block(blck_chain, false);
+  wide_difficulty_type basic_diff = get_difficulty_for_next_block(blck_chain, false);
   if (basic_diff < 10)
-  {
     starter_timestamp -= 90;
-  }
-
-  //adjust timestamp starting from timestamp%POS_SCAN_STEP = 0
-  //starter_timestamp = starter_timestamp - POS_SCAN_WINDOW;
   starter_timestamp = POS_SCAN_STEP - (starter_timestamp%POS_SCAN_STEP) + starter_timestamp;
+  */
 
-  for (uint64_t ts = starter_timestamp; ts < starter_timestamp + POS_SCAN_WINDOW/2; ts += POS_SCAN_STEP)
+  //for (uint64_t ts = starter_timestamp; ts < starter_timestamp + POS_SCAN_WINDOW/2; ts += POS_SCAN_STEP)
+
+   uint64_t last_block_ts = !blck_chain.empty() ? blck_chain.back()->b.timestamp : test_core_time::get_time();
+
+  //lets try to find block
+  for (size_t wallet_index = 0, size = wallets.size(); wallet_index < size; ++wallet_index)
   {
-    //lets try to find block
-    for (auto& w : wallets)
+    std::shared_ptr<tools::wallet2> w = wallets[wallet_index];
+    //set m_last_pow_block_h to big value, to let wallet to use any available outputs, including the those which is not behind last pow block
+    if (m_ignore_last_pow_in_wallets)
+      w->m_last_pow_block_h = CURRENCY_MAX_BLOCK_NUMBER;
+
+    tools::wallet2::mining_context context = AUTO_VAL_INIT(context);
+    w->fill_mining_context(context);
+
+    std::atomic<bool> stop(false);
+
+    //if (test_core_time::get_time() < last_block_ts)
+    test_core_time::adjust(last_block_ts); 
+      
+    if (w->scan_pos(context, stop, [](){ return true; }, w->get_core_runtime_config()))
     {
-      //set m_last_pow_block_h to big value, to let wallet to use any available outputs, including the those which is not behind last pow block
-      if (m_ignore_last_pow_in_wallets)
-        w->m_last_pow_block_h = CURRENCY_MAX_BLOCK_NUMBER;
+      //found kernel
+      found_wallet_index = wallet_index;
+      found_kh = crypto::cn_fast_hash(&context.sk, sizeof(context.sk)); // TODO: consider passing kernel_hash from scan_pos and do_pos_mining_iteration
+      found_timestamp = context.sk.block_timestamp;
 
-      std::vector<currency::pos_entry> pos_entries;
-      bool r = w->get_pos_entries(pos_entries);
-      CHECK_AND_ASSERT_THROW_MES(r, "Failed to get_pos_entries");
+      tools::wallet2::transfer_details td = AUTO_VAL_INIT(td);
+      r = w->get_transfer_info_by_index(context.index, td);
+      CHECK_AND_NO_ASSERT_MES(r, false, "get_transfer_info_by_index() failed for index " << context.index);
 
-      for (size_t i = 0; i != pos_entries.size(); i++)
-      {
+      pe.amount             = td.amount();
+      pe.block_timestamp    = context.sk.block_timestamp;
+      pe.g_index            = td.m_global_output_index;
+      pe.keyimage           = td.m_key_image;
+      pe.stake_unlock_time  = context.stake_unlock_time;
+      pe.tx_id              = td.tx_hash();
+      pe.tx_out_index       = td.m_internal_output_index;
+      pe.wallet_index       = context.index;
 
-        stake_kernel sk = AUTO_VAL_INIT(sk);
-        build_kernel(pos_entries[i].amount,
-          pos_entries[i].g_index,
-          pos_entries[i].keyimage,
-          sk,
-          blck_chain,
-          indexes, 
-          ts);
+      LOG_PRINT_GREEN("Found kernel: amount=" << print_money_brief(pe.amount)
+        << ", index=" << pe.g_index
+        << ", key_image" << pe.keyimage
+        /*<< ", diff: " << this_coin_diff*/, LOG_LEVEL_0);
+
+      return true;
+    }
+
+    /*
+        uint64_t h = 0; 
+        uint64_t out_i = 0;
+        const transaction * pts = nullptr;
+        crypto::public_key source_tx_pub_key = null_pkey;
+        crypto::public_key out_key = null_pkey;
+        r = get_output_details_by_global_index(blck_chain, 
+                                            indexes, 
+                                            pos_entries[i].amount, 
+                                            pos_entries[i].g_index, 
+                                            h, 
+                                            pts, 
+                                            out_i, 
+                                            source_tx_pub_key, 
+                                            out_key);
+        CHECK_AND_ASSERT_THROW_MES(r,"Failed to get_output_details_by_global_index()");
+        sk.block_timestamp = ts;
+        sk.kimage = pos_entries[i].keyimage;
+        //build_stake_modifier(sk.stake_modifier, blck_chain);
+        sk.stake_modifier = stake_modifier_type();
+        uint64_t last_pos_i = get_last_block_of_type(true, blck_chain);
+        uint64_t last_pow_i = get_last_block_of_type(false, blck_chain);
+        if (last_pos_i)
+        {
+          sk.stake_modifier.last_pos_kernel_id = blck_chain[last_pos_i]->ks_hash;
+        }
+        else
+        {
+          r = string_tools::parse_tpod_from_hex_string(POS_STARTER_KERNEL_HASH, sk.stake_modifier.last_pos_kernel_id);
+          CHECK_AND_ASSERT_MES(r, false, "Failed to parse POS_STARTER_KERNEL_HASH");
+        }
+        sk.stake_modifier.last_pow_id = get_block_hash(blck_chain[last_pow_i]->b);
+
+
         crypto::hash kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
         wide_difficulty_type this_coin_diff = basic_diff / pos_entries[i].amount;
-        if (!check_hash(kernel_hash, this_coin_diff))
-          continue;
-        else
+        if (check_hash(kernel_hash, this_coin_diff))
         {
           //found kernel
           LOG_PRINT_GREEN("Found kernel: amount=" << print_money(pos_entries[i].amount)
@@ -580,6 +672,7 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
         }
       }
     }
+    */
     
   }
   return false;
@@ -645,41 +738,6 @@ bool test_generator::get_output_details_by_global_index(const test_generator::bl
   return true;
 }
 //------------------------------------------------------------------
-bool test_generator::build_kernel(uint64_t amount, 
-                                  uint64_t global_index, 
-                                  const crypto::key_image& ki, 
-                                  stake_kernel& kernel, 
-                                  const test_generator::blockchain_vector& blck_chain,
-                                  const test_generator::outputs_index& indexes, 
-                                  uint64_t timestamp)
-{
-  kernel = stake_kernel();
-  kernel.kimage = ki;
-
-  //get block related with coinstake source transaction
-  uint64_t h = 0; 
-  uint64_t out_i = 0;
-  const transaction * pts = nullptr;
-  crypto::public_key source_tx_pub_key = null_pkey;
-  crypto::public_key out_key = null_pkey;
-
-  bool r = get_output_details_by_global_index(blck_chain, 
-                                     indexes, 
-                                     amount, 
-                                     global_index, 
-                                     h, 
-                                     pts, 
-                                     out_i, 
-                                     source_tx_pub_key, 
-                                     out_key);
-  CHECK_AND_ASSERT_THROW_MES(r,"Failed to get_output_details_by_global_index()");
-
-  kernel.block_timestamp = timestamp;
-
-  build_stake_modifier(kernel.stake_modifier, blck_chain);
-  return true;
-}
-
 
 bool test_generator::build_stake_modifier(stake_modifier_type& sm, const test_generator::blockchain_vector& blck_chain)
 {
@@ -697,8 +755,6 @@ bool test_generator::build_stake_modifier(stake_modifier_type& sm, const test_ge
   }
 
   sm.last_pow_id = get_block_hash(blck_chain[last_pow_i]->b);
-
-
   return true;
 }
 
@@ -710,7 +766,7 @@ currency::wide_difficulty_type test_generator::get_difficulty_for_next_block(con
   return get_difficulty_for_next_block(blocks, pow);
 }
 
-currency::wide_difficulty_type test_generator::get_difficulty_for_next_block(const std::vector<const block_info*>& blocks, bool pow) const
+/* static */ currency::wide_difficulty_type test_generator::get_difficulty_for_next_block(const std::vector<const block_info*>& blocks, bool pow)
 {
   std::vector<uint64_t> timestamps;
   std::vector<wide_difficulty_type> commulative_difficulties;

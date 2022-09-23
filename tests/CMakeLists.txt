@@ -62,8 +62,9 @@ add_test(coretests coretests)
 
 # set PCH for core_tests
 if(MSVC AND USE_PCH)
+  add_definitions("/DUSE_PCH")
   set_property(TARGET coretests APPEND_STRING PROPERTY COMPILE_FLAGS " /Yuchaingen.h /Zm1000")
-  set_property(SOURCE "core_tests/chaingen.cpp" APPEND_STRING PROPERTY COMPILE_FLAGS " /Ycchaingen.h /Zm1000")
+  set_property(SOURCE "core_tests/chaingen_pch.cpp" APPEND_STRING PROPERTY COMPILE_FLAGS " /Ycchaingen.h /Zm1000")
   set_property(TARGET coretests functional_tests hash-target-tests performance_tests unit_tests APPEND_STRING PROPERTY LINK_FLAGS "$(MSBuildProjectDirectory)/../src/$(ConfigurationName)/stdafx.obj")
   set_property(TARGET db_tests APPEND_STRING PROPERTY LINK_FLAGS "$(MSBuildProjectDirectory)/../../src/$(ConfigurationName)/stdafx.obj")
 endif()

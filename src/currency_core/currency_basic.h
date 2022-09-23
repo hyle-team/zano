@@ -989,7 +989,8 @@ namespace currency
     uint64_t tx_out_index;       // stake output local index in its tx
 
     //not for serialization
-    uint64_t wallet_index;
+
+    uint64_t wallet_index;       // transfer id index
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
