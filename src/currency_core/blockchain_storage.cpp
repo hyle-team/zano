@@ -4880,7 +4880,7 @@ bool blockchain_storage::check_block_timestamp_main(const block& b) const
   }
   if (is_pos_block(b) && b.timestamp > get_adjusted_time() + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT)
   {
-    LOG_PRINT_L0("Timestamp of PoS block with id: " << get_block_hash(b) << ", " << b.timestamp << ", bigger than adjusted time + " + epee::misc_utils::get_time_interval_string(CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT) + ": " << get_adjusted_time() << " (" << b.timestamp - get_adjusted_time() << ")");
+    LOG_PRINT_L0("Timestamp of PoS block with id: " << get_block_hash(b) << ", " << b.timestamp << ", bigger than adjusted time + " + epee::misc_utils::get_time_interval_string(CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT) + ": " << get_adjusted_time() + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT << " (" << b.timestamp - get_adjusted_time() - CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT << ")");
     return false;
   }
 
@@ -5590,8 +5590,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   if(!check_block_timestamp_main(bl))
   {
     LOG_PRINT_L0("Block with id: " << id << ENDL
-      << "have invalid timestamp: " << bl.timestamp);
-    //add_block_as_invalid(bl, id);//do not add blocks to invalid storage befor proof of work check was passed
+      << "has invalid timestamp: " << bl.timestamp);
+    // do not add this block to invalid block list prior to proof of work check
     bvc.m_verification_failed = true;
     return false;
   }
