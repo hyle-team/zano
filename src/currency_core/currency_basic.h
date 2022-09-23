@@ -687,6 +687,27 @@ namespace currency
 
 
 
+  struct asset_descriptor_base
+  {
+    uint64_t            total_max_supply = 0;
+    uint64_t            current_supply = 0;
+    uint8_t             decimal_point = 12;
+    std::string         ticker;
+    std::string         full_name;
+    crypto::public_key  owner = currency::null_pkey;
+
+    BEGIN_VERSIONED_SERIALIZE()
+      FIELD(total_max_supply)
+      FIELD(current_supply)
+      FIELD(decimal_point)
+      FIELD(ticker)
+      FIELD(full_name)
+      FIELD(owner)
+   END_SERIALIZE()
+  };
+
+
+
   struct extra_padding
   {
     std::vector<uint8_t> buff; //stub

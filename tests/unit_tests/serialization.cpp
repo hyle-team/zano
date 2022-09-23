@@ -740,3 +740,166 @@ TEST(Serialization, serializes_transacion_versions)
 
   validate_tx_serialisation(tx);
 }
+
+struct A
+{
+  std::string one;
+  std::string two;
+  std::vector<std::string> vector_one;
+
+  BEGIN_SERIALIZE()
+    FIELD(one)
+    FIELD(two)
+    FIELD(vector_one)
+    END_SERIALIZE()
+};
+
+struct A_v1 : public A
+{
+  std::vector<std::string> vector_two;
+
+
+  BEGIN_SERIALIZE()
+    CURRENT_VERSION(1)
+    FIELD(one)
+    FIELD(two)
+    FIELD(vector_one)
+    VERSION()
+    if (s_version < 1) return true;
+    FIELD(vector_two)
+  END_SERIALIZE()
+};
+
+struct A_v2 : public A_v1
+{
+  std::vector<std::string> vector_3;
+  std::vector<std::string> vector_4;
+
+
+  BEGIN_SERIALIZE()
+    CURRENT_VERSION(2)
+    FIELD(one)
+    FIELD(two)
+    FIELD(vector_one)
+    VERSION()
+    if (s_version < 1) return true;
+    FIELD(vector_two)
+    if (s_version < 2) return true;
+    FIELD(vector_3)
+    FIELD(vector_4)
+  END_SERIALIZE()
+};
+
+struct A_v3 : public A_v2
+{
+  std::vector<std::string> vector_5;
+
+  BEGIN_SERIALIZE()
+    CURRENT_VERSION(3)
+    FIELD(one)
+    FIELD(two)
+    FIELD(vector_one)
+    VERSION()
+    if (s_version < 1) return true;
+    FIELD(vector_two)
+    if (s_version < 2) return true;
+    FIELD(vector_3)
+    FIELD(vector_4)
+    if (s_version < 3) return true;
+    FIELD(vector_4)
+  END_SERIALIZE()
+};
+
+inline bool operator==(const A& lhs, const A& rhs) 
+{
+  if ((lhs.one != rhs.one || lhs.two != rhs.two || lhs.vector_one != rhs.vector_one))
+  {
+    return false;
+  }
+  return true;
+}
+
+inline bool operator==(const A_v1& lhs, const A_v1& rhs)
+{
+  if (!(static_cast<const A&>(lhs) == static_cast<const A&>(rhs)))
+    return false;
+  if ((lhs.vector_two != rhs.vector_two))
+  {
+    return false;
+  }
+  return true;
+}
+
+inline bool operator==(const A_v2& lhs, const A_v2& rhs)
+{
+  if (!(static_cast<const A_v1&>(lhs) == static_cast<const A_v1&>(rhs)))
+    return false;
+  if ((lhs.vector_3 != rhs.vector_3))
+  {
+    return false;
+  }
+  return true;
+}
+
+inline bool operator==(const A_v3& lhs, const A_v3& rhs)
+{
+  if (!(static_cast<const A_v2&>(lhs) == static_cast<const A_v2&>(rhs)))
+    return false;
+  if ((lhs.vector_5 != rhs.vector_5))
+  {
+    return false;
+  }
+  return true;
+}
+
+template<typename first, typename second>
+bool perform_test_ser_vers(second& f)
+{
+  string blob;
+  first s_s = AUTO_VAL_INIT(s_s);
+  if (!serialization::dump_binary(f, blob))
+    return false;
+  if (!serialization::parse_binary(blob, s_s))
+    return false;
+
+
+  if (!(f == static_cast<second&>(s_s)))
+  {
+    return false;
+  }
+  return true;
+}
+
+TEST(Serialization, versioning2)
+{
+  A_v3 a_3;
+  a_3.one = "one";
+  a_3.two = "two";
+  a_3.vector_one.push_back(a_3.one);
+  a_3.vector_one.push_back(a_3.two);
+  a_3.vector_two = a_3.vector_one;
+  a_3.vector_5 = a_3.vector_4 = a_3.vector_3 = a_3.vector_two;
+
+  A_v2 a_2(a_3);
+  A_v1 a_1(a_3);
+  A a(a_3);
+
+  bool r = perform_test_ser_vers<A_v1>(a);
+  ASSERT_TRUE(r);
+  r = perform_test_ser_vers<A_v2>(a);
+  ASSERT_TRUE(r);
+  r = perform_test_ser_vers<A_v3>(a);
+  ASSERT_TRUE(r);
+
+  r = perform_test_ser_vers<A_v2>(a_1);
+  ASSERT_TRUE(r);
+  r = perform_test_ser_vers<A_v3>(a_1);
+  ASSERT_TRUE(r);
+
+  r = perform_test_ser_vers<A_v3>(a_2);
+  ASSERT_TRUE(r);
+
+  r = perform_test_ser_vers<A_v3>(a_3);
+  ASSERT_TRUE(r);
+
+}

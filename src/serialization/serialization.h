@@ -61,7 +61,7 @@ inline bool do_serialize(Archive &ar, T &v)
 #define VARIANT_TAG(A, T, Tg) \
   template <bool W> struct variant_serialization_traits<A<W>, T> { static inline typename A<W>::variant_tag_type get_tag() { return Tg; } }
 #define BEGIN_SERIALIZE() \
-  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) {
+  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) {uint8_t s_current_version = 0; uint8_t s_version = 0;
 #define BEGIN_SERIALIZE_OBJECT() \
   template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) { _ser_ar.begin_object(); bool _ser_res = do_serialize_object(_ser_ar); _ser_ar.end_object(); return _ser_res; } \
   template <bool W, template <bool> class Archive> bool do_serialize_object(Archive<W> &_ser_ar){
@@ -97,6 +97,28 @@ do { \
   _ser_ar.serialize_varint(f); \
   if (!_ser_ar.stream().good()) return false; \
 } while (0);
+
+#define VERSION()                                       \
+do {                                                    \
+  _ser_ar.tag("VERSION");                               \
+  if (!_ser_ar.stream().good()){break;}                 \
+  _ser_ar.serialize_varint(s_version);                  \
+  if (!_ser_ar.stream().good()) return false;           \
+  if(s_version > s_current_version) return false;       \
+} while (0);
+
+#define CURRENT_VERSION(v)                              \
+do {                                                    \
+  s_current_version = v;                                \
+  if (_ser_ar.is_saving_arch()) { s_version = v; }      \
+} while (0);
+
+
+
+#define BEGIN_VERSIONED_SERIALIZE() \
+  BEGIN_SERIALIZE() \
+  VERSION()
+
 
 #define DEFINE_SERIALIZATION_VERSION(v) inline static uint32_t get_serialization_version() { return v; }
 
