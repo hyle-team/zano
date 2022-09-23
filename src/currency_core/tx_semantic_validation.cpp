@@ -68,7 +68,7 @@ namespace currency
 
     if (!check_tx_balance(tx))
     {
-      LOG_PRINT_RED_L0("tx balance check failed, tx id= " << get_transaction_hash(tx));
+      LOG_PRINT_RED_L0("balance check failed for tx " << get_transaction_hash(tx));
       return false;
     }
 

@@ -217,13 +217,9 @@ bool test_generator::construct_block(currency::block& blk,
                                      const std::list<currency::account_base>& coin_stake_sources)//in case of PoS block
 {
   bool r  = false;
-//   if (height > m_hardfork_01_after_heigh)
-//     blk.major_version = CURRENT_BLOCK_MAJOR_VERSION;
-//   else
-//     blk.major_version = BLOCK_MAJOR_VERSION_INITIAL;
+  bool pos = coin_stake_sources.size() > 0;
 
   blk.major_version = m_hardforks.get_block_major_version_by_height(height);
-
   blk.minor_version = CURRENT_BLOCK_MINOR_VERSION;
   blk.timestamp = timestamp;
   blk.prev_id = prev_id;
@@ -259,21 +255,21 @@ bool test_generator::construct_block(currency::block& blk,
 
   size_t won_walled_index = 0;
   pos_entry pe = AUTO_VAL_INIT(pe);
-  if (coin_stake_sources.size())
+  if (pos)
   {
     //build outputs index
     build_outputs_indext_for_chain(blocks, oi, txs_outs);
 
     //build wallets
     build_wallets(blocks, coin_stake_sources, txs_outs, wallets);
-    bool r = find_kernel(coin_stake_sources, 
-                         blocks, 
-                         oi, 
-                         wallets, 
-                         pe, 
-                         won_walled_index, 
-                         blk.timestamp, 
-                         kernerl_hash);
+    r = find_kernel(coin_stake_sources, 
+                    blocks, 
+                    oi, 
+                    wallets, 
+                    pe, 
+                    won_walled_index, 
+                    blk.timestamp, 
+                    kernerl_hash);
     CHECK_AND_ASSERT_THROW_MES(r, "failed to find_kernel ");
     blk.flags = CURRENCY_BLOCK_FLAG_POS_BLOCK;
   }
@@ -325,7 +321,7 @@ bool test_generator::construct_block(currency::block& blk,
   CHECK_AND_ASSERT_MES(a_diffic, false, "get_difficulty_for_next_block for test blocks returned 0!");
   // Nonce search...
   blk.nonce = 0;
-  if (!coin_stake_sources.size())
+  if (!pos)
   {
     //pow block
     while (!find_nounce(blk, blocks, a_diffic, height))
@@ -334,7 +330,7 @@ bool test_generator::construct_block(currency::block& blk,
   else
   {
     //need to build pos block
-    bool r = sign_block(blk, pe, *wallets[won_walled_index], blocks, oi);
+    r = sign_block(blk, pe, *wallets[won_walled_index], blocks, oi);
     CHECK_AND_ASSERT_MES(r, false, "Failed to find_kernel_and_sign()");
   }
 
@@ -392,10 +388,12 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
   {
     const tx_global_indexes& m_txs_outs;
     const blockchain_vector& m_blockchain;
+    const core_runtime_config& m_core_runtime_config;
     
-    stub_core_proxy(const blockchain_vector& blockchain, const tx_global_indexes& txs_outs)
+    stub_core_proxy(const blockchain_vector& blockchain, const tx_global_indexes& txs_outs, const core_runtime_config& crc)
       : m_blockchain(blockchain)
       , m_txs_outs(txs_outs)
+      , m_core_runtime_config(crc)
     {}
 
     bool call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(const currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& rqt, currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& rsp) override
@@ -415,10 +413,10 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
 
     bool call_COMMAND_RPC_GET_POS_MINING_DETAILS(const currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, currency::COMMAND_RPC_GET_POS_MINING_DETAILS::response& rsp) override
     {
-      rsp.pos_mining_allowed = true;
+      rsp.pos_mining_allowed = m_blockchain.size() >= m_core_runtime_config.pos_minimum_heigh;
       if (!rsp.pos_mining_allowed)
       {
-        rsp.status = API_RETURN_CODE_NOT_FOUND;
+        rsp.status = API_RETURN_CODE_FAIL;
         return true;
       }
 
@@ -452,7 +450,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
 
   };
 
-  std::shared_ptr<tools::i_core_proxy> tmp_proxy(new stub_core_proxy(blockchain, txs_outs));
+  std::shared_ptr<tools::i_core_proxy> tmp_proxy(new stub_core_proxy(blockchain, txs_outs, cc));
 
   //build wallets
   wallets.clear();
@@ -597,8 +595,8 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
     {
       //found kernel
       found_wallet_index = wallet_index;
-      found_kh = crypto::cn_fast_hash(&context.sk, sizeof(context.sk)); // TODO: consider passing kernel_hash from scan_pos and do_pos_mining_iteration
       found_timestamp = context.sk.block_timestamp;
+      found_kh = crypto::cn_fast_hash(&context.sk, sizeof(context.sk)); // TODO: consider passing kernel_hash from scan_pos and do_pos_mining_iteration
 
       tools::wallet2::transfer_details td = AUTO_VAL_INIT(td);
       r = w->get_transfer_info_by_index(context.index, td);
@@ -614,9 +612,9 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
       pe.wallet_index       = context.index;
 
       LOG_PRINT_GREEN("Found kernel: amount=" << print_money_brief(pe.amount)
-        << ", index=" << pe.g_index
-        << ", key_image" << pe.keyimage
-        /*<< ", diff: " << this_coin_diff*/, LOG_LEVEL_0);
+        << ", gindex=" << pe.g_index
+        << ", key_image=" << pe.keyimage
+        /*<< ", diff: " << this_coin_diff*/, LOG_LEVEL_1);
 
       return true;
     }

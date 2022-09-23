@@ -714,7 +714,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
           if (out_type_to_key || out_type_zc)
           {
-            WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
+            WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money_brief(td.amount()) << (out_type_zc ? " (hidden)" : "") << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
           }
           else if (out_is_to_htlc(out_v))
           {
