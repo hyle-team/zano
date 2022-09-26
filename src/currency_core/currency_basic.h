@@ -703,8 +703,46 @@ namespace currency
       FIELD(ticker)
       FIELD(full_name)
       FIELD(owner)
-   END_SERIALIZE()
+    END_SERIALIZE()
+
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(total_max_supply)
+      BOOST_SERIALIZE(current_supply)
+      BOOST_SERIALIZE(decimal_point)
+      BOOST_SERIALIZE(ticker)
+      BOOST_SERIALIZE(full_name)
+      BOOST_SERIALIZE(owner)
+    END_BOOST_SERIALIZATION()
   };
+
+
+#define ASSET_DESCRIPTOR_OPERATION_UNDEFINED     0
+#define ASSET_DESCRIPTOR_OPERATION_REGISTER      1
+#define ASSET_DESCRIPTOR_OPERATION_UPDATE        2
+
+
+  struct asset_descriptor_operation
+  {
+    uint8_t             operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
+    std::vector<crypto::signature> proof;
+    asset_descriptor_base descriptor;
+
+
+    BEGIN_VERSIONED_SERIALIZE()
+      FIELD(operation_type)
+      FIELD(proof)
+      FIELD(descriptor)
+    END_SERIALIZE()
+
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(operation_type)
+      BOOST_SERIALIZE(proof)
+      BOOST_SERIALIZE(descriptor)
+    END_BOOST_SERIALIZATION()
+  };
+
 
 
 
@@ -775,7 +813,7 @@ namespace currency
   typedef boost::mpl::vector24<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
-    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zarcanum_outs_range_proof, zc_balance_proof
+    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zarcanum_outs_range_proof, zc_balance_proof, asset_descriptor_operation
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -1101,6 +1139,9 @@ SET_VARIANT_TAGS(currency::zarcanum_outs_range_proof, 45, "zarcanum_outs_range_p
 SET_VARIANT_TAGS(currency::zc_balance_proof, 46, "zc_balance_proof");
 
 SET_VARIANT_TAGS(currency::open_asset_id, 47, "asset_id");
+
+SET_VARIANT_TAGS(currency::asset_descriptor_operation, 48, "asset_descriptor_base");
+
 
 
 

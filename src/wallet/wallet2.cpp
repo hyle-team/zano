@@ -4123,6 +4123,24 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::publish_new_asset(const asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations)
+{
+  asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
+  asset_reg_info.descriptor = asset_info;
+  asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+
+
+  std::vector<currency::tx_destination_entry> destinations_local = destinations;
+  std::vector<currency::extra_v> extra;
+  std::vector<currency::attachment_v> attachments;
+
+  extra.push_back(asset_reg_info);
+
+  transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
+
+
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)
 {
   if (!validate_alias_name(ai.m_alias))

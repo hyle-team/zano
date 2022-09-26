@@ -551,7 +551,8 @@ namespace tools
     void request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key = currency::null_skey);
     void request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
     bool check_available_sources(std::list<uint64_t>& amounts);
-    
+
+    void publish_new_asset(const asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations);
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
