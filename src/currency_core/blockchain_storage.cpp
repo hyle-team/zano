@@ -4028,9 +4028,13 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_store_db);
 
   TIME_MEASURE_START_PD(tx_print_log);
+  static const std::string hidden("hidden");
   LOG_PRINT_L1("Added tx to blockchain: " << tx_id << " via block at " << bl_height << " id " << print16(bl_id)
-    << ", ins: " << tx.vin.size() << ", outs: " << tx.vout.size() << ", outs sum: " << print_money_brief(get_outs_money_amount(tx)) << " (fee: " << (is_coinbase(tx) ? "0[coinbase]" : print_money_brief(get_tx_fee(tx))) << ")");
+    << ", ins: " << tx.vin.size() << ", outs: " << tx.vout.size()
+    << ", outs sum: " << (tx.version > TRANSACTION_VERSION_PRE_HF4 ? hidden : print_money_brief(get_outs_money_amount(tx)))
+    << " (fee: " << (is_coinbase(tx) ? "0 [coinbase]" : print_money_brief(get_tx_fee(tx))) << ")");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_print_log);
+
   //@#@ del me
 //   LOG_PRINT_L0("APPEND_TX_TIME_INNER: " << m_performance_data.tx_append_rl_wait.get_last_val() 
 //     << " | " << m_performance_data.tx_append_is_expired.get_last_val()
@@ -5225,6 +5229,9 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 
   if (var_is_after_hardfork_4_zone)
   {
+    CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "HF4: tx with version " << tx.version << " is not allowed");
+    CHECK_AND_ASSERT_MES(tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while required minimum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
+
     if(!validate_inputs_sorting(tx))
     {
       return false;

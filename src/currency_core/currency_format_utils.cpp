@@ -188,7 +188,8 @@ namespace currency
     bool pos,
     const pos_entry& pe)
   {
-    CHECK_AND_ASSERT_THROW_MES(!pos || tx.version <= TRANSACTION_VERSION_PRE_HF4, "PoS miner tx is currently unsupported for HF4 -- sowle");
+    bool r = false;
+    CHECK_AND_ASSERT_THROW_MES(!pos || tx_version <= TRANSACTION_VERSION_PRE_HF4, "PoS miner tx is currently unsupported for HF4 -- sowle");
 
     uint64_t block_reward = 0;
     if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward, height))
@@ -203,7 +204,7 @@ namespace currency
     //
     // 1. split block_reward into out_amounts
     std::vector<uint64_t> out_amounts;
-    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    if (tx_version > TRANSACTION_VERSION_PRE_HF4)
     {
       // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs
       // TODO: consider refactoring
@@ -297,34 +298,28 @@ namespace currency
       }
     }
 
-    uint64_t no = 0;
-    std::set<uint16_t> deriv_cache;
-    uint64_t summary_outs_money = 0;
-    //fill outputs
-    finalized_tx result = AUTO_VAL_INIT(result);
-    uint8_t tx_outs_attr = 0;
-
-    size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
-    uint64_t range_proof_start_index = output_index;
-    crypto::scalar_vec_t blinding_masks(tx.vout.size() + destinations.size()); // vector of secret blinging masks for each output. For range proof generation
-    crypto::scalar_vec_t amounts(tx.vout.size() + destinations.size());        // vector of amounts, converted to scalars. For ranage proof generation
+    // fill outputs
+    crypto::scalar_vec_t blinding_masks(destinations.size());       // vector of secret blinging masks for each output. For range proof generation
+    crypto::scalar_vec_t amounts(destinations.size());              // vector of amounts, converted to scalars. For ranage proof generation
     crypto::scalar_t blinding_masks_sum = 0;
+    uint64_t output_index = 0;
     for (auto& d : destinations)
     {
-
-      bool r = construct_tx_out(d, txkey.sec, no, tx, deriv_cache, account_keys(), blinding_masks[no], result, tx_outs_attr);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to contruct miner tx out");
-      amounts[output_index - range_proof_start_index] = d.amount;
-      summary_outs_money += d.amount;
+      std::set<uint16_t> deriv_cache;
+      finalized_tx result = AUTO_VAL_INIT(result);
+      uint8_t tx_outs_attr = 0;
+      r = construct_tx_out(d, txkey.sec, output_index, tx, deriv_cache, account_keys(), blinding_masks[output_index], result, tx_outs_attr);
+      CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed, output #" << output_index << ", amount: " << print_money_brief(d.amount));
+      amounts[output_index] = d.amount;
       blinding_masks_sum += blinding_masks[output_index];
-      no++;
+      ++output_index;
     }
     
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
       //add range proofs
       currency::zarcanum_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
-      bool r = generate_zarcanum_outs_range_proof(range_proof_start_index, amounts.size(), amounts, blinding_masks, tx.vout, range_proofs);
+      bool r = generate_zarcanum_outs_range_proof(0, amounts.size(), amounts, blinding_masks, tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zarcanum_outs_range_proof()");
       tx.attachment.push_back(range_proofs);
 
@@ -377,7 +372,7 @@ namespace currency
       outs_commitments_sum.modify_mul8();
 
       uint64_t fee = 0;
-      CHECK_AND_ASSERT_MES(get_tx_fee(tx, fee), false, "unable to get tx fee");
+      CHECK_AND_ASSERT_MES(get_tx_fee(tx, fee) || additional_inputs_amount_and_fees_for_mining_tx > 0, false, "unable to get fee for a non-mining tx");
 
       CHECK_AND_ASSERT_MES(additional_inputs_amount_and_fees_for_mining_tx == 0 || fee == 0, false, "invalid tx: fee = " << print_money_brief(fee) <<
         ", additional inputs + fees = " << print_money_brief(additional_inputs_amount_and_fees_for_mining_tx));
