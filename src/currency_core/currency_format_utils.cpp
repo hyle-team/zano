@@ -807,6 +807,17 @@ namespace currency
     return derive_public_key_from_target_address(destination_addr, tx_sec_key, index, out_eph_public_key, derivation);
   }
   //---------------------------------------------------------------
+  bool derive_key_pair_from_key_pair(const crypto::public_key& src_pub_key, const crypto::secret_key& src_sec_key, crypto::public_key& derived_sec_key, crypto::public_key& derived_pub_key, const char(&hs_domain)[32], uint64_t index)
+  {
+    crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+    bool r = crypto::generate_key_derivation(src_pub_key, src_sec_key, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to generate_key_derivation(" << src_pub_key << ", " << src_sec_key << ")");
+    scalar_t sec_key = crypto::hash_helper_t::hs(hs_domain, derivation, index);
+    derived_sec_key = sec_key.as_secret_key();
+    derived_pub_key = (sec_key * crypto::c_point_G).to_public_key();
+    return true;
+  }
+  //---------------------------------------------------------------
   // derivation = 8 * tx_sec_key * destination_addr.view_public_key
   // out_eph_public_key = destination_addr.spend_public_key + Hs(derivation, index) * G
   bool derive_public_key_from_target_address(const account_public_address& destination_addr, const crypto::secret_key& tx_sec_key, size_t index, crypto::public_key& out_eph_public_key, crypto::key_derivation& derivation)
@@ -1967,6 +1978,18 @@ namespace currency
           CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_target_address");
         }
         att_count++;
+      }
+    }
+
+
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    {
+      asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
+      if (get_type_in_variant_container(tx.extra, ado))
+      { 
+        crypto::secret_key stub = AUTO_VAL_INIT(stub);
+        bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_secret_key, stub, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+        CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_tx_and_account_pub_key()");
       }
     }
 
@@ -3311,6 +3334,12 @@ namespace currency
     bool operator()(const zc_balance_proof& bp)
     {
       tv.type = "zc_balance_proof";
+      return true;
+    }
+    template<typename t_type>
+    bool operator()(const t_type& t_t)
+    {
+      tv.type = typeid(t_t).name();
       return true;
     }
   };

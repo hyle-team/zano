@@ -315,6 +315,8 @@ namespace currency
   bool generate_key_image_helper(const account_keys& ack, const crypto::public_key& tx_public_key, size_t real_output_index, keypair& in_ephemeral, crypto::key_image& ki);
   bool derive_public_key_from_target_address(const account_public_address& destination_addr, const crypto::secret_key& tx_sec_key, size_t index, crypto::public_key& out_eph_public_key, crypto::key_derivation& derivation);
   bool derive_public_key_from_target_address(const account_public_address& destination_addr, const crypto::secret_key& tx_sec_key, size_t index, crypto::public_key& out_eph_public_key);
+  bool derive_key_pair_from_key_pair(const crypto::public_key& src_pub_key, const crypto::secret_key& src_sec_key, crypto::public_key& derived_sec_key, crypto::public_key& derived_pub_key, const char(&hs_domain)[32], uint64_t index = 0);
+
   std::string short_hash_str(const crypto::hash& h);
   bool is_mixattr_applicable_for_fake_outs_counter(uint8_t mix_attr, uint64_t fake_attr_count);
   bool is_tx_spendtime_unlocked(uint64_t unlock_time, uint64_t current_blockchain_size, uint64_t current_time);
@@ -534,6 +536,13 @@ namespace currency
   std::string print_money(t_number amount)
   {
     return print_fixed_decimal_point(amount, CURRENCY_DISPLAY_DECIMAL_POINT);
+  }
+  //---------------------------------------------------------------
+
+  template<typename t_number>
+  std::string print_asset_money(t_number amount, size_t decimal_point)
+  {
+    return print_fixed_decimal_point(amount, decimal_point);
   }
   //---------------------------------------------------------------
   template<class alias_rpc_details_t>

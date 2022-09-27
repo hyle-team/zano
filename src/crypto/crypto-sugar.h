@@ -1153,6 +1153,15 @@ namespace crypto
       return hs_calculator.calc_hash();
     }
 
+    static scalar_t hs(const char(&str32)[32], const crypto::key_derivation& derivation, uint64_t index)
+    {
+      hs_t hs_calculator(3);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_pub_key(reinterpret_cast<const crypto::public_key&>(derivation));
+      hs_calculator.add_scalar(index);
+      return hs_calculator.calc_hash();
+    }
+
     static point_t hp(const point_t& p)
     {
       point_t result;

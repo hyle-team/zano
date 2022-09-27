@@ -719,7 +719,8 @@ namespace currency
 
 #define ASSET_DESCRIPTOR_OPERATION_UNDEFINED     0
 #define ASSET_DESCRIPTOR_OPERATION_REGISTER      1
-#define ASSET_DESCRIPTOR_OPERATION_UPDATE        2
+#define ASSET_DESCRIPTOR_OPERATION_EMMIT         2
+#define ASSET_DESCRIPTOR_OPERATION_UPDATE        3
 
 
   struct asset_descriptor_operation
@@ -810,7 +811,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector24<
+  typedef boost::mpl::vector25<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
     tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zarcanum_outs_range_proof, zc_balance_proof, asset_descriptor_operation

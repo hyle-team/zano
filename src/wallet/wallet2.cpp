@@ -752,6 +752,48 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
   }
    
+  if (ptc.tx_money_spent_in_ins)
+  {
+    //check if there are asset_registration that belong to this wallet
+    asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
+    if (get_type_in_variant_container(tx.extra, ado))
+    {
+      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+      {
+        crypto::public_key self_check = AUTO_VAL_INIT(self_check);
+        crypto::secret_key asset_control_key = AUTO_VAL_INIT(asset_control_key);
+        bool r = derive_key_pair_from_key_pair(tx_pub_key, m_account.get_keys().spend_secret_key, asset_control_key, self_check, CRYPTO_HDS_ASSET_CONTROL_KEY);
+        if (!r)
+        {
+          //not critical error, continue to work 
+          LOG_ERROR("Failed to derive_key_pair_from_key_pair for asset_descriptor_operation in tx " << get_transaction_hash(tx));
+        }else
+        {
+          if (self_check != ado.descriptor.owner)
+          {
+            //still not critical error
+            LOG_ERROR("Public key from asset_descriptor_operation(" << ado.descriptor.owner << ") not much with derived public key(" << self_check << "), for tx" << get_transaction_hash(tx));
+          }
+          else 
+          {
+            wallet_own_asset_context& asset_context = m_own_asset_descriptors[hash_helper_t::hs(CRYPTO_HDS_ASSET_ID, ado.descriptor.owner), 0];
+            asset_context.asset_descriptor = ado.descriptor;
+            std::stringstream ss;
+            ss << "New Asset Registered:" 
+              << ENDL << "Name: " << asset_context.asset_descriptor.full_name 
+              << ENDL << "Ticker: " << asset_context.asset_descriptor.ticker
+              << ENDL << "Total Max Supply: " << print_asset_money(asset_context.asset_descriptor.total_max_supply, asset_context.asset_descriptor.decimal_point)
+              << ENDL << "Current Supply: " << print_asset_money(asset_context.asset_descriptor.current_supply, asset_context.asset_descriptor.decimal_point)
+              << ENDL << "DecimalPoint: " << asset_context.asset_descriptor.decimal_point;
+
+            WLT_LOG_MAGENTA(ss.str() << , LOG_LEVEL_0);
+            if (m_wcallback)
+              m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+          }
+        }
+      }
+    }
+  }
 
   if (ptc.tx_money_spent_in_ins)
   {//this actually is transfer transaction, notify about spend
@@ -4123,22 +4165,19 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::publish_new_asset(const asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations)
+void wallet2::publish_new_asset(const asset_descriptor_base& asset_info/*, const std::vector<currency::tx_destination_entry>& destinations*/, currency::transaction& result_tx)
 {
   asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
   asset_reg_info.descriptor = asset_info;
   asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
 
+  construct_tx_param ctp = get_default_construct_tx_param();
+  //ctp.dsts = destinations;
+  ctp.extra.push_back(asset_reg_info);
 
-  std::vector<currency::tx_destination_entry> destinations_local = destinations;
-  std::vector<currency::extra_v> extra;
-  std::vector<currency::attachment_v> attachments;
-
-  extra.push_back(asset_reg_info);
-
-  transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
-
-
+  finalized_tx ft = AUTO_VAL_INIT(ft);
+  this->transfer(ctp, ft, true, nullptr);
+  result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)

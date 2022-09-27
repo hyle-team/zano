@@ -506,6 +506,17 @@ namespace tools
     };
 
 
+    struct wallet_own_asset_context
+    {
+      asset_descriptor_base asset_descriptor;
+      crypto::secret_key control_key;
+
+      BEGIN_BOOST_SERIALIZATION()
+        BOOST_SERIALIZE(asset_descriptor)
+        BOOST_SERIALIZE(control_key)
+      END_BOOST_SERIALIZATION()
+    };
+
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
     void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password);
@@ -552,7 +563,7 @@ namespace tools
     void request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
     bool check_available_sources(std::list<uint64_t>& amounts);
 
-    void publish_new_asset(const asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations);
+    void publish_new_asset(const asset_descriptor_base& asset_info/*, const std::vector<currency::tx_destination_entry>& destinations*/, currency::transaction& result_tx);
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
@@ -804,6 +815,10 @@ namespace tools
       a & m_active_htlcs;
       a & m_active_htlcs_txid;
 
+      if (ver < 154)
+        return;
+      
+      a & m_own_asset_descriptors;
     }
 
     void wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history);
@@ -1084,6 +1099,7 @@ private:
     std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> m_unconfirmed_txs;
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
     std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
+    std::unordered_map<crypto::hash, wallet_own_asset_context> m_own_asset_descriptors;
 
     std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
     amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
@@ -1115,6 +1131,7 @@ private:
 } // namespace tools
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
+
 BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 11)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 3)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details_base, 2)

@@ -6,6 +6,7 @@
 
 // hash domain separation strings, 32 bytes long (31 chars + \0)
 //
+
 #define CRYPTO_HDS_OUT_AMOUNT_MASK            "ZANO_HDS_OUT_AMOUNT_MASK_______"
 #define CRYPTO_HDS_OUT_BLINDING_MASK          "ZANO_HDS_OUT_BLINDING_MASK_____"
 #define CRYPTO_HDS_OUT_CONCEALING_POINT       "ZANO_HDS_OUT_CONCEALING_POINT__"
@@ -22,3 +23,6 @@
 
 #define CRYPTO_HDS_ZARCANUM_LAST_POW_HASH     "ZANO_HDS_ZARCANUM_LAST_POW_HASH"
 #define CRYPTO_HDS_ZARCANUM_SECRET_Q          "ZANO_HDS_ZARCANUM_SECRET_Q_____"
+
+#define CRYPTO_HDS_ASSET_CONTROL_KEY          "ZANO_HDS_ASSET_CONTROL_KEY_____"
+#define CRYPTO_HDS_ASSET_ID                   "ZANO_HDS_ASSET_ID______________"
