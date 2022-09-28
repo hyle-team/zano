@@ -215,20 +215,20 @@ namespace currency
   };
 
 
-  struct zarcanum_outs_range_proof_commit_ref_t
+  struct zc_outs_range_proofs_with_commitments
   {
-    zarcanum_outs_range_proof_commit_ref_t(const zarcanum_outs_range_proof& range_proof, const std::vector<crypto::point_t>& amount_commitments)
+    zc_outs_range_proofs_with_commitments(const zc_outs_range_proof& range_proof, const std::vector<crypto::point_t>& amount_commitments)
       : range_proof(range_proof)
       , amount_commitments(amount_commitments)
     {}
-    zarcanum_outs_range_proof_commit_ref_t(const zarcanum_outs_range_proof& range_proof)
+    zc_outs_range_proofs_with_commitments(const zc_outs_range_proof& range_proof)
       : range_proof(range_proof)
     {}
-    const zarcanum_outs_range_proof&    range_proof;
-    std::vector<crypto::point_t> amount_commitments;
+    zc_outs_range_proof           range_proof;
+    std::vector<crypto::point_t>  amount_commitments;
   };
 
-  bool verify_multiple_zarcanum_outs_range_proofs(const std::vector<zarcanum_outs_range_proof_commit_ref_t>& range_proofs);
+  bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
   bool check_tx_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 

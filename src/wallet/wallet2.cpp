@@ -5536,10 +5536,7 @@ bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) c
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_need_to_split_outputs()
 {
-  if (this->m_core_runtime_config.hard_forks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_blockchain_current_size()))
-    return false;
-  else 
-    return true;
+  return !is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::prepare_tx_destinations(const assets_selection_context& needed_money_map,

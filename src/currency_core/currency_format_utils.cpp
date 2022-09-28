@@ -68,8 +68,8 @@ namespace currency
 
 
   //--------------------------------------------------------------------------------
-  bool generate_zarcanum_outs_range_proof(size_t out_index_start, size_t outs_count, const crypto::scalar_vec_t& amounts, const crypto::scalar_vec_t& blinding_masks,
-    const std::vector<tx_out_v>& vouts, zarcanum_outs_range_proof& result)
+  bool generate_zc_outs_range_proof(size_t out_index_start, size_t outs_count, const crypto::scalar_vec_t& amounts, const crypto::scalar_vec_t& blinding_masks,
+    const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result)
   {
     //TODO: review for Andre
     CHECK_AND_ASSERT_MES(amounts.size() == outs_count, false, "");
@@ -318,9 +318,9 @@ namespace currency
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
       //add range proofs
-      currency::zarcanum_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
-      bool r = generate_zarcanum_outs_range_proof(0, amounts.size(), amounts, blinding_masks, tx.vout, range_proofs);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to generate zarcanum_outs_range_proof()");
+      currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
+      bool r = generate_zc_outs_range_proof(0, amounts.size(), amounts, blinding_masks, tx.vout, range_proofs);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       tx.attachment.push_back(range_proofs);
 
       if (!pos)
@@ -1708,7 +1708,8 @@ namespace currency
     const uint8_t& tx_outs_attr = ftp.tx_outs_attr;
     const bool& shuffle = ftp.shuffle;
     const uint64_t& flags = ftp.flags;
-                
+    
+    bool r = false;
     transaction& tx = result.tx;
     crypto::secret_key& one_time_secret_key = result.one_time_key;
 
@@ -1929,7 +1930,7 @@ namespace currency
     for(const tx_destination_entry& dst_entr : shuffled_dsts)
     {
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
-      bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, blinding_masks[output_index], result, tx_outs_attr);
+      r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys, blinding_masks[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
       amounts[output_index - range_proof_start_index] = dst_entr.amount;
       summary_outs_money += dst_entr.amount;
@@ -1959,7 +1960,7 @@ namespace currency
         {
           CHECK_AND_ASSERT_MES(tsa.security.size() == 1, false, "Wrong tsa.security.size() = " << tsa.security.size());
 
-          bool r = derive_public_key_from_target_address(sender_account_keys.account_address, one_time_secret_key, att_count, tsa.security.back());
+          r = derive_public_key_from_target_address(sender_account_keys.account_address, one_time_secret_key, att_count, tsa.security.back());
           CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_target_address");
         }
         att_count++;
@@ -1980,11 +1981,18 @@ namespace currency
 
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
-      //add range proofs
-      currency::zarcanum_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
-      bool r = generate_zarcanum_outs_range_proof(range_proof_start_index, amounts.size(), amounts, blinding_masks, tx.vout, range_proofs);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to generate zarcanum_outs_range_proof()");
+      // add range proofs
+      currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
+      bool r = generate_zc_outs_range_proof(range_proof_start_index, amounts.size(), amounts, blinding_masks, tx.vout, range_proofs);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       tx.attachment.push_back(range_proofs);
+
+      // add explicit fee info
+      r = add_tx_fee_amount_to_extra(tx, summary_inputs_money - summary_outs_money);
+      CHECK_AND_ASSERT_MES(r, false, "add_tx_fee_amount_to_extra failed");
+
+      r = generate_tx_balance_proof(tx, blinding_masks_sum);
+      CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
     }
 
     if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
@@ -2018,7 +2026,7 @@ namespace currency
     //size_t input_index = input_starter_index;
     //size_t in_context_index = 0;
     crypto::scalar_t local_blinding_masks_sum = 0; // ZC only
-    bool r = false;
+    r = false;
     for (size_t i = 0; i != sources.size(); i++)
     {
       const tx_source_entry& source_entry = sources[inputs_mapping[i]];
@@ -3299,9 +3307,9 @@ namespace currency
       tv.details_view = tv.short_view;
       return true;
     }
-    bool operator()(const zarcanum_outs_range_proof& rp)
+    bool operator()(const zc_outs_range_proof& rp)
     {
-      tv.type = "zarcanum_outs_range_proof";
+      tv.type = "zc_outs_range_proof";
       tv.short_view = "outputs_count = " + std::to_string(rp.outputs_count);
       return true;
     }
@@ -3889,7 +3897,7 @@ namespace currency
   }
 
   //--------------------------------------------------------------------------------
-  bool verify_multiple_zarcanum_outs_range_proofs(const std::vector<zarcanum_outs_range_proof_commit_ref_t>& range_proofs)
+  bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs)
   {
     if (range_proofs.empty())
       return true;

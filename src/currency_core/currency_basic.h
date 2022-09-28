@@ -436,7 +436,7 @@ namespace currency
 
   // non-consoditated txs must have one of this objects in the attachments (outputs_count == vout.size())
   // consolidated -- one pre consolidated part (sum(outputs_count) == vout.size())
-  struct zarcanum_outs_range_proof
+  struct zc_outs_range_proof
   {
     crypto::bpp_signature_serialized bpp;
     uint8_t outputs_count;                // how many outputs are included in the proof
@@ -754,7 +754,7 @@ namespace currency
   typedef boost::mpl::vector24<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
-    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zarcanum_outs_range_proof, zc_balance_proof
+    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zc_outs_range_proof, zc_balance_proof
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -1077,7 +1077,7 @@ SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 41, "bppe_signature_serializ
 SET_VARIANT_TAGS(currency::NLSAG_sig, 42, "NLSAG_sig");
 SET_VARIANT_TAGS(currency::ZC_sig, 43, "ZC_sig");
 SET_VARIANT_TAGS(currency::void_sig, 44, "void_sig");
-SET_VARIANT_TAGS(currency::zarcanum_outs_range_proof, 45, "zarcanum_outs_range_proof");
+SET_VARIANT_TAGS(currency::zc_outs_range_proof, 45, "zc_outs_range_proof");
 SET_VARIANT_TAGS(currency::zc_balance_proof, 46, "zc_balance_proof");
 
 SET_VARIANT_TAGS(currency::open_asset_id, 47, "asset_id");
