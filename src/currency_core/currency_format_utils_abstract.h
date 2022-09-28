@@ -353,6 +353,26 @@ namespace currency
   size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
 
 
+  inline
+  void put_t_to_buff(std::string& buff)
+  {}
+
+  template <typename T, typename... Types>
+  void put_t_to_buff(std::string& buff, const T& var1, Types&... var2)
+  {
+    static_assert(std::is_pod<T>::value, "T must be a POD type.");
+    buff.append((const char*)&var1, sizeof(var1));
+    put_t_to_buff(buff, var2...);
+  }
+
+  template <typename... Types>
+  crypto::hash get_hash_from_POD_objects(Types&... var1)
+  {
+    std::string buff;
+    put_t_to_buff(buff, var1...);
+    return crypto::cn_fast_hash(buff.data(), buff.size());
+  }
+
 
 #define CHECKED_GET_SPECIFIC_VARIANT(variant_var, specific_type, variable_name, fail_return_val) \
   CHECK_AND_ASSERT_MES(variant_var.type() == typeid(specific_type), fail_return_val, "wrong variant type: " << variant_var.type().name() << ", expected " << typeid(specific_type).name()); \

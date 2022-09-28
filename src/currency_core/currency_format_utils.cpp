@@ -807,12 +807,12 @@ namespace currency
     return derive_public_key_from_target_address(destination_addr, tx_sec_key, index, out_eph_public_key, derivation);
   }
   //---------------------------------------------------------------
-  bool derive_key_pair_from_key_pair(const crypto::public_key& src_pub_key, const crypto::secret_key& src_sec_key, crypto::public_key& derived_sec_key, crypto::public_key& derived_pub_key, const char(&hs_domain)[32], uint64_t index)
+  bool derive_key_pair_from_key_pair(const crypto::public_key& src_pub_key, const crypto::secret_key& src_sec_key, crypto::secret_key& derived_sec_key, crypto::public_key& derived_pub_key, const char(&hs_domain)[32], uint64_t index)
   {
     crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
     bool r = crypto::generate_key_derivation(src_pub_key, src_sec_key, derivation);
     CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to generate_key_derivation(" << src_pub_key << ", " << src_sec_key << ")");
-    scalar_t sec_key = crypto::hash_helper_t::hs(hs_domain, derivation, index);
+    crypto::scalar_t sec_key = crypto::hash_helper_t::hs(hs_domain, derivation, index);
     derived_sec_key = sec_key.as_secret_key();
     derived_pub_key = (sec_key * crypto::c_point_G).to_public_key();
     return true;

@@ -1200,7 +1200,6 @@ namespace crypto
   {
     // hs won't touch memory if size is 0, so it's safe
     return hash_helper_t::hs(data(), sizeof(scalar_t) * size());
-  }
-
+  } 
 
 } // namespace crypto

@@ -776,7 +776,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           }
           else 
           {
-            wallet_own_asset_context& asset_context = m_own_asset_descriptors[hash_helper_t::hs(CRYPTO_HDS_ASSET_ID, ado.descriptor.owner), 0];
+            
+            wallet_own_asset_context& asset_context = m_own_asset_descriptors[get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, ado.descriptor.owner)];
             asset_context.asset_descriptor = ado.descriptor;
             std::stringstream ss;
             ss << "New Asset Registered:" 
@@ -786,7 +787,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
               << ENDL << "Current Supply: " << print_asset_money(asset_context.asset_descriptor.current_supply, asset_context.asset_descriptor.decimal_point)
               << ENDL << "DecimalPoint: " << asset_context.asset_descriptor.decimal_point;
 
-            WLT_LOG_MAGENTA(ss.str() << , LOG_LEVEL_0);
+            WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
             if (m_wcallback)
               m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
           }
@@ -4165,7 +4166,7 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::publish_new_asset(const asset_descriptor_base& asset_info/*, const std::vector<currency::tx_destination_entry>& destinations*/, currency::transaction& result_tx)
+void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx)
 {
   asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
   asset_reg_info.descriptor = asset_info;
