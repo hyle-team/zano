@@ -510,10 +510,12 @@ namespace tools
     {
       currency::asset_descriptor_base asset_descriptor;
       crypto::secret_key control_key;
+      uint64_t height = 0;
 
       BEGIN_BOOST_SERIALIZATION()
         BOOST_SERIALIZE(asset_descriptor)
         BOOST_SERIALIZE(control_key)
+        BOOST_SERIALIZE(height)
       END_BOOST_SERIALIZATION()
     };
 

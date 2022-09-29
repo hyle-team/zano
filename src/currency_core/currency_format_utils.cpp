@@ -1711,6 +1711,13 @@ namespace currency
     return true;
   }
 
+
+  crypto::hash get_asset_id_from_descriptor(const asset_descriptor_base& adb)
+  {
+    return get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, adb.owner);
+  }
+
+
   bool construct_tx(const account_keys& sender_account_keys, const finalize_tx_param& ftp, finalized_tx& result)
   {
     const std::vector<tx_source_entry>& sources = ftp.sources;
@@ -1797,6 +1804,19 @@ namespace currency
     //std::vector<const tx_source_entry*> zc_sources;
     //std::vector<const tx_source_entry*> NLSAG_sources;
 
+    crypto::hash asset_id_for_destinations = currency::null_hash;
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    {
+      asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
+      if (get_type_in_variant_container(tx.extra, ado))
+      {
+        crypto::secret_key stub = AUTO_VAL_INIT(stub);
+        bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_secret_key, stub, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);        
+        CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_tx_and_account_pub_key()");
+        //also assign this asset id to destinations
+        asset_id_for_destinations = get_asset_id_from_descriptor(ado.descriptor);
+      }
+    }
 
 
     std::vector<input_generation_context_data> in_contexts;    
@@ -1927,6 +1947,14 @@ namespace currency
 
     // "Shuffle" outs
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
+    if (asset_id_for_destinations != currency::null_hash)
+    {
+      //must be asset publication
+      for (auto& item : shuffled_dsts)
+      {
+        item.asset_id = asset_id_for_destinations;
+      }
+    }
     if (shuffle)
       std::sort(shuffled_dsts.begin(), shuffled_dsts.end(), [](const tx_destination_entry& de1, const tx_destination_entry& de2) { return de1.amount < de2.amount; });
 
@@ -1978,18 +2006,6 @@ namespace currency
           CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_target_address");
         }
         att_count++;
-      }
-    }
-
-
-    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
-    {
-      asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
-      if (get_type_in_variant_container(tx.extra, ado))
-      { 
-        crypto::secret_key stub = AUTO_VAL_INIT(stub);
-        bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_secret_key, stub, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
-        CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_tx_and_account_pub_key()");
       }
     }
 

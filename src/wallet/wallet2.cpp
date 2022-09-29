@@ -775,10 +775,10 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             LOG_ERROR("Public key from asset_descriptor_operation(" << ado.descriptor.owner << ") not much with derived public key(" << self_check << "), for tx" << get_transaction_hash(tx));
           }
           else 
-          {
-            
+          {            
             wallet_own_asset_context& asset_context = m_own_asset_descriptors[get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, ado.descriptor.owner)];
             asset_context.asset_descriptor = ado.descriptor;
+            asset_context.height = height;
             std::stringstream ss;
             ss << "New Asset Registered:" 
               << ENDL << "Name: " << asset_context.asset_descriptor.full_name 
@@ -2546,6 +2546,15 @@ void wallet2::detach_blockchain(uint64_t including_height)
   {
     if(including_height <= it->second.m_block_height)
       it = m_payments.erase(it);
+    else
+      ++it;
+  }
+
+  //asset descriptors
+  for (auto it = m_own_asset_descriptors.begin(); it != m_own_asset_descriptors.end(); )
+  {
+    if (including_height <= it->second.height)
+      it = m_own_asset_descriptors.erase(it);
     else
       ++it;
   }
