@@ -28,7 +28,8 @@ namespace crypto
     size_t len = sizeof h;
 
     std::string s(len * 2, ' ');
-    for (size_t i = 0; i < len; ++i) {
+    for (size_t i = 0; i < len; ++i)
+    {
       s[2 * i] = hexmap[data[len - 1 - i] >> 4];
       s[2 * i + 1] = hexmap[data[len - 1 - i] & 0x0F];
     }
@@ -44,7 +45,8 @@ namespace crypto
     size_t len = sizeof h;
 
     std::string s(len * 2, ' ');
-    for (size_t i = 0; i < len; ++i) {
+    for (size_t i = 0; i < len; ++i)
+    {
       s[2 * i] = hexmap[data[i] >> 4];
       s[2 * i + 1] = hexmap[data[i] & 0x0F];
     }

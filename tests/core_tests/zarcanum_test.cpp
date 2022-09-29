@@ -87,8 +87,8 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   alice_wlt->refresh();
   
   uint64_t unlocked = 0;
-  uint64_t balance = alice_wlt->balance(unlocked);
-  CHECK_AND_ASSERT_MES(unlocked == transfer_amount, false, "wrong amount");
+  //uint64_t balance = alice_wlt->balance(unlocked);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", transfer_amount * 4, UINT64_MAX, transfer_amount * 4), false, "");
 
   account_base bob_acc;
   bob_acc.generate();
@@ -107,8 +107,9 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   bob_wlt->refresh();
-  balance = bob_wlt->balance(unlocked);
-  CHECK_AND_ASSERT_MES(unlocked == transfer_amount2, false, "wrong amount");
+  //balance = bob_wlt->balance(unlocked);
+  //CHECK_AND_ASSERT_MES(unlocked == transfer_amount2, false, "wrong amount");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", transfer_amount2, UINT64_MAX, transfer_amount2), false, "");
 
   account_base staker_benefeciary_acc;
   staker_benefeciary_acc.generate();
@@ -153,8 +154,9 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
 
 
   bob_wlt->refresh();
-  balance = bob_wlt->balance(unlocked);
-  CHECK_AND_ASSERT_MES(unlocked == transfer_amount2*3, false, "wrong amount");
+  //balance = bob_wlt->balance(unlocked);
+  //CHECK_AND_ASSERT_MES(unlocked == transfer_amount2*3, false, "wrong amount");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", transfer_amount2*3, UINT64_MAX, transfer_amount2*3), false, "");
 
   //try to make pre-zarcanum block after hardfork 4
   currency::core_runtime_config rc = alice_wlt->get_core_runtime_config();

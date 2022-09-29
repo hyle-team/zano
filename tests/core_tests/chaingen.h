@@ -390,7 +390,7 @@ public:
   test_generator();
 
   //-----------
-  currency::wide_difficulty_type get_difficulty_for_next_block(const std::vector<const block_info*>& blocks, bool pow = true) const;
+  static currency::wide_difficulty_type get_difficulty_for_next_block(const std::vector<const block_info*>& blocks, bool pow = true);
   currency::wide_difficulty_type get_difficulty_for_next_block(const crypto::hash& head_id, bool pow = true) const;
   currency::wide_difficulty_type get_cumul_difficulty_for_next_block(const crypto::hash& head_id, bool pow = true) const;
   void get_block_chain(std::vector<const block_info*>& blockchain, const crypto::hash& head, size_t n) const;
@@ -403,14 +403,7 @@ public:
 
 
   //POS 
-  bool build_stake_modifier(currency::stake_modifier_type& sm, const test_generator::blockchain_vector& blck_chain);
-  bool build_kernel(uint64_t amount, 
-                    uint64_t global_index, 
-                    const crypto::key_image& ki,
-                    currency::stake_kernel& kernel,
-                    const blockchain_vector& blck_chain,
-                    const outputs_index& indexes, 
-                    uint64_t timestamp);
+  static bool build_stake_modifier(currency::stake_modifier_type& sm, const test_generator::blockchain_vector& blck_chain);
   
   bool find_kernel(const std::list<currency::account_base>& accs,
                    const blockchain_vector& blck_chain,
@@ -457,7 +450,7 @@ public:
   uint64_t get_already_generated_coins(const currency::block& blk) const;
   currency::wide_difficulty_type get_block_difficulty(const crypto::hash& blk_id) const;
   currency::wide_difficulty_type get_cumul_difficulty(const crypto::hash& head_id) const;
-  uint64_t get_timestamps_median(const blockchain_vector& blck_chain, size_t window_size = BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
+  static uint64_t get_timestamps_median(const blockchain_vector& blck_chain, size_t window_size = BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
   uint64_t get_timestamps_median(const crypto::hash& blockchain_head, size_t window_size = BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
 
   bool build_outputs_indext_for_chain(const std::vector<const block_info*>& blocks, outputs_index& index, tx_global_indexes& txs_outs) const;
@@ -533,7 +526,6 @@ public:
 
 private:
   bool m_ignore_last_pow_in_wallets;
-  uint64_t m_last_found_timestamp;
   
   currency::hard_forks_descriptor m_hardforks;
 
@@ -1090,7 +1082,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
     VEC_EVENTS.push_back(event_core_time(next_block.timestamp - 10));                 \
     VEC_EVENTS.push_back(next_block);                                                 \
     BLK_NAME = next_block;                                                            \
-  }                                                                                 
+  }
 
 #define REWIND_BLOCKS(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC) REWIND_BLOCKS_N(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
 

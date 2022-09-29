@@ -1308,7 +1308,7 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
   {
     CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 2, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zarcanum_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zarcanum_outs_range_proof)");
+    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zc_outs_range_proof)");
     CHECK_AND_ASSERT_MES(b.miner_tx.attachment[1].type() == typeid(zc_balance_proof), false, "coinbase transaction wrong attachmenttype #1 (expected: zc_balance_proof)");
   }
   else
@@ -4028,9 +4028,13 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_store_db);
 
   TIME_MEASURE_START_PD(tx_print_log);
+  static const std::string hidden("hidden");
   LOG_PRINT_L1("Added tx to blockchain: " << tx_id << " via block at " << bl_height << " id " << print16(bl_id)
-    << ", ins: " << tx.vin.size() << ", outs: " << tx.vout.size() << ", outs sum: " << print_money_brief(get_outs_money_amount(tx)) << " (fee: " << (is_coinbase(tx) ? "0[coinbase]" : print_money_brief(get_tx_fee(tx))) << ")");
+    << ", ins: " << tx.vin.size() << ", outs: " << tx.vout.size()
+    << ", outs sum: " << (tx.version > TRANSACTION_VERSION_PRE_HF4 ? hidden : print_money_brief(get_outs_money_amount(tx)))
+    << " (fee: " << (is_coinbase(tx) ? "0 [coinbase]" : print_money_brief(get_tx_fee(tx))) << ")");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_print_log);
+
   //@#@ del me
 //   LOG_PRINT_L0("APPEND_TX_TIME_INNER: " << m_performance_data.tx_append_rl_wait.get_last_val() 
 //     << " | " << m_performance_data.tx_append_is_expired.get_last_val()
@@ -4880,7 +4884,7 @@ bool blockchain_storage::check_block_timestamp_main(const block& b) const
   }
   if (is_pos_block(b) && b.timestamp > get_adjusted_time() + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT)
   {
-    LOG_PRINT_L0("Timestamp of PoS block with id: " << get_block_hash(b) << ", " << b.timestamp << ", bigger than adjusted time + " + epee::misc_utils::get_time_interval_string(CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT) + ": " << get_adjusted_time() << " (" << b.timestamp - get_adjusted_time() << ")");
+    LOG_PRINT_L0("Timestamp of PoS block with id: " << get_block_hash(b) << ", " << b.timestamp << ", bigger than adjusted time + " + epee::misc_utils::get_time_interval_string(CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT) + ": " << get_adjusted_time() + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT << " (" << b.timestamp - get_adjusted_time() - CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT << ")");
     return false;
   }
 
@@ -5225,6 +5229,9 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 
   if (var_is_after_hardfork_4_zone)
   {
+    CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "HF4: tx with version " << tx.version << " is not allowed");
+    CHECK_AND_ASSERT_MES(tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while required minimum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
+
     if(!validate_inputs_sorting(tx))
     {
       return false;
@@ -5541,7 +5548,7 @@ bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, tr
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zarcanum_outs_range_proof_commit_ref_t>& agregated_proofs, const transaction& tx /*, std::vector<crypto::point_t&>& tx_outs_commitments*/)
+bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs, const transaction& tx)
 {
   if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
   {
@@ -5550,12 +5557,12 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zarcanum_o
 
   //@#@ Verify somewhere(maybe here) that all outputs are covered with associated rangeproofs
   size_t proofs_count = 0;
-  size_t current_output_start = 0; //for Consolidated Transactions we'll have multiple zarcanum_outs_range_proof entries
+  size_t current_output_start = 0; //for Consolidated Transactions we'll have multiple zc_outs_range_proof entries
   for (const auto& a : tx.attachment)
   {
-    if (a.type() == typeid(zarcanum_outs_range_proof))
+    if (a.type() == typeid(zc_outs_range_proof))
     {
-      const zarcanum_outs_range_proof& zcrp = boost::get<zarcanum_outs_range_proof>(a);
+      const zc_outs_range_proof& zcrp = boost::get<zc_outs_range_proof>(a);
       agregated_proofs.emplace_back(zcrp);
       for (uint8_t i = 0; i != zcrp.outputs_count; i++)
       {
@@ -5579,19 +5586,22 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   TIME_MEASURE_START_PD_MS(block_processing_time_0_ms);
   CRITICAL_REGION_LOCAL(m_read_lock);
   TIME_MEASURE_START_PD(block_processing_time_1);
+
+  uint64_t height = get_current_blockchain_size(); // height <-> block height correspondence is validated in prevalidate_miner_transaction()
+
   if(bl.prev_id != get_top_block_id())
   {
-    LOG_PRINT_L0("Block with id: " << id << ENDL
-      << "have wrong prev_id: " << bl.prev_id << ENDL
+    LOG_PRINT_L0("Block with id: " << id << " @ " << height <<  ENDL
+      << "has wrong prev_id: " << bl.prev_id << ENDL
       << "expected: " << get_top_block_id());
     return false;
   }
 
   if(!check_block_timestamp_main(bl))
   {
-    LOG_PRINT_L0("Block with id: " << id << ENDL
-      << "have invalid timestamp: " << bl.timestamp);
-    //add_block_as_invalid(bl, id);//do not add blocks to invalid storage befor proof of work check was passed
+    LOG_PRINT_L0("Block with id: " << id << " @ " << height << ENDL
+      << "has invalid timestamp: " << bl.timestamp);
+    // do not add this block to invalid block list prior to proof of work check
     bvc.m_verification_failed = true;
     return false;
   }
@@ -5601,7 +5611,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     m_is_in_checkpoint_zone = true;
     if (!m_checkpoints.check_block(get_current_blockchain_size(), id))
     {
-      LOG_ERROR("CHECKPOINT VALIDATION FAILED");
+      LOG_ERROR("CHECKPOINT VALIDATION FAILED @ " << height);
       bvc.m_verification_failed = true;
       return false;
     }
@@ -5650,8 +5660,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
   if (!prevalidate_miner_transaction(bl, m_db_blocks.size(), is_pos_bl))
   {
-    LOG_PRINT_L0("Block with id: " << id
-      << " failed to pass prevalidation");
+    LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx prevalidation");
     bvc.m_verification_failed = true;
     return false;
   }
@@ -5674,7 +5683,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   TIME_MEASURE_START_PD(all_txs_insert_time_5);
   if (!add_transaction_from_block(bl.miner_tx, get_transaction_hash(bl.miner_tx), id, get_current_blockchain_size(), get_block_datetime(bl)))
   {
-    LOG_PRINT_L0("Block with id: " << id << " failed to add transaction to blockchain storage");
+    LOG_PRINT_L0("Block with id: " << id << " failed to add miner transaction to the blockchain storage");
     bvc.m_verification_failed = true;
     return false;
   }
@@ -5690,7 +5699,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   uint64_t burned_coins = 0;
   std::list<crypto::key_image> block_summary_kimages;
 
-  std::vector<zarcanum_outs_range_proof_commit_ref_t> range_proofs_agregated;
+  std::vector<zc_outs_range_proofs_with_commitments> range_proofs_agregated;
 
   for(const crypto::hash& tx_id : bl.tx_hashes)
   {
@@ -5829,7 +5838,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
 
   //validate range proofs
-  if (!verify_multiple_zarcanum_outs_range_proofs(range_proofs_agregated))
+  if (!verify_multiple_zc_outs_range_proofs(range_proofs_agregated))
   {
     LOG_PRINT_L0("Block with id: " << id
       << " have failed to verify multiple rangeproofs");

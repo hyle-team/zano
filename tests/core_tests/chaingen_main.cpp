@@ -129,7 +129,9 @@ bool generate_and_play(const char* const genclass_name)
     LOG_ERROR(genclass_name << " generation failed: generic exception");
   }
 
-  std::cout << concolor::bright_white << "#TEST# " << genclass_name << ": start replaying events" << concolor::normal << std::endl;
+  std::cout << concolor::bright_white << std::string(100, '=') << std::endl <<
+    "#TEST# >>>> " << genclass_name << " <<<< start replaying events" << std::endl <<
+    std::string(100, '=') << concolor::normal << std::endl;
 
   if (generated && do_replay_events(events, g))
   {

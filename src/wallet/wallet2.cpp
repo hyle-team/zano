@@ -714,7 +714,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
           if (out_type_to_key || out_type_zc)
           {
-            WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
+            WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money_brief(td.amount()) << (out_type_zc ? " (hidden)" : "") << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
           }
           else if (out_is_to_htlc(out_v))
           {
@@ -5603,10 +5603,7 @@ bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) c
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_need_to_split_outputs()
 {
-  if (this->m_core_runtime_config.hard_forks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_blockchain_current_size()))
-    return false;
-  else 
-    return true;
+  return !is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::prepare_tx_destinations(const assets_selection_context& needed_money_map,
