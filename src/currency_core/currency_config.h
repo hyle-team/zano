@@ -62,6 +62,7 @@
 
 #define WALLET_MAX_ALLOWED_OUTPUT_AMOUNT                ((uint64_t)0xffffffffffffffffLL)
 #define CURRENCY_MINER_TX_MAX_OUTS                      CURRENCY_TX_MAX_ALLOWED_OUTS
+#define CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP       3
 
 #define DIFFICULTY_STARTER                              1
 #define DIFFICULTY_POS_TARGET                           120 // seconds

@@ -207,16 +207,7 @@ namespace currency
     if (tx_version > TRANSACTION_VERSION_PRE_HF4)
     {
       // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs
-      // TODO: consider refactoring
-      uint64_t amount_remaining = block_reward;
-      for(size_t i = 1; i < CURRENCY_TX_MIN_ALLOWED_OUTS; ++i) // starting from 1 for one less iteration
-      {
-        uint64_t amount = crypto::rand<uint64_t>() % amount_remaining;
-        amount_remaining -= amount;
-        out_amounts.push_back(amount);
-      }
-      out_amounts.push_back(amount_remaining);
-      // std::shuffle(out_amounts.begin(), out_amounts.end(), crypto::uniform_random_bit_generator());
+      decompose_amount_randomly(block_reward, [&](uint64_t a){ out_amounts.push_back(a); }, CURRENCY_TX_MIN_ALLOWED_OUTS);
     }
     else
     {
