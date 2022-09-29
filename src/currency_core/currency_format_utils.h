@@ -288,6 +288,7 @@ namespace currency
 
   uint64_t get_tx_version(uint64_t h, const hard_forks_descriptor& hfd);
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
+  crypto::hash get_asset_id_from_descriptor(const asset_descriptor_base& adb);
 
 
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed = nullptr);

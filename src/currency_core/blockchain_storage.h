@@ -288,6 +288,8 @@ namespace currency
     uint64_t get_aliases_count()const;
     uint64_t get_block_h_older_then(uint64_t timestamp) const;
     bool validate_tx_service_attachmens_in_services(const tx_service_attachment& a, size_t i, const transaction& tx)const;
+    bool get_asset_info(const crypto::hash& asset_id, asset_descriptor_base& info)const;
+    uint64_t get_assets_count() const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
@@ -486,6 +488,9 @@ namespace currency
     typedef tools::db::cached_key_value_accessor<crypto::hash, ms_output_entry, false, false> multisig_outs_container;// ms out id => ms_output_entry
     typedef tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> solo_options_container;
     typedef tools::db::basic_key_value_accessor<uint32_t, block_gindex_increments, true> per_block_gindex_increments_container; // height => [(amount, gindex_increment), ...]
+    
+    typedef tools::db::cached_key_value_accessor<crypto::hash, std::list<asset_descriptor_base>, true, false> assets_container;
+
 
     //-----------------------------------------
 
@@ -527,6 +532,7 @@ namespace currency
     address_to_aliases_container m_db_addr_to_alias;
     per_block_gindex_increments_container m_db_per_block_gindex_incs;
     
+    assets_container m_db_assets;
 
 
 
@@ -645,6 +651,8 @@ namespace currency
     bool unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp);
     bool pop_alias_info(const extra_alias_entry& ai);
     bool put_alias_info(const transaction& tx, extra_alias_entry& ai);
+    bool pop_asset_info(const crypto::hash& asset_id);
+    bool put_asset_info(const transaction & tx, asset_descriptor_operation & ado);
     void fill_addr_to_alias_dict();
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();

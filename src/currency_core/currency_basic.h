@@ -725,15 +725,17 @@ namespace currency
 
   struct asset_descriptor_operation
   {
-    uint8_t             operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
-    std::vector<crypto::signature> proof;
-    asset_descriptor_base descriptor;
+    uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
+    std::vector<crypto::signature>  proof;
+    asset_descriptor_base           descriptor;
+    std::vector<crypto::hash>       asset_id; //questionable regarding form of optional fields
 
 
     BEGIN_VERSIONED_SERIALIZE()
       FIELD(operation_type)
       FIELD(proof)
       FIELD(descriptor)
+      FIELD(asset_id)
     END_SERIALIZE()
 
 

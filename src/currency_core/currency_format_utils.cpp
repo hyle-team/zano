@@ -1797,9 +1797,8 @@ namespace currency
       tx.extra.insert(tx.extra.end(), extra_local.begin(), extra_local.end());
     }
 
-//    //first: separate zarcanum inputs and regular one
-    //std::vector<const tx_source_entry*> zc_sources;
-    //std::vector<const tx_source_entry*> NLSAG_sources;
+
+    uint64_t summary_inputs_money = 0;
 
     crypto::hash asset_id_for_destinations = currency::null_hash;
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
@@ -1812,6 +1811,8 @@ namespace currency
         CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_tx_and_account_pub_key()");
         //also assign this asset id to destinations
         asset_id_for_destinations = get_asset_id_from_descriptor(ado.descriptor);
+        //TODO: temporary
+        summary_inputs_money += ado.descriptor.current_supply;
       }
     }
 
@@ -1824,7 +1825,6 @@ namespace currency
     size_t current_index = 0;
     inputs_mapping.resize(sources.size());
     size_t input_starter_index = tx.vin.size();
-    uint64_t summary_inputs_money = 0;
     //fill inputs NLSAG and Zarcanum 
     for (const tx_source_entry& src_entr : sources)
     {
@@ -2055,8 +2055,6 @@ namespace currency
       if (tx.attachment.size())
         add_attachments_info_to_extra(tx.extra, tx.attachment);
     }
-
-
     //
     // generate ring signatures
     //
