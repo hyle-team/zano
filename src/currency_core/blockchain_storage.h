@@ -489,7 +489,7 @@ namespace currency
     typedef tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> solo_options_container;
     typedef tools::db::basic_key_value_accessor<uint32_t, block_gindex_increments, true> per_block_gindex_increments_container; // height => [(amount, gindex_increment), ...]
     
-    typedef tools::db::cached_key_value_accessor<crypto::hash, std::list<asset_descriptor_base>, true, false> assets_container;
+    typedef tools::db::cached_key_value_accessor<crypto::hash, std::list<asset_descriptor_operation>, true, false> assets_container;
 
 
     //-----------------------------------------

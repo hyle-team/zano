@@ -4180,9 +4180,8 @@ void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_inf
   asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
   asset_reg_info.descriptor = asset_info;
   asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
-
   construct_tx_param ctp = get_default_construct_tx_param();
-  //ctp.dsts = destinations;
+  ctp.dsts = destinations;
   ctp.extra.push_back(asset_reg_info);
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
@@ -4988,6 +4987,9 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
   amounts_map[currency::null_hash].needed_amount = fee;
   BOOST_FOREACH(auto& dt, dsts)
   {
+    if(dt.asset_id == currency::ffff_hash)
+      continue;     //this destination for emmition only
+
     THROW_IF_TRUE_WALLET_EX(0 == dt.amount, error::zero_destination);
     uint64_t money_to_add = dt.amount;
     if (dt.amount_to_provide)

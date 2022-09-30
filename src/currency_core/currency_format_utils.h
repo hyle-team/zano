@@ -70,6 +70,7 @@ namespace currency
     extra_alias_entry m_alias;
     std::string m_user_data_blob;
     extra_attachment_info m_attachment_info;
+    asset_descriptor_operation m_asset_operation;
   };
 
   //---------------------------------------------------------------------------------------------------------------

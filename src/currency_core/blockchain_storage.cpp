@@ -3501,6 +3501,22 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
     r = pop_alias_info(ei.m_alias);
     CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
   }
+
+  if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
+  {
+    crypto::hash asset_id = currency::null_hash;
+    if (ei.m_asset_operation.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+    {
+      asset_id = get_asset_id_from_descriptor(ei.m_asset_operation.descriptor);
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(ei.m_asset_operation.asset_id.size() == 1, false, "Unexpected asset_id in operation");
+      asset_id = ei.m_asset_operation.asset_id.back();
+    }
+    r = pop_asset_info(asset_id);
+    CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
+  }
   return true;
 }
 //------------------------------------------------------------------
@@ -3533,7 +3549,7 @@ bool blockchain_storage::get_asset_info(const crypto::hash& asset_id, asset_desc
   {
     if (as_ptr->size())
     {
-      info = as_ptr->back();
+      info = as_ptr->back().descriptor;
       return true;
     }
   }
@@ -3738,9 +3754,9 @@ bool blockchain_storage::pop_asset_info(const crypto::hash& asset_id)
   assets_container::t_value_type local_asset_hist = *asset_history_ptr;
   local_asset_hist.pop_back();
   if (local_asset_hist.size())
-    m_db_aliases.set(asset_id, local_asset_hist);
+    m_db_assets.set(asset_id, local_asset_hist);
   else
-    m_db_aliases.erase(asset_id);
+    m_db_assets.erase(asset_id);
 
   LOG_PRINT_MAGENTA("[ASSET_POP]: " << asset_id << ": " << (!local_asset_hist.empty() ? "(prev)" : "(erased)"), LOG_LEVEL_1);
   return true;
@@ -3752,10 +3768,10 @@ bool blockchain_storage::put_asset_info(const transaction & tx, asset_descriptor
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
     crypto::hash asset_id = get_asset_id_from_descriptor(ado.descriptor);
-    auto asset_history_ptr = m_db_aliases.find(asset_id);
+    auto asset_history_ptr = m_db_assets.find(asset_id);
     CHECK_AND_ASSERT_MES(!asset_history_ptr, false, "Asset id already existing");
     assets_container::t_value_type local_asset_history = AUTO_VAL_INIT(local_asset_history);
-    local_asset_history.push_back(ado.descriptor);
+    local_asset_history.push_back(ado);
     m_db_assets.set(asset_id, local_asset_history);
     LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << asset_id << ": " << ado.descriptor.full_name, LOG_LEVEL_1);
     //TODO:
@@ -3860,6 +3876,12 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx)
     r = put_alias_info(tx, ei.m_alias);
     CHECK_AND_ASSERT_MES(r, false, "failed to put_alias_info");
   }
+  if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
+  {
+    r = put_asset_info(tx, ei.m_asset_operation);
+    CHECK_AND_ASSERT_MES(r, false, "failed to put_asset_info");
+  }
+
   return true;
 }
 //------------------------------------------------------------------

@@ -346,8 +346,16 @@ namespace currency
   {
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
+      //@#@ TODO: This is just a temporary code
+      uint64_t assets_emmited = 0;
+      asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
+      if (get_type_in_variant_container(tx.extra, ado) && ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+      {
+        assets_emmited += ado.descriptor.current_supply;
+      }
+
       size_t zc_inputs_count = 0;
-      uint64_t bare_inputs_sum = additional_inputs_amount_and_fees_for_mining_tx;
+      uint64_t bare_inputs_sum = additional_inputs_amount_and_fees_for_mining_tx + assets_emmited;
       for(auto& vin : tx.vin)
       {
         VARIANT_SWITCH_BEGIN(vin);
@@ -671,6 +679,7 @@ namespace currency
     mutable bool was_attachment;
     mutable bool was_userdata;
     mutable bool was_alias;
+    mutable bool was_asset;
 
     tx_extra_info& rei;
     const transaction& rtx;
@@ -699,6 +708,12 @@ namespace currency
     {
       ENSURE_ONETIME(was_alias, "alias");
       rei.m_alias = ae;
+      return true;
+    }
+    bool operator()(const asset_descriptor_operation & ado) const
+    {
+      ENSURE_ONETIME(was_asset, "asset");
+      rei.m_asset_operation = ado;
       return true;
     }
     bool operator()(const extra_alias_entry_old& ae) const
@@ -1949,7 +1964,10 @@ namespace currency
       //must be asset publication
       for (auto& item : shuffled_dsts)
       {
-        item.asset_id = asset_id_for_destinations;
+        if (item.asset_id == currency::ffff_hash)
+        {
+          item.asset_id = asset_id_for_destinations;
+        }
       }
     }
     if (shuffle)
