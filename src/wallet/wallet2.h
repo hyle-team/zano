@@ -970,7 +970,7 @@ private:
       detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
       const std::vector<currency::tx_destination_entry>& dsts,
-      std::vector<currency::tx_destination_entry>& final_detinations);
+      std::vector<currency::tx_destination_entry>& final_destinations);
     void prepare_tx_destinations(uint64_t needed_money,
       uint64_t found_money,
       detail::split_strategy_id_t destination_split_strategy_id,

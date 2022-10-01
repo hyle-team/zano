@@ -5556,11 +5556,22 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
   detail::split_strategy_id_t destination_split_strategy_id,
   const tx_dust_policy& dust_policy,
   const std::vector<currency::tx_destination_entry>& dsts,
-  std::vector<currency::tx_destination_entry>& final_detinations)
+  std::vector<currency::tx_destination_entry>& final_destinations)
 {
   for (auto& el: needed_money_map)
   {
-    prepare_tx_destinations(el.second.needed_amount, el.second.found_amount, destination_split_strategy_id, dust_policy, dsts, final_detinations, el.first);    
+    prepare_tx_destinations(el.second.needed_amount, el.second.found_amount, destination_split_strategy_id, dust_policy, dsts, final_destinations, el.first);    
+  }
+
+  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM) && final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+  {
+    // if there's not ehough destinations items (i.e. outputs), split the last one
+    tx_destination_entry de = final_destinations.back();
+    final_destinations.pop_back();
+    size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - final_destinations.size();
+    decompose_amount_randomly(de.amount, [&](uint64_t amount){ de.amount = amount; final_destinations.push_back(de); }, items_to_be_added);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(final_destinations.size() == CURRENCY_TX_MIN_ALLOWED_OUTS,
+      "can't get necessary number of outputs using decompose_amount_randomly(), got " << final_destinations.size() << " while mininum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
   }
 }
 //----------------------------------------------------------------------------------------------------
