@@ -1583,7 +1583,7 @@ namespace currency
     CHECK_AND_ASSERT_MES(tx.vin[input_index].type() == typeid(txin_zc_input), false, "Unexpected type of input #" << input_index);
 
     txin_zc_input& in = boost::get<txin_zc_input>(tx.vin[input_index]);
-    tx.signatures.emplace_back();
+    tx.signatures.emplace_back(ZC_sig());
     ZC_sig& sig = boost::get<ZC_sig>(tx.signatures.back());
 
     if (watch_only_mode)
@@ -1785,6 +1785,7 @@ namespace currency
     inputs_mapping.resize(sources.size());
     size_t input_starter_index = tx.vin.size();
     uint64_t summary_inputs_money = 0;
+    bool has_zc_inputs = false;
     //fill inputs NLSAG and Zarcanum 
     for (const tx_source_entry& src_entr : sources)
     {
@@ -1874,6 +1875,7 @@ namespace currency
         //potentially this approach might help to support htlc and multisig without making to complicated code
         if (src_entr.is_zarcanum())
         {
+          has_zc_inputs = true;
           txin_zc_input zc_in = AUTO_VAL_INIT(zc_in);
           zc_in.k_image = img;
           zc_in.key_offsets = std::move(key_offsets);
@@ -1982,8 +1984,11 @@ namespace currency
       r = add_tx_fee_amount_to_extra(tx, summary_inputs_money - summary_outs_money);
       CHECK_AND_ASSERT_MES(r, false, "add_tx_fee_amount_to_extra failed");
 
-      r = generate_tx_balance_proof(tx, blinding_masks_sum);
-      CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+      if (!has_zc_inputs)
+      {
+        r = generate_tx_balance_proof(tx, blinding_masks_sum);
+        CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+      }
     }
 
     if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
@@ -2248,9 +2253,12 @@ namespace currency
   {
     for(const auto& in : tx.vin)
     {
-      CHECK_AND_ASSERT_MES(in.type() == typeid(txin_to_key) || in.type() == typeid(txin_multisig) || in.type() == typeid(txin_htlc), false, "wrong variant type: "
-        << in.type().name() 
-        << ", in transaction id=" << get_transaction_hash(tx));
+      CHECK_AND_ASSERT_MES(
+        in.type() == typeid(txin_to_key) ||
+        in.type() == typeid(txin_multisig) ||
+        in.type() == typeid(txin_htlc) ||
+        in.type() == typeid(txin_zc_input), 
+        false, "wrong input type: " << in.type().name() << ", in transaction " << get_transaction_hash(tx));
     }
     return true;
   }
@@ -2315,7 +2323,6 @@ namespace currency
   {
     for(const auto& vo : tx.vout)
     {
-
       VARIANT_SWITCH_BEGIN(vo);
       VARIANT_CASE_CONST(tx_out_bare, out)
       {
@@ -2333,16 +2340,21 @@ namespace currency
         VARIANT_CASE_CONST(txout_multisig, ms)
           if (!(ms.keys.size() > 0 && ms.minimum_sigs > 0 && ms.minimum_sigs <= ms.keys.size()))
           {
-            LOG_ERROR("wrong multisig in transaction id=" << get_transaction_hash(tx));
+            LOG_ERROR("wrong multisig output in transaction " << get_transaction_hash(tx));
             return false;
           }
         VARIANT_CASE_OTHER()
-          LOG_ERROR("wrong variant type: " << out.target.type().name() << ", expected " << typeid(txout_to_key).name()
-            << ", in transaction id=" << get_transaction_hash(tx));
+          LOG_ERROR("wrong output type: " << out.target.type().name() << " in transaction " << get_transaction_hash(tx));
+          return false;
         VARIANT_SWITCH_END();
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@      
+        if (!check_key(o.amount_commitment))
+          return false;
+        if (!check_key(o.concealing_point))
+          return false;
+        if (!check_key(o.stealth_address))
+          return false;
       VARIANT_SWITCH_END();
     }
     return true;
@@ -2356,7 +2368,7 @@ namespace currency
   bool check_inputs_overflow(const transaction& tx)
   {
     uint64_t money = 0;
-    BOOST_FOREACH(const auto& in, tx.vin)
+    for(const auto& in : tx.vin)
     {
       uint64_t this_amount = 0;
       if (in.type() == typeid(txin_to_key))
@@ -2374,9 +2386,13 @@ namespace currency
         CHECKED_GET_SPECIFIC_VARIANT(in, const txin_htlc, htlc_in, false);
         this_amount = htlc_in.amount;
       }
+      else if (in.type() == typeid(txin_zc_input))
+      {
+        // ignore inputs with hidden amounts
+      }
       else
       {
-        LOG_ERROR("Unknow type in in: " << in.type().name());
+        LOG_ERROR("wrong input type: " << in.type().name());
         return false;
       }
       if (money > this_amount + money)
@@ -2389,15 +2405,15 @@ namespace currency
   bool check_outs_overflow(const transaction& tx)
   {
     uint64_t money = 0;
-    BOOST_FOREACH(const auto& o, tx.vout)
+    for(const auto& o : tx.vout)
     {
       VARIANT_SWITCH_BEGIN(o);
       VARIANT_CASE_CONST(tx_out_bare, o)
         if (money > o.amount + money)
           return false;
         money += o.amount;
-      VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@      
+      // VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        // ignore inputs with hidden amounts
       VARIANT_SWITCH_END();
     }
     return true;
