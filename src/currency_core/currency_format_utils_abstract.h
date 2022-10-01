@@ -168,7 +168,7 @@ namespace currency
   }
   //---------------------------------------------------------------
   inline
-    const crypto::key_image & get_key_image_txin_v(const txin_v& in_v)
+  const crypto::key_image & get_key_image_txin_v(const txin_v& in_v)
   {
     if (in_v.type() == typeid(txin_to_key))
     {
@@ -184,10 +184,10 @@ namespace currency
     }
     else
     {
-      ASSERT_MES_AND_THROW("[get_to_key_input_from_txin_v] Wrong type " << in_v.type().name());
+      ASSERT_MES_AND_THROW("[get_key_image_txin_v] Wrong type: " << in_v.type().name());
     }
   }
-
+  //---------------------------------------------------------------
   //, txin_htlc, txin_zc_input
   inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)
   {

@@ -1642,7 +1642,7 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
     {
       if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
       {
-        purge_keyimage_from_big_heap(get_to_key_input_from_txin_v(tx.vin[n]).k_image, block_id);
+        purge_keyimage_from_big_heap(get_key_image_txin_v(tx.vin[n]), block_id);
       }
       else if (tx.vin[n].type() == typeid(txin_zc_input))
       {
