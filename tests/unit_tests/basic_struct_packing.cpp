@@ -1,3 +1,4 @@
+// Copyright (c) 2022 Zano Project
 // Copyright (c) 2012-2014 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -12,6 +13,8 @@
 #include "currency_core/currency_boost_serialization.h"
 #include "currency_core/difficulty.h"
 #include "common/difficulty_boost_serialization.h"
+
+using namespace currency;
 
 TEST(block_pack_unpack, basic_struct_packing)
 {
@@ -68,4 +71,59 @@ TEST(boost_multiprecision_serizlization, basic_struct_packing)
   ASSERT_EQ(v_origial, v_unserialized);
 }
 
+////////////////////////////////////////////////////////////////////////////////
 
+TEST(tx_signatures_packing, 1)
+{
+  std::vector<signature_v> sigs;
+
+  sigs.clear();
+  ASSERT_EQ(1, get_object_blobsize(sigs));
+
+  //  v(x)  =  tools::get_varint_packed_size(x)
+
+  {
+    // empty NLSAG
+    // v(0) + (1 + v(0) + 0 * 2 * 32) = 3                                                    
+    sigs.clear();
+    sigs.emplace_back(std::move(NLSAG_sig()));
+    ASSERT_EQ(3, get_object_blobsize(sigs));
+  }
+
+  {
+    // 128 empty NLSAGs
+    // v(128) + 128 * (1 + v(0) + 0 * 2 * 32) = 258
+    sigs.clear();
+    for(size_t i = 0; i < 128; ++i)
+      sigs.emplace_back(std::move(NLSAG_sig()));
+    ASSERT_EQ(258, get_object_blobsize(sigs));
+  }
+
+  {
+    // empty ZC_sig
+    // v(0) + (1 + 32 + 32 + (1 + 10*32) + 32) = 99
+    sigs.clear();
+    sigs.emplace_back(std::move(ZC_sig()));
+    ASSERT_EQ(99, get_object_blobsize(sigs));
+  }
+
+  {
+    // 128 empty ZC_sigs
+    // v(128) + 128 * (1 + 32 + 32 + (v(0) + 0*32) + 32) = 12546
+    sigs.clear();
+    for(size_t i = 0; i < 128; ++i)
+      sigs.emplace_back(std::move(ZC_sig()));
+    ASSERT_EQ(12546, get_object_blobsize(sigs));
+  }
+
+  {
+    // 128 10-ring ZC_sigs
+    // v(128) + 128 * (1 + 32 + 32 + (v(10) + 10*32) + 32) = 53506   (97 + (v(10) + 10*32))
+    ZC_sig zc = AUTO_VAL_INIT(zc);
+    zc.clsags_gg.r.resize(10);
+    sigs.clear();
+    for(size_t i = 0; i < 128; ++i)
+      sigs.emplace_back(zc);
+    ASSERT_EQ(53506, get_object_blobsize(sigs));
+  }
+}
