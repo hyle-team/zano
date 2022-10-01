@@ -232,12 +232,8 @@ namespace currency
 
     for (size_t i = 0; i != t.vin.size(); i++)
     {
-      size_t sig_count = get_input_expected_signatures_count(t.vin[i]);
-      if (separately_signed_tx && i == t.vin.size() - 1)
-        ++sig_count;                                             // count in one more signature for the last input in a complete separately signed tx
-      tx_blob_size += tools::get_varint_packed_size(sig_count);  // size of transaction::signatures[i]
-      tx_blob_size += sizeof(crypto::signature) * sig_count;     // size of signatures' data itself
-      //tx_blob_size += sizeof(binary_archive<true>::variant_tag_type); //tools::get_varint_packed_size(variant_serialization_traits<binary_archive<true>, currency::NLSAG_sig>::get_tag()); // sizeof variant tag
+      size_t sig_size = get_input_expected_signature_size(t.vin[i], separately_signed_tx && i == t.vin.size() - 1);
+      tx_blob_size += sig_size;
     }
 
     // 2. attachments (try to find extra_attachment_info in tx prefix and count it in if succeed)
@@ -273,7 +269,7 @@ namespace currency
   bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil)
   {
     std::unordered_set<crypto::key_image> ki;
-    BOOST_FOREACH(const auto& in, tx.vin)
+    for(const auto& in : tx.vin)
     {
       if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc) || in.type() == typeid(txin_zc_input))
       {
