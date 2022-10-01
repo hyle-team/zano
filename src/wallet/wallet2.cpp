@@ -4818,16 +4818,24 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
           API_RETURN_CODE_INTERNAL_ERROR);
       }
       VARIANT_SWITCH_END();
-
-      auto interted_it = src.outputs.insert(it_to_insert, real_oe);
-      src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
-      src.real_output = interted_it - src.outputs.begin();
-      src.real_output_in_tx_index = td.m_internal_output_index;
-      print_source_entry(src); 
     }
     VARIANT_CASE_CONST(tx_out_zarcanum, o);
-    //@#@      
+      real_oe.amount_commitment = o.amount_commitment;
+      real_oe.concealing_point = o.concealing_point;
+      real_oe.stealth_address = o.stealth_address;
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_opt_blinding_mask, "m_opt_blinding_mask is null, transfer index: " << J << ", amount: " << print_money_brief(td.amount())); 
+      src.real_out_amount_blinding_mask = *td.m_opt_blinding_mask;
     VARIANT_SWITCH_END();
+
+    auto interted_it = src.outputs.insert(it_to_insert, real_oe);
+    src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
+    src.real_output = interted_it - src.outputs.begin();
+    src.real_output_in_tx_index = td.m_internal_output_index;
+    
+    std::stringstream ss;
+    ss << "source entry [" << i << "], td_idx: " << J << ", ";
+    print_source_entry(ss, src);
+    WLT_LOG_L1(ss.str());
     
     ++i;
   }
@@ -4919,7 +4927,7 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
 {
   assets_selection_context amounts_map;
   amounts_map[currency::null_hash].needed_amount = fee;
-  BOOST_FOREACH(auto& dt, dsts)
+  for(auto& dt : dsts)
   {
     THROW_IF_TRUE_WALLET_EX(0 == dt.amount, error::zero_destination);
     uint64_t money_to_add = dt.amount;
@@ -5518,11 +5526,16 @@ uint64_t wallet2::get_tx_expiration_median() const
   return res.expiration_median;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::print_source_entry(const currency::tx_source_entry& src) const
+void wallet2::print_source_entry(std::stringstream& output, const currency::tx_source_entry& src) const
 {
-  std::ostringstream indexes;
-  std::for_each(src.outputs.begin(), src.outputs.end(), [&](const currency::tx_source_entry::output_entry& s_e) { indexes << s_e.out_reference << " "; });
-  WLT_LOG_L0("amount=" << currency::print_money(src.amount) << ", real_output=" << src.real_output << ", real_output_in_tx_index=" << src.real_output_in_tx_index << ", indexes: " << indexes.str());
+  std::stringstream ss;
+  for(auto& el : src.outputs)
+    ss << el.out_reference << " ";
+  
+  output << "amount: " << print_money_brief(src.amount) << (src.is_zarcanum() ? " (hidden)" : "")
+    << ", real_output: " << src.real_output
+    << ", real_output_in_tx_index: " << src.real_output_in_tx_index
+    << ", indexes: " << ss.str();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const

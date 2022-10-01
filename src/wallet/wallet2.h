@@ -1015,7 +1015,8 @@ private:
 
     
     void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_public::wallet_transfer_info_details& res_td) const;
-    void print_source_entry(const currency::tx_source_entry& src) const;
+    void print_source_entry(std::stringstream& output, const currency::tx_source_entry& src) const;
+
 
     void init_log_prefix();
     void load_keys2ki(bool create_if_not_exist, bool& need_to_resync);
