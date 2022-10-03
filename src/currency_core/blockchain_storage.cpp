@@ -709,25 +709,29 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
     purge_transaction_visitor(blockchain_storage& bcs, key_images_container& spent_keys, bool strict_check):
       m_bcs(bcs),
       m_spent_keys(spent_keys), 
-      m_strict_check(strict_check){}
-
-    bool operator()(const txin_to_key& inp) const
+      m_strict_check(strict_check)
+    {}
+    bool process_input(const crypto::key_image& k_image, const std::vector<txout_ref_v>& key_offsets, uint64_t amount) const
     {
-      bool r = m_spent_keys.erase_validate(inp.k_image);
-      CHECK_AND_ASSERT_MES( !(!r && m_strict_check), false, "purge_transaction_keyimages_from_blockchain: key image " << inp.k_image << " was not found");
+      bool r = m_spent_keys.erase_validate(k_image);
+      CHECK_AND_ASSERT_MES(r || !m_strict_check, false, "purge_transaction_keyimages_from_blockchain: key image " << k_image << " was not found");
 
-      if(inp.key_offsets.size() == 1)
+      if(key_offsets.size() == 1)
       {
         //direct spend detected
-        if(!m_bcs.update_spent_tx_flags_for_input(inp.amount, inp.key_offsets[0], false))
+        if(!m_bcs.update_spent_tx_flags_for_input(amount, key_offsets[0], false))
         {
           //internal error
-          LOG_PRINT_L0("Failed to  update_spent_tx_flags_for_input");
+          LOG_ERROR("update_spent_tx_flags_for_input failed");
           return false;
         }
       }
 
       return true;
+    }
+    bool operator()(const txin_to_key& inp) const
+    {
+      return process_input(inp.k_image, inp.key_offsets, inp.amount);
     }
     bool operator()(const txin_gen& inp) const
     {
@@ -737,19 +741,18 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
     {
       if (!m_bcs.update_spent_tx_flags_for_input(inp.multisig_out_id, 0))
       {
-        LOG_PRINT_L0("update_spent_tx_flags_for_input failed for multisig id " << inp.multisig_out_id << " amount: " << inp.amount);
+        LOG_ERROR("update_spent_tx_flags_for_input failed for multisig id " << inp.multisig_out_id << " amount: " << inp.amount);
         return false;
       }
       return true;
     }
     bool operator()(const txin_htlc& inp) const
     {
-      return this->operator()(static_cast<const txin_to_key&>(inp));
+      return process_input(inp.k_image, inp.key_offsets, inp.amount);
     }
     bool operator()(const txin_zc_input& inp) const
     {
-      // TODO: #@#@
-      return false;
+      return process_input(inp.k_image, inp.key_offsets, 0 /* amount */);
     }
   };
 
@@ -1640,15 +1643,9 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
     transaction& tx = *tx_ptr;
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {
-      if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
-      {
-        purge_keyimage_from_big_heap(get_key_image_from_txin_v(tx.vin[n]), block_id);
-      }
-      else if (tx.vin[n].type() == typeid(txin_zc_input))
-      {
-        const txin_zc_input& zcin = boost::get<txin_zc_input>(tx.vin[n]);
-        purge_keyimage_from_big_heap(zcin.k_image, block_id);
-      }
+      crypto::key_image ki = AUTO_VAL_INIT(ki);
+      if (get_key_image_from_txin_v(tx.vin[n], ki))
+        purge_keyimage_from_big_heap(ki, block_id);
     }
   }
   return true;
