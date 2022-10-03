@@ -1823,12 +1823,12 @@ namespace currency
       if (pado)
       {
         crypto::secret_key stub = AUTO_VAL_INIT(stub);
-        bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_secret_key, stub, pado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+        bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_secret_key, stub, pado->descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
         CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_tx_and_account_pub_key()");
         //also assign this asset id to destinations
-        asset_id_for_destinations = get_asset_id_from_descriptor(pado.descriptor);
+        asset_id_for_destinations = get_asset_id_from_descriptor(pado->descriptor);
         //TODO: temporary
-        summary_inputs_money += pado.descriptor.current_supply;
+        summary_inputs_money += pado->descriptor.current_supply;
       }
     }
 
