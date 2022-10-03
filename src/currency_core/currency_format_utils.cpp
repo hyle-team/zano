@@ -1816,18 +1816,19 @@ namespace currency
     uint64_t summary_inputs_money = 0;
 
     crypto::hash asset_id_for_destinations = currency::null_hash;
+    asset_descriptor_operation* pado = nullptr;
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
-      asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
-      if (get_type_in_variant_container(tx.extra, ado))
+      pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
+      if (pado)
       {
         crypto::secret_key stub = AUTO_VAL_INIT(stub);
-        bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_secret_key, stub, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);        
+        bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_secret_key, stub, pado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
         CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_tx_and_account_pub_key()");
         //also assign this asset id to destinations
-        asset_id_for_destinations = get_asset_id_from_descriptor(ado.descriptor);
+        asset_id_for_destinations = get_asset_id_from_descriptor(pado.descriptor);
         //TODO: temporary
-        summary_inputs_money += ado.descriptor.current_supply;
+        summary_inputs_money += pado.descriptor.current_supply;
       }
     }
 
@@ -1957,19 +1958,25 @@ namespace currency
       tx.vin.push_back(ins_zc);
     }*/
 
-    // "Shuffle" outs
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
     if (asset_id_for_destinations != currency::null_hash)
     {
+      uint64_t amount_of_assets = 0;
       //must be asset publication
       for (auto& item : shuffled_dsts)
       {
         if (item.asset_id == currency::ffff_hash)
         {
           item.asset_id = asset_id_for_destinations;
+          amount_of_assets += item.amount;
         }
       }
+      CHECK_AND_ASSERT_MES(pado, false, "pado is null ??");
+      pado->descriptor.current_supply = amount_of_assets;
     }
+
+
+    // "Shuffle" outs
     if (shuffle)
       std::sort(shuffled_dsts.begin(), shuffled_dsts.end(), [](const tx_destination_entry& de1, const tx_destination_entry& de2) { return de1.amount < de2.amount; });
 

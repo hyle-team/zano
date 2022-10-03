@@ -3776,7 +3776,6 @@ bool blockchain_storage::put_asset_info(const transaction & tx, asset_descriptor
     LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << asset_id << ": " << ado.descriptor.full_name, LOG_LEVEL_1);
     //TODO:
     //rise_core_event(CORE_EVENT_ADD_ASSET, alias_info_to_rpc_alias_info(ai));
-
   }
   else
   {  

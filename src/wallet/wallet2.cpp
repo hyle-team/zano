@@ -4175,7 +4175,7 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx)
+void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::hash& asset_id)
 {
   asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
   asset_reg_info.descriptor = asset_info;
@@ -4187,6 +4187,11 @@ void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_inf
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
   result_tx = ft.tx;
+  //get generated asset id
+  currency::asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
+  bool r = get_type_in_variant_container(result_tx.extra, ado);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed find asset info in tx");
+  asset_id = get_asset_id_from_descriptor(ado.descriptor); 
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)

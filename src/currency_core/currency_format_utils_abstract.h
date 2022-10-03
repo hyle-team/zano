@@ -96,17 +96,41 @@ namespace currency
   template<typename specific_type_t, typename variant_t_container>
   bool get_type_in_variant_container(variant_t_container& av, specific_type_t& a)
   {
-    for (auto& ai : av)
+    const specific_type_t* pa = get_type_in_variant_container<const specific_type_t>(av);
+    if (pa)
     {
-      if (ai.type() == typeid(specific_type_t))
-      {
-        a = boost::get<specific_type_t>(ai);
-        return true;
-      }
+      a = *pa;
+      return true;
     }
     return false;
   }
   //---------------------------------------------------------------
+  //---------------------------------------------------------------
+  template<typename specific_type_t, typename variant_t_container>
+  specific_type_t* get_type_in_variant_container(variant_t_container& av)
+  {
+    for (auto& ai : av)
+    {
+      if (ai.type() == typeid(specific_type_t))
+      {
+        return &boost::get<specific_type_t>(ai);
+      }
+    }
+    return nullptr;
+  }
+  //---------------------------------------------------------------
+  template<typename specific_type_t, typename variant_t_container>
+  specific_type_t& get_type_in_variant_container_by_ref(variant_t_container& av)
+  {
+    for (auto& ai : av)
+    {
+      if (ai.type() == typeid(specific_type_t))
+      {
+        return boost::get<specific_type_t>(ai);
+      }
+    }
+    ASSERT_MES_AND_THROW("Objec not found");
+  }
   // if cb returns true, it means "continue", false -- means "stop"
   template<typename specific_type_t, typename variant_container_t, typename callback_t>
   bool process_type_in_variant_container(const variant_container_t& av, callback_t& cb, bool return_value_if_none_found = true)
