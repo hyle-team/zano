@@ -274,7 +274,7 @@ namespace currency
       if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc) || in.type() == typeid(txin_zc_input))
       {
          
-        if (!ki.insert(get_key_image_txin_v(in)).second)
+        if (!ki.insert(get_key_image_from_txin_v(in)).second)
           return false;
       }
     }

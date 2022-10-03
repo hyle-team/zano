@@ -1642,7 +1642,7 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
     {
       if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
       {
-        purge_keyimage_from_big_heap(get_key_image_txin_v(tx.vin[n]), block_id);
+        purge_keyimage_from_big_heap(get_key_image_from_txin_v(tx.vin[n]), block_id);
       }
       else if (tx.vin[n].type() == typeid(txin_zc_input))
       {
@@ -5308,7 +5308,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
   CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() == 2, false, "incorrect: miner_tx.vin.size() = " << b.miner_tx.vin.size());
   CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(txin_gen), false, "incorrect input 0 type: " << b.miner_tx.vin[0].type().name());
   CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key) || b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "incorrect input 1 type: " << b.miner_tx.vin[1].type().name());
-  const crypto::key_image& stake_key_image = get_key_image_txin_v(b.miner_tx.vin[1]);
+  const crypto::key_image& stake_key_image = get_key_image_from_txin_v(b.miner_tx.vin[1]);
   //check keyimage if it's main chain candidate
   if (!for_altchain)
   {
