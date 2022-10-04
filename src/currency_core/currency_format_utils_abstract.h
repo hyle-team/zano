@@ -149,6 +149,7 @@ namespace currency
     return found;
   }
   //---------------------------------------------------------------
+  // DEPRECATED, should be removed soon -- sowle
   inline
   const txin_to_key& get_to_key_input_from_txin_v(const txin_v& in_v)
   {
@@ -210,7 +211,22 @@ namespace currency
     if (in_v.type() == typeid(txin_zc_input))
       return boost::get<txin_zc_input>(in_v).k_image;
 
-    ASSERT_MES_AND_THROW("[get_key_image_from_txin_v] Wrong type: " << in_v.type().name());
+    CHECK_AND_ASSERT_THROW_MES(false, "[get_key_image_from_txin_v] Wrong type: " << in_v.type().name());
+  }
+  //---------------------------------------------------------------
+  inline
+  const std::vector<currency::txout_ref_v>& get_key_offsets_from_txin_v(const txin_v& in_v)
+  {
+    if (in_v.type() == typeid(txin_to_key))
+      return boost::get<txin_to_key>(in_v).key_offsets;
+    
+    if (in_v.type() == typeid(txin_htlc))
+      return boost::get<txin_htlc>(in_v).key_offsets;
+
+    if (in_v.type() == typeid(txin_zc_input))
+      return boost::get<txin_zc_input>(in_v).key_offsets;
+
+    CHECK_AND_ASSERT_THROW_MES(false, "[get_key_offsets_from_txin_v] Wrong type: " << in_v.type().name());
   }
   //---------------------------------------------------------------
   //, txin_htlc, txin_zc_input

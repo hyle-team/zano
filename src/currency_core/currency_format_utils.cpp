@@ -1664,7 +1664,7 @@ namespace currency
       sigs.resize(src_entr.outputs.size());
 
       if (!watch_only_mode)
-        crypto::generate_ring_signature(tx_hash_for_signature, get_to_key_input_from_txin_v(tx.vin[input_index]).k_image, keys_ptrs, in_context.in_ephemeral.sec, src_entr.real_output, sigs.data());
+        crypto::generate_ring_signature(tx_hash_for_signature, get_key_image_from_txin_v(tx.vin[input_index]), keys_ptrs, in_context.in_ephemeral.sec, src_entr.real_output, sigs.data());
 
       if (pss_ring_s)
       {

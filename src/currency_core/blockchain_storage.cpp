@@ -4454,7 +4454,7 @@ struct outputs_visitor
     , m_scan_context(scan_context)
   {}
 
-  bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_bare& out, uint64_t out_i)
+  bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_v& out_v, uint64_t out_i)
   {
     //check tx unlock time
     uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
@@ -4474,15 +4474,20 @@ struct outputs_visitor
       }
     }
 
-    VARIANT_SWITCH_BEGIN(out.target)
-      VARIANT_CASE_CONST(txout_to_key, out_tk)
-        m_results_collector.push_back(out_tk.key);
-      VARIANT_CASE_CONST(txout_htlc, out_htlc)
-        m_scan_context.htlc_outs.push_back(out_htlc);
-        m_results_collector.push_back(m_scan_context.htlc_is_expired ? out_htlc.pkey_refund : out_htlc.pkey_redeem);
-      VARIANT_CASE_OTHER()
-        LOG_PRINT_L0("Output have wrong type id, which=" << out.target.which());
-        return false;
+    VARIANT_SWITCH_BEGIN(out_v)
+      VARIANT_CASE_CONST(tx_out_bare, out)
+        VARIANT_SWITCH_BEGIN(out.target)
+          VARIANT_CASE_CONST(txout_to_key, out_tk)
+            m_results_collector.push_back(out_tk.key);
+          VARIANT_CASE_CONST(txout_htlc, out_htlc)
+            m_scan_context.htlc_outs.push_back(out_htlc);
+            m_results_collector.push_back(m_scan_context.htlc_is_expired ? out_htlc.pkey_refund : out_htlc.pkey_redeem);
+          VARIANT_CASE_OTHER()
+            LOG_PRINT_L0("Output has wrong target type id: " << out.target.which());
+            return false;
+        VARIANT_SWITCH_END()
+      VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+        m_scan_context.zc_outs.push_back(out_zc);
     VARIANT_SWITCH_END()
 
     return true;
@@ -4784,15 +4789,15 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  // somehow we need to get a list<tx_out_zarcanum> this input is referring to
+  // we need a list<tx_out_zarcanum> this input is referring to
   // and make sure that all of them are good (i.e. check 1) source tx unlock time validity; 2) mixin restrictions; 3) general gindex/ref_by_id corectness)
+  // get_output_keys_for_input_with_checks is used for that
   //
-  // get_output_keys_for_input_with_checks may be used for that, but at that time it needs refactoring
-  //
-  std::vector<crypto::public_key> output_keys; // won't be used
+  std::vector<crypto::public_key> dummy_output_keys; // won't be used
+  uint64_t dummy_source_max_unlock_time_for_pos_coinbase_dummy = 0; // won't be used
   scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
-  uint64_t source_max_unlock_time_for_pos_coinbase_dummy = 0;
-  if (!get_output_keys_for_input_with_checks(tx, zc_in, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
+
+  if (!get_output_keys_for_input_with_checks(tx, zc_in, dummy_output_keys, max_related_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
   {
     LOG_PRINT_L0("get_output_keys_for_input_with_checks failed for input #" << in_index << ", key_offset.size = " << zc_in.key_offsets.size() << ")");
     return false;
@@ -4802,7 +4807,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   // here we don't need to check zc_in.k_image validity because it is checked in verify_CLSAG_GG()
 
-  CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() > 0, false, "zero referenced outputs found");
+  CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() == zc_in.key_offsets.size(), false, "incorrect number of referenced outputs found: " << scan_contex.zc_outs.size() << ", while " << zc_in.key_offsets.size() << " is expected.");
   CHECK_AND_ASSERT_MES(in_index < tx.signatures.size(), false, "tx.signatures.size (" << tx.signatures.size() << ") is less than or equal to in_index (" << in_index << ")");
   // TODO: consider additional checks here
 
@@ -4951,20 +4956,12 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
     }
     for (auto& in : tx_chain_entry->tx.vin)
     {
-      if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
+      crypto::key_image k_image = AUTO_VAL_INIT(k_image);
+      if (get_key_image_from_txin_v(in, k_image))
       {
-        if (get_to_key_input_from_txin_v(in).k_image == ki)
+        if (k_image == ki)
         {
           id_result = get_transaction_hash(tx_chain_entry->tx);  // ??? @#@#  why not just use tx_id ?
-          return tx_chain_entry;
-        }
-      }
-      else if (in.type() == typeid(txin_zc_input))
-      {
-        const auto& zc_in = boost::get<txin_zc_input>(in);
-        if (zc_in.k_image == ki)
-        {
-          id_result = tx_id;
           return tx_chain_entry;
         }
       }
@@ -6889,6 +6886,12 @@ bool blockchain_storage::is_output_allowed_for_input(const output_key_or_htlc_v&
   else {
     ASSERT_MES_AND_THROW("Unexpected type in output_key_or_htlc_v: " << out_v.type().name());
   }
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const
+{
+  CHECK_AND_ASSERT_MES(in_v.type() == typeid(txin_zc_input), false, "tx_out_zarcanum can only be referenced by txin_zc_input, not by " << in_v.type().name());
+  return true;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::validate_alt_block_ms_input(const transaction& input_tx, const crypto::hash& input_tx_hash, size_t input_index, uint64_t split_height, const alt_chain_type& alt_chain) const
