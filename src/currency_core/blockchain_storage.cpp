@@ -4286,9 +4286,10 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
   // check all tx's inputs for being already spent
   for (const txin_v& in : tx.vin)
   {
-    if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
+    crypto::key_image ki = AUTO_VAL_INIT(ki);
+    if (get_key_image_from_txin_v(in, ki))
     {
-      if (have_tx_keyimg_as_spent(get_to_key_input_from_txin_v(in).k_image))
+      if (have_tx_keyimg_as_spent(ki))
       {
         return true;
       }        
@@ -4296,12 +4297,6 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
     else if (in.type() == typeid(txin_multisig))
     {
       if (is_multisig_output_spent(boost::get<const txin_multisig>(in).multisig_out_id))
-        return true;
-    }
-    else if (in.type() == typeid(txin_zc_input))
-    {
-      const auto& zcin = boost::get<txin_zc_input>(in);
-      if (have_tx_keyimg_as_spent(zcin.k_image))
         return true;
     }
     else if (in.type() == typeid(txin_gen))
