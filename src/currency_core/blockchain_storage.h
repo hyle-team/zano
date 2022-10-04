@@ -240,11 +240,11 @@ namespace currency
 
 
     template<class visitor_t>
-    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_to_key& tx_in_to_key, visitor_t& vis) 
+    bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& in_v, visitor_t& vis) 
     { 
       scan_for_keys_context cntx_stub = AUTO_VAL_INIT(cntx_stub);
       uint64_t stub = 0; 
-      return scan_outputkeys_for_indexes(validated_tx, tx_in_to_key, vis, stub, cntx_stub);
+      return scan_outputkeys_for_indexes(validated_tx, in_v, vis, stub, cntx_stub);
     }
     template<class visitor_t>
     bool scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& /*scan_context*/) const;
@@ -674,6 +674,7 @@ namespace currency
     bool is_output_allowed_for_input(const output_key_or_htlc_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const;
     bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
+    bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
 
     // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
     bool is_hardfork_active(size_t hardfork_id) const;
@@ -724,10 +725,8 @@ namespace currency
   template<class visitor_t>
   bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& scan_context) const
   {
-    const txin_to_key& input_to_key = get_to_key_input_from_txin_v(verified_input);
-
-    uint64_t amount = input_to_key.amount;
-    const std::vector<txout_ref_v>& key_offsets = input_to_key.key_offsets;
+    uint64_t amount = get_amount_from_variant(verified_input);
+    const std::vector<txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(verified_input);
 
     CRITICAL_REGION_LOCAL(m_read_lock);
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_get_item_size);
@@ -797,7 +796,7 @@ namespace currency
           patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
 
           bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(outtk.mix_attr, key_offsets.size() - 1);
-          CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx output #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+          CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx input ref #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
         }
         else if (o.target.type() == typeid(txout_htlc))
         {
@@ -828,14 +827,25 @@ namespace currency
 
         if (!vis.handle_output(tx_ptr->tx, validated_tx, o, n))
         {
-          LOG_PRINT_L0("Failed to handle_output for output id = " << tx_id << ", no " << n);
+          LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id);
           return false;
         }
         TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       }
-      VARIANT_CASE_CONST(tx_out_zarcanum, oz)
-        //@#@
-        return false;
+      VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+        bool r = is_output_allowed_for_input(out_zc, verified_input);
+        CHECK_AND_ASSERT_MES(r, false, "Input and output are incompatible");
+
+        r = is_mixattr_applicable_for_fake_outs_counter(out_zc.mix_attr, key_offsets.size() - 1);
+        CHECK_AND_ASSERT_MES(r, false, "tx input ref #" << output_index << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(out_zc.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+
+        TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
+        if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
+        {
+          LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id);
+          return false;
+        }
+        TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       VARIANT_CASE_THROW_ON_OTHER();
       VARIANT_SWITCH_END();
 

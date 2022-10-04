@@ -24,6 +24,23 @@ const currency::account_base null_account = AUTO_VAL_INIT(null_account);
 //@#@: TODO: need refactoring, unsafe operations
 POD_MAKE_COMPARABLE(currency, tx_out_bare);
 
+bool get_stealth_address_form_tx_out_v(const tx_out_v& out_v, crypto::public_key& result)
+{
+  VARIANT_SWITCH_BEGIN(out_v);
+    VARIANT_CASE_CONST(tx_out_bare, out_b);
+      VARIANT_SWITCH_BEGIN(out_b.target);
+        VARIANT_CASE_CONST(txout_to_key, otk);
+          result = otk.key;
+          return true;
+      VARIANT_SWITCH_END();
+    VARIANT_CASE_CONST(tx_out_zarcanum, out_zc);
+      result = out_zc.stealth_address;
+      return true;
+  VARIANT_SWITCH_END();
+
+  return false;
+}
+
 // Determines which output is real and actually spent in tx inputs, when there are fake outputs.
 bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx, const currency::account_keys& keys, std::vector<size_t>& real_inputs)
 {
@@ -36,9 +53,10 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
       , m_found(false)
     {}
 
-    bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_bare& out, uint64_t out_i)
+    bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_v& out_v, uint64_t source_tx_output_index)
     {
       CHECK_AND_ASSERT_MES(!m_found, false, "Internal error: m_found is true but the visitor is still being applied");
+      /*
       auto is_even = [&](const tx_out_v& v) { return boost::get<tx_out_bare>(v) == out; };
       auto it = std::find_if(validated_tx.vout.begin(), validated_tx.vout.end(), is_even);
       if (it == validated_tx.vout.end())
@@ -57,8 +75,20 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
       /*crypto::public_key ephemeral_public_key;
       derive_public_key(derivation, output_tx_index, m_keys.account_address.spend_public_key, ephemeral_public_key);*/
 
+      /*
       crypto::key_image ki;
       generate_key_image(output_public_key, ephemeral_secret_key, ki);
+      s*/
+
+      crypto::key_image ki = AUTO_VAL_INIT(ki);
+      crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(validated_tx);
+      currency::keypair ephemeral_key = AUTO_VAL_INIT(ephemeral_key);
+      currency::generate_key_image_helper(m_keys, tx_pub_key, source_tx_output_index, ephemeral_key, ki);
+
+      crypto::public_key stealth_address = AUTO_VAL_INIT(stealth_address);
+      bool r = get_stealth_address_form_tx_out_v(out_v, stealth_address);
+      CHECK_AND_ASSERT_MES(r, false, "can't get stealth address from output #" << source_tx_output_index << " tx " << get_transaction_hash(source_tx));
+      CHECK_AND_ASSERT_MES(stealth_address == ephemeral_key.pub, false, "derived pub key doesn't match with the stealth address, tx " << get_transaction_hash(source_tx) << " out #" << source_tx_output_index);
 
       if (ki == m_txin_key_image)
       {
@@ -76,15 +106,26 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
     bool                    m_found;
   };
 
-  for (auto& txin : tx.vin)
+  for (auto& in : tx.vin)
   {
-    const txin_to_key& in = boost::get<txin_to_key>(txin);
-    if (in.key_offsets.size() == 1)
+    try
     {
-      real_inputs.push_back(0); // trivial case when no mixin is used
+      if (get_key_offsets_from_txin_v(in).size() == 1)
+      {
+        real_inputs.push_back(0); // trivial case when no mixin is used
+        continue;
+      }
+    }
+    catch(...)
+    {
       continue;
     }
-    local_visitor vis(keys, in.k_image);
+
+    crypto::key_image ki = AUTO_VAL_INIT(ki);
+    if (!get_key_image_from_txin_v(in, ki))
+      continue;
+
+    local_visitor vis(keys, ki);
     bool r = c.get_blockchain_storage().scan_outputkeys_for_indexes(tx, in, vis);
     CHECK_AND_ASSERT_MES(r || vis.m_found, false, "scan_outputkeys_for_indexes failed");
     if (!vis.m_found)
