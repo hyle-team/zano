@@ -4889,16 +4889,24 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
           API_RETURN_CODE_INTERNAL_ERROR);
       }
       VARIANT_SWITCH_END();
-
-      auto interted_it = src.outputs.insert(it_to_insert, real_oe);
-      src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
-      src.real_output = interted_it - src.outputs.begin();
-      src.real_output_in_tx_index = td.m_internal_output_index;
-      print_source_entry(src); 
     }
     VARIANT_CASE_CONST(tx_out_zarcanum, o);
-    //@#@      
+      real_oe.amount_commitment = o.amount_commitment;
+      real_oe.concealing_point = o.concealing_point;
+      real_oe.stealth_address = o.stealth_address;
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_opt_blinding_mask, "m_opt_blinding_mask is null, transfer index: " << J << ", amount: " << print_money_brief(td.amount())); 
+      src.real_out_amount_blinding_mask = *td.m_opt_blinding_mask;
     VARIANT_SWITCH_END();
+
+    auto interted_it = src.outputs.insert(it_to_insert, real_oe);
+    src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
+    src.real_output = interted_it - src.outputs.begin();
+    src.real_output_in_tx_index = td.m_internal_output_index;
+    
+    std::stringstream ss;
+    ss << "source entry [" << i << "], td_idx: " << J << ", ";
+    print_source_entry(ss, src);
+    WLT_LOG_L1(ss.str());
     
     ++i;
   }
@@ -4990,7 +4998,7 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
 {
   assets_selection_context amounts_map;
   amounts_map[currency::null_hash].needed_amount = fee;
-  BOOST_FOREACH(auto& dt, dsts)
+  for(auto& dt : dsts)
   {
     if(dt.asset_id == currency::ffff_hash)
       continue;     //this destination for emmition only
@@ -5592,11 +5600,16 @@ uint64_t wallet2::get_tx_expiration_median() const
   return res.expiration_median;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::print_source_entry(const currency::tx_source_entry& src) const
+void wallet2::print_source_entry(std::stringstream& output, const currency::tx_source_entry& src) const
 {
-  std::ostringstream indexes;
-  std::for_each(src.outputs.begin(), src.outputs.end(), [&](const currency::tx_source_entry::output_entry& s_e) { indexes << s_e.out_reference << " "; });
-  WLT_LOG_L0("amount=" << currency::print_money(src.amount) << ", real_output=" << src.real_output << ", real_output_in_tx_index=" << src.real_output_in_tx_index << ", indexes: " << indexes.str());
+  std::stringstream ss;
+  for(auto& el : src.outputs)
+    ss << el.out_reference << " ";
+  
+  output << "amount: " << print_money_brief(src.amount) << (src.is_zarcanum() ? " (hidden)" : "")
+    << ", real_output: " << src.real_output
+    << ", real_output_in_tx_index: " << src.real_output_in_tx_index
+    << ", indexes: " << ss.str();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const
@@ -5617,11 +5630,22 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
   detail::split_strategy_id_t destination_split_strategy_id,
   const tx_dust_policy& dust_policy,
   const std::vector<currency::tx_destination_entry>& dsts,
-  std::vector<currency::tx_destination_entry>& final_detinations)
+  std::vector<currency::tx_destination_entry>& final_destinations)
 {
   for (auto& el: needed_money_map)
   {
-    prepare_tx_destinations(el.second.needed_amount, el.second.found_amount, destination_split_strategy_id, dust_policy, dsts, final_detinations, el.first);    
+    prepare_tx_destinations(el.second.needed_amount, el.second.found_amount, destination_split_strategy_id, dust_policy, dsts, final_destinations, el.first);    
+  }
+
+  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM) && final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+  {
+    // if there's not ehough destinations items (i.e. outputs), split the last one
+    tx_destination_entry de = final_destinations.back();
+    final_destinations.pop_back();
+    size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - final_destinations.size();
+    decompose_amount_randomly(de.amount, [&](uint64_t amount){ de.amount = amount; final_destinations.push_back(de); }, items_to_be_added);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(final_destinations.size() == CURRENCY_TX_MIN_ALLOWED_OUTS,
+      "can't get necessary number of outputs using decompose_amount_randomly(), got " << final_destinations.size() << " while mininum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
   }
 }
 //----------------------------------------------------------------------------------------------------

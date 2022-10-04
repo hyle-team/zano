@@ -710,12 +710,56 @@ namespace currency
   {
     decompose_amount_into_digits(amount, dust_threshold, chunk_handler, dust_handler, max_output_allowed, CURRENCY_TX_MAX_ALLOWED_OUTS, 0);
   }
+
+  // num_digits_to_keep -- how many digits to keep in chunks, 0 means all digits
+  // Ex.: num_digits_to_keep == 3, number_of_outputs == 2 then  1.0 may be decomposed into 0.183 + 0.817
+  //      num_digits_to_keep == 0, number_of_outputs == 2 then  1.0 may be decomposed into 0.183374827362 + 0.816625172638
+  template<typename chunk_handler_t>
+  void decompose_amount_randomly(uint64_t amount, chunk_handler_t chunk_cb, size_t number_of_outputs = CURRENCY_TX_MIN_ALLOWED_OUTS, size_t num_digits_to_keep = CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP)
+  {
+    if (amount < number_of_outputs)
+      return;
+
+    uint64_t boundary = 1000;
+    if (num_digits_to_keep != CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP)
+    {
+      boundary = 1;
+      for(size_t i = 0; i < num_digits_to_keep; ++i)
+        boundary *= 10;
+    }
+
+    auto trim_digits_and_add_variance = [boundary, num_digits_to_keep](uint64_t& v){
+      if (num_digits_to_keep != 0 && v > 1)
+      {
+        uint64_t multiplier = 1;
+        while(v >= boundary)
+        {
+          v /= 10;
+          multiplier *= 10;
+        }
+        v = v / 2 + crypto::rand<uint64_t>() % (v + 1);
+        v *= multiplier;
+      }
+    };
+
+    uint64_t amount_remaining = amount;
+    for(size_t i = 1; i < number_of_outputs && amount_remaining > 1; ++i) // starting from 1 for one less iteration
+    {
+      uint64_t chunk_amount = amount_remaining / (number_of_outputs - i + 1);
+      trim_digits_and_add_variance(chunk_amount);
+      amount_remaining -= chunk_amount;
+      chunk_cb(chunk_amount);
+    }
+    chunk_cb(amount_remaining);
+  }
+
   //---------------------------------------------------------------
+  /*
   inline size_t get_input_expected_signatures_count(const txin_v& tx_in)
   {
     struct txin_signature_size_visitor : public boost::static_visitor<size_t>
     {
-      size_t operator()(const txin_gen& /*txin*/) const           { return 0; }
+      size_t operator()(const txin_gen& txin) const           { return 0; }
       size_t operator()(const txin_to_key& txin) const            { return txin.key_offsets.size(); }
       size_t operator()(const txin_multisig& txin) const          { return txin.sigs_count; }
       size_t operator()(const txin_htlc& txin) const              { return 1; }
@@ -723,6 +767,22 @@ namespace currency
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(), tx_in);
+  }*/
+  //---------------------------------------------------------------
+  inline size_t get_input_expected_signature_size(const txin_v& tx_in, bool last_input_in_separately_signed_tx)
+  {
+    struct txin_signature_size_visitor : public boost::static_visitor<size_t>
+    {
+      txin_signature_size_visitor(size_t add) : a(add) {}
+      size_t a;
+      size_t operator()(const txin_gen& /*txin*/) const   { return 0; }
+      size_t operator()(const txin_to_key& txin) const    { return tools::get_varint_packed_size(txin.key_offsets.size() + a) + sizeof(crypto::signature) * (txin.key_offsets.size() + a); }
+      size_t operator()(const txin_multisig& txin) const  { return tools::get_varint_packed_size(txin.sigs_count + a) + sizeof(crypto::signature) * (txin.sigs_count + a); }
+      size_t operator()(const txin_htlc& txin) const      { return tools::get_varint_packed_size(1 + a) + sizeof(crypto::signature) * (1 + a);  }
+      size_t operator()(const txin_zc_input& txin) const  { return 97 + tools::get_varint_packed_size(txin.key_offsets.size()) + txin.key_offsets.size() * 32; }
+    };
+
+    return boost::apply_visitor(txin_signature_size_visitor(last_input_in_separately_signed_tx ? 1 : 0), tx_in);
   }
   //---------------------------------------------------------------
   template<class txin_t>

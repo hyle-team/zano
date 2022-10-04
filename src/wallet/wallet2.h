@@ -988,7 +988,7 @@ private:
       detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
       const std::vector<currency::tx_destination_entry>& dsts,
-      std::vector<currency::tx_destination_entry>& final_detinations);
+      std::vector<currency::tx_destination_entry>& final_destinations);
     void prepare_tx_destinations(uint64_t needed_money,
       uint64_t found_money,
       detail::split_strategy_id_t destination_split_strategy_id,
@@ -1033,7 +1033,8 @@ private:
 
     
     void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_public::wallet_transfer_info_details& res_td) const;
-    void print_source_entry(const currency::tx_source_entry& src) const;
+    void print_source_entry(std::stringstream& output, const currency::tx_source_entry& src) const;
+
 
     void init_log_prefix();
     void load_keys2ki(bool create_if_not_exist, bool& need_to_resync);

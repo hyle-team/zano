@@ -192,26 +192,51 @@ namespace currency
   }
   //---------------------------------------------------------------
   inline
-    const crypto::key_image & get_key_image_txin_v(const txin_v& in_v)
+  const bool get_key_image_from_txin_v(const txin_v& in_v, crypto::key_image& result) noexcept
+  {
+    try
+    {
+      if (in_v.type() == typeid(txin_to_key))
+      {
+        result = boost::get<txin_to_key>(in_v).k_image;
+        return true;
+      }
+    
+      if (in_v.type() == typeid(txin_htlc))
+      {
+        result = boost::get<txin_htlc>(in_v).k_image;
+        return true;
+      }
+
+      if (in_v.type() == typeid(txin_zc_input))
+      {
+        result = boost::get<txin_zc_input>(in_v).k_image;
+        return true;
+      }
+    }
+    catch(...)
+    {
+      // should never go here, just precaution
+    }
+
+    return false;
+  }
+  //---------------------------------------------------------------
+  inline
+  const crypto::key_image& get_key_image_from_txin_v(const txin_v& in_v)
   {
     if (in_v.type() == typeid(txin_to_key))
-    {
       return boost::get<txin_to_key>(in_v).k_image;
-    }
-    else if (in_v.type() == typeid(txin_htlc))
-    {
+    
+    if (in_v.type() == typeid(txin_htlc))
       return boost::get<txin_htlc>(in_v).k_image;
-    }
-    else if (in_v.type() == typeid(txin_zc_input))
-    {
-      return boost::get<txin_zc_input>(in_v).k_image;
-    }
-    else
-    {
-      ASSERT_MES_AND_THROW("[get_to_key_input_from_txin_v] Wrong type " << in_v.type().name());
-    }
-  }
 
+    if (in_v.type() == typeid(txin_zc_input))
+      return boost::get<txin_zc_input>(in_v).k_image;
+
+    ASSERT_MES_AND_THROW("[get_key_image_from_txin_v] Wrong type: " << in_v.type().name());
+  }
+  //---------------------------------------------------------------
   //, txin_htlc, txin_zc_input
   inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)
   {

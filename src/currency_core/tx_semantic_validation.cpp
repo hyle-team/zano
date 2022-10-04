@@ -22,7 +22,7 @@ namespace currency
   bool check_tx_inputs_keyimages_diff(const transaction& tx)
   {
     std::unordered_set<crypto::key_image> ki;
-    BOOST_FOREACH(const auto& in, tx.vin)
+    for(const auto& in : tx.vin)
     {
       if (in.type() == typeid(txin_to_key))
       {
