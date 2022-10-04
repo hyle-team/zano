@@ -281,6 +281,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_aliases.init(BLOCKCHAIN_STORAGE_CONTAINER_ALIASES);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_assets.init(BLOCKCHAIN_STORAGE_CONTAINER_ASSETS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_addr_to_alias.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_per_block_gindex_incs.init(BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS);
