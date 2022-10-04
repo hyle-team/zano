@@ -665,20 +665,18 @@ namespace currency
   //---------------------------------------------------------------
   struct tx_extra_handler : public boost::static_visitor<bool>
   {
-    mutable bool was_padding; //let the padding goes only at the end
-    mutable bool was_pubkey;
-    mutable bool was_attachment;
-    mutable bool was_userdata;
-    mutable bool was_alias;
-    mutable bool was_asset;
+    mutable bool was_padding = false; //let the padding goes only at the end
+    mutable bool was_pubkey = false;
+    mutable bool was_attachment = false;
+    mutable bool was_userdata = false;
+    mutable bool was_alias = false;
+    mutable bool was_asset = false;
 
     tx_extra_info& rei;
     const transaction& rtx;
 
     tx_extra_handler(tx_extra_info& ei, const transaction& tx) :rei(ei), rtx(tx)
-    {
-      was_padding = was_pubkey = was_attachment = was_userdata = was_alias = false;
-    }
+    {}
 
 #define ENSURE_ONETIME(varname, entry_name) CHECK_AND_ASSERT_MES(varname == false, false, "double entry in tx_extra: " entry_name); varname = true;
 
