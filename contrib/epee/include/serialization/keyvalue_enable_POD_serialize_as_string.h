@@ -47,7 +47,7 @@ namespace epee \
       bool r = kv_unserialize(s, stg, hparent_section, pname); \
       if (r) \
       { \
-        d = epee::transform_str_to_t_pod<decltype(d)>(s); \
+        d = epee::transform_str_to_t_pod<type_name>(s); \
       } \
       return r; \
     } \
