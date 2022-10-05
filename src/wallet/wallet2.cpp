@@ -3753,7 +3753,8 @@ bool wallet2::do_pos_mining_iteration(mining_context& context, size_t transfer_i
 
   if (context.zarcanum && td.is_zc())
   {
-    crypto::mp::uint256_t lhs, rhs;
+    crypto::mp::uint256_t lhs;
+    crypto::mp::uint512_t rhs;
     {
       PROFILE_FUNC("check_zarcanum");
       found = crypto::zarcanum_check_main_pos_inequality(kernel_hash, *td.m_opt_blinding_mask, context.secret_q, context.last_pow_block_id_hashed, context.z_l_div_z_D, stake_amount, lhs, rhs);
@@ -3765,7 +3766,7 @@ bool wallet2::do_pos_mining_iteration(mining_context& context, size_t transfer_i
       LOG_PRINT_GREEN("Found Zarcanum kernel: amount: " << currency::print_money_brief(stake_amount) << ", gindex: " << td.m_global_output_index << ENDL
         << "difficulty:            " << context.basic_diff << ENDL
         << "kernel info:           " << ENDL
-        << print_stake_kernel_info(context.sk) << ENDL 
+        << print_stake_kernel_info(context.sk) 
         << "kernel_hash:           " << kernel_hash << ENDL
         << "lhs:                   " << lhs << ENDL
         << "rhs:                   " << rhs
@@ -3787,7 +3788,7 @@ bool wallet2::do_pos_mining_iteration(mining_context& context, size_t transfer_i
       LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money_brief(stake_amount)<< ", gindex: " << td.m_global_output_index << ENDL
         << "difficulty:            " << context.basic_diff << ", final_diff: " << final_diff << ENDL
         << "kernel info:           " << ENDL
-        << print_stake_kernel_info(context.sk) << ENDL 
+        << print_stake_kernel_info(context.sk) 
         << "kernel_hash(proof):    " << kernel_hash,
         LOG_LEVEL_0);
     }
