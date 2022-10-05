@@ -412,6 +412,7 @@ namespace currency
       FIELD(amount_commitment)
       FIELD(encrypted_amount)
       FIELD(mix_attr)
+      FIELD(etc_details)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
@@ -420,6 +421,7 @@ namespace currency
       BOOST_SERIALIZE(amount_commitment)
       BOOST_SERIALIZE(encrypted_amount)
       BOOST_SERIALIZE(mix_attr)
+      BOOST_SERIALIZE(etc_details)
     END_BOOST_SERIALIZATION()
   };
 

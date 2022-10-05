@@ -74,6 +74,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::hash asset_id = currency::null_hash;
   miner_wlt->publish_new_asset(adb, destinations, tx, asset_id);
+  LOG_PRINT_L0("Published new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
 
   //pass over hardfork
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -92,7 +93,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   CHECK_AND_ASSERT_MES(it_asset != balances.end() && it_native != balances.end(), false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native->second.total == 0, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_native->second.total == 17517226000000000000, false, "Failed to find needed asset in result balances");
 
 
   balances.clear();
@@ -101,10 +102,11 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   it_asset = balances.find(asset_id);
   it_native = balances.find(currency::null_hash);
 
-  CHECK_AND_ASSERT_MES(it_asset != balances.end() && it_native != balances.end(), false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_asset != balances.end(), false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_native == balances.end(), false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native->second.total == 0, false, "Failed to find needed asset in result balances");
-
+  
+  //TODO: add transfer of tokens
 
   return true;
 }
