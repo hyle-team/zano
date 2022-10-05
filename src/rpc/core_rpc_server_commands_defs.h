@@ -11,7 +11,6 @@
 #include "currency_core/difficulty.h"
 #include "crypto/hash.h"
 #include "p2p/p2p_protocol_defs.h"
-#include "rpc/mining_protocol_defs.h"
 #include "storages/portable_storage_base.h"
 #include "currency_core/offers_service_basics.h"
 #include "currency_core/basic_api_response_codes.h"
@@ -1079,25 +1078,6 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(alias_info_list)
         KV_SERIALIZE(status)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-
-  struct COMMAND_RPC_GET_ADDENDUMS
-  {
-
-    typedef mining::height_info request;
-
-    struct response
-    {
-      std::string status;
-      std::list<mining::addendum> addms;
-
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-        KV_SERIALIZE(addms)
       END_KV_SERIALIZE_MAP()
     };
   };

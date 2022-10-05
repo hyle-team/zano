@@ -14,7 +14,6 @@
 #include "currency_core/currency_core.h"
 #include "p2p/net_node.h"
 #include "currency_protocol/currency_protocol_handler.h"
-#include "mining_protocol_defs.h"
 #include "currency_core/bc_offers_service.h"
 
 
@@ -72,7 +71,6 @@ namespace currency
     bool on_get_aliases(const COMMAND_RPC_GET_ALIASES::request& req, COMMAND_RPC_GET_ALIASES::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alias_reward(const COMMAND_RPC_GET_ALIAS_REWARD::request& req, COMMAND_RPC_GET_ALIAS_REWARD::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);  
-    bool on_get_addendums(const COMMAND_RPC_GET_ADDENDUMS::request& req, COMMAND_RPC_GET_ADDENDUMS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_reset_transaction_pool(const COMMAND_RPC_RESET_TX_POOL::request& req, COMMAND_RPC_RESET_TX_POOL::response& res, connection_context& cntx);
     bool on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx);
     bool on_get_current_core_tx_expiration_median(const COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::request& req, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response& res, connection_context& cntx);
@@ -93,15 +91,6 @@ namespace currency
     
     
     
-    //mining rpc
-    bool on_login(const mining::COMMAND_RPC_LOGIN::request& req, mining::COMMAND_RPC_LOGIN::response& res, connection_context& cntx);
-    bool on_getjob(const mining::COMMAND_RPC_GETJOB::request& req, mining::COMMAND_RPC_GETJOB::response& res, connection_context& cntx);
-    bool on_submit(const mining::COMMAND_RPC_SUBMITSHARE::request& req, mining::COMMAND_RPC_SUBMITSHARE::response& res, connection_context& cntx);
-    
-    
-
-
-
     CHAIN_HTTP_TO_MAP2(connection_context); //forward http requests to uri map
 
     BEGIN_URI_MAP2()
@@ -157,10 +146,6 @@ namespace currency
         MAP_JON_RPC   ("get_current_core_tx_expiration_median", on_get_current_core_tx_expiration_median, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN)
         //
         MAP_JON_RPC_WE("marketplace_global_get_offers_ex",               on_get_offers_ex,               COMMAND_RPC_GET_OFFERS_EX)
-        //remote miner rpc
-        MAP_JON_RPC_N(on_login,            mining::COMMAND_RPC_LOGIN)
-        MAP_JON_RPC_N(on_getjob,           mining::COMMAND_RPC_GETJOB)
-        MAP_JON_RPC_N(on_submit,           mining::COMMAND_RPC_SUBMITSHARE)        
       END_JSON_RPC_MAP()
     END_URI_MAP2()
   
@@ -169,8 +154,6 @@ namespace currency
     //-----------------------
     bool handle_command_line(const boost::program_options::variables_map& vm);
     bool check_core_ready_(const std::string& calling_method);
-    bool get_job(const std::string& job_id, mining::job_details& job, epee::json_rpc::error& err, connection_context& cntx);
-    bool get_current_hi(mining::height_info& hi);
 
     //utils
     uint64_t get_block_reward(const block& blk);
@@ -184,10 +167,6 @@ namespace currency
     std::string m_port;
     std::string m_bind_ip;
     bool m_ignore_status;
-    //mining stuff
-    epee::critical_section m_session_jobs_lock;
-    std::map<std::string, currency::block> m_session_jobs; //session id -> blob
-    std::atomic<size_t> m_session_counter;
   };
 }
 
