@@ -241,7 +241,7 @@ namespace tools
       const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
       std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
     {
-      splitted_dsts = dsts;
+      splitted_dsts.insert(splitted_dsts.end(), dsts.begin(), dsts.end());
       if (change_dst.amount > 0)
         splitted_dsts.push_back(change_dst);
     }
@@ -578,8 +578,8 @@ namespace tools
 
     uint64_t unlocked_balance() const;
 
-    void transfer(uint64_t amount, const currency::account_public_address& acc);
-    void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx);
+    void transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::hash& asset_id = currency::null_hash);
+    void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx, const crypto::hash& asset_id = currency::null_hash);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts,
                   size_t fake_outputs_count, 

@@ -1877,7 +1877,7 @@ detail::split_strategy_id_t wallet2::get_current_split_strategy()
     return tools::detail::ssi_void;
 }
 //
-void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx)
+void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx, const crypto::hash& asset_id)
 {
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
@@ -1886,13 +1886,14 @@ void wallet2::transfer(uint64_t amount, const currency::account_public_address& 
   dst.resize(1);
   dst.back().addr.push_back(acc);
   dst.back().amount = amount;
+  dst.back().asset_id = asset_id;
   this->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, get_current_split_strategy(), tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc)
+void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::hash& asset_id)
 {
   transaction result_tx = AUTO_VAL_INIT(result_tx);
-  this->transfer(amount, acc, result_tx);
+  this->transfer(amount, acc, result_tx, asset_id);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::reset_creation_time(uint64_t timestamp)
@@ -5664,7 +5665,14 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
     change_dts.asset_id = asset_id;
   }
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(found_money >= needed_money, "needed_money==" << needed_money << "  <  found_money==" << found_money);
-
+  if (asset_id != currency::null_hash)
+  {
+    if (change_dts.amount)
+    {
+      final_detinations.push_back(change_dts);
+    }
+    return;
+  }
 
   uint64_t dust = 0;
   bool r = detail::apply_split_strategy_by_id(destination_split_strategy_id, dsts, change_dts, dust_policy.dust_threshold, final_detinations, dust, WALLET_MAX_ALLOWED_OUTPUT_AMOUNT);

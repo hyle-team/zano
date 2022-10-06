@@ -20,6 +20,10 @@ using namespace currency;
 //------------------------------------------------------------------------------
 multiassets_basic_test::multiassets_basic_test()
 {
+  // TODO: remove the following line
+  static uint64_t ts = 1;
+  random_state_test_restorer::reset_random(ts);
+
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, configure_core);
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, c1);
 
@@ -35,12 +39,13 @@ bool multiassets_basic_test::generate(std::vector<test_event_entry>& events) con
   account_base& miner_acc = m_accounts[MINER_ACC_IDX];
   miner_acc.generate();
 
-  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  uint64_t ts = 145000000;
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
   set_hard_fork_heights_to_generator(generator);
   //TODO: Need to make sure REWIND_BLOCKS_N and other coretests codebase are capable of following hardfork4 rules
   //in this test hardfork4 moment moved to runtime section
-  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
   DO_CALLBACK(events, "c1");
 
@@ -51,10 +56,11 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 {
   bool r = false;
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->get_account().set_createtime(0);
   account_base alice_acc;
   alice_acc.generate();
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
-
+  alice_wlt->get_account().set_createtime(0);
   miner_wlt->refresh();
 
   asset_descriptor_base adb = AUTO_VAL_INIT(adb);
@@ -106,7 +112,32 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(it_native == balances.end(), false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
   
-  //TODO: add transfer of tokens
+  miner_wlt->transfer(AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC/2, alice_wlt->get_account().get_public_address(), asset_id);
+  //pass over hardfork
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  alice_wlt->refresh();
+  balances.clear();
+  alice_wlt->balance(balances, mined);
+
+  it_asset = balances.find(asset_id);
+
+  CHECK_AND_ASSERT_MES(it_asset != balances.end(), false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC + AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC/2, false, "Failed to find needed asset in result balances");
+
+  try {
+
+    miner_wlt->transfer(AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC / 2, alice_wlt->get_account().get_public_address(), asset_id);
+    //pass over hardfork
+    CHECK_AND_ASSERT_MES(false, false, "Transfer with 0 Zano worked(fail)");
+  }
+  catch (...)
+  {
+    
+  }
+
+
 
   return true;
 }
