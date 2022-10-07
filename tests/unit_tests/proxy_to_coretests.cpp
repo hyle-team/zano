@@ -4,9 +4,9 @@
 
 #include "gtest/gtest.h"
 
-#include "common/util.h"
-#include "p2p/net_peerlist.h"
-#include "core_tests/chaingen.h"
+//#include "common/util.h"
+//#include "p2p/net_peerlist.h"
+//#include "core_tests/chaingen.h"
 
 
 //TODO
