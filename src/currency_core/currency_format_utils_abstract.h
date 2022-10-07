@@ -91,6 +91,19 @@ namespace currency
         ++result;
     }
     return result;
+  }  
+  //---------------------------------------------------------------
+  template<typename specific_type_t, typename variant_t_container>
+  specific_type_t* get_type_in_variant_container(variant_t_container& av)
+  {
+    for (auto& ai : av)
+    {
+      if (ai.type() == typeid(specific_type_t))
+      {
+        return &boost::get<specific_type_t>(ai);
+      }
+    }
+    return nullptr;
   }
   //---------------------------------------------------------------
   template<typename specific_type_t, typename variant_t_container>
@@ -105,19 +118,6 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
-  //---------------------------------------------------------------
-  template<typename specific_type_t, typename variant_t_container>
-  specific_type_t* get_type_in_variant_container(variant_t_container& av)
-  {
-    for (auto& ai : av)
-    {
-      if (ai.type() == typeid(specific_type_t))
-      {
-        return &boost::get<specific_type_t>(ai);
-      }
-    }
-    return nullptr;
-  }
   //---------------------------------------------------------------
   template<typename specific_type_t, typename variant_t_container>
   specific_type_t& get_type_in_variant_container_by_ref(variant_t_container& av)
