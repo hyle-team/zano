@@ -16,13 +16,14 @@
 
 
 using namespace currency;
-
+uint64_t multiassets_basic_test::ts_starter = 0;
 //------------------------------------------------------------------------------
 multiassets_basic_test::multiassets_basic_test()
 {
   // TODO: remove the following line
-  static uint64_t ts = 1;
-  random_state_test_restorer::reset_random(ts);
+
+  //LOG_PRINT_MAGENTA("STARTER TS: " << ts_starter, LOG_LEVEL_0);
+  //random_state_test_restorer::reset_random(ts_starter);
 
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, configure_core);
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, c1);
@@ -134,7 +135,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   }
   catch (...)
   {
-    
+    return true;
   }
 
 

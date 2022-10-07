@@ -2082,10 +2082,12 @@ namespace currency
     //size_t in_context_index = 0;
     crypto::scalar_t local_blinding_masks_sum = 0; // ZC only
     r = false;
-    for (size_t i = 0; i != sources.size(); i++)
+    for (size_t i_ = 0; i_ != sources.size(); i_++)
     {
-      const tx_source_entry& source_entry = sources[inputs_mapping[i]];
-      crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, i + input_starter_index, tx_prefix_hash);
+      size_t i_mapped = inputs_mapping[i_];
+
+      const tx_source_entry& source_entry = sources[i_mapped];
+      crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, i_ + input_starter_index, tx_prefix_hash);
       CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
       std::stringstream ss_ring_s;
 
@@ -2093,14 +2095,14 @@ namespace currency
       {
         // ZC
         // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
-        r = generate_ZC_sig(tx_hash_for_signature, i + input_starter_index, source_entry, in_contexts[i], sender_account_keys, blinding_masks_sum, flags,
-          local_blinding_masks_sum, tx, i + 1 == sources.size());
+        r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, blinding_masks_sum, flags,
+          local_blinding_masks_sum, tx, i_ + 1 == sources.size());
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
       }
       else
       {
         // NLSAG
-        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, i + input_starter_index, source_entry, sender_account_keys, in_contexts[i], txkey, flags, tx, &ss_ring_s);
+        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, i_ + input_starter_index, source_entry, sender_account_keys, in_contexts[i_mapped], txkey, flags, tx, &ss_ring_s);
         CHECK_AND_ASSERT_MES(r, false, "generate_NLSAG_sig failed");
       }
 

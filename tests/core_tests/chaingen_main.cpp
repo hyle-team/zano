@@ -1061,7 +1061,7 @@ int main(int argc, char* argv[])
     
     GENERATE_AND_PLAY(zarcanum_basic_test);
     GENERATE_AND_PLAY(multiassets_basic_test);
-
+  
     
 
     // GENERATE_AND_PLAY(gen_block_reward);
