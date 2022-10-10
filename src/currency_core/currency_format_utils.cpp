@@ -1575,7 +1575,7 @@ namespace currency
   };
   //--------------------------------------------------------------------------------
   bool generate_ZC_sig(const crypto::hash& tx_hash_for_signature, size_t input_index, const tx_source_entry& se, const input_generation_context_data& in_context,
-    const account_keys& sender_account_keys, const crypto::scalar_t& blinding_masks_sum, const uint64_t tx_flags, crypto::scalar_t& local_blinding_masks_sum, transaction& tx)
+    const account_keys& sender_account_keys, const crypto::scalar_t& blinding_masks_sum, const uint64_t tx_flags, crypto::scalar_t& local_blinding_masks_sum, transaction& tx, bool last_output)
   {
     bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
     CHECK_AND_ASSERT_MES(se.is_zarcanum(), false, "sources contains a non-zarcanum input");
@@ -1597,7 +1597,7 @@ namespace currency
 #endif
 
     crypto::scalar_t blinding_mask = 0;
-    if ((tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0 || se.separately_signed_tx_complete)
+    if ((last_output && (tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0) || se.separately_signed_tx_complete)
     {
       // either normal tx or the last signature of consolidated tx -- in both cases we need to calculate non-random blinding mask for pseudo output commitment
       blinding_mask = blinding_masks_sum + local_blinding_masks_sum;
@@ -2034,7 +2034,8 @@ namespace currency
       {
         // ZC
         // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
-        r = generate_ZC_sig(tx_hash_for_signature, i + input_starter_index, source_entry, in_contexts[i], sender_account_keys, blinding_masks_sum, flags, local_blinding_masks_sum, tx);
+        r = generate_ZC_sig(tx_hash_for_signature, i + input_starter_index, source_entry, in_contexts[i], sender_account_keys, blinding_masks_sum, flags,
+          local_blinding_masks_sum, tx, i + 1 == sources.size());
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
       }
       else
