@@ -806,7 +806,7 @@ struct A_v3 : public A_v2
     FIELD(vector_3)
     FIELD(vector_4)
     if (s_version < 3) return true;
-    FIELD(vector_4)
+    FIELD(vector_5)
   END_SERIALIZE()
 };
 
