@@ -917,6 +917,8 @@ namespace crypto
   extern const point_t  c_point_H2;
   extern const point_t  c_point_X;
   extern const point_t  c_point_0;
+  extern const point_t  c_point_H_plus_G;
+  extern const point_t  c_point_H_minus_G;
 
   //
   // hash functions' helper
