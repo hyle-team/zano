@@ -1580,7 +1580,6 @@ namespace currency
     ftp.tx_outs_attr = tx_outs_attr;
     ftp.shuffle = shuffle;
     ftp.flags = flags;
-    ftp.tx_version;
 
     finalized_tx ft = AUTO_VAL_INIT(ft);
     ft.tx = tx;
@@ -1832,7 +1831,8 @@ namespace currency
     //fill inputs NLSAG and Zarcanum 
     for (const tx_source_entry& src_entr : sources)
     {
-      inputs_mapping[current_index] = current_index++;
+      inputs_mapping[current_index] = current_index;
+      current_index++;
       in_contexts.push_back(input_generation_context_data());
       if(src_entr.is_multisig())
       {//multisig input

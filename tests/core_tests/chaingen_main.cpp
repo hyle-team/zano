@@ -1060,7 +1060,13 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(isolate_auditable_and_proof);
     
     GENERATE_AND_PLAY(zarcanum_basic_test);
-    GENERATE_AND_PLAY(multiassets_basic_test);
+
+    stop_on_first_fail = true;
+    for (uint64_t i = 0; i != 30; i++)
+    {
+      multiassets_basic_test::ts_starter = i;
+      GENERATE_AND_PLAY(multiassets_basic_test);
+    }
   
     
 
