@@ -844,11 +844,11 @@ namespace crypto
     // zeroes all elements
     void zero()
     {
-      PUSH_GCC_WARNINGS()
+      PUSH_GCC_WARNINGS
       DISABLE_GCC_AND_CLANG_WARNING(class-memaccess)
       size_t size_bytes = sizeof(scalar_t) * size();
       memset(data(), 0, size_bytes);
-      POP_GCC_WARNINGS()
+      POP_GCC_WARNINGS
     }
 
     // invert all elements in-place efficiently: 4*N muptiplications + 1 inversion
