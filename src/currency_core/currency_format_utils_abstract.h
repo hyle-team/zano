@@ -193,7 +193,7 @@ namespace currency
   }
   //---------------------------------------------------------------
   inline
-  const bool get_key_image_from_txin_v(const txin_v& in_v, crypto::key_image& result) noexcept
+  bool get_key_image_from_txin_v(const txin_v& in_v, crypto::key_image& result) noexcept
   {
     try
     {
@@ -218,6 +218,7 @@ namespace currency
     catch(...)
     {
       // should never go here, just precaution
+      return false;
     }
 
     return false;
