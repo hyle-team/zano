@@ -443,7 +443,7 @@ namespace currency
   struct zc_outs_range_proof
   {
     crypto::bpp_signature_serialized bpp;
-    uint8_t outputs_count;                // how many outputs are included in the proof
+    uint8_t outputs_count = 0;                // how many outputs are included in the proof
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(bpp)
@@ -459,7 +459,7 @@ namespace currency
   // Zarcanum-aware CLSAG signature
   struct ZC_sig
   {
-    crypto::public_key pseudo_out_amount_commitment; // premultiplied by 1/8
+    crypto::public_key pseudo_out_amount_commitment = null_pkey; // premultiplied by 1/8
     crypto::CLSAG_GG_signature_serialized clsags_gg;
     
     BEGIN_SERIALIZE_OBJECT()
@@ -475,7 +475,7 @@ namespace currency
 
   struct zc_balance_proof
   {
-    crypto::signature s;
+    crypto::signature s = null_sig;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(s)

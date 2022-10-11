@@ -100,7 +100,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   CHECK_AND_ASSERT_MES(it_asset != balances.end() && it_native != balances.end(), false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native->second.total == 17517226000000000000, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_native->second.total == uint64_t(17517226)*COIN, false, "Failed to find needed asset in result balances");
 
 
   balances.clear();
