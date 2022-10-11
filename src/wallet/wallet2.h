@@ -1312,7 +1312,7 @@ namespace tools
         ptc.is_derived_from_coinbase = true;
       else
         ptc.is_derived_from_coinbase = false;
-      WLT_LOG_L0("Spent key out, transfer #" << tr_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << ptc.height <<
+      WLT_LOG_L0("Spent key out, transfer #" << tr_index << ", amount: " << currency::print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << ptc.height <<
         "; flags: " << flags_before << " -> " << td.m_flags);
       ptc.mtd.spent_indices.push_back(ptc.i);
       remove_transfer_from_expiration_list(tr_index);
