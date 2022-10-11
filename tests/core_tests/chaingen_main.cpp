@@ -1061,12 +1061,12 @@ int main(int argc, char* argv[])
     
     GENERATE_AND_PLAY(zarcanum_basic_test);
 
-    stop_on_first_fail = true;
-    for (size_t i = 0; i != 100; i++)
-    {
-      multiassets_basic_test::ts_starter = i;
+    //stop_on_first_fail = true;
+    //for (size_t i = 0; i != 100; i++)
+    //{
+    //  multiassets_basic_test::ts_starter = i;
       GENERATE_AND_PLAY(multiassets_basic_test);
-    }
+    //}
   
     
 
