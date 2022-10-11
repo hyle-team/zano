@@ -141,8 +141,7 @@ namespace crypto
       crypto::secret_key  m_sk;
     };
 
-    scalar_t()
-    {}
+    scalar_t() = default;
 
     // won't check scalar range validity (< L)
     scalar_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
