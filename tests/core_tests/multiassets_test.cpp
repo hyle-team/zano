@@ -22,8 +22,8 @@ multiassets_basic_test::multiassets_basic_test()
 {
   // TODO: remove the following line
 
-  LOG_PRINT_MAGENTA("STARTER TS: " << ts_starter, LOG_LEVEL_0);
-  random_state_test_restorer::reset_random(ts_starter);
+  //LOG_PRINT_MAGENTA("STARTER TS: " << ts_starter, LOG_LEVEL_0);
+  //random_state_test_restorer::reset_random(ts_starter);
 
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, configure_core);
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, c1);
