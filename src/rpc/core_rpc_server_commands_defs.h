@@ -318,11 +318,13 @@ namespace currency
     struct request
     {
       std::list<uint64_t> amounts;
-      uint64_t            outs_count;
+      uint64_t            decoys_count;       // how many decoy outputs needed (per amount)
+      uint64_t            height_upper_limit; // all the decoy outputs must be either older than, or the same age as this height
       bool                use_forced_mix_outs;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(amounts)
-        KV_SERIALIZE(outs_count)
+        KV_SERIALIZE(decoys_count)
+        KV_SERIALIZE(height_upper_limit)
         KV_SERIALIZE(use_forced_mix_outs)
       END_KV_SERIALIZE_MAP()
     };
@@ -331,7 +333,9 @@ namespace currency
     struct out_entry
     {
       uint64_t global_amount_index;
-      crypto::public_key out_key;
+      crypto::public_key stealth_address;
+      crypto::public_key concealing_point;
+      crypto::public_key amount_commitment;
     };
 #pragma pack(pop)
 

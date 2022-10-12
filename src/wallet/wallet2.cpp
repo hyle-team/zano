@@ -4731,7 +4731,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
     req.use_forced_mix_outs = false; //add this feature to UI later
-    req.outs_count = fake_outputs_count + 1;// add one to make possible (if need) to skip real output key
+    req.decoys_count = fake_outputs_count + 1;// add one to make possible (if need) to skip real output key
     for (uint64_t i: selected_indicies)
     {
       auto it = m_transfers.begin() + i;
@@ -4751,7 +4751,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
     std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
     for(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_outs : daemon_resp.outs)
     {
-      if (amount_outs.outs.size() < req.outs_count)
+      if (amount_outs.outs.size() < req.decoys_count)
       {
         scanty_outs.push_back(amount_outs);
       }
@@ -5980,7 +5980,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
     req.use_forced_mix_outs = false;
-    req.outs_count = fake_outs_count + 1;
+    req.decoys_count = fake_outs_count + 1;
     for (uint64_t i : selected_transfers)
       req.amounts.push_back(m_transfers[i].amount());
 

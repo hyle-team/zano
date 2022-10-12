@@ -52,7 +52,7 @@ bool get_random_outs_test::check_get_rand_outs(currency::core& c, size_t ev_inde
 {
   currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
   req.amounts.push_back(m_amount);
-  req.outs_count = 4;
+  req.decoys_count = 4;
   req.use_forced_mix_outs = false;
   currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response res = AUTO_VAL_INIT(res);
   c.get_blockchain_storage().get_random_outs_for_amounts(req, res);
