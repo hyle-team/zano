@@ -27,30 +27,23 @@ namespace crypto
 #define DBG_VAL_PRINT(x) (void(0)) // std::cout << #x ": " << x << ENDL
 #define DBG_PRINT(x)     (void(0)) // std::cout << x << ENDL
 
-  template<typename CT>
-  bool bppe_gen(const scalar_vec_t& values, const scalar_vec_t& masks, const scalar_vec_t& masks2, bppe_signature& sig, std::vector<point_t>& commitments, uint8_t* p_err = nullptr)
-  {
 #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
     if (!(cond)) { LOG_PRINT_RED("bppe_gen: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
+
+  template<typename CT>
+  bool bppe_gen(const scalar_vec_t& values, const scalar_vec_t& masks, const scalar_vec_t& masks2, const std::vector<const crypto::public_key*>& commitments_1div8, bppe_signature& sig, uint8_t* p_err = nullptr)
+  {
+    // Note: commitments_1div8 are supposed to be already calculated
     static_assert(CT::c_bpp_n <= 255, "too big N");
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(values.size() > 0 && values.size() <= CT::c_bpp_values_max && values.size() == masks.size() && masks.size() == masks2.size(), 1);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(values.size() > 0 && values.size() <= CT::c_bpp_values_max && values.size() == masks.size() && masks.size() == masks2.size() && values.size() == commitments_1div8.size(), 1);
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(masks.is_reduced() && masks2.is_reduced(), 3);
 
     const size_t c_bpp_log2_m = constexpr_ceil_log2(values.size());
     const size_t c_bpp_m = 1ull << c_bpp_log2_m;
     const size_t c_bpp_mn = c_bpp_m * CT::c_bpp_n;
     const size_t c_bpp_log2_mn = c_bpp_log2_m + CT::c_bpp_log2_n;
-
-    // pre-multiply all output points by c_scalar_1div8
-    // in order to enforce these points to be in the prime-order subgroup (after mul by 8 in bpp_verify())
-
-    // calc commitments vector as commitments[i] = 1/8 * values[i] * G + 1/8 * masks[i] * H + 1/8 * masks2[i] * H2
-    commitments.resize(values.size());
-    for (size_t i = 0; i < values.size(); ++i)
-      CT::calc_pedersen_commitment_2(values[i] * c_scalar_1div8, masks[i] * c_scalar_1div8, masks2[i] * c_scalar_1div8, commitments[i]);
-
 
     // s.a. BP+ paper, page 15, eq. 11
     // decompose v into aL and aR:
@@ -86,7 +79,7 @@ namespace crypto
     DBG_PRINT("initial transcript: " << e);
 
     hash_helper_t::hs_t hsc;
-    CT::update_transcript(hsc, e, commitments);
+    CT::update_transcript(hsc, e, commitments_1div8);
 
     // Zarcanum paper, page 33, Fig. D.3: The prover chooses alpha_1, alpha_2 and computes A = g^aL h^aR h_1^alpha_1 h_2^alpha_2
     // so we calculate A0 = alpha_1 * H + alpha_2 * H_2 + SUM(aL_i * G_i) + SUM(aR_i * H_i)
@@ -336,8 +329,26 @@ namespace crypto
     DBG_VAL_PRINT(sig.delta_2);
 
     return true;
-#undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
   } // bppe_gen()
+
+
+  // convenient overload for tests 
+  template<typename CT>
+  bool bppe_gen(const scalar_vec_t& values, const scalar_vec_t& masks, const scalar_vec_t& masks2, bppe_signature& sig, std::vector<point_t>& commitments_1div8_to_be_generated, uint8_t* p_err = nullptr)
+  {
+    // calc commitments vector as commitments[i] = 1/8 * values[i] * G + 1/8 * masks[i] * H + 1/8 * masks2[i] * H2
+    commitments_1div8_to_be_generated.resize(values.size());
+    std::vector<crypto::public_key> commitments_1div8(values.size());
+    std::vector<const crypto::public_key*> commitments_1div8_pointers(values.size());
+    for (size_t i = 0; i < values.size(); ++i)
+    {
+      CT::calc_pedersen_commitment_2(values[i] * c_scalar_1div8, masks[i] * c_scalar_1div8, masks2[i] * c_scalar_1div8, commitments_1div8_to_be_generated[i]);
+      commitments_1div8[i] = (commitments_1div8_to_be_generated[i]).to_public_key();
+      commitments_1div8_pointers[i] = &commitments_1div8[i];
+    }
+    return bppe_gen<CT>(values, masks, masks2, commitments_1div8_pointers, sig, p_err); 
+  }
+  #undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
 
 
   struct bppe_sig_commit_ref_t
@@ -347,7 +358,7 @@ namespace crypto
       , commitments(commitments)
     {}
     const bppe_signature& sig;
-    const std::vector<point_t>& commitments;
+    const std::vector<point_t>& commitments; // assumed to be premultiplied by 1/8
   };
 
 
