@@ -353,7 +353,7 @@ bool test_generator::sign_block(currency::block& b,
                                 const std::vector<const block_info*>& blocks, 
                                 const outputs_index& oi)
 {
-  uint64_t h = 0;
+  /*uint64_t h = 0;
   uint64_t out_i = 0;
   const transaction * pts = nullptr;
   crypto::public_key source_tx_pub_key = null_pkey;
@@ -368,11 +368,9 @@ bool test_generator::sign_block(currency::block& b,
     out_i,
     source_tx_pub_key,
     out_key);
-  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get_output_details_by_global_index()");
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get_output_details_by_global_index()");*/
 
-  std::vector<const crypto::public_key*> keys_ptrs;
-  keys_ptrs.push_back(&out_key);
-  r = w.prepare_and_sign_pos_block(b, pe, source_tx_pub_key, out_i, keys_ptrs);
+  bool r = w.prepare_and_sign_pos_block(b, pe);
   CHECK_AND_ASSERT_THROW_MES(r,"Failed to prepare_and_sign_pos_block()");
 
   return true;

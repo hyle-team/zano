@@ -833,11 +833,7 @@ namespace currency
     params.stakeholder_address = stakeholder_address;
     params.ex_nonce = req.extra_text;
     params.pos = req.pos_block;
-    params.pe.amount = req.pos_amount;
-    params.pe.g_index = req.pos_g_index;
-    params.pe.tx_id = req.tx_id;
-    params.pe.tx_out_index = req.tx_out_index;
-    params.pe.stake_unlock_time = req.stake_unlock_time;
+    params.pe = req.pe;
     //params.pe.keyimage key image will be set in the wallet
     //params.pe.wallet_index is not included in serialization map, TODO: refactoring here
     params.pcustom_fill_block_template_func = nullptr;
