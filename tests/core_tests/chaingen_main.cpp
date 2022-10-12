@@ -1064,7 +1064,7 @@ int main(int argc, char* argv[])
     //stop_on_first_fail = true;
     //for (size_t i = 0; i != 100; i++)
     //{
-    //  multiassets_basic_test::ts_starter = i;
+      multiassets_basic_test::ts_starter = 0;
       GENERATE_AND_PLAY(multiassets_basic_test);
     //}
   
