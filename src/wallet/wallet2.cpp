@@ -3589,10 +3589,9 @@ bool wallet2::get_pos_entries(std::vector<currency::pos_entry>& entries)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index)
+bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index) const
 {
-  const currency::core_runtime_config& rtc = get_core_runtime_config();
-  return rtc.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
+  return m_core_runtime_config.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_and_sign_pos_block(currency::block& b, 
