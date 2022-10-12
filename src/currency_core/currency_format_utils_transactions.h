@@ -110,6 +110,7 @@ namespace currency
       FIELD(amount_to_provide)
       FIELD(unlock_time)
       FIELD(htlc_options)
+      FIELD(asset_id)
     END_SERIALIZE()
   };
 

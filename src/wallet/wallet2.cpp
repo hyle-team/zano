@@ -4185,6 +4185,10 @@ void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_inf
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_reg_info);
 
+  //&&&&&
+  LOG_PRINT_MAGENTA("ctp.dsts[0].asset_id:" << ctp.dsts[0].asset_id << ", ctp.dsts[1].asset_id:" << ctp.dsts[1].asset_id);
+
+
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
   result_tx = ft.tx;
@@ -5746,6 +5750,13 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   TIME_MEASURE_START_MS(prepare_tx_destinations_time);
   prepare_tx_destinations(needed_money_map, static_cast<detail::split_strategy_id_t>(ctp.split_strategy_id), ctp.dust_policy, ctp.dsts, ftp.prepared_destinations);
   TIME_MEASURE_FINISH_MS(prepare_tx_destinations_time);
+
+  //&&&&&
+  for (const auto d : ftp.prepared_destinations)
+  {
+    LOG_PRINT_MAGENTA("[prepare_tx_destinations] amount:" << d.amoumt << ", asset_id:" << d.asset_id);
+  }
+
 
   if (ctp.mark_tx_as_complete && !ftp.sources.empty())
     ftp.sources.back().separately_signed_tx_complete = true;
