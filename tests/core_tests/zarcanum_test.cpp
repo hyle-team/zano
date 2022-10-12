@@ -119,20 +119,17 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   miner_benefeciary_acc.generate();
   std::shared_ptr<tools::wallet2> miner_benefeciary_acc_wlt = init_playtime_test_wallet(events, c, miner_benefeciary_acc);
 
+  alice_wlt->refresh();
+
   size_t pos_entries_count = 0;
   //do staking 
-  for(size_t i = 0; i!= CURRENCY_MINED_MONEY_UNLOCK_WINDOW+4; i++)
+  for(size_t i = 0; i != CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4; i++)
   {
-    if (!mine_next_pos_block_in_playtime_with_wallet(*alice_wlt.get(), staker_benefeciary_acc_wlt->get_account().get_public_address(), pos_entries_count))
-    {
-      CHECK_AND_ASSERT_MES(false, false, "Couldn't generate staking");
-      return false;
-    }   
-    if (!mine_next_pow_block_in_playtime(miner_benefeciary_acc.get_public_address(), c))
-    {
-      CHECK_AND_ASSERT_MES(false, false, "Couldn't generate pow");
-      return false;
-    }
+    r = mine_next_pos_block_in_playtime_with_wallet(*alice_wlt.get(), staker_benefeciary_acc_wlt->get_account().get_public_address(), pos_entries_count);
+    CHECK_AND_ASSERT_MES(r, false, "mine_next_pos_block_in_playtime_with_wallet failed");
+
+    r = mine_next_pow_block_in_playtime(miner_benefeciary_acc.get_public_address(), c);
+    CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   }
 
   //attempt to spend staked and mined coinbase outs
@@ -140,10 +137,10 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   miner_benefeciary_acc_wlt->refresh();
 
   staker_benefeciary_acc_wlt->transfer(transfer_amount2, bob_acc.get_public_address());
-  LOG_PRINT_MAGENTA("Zarcanum(pos-coinbase)-2-zarcanum transaction sent from Staker to Bob " << transfer_amount2, LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("Zarcanum(pos-coinbase)-2-zarcanum transaction sent from Staker to Bob " << print_money_brief(transfer_amount2), LOG_LEVEL_0);
 
   miner_benefeciary_acc_wlt->transfer(transfer_amount2, bob_acc.get_public_address());
-  LOG_PRINT_MAGENTA("Zarcanum(pow-coinbase)-2-zarcanum transaction sent from Staker to Bob " << transfer_amount2, LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("Zarcanum(pow-coinbase)-2-zarcanum transaction sent from Staker to Bob " << print_money_brief(transfer_amount2), LOG_LEVEL_0);
 
   CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool");
 

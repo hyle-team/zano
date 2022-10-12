@@ -842,11 +842,7 @@ namespace tools
     //next functions in public area only becausce of test_generator
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
-    bool prepare_and_sign_pos_block(currency::block& b,
-      const currency::pos_entry& pos_info,
-      const crypto::public_key& source_tx_pub_key,
-      uint64_t in_tx_output_index,
-      const std::vector<const crypto::public_key*>& keys_ptrs);
+    bool prepare_and_sign_pos_block(currency::block& b, const currency::pos_entry& pe) const;
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
@@ -857,8 +853,8 @@ namespace tools
     bool get_pos_entries(std::vector<currency::pos_entry>& entries); // TODO: make it const
     size_t get_pos_entries_count();
 
-    bool build_minted_block(const mining_context& cxt, uint64_t new_block_expected_height = UINT64_MAX);
-    bool build_minted_block(const mining_context& cxt, const currency::account_public_address& miner_address, uint64_t new_block_expected_height = UINT64_MAX);
+    bool build_minted_block(const mining_context& cxt);
+    bool build_minted_block(const mining_context& cxt, const currency::account_public_address& miner_address);
     bool reset_history();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
@@ -1064,7 +1060,7 @@ private:
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(uint64_t amount, const std::vector<currency::txout_ref_v> & key_offsets);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_zc_input& inzc);
-    bool is_in_hardfork_zone(uint64_t hardfork_index);
+    bool is_in_hardfork_zone(uint64_t hardfork_index) const;
     uint8_t out_get_mixin_attr(const currency::tx_out_v& out_t);
     const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);
 

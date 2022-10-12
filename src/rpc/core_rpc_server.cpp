@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -35,8 +35,11 @@ namespace currency
   }
   //------------------------------------------------------------------------------------------------------------------------------
   core_rpc_server::core_rpc_server(core& cr, nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& p2p,
-    bc_services::bc_offers_service& of
-    ) :m_core(cr), m_p2p(p2p), m_of(of), m_session_counter(0), m_ignore_status(false)
+    bc_services::bc_offers_service& of)
+    : m_core(cr)
+    , m_p2p(p2p)
+    , m_of(of)
+    , m_ignore_status(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::handle_command_line(const boost::program_options::variables_map& vm)
@@ -830,11 +833,7 @@ namespace currency
     params.stakeholder_address = stakeholder_address;
     params.ex_nonce = req.extra_text;
     params.pos = req.pos_block;
-    params.pe.amount = req.pos_amount;
-    params.pe.g_index = req.pos_g_index;
-    params.pe.tx_id = req.tx_id;
-    params.pe.tx_out_index = req.tx_out_index;
-    params.pe.stake_unlock_time = req.stake_unlock_time;
+    params.pe = req.pe;
     //params.pe.keyimage key image will be set in the wallet
     //params.pe.wallet_index is not included in serialization map, TODO: refactoring here
     params.pcustom_fill_block_template_func = nullptr;
@@ -1157,109 +1156,6 @@ namespace currency
   }
 
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::get_current_hi(mining::height_info& hi)
-  {
-    block prev_block = AUTO_VAL_INIT(prev_block);
-    m_core.get_blockchain_storage().get_top_block(prev_block);
-    hi.block_id  = string_tools::pod_to_hex(currency::get_block_hash(prev_block));
-    hi.height = get_block_height(prev_block);
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  void core_rpc_server::set_session_blob(const std::string& session_id, const currency::block& blob)
-  {
-    CRITICAL_REGION_LOCAL(m_session_jobs_lock);
-    m_session_jobs[session_id] = blob;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::get_session_blob(const std::string& session_id, currency::block& blob)
-  {
-    CRITICAL_REGION_LOCAL(m_session_jobs_lock);
-    auto it = m_session_jobs.find(session_id);
-    if(it == m_session_jobs.end())
-      return false;
-
-    blob = it->second;
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::get_job(const std::string& job_id, mining::job_details& job, epee::json_rpc::error& err, connection_context& cntx)
-  {
-    COMMAND_RPC_GETBLOCKTEMPLATE::request bt_req = AUTO_VAL_INIT(bt_req);
-    COMMAND_RPC_GETBLOCKTEMPLATE::response bt_res = AUTO_VAL_INIT(bt_res);
-
-    // !!!!!!!! SET YOUR WALLET ADDRESS HERE  !!!!!!!!
-    bt_req.wallet_address = "1HNJjUsofq5LYLoXem119dd491yFAb5g4bCHkecV4sPqigmuxw57Ci9am71fEN4CRmA9jgnvo5PDNfaq8QnprWmS5uLqnbq";
-    
-    if(!on_getblocktemplate(bt_req, bt_res, err, cntx))
-      return false;
-
-    //patch block blob if you need(bt_res.blocktemplate_blob), and than load block from blob template
-    //important: you can't change block size, since it could touch reward and block became invalid
-
-    block b = AUTO_VAL_INIT(b);
-    std::string bin_buff;
-    bool r = string_tools::parse_hexstr_to_binbuff(bt_res.blocktemplate_blob, bin_buff);
-    CHECK_AND_ASSERT_MES(r, false, "internal error, failed to parse hex block");
-    r = currency::parse_and_validate_block_from_blob(bin_buff, b);
-    CHECK_AND_ASSERT_MES(r, false, "internal error, failed to parse block");
-
-    set_session_blob(job_id, b);
-    job.blob = string_tools::buff_to_hex_nodelimer(currency::get_block_hashing_blob(b));
-    //TODO: set up share difficulty here!
-    job.difficulty = bt_res.difficulty; //difficulty leaved as string field since it will be refactored into 128 bit format
-    job.job_id = "SOME_JOB_ID";
-    get_current_hi(job.prev_hi);
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_login(const mining::COMMAND_RPC_LOGIN::request& req, mining::COMMAND_RPC_LOGIN::response& res, connection_context& cntx)
-  {
-    if(!check_core_ready())
-    {
-      res.status = API_RETURN_CODE_BUSY;
-      return true;
-    }
-    
-    //TODO: add login information here
-
-
-    res.id =  std::to_string(m_session_counter++); //session id
-
-    if(req.hi.height)
-    {
-      epee::json_rpc::error err = AUTO_VAL_INIT(err);
-      if(!get_job(res.id, res.job, err, cntx))
-      {
-        res.status = err.message;
-        return true;
-      }
-    }
-
-    res.status = API_RETURN_CODE_OK;
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_getjob(const mining::COMMAND_RPC_GETJOB::request& req, mining::COMMAND_RPC_GETJOB::response& res, connection_context& cntx)
-  {
-    if(!check_core_ready())
-    {
-      res.status = API_RETURN_CODE_BUSY;
-      return true;
-    }
-    
- 
-
-    /*epee::json_rpc::error err = AUTO_VAL_INIT(err);
-    if(!get_job(req.id, res.jd, err, cntx))
-    {
-      res.status = err.message;
-      return true;
-    }*/
-
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_alias_reward(const COMMAND_RPC_GET_ALIAS_REWARD::request& req, COMMAND_RPC_GET_ALIAS_REWARD::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
 
@@ -1320,45 +1216,6 @@ namespace currency
       res.alias_info_list.back().alias = req2.alias;
 
     }
-    res.status = API_RETURN_CODE_OK;
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_submit(const mining::COMMAND_RPC_SUBMITSHARE::request& req, mining::COMMAND_RPC_SUBMITSHARE::response& res, connection_context& cntx)
-  {
-    if(!check_core_ready())
-    {
-      res.status = API_RETURN_CODE_BUSY;
-      return true;
-    }
-    block b = AUTO_VAL_INIT(b);
-    if(!get_session_blob(req.id, b))
-    {
-      res.status = "Wrong session id";
-      return true;
-    }
-
-    b.nonce = req.nonce;
-
-    if(!m_core.handle_block_found(b))
-    {
-      res.status = "Block not accepted";
-      LOG_ERROR("Submited block not accepted");
-      return true;
-    }
-    res.status = API_RETURN_CODE_OK;
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_addendums(const COMMAND_RPC_GET_ADDENDUMS::request& req, COMMAND_RPC_GET_ADDENDUMS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
-  {
-    if (!check_core_ready())
-    {
-      res.status = API_RETURN_CODE_BUSY;
-      return true;
-    }
-
-
     res.status = API_RETURN_CODE_OK;
     return true;
   }

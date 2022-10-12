@@ -28,6 +28,9 @@ namespace crypto
 
   const point_t  c_point_0        = point_t(point_t::tag_zero());
 
+  const point_t  c_point_H_plus_G = c_point_H + c_point_G;                                                               // checked in crypto_constants
+  const point_t  c_point_H_minus_G = c_point_H - c_point_G;                                                              // checked in crypto_constants
+
   static_assert(sizeof(scalar_t::m_sk) == sizeof(scalar_t::m_u64) && sizeof(scalar_t::m_u64) == sizeof(scalar_t::m_s), "size missmatch");
 
 } // namespace crypto

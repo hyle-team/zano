@@ -1118,6 +1118,14 @@ TEST(crypto, scalar_arithmetic_assignment)
   return true;
 }
 
+TEST(crypto, constants)
+{
+  ASSERT_EQ(c_point_H_plus_G, c_point_H + c_point_G);
+  ASSERT_EQ(c_point_H_minus_G, c_point_H - c_point_G);
+
+  return true;
+}
+
 TEST(crypto, point_basics)
 {
   scalar_t s = 4;

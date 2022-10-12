@@ -11,7 +11,6 @@
 #include "currency_core/difficulty.h"
 #include "crypto/hash.h"
 #include "p2p/p2p_protocol_defs.h"
-#include "rpc/mining_protocol_defs.h"
 #include "storages/portable_storage_base.h"
 #include "currency_core/offers_service_basics.h"
 #include "currency_core/basic_api_response_codes.h"
@@ -319,11 +318,13 @@ namespace currency
     struct request
     {
       std::list<uint64_t> amounts;
-      uint64_t            outs_count;
+      uint64_t            decoys_count;       // how many decoy outputs needed (per amount)
+      uint64_t            height_upper_limit; // all the decoy outputs must be either older than, or the same age as this height
       bool                use_forced_mix_outs;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(amounts)
-        KV_SERIALIZE(outs_count)
+        KV_SERIALIZE(decoys_count)
+        KV_SERIALIZE(height_upper_limit)
         KV_SERIALIZE(use_forced_mix_outs)
       END_KV_SERIALIZE_MAP()
     };
@@ -332,7 +333,9 @@ namespace currency
     struct out_entry
     {
       uint64_t global_amount_index;
-      crypto::public_key out_key;
+      crypto::public_key stealth_address;
+      crypto::public_key concealing_point;
+      crypto::public_key amount_commitment;
     };
 #pragma pack(pop)
 
@@ -804,11 +807,13 @@ namespace currency
       std::string wallet_address;
       std::string stakeholder_address;
       bool pos_block;              //is pos block 
-      uint64_t pos_amount;         //do we still need it?
-      uint64_t pos_g_index;        //
-      crypto::hash tx_id;
-      uint64_t tx_out_index;
-      uint64_t stake_unlock_time;
+      //uint64_t pos_amount;         //do we still need it?
+      //uint64_t pos_g_index;        //
+      //crypto::hash tx_id;
+      //uint64_t tx_out_index;
+      //uint64_t stake_unlock_time;
+
+      pos_entry pe;                     // for making PoS blocks
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_BLOB_AS_HEX_STRING(explicit_transaction)
@@ -816,11 +821,12 @@ namespace currency
         KV_SERIALIZE(wallet_address)   
         KV_SERIALIZE(stakeholder_address);
         KV_SERIALIZE(pos_block)
-        KV_SERIALIZE(pos_amount)
-        KV_SERIALIZE(pos_g_index)
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
-        KV_SERIALIZE(tx_out_index)
-        KV_SERIALIZE(stake_unlock_time)
+        //KV_SERIALIZE(pos_amount)
+        //KV_SERIALIZE(pos_g_index)
+        //KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+        //KV_SERIALIZE(tx_out_index)
+        //KV_SERIALIZE(stake_unlock_time)
+        KV_SERIALIZE(pe)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1079,25 +1085,6 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(alias_info_list)
         KV_SERIALIZE(status)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-
-  struct COMMAND_RPC_GET_ADDENDUMS
-  {
-
-    typedef mining::height_info request;
-
-    struct response
-    {
-      std::string status;
-      std::list<mining::addendum> addms;
-
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-        KV_SERIALIZE(addms)
       END_KV_SERIALIZE_MAP()
     };
   };
