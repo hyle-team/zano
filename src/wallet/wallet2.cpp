@@ -5880,10 +5880,9 @@ construct_tx_param wallet2::get_default_construct_tx_param_inital()
   ctp.shuffle = 0;
   return ctp;
 }
-const construct_tx_param& wallet2::get_default_construct_tx_param()
+construct_tx_param wallet2::get_default_construct_tx_param()
 {
-  construct_tx_param ctp = get_default_construct_tx_param_inital();
-  return ctp;
+  return get_default_construct_tx_param_inital();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const currency::finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str /* = nullptr */)

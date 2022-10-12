@@ -1006,7 +1006,7 @@ private:
     template<typename input_t>
     bool process_input_t(const input_t& in_t, wallet2::process_transaction_context& ptc, const currency::transaction& tx);
 
-    const construct_tx_param& get_default_construct_tx_param();
+    construct_tx_param get_default_construct_tx_param();
 
     uint64_t get_tx_expiration_median() const;
 
