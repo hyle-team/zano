@@ -912,7 +912,7 @@ int main(int argc, char* argv[])
     // GENERATE_AND_PLAY(pos_wallet_minting_same_amount_diff_outs); // Long test! Takes ~10 hours to simulate 6000 blocks on 2015 middle-end computer
     //GENERATE_AND_PLAY(pos_emission_test); // Long test! by demand only
     GENERATE_AND_PLAY(pos_wallet_big_block_test);
-    GENERATE_AND_PLAY(block_template_against_txs_size);
+    //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
     GENERATE_AND_PLAY(pos_altblocks_validation);
 
     // alternative blocks and generic chain-switching tests

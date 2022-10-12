@@ -184,8 +184,8 @@ namespace tools
         else
         {
           currency::decompose_amount_into_digits(de.amount, dust_threshold,
-            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, de.addr)); },
-            [&](uint64_t a_dust) { splitted_dsts.push_back(currency::tx_destination_entry(a_dust, de.addr)); }, max_output_allowed);
+            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, de.addr, de.asset_id)); },
+            [&](uint64_t a_dust) { splitted_dsts.push_back(currency::tx_destination_entry(a_dust, de.addr, de.asset_id)); }, max_output_allowed);
         }
       }
 
