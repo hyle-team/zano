@@ -1737,8 +1737,6 @@ namespace currency
     result.ftp = ftp;
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "Too many outs (" << destinations.size() << ")! Tx can't be constructed.");
 
-    bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
-
     bool append_mode = false;
     if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
       append_mode = true;

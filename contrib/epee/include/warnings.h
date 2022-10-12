@@ -12,8 +12,12 @@
 #define DISABLE_GCC_WARNING(w)
 #define DISABLE_CLANG_WARNING(w)
 #define DISABLE_GCC_AND_CLANG_WARNING(w)
+#define ATTRIBUTE_UNUSED 
 
 #else
+
+
+#define ATTRIBUTE_UNUSED __attribute__((unused))
 
 #include <boost/preprocessor/stringize.hpp>
 

@@ -61,7 +61,7 @@ inline bool do_serialize(Archive &ar, T &v)
 #define VARIANT_TAG(A, T, Tg) \
   template <bool W> struct variant_serialization_traits<A<W>, T> { static inline typename A<W>::variant_tag_type get_tag() { return Tg; } }
 #define BEGIN_SERIALIZE() \
-  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) {uint8_t s_current_version = 0; uint8_t s_version = 0;
+  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) {uint8_t s_current_version ATTRIBUTE_UNUSED = 0; uint8_t s_version ATTRIBUTE_UNUSED = 0;
 #define BEGIN_SERIALIZE_OBJECT() \
   template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) { _ser_ar.begin_object(); bool _ser_res = do_serialize_object(_ser_ar); _ser_ar.end_object(); return _ser_res; } \
   template <bool W, template <bool> class Archive> bool do_serialize_object(Archive<W> &_ser_ar){
