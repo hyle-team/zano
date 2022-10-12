@@ -5881,7 +5881,7 @@ construct_tx_param wallet2::get_default_construct_tx_param_inital()
 }
 const construct_tx_param& wallet2::get_default_construct_tx_param()
 {
-  static construct_tx_param ctp = get_default_construct_tx_param_inital();
+  construct_tx_param ctp = get_default_construct_tx_param_inital();
   return ctp;
 }
 //----------------------------------------------------------------------------------------------------
