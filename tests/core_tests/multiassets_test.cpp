@@ -78,9 +78,9 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   destinations[1].amount = AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC;
   destinations[1].asset_id = currency::ffff_hash;
   
-  LOG_PRINT_MAGENTA("destinations[0].asset_id:" << destinations[0].asset_id);
-  LOG_PRINT_MAGENTA("destinations[1].asset_id:" << destinations[1].asset_id);
-  LOG_PRINT_MAGENTA("currency::ffff_hash:" << currency::ffff_hash);
+  LOG_PRINT_MAGENTA("destinations[0].asset_id:" << destinations[0].asset_id, LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("destinations[1].asset_id:" << destinations[1].asset_id, LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("currency::ffff_hash:" << currency::ffff_hash, LOG_LEVEL_0);
 
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::hash asset_id = currency::null_hash;
