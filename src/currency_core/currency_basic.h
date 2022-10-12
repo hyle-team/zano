@@ -38,6 +38,7 @@
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "crypto/range_proofs.h"
+#include "crypto/zarcanum.h"
 #include "misc_language.h"
 #include "block_flags.h"
 #include "etc_custom_serialization.h"
@@ -482,6 +483,22 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
+
+  struct zarcanum_sig : public crypto::zarcanum_proof
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(d)
+      FIELD(C)
+      // TODO
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(d)
+      BOOST_SERIALIZE(C)
+      // TODO
+    END_BOOST_SERIALIZATION()
+  };
+
 //#pragma pack(pop)
 
   typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_htlc, txin_zc_input> txin_v;
@@ -803,8 +820,7 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
-
-  typedef boost::variant<NLSAG_sig, void_sig, ZC_sig> signature_v;
+  typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig> signature_v;
 
 
 
@@ -1077,10 +1093,11 @@ SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 41, "bppe_signature_serializ
 SET_VARIANT_TAGS(currency::NLSAG_sig, 42, "NLSAG_sig");
 SET_VARIANT_TAGS(currency::ZC_sig, 43, "ZC_sig");
 SET_VARIANT_TAGS(currency::void_sig, 44, "void_sig");
-SET_VARIANT_TAGS(currency::zc_outs_range_proof, 45, "zc_outs_range_proof");
-SET_VARIANT_TAGS(currency::zc_balance_proof, 46, "zc_balance_proof");
+SET_VARIANT_TAGS(currency::zarcanum_sig, 45, "zarcanum_sig");
+SET_VARIANT_TAGS(currency::zc_outs_range_proof, 46, "zc_outs_range_proof");
+SET_VARIANT_TAGS(currency::zc_balance_proof, 47, "zc_balance_proof");
 
-SET_VARIANT_TAGS(currency::open_asset_id, 47, "asset_id");
+SET_VARIANT_TAGS(currency::open_asset_id, 48, "asset_id");
 
 
 

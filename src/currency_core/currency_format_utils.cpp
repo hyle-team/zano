@@ -3901,7 +3901,12 @@ namespace currency
     //@#@ TODO
     return false;
   }
-
+  //--------------------------------------------------------------------------------
+  bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b)
+  {
+    //@#@ TODO
+    return false;
+  }
   //--------------------------------------------------------------------------------
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs)
   {

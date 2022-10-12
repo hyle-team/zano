@@ -6,6 +6,8 @@
 // Note: This file originates from tests/functional_tests/crypto_tests.cpp 
 #pragma once
 #include "crypto-sugar.h"
+#include "crypto/range_proof_bppe.h"
+#include "crypto/clsag.h"
 #include <boost/multiprecision/cpp_int.hpp>
 
 namespace crypto
@@ -21,5 +23,32 @@ namespace crypto
   bool zarcanum_check_main_pos_inequality(const hash& kernel_hash, const scalar_t& blinding_mask, const scalar_t& secret_q,
   const scalar_t& last_pow_block_id_hashed, const mp::uint256_t& z_l_div_z_D_, uint64_t stake_amount, mp::uint256_t& lhs, mp::uint512_t& rhs);
 
+
+  struct zarcanum_proof
+  {
+    scalar_t    d         = 0;
+    public_key  C;
+    public_key  C_prime;
+    public_key  E;
+
+    scalar_t    c;                // shared Fiat-Shamir challenge for the following three proofs
+    scalar_t    y0;               // 1st linear composition proof
+    scalar_t    y1;               //     ( C + C' = lin(X, H + G) )
+    scalar_t    y2;               // 2nd linear composition proof
+    scalar_t    y3;               //     ( C - C' = lin(X, H - G) )
+    scalar_t    y4;               // Schnorr proof (F = lin(X))
+    
+    bppe_signature E_range_proof;
+    CLSAG_GGXG_signature ring_sig;
+  };
+
+  bool zarcanum_generate_proof(const hash& kernel_hash, const public_key& stake_commitment_1div8, const scalar_t& last_pow_block_id_hashed,
+    const scalar_t& blinding_mask, const scalar_t& secret_q, uint64_t stake_amount,
+    uint64_t secret_index,
+    zarcanum_proof& result, uint8_t* p_err = nullptr);
+
+  
+
+  bool zarcanum_verify_proof(const hash& kernel_hash, const public_key& commitment_1div8, const scalar_t& last_pow_block_id_hashed, const zarcanum_proof& proof, uint8_t* p_err = nullptr);
 
 } // namespace crypto

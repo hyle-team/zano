@@ -59,6 +59,7 @@ namespace currency
   bool operator ==(const currency::NLSAG_sig& a, const currency::NLSAG_sig& b);
   bool operator ==(const currency::void_sig& a, const currency::void_sig& b);
   bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b);
+  bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
 
   typedef boost::multiprecision::uint128_t uint128_tl;
 
