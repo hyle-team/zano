@@ -86,7 +86,7 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   //miner_wlt->refresh();
   alice_wlt->refresh();
   
-  uint64_t unlocked = 0;
+  //uint64_t unlocked = 0;
   //uint64_t balance = alice_wlt->balance(unlocked);
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", transfer_amount * 4, UINT64_MAX, transfer_amount * 4), false, "");
 
