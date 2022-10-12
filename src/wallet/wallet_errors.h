@@ -463,6 +463,7 @@ namespace tools
             ss << currency::get_account_address_as_str(a) << ";";
           } 
           ss << " anount: " << currency::print_money(dst.amount);
+          ss << " asset_id: " << dst.asset_id;
         }
 
         ss << "\nunlock_time: " << m_unlock_time;
