@@ -229,6 +229,35 @@ namespace currency
     CHECK_AND_ASSERT_THROW_MES(false, "[get_key_offsets_from_txin_v] Wrong type: " << in_v.type().name());
   }
   //---------------------------------------------------------------
+  inline
+  bool get_mix_attr_from_tx_out_v(const tx_out_v& out_v, uint8_t& result) noexcept
+  {
+    try
+    {
+      if (out_v.type() == typeid(tx_out_bare))
+      {
+        const tx_out_bare& ob = boost::get<tx_out_bare>(out_v);
+        if (ob.target.type() == typeid(txout_to_key))
+        {
+          result = boost::get<txout_to_key>(ob.target).mix_attr;
+          return true;
+        }
+      }
+    
+      if (out_v.type() == typeid(tx_out_zarcanum))
+      {
+        result = boost::get<tx_out_zarcanum>(out_v).mix_attr;
+        return true;
+      }
+    }
+    catch(...)
+    {
+      // should never go here, just precaution
+    }
+
+    return false;
+  }
+  //---------------------------------------------------------------
   //, txin_htlc, txin_zc_input
   inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)
   {

@@ -246,10 +246,8 @@ namespace currency
     }
 
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS || height == 0, false, "Too many outs (" << destinations.size() << ")! Miner tx can't be constructed.");
+    tx = AUTO_VAL_INIT_T(transaction);
     tx.version = tx_version;
-    tx.vin.clear();
-    tx.vout.clear();
-    tx.extra.clear();
 
     keypair txkey = keypair::generate();
     add_tx_pub_key_to_extra(tx, txkey.pub);

@@ -2475,15 +2475,21 @@ size_t blockchain_storage::get_alternative_blocks_count() const
   return m_alternative_chains.size();
 }
 //------------------------------------------------------------------
-bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, uint64_t amount, size_t i, uint64_t mix_count, bool use_only_forced_to_mix) const
+bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, uint64_t amount, size_t g_index, uint64_t mix_count,
+  bool use_only_forced_to_mix, uint64_t height_upper_limit) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  auto out_ptr = m_db_outputs.get_subitem(amount, i);
+  auto out_ptr = m_db_outputs.get_subitem(amount, g_index);
   auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
   CHECK_AND_ASSERT_MES(tx_ptr, false, "internal error: transaction with id " << out_ptr->tx_id << ENDL <<
-    ", used in mounts global index for amount=" << amount << ": i=" << i << "not found in transactions index");
+    ", used in mounts global index for amount=" << amount << ": g_index=" << g_index << "not found in transactions index");
   CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() > out_ptr->out_no, false, "internal error: in global outs index, transaction out index="
     << out_ptr->out_no << " more than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
+
+  CHECK_AND_ASSERT_MES(amount != 0 || height_upper_limit != 0, false, "height_upper_limit must be nonzero for hidden amounts (amount = 0)");
+
+  if (height_upper_limit != 0 && tx_ptr->m_keeper_block_height > height_upper_limit)
+    return false;
   
   const transaction& tx = tx_ptr->tx;
   CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() == tx.vout.size(), false, "internal error: spent_flag.size()=" << tx_ptr->m_spent_flags.size() << ", tx.vout.size()=" << tx.vout.size());
@@ -2495,12 +2501,25 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   //check if transaction is unlocked
   if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
     return false;
+
+  const tx_out_v& out_v = tx.vout[out_ptr->out_no];
   
   // do not use burned coins
-  if (is_out_burned(tx.vout[out_ptr->out_no]))
+  if (is_out_burned(out_v))
     return false;
 
-  VARIANT_SWITCH_BEGIN(tx.vout[out_ptr->out_no]);
+  // check mix_attr
+  uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+  if (!get_mix_attr_from_tx_out_v(out_v, mix_attr))
+    return false; // output has no mix_attr, skip it
+  if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+    return false; //COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS call means that ring signature will have more than one entry.
+  else if (use_only_forced_to_mix && mix_attr == CURRENCY_TO_KEY_OUT_RELAXED)
+    return false; //relaxed not allowed
+  else if (mix_attr != CURRENCY_TO_KEY_OUT_RELAXED && mix_attr > mix_count)
+    return false; //mix_attr set to specific minimum, and mix_count is less then desired count
+
+  VARIANT_SWITCH_BEGIN(out_v);
   VARIANT_CASE_CONST(tx_out_bare, o)
   {
     if (o.target.type() == typeid(txout_htlc))
@@ -2508,41 +2527,20 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
       //silently return false, it's ok
       return false;
     }
-    CHECK_AND_ASSERT_MES(o.target.type() == typeid(txout_to_key), false, "unknown tx out type");
+    CHECK_AND_ASSERT_MES(o.target.type() == typeid(txout_to_key), false, "unexpected out target type: " << o.target.type().name());
     const txout_to_key& otk = boost::get<txout_to_key>(o.target);
 
-    // TODO #@#@ remove code duplication, make extracting mix_attr in a more generalized way
-
-    //use appropriate mix_attr out 
-    uint8_t mix_attr = otk.mix_attr;
-
-    if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-      return false; //COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS call means that ring signature will have more than one entry.
-    else if (use_only_forced_to_mix && mix_attr == CURRENCY_TO_KEY_OUT_RELAXED)
-      return false; //relaxed not allowed
-    else if (mix_attr != CURRENCY_TO_KEY_OUT_RELAXED && mix_attr > mix_count)
-      return false;//mix_attr set to specific minimum, and mix_count is less then desired count
-
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
-    oen.global_amount_index = i;
-    oen.out_key = otk.key;
+    oen.global_amount_index = g_index;
+    oen.stealth_address = otk.key;
   }
   VARIANT_CASE_CONST(tx_out_zarcanum, toz)
   {
-    //use appropriate mix_attr out 
-    uint8_t mix_attr = toz.mix_attr;
-
-    if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-      return false; //COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS call means that ring signature will have more than one entry.
-    else if (use_only_forced_to_mix && mix_attr == CURRENCY_TO_KEY_OUT_RELAXED)
-      return false; //relaxed not allowed
-    else if (mix_attr != CURRENCY_TO_KEY_OUT_RELAXED && mix_attr > mix_count)
-      return false;//mix_attr set to specific minimum, and mix_count is less then desired count
-
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
-    oen.global_amount_index = i;
-    oen.out_key = toz.amount_commitment;
-    // TODO @#@#  this is certainly not enough
+    oen.amount_commitment   = toz.amount_commitment;
+    oen.concealing_point    = toz.concealing_point;
+    oen.global_amount_index = g_index;
+    oen.stealth_address     = toz.stealth_address;
   }
   VARIANT_SWITCH_END();
 
@@ -2572,7 +2570,7 @@ size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount) const
 bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res)const
 {  
   CRITICAL_REGION_LOCAL(m_read_lock);
-  BOOST_FOREACH(uint64_t amount, req.amounts)
+  for(uint64_t amount : req.amounts)
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs = *res.outs.insert(res.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount());
     result_outs.amount = amount;
@@ -2586,31 +2584,32 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
     //lets find upper bound of not fresh outs
     size_t up_index_limit = find_end_of_allowed_index(amount);
     CHECK_AND_ASSERT_MES(up_index_limit <= outs_container_size, false, "internal error: find_end_of_allowed_index returned wrong index=" << up_index_limit << ", with amount_outs.size = " << outs_container_size);
-    if (up_index_limit >= req.outs_count)
+    if (up_index_limit >= req.decoys_count)
     {
       std::set<size_t> used;
       size_t try_count = 0;
-      for(uint64_t j = 0; j != req.outs_count && try_count < up_index_limit;)
+      for(uint64_t j = 0; j != req.decoys_count && try_count < up_index_limit;)
       {
-        size_t i = crypto::rand<size_t>()%up_index_limit;
-        if(used.count(i))
+        size_t g_index = crypto::rand<size_t>() % up_index_limit;
+        if(used.count(g_index))
           continue;
-        bool added = add_out_to_get_random_outs(result_outs, amount, i, req.outs_count, req.use_forced_mix_outs);
-        used.insert(i);
+        bool added = add_out_to_get_random_outs(result_outs, amount, g_index, req.decoys_count, req.use_forced_mix_outs, req.height_upper_limit);
+        used.insert(g_index);
         if(added)
           ++j;
         ++try_count;
       }
-      if (result_outs.outs.size() < req.outs_count)
+      if (result_outs.outs.size() < req.decoys_count)
       {
-        LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.outs_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total");
+        LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total");
       }
-    }else
+    }
+    else
     {
       size_t added = 0;
       for (size_t i = 0; i != up_index_limit; i++)
-        added += add_out_to_get_random_outs(result_outs, amount, i, req.outs_count, req.use_forced_mix_outs) ? 1 : 0;
-      LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.outs_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs");
+        added += add_out_to_get_random_outs(result_outs, amount, i, req.decoys_count, req.use_forced_mix_outs, req.height_upper_limit) ? 1 : 0;
+      LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs");
     }
   }
   return true;
