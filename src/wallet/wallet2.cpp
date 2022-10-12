@@ -4185,10 +4185,6 @@ void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_inf
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_reg_info);
 
-  //&&&&&
-  LOG_PRINT_MAGENTA("ctp.dsts[0].asset_id:" << ctp.dsts[0].asset_id << ", ctp.dsts[1].asset_id:" << ctp.dsts[1].asset_id, LOG_LEVEL_0);
-
-
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
   result_tx = ft.tx;
@@ -5661,9 +5657,6 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   const std::vector<currency::tx_destination_entry>& dsts,
   std::vector<currency::tx_destination_entry>& final_detinations, const crypto::hash& asset_id)
 {
-  //&&&&&
-  LOG_PRINT_MAGENTA("[-->prepare_tx_destinations[asset_id="<< asset_id <<"]] needed_money " << needed_money, LOG_LEVEL_0);
-
   currency::tx_destination_entry change_dts = AUTO_VAL_INIT(change_dts);
   if (needed_money < found_money)
   {
@@ -5681,36 +5674,10 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
     return;
   }
 
-  //&&&&&
-  //LOG_PRINT_MAGENTA("[--prepare_tx_destinations[asset_id=" << asset_id << "]] needed_money " << needed_money, LOG_LEVEL_0);
-
-  //&&&&&
-  for (const auto& d : dsts)
-  {
-    LOG_PRINT_MAGENTA("[--prepare_tx_destinations::before split] amount:" << d.amount << ", asset_id:" << d.asset_id, LOG_LEVEL_0);
-  }
-
   uint64_t dust = 0;
   bool r = detail::apply_split_strategy_by_id(destination_split_strategy_id, dsts, change_dts, dust_policy.dust_threshold, final_detinations, dust, WALLET_MAX_ALLOWED_OUTPUT_AMOUNT);
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "invalid split strategy id: " << destination_split_strategy_id);
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(dust_policy.dust_threshold >= dust, "invalid dust value: dust = " << dust << ", dust_threshold = " << dust_policy.dust_threshold);
-
-  //&&&&&
-  for (const auto& d : final_detinations)
-  {
-    LOG_PRINT_MAGENTA("[--prepare_tx_destinations::after split] amount:" << d.amount << ", asset_id:" << d.asset_id, LOG_LEVEL_0);
-  }
-
-
-
-  //@#@
-#ifdef _DEBUG
-  if (final_detinations.size() > 10)
-  {
-    WLT_LOG_L0("final_detinations.size()=" << final_detinations.size());
-  }
-#endif
-  //@#@
 
   if (0 != dust && !dust_policy.add_to_fee)
   {
@@ -5767,26 +5734,9 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   }
   TIME_MEASURE_FINISH_MS(prepare_tx_sources_time);
 
-  //&&&&&
-  for (const auto& d : ctp.dsts)
-  {
-    LOG_PRINT_MAGENTA("[pre-prepare_tx_destinations] amount:" << d.amount << ", asset_id:" << d.asset_id, LOG_LEVEL_0);
-  }
-  //&&&&&
-  for (const auto& d : needed_money_map)
-  {
-    LOG_PRINT_MAGENTA("[pre-prepare_tx_destinations] needed_money_map key: " << d.first << ", needed amount: " << d.second.needed_amount, LOG_LEVEL_0);
-  }
-
   TIME_MEASURE_START_MS(prepare_tx_destinations_time);
   prepare_tx_destinations(needed_money_map, static_cast<detail::split_strategy_id_t>(ctp.split_strategy_id), ctp.dust_policy, ctp.dsts, ftp.prepared_destinations);
   TIME_MEASURE_FINISH_MS(prepare_tx_destinations_time);
-
-  //&&&&&
-  for (const auto& d : ftp.prepared_destinations)
-  {
-    LOG_PRINT_MAGENTA("[post-prepare_tx_destinations] amount:" << d.amount << ", asset_id:" << d.asset_id, LOG_LEVEL_0);
-  }
 
 
   if (ctp.mark_tx_as_complete && !ftp.sources.empty())

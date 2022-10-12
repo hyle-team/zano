@@ -1948,11 +1948,9 @@ namespace currency
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
     if (asset_id_for_destinations != currency::null_hash)
     {
-      LOG_PRINT_MAGENTA("[Asset descriptor operation]: shuffled_dsts.size()=" << shuffled_dsts.size(), LOG_LEVEL_0);
       //must be asset publication
       for (auto& item : shuffled_dsts)
       {
-        LOG_PRINT_MAGENTA("[Asset descriptor operation]: item.asset_id: " << item.asset_id << ", amount: " << item.amount, LOG_LEVEL_0);
         if (item.asset_id == currency::ffff_hash)
         {
           item.asset_id = asset_id_for_destinations;
@@ -1963,7 +1961,6 @@ namespace currency
       pado->descriptor.current_supply = amount_of_assets;
       //TODO: temporary
       summary_inputs_money += amount_of_assets;
-      LOG_PRINT_MAGENTA("[Asset descripto operation]: amount_of_assets: " << amount_of_assets << ", summary_inputs_money: " << summary_inputs_money, LOG_LEVEL_0);
     }
 
 
