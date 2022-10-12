@@ -6,7 +6,7 @@
 // Note: This file originates from tests/functional_tests/crypto_tests.cpp 
 #pragma once
 #include "crypto-sugar.h"
-#include "crypto/range_proof_bppe.h"
+#include "crypto/range_proofs.h"
 #include "crypto/clsag.h"
 #include <boost/multiprecision/cpp_int.hpp>
 
