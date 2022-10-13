@@ -141,8 +141,7 @@ namespace crypto
       crypto::secret_key  m_sk;
     };
 
-    scalar_t()
-    {}
+    scalar_t() = default;
 
     // won't check scalar range validity (< L)
     scalar_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
@@ -844,8 +843,11 @@ namespace crypto
     // zeroes all elements
     void zero()
     {
+      PUSH_GCC_WARNINGS
+      DISABLE_GCC_AND_CLANG_WARNING(class-memaccess)
       size_t size_bytes = sizeof(scalar_t) * size();
       memset(data(), 0, size_bytes);
+      POP_GCC_WARNINGS
     }
 
     // invert all elements in-place efficiently: 4*N muptiplications + 1 inversion
@@ -1157,6 +1159,15 @@ namespace crypto
       return hs_calculator.calc_hash();
     }
 
+    static scalar_t hs(const char(&str32)[32], const crypto::key_derivation& derivation, uint64_t index)
+    {
+      hs_t hs_calculator(3);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_pub_key(reinterpret_cast<const crypto::public_key&>(derivation));
+      hs_calculator.add_scalar(index);
+      return hs_calculator.calc_hash();
+    }
+
     static point_t hp(const point_t& p)
     {
       point_t result;
@@ -1195,7 +1206,6 @@ namespace crypto
   {
     // hs won't touch memory if size is 0, so it's safe
     return hash_helper_t::hs(data(), sizeof(scalar_t) * size());
-  }
-
+  } 
 
 } // namespace crypto

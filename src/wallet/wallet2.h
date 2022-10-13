@@ -184,8 +184,8 @@ namespace tools
         else
         {
           currency::decompose_amount_into_digits(de.amount, dust_threshold,
-            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, de.addr)); },
-            [&](uint64_t a_dust) { splitted_dsts.push_back(currency::tx_destination_entry(a_dust, de.addr)); }, max_output_allowed);
+            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, de.addr, de.asset_id)); },
+            [&](uint64_t a_dust) { splitted_dsts.push_back(currency::tx_destination_entry(a_dust, de.addr, de.asset_id)); }, max_output_allowed);
         }
       }
 
@@ -241,7 +241,7 @@ namespace tools
       const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
       std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
     {
-      splitted_dsts = dsts;
+      splitted_dsts.insert(splitted_dsts.end(), dsts.begin(), dsts.end());
       if (change_dst.amount > 0)
         splitted_dsts.push_back(change_dst);
     }
@@ -252,6 +252,9 @@ namespace tools
       const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
       std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
     {
+      //&&&&&
+      LOG_PRINT_MAGENTA("[--apply_split_strategy_by_id, split strtegy_id: " << id, LOG_LEVEL_0);
+
       switch (id)
       {
       case ssi_digit:
@@ -506,6 +509,19 @@ namespace tools
     };
 
 
+    struct wallet_own_asset_context
+    {
+      currency::asset_descriptor_base asset_descriptor;
+      crypto::secret_key control_key;
+      uint64_t height = 0;
+
+      BEGIN_BOOST_SERIALIZATION()
+        BOOST_SERIALIZE(asset_descriptor)
+        BOOST_SERIALIZE(control_key)
+        BOOST_SERIALIZE(height)
+      END_BOOST_SERIALIZATION()
+    };
+
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
     void restore(const std::wstring& path, const std::string& pass, const std::string& seed_or_tracking_seed, bool tracking_wallet, const std::string& seed_password);
@@ -551,7 +567,8 @@ namespace tools
     void request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key = currency::null_skey);
     void request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
     bool check_available_sources(std::list<uint64_t>& amounts);
-    
+
+    void publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::hash& asset_id);
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
@@ -564,8 +581,8 @@ namespace tools
 
     uint64_t unlocked_balance() const;
 
-    void transfer(uint64_t amount, const currency::account_public_address& acc);
-    void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx);
+    void transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::hash& asset_id = currency::null_hash);
+    void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx, const crypto::hash& asset_id = currency::null_hash);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts,
                   size_t fake_outputs_count, 
@@ -803,6 +820,10 @@ namespace tools
       a & m_active_htlcs;
       a & m_active_htlcs_txid;
 
+      if (ver < 154)
+        return;
+      
+      a & m_own_asset_descriptors;
     }
 
     void wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history);
@@ -985,7 +1006,7 @@ private:
     template<typename input_t>
     bool process_input_t(const input_t& in_t, wallet2::process_transaction_context& ptc, const currency::transaction& tx);
 
-    const construct_tx_param& get_default_construct_tx_param();
+    construct_tx_param get_default_construct_tx_param();
 
     uint64_t get_tx_expiration_median() const;
 
@@ -1080,6 +1101,7 @@ private:
     std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> m_unconfirmed_txs;
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
     std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
+    std::unordered_map<crypto::hash, wallet_own_asset_context> m_own_asset_descriptors;
 
     std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
     amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
@@ -1111,6 +1133,7 @@ private:
 } // namespace tools
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
+
 BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 11)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 3)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details_base, 2)
@@ -1288,7 +1311,7 @@ namespace tools
         ptc.is_derived_from_coinbase = true;
       else
         ptc.is_derived_from_coinbase = false;
-      WLT_LOG_L0("Spent key out, transfer #" << tr_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << ptc.height <<
+      WLT_LOG_L0("Spent key out, transfer #" << tr_index << ", amount: " << currency::print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << ptc.height <<
         "; flags: " << flags_before << " -> " << td.m_flags);
       ptc.mtd.spent_indices.push_back(ptc.i);
       remove_transfer_from_expiration_list(tr_index);

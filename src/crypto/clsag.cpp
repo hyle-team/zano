@@ -14,7 +14,7 @@ namespace crypto
   #define DBG_VAL_PRINT(x) (void(0)) // std::cout << #x ": " << x << std::endl
   #define DBG_PRINT(x)     (void(0)) // std::cout << x << std::endl
 
-  static std::ostream &operator <<(std::ostream &o, const crypto::hash &v) { return o << pod_to_hex(v); }
+  //static std::ostream &operator <<(std::ostream &o, const crypto::hash &v) { return o << pod_to_hex(v); }
 
   bool generate_CLSAG_GG(const hash& m, const std::vector<CLSAG_GG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const key_image& ki,
     const scalar_t& secret_x, const scalar_t& secret_f, uint64_t secret_index, CLSAG_GG_signature& sig)

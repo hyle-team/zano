@@ -41,3 +41,4 @@
 #include "atomic_tests.h"
 #include "isolate_auditable_and_proof.h"
 #include "zarcanum_test.h"
+#include "multiassets_test.h"

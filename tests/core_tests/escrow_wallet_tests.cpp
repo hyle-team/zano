@@ -3135,7 +3135,7 @@ bool escrow_balance::generate(std::vector<test_event_entry>& events) const
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   m_alice_bob_start_amount = MK_TEST_COINS(200);
-  uint64_t amount_chunks = 10;
+  //uint64_t amount_chunks = 10;
   m_alice_bob_start_chunk_amount = m_alice_bob_start_amount / 10;
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
@@ -3159,7 +3159,7 @@ bool escrow_balance::generate(std::vector<test_event_entry>& events) const
 
 bool escrow_balance::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);

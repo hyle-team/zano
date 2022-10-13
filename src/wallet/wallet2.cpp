@@ -752,6 +752,49 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
   }
    
+  if (ptc.tx_money_spent_in_ins)
+  {
+    //check if there are asset_registration that belong to this wallet
+    asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
+    if (get_type_in_variant_container(tx.extra, ado))
+    {
+      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+      {
+        crypto::public_key self_check = AUTO_VAL_INIT(self_check);
+        crypto::secret_key asset_control_key = AUTO_VAL_INIT(asset_control_key);
+        bool r = derive_key_pair_from_key_pair(tx_pub_key, m_account.get_keys().spend_secret_key, asset_control_key, self_check, CRYPTO_HDS_ASSET_CONTROL_KEY);
+        if (!r)
+        {
+          //not critical error, continue to work 
+          LOG_ERROR("Failed to derive_key_pair_from_key_pair for asset_descriptor_operation in tx " << get_transaction_hash(tx));
+        }else
+        {
+          if (self_check != ado.descriptor.owner)
+          {
+            //still not critical error
+            LOG_ERROR("Public key from asset_descriptor_operation(" << ado.descriptor.owner << ") not much with derived public key(" << self_check << "), for tx" << get_transaction_hash(tx));
+          }
+          else 
+          {            
+            wallet_own_asset_context& asset_context = m_own_asset_descriptors[get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, ado.descriptor.owner)];
+            asset_context.asset_descriptor = ado.descriptor;
+            asset_context.height = height;
+            std::stringstream ss;
+            ss << "New Asset Registered:" 
+              << ENDL << "Name: " << asset_context.asset_descriptor.full_name 
+              << ENDL << "Ticker: " << asset_context.asset_descriptor.ticker
+              << ENDL << "Total Max Supply: " << print_asset_money(asset_context.asset_descriptor.total_max_supply, asset_context.asset_descriptor.decimal_point)
+              << ENDL << "Current Supply: " << print_asset_money(asset_context.asset_descriptor.current_supply, asset_context.asset_descriptor.decimal_point)
+              << ENDL << "DecimalPoint: " << asset_context.asset_descriptor.decimal_point;
+
+            WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
+            if (m_wcallback)
+              m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+          }
+        }
+      }
+    }
+  }
 
   if (ptc.tx_money_spent_in_ins)
   {//this actually is transfer transaction, notify about spend
@@ -1834,7 +1877,7 @@ detail::split_strategy_id_t wallet2::get_current_split_strategy()
     return tools::detail::ssi_void;
 }
 //
-void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx)
+void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx, const crypto::hash& asset_id)
 {
   std::vector<currency::extra_v> extra;
   std::vector<currency::attachment_v> attachments;
@@ -1843,13 +1886,14 @@ void wallet2::transfer(uint64_t amount, const currency::account_public_address& 
   dst.resize(1);
   dst.back().addr.push_back(acc);
   dst.back().amount = amount;
+  dst.back().asset_id = asset_id;
   this->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, get_current_split_strategy(), tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc)
+void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::hash& asset_id)
 {
   transaction result_tx = AUTO_VAL_INIT(result_tx);
-  this->transfer(amount, acc, result_tx);
+  this->transfer(amount, acc, result_tx, asset_id);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::reset_creation_time(uint64_t timestamp)
@@ -2503,6 +2547,15 @@ void wallet2::detach_blockchain(uint64_t including_height)
   {
     if(including_height <= it->second.m_block_height)
       it = m_payments.erase(it);
+    else
+      ++it;
+  }
+
+  //asset descriptors
+  for (auto it = m_own_asset_descriptors.begin(); it != m_own_asset_descriptors.end(); )
+  {
+    if (including_height <= it->second.height)
+      it = m_own_asset_descriptors.erase(it);
     else
       ++it;
   }
@@ -4122,6 +4175,25 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::hash& asset_id)
+{
+  asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
+  asset_reg_info.descriptor = asset_info;
+  asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  construct_tx_param ctp = get_default_construct_tx_param();
+  ctp.dsts = destinations;
+  ctp.extra.push_back(asset_reg_info);
+
+  finalized_tx ft = AUTO_VAL_INIT(ft);
+  this->transfer(ctp, ft, true, nullptr);
+  result_tx = ft.tx;
+  //get generated asset id
+  currency::asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
+  bool r = get_type_in_variant_container(result_tx.extra, ado);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed find asset info in tx");
+  asset_id = get_asset_id_from_descriptor(ado.descriptor); 
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)
 {
   if (!validate_alias_name(ai.m_alias))
@@ -4930,6 +5002,9 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
   amounts_map[currency::null_hash].needed_amount = fee;
   for(auto& dt : dsts)
   {
+    if(dt.asset_id == currency::ffff_hash)
+      continue;     //this destination for emmition only
+
     THROW_IF_TRUE_WALLET_EX(0 == dt.amount, error::zero_destination);
     uint64_t money_to_add = dt.amount;
     if (dt.amount_to_provide)
@@ -5591,21 +5666,19 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
     change_dts.asset_id = asset_id;
   }
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(found_money >= needed_money, "needed_money==" << needed_money << "  <  found_money==" << found_money);
-
+  if (asset_id != currency::null_hash)
+  {
+    if (change_dts.amount)
+    {
+      final_detinations.push_back(change_dts);
+    }
+    return;
+  }
 
   uint64_t dust = 0;
   bool r = detail::apply_split_strategy_by_id(destination_split_strategy_id, dsts, change_dts, dust_policy.dust_threshold, final_detinations, dust, WALLET_MAX_ALLOWED_OUTPUT_AMOUNT);
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "invalid split strategy id: " << destination_split_strategy_id);
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(dust_policy.dust_threshold >= dust, "invalid dust value: dust = " << dust << ", dust_threshold = " << dust_policy.dust_threshold);
-
-  //@#@
-#ifdef _DEBUG
-  if (final_detinations.size() > 10)
-  {
-    WLT_LOG_L0("final_detinations.size()=" << final_detinations.size());
-  }
-#endif
-  //@#@
 
   if (0 != dust && !dust_policy.add_to_fee)
   {
@@ -5665,6 +5738,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   TIME_MEASURE_START_MS(prepare_tx_destinations_time);
   prepare_tx_destinations(needed_money_map, static_cast<detail::split_strategy_id_t>(ctp.split_strategy_id), ctp.dust_policy, ctp.dsts, ftp.prepared_destinations);
   TIME_MEASURE_FINISH_MS(prepare_tx_destinations_time);
+
 
   if (ctp.mark_tx_as_complete && !ftp.sources.empty())
     ftp.sources.back().separately_signed_tx_complete = true;
@@ -5806,10 +5880,9 @@ construct_tx_param wallet2::get_default_construct_tx_param_inital()
   ctp.shuffle = 0;
   return ctp;
 }
-const construct_tx_param& wallet2::get_default_construct_tx_param()
+construct_tx_param wallet2::get_default_construct_tx_param()
 {
-  static construct_tx_param ctp = get_default_construct_tx_param_inital();
-  return ctp;
+  return get_default_construct_tx_param_inital();
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const currency::finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str /* = nullptr */)

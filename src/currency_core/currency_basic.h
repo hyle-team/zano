@@ -54,6 +54,8 @@ namespace currency
   const static crypto::key_derivation null_derivation = AUTO_VAL_INIT(null_derivation);
 
   const static crypto::hash gdefault_genesis = epee::string_tools::hex_to_pod<crypto::hash>("CC608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB99852");
+  const static crypto::hash ffff_hash = epee::string_tools::hex_to_pod<crypto::hash>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+
 
   typedef std::string payment_id_t;
 
@@ -411,6 +413,7 @@ namespace currency
       FIELD(amount_commitment)
       FIELD(encrypted_amount)
       FIELD(mix_attr)
+      FIELD(etc_details)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
@@ -419,6 +422,7 @@ namespace currency
       BOOST_SERIALIZE(amount_commitment)
       BOOST_SERIALIZE(encrypted_amount)
       BOOST_SERIALIZE(mix_attr)
+      BOOST_SERIALIZE(etc_details)
     END_BOOST_SERIALIZATION()
   };
 
@@ -440,7 +444,7 @@ namespace currency
   struct zc_outs_range_proof
   {
     crypto::bpp_signature_serialized bpp;
-    uint8_t outputs_count;                // how many outputs are included in the proof
+    uint8_t outputs_count = 0;                // how many outputs are included in the proof
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(bpp)
@@ -456,7 +460,7 @@ namespace currency
   // Zarcanum-aware CLSAG signature
   struct ZC_sig
   {
-    crypto::public_key pseudo_out_amount_commitment; // premultiplied by 1/8
+    crypto::public_key pseudo_out_amount_commitment = null_pkey; // premultiplied by 1/8
     crypto::CLSAG_GG_signature_serialized clsags_gg;
     
     BEGIN_SERIALIZE_OBJECT()
@@ -472,7 +476,7 @@ namespace currency
 
   struct zc_balance_proof
   {
-    crypto::signature s;
+    crypto::signature s = null_sig;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(s)
@@ -704,6 +708,68 @@ namespace currency
 
 
 
+  struct asset_descriptor_base
+  {
+    uint64_t            total_max_supply = 0;
+    uint64_t            current_supply = 0;
+    uint8_t             decimal_point = 12;
+    std::string         ticker;
+    std::string         full_name;
+    crypto::public_key  owner = currency::null_pkey;
+
+    BEGIN_VERSIONED_SERIALIZE()
+      FIELD(total_max_supply)
+      FIELD(current_supply)
+      FIELD(decimal_point)
+      FIELD(ticker)
+      FIELD(full_name)
+      FIELD(owner)
+    END_SERIALIZE()
+
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(total_max_supply)
+      BOOST_SERIALIZE(current_supply)
+      BOOST_SERIALIZE(decimal_point)
+      BOOST_SERIALIZE(ticker)
+      BOOST_SERIALIZE(full_name)
+      BOOST_SERIALIZE(owner)
+    END_BOOST_SERIALIZATION()
+  };
+
+
+#define ASSET_DESCRIPTOR_OPERATION_UNDEFINED     0
+#define ASSET_DESCRIPTOR_OPERATION_REGISTER      1
+#define ASSET_DESCRIPTOR_OPERATION_EMMIT         2
+#define ASSET_DESCRIPTOR_OPERATION_UPDATE        3
+
+
+  struct asset_descriptor_operation
+  {
+    uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
+    std::vector<crypto::signature>  proof;
+    asset_descriptor_base           descriptor;
+    std::vector<crypto::hash>       asset_id; //questionable regarding form of optional fields
+
+
+    BEGIN_VERSIONED_SERIALIZE()
+      FIELD(operation_type)
+      FIELD(proof)
+      FIELD(descriptor)
+      FIELD(asset_id)
+    END_SERIALIZE()
+
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(operation_type)
+      BOOST_SERIALIZE(proof)
+      BOOST_SERIALIZE(descriptor)
+    END_BOOST_SERIALIZATION()
+  };
+
+
+
+
   struct extra_padding
   {
     std::vector<uint8_t> buff; //stub
@@ -768,10 +834,10 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector24<
+  typedef boost::mpl::vector25<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
-    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zc_outs_range_proof, zc_balance_proof
+    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zc_outs_range_proof, zc_balance_proof, asset_descriptor_operation
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -1098,6 +1164,9 @@ SET_VARIANT_TAGS(currency::zc_outs_range_proof, 46, "zc_outs_range_proof");
 SET_VARIANT_TAGS(currency::zc_balance_proof, 47, "zc_balance_proof");
 
 SET_VARIANT_TAGS(currency::open_asset_id, 48, "asset_id");
+
+SET_VARIANT_TAGS(currency::asset_descriptor_operation, 48, "asset_descriptor_base");
+
 
 
 

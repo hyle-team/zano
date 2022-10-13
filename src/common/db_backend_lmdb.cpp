@@ -291,6 +291,10 @@ namespace tools
 
       if (res == MDB_NOTFOUND)
         return false;
+      if (res != MDB_SUCCESS)
+      {
+        return false;
+      }
 
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_get, h: " << h << ", ks: " << ks);
       res_buff.assign((const char*)data.mv_data, data.mv_size);

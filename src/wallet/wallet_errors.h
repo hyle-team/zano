@@ -463,6 +463,7 @@ namespace tools
             ss << currency::get_account_address_as_str(a) << ";";
           } 
           ss << " anount: " << currency::print_money(dst.amount);
+          ss << " asset_id: " << dst.asset_id;
         }
 
         ss << "\nunlock_time: " << m_unlock_time;
@@ -758,3 +759,4 @@ if (cond)                                                                       
     LOG_ERROR("THROW EXCEPTION: wallet_common_error");                                               \
     tools::error::throw_wallet_ex<tools::error::wallet_common_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str());    \
   }
+

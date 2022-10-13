@@ -1001,7 +1001,6 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
 {
   for (const block& blk : blockchain)
   {
-    volatile uint64_t height = get_block_height(blk);
 
     std::vector<const transaction*> vtx;
     vtx.push_back(&blk.miner_tx);

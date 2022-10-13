@@ -186,7 +186,7 @@ bool hard_fork_1_unlock_time_2_in_coinbase::generate(std::vector<test_event_entr
   // Test idea: make sure etc_tx_details_unlock_time2 can be used in-coinbase txs
   // only after hardfork 1
 
-  bool r = false;
+  //bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   generator.set_hardfork_height(1, m_hardfork_height);
@@ -257,7 +257,7 @@ bool hard_fork_1_chain_switch_pow_only::generate(std::vector<test_event_entry>& 
 {
   // Test idea: make sure chain switches without PoS before and after hardfork
 
-  bool r = false;
+  //bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());

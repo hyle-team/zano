@@ -335,8 +335,16 @@ namespace currency
   {
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
+      //@#@ TODO: This is just a temporary code
+      uint64_t assets_emmited = 0;
+      asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
+      if (get_type_in_variant_container(tx.extra, ado) && ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+      {
+        assets_emmited += ado.descriptor.current_supply;
+      }
+
       size_t zc_inputs_count = 0;
-      uint64_t bare_inputs_sum = additional_inputs_amount_and_fees_for_mining_tx;
+      uint64_t bare_inputs_sum = additional_inputs_amount_and_fees_for_mining_tx + assets_emmited;
       for(auto& vin : tx.vin)
       {
         VARIANT_SWITCH_BEGIN(vin);
@@ -655,19 +663,18 @@ namespace currency
   //---------------------------------------------------------------
   struct tx_extra_handler : public boost::static_visitor<bool>
   {
-    mutable bool was_padding; //let the padding goes only at the end
-    mutable bool was_pubkey;
-    mutable bool was_attachment;
-    mutable bool was_userdata;
-    mutable bool was_alias;
+    mutable bool was_padding = false; //let the padding goes only at the end
+    mutable bool was_pubkey = false;
+    mutable bool was_attachment = false;
+    mutable bool was_userdata = false;
+    mutable bool was_alias = false;
+    mutable bool was_asset = false;
 
     tx_extra_info& rei;
     const transaction& rtx;
 
     tx_extra_handler(tx_extra_info& ei, const transaction& tx) :rei(ei), rtx(tx)
-    {
-      was_padding = was_pubkey = was_attachment = was_userdata = was_alias = false;
-    }
+    {}
 
 #define ENSURE_ONETIME(varname, entry_name) CHECK_AND_ASSERT_MES(varname == false, false, "double entry in tx_extra: " entry_name); varname = true;
 
@@ -688,6 +695,12 @@ namespace currency
     {
       ENSURE_ONETIME(was_alias, "alias");
       rei.m_alias = ae;
+      return true;
+    }
+    bool operator()(const asset_descriptor_operation & ado) const
+    {
+      ENSURE_ONETIME(was_asset, "asset");
+      rei.m_asset_operation = ado;
       return true;
     }
     bool operator()(const extra_alias_entry_old& ae) const
@@ -789,6 +802,17 @@ namespace currency
   {
     crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
     return derive_public_key_from_target_address(destination_addr, tx_sec_key, index, out_eph_public_key, derivation);
+  }
+  //---------------------------------------------------------------
+  bool derive_key_pair_from_key_pair(const crypto::public_key& src_pub_key, const crypto::secret_key& src_sec_key, crypto::secret_key& derived_sec_key, crypto::public_key& derived_pub_key, const char(&hs_domain)[32], uint64_t index)
+  {
+    crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+    bool r = crypto::generate_key_derivation(src_pub_key, src_sec_key, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "at creation outs: failed to generate_key_derivation(" << src_pub_key << ", " << src_sec_key << ")");
+    crypto::scalar_t sec_key = crypto::hash_helper_t::hs(hs_domain, derivation, index);
+    derived_sec_key = sec_key.as_secret_key();
+    derived_pub_key = (sec_key * crypto::c_point_G).to_public_key();
+    return true;
   }
   //---------------------------------------------------------------
   // derivation = 8 * tx_sec_key * destination_addr.view_public_key
@@ -1554,7 +1578,6 @@ namespace currency
     ftp.tx_outs_attr = tx_outs_attr;
     ftp.shuffle = shuffle;
     ftp.flags = flags;
-    ftp.tx_version;
 
     finalized_tx ft = AUTO_VAL_INIT(ft);
     ft.tx = tx;
@@ -1685,6 +1708,13 @@ namespace currency
     return true;
   }
 
+
+  crypto::hash get_asset_id_from_descriptor(const asset_descriptor_base& adb)
+  {
+    return get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, adb.owner);
+  }
+
+
   bool construct_tx(const account_keys& sender_account_keys, const finalize_tx_param& ftp, finalized_tx& result)
   {
     const std::vector<tx_source_entry>& sources = ftp.sources;
@@ -1704,8 +1734,6 @@ namespace currency
 
     result.ftp = ftp;
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "Too many outs (" << destinations.size() << ")! Tx can't be constructed.");
-
-    bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
 
     bool append_mode = false;
     if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
@@ -1768,10 +1796,23 @@ namespace currency
       tx.extra.insert(tx.extra.end(), extra_local.begin(), extra_local.end());
     }
 
-//    //first: separate zarcanum inputs and regular one
-    //std::vector<const tx_source_entry*> zc_sources;
-    //std::vector<const tx_source_entry*> NLSAG_sources;
 
+    uint64_t summary_inputs_money = 0;
+
+    crypto::hash asset_id_for_destinations = currency::null_hash;
+    asset_descriptor_operation* pado = nullptr;
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    {
+      pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
+      if (pado)
+      {
+        crypto::secret_key stub = AUTO_VAL_INIT(stub);
+        bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_secret_key, stub, pado->descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+        CHECK_AND_ASSERT_MES(r, false, "Failed to derive_public_key_from_tx_and_account_pub_key()");
+        //also assign this asset id to destinations
+        asset_id_for_destinations = get_asset_id_from_descriptor(pado->descriptor);
+      }
+    }
 
 
     std::vector<input_generation_context_data> in_contexts;    
@@ -1782,12 +1823,12 @@ namespace currency
     size_t current_index = 0;
     inputs_mapping.resize(sources.size());
     size_t input_starter_index = tx.vin.size();
-    uint64_t summary_inputs_money = 0;
     bool has_zc_inputs = false;
     //fill inputs NLSAG and Zarcanum 
     for (const tx_source_entry& src_entr : sources)
     {
-      inputs_mapping[current_index] = current_index++;
+      inputs_mapping[current_index] = current_index;
+      current_index++;
       in_contexts.push_back(input_generation_context_data());
       if(src_entr.is_multisig())
       {//multisig input
@@ -1901,9 +1942,27 @@ namespace currency
     {
       tx.vin.push_back(ins_zc);
     }*/
+    uint64_t amount_of_assets = 0;
+    std::vector<tx_destination_entry> shuffled_dsts(destinations);
+    if (asset_id_for_destinations != currency::null_hash)
+    {
+      //must be asset publication
+      for (auto& item : shuffled_dsts)
+      {
+        if (item.asset_id == currency::ffff_hash)
+        {
+          item.asset_id = asset_id_for_destinations;
+          amount_of_assets += item.amount;
+        }
+      }
+      CHECK_AND_ASSERT_MES(pado, false, "pado is null ??");
+      pado->descriptor.current_supply = amount_of_assets;
+      //TODO: temporary
+      summary_inputs_money += amount_of_assets;
+    }
+
 
     // "Shuffle" outs
-    std::vector<tx_destination_entry> shuffled_dsts(destinations);
     if (shuffle)
       std::sort(shuffled_dsts.begin(), shuffled_dsts.end(), [](const tx_destination_entry& de1, const tx_destination_entry& de2) { return de1.amount < de2.amount; });
 
@@ -1984,7 +2043,7 @@ namespace currency
 
       if (!has_zc_inputs)
       {
-        r = generate_tx_balance_proof(tx, blinding_masks_sum);
+        r = generate_tx_balance_proof(tx, blinding_masks_sum, amount_of_assets);
         CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
       }
     }
@@ -2010,8 +2069,6 @@ namespace currency
       if (tx.attachment.size())
         add_attachments_info_to_extra(tx.extra, tx.attachment);
     }
-
-
     //
     // generate ring signatures
     //
@@ -2021,10 +2078,12 @@ namespace currency
     //size_t in_context_index = 0;
     crypto::scalar_t local_blinding_masks_sum = 0; // ZC only
     r = false;
-    for (size_t i = 0; i != sources.size(); i++)
+    for (size_t i_ = 0; i_ != sources.size(); i_++)
     {
-      const tx_source_entry& source_entry = sources[inputs_mapping[i]];
-      crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, i + input_starter_index, tx_prefix_hash);
+      size_t i_mapped = inputs_mapping[i_];
+
+      const tx_source_entry& source_entry = sources[i_mapped];
+      crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, i_ + input_starter_index, tx_prefix_hash);
       CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
       std::stringstream ss_ring_s;
 
@@ -2032,14 +2091,14 @@ namespace currency
       {
         // ZC
         // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
-        r = generate_ZC_sig(tx_hash_for_signature, i + input_starter_index, source_entry, in_contexts[i], sender_account_keys, blinding_masks_sum, flags,
-          local_blinding_masks_sum, tx, i + 1 == sources.size());
+        r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, blinding_masks_sum, flags,
+          local_blinding_masks_sum, tx, i_ + 1 == sources.size());
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
       }
       else
       {
         // NLSAG
-        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, i + input_starter_index, source_entry, sender_account_keys, in_contexts[i], txkey, flags, tx, &ss_ring_s);
+        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, i_ + input_starter_index, source_entry, sender_account_keys, in_contexts[i_mapped], txkey, flags, tx, &ss_ring_s);
         CHECK_AND_ASSERT_MES(r, false, "generate_NLSAG_sig failed");
       }
 
@@ -3322,6 +3381,12 @@ namespace currency
     bool operator()(const zc_balance_proof& bp)
     {
       tv.type = "zc_balance_proof";
+      return true;
+    }
+    template<typename t_type>
+    bool operator()(const t_type& t_t)
+    {
+      tv.type = typeid(t_t).name();
       return true;
     }
   };

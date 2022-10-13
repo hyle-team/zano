@@ -1261,7 +1261,7 @@ namespace log_space
       enabled_channels_local.insert(ch_name);
       genabled_channels.swap(enabled_channels_local);
 #ifndef ANDROID_BUILD
-      std::cout << "log channel '" << ch_name << "' enabled" << std::endl;
+      //std::cout << "log channel '" << ch_name << "' enabled" << std::endl;
 #endif
     }
 

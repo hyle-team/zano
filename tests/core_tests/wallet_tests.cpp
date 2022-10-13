@@ -3290,7 +3290,6 @@ bool wallet_unconfimed_tx_balance::generate(std::vector<test_event_entry>& event
 
 bool wallet_unconfimed_tx_balance::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false;
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
 
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(100), false, UINT64_MAX, MK_TEST_COINS(100)), false, "");
@@ -3505,7 +3504,6 @@ wallet_watch_only_and_chain_switch::wallet_watch_only_and_chain_switch()
 
 bool wallet_watch_only_and_chain_switch::generate(std::vector<test_event_entry>& events) const
 {
-  bool r = false;
 
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
@@ -3602,7 +3600,6 @@ wallet_spend_form_auditable_and_track::wallet_spend_form_auditable_and_track()
 
 bool wallet_spend_form_auditable_and_track::generate(std::vector<test_event_entry>& events) const
 {
-  bool r = false;
 
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();

@@ -59,6 +59,7 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS    "addr_to_alias"
 #define BLOCKCHAIN_STORAGE_CONTAINER_TX_FEE_MEDIAN    "median_fee2"
 #define BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS      "gindex_increments"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS           "assets"
 
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT          0
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT              1
@@ -95,6 +96,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_multisig_outs(m_db),
                                                                  m_db_solo_options(m_db),
                                                                  m_db_aliases(m_db),
+                                                                 m_db_assets(m_db),
                                                                  m_db_addr_to_alias(m_db), 
                                                                  m_read_lock(m_rw_lock),
                                                                  m_db_current_block_cumul_sz_limit(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT, m_db_solo_options),
@@ -279,6 +281,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_aliases.init(BLOCKCHAIN_STORAGE_CONTAINER_ALIASES);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_assets.init(BLOCKCHAIN_STORAGE_CONTAINER_ASSETS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_addr_to_alias.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_per_block_gindex_incs.init(BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS);
@@ -297,6 +301,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_multisig_outs.set_cache_size(cache_size);
       m_db_solo_options.set_cache_size(cache_size);
       m_db_aliases.set_cache_size(cache_size);
+      m_db_assets.set_cache_size(cache_size);
       m_db_addr_to_alias.set_cache_size(cache_size);
     }
 
@@ -414,6 +419,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_multisig_outs.deinit();
       m_db_solo_options.deinit();
       m_db_aliases.deinit();
+      m_db_assets.deinit();
       m_db_addr_to_alias.deinit();
       m_db_per_block_gindex_incs.deinit();
       m_db.close();
@@ -660,6 +666,7 @@ bool blockchain_storage::clear()
   m_db_outputs.clear();
   m_db_multisig_outs.clear();
   m_db_aliases.clear();
+  m_db_assets.clear();
   m_db_addr_to_alias.clear();
   m_db_per_block_gindex_incs.clear();
   m_pos_targetdata_cache.clear();
@@ -1549,6 +1556,7 @@ void blockchain_storage::reset_db_cache() const
   m_db_solo_options.clear_cache();
   m_db_multisig_outs.clear_cache();
   m_db_aliases.clear_cache();
+  m_db_assets.clear_cache();
   m_db_addr_to_alias.clear_cache();
 
 }
@@ -2949,6 +2957,7 @@ void blockchain_storage::print_db_cache_perfeormance_data() const
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_multisig_outs) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_solo_options) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_aliases) << ENDL
+    DB_CONTAINER_PERF_DATA_ENTRY(m_db_assets) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_addr_to_alias) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_db_per_block_gindex_incs) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_tx_fee_median) << ENDL
@@ -3490,6 +3499,22 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
     r = pop_alias_info(ei.m_alias);
     CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
   }
+
+  if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
+  {
+    crypto::hash asset_id = currency::null_hash;
+    if (ei.m_asset_operation.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+    {
+      asset_id = get_asset_id_from_descriptor(ei.m_asset_operation.descriptor);
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(ei.m_asset_operation.asset_id.size() == 1, false, "Unexpected asset_id in operation");
+      asset_id = ei.m_asset_operation.asset_id.back();
+    }
+    r = pop_asset_info(asset_id);
+    CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
+  }
   return true;
 }
 //------------------------------------------------------------------
@@ -3512,6 +3537,27 @@ uint64_t blockchain_storage::get_aliases_count() const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   return m_db_aliases.size();
+}
+//------------------------------------------------------------------
+bool blockchain_storage::get_asset_info(const crypto::hash& asset_id, asset_descriptor_base& info)const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  auto as_ptr = m_db_assets.find(asset_id);
+  if (as_ptr)
+  {
+    if (as_ptr->size())
+    {
+      info = as_ptr->back().descriptor;
+      return true;
+    }
+  }
+  return false;
+}
+//------------------------------------------------------------------
+uint64_t blockchain_storage::get_assets_count() const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  return m_db_assets.size();
 }
 //------------------------------------------------------------------
 std::string blockchain_storage::get_alias_by_address(const account_public_address& addr)const
@@ -3696,6 +3742,48 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::pop_asset_info(const crypto::hash& asset_id)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  auto asset_history_ptr = m_db_assets.find(asset_id);
+  CHECK_AND_ASSERT_MES(asset_history_ptr && asset_history_ptr->size(), false, "empty name list in pop_asset_info");
+
+  assets_container::t_value_type local_asset_hist = *asset_history_ptr;
+  local_asset_hist.pop_back();
+  if (local_asset_hist.size())
+    m_db_assets.set(asset_id, local_asset_hist);
+  else
+    m_db_assets.erase(asset_id);
+
+  LOG_PRINT_MAGENTA("[ASSET_POP]: " << asset_id << ": " << (!local_asset_hist.empty() ? "(prev)" : "(erased)"), LOG_LEVEL_1);
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::put_asset_info(const transaction & tx, asset_descriptor_operation & ado)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+  {
+    crypto::hash asset_id = get_asset_id_from_descriptor(ado.descriptor);
+    auto asset_history_ptr = m_db_assets.find(asset_id);
+    CHECK_AND_ASSERT_MES(!asset_history_ptr, false, "Asset id already existing");
+    assets_container::t_value_type local_asset_history = AUTO_VAL_INIT(local_asset_history);
+    local_asset_history.push_back(ado);
+    m_db_assets.set(asset_id, local_asset_history);
+    LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << asset_id << ": " << ado.descriptor.full_name, LOG_LEVEL_1);
+    //TODO:
+    //rise_core_event(CORE_EVENT_ADD_ASSET, alias_info_to_rpc_alias_info(ai));
+  }
+  else
+  {  
+    //TODO: implement other operations
+    CHECK_AND_ASSERT_THROW(false, "not implemented yet");
+  }
+
+  return true;
+}
+//------------------------------------------------------------------
 void blockchain_storage::set_event_handler(i_core_event_handler* event_handler) const 
 {
   if (event_handler == nullptr)
@@ -3785,6 +3873,12 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx)
     r = put_alias_info(tx, ei.m_alias);
     CHECK_AND_ASSERT_MES(r, false, "failed to put_alias_info");
   }
+  if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
+  {
+    r = put_asset_info(tx, ei.m_asset_operation);
+    CHECK_AND_ASSERT_MES(r, false, "failed to put_asset_info");
+  }
+
   return true;
 }
 //------------------------------------------------------------------

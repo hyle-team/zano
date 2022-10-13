@@ -927,7 +927,7 @@ bool gen_checkpoints_set_after_switching_to_altchain::generate(std::vector<test_
   //               \ 
   //                \- (2 )-                          <- main chain
 
-  bool r = false;
+  //bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());

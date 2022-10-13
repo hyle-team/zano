@@ -76,7 +76,7 @@ bool hard_fork_2_tx_payer_in_wallet::generate(std::vector<test_event_entry>& eve
 
 bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
@@ -324,7 +324,7 @@ bool hard_fork_2_tx_receiver_in_wallet::generate(std::vector<test_event_entry>& 
 
 bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
@@ -468,7 +468,7 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::generate(std::vector<test_event
 
 bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
@@ -670,7 +670,7 @@ bool hard_fork_2_auditable_addresses_basics::generate(std::vector<test_event_ent
 
 bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
@@ -909,7 +909,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
   static const std::wstring bob_wo_restored_filename(L"bob_wo_restored_wallet");
   static const std::wstring bob_non_auditable_filename(L"bob_non_auditable_wallet");
 
-  bool r = false, stub_bool = false;
+  bool r = false;
   
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> alice_wlt   = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
@@ -1181,7 +1181,7 @@ bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::generate(std::vector<te
 template<bool before_hf_2>
 bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);

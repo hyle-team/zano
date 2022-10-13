@@ -91,22 +91,46 @@ namespace currency
         ++result;
     }
     return result;
-  }
+  }  
   //---------------------------------------------------------------
   template<typename specific_type_t, typename variant_t_container>
-  bool get_type_in_variant_container(variant_t_container& av, specific_type_t& a)
+  specific_type_t* get_type_in_variant_container(variant_t_container& av)
   {
     for (auto& ai : av)
     {
       if (ai.type() == typeid(specific_type_t))
       {
-        a = boost::get<specific_type_t>(ai);
-        return true;
+        return &boost::get<specific_type_t>(ai);
       }
+    }
+    return nullptr;
+  }
+  //---------------------------------------------------------------
+  template<typename specific_type_t, typename variant_t_container>
+  bool get_type_in_variant_container(variant_t_container& av, specific_type_t& a)
+  {
+    const specific_type_t* pa = get_type_in_variant_container<const specific_type_t>(av);
+    if (pa)
+    {
+      a = *pa;
+      return true;
     }
     return false;
   }
   //---------------------------------------------------------------
+  //---------------------------------------------------------------
+  template<typename specific_type_t, typename variant_t_container>
+  specific_type_t& get_type_in_variant_container_by_ref(variant_t_container& av)
+  {
+    for (auto& ai : av)
+    {
+      if (ai.type() == typeid(specific_type_t))
+      {
+        return boost::get<specific_type_t>(ai);
+      }
+    }
+    ASSERT_MES_AND_THROW("Objec not found");
+  }
   // if cb returns true, it means "continue", false -- means "stop"
   template<typename specific_type_t, typename variant_container_t, typename callback_t>
   bool process_type_in_variant_container(const variant_container_t& av, callback_t& cb, bool return_value_if_none_found = true)
@@ -194,6 +218,7 @@ namespace currency
     catch(...)
     {
       // should never go here, just precaution
+      return false;
     }
 
     return false;
@@ -422,6 +447,26 @@ namespace currency
   size_t get_object_blobsize(const transaction& t);
   size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
 
+
+  inline
+  void put_t_to_buff(std::string& buff)
+  {}
+
+  template <typename T, typename... Types>
+  void put_t_to_buff(std::string& buff, const T& var1, Types&... var2)
+  {
+    static_assert(std::is_pod<T>::value, "T must be a POD type.");
+    buff.append((const char*)&var1, sizeof(var1));
+    put_t_to_buff(buff, var2...);
+  }
+
+  template <typename... Types>
+  crypto::hash get_hash_from_POD_objects(Types&... var1)
+  {
+    std::string buff;
+    put_t_to_buff(buff, var1...);
+    return crypto::cn_fast_hash(buff.data(), buff.size());
+  }
 
 
 #define CHECKED_GET_SPECIFIC_VARIANT(variant_var, specific_type, variable_name, fail_return_val) \
