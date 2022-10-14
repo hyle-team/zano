@@ -265,16 +265,22 @@ namespace currency
     in.height = height;
     tx.vin.push_back(in);
 
+    // input #1: stake (for PoS blocks only)
     if (pos)
     {
-      // input #1: stake (for PoS blocks only)
-      if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+      if (tx.version > TRANSACTION_VERSION_PRE_HF4 /* && stake is zarcanum */)
       {
         // TODO: add Zarcanum part
+        txin_zc_input stake_input;
+        //stake_input.key_offsets.push_back(pe.g_index);
+        stake_input.k_image = pe.keyimage;
+        tx.vin.emplace_back(std::move(stake_input));
+        //reserve place for ring signature
+        tx.signatures.emplace_back(std::move(zarcanum_sig()));
       }
       else
       {
-        // old fashioned tx non-hidden amounts PoS scheme
+        // old fashioned non-hidden amount direct spend PoS scheme
         txin_to_key stake_input;
         stake_input.amount = pe.amount;
         stake_input.key_offsets.push_back(pe.g_index);

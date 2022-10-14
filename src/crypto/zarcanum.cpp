@@ -46,8 +46,12 @@ namespace crypto
     if (!(cond)) { LOG_PRINT_RED("zarcanum_generate_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
-  bool zarcanum_generate_proof(const hash& kernel_hash, const public_key& commitment_1div8, const scalar_t& blinding_mask, const scalar_t& secret_q,
-    const scalar_t& last_pow_block_id_hashed, uint64_t stake_amount, zarcanum_proof& result, uint8_t* p_err)
+  
+ bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<crypto::CLSAG_GGXG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment,
+    const scalar_t& last_pow_block_id_hashed,
+    const scalar_t& blinding_mask, const scalar_t& secret_q, uint64_t stake_amount,
+    uint64_t secret_index,
+    zarcanum_proof& result, uint8_t* p_err /* = nullptr */)
   {
     const scalar_t a = stake_amount;
     const scalar_t h = scalar_t(kernel_hash);
@@ -71,9 +75,9 @@ namespace crypto
     point_t C_prime = x1 * c_point_X + f_plus_q     * c_point_H + a            * c_point_G;
     point_t E       = bx * c_point_X +           ba * c_point_H +           bf * c_point_G;
 
-    result.C        = C.to_public_key();
-    result.C_prime  = C_prime.to_public_key();
-    result.E        = E.to_public_key();
+    result.C        = (c_scalar_1div8 * C).to_public_key();
+    result.C_prime  = (c_scalar_1div8 * C_prime).to_public_key();
+    result.E        = (c_scalar_1div8 * E).to_public_key();
 
     // three proofs with a shared Fiat-Shamir challenge c
     // 1) linear composition proof for the fact, that  C + C' = lin(X, H + G) = (x + x') X + (a + f + q) (H + G)
@@ -109,12 +113,12 @@ namespace crypto
     result.y4 = r4 + result.c * x2;                                                                           // y_4 = r_4 + c x''
 
     // range proof for E
-    const scalar_vec_t values = { a };  // H component
+    const scalar_vec_t values = { ba }; // H component
     const scalar_vec_t masks  = { bf }; // G component
     const scalar_vec_t masks2 = { bx }; // X component
-    const std::vector<const public_key*> commitments_1div8 = { &commitment_1div8 };
+    const std::vector<const public_key*> E_1div8_vec_ptr = { &result.E };
     
-    if (!bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks2, commitments_1div8, result.E_range_proof, p_err))
+    if (!bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks2, E_1div8_vec_ptr, result.E_range_proof, p_err))
     {
       return false;
     }
