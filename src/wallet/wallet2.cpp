@@ -3647,12 +3647,15 @@ bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index) const
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_and_sign_pos_block(currency::block& b, const pos_entry& pe) const
+bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const pos_entry& pe) const
 {
+  bool r = false;
   WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(), false, "invalid pe.wallet_index: " << pe.wallet_index);
-  const transaction& source_tx = m_transfers[pe.wallet_index].m_ptx_wallet_info->m_tx;
-
-  if (!is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
+  const transfer_details& td = m_transfers[pe.wallet_index];
+  const transaction& source_tx = td.m_ptx_wallet_info->m_tx;
+  WLT_CHECK_AND_ASSERT_MES(pe.tx_out_index < source_tx.vout.size(), false, "invalid pe.tx_out_index: " << pe.tx_out_index);
+  const currency::tx_out_v& stake_out_v = source_tx.vout[pe.tx_out_index];
+  if (!cxt.zarcanum)
   {
     // old PoS with non-hidden amounts
     WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(currency::txin_gen), false, "Wrong input 0 type in transaction: " << b.miner_tx.vin[0].type().name());
@@ -3687,7 +3690,6 @@ bool wallet2::prepare_and_sign_pos_block(currency::block& b, const pos_entry& pe
     // get stake output pub key (stealth address) for ring signature generation
     std::vector<const crypto::public_key*> keys_ptrs;
     TRY_ENTRY()
-      const currency::tx_out_v& stake_out_v = source_tx.vout[pe.tx_out_index];
       keys_ptrs.push_back(&boost::get<currency::txout_to_key>(boost::get<tx_out_bare>(stake_out_v).target).key);
     CATCH_ENTRY_CUSTOM("wallet2::prepare_and_sign_pos_block", { LOG_PRINT_RED_L0("unable to get output's pub key because of the exception"); }, false);
 
@@ -3884,6 +3886,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   tmpl_req.wallet_address = get_account_address_as_str(miner_address);
   tmpl_req.stakeholder_address = get_account_address_as_str(m_account.get_public_address());
   tmpl_req.pos_block = true;
+  tmpl_req.extra_text = m_miner_text_info;
 
   tmpl_req.pe = AUTO_VAL_INIT(tmpl_req.pe);
   tmpl_req.pe.amount              = td.amount();
@@ -3895,18 +3898,6 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   tmpl_req.pe.tx_out_index        = td.m_internal_output_index;
   tmpl_req.pe.wallet_index        = cxt.index;
 
-  //pe.g_index = tmpl_req.pos_g_index = td.m_global_output_index;
-  //pe.amount = tmpl_req.pos_amount = td.amount();//  pe.amount;   
-  //pe.keyimage = td.m_key_image;
-  //pe.block_timestamp = td.m_ptx_wallet_info->m_block_timestamp;
-  //pe.stake_unlock_time = tmpl_req.stake_unlock_time = cxt.stake_unlock_time;
-  //pe.tx_id = tmpl_req.tx_id = td.tx_hash();
-  //pe.tx_out_index = tmpl_req.tx_out_index = td.m_internal_output_index;
-  //pe.wallet_index = cxt.index;
-
-  //tmpl_req.pos_index = pe.index; // gindex <--- this should be removed as soon as pos_entry::index is replaced with tx_id and tx_out_index
-  // TODO: also fill out tx_id and tx_out_index for mining tx creation
-  tmpl_req.extra_text = m_miner_text_info;
   //generate packing tx
   transaction pack_tx = AUTO_VAL_INIT(pack_tx);
   if (generate_packing_transaction_if_needed(pack_tx, 0))
@@ -3936,20 +3927,18 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   set_block_datetime(current_timestamp, b);
   WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
 
-  const currency::tx_out_v& stake_out_v = td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index];
-  if (cxt.zarcanum && td.is_zc())
-  {
-    // Zarcanum
-    WLT_CHECK_AND_ASSERT_MES(stake_out_v.type() == typeid(tx_out_zarcanum), false, "unexpected stake output type: " << stake_out_v.type().name() << ", expected: zarcanum");
-
-    return false;
-  }
-  else
-  {
+  //const currency::tx_out_v& stake_out_v = td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index];
+  //if (cxt.zarcanum && td.is_zc())
+  //{
+  //  // Zarcanum
+  //  return false;
+  //}
+  //else
+  //{
     // old fashioned non-hidden amount PoS scheme
-    res = prepare_and_sign_pos_block(b, tmpl_req.pe);
+    res = prepare_and_sign_pos_block(cxt, b, tmpl_req.pe);
     WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
-  }
+  //}
 
   crypto::hash block_hash = get_block_hash(b);
   WLT_LOG_GREEN("Block " << print16(block_hash) << " has been constructed, sending to core...", LOG_LEVEL_0);

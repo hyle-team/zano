@@ -330,7 +330,7 @@ bool test_generator::construct_block(currency::block& blk,
   else
   {
     //need to build pos block
-    r = sign_block(blk, pe, *wallets[won_walled_index], blocks, oi);
+    r = sign_block(blk, pe, *wallets[won_walled_index].wallet, wallets[won_walled_index].mining_context, blocks, oi);
     CHECK_AND_ASSERT_MES(r, false, "Failed to find_kernel_and_sign()");
   }
 
@@ -347,32 +347,15 @@ bool test_generator::construct_block(currency::block& blk,
   return true;
 }
 
-bool test_generator::sign_block(currency::block& b, 
-                                pos_entry& pe, 
-                                tools::wallet2& w, 
+bool test_generator::sign_block(currency::block& b,
+                                pos_entry& pe,
+                                tools::wallet2& w,
+                                const tools::wallet2::mining_context& mining_context,
                                 const std::vector<const block_info*>& blocks, 
                                 const outputs_index& oi)
 {
-  /*uint64_t h = 0;
-  uint64_t out_i = 0;
-  const transaction * pts = nullptr;
-  crypto::public_key source_tx_pub_key = null_pkey;
-  crypto::public_key out_key = null_pkey;
-
-  bool r = get_output_details_by_global_index(blocks,
-    oi,
-    pe.amount,
-    pe.g_index, 
-    h,
-    pts,
-    out_i,
-    source_tx_pub_key,
-    out_key);
-  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get_output_details_by_global_index()");*/
-
-  bool r = w.prepare_and_sign_pos_block(b, pe);
-  CHECK_AND_ASSERT_THROW_MES(r,"Failed to prepare_and_sign_pos_block()");
-
+  bool r = w.prepare_and_sign_pos_block(mining_context, b, pe);
+  CHECK_AND_ASSERT_MES(r, false, "prepare_and_sign_pos_block failed");
   return true;
 }
 
@@ -438,10 +421,11 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
   wallets.clear();
   for (auto a : accs)
   {
-    wallets.push_back(std::shared_ptr<tools::wallet2>(new tools::wallet2()));
-    wallets.back()->assign_account(a);
-    wallets.back()->get_account().set_createtime(0);
-    wallets.back()->set_core_proxy(tmp_proxy);
+    wallets.push_back(gen_wallet_info());
+    wallets.back().wallet = std::shared_ptr<tools::wallet2>(new tools::wallet2());
+    wallets.back().wallet->assign_account(a);
+    wallets.back().wallet->get_account().set_createtime(0);
+    wallets.back().wallet->set_core_proxy(tmp_proxy);
 
     currency::core_runtime_config pc = cc;
     pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
@@ -449,7 +433,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
     pc.hard_forks = m_hardforks;
     pc.get_core_time = test_core_time::get_time;
 
-    wallets.back()->set_core_runtime_config(pc);
+    wallets.back().wallet->set_core_runtime_config(pc);
   }
 
   for (auto& w : wallets)
@@ -474,7 +458,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
         bdde.txs_ptr.push_back(tx_ptr);
       }
 
-      w->process_new_blockchain_entry(b->b, bdde, currency::get_block_hash(b->b), height);
+      w.wallet->process_new_blockchain_entry(b->b, bdde, currency::get_block_hash(b->b), height);
     }
   }
   return true;
@@ -539,12 +523,13 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
   //lets try to find block
   for (size_t wallet_index = 0, size = wallets.size(); wallet_index < size; ++wallet_index)
   {
-    std::shared_ptr<tools::wallet2> w = wallets[wallet_index];
+    std::shared_ptr<tools::wallet2> w = wallets[wallet_index].wallet;
+    wallets[wallet_index].mining_context = AUTO_VAL_INIT_T(tools::wallet2::mining_context);
+    tools::wallet2::mining_context& context = wallets[wallet_index].mining_context;
     //set m_last_pow_block_h to big value, to let wallet to use any available outputs, including the those which is not behind last pow block
     if (m_ignore_last_pow_in_wallets)
       w->m_last_pow_block_h = CURRENCY_MAX_BLOCK_NUMBER;
 
-    tools::wallet2::mining_context context = AUTO_VAL_INIT(context);
     w->fill_mining_context(context);
 
     std::atomic<bool> stop(false);

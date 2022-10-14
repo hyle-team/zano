@@ -221,7 +221,7 @@ bool gen_chain_switch_pow_pos::check_balance_1(currency::core& c, size_t ev_inde
 
   test_generator::wallets_vector w;
   bool r = generator.build_wallets(get_block_hash(plk_2), m_accounts, w);
-  CHECK_AND_ASSERT_MES(r && w.size() == 3 && w[0] != 0 && w[1] != 0 && w[2] != 0, false, "failed to build wallets");
+  CHECK_AND_ASSERT_MES(r && w.size() == 3 && w[0].wallet != 0 && w[1].wallet != 0 && w[2].wallet != 0, false, "failed to build wallets");
 
   /*
   uint64_t mined_amount = m_early_blocks_reward * 12 + TX_POOL_MINIMUM_FEE / 2 + m_enormous_fee / 2;
@@ -229,7 +229,7 @@ bool gen_chain_switch_pow_pos::check_balance_1(currency::core& c, size_t ev_inde
     return false;
     */
 
-  if (!check_balance_via_wallet(*w[1], "alice", MK_TEST_COINS(1), 0, 0, 0, 0))
+  if (!check_balance_via_wallet(*w[1].wallet, "alice", MK_TEST_COINS(1), 0, 0, 0, 0))
     return false;
 
   return true;

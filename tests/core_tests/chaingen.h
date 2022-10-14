@@ -372,7 +372,13 @@ public:
   typedef std::unordered_map<crypto::hash, std::vector<uint64_t> > tx_global_indexes;
 
   typedef std::vector<const block_info*> blockchain_vector;
-  typedef std::vector<std::shared_ptr<tools::wallet2> > wallets_vector;
+  
+  struct gen_wallet_info
+  {
+    tools::wallet2::mining_context  mining_context;
+    std::shared_ptr<tools::wallet2> wallet;
+  };
+  typedef std::vector<gen_wallet_info> wallets_vector;
 
 
   enum block_fields
@@ -430,7 +436,8 @@ public:
   
   bool sign_block(currency::block& b, 
                   currency::pos_entry& pe, 
-                  tools::wallet2& w, 
+                  tools::wallet2& w,
+                  const tools::wallet2::mining_context& mining_context,
                   const blockchain_vector& blocks, 
                   const outputs_index& oi);
   
