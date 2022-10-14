@@ -578,7 +578,7 @@ namespace currency
   }
 
   //---------------------------------------------------------------
-  bool get_tx_fee(const transaction& tx, uint64_t & fee)
+  bool get_tx_fee(const transaction& tx, uint64_t& fee)
   {
     fee = 0;
     if (is_coinbase(tx))
@@ -607,9 +607,7 @@ namespace currency
       return true; // continue
       };
       
- 
     bool r = process_type_in_variant_container<zarcanum_tx_data_v1>(tx.extra, cb, false);
-      
       
     if (!r)
     {

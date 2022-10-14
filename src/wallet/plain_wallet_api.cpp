@@ -130,7 +130,7 @@ namespace plain_wallet
     log_dir += "/" LOGS_FOLDER;
 
     log_space::get_set_need_thread_id(true, true);
-    log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
+    log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet", false);
     epee::log_space::get_set_log_detalisation_level(true, log_level);
 #ifdef ANDROID_BUILD
     epee::log_space::log_singletone::add_logger(new android_logger());

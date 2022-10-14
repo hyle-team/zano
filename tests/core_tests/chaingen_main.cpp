@@ -658,7 +658,7 @@ int main(int argc, char* argv[])
     log_space::log_singletone::get_default_log_file().c_str(), 
     log_space::log_singletone::get_default_log_folder().c_str());
 
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
+  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet", false);
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);

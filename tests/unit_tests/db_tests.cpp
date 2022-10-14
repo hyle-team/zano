@@ -986,7 +986,7 @@ namespace db_test
     bool r = false;
     epee::shared_recursive_mutex rw_lock;
 
-    epee::log_space::log_singletone::enable_channels("lmdb");
+    epee::log_space::log_singletone::enable_channels("lmdb", false);
 
     static const uint64_t buffer_size = 64 * 1024;                                         // 64 KB
     static const uint64_t db_total_size = static_cast<uint64_t>(2.1 * 1024 * 1024 * 1024); // 2.1 GB -- a bit more than 2GB to test 2GB boundary

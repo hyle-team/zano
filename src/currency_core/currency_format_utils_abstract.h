@@ -218,7 +218,6 @@ namespace currency
     catch(...)
     {
       // should never go here, just precaution
-      return false;
     }
 
     return false;

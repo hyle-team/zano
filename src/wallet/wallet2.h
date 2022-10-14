@@ -252,9 +252,6 @@ namespace tools
       const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
       std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
     {
-      //&&&&&
-      LOG_PRINT_MAGENTA("[--apply_split_strategy_by_id, split strtegy_id: " << id, LOG_LEVEL_0);
-
       switch (id)
       {
       case ssi_digit:
