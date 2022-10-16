@@ -116,7 +116,7 @@ DISABLE_VS_WARNINGS(4100)
 
 #define ENABLE_CHANNEL_BY_DEFAULT(ch_name)   \
   static bool COMBINE(init_channel, __LINE__) UNUSED_ATTRIBUTE = epee::misc_utils::static_initializer([](){  \
-  epee::log_space::log_singletone::enable_channel(ch_name);  return true; \
+  epee::log_space::log_singletone::enable_channel(ch_name, false);  return true; \
 });
 
 
@@ -1239,21 +1239,24 @@ namespace log_space
       return genabled_channels.find(ch_name) != genabled_channels.end();
     }
 
-    static void enable_channels(const std::string& channels_set)
+    static void enable_channels(const std::string& channels_set, bool verbose = true)
     {
       std::set<std::string>& genabled_channels = get_enabled_channels();
       std::list<std::string> list_of_channels;
       boost::split(list_of_channels, channels_set, boost::is_any_of(",;: "), boost::token_compress_on);
-      std::cout << "log channels: ";
+      if (verbose)
+        std::cout << "log channels: ";
       for (const auto& ch : list_of_channels)
       {
         genabled_channels.insert(ch);
-        std::cout << ch << " ";
+        if (verbose)
+          std::cout << ch << " ";
       }
-      std::cout << " enabled" << std::endl;
+      if (verbose)
+        std::cout << " enabled" << std::endl;
     }
 
-    static void enable_channel(const std::string& ch_name)
+    static void enable_channel(const std::string& ch_name, bool verbose = true)
     {
       std::set<std::string>& genabled_channels = get_enabled_channels();
       //lazy synchronization: just replace with modified copy of whole set
@@ -1261,7 +1264,8 @@ namespace log_space
       enabled_channels_local.insert(ch_name);
       genabled_channels.swap(enabled_channels_local);
 #ifndef ANDROID_BUILD
-      //std::cout << "log channel '" << ch_name << "' enabled" << std::endl;
+      if (verbose)
+        std::cout << "log channel '" << ch_name << "' enabled" << std::endl;
 #endif
     }
 

@@ -658,7 +658,7 @@ int main(int argc, char* argv[])
     log_space::log_singletone::get_default_log_file().c_str(), 
     log_space::log_singletone::get_default_log_folder().c_str());
 
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
+  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet", false);
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
@@ -1061,14 +1061,8 @@ int main(int argc, char* argv[])
     
     GENERATE_AND_PLAY(zarcanum_basic_test);
 
-    //stop_on_first_fail = true;
-    //for (size_t i = 0; i != 100; i++)
-    //{
-      multiassets_basic_test::ts_starter = 0;
-      GENERATE_AND_PLAY(multiassets_basic_test);
-    //}
-  
-    
+    GENERATE_AND_PLAY(multiassets_basic_test);
+    //GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */

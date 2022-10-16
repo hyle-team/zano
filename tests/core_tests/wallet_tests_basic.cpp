@@ -47,9 +47,9 @@ bool wallet_test::check_balance_via_build_wallets(currency::core& c, size_t ev_i
   std::list<account_base> accounts(1, acc);
   test_generator::wallets_vector w;
   r = generator.build_wallets(get_block_hash(*top_block), accounts, w, c.get_blockchain_storage().get_core_runtime_config());
-  CHECK_AND_ASSERT_MES(r && w.size() == 1 && w[0] != 0, false, "check_balance: failed to build wallets");
+  CHECK_AND_ASSERT_MES(r && w.size() == 1 && w[0].wallet != 0, false, "check_balance: failed to build wallets");
 
-  if (!check_balance_via_wallet(*w[0], epee::string_tools::num_to_string_fast(pcb.account_index).c_str(), pcb.total_balance, pcb.mined_balance, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
+  if (!check_balance_via_wallet(*w[0].wallet, epee::string_tools::num_to_string_fast(pcb.account_index).c_str(), pcb.total_balance, pcb.mined_balance, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
     return false;
 
   return true;

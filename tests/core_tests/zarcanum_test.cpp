@@ -8,6 +8,8 @@
 #include "wallet_test_core_proxy.h"
 
 #include "random_helper.h"
+#include "tx_builder.h"
+
 
 #define  AMOUNT_TO_TRANSFER_ZARCANUM_BASIC (TESTS_DEFAULT_FEE*10)
 
@@ -52,6 +54,7 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   account_base alice_acc;
   alice_acc.generate();
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
+ 
 
   //pass over hardfork
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
@@ -162,6 +165,65 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   r = mine_next_pos_block_in_playtime_with_wallet(*alice_wlt.get(), staker_benefeciary_acc_wlt->get_account().get_public_address(), pos_entries_count);
   CHECK_AND_ASSERT_MES(!r, false, "Pre-zarcanum block accepted in post-zarcanum era");
 
+
+  return true;
+}
+
+
+
+zarcanum_test_n_inputs_validation::zarcanum_test_n_inputs_validation()
+{
+  REGISTER_CALLBACK_METHOD(zarcanum_basic_test, configure_core);
+
+  m_hardforks.set_hardfork_height(1, 1);
+  m_hardforks.set_hardfork_height(2, 1);
+  m_hardforks.set_hardfork_height(3, 1);
+  m_hardforks.set_hardfork_height(4, 12);
+}  
+
+
+bool zarcanum_test_n_inputs_validation::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts_start = 1338224400;
+
+  GENERATE_ACCOUNT(miner_account);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_account, ts_start);
+  REWIND_BLOCKS(events, blk_0r, blk_0, miner_account);
+
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  fill_tx_sources_and_destinations(events, blk_0r, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+  destinations.resize(1);
+
+  tx_builder builder;
+  builder.step1_init(TRANSACTION_VERSION_PRE_HF4);
+  builder.step2_fill_inputs(miner_account.get_keys(), sources);
+  builder.step3_fill_outputs(destinations);
+  builder.step4_calc_hash();
+  builder.step5_sign(sources);
+
+//  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(builder.m_tx);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_11, blk_0r, miner_account, builder.m_tx);
+  REWIND_BLOCKS_N(events, blk_14, blk_11, miner_account, 4);
+
+
+  sources.clear();
+  destinations.clear();
+  fill_tx_sources_and_destinations(events, blk_0r, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+  destinations.resize(1);
+  tx_builder builder2;
+  //TODO: implement configuring for zarcanum type outputs
+  builder2.step1_init(TRANSACTION_VERSION_POST_HF4);
+  builder2.step2_fill_inputs(miner_account.get_keys(), sources);
+  builder2.step3_fill_outputs(destinations);
+  builder2.step4_calc_hash();
+  builder2.step5_sign(sources);
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(builder2.m_tx);
+  REWIND_BLOCKS_N(events, blk_16, blk_14, miner_account, 2);
 
   return true;
 }

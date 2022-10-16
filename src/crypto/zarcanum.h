@@ -27,9 +27,9 @@ namespace crypto
   struct zarcanum_proof
   {
     scalar_t    d         = 0;
-    public_key  C;
-    public_key  C_prime;
-    public_key  E;
+    public_key  C;                // premultiplied by 1/8
+    public_key  C_prime;          // premultiplied by 1/8
+    public_key  E;                // premultiplied by 1/8
 
     scalar_t    c;                // shared Fiat-Shamir challenge for the following three proofs
     scalar_t    y0;               // 1st linear composition proof
@@ -39,14 +39,15 @@ namespace crypto
     scalar_t    y4;               // Schnorr proof (F = lin(X))
     
     bppe_signature E_range_proof;
-    CLSAG_GGXG_signature ring_sig;
+
+    crypto::public_key pseudo_out_amount_commitment; // premultiplied by 1/8
+    CLSAG_GGXG_signature clsag_ggxg;
   };
 
-  bool zarcanum_generate_proof(const hash& kernel_hash, const public_key& stake_commitment_1div8, const scalar_t& last_pow_block_id_hashed,
-    const scalar_t& blinding_mask, const scalar_t& secret_q, uint64_t stake_amount,
-    uint64_t secret_index,
+  bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<crypto::CLSAG_GGXG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment,
+    const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
+    const scalar_t& secret_x, const scalar_t& secret_q, uint64_t secret_index, const scalar_t& pseudo_out_blinding_mask, uint64_t stake_amount, const scalar_t& stake_blinding_mask,
     zarcanum_proof& result, uint8_t* p_err = nullptr);
-
   
 
   bool zarcanum_verify_proof(const hash& kernel_hash, const public_key& commitment_1div8, const scalar_t& last_pow_block_id_hashed, const zarcanum_proof& proof, uint8_t* p_err = nullptr);

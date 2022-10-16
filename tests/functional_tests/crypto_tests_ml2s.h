@@ -64,7 +64,7 @@ TEST(ml2s, hs)
   x = 0;
 
   crypto::hash h;
-  scalar_t r;
+  //scalar_t r;
 
   sha3(0, 0, &h, sizeof h);
   LOG_PRINT("SHA3() -> " << h, LOG_LEVEL_0);

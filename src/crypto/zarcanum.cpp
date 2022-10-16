@@ -46,12 +46,15 @@ namespace crypto
     if (!(cond)) { LOG_PRINT_RED("zarcanum_generate_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
-  bool zarcanum_generate_proof(const hash& kernel_hash, const public_key& commitment_1div8, const scalar_t& blinding_mask, const scalar_t& secret_q,
-    const scalar_t& last_pow_block_id_hashed, uint64_t stake_amount, zarcanum_proof& result, uint8_t* p_err)
+  
+  bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<crypto::CLSAG_GGXG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment,
+    const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
+    const scalar_t& secret_x, const scalar_t& secret_q, uint64_t secret_index, const scalar_t& pseudo_out_blinding_mask, uint64_t stake_amount, const scalar_t& stake_blinding_mask,
+    zarcanum_proof& result, uint8_t* p_err /* = nullptr */)
   {
     const scalar_t a = stake_amount;
     const scalar_t h = scalar_t(kernel_hash);
-    const scalar_t f_plus_q = blinding_mask + secret_q;
+    const scalar_t f_plus_q = stake_blinding_mask + secret_q;
     const scalar_t f_plus_q_plus_fp = f_plus_q + last_pow_block_id_hashed;
     const scalar_t lhs = h * f_plus_q_plus_fp;                                                                // == h * (f + q + f') mod l
     const mp::uint256_t d_mp = lhs.as_boost_mp_type<mp::uint256_t>() / (c_zarcanum_z_coeff_mp * stake_amount) + 1;
@@ -71,9 +74,9 @@ namespace crypto
     point_t C_prime = x1 * c_point_X + f_plus_q     * c_point_H + a            * c_point_G;
     point_t E       = bx * c_point_X +           ba * c_point_H +           bf * c_point_G;
 
-    result.C        = C.to_public_key();
-    result.C_prime  = C_prime.to_public_key();
-    result.E        = E.to_public_key();
+    result.C        = (c_scalar_1div8 * C).to_public_key();
+    result.C_prime  = (c_scalar_1div8 * C_prime).to_public_key();
+    result.E        = (c_scalar_1div8 * E).to_public_key();
 
     // three proofs with a shared Fiat-Shamir challenge c
     // 1) linear composition proof for the fact, that  C + C' = lin(X, H + G) = (x + x') X + (a + f + q) (H + G)
@@ -109,29 +112,26 @@ namespace crypto
     result.y4 = r4 + result.c * x2;                                                                           // y_4 = r_4 + c x''
 
     // range proof for E
-    const scalar_vec_t values = { a };  // H component
+    const scalar_vec_t values = { ba }; // H component
     const scalar_vec_t masks  = { bf }; // G component
     const scalar_vec_t masks2 = { bx }; // X component
-    const std::vector<const public_key*> commitments_1div8 = { &commitment_1div8 };
+    const std::vector<const public_key*> E_1div8_vec_ptr = { &result.E };
     
-    if (!bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks2, commitments_1div8, result.E_range_proof, p_err))
-    {
-      return false;
-    }
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks2, E_1div8_vec_ptr, result.E_range_proof), 10);
 
     // = four-layers ring signature data outline =
     // (j in [0, ring_size-1])
     // layer 0 ring
-    //     se.outputs[j].stealth_address;
+    //     A[j] ( = ring[j].stealth_address)
     // layer 0 secret (with respect to G)
-    //     in_contexts[i].in_ephemeral.sec;
+    //     secret_x
     // layer 0 linkability
-    //     in.k_image;
+    //     stake_ki
     //
     // layer 1 ring
-    //     crypto::point_t(se.outputs[j].amount_commitment) - pseudo_out_amount_commitment;
+    //     ring[j].amount_commitment - pseudo_out_amount_commitment
     // layer 1 secret (with respect to G)
-    //     se.real_out_amount_blinding_mask - blinding_mask;
+    //     stake_blinding_mask - pseudo_out_blinding_mask
     //
     // additional layers for Zarcanum:
     //
@@ -144,8 +144,13 @@ namespace crypto
     //     Q[j]
     // layer 3 secret (with respect to G)
     //     secret_q
+    TRY_ENTRY()
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(generate_CLSAG_GGXG(m, ring, pseudo_out_amount_commitment, C, stake_ki,
+      secret_x, stake_blinding_mask - pseudo_out_blinding_mask, x0, secret_q, secret_index,
+      result.clsag_ggxg), 20);
+    CATCH_ENTRY2(false);
 
-      return true;
+    return true;
   }
 
 

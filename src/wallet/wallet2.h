@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2020 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -252,9 +252,6 @@ namespace tools
       const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
       std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
     {
-      //&&&&&
-      LOG_PRINT_MAGENTA("[--apply_split_strategy_by_id, split strtegy_id: " << id, LOG_LEVEL_0);
-
       switch (id)
       {
       case ssi_digit:
@@ -432,6 +429,7 @@ namespace tools
       crypto::scalar_t last_pow_block_id_hashed;    // Zarcanum notation: f'
       crypto::scalar_t secret_q;                    // Zarcanum notation: q
       boost::multiprecision::uint256_t z_l_div_z_D; // Zarcanum notation: z * floor( l / (z * D) )  (max possible value (assuming z=2^64) :  z * 2^252 / (z * 1) ~= 2^252)
+      crypto::hash     kernel_hash;                 // Zarcanum notation: h
 
       currency::wide_difficulty_type basic_diff;
       currency::stake_kernel sk;
@@ -842,7 +840,7 @@ namespace tools
     //next functions in public area only becausce of test_generator
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
-    bool prepare_and_sign_pos_block(currency::block& b, const currency::pos_entry& pe) const;
+    bool prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const currency::pos_entry& pe) const;
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,

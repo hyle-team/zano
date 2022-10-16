@@ -30,6 +30,7 @@
 #define CURRENT_TRANSACTION_VERSION                     2
 #define TRANSACTION_VERSION_INITAL                      0
 #define TRANSACTION_VERSION_PRE_HF4                     1
+#define TRANSACTION_VERSION_POST_HF4                    2 
 #define HF1_BLOCK_MAJOR_VERSION                         1
 #define HF3_BLOCK_MAJOR_VERSION                         2
 #define CURRENT_BLOCK_MAJOR_VERSION                     3

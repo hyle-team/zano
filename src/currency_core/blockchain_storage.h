@@ -352,7 +352,7 @@ namespace currency
       wide_difficulty_type basic_diff,
       uint64_t& amount,
       wide_difficulty_type& final_diff,
-      crypto::hash& proof_hash,
+      crypto::hash& kernel_hash,
       const crypto::hash& id,
       bool for_altchain,
       const alt_chain_type& alt_chain = alt_chain_type(),
