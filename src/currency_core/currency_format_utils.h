@@ -385,7 +385,7 @@ namespace currency
 
   //PoS
   bool is_pos_block(const block& b);
-  bool is_pos_block(const transaction& tx);
+  bool is_pos_miner_tx(const transaction& tx);
   wide_difficulty_type correct_difficulty_with_sequence_factor(size_t sequence_factor, wide_difficulty_type diff);
   void print_currency_details();
   std::string print_reward_change_first_blocks(size_t n_of_first_blocks);

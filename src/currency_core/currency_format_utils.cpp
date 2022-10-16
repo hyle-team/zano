@@ -189,7 +189,6 @@ namespace currency
     const pos_entry& pe)
   {
     bool r = false;
-    CHECK_AND_ASSERT_THROW_MES(!pos || tx_version <= TRANSACTION_VERSION_PRE_HF4, "PoS miner tx is currently unsupported for HF4 -- sowle");
 
     uint64_t block_reward = 0;
     if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward, height))
@@ -271,10 +270,10 @@ namespace currency
       if (tx.version > TRANSACTION_VERSION_PRE_HF4 /* && stake is zarcanum */)
       {
         // TODO: add Zarcanum part
-        txin_zc_input stake_input;
+        //txin_zc_input stake_input = AUTO_VAL_INIT(stake_input);
         //stake_input.key_offsets.push_back(pe.g_index);
-        stake_input.k_image = pe.keyimage;
-        tx.vin.emplace_back(std::move(stake_input));
+        //stake_input.k_image = pe.keyimage;
+        tx.vin.emplace_back(std::move(txin_zc_input()));
         //reserve place for ring signature
         tx.signatures.emplace_back(std::move(zarcanum_sig()));
       }
@@ -3579,17 +3578,19 @@ namespace currency
   {
     if (!(b.flags & CURRENCY_BLOCK_FLAG_POS_BLOCK))
       return false;
-    return is_pos_block(b.miner_tx);
+    return is_pos_miner_tx(b.miner_tx);
   }
   //---------------------------------------------------------------
-  bool is_pos_block(const transaction& tx)
+  bool is_pos_miner_tx(const transaction& tx)
   {
     if (tx.vin.size() == 2 &&
       tx.vin[0].type() == typeid(txin_gen) &&
-      tx.vin[1].type() == typeid(txin_to_key))
+      (tx.vin[1].type() == typeid(txin_to_key) ||
+       tx.vin[1].type() == typeid(txin_zc_input)))
       return true;
     return false;
   }
+  //---------------------------------------------------------------
   size_t get_max_block_size()
   {
     return CURRENCY_MAX_BLOCK_SIZE;

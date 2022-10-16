@@ -4552,7 +4552,7 @@ struct outputs_visitor
     //check tx unlock time
     uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
     //let coinbase sources for PoS block to have locked inputs, the outputs supposed to be locked same way, except the reward 
-    if (is_coinbase(validated_tx) && is_pos_block(validated_tx)) // @#@ consider changing to one call to is_pos_coinbase()
+    if (is_coinbase(validated_tx) && is_pos_miner_tx(validated_tx)) // @#@ consider changing to one call to is_pos_coinbase()
     {
       CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(source_out_unlock_time), false, "source output #" << out_i << " is locked by time, not by height, which is not allowed for PoS coinbase");
       if (source_out_unlock_time > m_source_max_unlock_time_for_pos_coinbase)
@@ -5374,7 +5374,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
                                             wide_difficulty_type basic_diff, 
                                             uint64_t& amount, 
                                             wide_difficulty_type& final_diff, 
-                                            crypto::hash& proof_hash, 
+                                            crypto::hash& kernel_hash, 
                                             const crypto::hash& id, 
                                             bool for_altchain, 
                                             const alt_chain_type& alt_chain,
@@ -5415,7 +5415,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
   CHECK_AND_ASSERT_MES(r, false, "failed to build_stake_modifier");
   r = build_kernel(stake_key_image, sk, sm, b.timestamp);
   CHECK_AND_ASSERT_MES(r, false, "failed to build kernel_stake");
-  proof_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
+  kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
 
   if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
   {
@@ -5424,6 +5424,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
   else
   {
     // old PoS non-hidden amount scheme
+    CHECK_AND_ASSERT_MES(b.miner_tx.version <= TRANSACTION_VERSION_PRE_HF4, false, "PoS miner tx has incorrect version: " << b.miner_tx.version);
     CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "incorrect input 1 type: " << b.miner_tx.vin[1].type().name() << ", txin_to_key expected");
     const txin_to_key& intk = boost::get<txin_to_key>(b.miner_tx.vin[1]);
     amount = intk.amount;
@@ -5435,16 +5436,16 @@ bool blockchain_storage::validate_pos_block(const block& b,
     LOG_PRINT_L2("STAKE KERNEL for bl ID: " << get_block_hash(b) << ENDL
       << print_stake_kernel_info(sk)
       << "amount: " << print_money(amount) << ENDL
-      << "kernel_hash: " << proof_hash);
+      << "kernel_hash: " << kernel_hash);
 
     final_diff = basic_diff / amount;
-    if (!check_hash(proof_hash, final_diff))
+    if (!check_hash(kernel_hash, final_diff))
     {
       LOG_ERROR("PoS difficulty check failed for block " << get_block_hash(b) << " @ HEIGHT " << get_block_height(b) << ":" << ENDL
         << "  basic_diff:  " << basic_diff << ENDL
         << "  final_diff:  " << final_diff << ENDL
         << "  amount:      " << print_money_brief(amount) << ENDL
-        << "  kernel_hash: " << proof_hash << ENDL
+        << "  kernel_hash: " << kernel_hash << ENDL
         );
       return false;
     }
