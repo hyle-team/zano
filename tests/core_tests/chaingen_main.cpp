@@ -1061,14 +1061,8 @@ int main(int argc, char* argv[])
     
     GENERATE_AND_PLAY(zarcanum_basic_test);
 
-    //stop_on_first_fail = true;
-    //for (size_t i = 0; i != 100; i++)
-    //{
-      multiassets_basic_test::ts_starter = 0;
-      GENERATE_AND_PLAY(multiassets_basic_test);
-    //}
-  
-    
+    GENERATE_AND_PLAY(multiassets_basic_test);
+    GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */
