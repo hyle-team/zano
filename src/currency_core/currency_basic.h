@@ -493,13 +493,33 @@ namespace currency
     BEGIN_SERIALIZE_OBJECT()
       FIELD(d)
       FIELD(C)
-      // TODO
+      FIELD(C_prime);
+      FIELD(E);
+      FIELD(c);
+      FIELD(y0);
+      FIELD(y1);
+      FIELD(y2);
+      FIELD(y3);
+      FIELD(y4);
+      FIELD((crypto::bppe_signature_serialized&)E_range_proof);
+      FIELD(pseudo_out_amount_commitment);
+      FIELD((crypto::CLSAG_GGXG_signature_serialized&)clsag_ggxg);
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(d)
       BOOST_SERIALIZE(C)
-      // TODO
+      BOOST_SERIALIZE(C_prime);
+      BOOST_SERIALIZE(E);
+      BOOST_SERIALIZE(c);
+      BOOST_SERIALIZE(y0);
+      BOOST_SERIALIZE(y1);
+      BOOST_SERIALIZE(y2);
+      BOOST_SERIALIZE(y3);
+      BOOST_SERIALIZE(y4);
+      BOOST_SERIALIZE((crypto::bppe_signature_serialized&)E_range_proof);
+      BOOST_SERIALIZE(pseudo_out_amount_commitment);
+      BOOST_SERIALIZE((crypto::CLSAG_GGXG_signature_serialized&)clsag_ggxg);
     END_BOOST_SERIALIZATION()
   };
 
