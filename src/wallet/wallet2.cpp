@@ -3892,9 +3892,15 @@ void wallet2::do_pos_mining_prepare_entry(mining_context& context, size_t transf
 
   if (context.zarcanum)
   {
-    crypto::point_t R(get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx));
     crypto::scalar_t v = m_account.get_keys().view_secret_key;
-    context.secret_q = v * crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_SECRET_Q, v * R);
+    crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+    bool r = crypto::generate_key_derivation(get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx), m_account.get_keys().view_secret_key, derivation); // 8 * v * R
+    CHECK_AND_ASSERT_MES_NO_RET(r, "generate_key_derivation failed"); 
+    crypto::scalar_t h = AUTO_VAL_INIT(h);
+    crypto::derivation_to_scalar(derivation, td.m_internal_output_index, h.as_secret_key()); // h = Hs(8 * v * R, i)
+
+    // q = Hs(domain_sep, Hs(8 * v * R, i) ) * 8 * v
+    context.secret_q = v * 8 * crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h);
   }
 }
 //------------------------------------------------------------------
