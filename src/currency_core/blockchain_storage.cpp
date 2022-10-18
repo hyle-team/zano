@@ -5419,6 +5419,31 @@ bool blockchain_storage::validate_pos_block(const block& b,
 
   if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
   {
+    CHECK_AND_ASSERT_MES(b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4, false, "Zarcanum PoS: miner tx with version " << b.miner_tx.version << " is not allowed");
+    CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "incorrect input 1 type: " << b.miner_tx.vin[1].type().name() << ", txin_zc_input expected");
+    const txin_zc_input& stake_input = boost::get<txin_zc_input>(b.miner_tx.vin[1]);
+    CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1, false, "incorrect number of stake input signatures: " << b.miner_tx.signatures.size());
+    CHECK_AND_ASSERT_MES(b.miner_tx.signatures[0].type() == typeid(zarcanum_sig), false, "incorrect sig 0 type: " << b.miner_tx.signatures[0].type().name());
+    const zarcanum_sig& sig = boost::get<zarcanum_sig>(b.miner_tx.signatures[0]);
+    const crypto::hash miner_tx_hash = get_transaction_hash(b.miner_tx);
+
+    // TODO @#@# do general input check for main chain blocks only?
+    uint64_t max_related_block_height = 0;
+    std::vector<crypto::public_key> dummy_output_keys; // won't be used
+    uint64_t dummy_source_max_unlock_time_for_pos_coinbase_dummy = 0; // won't be used
+    scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
+    r = get_output_keys_for_input_with_checks(b.miner_tx, stake_input, dummy_output_keys, max_related_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex);
+    CHECK_AND_ASSERT_MES(r, false, "get_output_keys_for_input_with_checks failed for stake input");
+    CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() == stake_input.key_offsets.size(), false, "incorrect number of referenced outputs found: " << scan_contex.zc_outs.size() << ", while " << stake_input.key_offsets.size() << " is expected.");
+    // build a ring of references
+    vector<crypto::CLSAG_GGXG_input_ref_t> ring;
+    ring.reserve(scan_contex.zc_outs.size());
+    for(auto& zc_out : scan_contex.zc_outs)
+      ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.concealing_point);
+
+    r = crypto::verify_CLSAG_GGXG(miner_tx_hash, ring, sig.pseudo_out_amount_commitment, sig.C, stake_input.k_image, sig.clsag_ggxg);
+    CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GGXG failed");
+    
     return false; // not implemented yet, TODO @#@#
   }
   else

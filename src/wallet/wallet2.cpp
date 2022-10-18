@@ -3724,7 +3724,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   uint64_t secret_index = 0; // index of the real stake output
 
   // get decoys outputs and construct miner tx
-  static size_t required_decoys_count = 8;          // TODO @#@# set them somewhere else
+  static size_t required_decoys_count = 4;          // TODO @#@# set them somewhere else
   static bool use_only_forced_to_mix = false;       // TODO @#@# set them somewhere else
   if (required_decoys_count > 0)
   {
@@ -3743,8 +3743,10 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys_resp.outs[0].outs.size() == required_decoys_count + 1, "for PoS stake tx got less decoys to mix than requested: " << decoys_resp.outs[0].outs.size() << " < " << required_decoys_count + 1);
 
     auto& decoys = decoys_resp.outs[0].outs;
-    std::unordered_set<uint64_t> used_gindices{ td.m_global_output_index };
-    size_t good_decoys_count = 0;
+    decoys.emplace_front(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point);
+
+    std::unordered_set<uint64_t> used_gindices;
+    size_t good_outs_count = 0;
     for(auto it = decoys.begin(); it != decoys.end(); )
     {
       if (used_gindices.count(it->global_amount_index) != 0)
@@ -3753,31 +3755,26 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
         continue;
       }
       used_gindices.insert(it->global_amount_index);
-      if (++good_decoys_count == required_decoys_count)
+      if (++good_outs_count == required_decoys_count + 1)
       {
         decoys.erase(++it, decoys.end());
         break;
       }
       ++it;
     }
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys.size() == required_decoys_count, "for PoS stake got less good decoys than required: " << decoys.size() << " < " << required_decoys_count);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys.size() == required_decoys_count + 1, "for PoS stake got less good decoys than required: " << decoys.size() << " < " << required_decoys_count);
 
-    secret_index = crypto::rand<uint64_t>() % (decoys.size());
+    decoys.sort([](auto& l, auto& r){ return l.global_amount_index < r.global_amount_index; }); // sort them now (absolute_output_offsets_to_relative)
+
     uint64_t i = 0;
     for(auto& el : decoys)
     {
-      if (i++ == secret_index)
-      {
-        ring.emplace_back(stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point);
-        stake_input.key_offsets.push_back(td.m_global_output_index);
-      }
+      uint64_t gindex = el.global_amount_index;
+      if (gindex == td.m_global_output_index)
+        secret_index = i;
+      ++i;
       ring.emplace_back(el.stealth_address, el.amount_commitment, el.concealing_point);
       stake_input.key_offsets.push_back(el.global_amount_index);
-    }
-    if (i == secret_index)
-    {
-      ring.emplace_back(stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point);
-      stake_input.key_offsets.push_back(td.m_global_output_index);
     }
     stake_input.key_offsets = absolute_output_offsets_to_relative(stake_input.key_offsets);
   }
@@ -3793,6 +3790,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   {
     crypto::point_t source_amount_commitment = crypto::c_scalar_1div8 * td.m_amount * crypto::c_point_H + crypto::c_scalar_1div8 * *td.m_opt_blinding_mask * crypto::c_point_G;
     CHECK_AND_ASSERT_MES(stake_out.amount_commitment == source_amount_commitment.to_public_key(), false, "real output amount commitment check failed");
+    CHECK_AND_ASSERT_MES(ring[secret_index].amount_commitment == stake_out.amount_commitment, false, "ring secret member doesn't match with the stake output");
   }
   #endif
 
