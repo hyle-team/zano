@@ -667,6 +667,7 @@ int main(int argc, char* argv[])
 
   po::options_description desc_options("Allowed options");
   command_line::add_arg(desc_options, command_line::arg_help);
+  command_line::add_arg(desc_options, command_line::arg_log_level);
   command_line::add_arg(desc_options, arg_test_data_path);
   command_line::add_arg(desc_options, arg_generate_test_data);
   command_line::add_arg(desc_options, arg_play_test_data);
@@ -695,6 +696,16 @@ int main(int argc, char* argv[])
   {
     std::cout << desc_options << std::endl;
     return 0;
+  }
+
+  if (command_line::has_arg(g_vm, command_line::arg_log_level))
+  {
+    int new_log_level = command_line::get_arg(g_vm, command_line::arg_log_level);
+    if (new_log_level >= LOG_LEVEL_MIN && new_log_level <= LOG_LEVEL_MAX && log_space::get_set_log_detalisation_level(false) != new_log_level)
+    {
+      log_space::get_set_log_detalisation_level(true, new_log_level);
+      LOG_PRINT_L0("LOG_LEVEL set to " << new_log_level);
+    }
   }
 
   if (command_line::has_arg(g_vm, arg_stop_on_fail))
