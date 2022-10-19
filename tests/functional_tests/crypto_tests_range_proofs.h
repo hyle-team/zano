@@ -290,3 +290,96 @@ TEST(bppe, two)
 
   return true;
 }
+
+TEST(bppe, power_128)
+{
+  std::vector<bppe_signature> signatures_vector;
+  signatures_vector.reserve(200);
+  std::vector<std::vector<point_t>> commitments_vector;
+  commitments_vector.reserve(200);
+
+  std::vector<bppe_sig_commit_ref_t> sigs;
+  uint8_t err = 0;
+  bool r = false;
+
+  auto gen_rp_for_vec = [&](const scalar_vec_t& values)
+  {
+    signatures_vector.resize(signatures_vector.size() + 1);
+    bppe_signature &bppe_sig = signatures_vector.back();
+    commitments_vector.resize(commitments_vector.size() + 1);
+    std::vector<point_t>& commitments = commitments_vector.back();
+
+    scalar_vec_t masks, masks2;
+    for(auto& el: values)
+    {
+      masks.emplace_back(scalar_t::random());
+      masks2.emplace_back(scalar_t::random());
+    }
+
+    r = bppe_gen<bpp_crypto_trait_zano<128>>(values, masks, masks2, bppe_sig, commitments, &err);
+    ASSERT_TRUE(r);
+    sigs.emplace_back(bppe_sig, commitments);
+    return true;
+  };
+
+  auto gen_rp_for_value = [&](const scalar_t& v) { return gen_rp_for_vec(scalar_vec_t{ v }); };
+
+  const scalar_t s_128_max = scalar_t(UINT64_MAX, UINT64_MAX, 0, 0);
+
+  LOG_PRINT_L0("1");
+  ASSERT_TRUE(gen_rp_for_value(s_128_max));
+  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
+
+  LOG_PRINT_L0("2");
+  ASSERT_TRUE(gen_rp_for_value(scalar_t(crypto::rand<uint64_t>(), crypto::rand<uint64_t>(), 0, 0)));
+  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
+
+  LOG_PRINT_L0("3");
+  ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, 1, 0)));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
+
+  LOG_PRINT_L0("4");
+  ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, crypto::rand<uint64_t>(), 0)));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
+
+  LOG_PRINT_L0("5");
+  ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, 0, crypto::rand<uint64_t>())));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
+
+  LOG_PRINT_L0("6");
+  ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, 0, UINT64_MAX)));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
+
+  LOG_PRINT_L0("7");
+  ASSERT_TRUE(gen_rp_for_vec(scalar_vec_t{s_128_max, s_128_max, s_128_max, s_128_max}));
+  LOG_PRINT_L0("simple generated");
+  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  LOG_PRINT_L0("simple verified");
+  for(size_t i = 0; i < 16; ++i)
+  {
+    LOG_PRINT_L0("    #" << i << " simple generated");
+    scalar_vec_t vec;
+    for(size_t j = 0, n = crypto::rand<size_t>() % 4 + 1; j < n; ++j)
+      vec.emplace_back(scalar_t(crypto::rand<uint64_t>(), crypto::rand<uint64_t>(), 0, 0));
+    ASSERT_TRUE(gen_rp_for_vec(vec));
+  }
+  LOG_PRINT_L0("verification started");
+  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
+  LOG_PRINT_L0("verification finished" << ENDL);
+
+  LOG_PRINT_L0("8");
+  ASSERT_TRUE(gen_rp_for_value(s_128_max));
+  ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, 0, UINT64_MAX)));
+  ASSERT_TRUE(gen_rp_for_value(s_128_max));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
+
+  return true;
+}
