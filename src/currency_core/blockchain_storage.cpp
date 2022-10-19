@@ -37,6 +37,7 @@
 #include "tx_semantic_validation.h"
 #include "crypto/RIPEMD160_helper.h"
 #include "crypto/bitcoin/sha256_helper.h"
+#include "crypto_config.h"
 
 
 #undef LOG_DEFAULT_CHANNEL 
@@ -1280,7 +1281,10 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   }
   if (pos)
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "coinstake transaction in the block has the wrong type");
+    if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+      CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "coinstake tx has incorrect type of input #1: " << b.miner_tx.vin[1].type().name());
+    else
+      CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "coinstake tx has incorrect type of input #1: " << b.miner_tx.vin[1].type().name());
   }
 
   if (m_core_runtime_config.is_hardfork_active_for_height(1, height))
@@ -1315,11 +1319,19 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
     return false;
   }
 
-  if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
+  if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 2, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zc_outs_range_proof)");
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[1].type() == typeid(zc_balance_proof), false, "coinbase transaction wrong attachmenttype #1 (expected: zc_balance_proof)");
+    if (pos)
+    {
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 1, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zc_outs_range_proof)");
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 2, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zc_outs_range_proof)");
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment[1].type() == typeid(zc_balance_proof), false, "coinbase transaction wrong attachmenttype #1 (expected: zc_balance_proof)");
+    }
   }
   else
   {
@@ -5441,10 +5453,13 @@ bool blockchain_storage::validate_pos_block(const block& b,
     for(auto& zc_out : scan_contex.zc_outs)
       ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.concealing_point);
 
-    r = crypto::verify_CLSAG_GGXG(miner_tx_hash, ring, sig.pseudo_out_amount_commitment, sig.C, stake_input.k_image, sig.clsag_ggxg);
-    CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GGXG failed");
+    crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
+
+    uint8_t err = 0;
+    r = crypto::zarcanum_verify_proof(miner_tx_hash, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, sig, &err);
+    CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << err);
     
-    return false; // not implemented yet, TODO @#@#
+    return true;
   }
   else
   {

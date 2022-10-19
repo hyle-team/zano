@@ -317,7 +317,7 @@ namespace crypto
     hsc.add_point(alpha_g * ki_base);
     hsc.add_point(alpha_x * c_point_X);
     hsc.add_point(alpha_x * ki_base);
-    DBG_PRINT("c[" << secret_index << "] = Hs(ih, " << alpha_g * c_point_G << ", " << alpha_g * ki_base << ", " << alpha_x * c_point_X << ", " << alpha_x * ki_base << ")");
+    //DBG_PRINT("c[" << secret_index << "] = Hs(ih, " << alpha_g * c_point_G << ", " << alpha_g * ki_base << ", " << alpha_x * c_point_X << ", " << alpha_x * ki_base << ")");
     scalar_t c_prev = hsc.calc_hash();  // c_{secret_index + 1}
 
     sig.r_g.clear();
@@ -355,8 +355,8 @@ namespace crypto
   }
 
 
-  bool verify_CLSAG_GGXG(const hash& m, const std::vector<CLSAG_GGXG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment, const public_key& extended_amount_commitment, const key_image& ki,
-    const CLSAG_GGXG_signature& sig)
+  bool verify_CLSAG_GGXG(const hash& m, const std::vector<CLSAG_GGXG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment, const public_key& extended_amount_commitment,
+    const key_image& ki, const CLSAG_GGXG_signature& sig)
   {
     DBG_PRINT("== verify_CLSAG_GGXG ==");
     size_t ring_size = ring.size();
@@ -474,7 +474,7 @@ namespace crypto
       hsc.add_point(sig.r_x[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_x);
       c_prev = hsc.calc_hash(); // c_{i + 1}
       DBG_PRINT("c[" << i + 1 << "] = " << c_prev);
-      DBG_PRINT("c[" << i + 1 << "] = Hs(ih, " << sig.r_g[i] * c_point_G + c_prev * W_pub_keys_g[i] << ", " << sig.r_g[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_g << ", " << sig.r_x[i] * c_point_X + c_prev * W_pub_keys_x[i] << ", " << sig.r_x[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_x << ")");
+      //DBG_PRINT("c[" << i + 1 << "] = Hs(ih, " << sig.r_g[i] * c_point_G + c_prev * W_pub_keys_g[i] << ", " << sig.r_g[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_g << ", " << sig.r_x[i] * c_point_X + c_prev * W_pub_keys_x[i] << ", " << sig.r_x[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_x << ")");
     }
 
     return c_prev == sig.c;

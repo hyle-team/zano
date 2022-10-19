@@ -387,6 +387,9 @@ namespace currency
         VARIANT_CASE_CONST(ZC_sig, zc_sig);
           sum_of_pseudo_out_amount_commitments += crypto::point_t(zc_sig.pseudo_out_amount_commitment); // *1/8
           ++zc_sigs_count;
+        VARIANT_CASE_CONST(zarcanum_sig, sig);
+          sum_of_pseudo_out_amount_commitments += crypto::point_t(sig.pseudo_out_amount_commitment); // *1/8
+          ++zc_sigs_count;
         VARIANT_SWITCH_END();
       }
       sum_of_pseudo_out_amount_commitments.modify_mul8();

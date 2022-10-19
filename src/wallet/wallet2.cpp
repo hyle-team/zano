@@ -3796,7 +3796,6 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
 
   crypto::scalar_t pseudo_out_blinding_mask = crypto::scalar_t::random();
   crypto::point_t pseudo_out_amount_commitment = td.m_amount * crypto::c_point_H + pseudo_out_blinding_mask * crypto::c_point_G;
-  sig.pseudo_out_amount_commitment = (crypto::c_scalar_1div8 * pseudo_out_amount_commitment).to_public_key();
 
   crypto::hash tx_hash_for_sig = get_transaction_hash(b.miner_tx);
 
