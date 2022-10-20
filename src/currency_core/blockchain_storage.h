@@ -332,6 +332,9 @@ namespace currency
     bool is_tx_expired(const transaction& tx) const;
     std::shared_ptr<const transaction_chain_entry> find_key_image_and_related_tx(const crypto::key_image& ki, crypto::hash& id_result) const;
 
+    // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
+    bool is_hardfork_active(size_t hardfork_id) const;
+
     wide_difficulty_type block_difficulty(size_t i)const;
     bool forecast_difficulty(std::vector<std::pair<uint64_t, wide_difficulty_type>> &out_height_2_diff_vector, bool pos) const;
     bool prune_aged_alt_blocks();
@@ -675,10 +678,6 @@ namespace currency
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const;
     bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
-
-    // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
-    bool is_hardfork_active(size_t hardfork_id) const;
-
 
 
 

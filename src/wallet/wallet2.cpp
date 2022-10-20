@@ -3168,7 +3168,7 @@ bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, 
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const
 {
-  static const char* header = "index                 amount  g_index  flags       block  tx                                                                  out#  key image";
+  static const char* header = "index                 amount  g_index  flags       block  tx                                                                out#  key image";
   std::stringstream ss;
   ss << header << ENDL;
   size_t count = 0;
@@ -4379,7 +4379,7 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose) const
   else
   {
     boost::io::ios_flags_saver ifs(ss);
-    ss << "index                 amount  spent_h  g_index   block  block_ts     flg tx                                                                   out#  key image" << ENDL;
+    ss << "index                 amount  spent_h  g_index   block  block_ts     flg  tx                                                                out#  key image" << ENDL;
     for (size_t i = 0; i != m_transfers.size(); i++)
     {
       const transfer_details& td = m_transfers[i];

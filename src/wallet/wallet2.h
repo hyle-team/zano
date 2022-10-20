@@ -699,7 +699,7 @@ namespace tools
     bool fill_mining_context(mining_context& ctx);
     
     void get_transfers(wallet2::transfer_container& incoming_transfers) const;
-    std::string get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const;
+    std::string get_transfers_str(bool include_spent = true, bool include_unspent = true) const;
 
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;

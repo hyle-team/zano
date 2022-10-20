@@ -5463,7 +5463,8 @@ bool blockchain_storage::validate_pos_block(const block& b,
     uint8_t err = 0;
     r = crypto::zarcanum_verify_proof(miner_tx_hash, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, sig, &err);
     CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << err);
-    
+
+    final_diff = basic_diff; // just for logs
     return true;
   }
   else
@@ -5748,7 +5749,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     m_is_in_checkpoint_zone = false;
 
   crypto::hash proof_hash = null_hash;
-  uint64_t pos_coinstake_amount = 0; 
+  uint64_t pos_coinstake_amount = UINT64_MAX; 
   wide_difficulty_type this_coin_diff = 0;
   bool is_pos_bl = is_pos_block(bl);
   //check if PoS allowed in this height
@@ -6094,7 +6095,12 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   { // PoS
     int64_t actual_ts = get_block_datetime(bei.bl); // signed int is intentionally used here
     int64_t ts_diff = actual_ts - m_core_runtime_config.get_core_time();
-    powpos_str_entry << "PoS:\t" << proof_hash << ", stake amount: " << print_money_brief(pos_coinstake_amount) << ", final_difficulty: " << this_coin_diff;
+    powpos_str_entry << "PoS:\t" << proof_hash << ", stake amount: ";
+    if (pos_coinstake_amount != UINT64_MAX)
+      powpos_str_entry << print_money_brief(pos_coinstake_amount);
+    else
+      powpos_str_entry << "hidden";
+    powpos_str_entry << ", final_difficulty: " << this_coin_diff;
     timestamp_str_entry << ", actual ts: " << actual_ts << " (diff: " << std::showpos << ts_diff << "s) block ts: " << std::noshowpos << bei.bl.timestamp << " (shift: " << std::showpos << static_cast<int64_t>(bei.bl.timestamp) - actual_ts << ")";
   }
   else
