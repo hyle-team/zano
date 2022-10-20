@@ -291,7 +291,7 @@ bool test_generator::construct_block(currency::block& blk,
                                     test_generator::get_test_gentime_settings().miner_tx_max_outs,
                                     static_cast<bool>(coin_stake_sources.size()),
                                     pe,
-                                    blinding_masks_sum);
+                                    &blinding_masks_sum);
     CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
     size_t coinbase_size = get_object_blobsize(blk.miner_tx);

@@ -183,11 +183,11 @@ namespace currency
     const account_public_address &stakeholder_address,
     transaction& tx,
     uint64_t tx_version,
-    const blobdata& extra_nonce           /* = blobdata() */,
-    size_t max_outs                       /* = CURRENCY_MINER_TX_MAX_OUTS */,
-    bool pos                              /* = false */,
-    const pos_entry& pe                   /* = pos_entry() */,
-    crypto::scalar_t& blinding_masks_sum  /* = crypto::scalar_t() */
+    const blobdata& extra_nonce               /* = blobdata() */,
+    size_t max_outs                           /* = CURRENCY_MINER_TX_MAX_OUTS */,
+    bool pos                                  /* = false */,
+    const pos_entry& pe                       /* = pos_entry() */,
+    crypto::scalar_t* blinding_masks_sum_ptr  /* = nullptr */
   )
   {
     bool r = false;
@@ -297,7 +297,7 @@ namespace currency
     // fill outputs
     crypto::scalar_vec_t blinding_masks(destinations.size());       // vector of secret blinging masks for each output. For range proof generation
     crypto::scalar_vec_t amounts(destinations.size());              // vector of amounts, converted to scalars. For ranage proof generation
-    blinding_masks_sum = 0;
+    crypto::scalar_t blinding_masks_sum = 0;
     uint64_t output_index = 0;
     for (auto& d : destinations)
     {
@@ -334,6 +334,9 @@ namespace currency
       //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
       set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
     }
+
+    if (blinding_masks_sum_ptr)
+      *blinding_masks_sum_ptr = blinding_masks_sum;
 
     return true;
   }
