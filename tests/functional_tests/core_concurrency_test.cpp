@@ -109,7 +109,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
       wide_difficulty_type diff = 0;
       if (prev_block.height != 0)
         test_core_time::adjust(prev_block.bl.timestamp + DIFFICULTY_POW_TARGET);
-      r = bcs.create_block_template(b, miner_addr, diff, height, ex_nonce);
+      r = bcs.create_block_template(miner_addr, ex_nonce, b, diff, height);
       CHECK_AND_ASSERT_MES(r, false, "create_block_template failed");
     }
     else

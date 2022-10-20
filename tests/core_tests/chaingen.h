@@ -434,12 +434,11 @@ public:
   bool init_test_wallet(const currency::account_base& account, const crypto::hash& genesis_hash, std::shared_ptr<tools::wallet2> &result);
   bool refresh_test_wallet(const std::vector<test_event_entry>& events, tools::wallet2* w, const crypto::hash& top_block_hash, size_t expected_blocks_to_be_fetched = std::numeric_limits<size_t>::max());
   
-  bool sign_block(currency::block& b, 
-                  currency::pos_entry& pe, 
-                  tools::wallet2& w,
-                  const tools::wallet2::mining_context& mining_context,
-                  const blockchain_vector& blocks, 
-                  const outputs_index& oi);
+  bool sign_block(const tools::wallet2::mining_context& mining_context,
+                  const currency::pos_entry& pe,
+                  const tools::wallet2& w,
+                  const crypto::scalar_t& blinding_masks_sum,
+                  currency::block& b);
   
   bool get_output_details_by_global_index(const test_generator::blockchain_vector& blck_chain,
                                           const test_generator::outputs_index& indexes,

@@ -1406,24 +1406,25 @@ uint64_t blockchain_storage::get_current_comulative_blocksize_limit() const
   return m_db_current_block_cumul_sz_limit;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::create_block_template(block& b,
-                                               const account_public_address& miner_address, 
+bool blockchain_storage::create_block_template(const account_public_address& miner_address,
+                                               const blobdata& ex_nonce,
+                                               block& b,
                                                wide_difficulty_type& diffic, 
-                                               uint64_t& height, 
-                                               const blobdata& ex_nonce) const
+                                               uint64_t& height) const
 {
-  return create_block_template(b, miner_address, miner_address, diffic, height, ex_nonce, false, pos_entry());
+  return create_block_template(miner_address, miner_address, ex_nonce, false, pos_entry(), nullptr, b, diffic, height, crypto::scalar_t());
 }
 //------------------------------------------------------------------
-bool blockchain_storage::create_block_template(block& b, 
-                                               const account_public_address& miner_address, 
+bool blockchain_storage::create_block_template(const account_public_address& miner_address,
                                                const account_public_address& stakeholder_address,
-                                               wide_difficulty_type& diffic, 
-                                               uint64_t& height, 
-                                               const blobdata& ex_nonce, 
-                                               bool pos, 
+                                               const blobdata& ex_nonce,
+                                               bool pos,
                                                const pos_entry& pe,
-                                               fill_block_template_func_t custom_fill_block_template_func /* = nullptr */) const
+                                               fill_block_template_func_t custom_fill_block_template_func,
+                                               block& b,
+                                               wide_difficulty_type& diffic,
+                                               uint64_t& height,
+                                               crypto::scalar_t& blinding_mask_sum /* = crypto::scalar_t */) const
 {
   create_block_template_params params = AUTO_VAL_INIT(params);
   params.miner_address = miner_address;
@@ -1434,9 +1435,11 @@ bool blockchain_storage::create_block_template(block& b,
   params.pcustom_fill_block_template_func = custom_fill_block_template_func;
   create_block_template_response resp = AUTO_VAL_INIT(resp);
   bool r = create_block_template(params, resp);
+
   b = resp.b;
   diffic = resp.diffic;
-  height = resp.height;  
+  height = resp.height;
+  blinding_mask_sum = resp.blinding_mask_sum;
   return r;
 }
 
@@ -1520,7 +1523,8 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    ex_nonce, 
                                                    CURRENCY_MINER_TX_MAX_OUTS, 
                                                    pos,
-                                                   pe);
+                                                   pe,
+                                                   resp.blinding_mask_sum);
   CHECK_AND_ASSERT_MES(r, false, "Failed to construc miner tx, first chance");
   uint64_t coinbase_size = get_object_blobsize(b.miner_tx);
   // "- 100" - to reserve room for PoS additions into miner tx

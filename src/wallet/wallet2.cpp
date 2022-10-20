@@ -3647,7 +3647,7 @@ bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index) const
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const pos_entry& pe) const
+bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const pos_entry& pe, const crypto::scalar_t& blinding_masks_sum) const
 {
   bool r = false;
   WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(), false, "invalid pe.wallet_index: " << pe.wallet_index);
@@ -3794,7 +3794,8 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   }
   #endif
 
-  crypto::scalar_t pseudo_out_blinding_mask = crypto::scalar_t::random();
+  crypto::scalar_t pseudo_out_blinding_mask = blinding_masks_sum;
+  //process_type_in_variant_container<tx_out_zarcanum>(b.miner_tx.vout, [&](tx_out_zarcanum& o){ pseudo_out_blinding_mask += o. });
   crypto::point_t pseudo_out_amount_commitment = td.m_amount * crypto::c_point_H + pseudo_out_blinding_mask * crypto::c_point_G;
 
   crypto::hash tx_hash_for_sig = get_transaction_hash(b.miner_tx);
@@ -4042,7 +4043,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   //else
   //{
     // old fashioned non-hidden amount PoS scheme
-    res = prepare_and_sign_pos_block(cxt, b, tmpl_req.pe);
+    res = prepare_and_sign_pos_block(cxt, b, tmpl_req.pe, tmpl_rsp.blinding_masks_sum);
     WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
   //}
 

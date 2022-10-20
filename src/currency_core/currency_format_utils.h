@@ -243,7 +243,8 @@ namespace currency
                                                              const blobdata& extra_nonce = blobdata(), 
                                                              size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS, 
                                                              bool pos = false,
-                                                             const pos_entry& pe = pos_entry());
+                                                             const pos_entry& pe = pos_entry(),
+                                                             crypto::scalar_t& blinding_masks_sum = crypto::scalar_t());
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& out_blinding_mask, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);

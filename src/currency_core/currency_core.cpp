@@ -355,7 +355,7 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe)
   {
-    return m_blockchain_storage.create_block_template(b, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
+    return m_blockchain_storage.create_block_template(adr, stakeholder_address, ex_nonce, pos, pe, nullptr, b, diffic, height);
   }
   //-----------------------------------------------------------------------------------------------
   bool core::get_block_template(const create_block_template_params& params, create_block_template_response& resp)
