@@ -17,6 +17,7 @@
 using namespace currency;
 
 //------------------------------------------------------------------------------
+
 zarcanum_basic_test::zarcanum_basic_test()
 {
   REGISTER_CALLBACK_METHOD(zarcanum_basic_test, configure_core);
@@ -30,11 +31,14 @@ zarcanum_basic_test::zarcanum_basic_test()
 
 bool zarcanum_basic_test::generate(std::vector<test_event_entry>& events) const
 {
-  m_accounts.resize(MINER_ACC_IDX+1);
-  account_base& miner_acc = m_accounts[MINER_ACC_IDX];
-  miner_acc.generate();
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  //account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
 
-  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
   set_hard_fork_heights_to_generator(generator);
   //TODO: Need to make sure REWIND_BLOCKS_N and other coretests codebase are capable of following hardfork4 rules
@@ -50,58 +54,46 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
 {
   bool r = false;
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
 
-  account_base alice_acc;
-  alice_acc.generate();
-  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
- 
-
-  //pass over hardfork
+  // check passing over the hardfork
+  CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM), false, "ZANO_HARDFORK_04_ZARCANUM is active");
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
-
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM), false, "ZANO_HARDFORK_04_ZARCANUM is not active");
 
   miner_wlt->refresh();
   alice_wlt->refresh();
-
 
 
   CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
   //create transfer from pre-zarcanum inputs to post-zarcanum inputs
   uint64_t transfer_amount = AMOUNT_TO_TRANSFER_ZARCANUM_BASIC + TESTS_DEFAULT_FEE;
-  miner_wlt->transfer(transfer_amount, alice_wlt->get_account().get_public_address());
-  LOG_PRINT_MAGENTA("Legacy-2-zarcanum transaction sent to Alice: " << transfer_amount, LOG_LEVEL_0);
-  miner_wlt->transfer(transfer_amount, alice_wlt->get_account().get_public_address());
-  LOG_PRINT_MAGENTA("Legacy-2-zarcanum transaction sent to Alice: " << transfer_amount, LOG_LEVEL_0);
-  miner_wlt->transfer(transfer_amount, alice_wlt->get_account().get_public_address());
-  LOG_PRINT_MAGENTA("Legacy-2-zarcanum transaction sent to Alice: " << transfer_amount, LOG_LEVEL_0);
-  miner_wlt->transfer(transfer_amount, alice_wlt->get_account().get_public_address());
-  LOG_PRINT_MAGENTA("Legacy-2-zarcanum transaction sent to Alice: " << transfer_amount, LOG_LEVEL_0);
+  const size_t batches_to_Alice_count = 4;
+  for(size_t i = 0; i < batches_to_Alice_count; ++i)
+  {
+    miner_wlt->transfer(transfer_amount, alice_wlt->get_account().get_public_address());
+    LOG_PRINT_MAGENTA("Legacy-2-zarcanum transaction sent to Alice: " << print_money_brief(transfer_amount), LOG_LEVEL_0);
+  }
 
-
-  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 4, false, "Incorrect txs count in the pool");
+  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == batches_to_Alice_count, false, "Incorrect txs count in the pool");
 
 
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
-  //miner_wlt->refresh();
+  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
+
   alice_wlt->refresh();
   
-  //uint64_t unlocked = 0;
-  //uint64_t balance = alice_wlt->balance(unlocked);
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", transfer_amount * 4, UINT64_MAX, transfer_amount * 4), false, "");
-
-  account_base bob_acc;
-  bob_acc.generate();
-  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, bob_acc);
-
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", transfer_amount * batches_to_Alice_count, UINT64_MAX, transfer_amount * batches_to_Alice_count), false, "");
 
   //create transfer from post-zarcanum inputs to post-zarcanum inputs
   uint64_t transfer_amount2 = AMOUNT_TO_TRANSFER_ZARCANUM_BASIC;
-  alice_wlt->transfer(transfer_amount2, bob_acc.get_public_address());
-  LOG_PRINT_MAGENTA("Zarcanum-2-zarcanum transaction sent from Alice  to Bob " << transfer_amount2, LOG_LEVEL_0);
+  alice_wlt->transfer(transfer_amount2, m_accounts[BOB_ACC_IDX].get_public_address());
+  LOG_PRINT_MAGENTA("Zarcanum-2-zarcanum transaction sent from Alice to Bob " << print_money_brief(transfer_amount2), LOG_LEVEL_0);
 
 
   CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
@@ -110,8 +102,6 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   bob_wlt->refresh();
-  //balance = bob_wlt->balance(unlocked);
-  //CHECK_AND_ASSERT_MES(unlocked == transfer_amount2, false, "wrong amount");
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", transfer_amount2, UINT64_MAX, transfer_amount2), false, "");
 
   account_base staker_benefeciary_acc;
@@ -122,27 +112,36 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   miner_benefeciary_acc.generate();
   std::shared_ptr<tools::wallet2> miner_benefeciary_acc_wlt = init_playtime_test_wallet(events, c, miner_benefeciary_acc);
 
-  alice_wlt->refresh();
-
   size_t pos_entries_count = 0;
   //do staking 
-  for(size_t i = 0; i != CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4; i++)
+  for(size_t i = 0; i < batches_to_Alice_count - 1; i++)
   {
+    alice_wlt->refresh();
     r = mine_next_pos_block_in_playtime_with_wallet(*alice_wlt.get(), staker_benefeciary_acc_wlt->get_account().get_public_address(), pos_entries_count);
-    CHECK_AND_ASSERT_MES(r, false, "mine_next_pos_block_in_playtime_with_wallet failed");
+    CHECK_AND_ASSERT_MES(r, false, "mine_next_pos_block_in_playtime_with_wallet failed, pos_entries_count = " << pos_entries_count);
 
     r = mine_next_pow_block_in_playtime(miner_benefeciary_acc.get_public_address(), c);
     CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   }
 
+  // make sure all mined coins in staker_benefeciary_acc_wlt and miner_benefeciary_acc_wlt are now spendable
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
   //attempt to spend staked and mined coinbase outs
   staker_benefeciary_acc_wlt->refresh();
   miner_benefeciary_acc_wlt->refresh();
 
-  staker_benefeciary_acc_wlt->transfer(transfer_amount2, bob_acc.get_public_address());
+  uint64_t mined_amount = (batches_to_Alice_count - 1) * COIN;
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*staker_benefeciary_acc_wlt, "staker_benefeciary", mined_amount, mined_amount, mined_amount), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_benefeciary_acc_wlt, "miner_benefeciary", mined_amount, mined_amount, mined_amount), false, "");
+
+
+  staker_benefeciary_acc_wlt->transfer(transfer_amount2, bob_wlt->get_account().get_public_address());
   LOG_PRINT_MAGENTA("Zarcanum(pos-coinbase)-2-zarcanum transaction sent from Staker to Bob " << print_money_brief(transfer_amount2), LOG_LEVEL_0);
 
-  miner_benefeciary_acc_wlt->transfer(transfer_amount2, bob_acc.get_public_address());
+  miner_benefeciary_acc_wlt->transfer(transfer_amount2, bob_wlt->get_account().get_public_address());
   LOG_PRINT_MAGENTA("Zarcanum(pow-coinbase)-2-zarcanum transaction sent from Staker to Bob " << print_money_brief(transfer_amount2), LOG_LEVEL_0);
 
   CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool");
@@ -154,13 +153,14 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
 
 
   bob_wlt->refresh();
-  //balance = bob_wlt->balance(unlocked);
-  //CHECK_AND_ASSERT_MES(unlocked == transfer_amount2*3, false, "wrong amount");
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", transfer_amount2*3, UINT64_MAX, transfer_amount2*3), false, "");
 
   //try to make pre-zarcanum block after hardfork 4
   currency::core_runtime_config rc = alice_wlt->get_core_runtime_config();
-  rc.hard_forks.set_hardfork_height(4, ZANO_HARDFORK_04_AFTER_HEIGHT);
+  rc.hard_forks.set_hardfork_height(4, ZANO_HARDFORK_04_AFTER_HEIGHT);  // <-- TODO: this won't help to build pre-hardfork block,
+                                                                        // because blocktemplate is created by the core.
+                                                                        // (wallet2::build_minted_block will fail instead)
+                                                                        // We need to use pos block builder or smth -- sowle
   alice_wlt->set_core_runtime_config(rc);
   r = mine_next_pos_block_in_playtime_with_wallet(*alice_wlt.get(), staker_benefeciary_acc_wlt->get_account().get_public_address(), pos_entries_count);
   CHECK_AND_ASSERT_MES(!r, false, "Pre-zarcanum block accepted in post-zarcanum era");
@@ -169,7 +169,7 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   return true;
 }
 
-
+//------------------------------------------------------------------------------
 
 zarcanum_test_n_inputs_validation::zarcanum_test_n_inputs_validation()
 {
