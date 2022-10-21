@@ -215,12 +215,35 @@ namespace currency
     return total;
   }
   //---------------------------------------------------------------
+  inline size_t get_input_expected_signature_size_local(const txin_v& tx_in, bool last_input_in_separately_signed_tx)
+  {
+    struct txin_signature_size_visitor : public boost::static_visitor<size_t>
+    {
+      txin_signature_size_visitor(size_t add) : a(add) {}
+      size_t a;
+      size_t operator()(const txin_gen& /*txin*/) const   { return 0; }
+      size_t operator()(const txin_to_key& txin) const    { return tools::get_varint_packed_size(txin.key_offsets.size() + a) + sizeof(crypto::signature) * (txin.key_offsets.size() + a); }
+      size_t operator()(const txin_multisig& txin) const  { return tools::get_varint_packed_size(txin.sigs_count + a) + sizeof(crypto::signature) * (txin.sigs_count + a); }
+      size_t operator()(const txin_htlc& txin) const      { return tools::get_varint_packed_size(1 + a) + sizeof(crypto::signature) * (1 + a);  }
+      size_t operator()(const txin_zc_input& txin) const  { return 96 + tools::get_varint_packed_size(txin.key_offsets.size()) + txin.key_offsets.size() * 32; }
+    };
+
+    return boost::apply_visitor(txin_signature_size_visitor(last_input_in_separately_signed_tx ? 1 : 0), tx_in);
+  }
+  //---------------------------------------------------------------
   size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size)
   {
     size_t tx_blob_size = prefix_blob_size;
 
     if (is_coinbase(t))
+    {
+      if (is_pos_miner_tx(t) && t.version > TRANSACTION_VERSION_PRE_HF4)
+      {
+        // Zarcanum
+        return tx_blob_size;
+      }
       return tx_blob_size;
+    }
 
     // for purged tx, with empty signatures and attachments, this function should return the blob size
     // which the tx would have if the signatures and attachments were correctly filled with actual data
@@ -229,10 +252,12 @@ namespace currency
     bool separately_signed_tx = get_tx_flags(t) & TX_FLAG_SIGNATURE_MODE_SEPARATE;
 
     tx_blob_size += tools::get_varint_packed_size(t.vin.size()); // size of transaction::signatures (equals to total inputs count)
+    if (t.version > TRANSACTION_VERSION_PRE_HF4)
+      tx_blob_size += t.vin.size(); // for HF4 txs 'signatures' is a verctor of variants, so it's +1 byte per signature (assuming sigs count equals to inputs count) 
 
     for (size_t i = 0; i != t.vin.size(); i++)
     {
-      size_t sig_size = get_input_expected_signature_size(t.vin[i], separately_signed_tx && i == t.vin.size() - 1);
+      size_t sig_size = get_input_expected_signature_size_local(t.vin[i], separately_signed_tx && i == t.vin.size() - 1);
       tx_blob_size += sig_size;
     }
 

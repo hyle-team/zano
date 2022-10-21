@@ -772,8 +772,6 @@ int main(int argc, char* argv[])
     MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
     MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
 
-    MARK_TEST_AS_POSTPONED(zarcanum_basic_test);
-
 #undef MARK_TEST_AS_POSTPONED
 
 
