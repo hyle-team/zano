@@ -57,7 +57,7 @@ namespace currency
       return 0;
     }
 
-    uint8_t get_block_major_version_by_height(uint64_t height)
+    uint8_t get_block_major_version_by_height(uint64_t height) const
     {      
       if (!this->is_hardfork_active_for_height(1, height))
         return BLOCK_MAJOR_VERSION_INITIAL;

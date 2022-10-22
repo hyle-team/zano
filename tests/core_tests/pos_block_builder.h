@@ -1,16 +1,20 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#pragma once
 
-#pragma once 
+namespace currency
+{
+  struct hard_forks_descriptor;
+}
 
 struct pos_block_builder
 {
-  pos_block_builder();
+  pos_block_builder() = default;
   void clear();
   
-  void step1_init_header(size_t block_height, crypto::hash& prev_block_hash);
+  void step1_init_header(const currency::hard_forks_descriptor& hardforks, size_t block_height, crypto::hash& prev_block_hash);
   
   void step2_set_txs(const std::vector<currency::transaction>& txs);
   
@@ -51,6 +55,8 @@ struct pos_block_builder
   size_t                  m_height;
   size_t                  m_pos_stake_output_gindex;
   uint64_t                m_pos_stake_amount;
+
+  bool                    m_zarcanum;
 };
 
 bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,

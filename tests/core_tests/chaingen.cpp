@@ -1926,7 +1926,7 @@ bool generate_pos_block_with_given_coinstake(test_generator& generator, const st
     crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake_tx.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner.get_public_address());

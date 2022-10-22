@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -9,23 +9,16 @@
 using namespace epee;
 using namespace currency;
 
-pos_block_builder::pos_block_builder()
-{
-  clear();
-}
-
 void pos_block_builder::clear()
 {
-  m_block = AUTO_VAL_INIT(m_block);
-  m_stake_kernel = AUTO_VAL_INIT(m_stake_kernel);
-  m_step = 0;
+  *this = AUTO_VAL_INIT_T(pos_block_builder);
 }
 
-void pos_block_builder::step1_init_header(size_t block_height, crypto::hash& prev_block_hash)
+void pos_block_builder::step1_init_header(const hard_forks_descriptor& hardforks, size_t block_height, crypto::hash& prev_block_hash)
 {
   CHECK_AND_ASSERT_THROW_MES(m_step == 0, "pos_block_builder: incorrect step sequence");
   m_block.minor_version = CURRENT_BLOCK_MINOR_VERSION;
-  m_block.major_version = BLOCK_MAJOR_VERSION_INITIAL;
+  m_block.major_version = hardforks.get_block_major_version_by_height(block_height);
   m_block.timestamp = 0; // to be set at step 3
   m_block.prev_id = prev_block_hash;
   m_block.flags = CURRENCY_BLOCK_FLAG_POS_BLOCK;
@@ -73,7 +66,7 @@ void pos_block_builder::step3_build_stake_kernel(
   m_pos_stake_output_gindex = stake_output_gindex;
 
   m_stake_kernel.kimage = stake_output_key_image;
-  m_stake_kernel.block_timestamp = m_block.timestamp;
+  m_stake_kernel.block_timestamp = 0;
   m_stake_kernel.stake_modifier.last_pow_id = last_pow_block_hash;
   m_stake_kernel.stake_modifier.last_pos_kernel_id = last_pos_block_kernel_hash;
   if (last_pos_block_kernel_hash == null_hash)
@@ -281,16 +274,18 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
 bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::block& prev_block, const currency::block& coinstake_scr_block, const currency::account_base& acc,
   std::function<bool(currency::block&)> before_sign_cb, currency::block& output)
 {
+  blockchain_storage& bcs = c.get_blockchain_storage();
+
   // these values (median and diff) are correct only for the next main chain block, it's incorrect for altblocks, especially for old altblocks
   // but for now we assume they will work fine
-  uint64_t block_size_median = c.get_blockchain_storage().get_current_comulative_blocksize_limit() / 2;
-  currency::wide_difficulty_type difficulty = c.get_blockchain_storage().get_next_diff_conditional(true);
+  uint64_t block_size_median = bcs.get_current_comulative_blocksize_limit() / 2;
+  currency::wide_difficulty_type difficulty = bcs.get_next_diff_conditional(true);
 
   crypto::hash prev_id = get_block_hash(prev_block);
   size_t height = get_block_height(prev_block) + 1;
 
   block_extended_info bei = AUTO_VAL_INIT(bei);
-  bool r = c.get_blockchain_storage().get_block_extended_info_by_hash(prev_id, bei);
+  bool r = bcs.get_block_extended_info_by_hash(prev_id, bei);
   CHECK_AND_ASSERT_MES(r, false, "get_block_extended_info_by_hash failed for hash = " << prev_id);
 
 
@@ -305,7 +300,7 @@ bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::
   crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(bcs.get_core_runtime_config().hard_forks, height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, difficulty, prev_id, null_hash, prev_block.timestamp);
   pb.step4_generate_coinbase_tx(block_size_median, bei.already_generated_coins, acc.get_public_address());

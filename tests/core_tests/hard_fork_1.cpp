@@ -397,7 +397,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
     crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -573,7 +573,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
     crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address());
@@ -612,7 +612,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
     crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -660,7 +660,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
     crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -757,7 +757,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -802,7 +802,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -846,7 +846,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
