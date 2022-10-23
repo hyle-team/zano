@@ -3567,8 +3567,11 @@ bool wallet2::get_transfer_address(const std::string& adr_str, currency::account
   return m_core_proxy->get_transfer_address(adr_str, addr, payment_id);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time) const
+bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, bool is_zarcanum_hf, uint64_t& stake_unlock_time) const
 {
+  if (is_zarcanum_hf && !tr.is_zc())
+    return false;
+
   if (!tr.is_spendable())
     return false;
 
@@ -3603,6 +3606,7 @@ void wallet2::get_mining_history(wallet_public::mining_history& hist, uint64_t t
 //----------------------------------------------------------------------------------------------------
 size_t wallet2::get_pos_entries_count()
 {
+  bool is_zarcanum_hf = is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
   size_t counter = 0;
 
   for (size_t i = 0, size = m_transfers.size(); i < size; i++)
@@ -3610,7 +3614,7 @@ size_t wallet2::get_pos_entries_count()
     auto& tr = m_transfers[i];
 
     uint64_t stake_unlock_time = 0;
-    if (!is_transfer_okay_for_pos(tr, stake_unlock_time))
+    if (!is_transfer_okay_for_pos(tr, is_zarcanum_hf, stake_unlock_time))
       continue;
 
     ++counter;
@@ -3621,12 +3625,13 @@ size_t wallet2::get_pos_entries_count()
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_pos_entries(std::vector<currency::pos_entry>& entries)
 {
+  bool is_zarcanum_hf = is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
   for (size_t i = 0; i != m_transfers.size(); i++)
   {
     auto& tr = m_transfers[i];
 
     uint64_t stake_unlock_time = 0;
-    if (!is_transfer_okay_for_pos(tr, stake_unlock_time))
+    if (!is_transfer_okay_for_pos(tr, is_zarcanum_hf, stake_unlock_time))
       continue;
 
     pos_entry pe = AUTO_VAL_INIT(pe);
@@ -3819,26 +3824,17 @@ bool wallet2::fill_mining_context(mining_context& ctx)
 {
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::request pos_details_req = AUTO_VAL_INIT(pos_details_req);
   currency::COMMAND_RPC_GET_POS_MINING_DETAILS::response pos_details_resp = AUTO_VAL_INIT(pos_details_resp);
-  ctx.status = API_RETURN_CODE_NOT_FOUND;
   m_core_proxy->call_COMMAND_RPC_GET_POS_MINING_DETAILS(pos_details_req, pos_details_resp);
   if (pos_details_resp.status != API_RETURN_CODE_OK)
     return false;
-  ctx.basic_diff.assign(pos_details_resp.pos_basic_difficulty);
-  ctx.sk = AUTO_VAL_INIT(ctx.sk);
-  ctx.sk.stake_modifier = pos_details_resp.sm;
 
-  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
-  {
-    // Zarcanum (PoS with hidden amounts)
-    ctx.zarcanum = true;
-    ctx.last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, ctx.sk.stake_modifier.last_pow_id);
-    ctx.z_l_div_z_D = crypto::zarcanum_precalculate_z_l_div_z_D(ctx.basic_diff);
-  }
+  ctx = mining_context{};
+  ctx.init(wide_difficulty_type(pos_details_resp.pos_basic_difficulty), pos_details_resp.sm, is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM));
 
   ctx.last_block_hash = pos_details_resp.last_block_hash;
   ctx.is_pos_allowed = pos_details_resp.pos_mining_allowed;
   ctx.starter_timestamp = pos_details_resp.starter_timestamp;
-  ctx.status = API_RETURN_CODE_OK;
+  ctx.status = API_RETURN_CODE_NOT_FOUND;
   return true;
 }
 //------------------------------------------------------------------
@@ -3885,82 +3881,17 @@ void wallet2::do_pos_mining_prepare_entry(mining_context& context, size_t transf
   CHECK_AND_ASSERT_MES_NO_RET(transfer_index < m_transfers.size(), "transfer_index is out of bounds: " << transfer_index); 
   const transfer_details& td = m_transfers[transfer_index];
 
-  // pre build kernel
-  context.sk.kimage = td.m_key_image;
+  crypto::scalar_t blinding_mask{};
+  if (td.m_opt_blinding_mask)
+    blinding_mask = *td.m_opt_blinding_mask;
 
-  if (context.zarcanum)
-  {
-    crypto::scalar_t v = m_account.get_keys().view_secret_key;
-    crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-    bool r = crypto::generate_key_derivation(get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx), m_account.get_keys().view_secret_key, derivation); // 8 * v * R
-    CHECK_AND_ASSERT_MES_NO_RET(r, "generate_key_derivation failed"); 
-    crypto::scalar_t h = AUTO_VAL_INIT(h);
-    crypto::derivation_to_scalar(derivation, td.m_internal_output_index, h.as_secret_key()); // h = Hs(8 * v * R, i)
-
-    // q = Hs(domain_sep, Hs(8 * v * R, i) ) * 8 * v
-    context.secret_q = v * 8 * crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h);
-  }
+  context.prepare_entry(td.amount(), td.m_key_image, get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx), td.m_internal_output_index,
+    blinding_mask, m_account.get_keys().view_secret_key);
 }
 //------------------------------------------------------------------
 bool wallet2::do_pos_mining_iteration(mining_context& context, size_t transfer_index, uint64_t ts)
 {
-  CHECK_AND_NO_ASSERT_MES(transfer_index < m_transfers.size(), false, "transfer_index is out of bounds: " << transfer_index); 
-  const transfer_details& td = m_transfers[transfer_index];
-
-  // update stake kernel and calculate it's hash
-  context.sk.block_timestamp = ts;
-  {
-    PROFILE_FUNC("calc_hash");
-    context.kernel_hash = crypto::cn_fast_hash(&context.sk, sizeof(context.sk));
-  }
-
-  const uint64_t stake_amount = td.amount();
-  bool found = false;
-
-  if (context.zarcanum && td.is_zc())
-  {
-    crypto::mp::uint256_t lhs;
-    crypto::mp::uint512_t rhs;
-    {
-      PROFILE_FUNC("check_zarcanum");
-      found = crypto::zarcanum_check_main_pos_inequality(context.kernel_hash, *td.m_opt_blinding_mask, context.secret_q, context.last_pow_block_id_hashed, context.z_l_div_z_D, stake_amount, lhs, rhs);
-      ++context.iterations_processed;
-    }
-    if (found)
-    {
-      found = true;
-      LOG_PRINT_GREEN("Found Zarcanum kernel: amount: " << currency::print_money_brief(stake_amount) << ", gindex: " << td.m_global_output_index << ENDL
-        << "difficulty:            " << context.basic_diff << ENDL
-        << "kernel info:           " << ENDL
-        << print_stake_kernel_info(context.sk) 
-        << "kernel_hash:           " << context.kernel_hash << ENDL
-        << "lhs:                   " << lhs << ENDL
-        << "rhs:                   " << rhs
-        , LOG_LEVEL_0);
-
-    }
-  }
-  else
-  {
-    // old PoS with non-hidden amounts
-    currency::wide_difficulty_type final_diff = context.basic_diff / stake_amount;
-    {
-      PROFILE_FUNC("check_hash");
-      found = currency::check_hash(context.kernel_hash, final_diff);
-      ++context.iterations_processed;
-    }
-    if (found)
-    {
-      LOG_PRINT_GREEN("Found kernel: amount: " << currency::print_money_brief(stake_amount)<< ", gindex: " << td.m_global_output_index << ENDL
-        << "difficulty:            " << context.basic_diff << ", final_diff: " << final_diff << ENDL
-        << "kernel info:           " << ENDL
-        << print_stake_kernel_info(context.sk) 
-        << "kernel_hash(proof):    " << context.kernel_hash,
-        LOG_LEVEL_0);
-    }
-  }
-
-  return found;
+  return context.do_iteration(ts);
 }
 //-------------------------------
 bool wallet2::reset_history()
