@@ -11,7 +11,7 @@ using namespace currency;
 
 void pos_block_builder::clear()
 {
-  *this = AUTO_VAL_INIT_T(pos_block_builder);
+  *this = pos_block_builder{};
 }
 
 void pos_block_builder::step1_init_header(const hard_forks_descriptor& hardforks, size_t block_height, crypto::hash& prev_block_hash)

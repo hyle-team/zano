@@ -47,16 +47,16 @@ struct pos_block_builder
 
   void step5_sign(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const crypto::public_key& stake_tx_out_pub_key, const currency::account_base& stakeholder_account);
 
-  currency::block         m_block;
-  size_t                  m_step;
-  size_t                  m_txs_total_size;
-  uint64_t                m_total_fee;
-  currency::stake_kernel  m_stake_kernel;
-  size_t                  m_height;
-  size_t                  m_pos_stake_output_gindex;
-  uint64_t                m_pos_stake_amount;
+  currency::block         m_block                         {};
+  size_t                  m_step                          = 0;
+  size_t                  m_txs_total_size                = 0;
+  uint64_t                m_total_fee                     = 0;
+  currency::stake_kernel  m_stake_kernel                  {};
+  size_t                  m_height                        = 0;
+  size_t                  m_pos_stake_output_gindex       = 0;
+  uint64_t                m_pos_stake_amount              = 0;
 
-  bool                    m_zarcanum;
+  bool                    m_zarcanum                      = false;
 };
 
 bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
