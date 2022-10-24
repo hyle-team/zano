@@ -2114,37 +2114,13 @@ namespace currency
       }
 
       LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
-
-      //input_index++;
-      //in_context_index++;
     }
-    /*
-    for(const tx_source_entry& source_entry : sources)
-    {
-      crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, input_index, tx_prefix_hash);
-      CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
-      std::stringstream ss_ring_s;
 
-      if (source_entry.is_zarcanum())
-      {
-        // ZC
-        // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
-        r = generate_ZC_sig(tx_hash_for_signature, input_index, source_entry, in_contexts[in_context_index], sender_account_keys, blinding_masks_sum, flags, local_blinding_masks_sum, tx);
-        CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
-      }
-      else
-      {
-        // NLSAG
-        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, input_index, source_entry, sender_account_keys, in_contexts[in_context_index], txkey, flags, tx, &ss_ring_s);
-        CHECK_AND_ASSERT_MES(r, false, "generate_NLSAG_sig failed");
-      }
+    //size_t prefix_size = get_object_blobsize(static_cast<const transaction_prefix&>(tx));
+    //size_t full_blob_size = t_serializable_object_to_blob(tx).size();
+    //size_t estimated_blob_size = get_object_blobsize(tx);
+    //CHECK_AND_ASSERT_MES(full_blob_size == estimated_blob_size, false, "!");
 
-      LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
-
-      input_index++;
-      in_context_index++;
-    }
-    */
     return true;
   }
 

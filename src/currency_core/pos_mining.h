@@ -9,18 +9,17 @@ namespace currency
 
   struct pos_mining_context
   {
-    wide_difficulty_type basic_diff;
+                                                    // Zarcanum notation:
+    wide_difficulty_type basic_diff;                //  D
     stake_kernel      sk;
+    crypto::scalar_t  last_pow_block_id_hashed;     //  f'
+    crypto::scalar_t  secret_q;                     //  q
+    boost::multiprecision::uint256_t z_l_div_z_D;   //  z * floor( l / (z * D) )  (max possible value (assuming z=2^64) :  z * 2^252 / (z * 1) ~= 2^252)
+    crypto::hash      kernel_hash;                  //  h
+    crypto::scalar_t  stake_out_blinding_mask;      //  f
+    uint64_t          stake_amount;                 //  a
 
-    crypto::scalar_t  last_pow_block_id_hashed;     // Zarcanum notation: f'
-    crypto::scalar_t  secret_q;                     // Zarcanum notation: q
-    boost::multiprecision::uint256_t z_l_div_z_D;   // Zarcanum notation: z * floor( l / (z * D) )  (max possible value (assuming z=2^64) :  z * 2^252 / (z * 1) ~= 2^252)
-    crypto::hash      kernel_hash;                  // Zarcanum notation: h
-    crypto::scalar_t  stake_out_blinding_mask;      // Zarcanum notation: f
-
-    uint64_t          stake_amount;
-
-    bool              zarcanum;
+    bool              zarcanum; // false for pre-HF4 classic PoS with explicit amounts 
 
     void init(const wide_difficulty_type& pos_diff, const stake_modifier_type& sm, bool is_zarcanum);
 

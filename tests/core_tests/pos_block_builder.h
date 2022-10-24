@@ -27,6 +27,26 @@ struct pos_block_builder
     uint64_t timestamp_lower_bound,
     uint64_t timestamp_window = POS_SCAN_WINDOW,
     uint64_t timestamp_step = POS_SCAN_STEP);
+
+  
+  void pos_block_builder::step3a(
+    currency::wide_difficulty_type difficulty,
+    const crypto::hash& last_pow_block_hash,
+    const crypto::hash& last_pos_block_kernel_hash
+    );
+
+  void pos_block_builder::step3b(
+    uint64_t stake_output_amount,
+    const crypto::key_image& stake_output_key_image,
+    const crypto::public_key& stake_source_tx_pub_key,
+    uint64_t stake_out_in_tx_index,
+    const crypto::scalar_t& stake_out_blinding_mask,
+    const crypto::secret_key& view_secret,
+    size_t stake_output_gindex,
+    uint64_t timestamp_lower_bound,
+    uint64_t timestamp_window,
+    uint64_t timestamp_step);
+
   
   void step4_generate_coinbase_tx(size_t median_size,
     const boost::multiprecision::uint128_t& already_generated_coins,
@@ -51,12 +71,12 @@ struct pos_block_builder
   size_t                  m_step                          = 0;
   size_t                  m_txs_total_size                = 0;
   uint64_t                m_total_fee                     = 0;
-  currency::stake_kernel  m_stake_kernel                  {};
+  //currency::stake_kernel  m_stake_kernel                  {};
   size_t                  m_height                        = 0;
   size_t                  m_pos_stake_output_gindex       = 0;
-  uint64_t                m_pos_stake_amount              = 0;
+  //uint64_t                m_pos_stake_amount              = 0;
 
-  bool                    m_zarcanum                      = false;
+  currency::pos_mining_context m_context                  {};
 };
 
 bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,

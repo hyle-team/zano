@@ -46,7 +46,7 @@ namespace crypto
     if (!(cond)) { LOG_PRINT_RED("zarcanum_generate_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
   
-  bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment,
+  bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXG_input_ref_t>& ring,
     const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
     const scalar_t& secret_x, const scalar_t& secret_q, uint64_t secret_index, const scalar_t& pseudo_out_blinding_mask, uint64_t stake_amount, const scalar_t& stake_blinding_mask,
     zarcanum_proof& result, uint8_t* p_err /* = nullptr */)
@@ -144,6 +144,7 @@ namespace crypto
     // layer 3 secret (with respect to G)
     //     secret_q
 
+    point_t pseudo_out_amount_commitment = a * crypto::c_point_H + pseudo_out_blinding_mask * crypto::c_point_G;
     result.pseudo_out_amount_commitment = (crypto::c_scalar_1div8 * pseudo_out_amount_commitment).to_public_key();
 
     TRY_ENTRY()
