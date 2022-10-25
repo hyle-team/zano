@@ -223,6 +223,8 @@ struct test_gentime_settings
   uint64_t                dust_threshold;
 };
 
+class test_generator;
+
 class test_chain_unit_base
 {
 public:
@@ -235,6 +237,8 @@ public:
   bool need_core_proxy() const { return false; }  // tests can override this in order to obtain core proxy (e.g. for wallet)
   void set_core_proxy(std::shared_ptr<tools::i_core_proxy>) { /* do nothing */ }
   uint64_t get_tx_version_from_events(const std::vector<test_event_entry> &events) const;
+
+  void on_test_generator_created(test_generator& generator) const; // tests can override this for special initialization
 
 private:
   callbacks_map m_callbacks;
@@ -1005,6 +1009,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define MAKE_GENESIS_BLOCK(VEC_EVENTS, BLK_NAME, MINER_ACC, TS)                       \
   PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_GENESIS_BLOCK(" << #BLK_NAME << ")");          \
   test_generator generator;                                                           \
+  on_test_generator_created(generator);                                               \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_genesis_block(BLK_NAME, MINER_ACC, TS);                         \
   VEC_EVENTS.push_back(BLK_NAME)

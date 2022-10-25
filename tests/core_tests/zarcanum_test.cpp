@@ -40,7 +40,6 @@ bool zarcanum_basic_test::generate(std::vector<test_event_entry>& events) const
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
-  set_hard_fork_heights_to_generator(generator);
   //TODO: Need to make sure REWIND_BLOCKS_N and other coretests codebase are capable of following hardfork4 rules
   //in this test hardfork4 moment moved to runtime section
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
@@ -224,6 +223,65 @@ bool zarcanum_test_n_inputs_validation::generate(std::vector<test_event_entry>& 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(builder2.m_tx);
   REWIND_BLOCKS_N(events, blk_16, blk_14, miner_account, 2);
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+zarcanum_pos_block_math::zarcanum_pos_block_math()
+{
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
+
+  REGISTER_CALLBACK_METHOD(zarcanum_pos_block_math, c1);
+}
+
+bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: 
+
+  bool r = false;
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  //
+  // before hardfork 1
+  //
+
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations), false, "");
+
+  std::vector<extra_v> extra;
+  transaction tx_0 = AUTO_VAL_INIT(tx_0);
+  crypto::secret_key tx_sec_key;
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  //DO_CALLBACK(events, "mark_invalid_tx"); 
+  events.push_back(tx_0);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool zarcanum_pos_block_math::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(1), 0, MK_TEST_COINS(1), 0, 0), false, "");
 
   return true;
 }

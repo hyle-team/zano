@@ -1,8 +1,7 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #pragma once 
 #include "chaingen.h"
 #include "wallet_tests_basic.h"
@@ -21,4 +20,9 @@ struct zarcanum_test_n_inputs_validation : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-
+struct zarcanum_pos_block_math : public wallet_test
+{
+  zarcanum_pos_block_math();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool zarcanum_pos_block_math::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

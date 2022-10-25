@@ -927,42 +927,44 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
 
 //------------------------------------------------------------------------------
 
-struct output_index {
-    const currency::txout_target_v out;
-    uint64_t amount;
-    size_t blk_height; // block height
-    size_t tx_no; // index of transaction in block
-    size_t out_no; // index of out in transaction
-    size_t idx;
-    bool spent;
-    const currency::block *p_blk;
-    const currency::transaction *p_tx;
+struct output_index
+{
+  const currency::txout_target_v out;
+  uint64_t amount;
+  size_t blk_height; // block height
+  size_t tx_no; // index of transaction in block
+  size_t out_no; // index of out in transaction
+  size_t idx;
+  bool spent;
+  const currency::block *p_blk;
+  const currency::transaction *p_tx;
 
-    output_index(const currency::txout_target_v &_out, uint64_t _a, size_t _h, size_t tno, size_t ono, const currency::block *_pb, const currency::transaction *_pt)
-        : out(_out), amount(_a), blk_height(_h), tx_no(tno), out_no(ono), idx(0), spent(false), p_blk(_pb), p_tx(_pt) { }
+  output_index(const currency::txout_target_v &_out, uint64_t _a, size_t _h, size_t tno, size_t ono, const currency::block *_pb, const currency::transaction *_pt)
+    : out(_out), amount(_a), blk_height(_h), tx_no(tno), out_no(ono), idx(0), spent(false), p_blk(_pb), p_tx(_pt)
+  {}
 
-    output_index(const output_index &other)
-        : out(other.out), amount(other.amount), blk_height(other.blk_height), tx_no(other.tx_no), out_no(other.out_no), idx(other.idx), spent(other.spent), p_blk(other.p_blk), p_tx(other.p_tx) {  }
+  output_index(const output_index &other)
+    : out(other.out), amount(other.amount), blk_height(other.blk_height), tx_no(other.tx_no), out_no(other.out_no), idx(other.idx), spent(other.spent), p_blk(other.p_blk), p_tx(other.p_tx)
+  {}
 
-    const std::string toString() const {
-        std::stringstream ss;
+  const std::string to_string() const
+  {
+    std::stringstream ss;
+    ss << "output_index{blk_height=" << blk_height
+      << " tx_no=" << tx_no
+      << " out_no=" << out_no
+      << " amount=" << amount
+      << " idx=" << idx
+      << " spent=" << spent
+      << "}";
+    return ss.str();
+  }
 
-        ss << "output_index{blk_height=" << blk_height
-           << " tx_no=" << tx_no
-           << " out_no=" << out_no
-           << " amount=" << amount
-           << " idx=" << idx
-           << " spent=" << spent
-           << "}";
-
-        return ss.str();
-    }
-
-    output_index& operator=(const output_index& other)
-    {
-      new(this) output_index(other);
-      return *this;
-    }
+  output_index& operator=(const output_index& other)
+  {
+    new(this) output_index(other);
+    return *this;
+  }
 };
 
 typedef std::map<uint64_t, std::vector<size_t> > map_output_t;           // amount -> [N -> global out index]
@@ -985,9 +987,11 @@ namespace
 
 bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, const currency::account_keys& acc_keys)
 {
+  bool r = false;
+
   for (const block& blk : blockchain)
   {
-
+    uint64_t height = get_block_height(blk);
     std::vector<const transaction*> vtx;
     vtx.push_back(&blk.miner_tx);
 
@@ -1007,18 +1011,35 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
 
       for (size_t j = 0; j < tx.vout.size(); ++j)
       {
-        const tx_out_bare &out = boost::get<tx_out_bare>(tx.vout[j]);
-        output_index oi(out.target, out.amount, boost::get<txin_gen>(*blk.miner_tx.vin.begin()).height, i, j, &blk, vtx[i]);
+        VARIANT_SWITCH_BEGIN(tx.vout[j])
+        VARIANT_CASE_CONST(tx_out_bare, out)
+          if (out.target.type() == typeid(txout_to_key))
+          {
+            std::vector<output_index>& outs_vec = outs[out.amount];
+            size_t out_global_idx = outs_vec.size();
+            output_index oi(out.target, out.amount, height, i, j, &blk, vtx[i]);
+            oi.idx = out_global_idx;
+            outs_vec.emplace_back(std::move(oi));
+            // Is out to me?
+            if (is_out_to_acc(acc_keys, boost::get<txout_to_key>(out.target), derivation, j))
+              outs_mine[out.amount].push_back(out_global_idx);
+          }
+        VARIANT_CASE_CONST(tx_out_zarcanum, out)
+          std::vector<output_index>& outs_vec = outs[0]; // amount = 0 for ZC outs
+          size_t out_global_idx = outs_vec.size();
 
-        if (out.target.type() == typeid(txout_to_key))
-        {
-          outs[out.amount].push_back(oi);
-          size_t tx_global_idx = outs[out.amount].size() - 1;
-          outs[out.amount][tx_global_idx].idx = tx_global_idx;
-          // Is out to me?
-          if (is_out_to_acc(acc_keys, boost::get<txout_to_key>(out.target), derivation, j))
-            outs_mine[out.amount].push_back(tx_global_idx);
-        }
+          output_index oi(currency::txout_target_v(), 0 /* amount */, height, i, j, &blk, vtx[i]);
+          oi.idx = out_global_idx;
+          outs_vec.emplace_back(std::move(oi));
+
+          uint64_t decoded_amount = 0;
+          crypto::scalar_t blinding_mask{};
+          if (is_out_to_acc(acc_keys, out, derivation, j, decoded_amount, blinding_mask))
+          {
+            outs_vec.back().amount = decoded_amount;
+            outs_mine[decoded_amount /* TODO @#@# use 0 here?? */].push_back(out_global_idx);
+          }
+        VARIANT_SWITCH_END()
       }
     }
   }
@@ -1202,7 +1223,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
     // Iterate in reverse is more efficiency
     uint64_t sources_amount = 0;
     bool sources_found = false;
-    BOOST_REVERSE_FOREACH(const map_output_t::value_type o, outs_mine)
+    for(const map_output_t::value_type o : outs_mine)
     {
         for (size_t i = 0; i < o.second.size() && !sources_found; ++i)
         {
@@ -1219,7 +1240,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
                   continue;
               }
               else
-              {
+              { 
                 //interpret as time
               }
             }
@@ -1507,33 +1528,36 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
   return construct_tx(keys_from, sources, destinations, empty_attachment, tx, tx_version, 0);
 }
 
-uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log) {
-    uint64_t res = 0;
-    std::map<uint64_t, std::vector<output_index> > outs;
-    std::map<uint64_t, std::vector<size_t> > outs_mine;
+uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log)
+{
+  uint64_t res = 0;
+  std::map<uint64_t, std::vector<output_index> > outs;
+  std::map<uint64_t, std::vector<size_t> > outs_mine;
 
-    map_hash2tx_t confirmed_txs;
-    get_confirmed_txs(blockchain, mtx, confirmed_txs);
+  map_hash2tx_t confirmed_txs;
+  get_confirmed_txs(blockchain, mtx, confirmed_txs);
 
-    if (!init_output_indices(outs, outs_mine, blockchain, confirmed_txs, addr))
-        return false;
+  if (!init_output_indices(outs, outs_mine, blockchain, confirmed_txs, addr))
+    return false;
 
-    if (!init_spent_output_indices(outs, outs_mine, blockchain, confirmed_txs, addr))
-        return false;
+  if (!init_spent_output_indices(outs, outs_mine, blockchain, confirmed_txs, addr))
+    return false;
 
-    BOOST_FOREACH (const map_output_t::value_type &o, outs_mine) {
-        for (size_t i = 0; i < o.second.size(); ++i) {
-            if (outs[o.first][o.second[i]].spent)
-                continue;
+  for (const map_output_t::value_type &o : outs_mine)
+  {
+    for (size_t i = 0; i < o.second.size(); ++i)
+    {
+      if (outs[o.first][o.second[i]].spent)
+        continue;
 
-            output_index& oiv = outs[o.first][o.second[i]];
-            res += oiv.amount;
-            if (dbg_log)
-              LOG_PRINT_L0(oiv.toString());
-        }
+      output_index& oiv = outs[o.first][o.second[i]];
+      res += oiv.amount;
+      if (dbg_log)
+        LOG_PRINT_L0(oiv.to_string());
     }
+  }
 
-    return res;
+  return res;
 }
 
 uint64_t get_balance(const currency::account_base& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log)
@@ -2032,6 +2056,11 @@ bool test_chain_unit_base::verify(const std::string& cb_name, currency::core& c,
     return false;
   }
   return cb_it->second(c, ev_index, events);
+}
+
+void test_chain_unit_base::on_test_generator_created(test_generator& gen) const
+{
+  gen.set_hardforks(m_hardforks);
 }
 
 //------------------------------------------------------------------------------

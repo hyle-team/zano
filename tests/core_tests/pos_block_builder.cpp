@@ -231,9 +231,8 @@ void pos_block_builder::step5_sign_zarcanum(const crypto::public_key& stake_tx_p
   crypto::derive_secret_key(pos_coin_derivation, stake_tx_out_index, stakeholder_account.get_keys().spend_secret_key, secret_x); // x = s + Hs(v * 8 * R, i)
 
   std::vector<crypto::CLSAG_GGXG_input_ref_t> ring;
-  crypto::scalar_t stake_blinding_mask;
-  crypto::scalar_t blinding_masks_sum;
   uint64_t secret_index = 0;
+  crypto::scalar_t blinding_masks_sum;
 
 
 
