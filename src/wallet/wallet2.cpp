@@ -3799,17 +3799,18 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   }
   #endif
 
+  // calculate secret_x
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   r = crypto::generate_key_derivation(source_tx_pub_key, m_account.get_keys().view_secret_key, derivation);
   WLT_CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed, tid: " << pe.wallet_index << ", pe.tx_id: " << pe.tx_id);
   crypto::secret_key secret_x = AUTO_VAL_INIT(secret_x);
   crypto::derive_secret_key(derivation, pe.tx_out_index, m_account.get_keys().spend_secret_key, secret_x);
 
-  crypto::hash tx_hash_for_sig = get_transaction_hash(b.miner_tx); // TODO @#@# consider adding more input data to this hash
+  crypto::hash tx_hash_for_sig = get_transaction_hash(b.miner_tx); // TODO @#@# change to block hash
 
   uint8_t err = 0;
-  r = crypto::zarcanum_generate_proof(tx_hash_for_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, pe.keyimage,
-    secret_x, cxt.secret_q, secret_index, blinding_masks_sum, td.m_amount, *td.m_opt_blinding_mask,
+  r = crypto::zarcanum_generate_proof(tx_hash_for_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,
+    secret_x, cxt.secret_q, secret_index, blinding_masks_sum, cxt.stake_amount, cxt.stake_out_blinding_mask,
     static_cast<crypto::zarcanum_proof&>(sig), &err);
   WLT_CHECK_AND_ASSERT_MES(r, false, "zarcanum_generate_proof failed, err: " << (int)err);
 

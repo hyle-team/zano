@@ -169,6 +169,8 @@ namespace crypto
   {
     bool r = false;
 
+    // TODO @#@#
+
     std::vector<point_t> E_for_range_proof = { point_t(sig.E) };
     std::vector<bppe_sig_commit_ref_t> range_proofs = { bppe_sig_commit_ref_t(sig.E_range_proof, E_for_range_proof) };
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(range_proofs), 10);

@@ -199,21 +199,54 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
 void pos_block_builder::step5_sign(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const crypto::public_key& stake_tx_out_pub_key, const currency::account_base& stakeholder_account)
 {
   CHECK_AND_ASSERT_THROW_MES(m_step == 4, "pos_block_builder: incorrect step sequence");
+  if (m_context.zarcanum) { LOG_PRINT_YELLOW("pos_block_builder::step5_sign() is called for seemingly zarcanum block", LOG_LEVEL_0); }
 
   crypto::key_derivation pos_coin_derivation = AUTO_VAL_INIT(pos_coin_derivation);
-  bool r = crypto::generate_key_derivation(stake_tx_pub_key, stakeholder_account.get_keys().view_secret_key, pos_coin_derivation); // derivation(tx_pub; view_sec)
+  bool r = crypto::generate_key_derivation(stake_tx_pub_key, stakeholder_account.get_keys().view_secret_key, pos_coin_derivation); // v * 8 * R
   CHECK_AND_ASSERT_THROW_MES(r, "generate_key_derivation failed");
 
-  crypto::secret_key derived_secret_ephemeral_key = AUTO_VAL_INIT(derived_secret_ephemeral_key);
-  crypto::derive_secret_key(pos_coin_derivation, stake_tx_out_index, stakeholder_account.get_keys().spend_secret_key, derived_secret_ephemeral_key); // derivation.derive(spend_sec, out_idx) => input ephemeral secret key
+  crypto::secret_key secret_x = AUTO_VAL_INIT(secret_x);
+  crypto::derive_secret_key(pos_coin_derivation, stake_tx_out_index, stakeholder_account.get_keys().spend_secret_key, secret_x); // x = s + Hs(v * 8 * R, i)
 
   // sign block actually in coinbase transaction
   crypto::hash block_hash = currency::get_block_hash(m_block);
   std::vector<const crypto::public_key*> keys_ptrs(1, &stake_tx_out_pub_key);
-  crypto::generate_ring_signature(block_hash, m_context.sk.kimage, keys_ptrs, derived_secret_ephemeral_key, 0, &boost::get<currency::NLSAG_sig>(m_block.miner_tx.signatures[0]).s[0]);
+  crypto::generate_ring_signature(block_hash, m_context.sk.kimage, keys_ptrs, secret_x, 0, &boost::get<currency::NLSAG_sig>(m_block.miner_tx.signatures[0]).s[0]);
 
   m_step = 5;
 }
+
+
+void pos_block_builder::step5_sign_zarcanum(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const currency::account_base& stakeholder_account)
+{
+  CHECK_AND_ASSERT_THROW_MES(m_step == 4, "pos_block_builder: incorrect step sequence");
+
+  CHECK_AND_ASSERT_THROW_MES(m_block.miner_tx.signatures.size() == 1, "pos_block_builder: incorrect size of miner_tx signatures: " << m_block.miner_tx.signatures.size());
+  zarcanum_sig& sig = boost::get<zarcanum_sig>(m_block.miner_tx.signatures[0]);
+
+  crypto::key_derivation pos_coin_derivation{};
+  bool r = crypto::generate_key_derivation(stake_tx_pub_key, stakeholder_account.get_keys().view_secret_key, pos_coin_derivation); // v * 8 * R
+  CHECK_AND_ASSERT_THROW_MES(r, "generate_key_derivation failed");
+  crypto::secret_key secret_x{};
+  crypto::derive_secret_key(pos_coin_derivation, stake_tx_out_index, stakeholder_account.get_keys().spend_secret_key, secret_x); // x = s + Hs(v * 8 * R, i)
+
+  std::vector<crypto::CLSAG_GGXG_input_ref_t> ring;
+  crypto::scalar_t stake_blinding_mask;
+  crypto::scalar_t blinding_masks_sum;
+  uint64_t secret_index = 0;
+
+
+
+  crypto::hash tx_hash_for_sig = get_transaction_hash(m_block.miner_tx); // TODO @#@# change to currency::get_block_hash(m_block);
+  uint8_t err = 0;
+  r = crypto::zarcanum_generate_proof(tx_hash_for_sig, m_context.kernel_hash, ring, m_context.last_pow_block_id_hashed, m_context.sk.kimage,
+    secret_x, m_context.secret_q, secret_index, blinding_masks_sum, m_context.stake_amount, m_context.stake_out_blinding_mask,
+    static_cast<crypto::zarcanum_proof&>(sig), &err);
+  CHECK_AND_ASSERT_THROW_MES(r, "zarcanum_generate_proof failed, err: " << (int)err);
+
+  m_step = 5;
+}
+
 
 
 bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
