@@ -1223,7 +1223,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
     // Iterate in reverse is more efficiency
     uint64_t sources_amount = 0;
     bool sources_found = false;
-    for(const map_output_t::value_type o : outs_mine)
+    BOOST_REVERSE_FOREACH(const map_output_t::value_type o, outs_mine)
     {
         for (size_t i = 0; i < o.second.size() && !sources_found; ++i)
         {
