@@ -1009,7 +1009,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define MAKE_GENESIS_BLOCK(VEC_EVENTS, BLK_NAME, MINER_ACC, TS)                       \
   PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_GENESIS_BLOCK(" << #BLK_NAME << ")");          \
   test_generator generator;                                                           \
-  on_test_generator_created(generator);                                               \
+  this->on_test_generator_created(generator);                                         \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_genesis_block(BLK_NAME, MINER_ACC, TS);                         \
   VEC_EVENTS.push_back(BLK_NAME)
