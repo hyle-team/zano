@@ -144,8 +144,8 @@ namespace crypto
   template<typename CT>
   bool multiexp_and_check_being_zero(const scalar_vec_t& g_scalars, const scalar_vec_t& h_scalars, const point_t& summand)
   {
-    CHECK_AND_ASSERT_MES(g_scalars.size() < CT::c_bpp_mn_max, false, "g_scalars oversized");
-    CHECK_AND_ASSERT_MES(h_scalars.size() < CT::c_bpp_mn_max, false, "h_scalars oversized");
+    CHECK_AND_ASSERT_MES(g_scalars.size() <= CT::c_bpp_mn_max, false, "g_scalars oversized");
+    CHECK_AND_ASSERT_MES(h_scalars.size() <= CT::c_bpp_mn_max, false, "h_scalars oversized");
 
     point_t result = summand;
 
