@@ -929,23 +929,25 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
 
 struct output_index
 {
-  const currency::txout_target_v out;
+  const currency::tx_out_v out_v;
   uint64_t amount;
   size_t blk_height; // block height
   size_t tx_no; // index of transaction in block
   size_t out_no; // index of out in transaction
   size_t idx;
   bool spent;
+  bool zc_out;
   const currency::block *p_blk;
   const currency::transaction *p_tx;
+  crypto::scalar_t blinding_mask; // zc outs
 
-  output_index(const currency::txout_target_v &_out, uint64_t _a, size_t _h, size_t tno, size_t ono, const currency::block *_pb, const currency::transaction *_pt)
-    : out(_out), amount(_a), blk_height(_h), tx_no(tno), out_no(ono), idx(0), spent(false), p_blk(_pb), p_tx(_pt)
+  output_index(const currency::tx_out_v &_out_v, uint64_t _a, size_t _h, size_t tno, size_t ono, const currency::block *_pb, const currency::transaction *_pt)
+    : out_v(_out_v), amount(_a), blk_height(_h), tx_no(tno), out_no(ono), idx(0), spent(false), zc_out(false), p_blk(_pb), p_tx(_pt), blinding_mask(0)
   {}
 
-  output_index(const output_index &other)
-    : out(other.out), amount(other.amount), blk_height(other.blk_height), tx_no(other.tx_no), out_no(other.out_no), idx(other.idx), spent(other.spent), p_blk(other.p_blk), p_tx(other.p_tx)
-  {}
+  output_index(const output_index &other) = default;
+  //  : out(other.out), amount(other.amount), blk_height(other.blk_height), tx_no(other.tx_no), out_no(other.out_no), idx(other.idx), spent(other.spent), p_blk(other.p_blk), p_tx(other.p_tx)
+  //{}
 
   const std::string to_string() const
   {
@@ -956,6 +958,7 @@ struct output_index
       << " amount=" << amount
       << " idx=" << idx
       << " spent=" << spent
+      << " zc_out=" << zc_out
       << "}";
     return ss.str();
   }
@@ -1017,7 +1020,7 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
           {
             std::vector<output_index>& outs_vec = outs[out.amount];
             size_t out_global_idx = outs_vec.size();
-            output_index oi(out.target, out.amount, height, i, j, &blk, vtx[i]);
+            output_index oi(out, out.amount, height, i, j, &blk, vtx[i]);
             oi.idx = out_global_idx;
             outs_vec.emplace_back(std::move(oi));
             // Is out to me?
@@ -1028,16 +1031,18 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
           std::vector<output_index>& outs_vec = outs[0]; // amount = 0 for ZC outs
           size_t out_global_idx = outs_vec.size();
 
-          output_index oi(currency::txout_target_v(), 0 /* amount */, height, i, j, &blk, vtx[i]);
+          output_index oi(out, 0 /* amount */, height, i, j, &blk, vtx[i]);
+          oi.zc_out = true;
           oi.idx = out_global_idx;
           outs_vec.emplace_back(std::move(oi));
 
           uint64_t decoded_amount = 0;
-          crypto::scalar_t blinding_mask{};
-          if (is_out_to_acc(acc_keys, out, derivation, j, decoded_amount, blinding_mask))
+          crypto::scalar_t decoded_blinding_mask{};
+          if (is_out_to_acc(acc_keys, out, derivation, j, decoded_amount, decoded_blinding_mask))
           {
             outs_vec.back().amount = decoded_amount;
-            outs_mine[decoded_amount /* TODO @#@# use 0 here?? */].push_back(out_global_idx);
+            outs_vec.back().blinding_mask = decoded_blinding_mask;
+            outs_mine[0].push_back(out_global_idx);
           }
         VARIANT_SWITCH_END()
       }
@@ -1049,59 +1054,58 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
 
 bool init_spent_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, const currency::account_keys& from)
 {
-    for(const map_output_t::value_type &o : outs_mine)
+  // 1. make a hashset of spend key images
+  std::unordered_set<crypto::key_image> spent_key_images;
+  auto add_key_images_from_tx = [&](const transaction& tx) -> bool {
+    for(const txin_v& in: tx.vin)
     {
-        for (size_t i = 0; i < o.second.size(); ++i)
-        {
-            output_index &oi = outs[o.first][o.second[i]];
-
-            // construct key image for this output
-            crypto::key_image out_ki;
-            keypair in_ephemeral;
-            generate_key_image_helper(from, get_tx_pub_key_from_extra(*oi.p_tx), oi.out_no, in_ephemeral, out_ki);
-
-            // lookup for this key image in the events std::vector
-            for(auto& tx_pair : mtx)
-            {
-                const transaction& tx = *tx_pair.second;
-                for(const txin_v &in : tx.vin)
-                {
-                    if (typeid(txin_to_key) == in.type())
-                    {
-                        const txin_to_key &itk = boost::get<txin_to_key>(in);
-                        if (itk.k_image == out_ki)
-                            oi.spent = true;
-                    }
-                }
-            }
-
-            // check whether this key image has been spent in miner tx of a PoS block
-            // TODO change this check to simply adding PoS miner tx to mtx map
-            for (auto& b : blockchain)
-            {
-              if (!is_pos_block(b))
-                continue;
-              for (const txin_v &in : b.miner_tx.vin)
-              {
-                if (in.type() == typeid(txin_to_key))
-                {
-                    const txin_to_key &itk = boost::get<txin_to_key>(in);
-                    if (itk.k_image == out_ki)
-                        oi.spent = true;
-                }
-              }
-            }
-        }
+      crypto::key_image ki{};
+      if (get_key_image_from_txin_v(in, ki))
+        if (!spent_key_images.insert(ki).second)
+          return false;
     }
-
     return true;
+  };
+
+  for(auto& tx_pair : mtx)
+  {
+    CHECK_AND_ASSERT_MES(add_key_images_from_tx(*tx_pair.second), false, "insertion of spent key image failed for tx " << get_transaction_hash(*tx_pair.second));
+  }
+
+  for (auto& b : blockchain)
+  {
+    if (is_pos_block(b))
+      CHECK_AND_ASSERT_MES(add_key_images_from_tx(b.miner_tx), false, "insertion of spent key image failed for miner tx " << get_transaction_hash(b.miner_tx));
+  }
+
+  // 2. check outputs from outs_mine against spent key images
+  if (spent_key_images.empty())
+    return true;
+
+  for(const map_output_t::value_type &o : outs_mine)
+  {
+    for (size_t i = 0; i < o.second.size(); ++i)
+    {
+      output_index &oi = outs[o.first][o.second[i]];
+
+      // construct key image for this output
+      crypto::key_image out_ki;
+      keypair in_ephemeral;
+      generate_key_image_helper(from, get_tx_pub_key_from_extra(*oi.p_tx), oi.out_no, in_ephemeral, out_ki); // TODO: store ki and secret ephemeral for further use
+
+      if (spent_key_images.count(out_ki) != 0)
+        oi.spent = true;
+    }
+  }
+
+  return true;
 }
 
-bool fill_output_entries(std::vector<output_index>& out_indices,
-                         size_t sender_out, size_t nmix, uint64_t& real_entry_idx,
-                         std::vector<tx_source_entry::output_entry>& output_entries,
-                         bool use_ref_by_id)
+bool fill_output_entries(const std::vector<output_index>& out_indices, size_t sender_out, size_t nmix, bool use_ref_by_id,
+                         uint64_t& real_entry_idx, std::vector<tx_source_entry::output_entry>& output_entries)
 {
+  // use_ref_by_id = true; // <-- HINT: this could be used to enforce using ref_by_id across all the tests if needed
+
   if (out_indices.size() <= nmix)
     return false;
 
@@ -1122,8 +1126,12 @@ bool fill_output_entries(std::vector<output_index>& out_indices,
     }
     else if (0 < rest)
     {
-      if(boost::get<txout_to_key>(oi.out).mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX || boost::get<txout_to_key>(oi.out).mix_attr > nmix+1)
-        continue;
+      uint8_t mix_attr = 0;
+      if (get_mix_attr_from_tx_out_v(oi.out_v, mix_attr))
+      {
+        if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX || mix_attr > nmix + 1)
+          continue;
+      }
 
       --rest;
       append = true;
@@ -1131,20 +1139,28 @@ bool fill_output_entries(std::vector<output_index>& out_indices,
 
     if (append)
     {
-      tx_source_entry::output_entry oe = AUTO_VAL_INIT(oe);
-      const txout_to_key& otk = boost::get<txout_to_key>(oi.out);
-      if (use_ref_by_id)                                              // <-- HINT: this could be replaced by 'true' to enforce using ref_by_id across all the tests if needed
+      txout_ref_v out_ref_v{};
+      if (use_ref_by_id)
       {
         ref_by_id rbi = AUTO_VAL_INIT(rbi);
         rbi.n = oi.out_no;
         rbi.tx_id = get_transaction_hash(*oi.p_tx);
-        oe = tx_source_entry::output_entry(rbi, otk.key);
+        out_ref_v = rbi;
       }
       else
       {
-        oe = tx_source_entry::output_entry(oi.idx, otk.key);
+        out_ref_v = oi.idx;
       }
-      output_entries.push_back(oe);
+
+      VARIANT_SWITCH_BEGIN(oi.out_v)
+      VARIANT_CASE_CONST(tx_out_bare, ob)
+        VARIANT_SWITCH_BEGIN(ob.target)
+        VARIANT_CASE_CONST(txout_to_key, otk)
+          output_entries.emplace_back(out_ref_v, otk.key);
+        VARIANT_SWITCH_END()
+      VARIANT_CASE_CONST(tx_out_zarcanum, ozc)
+        output_entries.emplace_back(out_ref_v, ozc.stealth_address, ozc.concealing_point, ozc.amount_commitment);
+      VARIANT_SWITCH_END()
     }
   }
 
@@ -1163,110 +1179,116 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, const std::vector<currency::tx_source_entry>& sources_to_avoid,
                      bool check_for_spends, bool check_for_unlocktime, bool use_ref_by_id, uint64_t* p_sources_amount_found /* = nullptr */)
 {
-    map_output_idx_t outs;
-    map_output_t outs_mine;
+  map_output_idx_t outs;
+  map_output_t outs_mine;
 
-    std::vector<currency::block> blockchain;
-    map_hash2tx_t mtx;
-    if (!find_block_chain(events, blockchain, mtx, get_block_hash(blk_head)))
-        return false;
+  std::vector<currency::block> blockchain;
+  map_hash2tx_t mtx;
+  if (!find_block_chain(events, blockchain, mtx, get_block_hash(blk_head)))
+    return false;
 
-    if (!init_output_indices(outs, outs_mine, blockchain, mtx, from))
-        return false;
+  if (!init_output_indices(outs, outs_mine, blockchain, mtx, from))
+    return false;
 
-    if(check_for_spends)
+  if(check_for_spends)
+  {
+    if (!init_spent_output_indices(outs, outs_mine, blockchain, mtx, from))
+      return false;
+  }
+
+  // mark some outputs as spent to avoid their using
+  for (const auto& s : sources_to_avoid)
+  {
+    for (const auto& s_outputs_el : s.outputs) // avoid all outputs, including fake mix-ins
     {
-      if (!init_spent_output_indices(outs, outs_mine, blockchain, mtx, from))
-        return false;
-    }
-
-    // mark some outputs as spent to avoid their using
-    for (const auto& s : sources_to_avoid)
-    {
-      for (const auto& s_outputs_el : s.outputs) // avoid all outputs, including fake mix-ins
+      txout_ref_v sout = s_outputs_el.out_reference;
+      if (sout.type().hash_code() == typeid(uint64_t).hash_code())       // output by global index
       {
-        txout_ref_v sout = s_outputs_el.out_reference;
-        if (sout.type().hash_code() == typeid(uint64_t).hash_code())       // output by global index
+        uint64_t gindex = boost::get<uint64_t>(sout);
+        auto& outs_by_amount = outs[s.amount];
+        if (gindex >= outs_by_amount.size())
+          return false;
+        outs_by_amount[gindex].spent = true;
+      }
+      else if (sout.type().hash_code() == typeid(ref_by_id).hash_code()) // output by ref_by_id
+      {
+        ref_by_id out_ref_by_id = boost::get<ref_by_id>(sout);
+        const auto it = mtx.find(out_ref_by_id.tx_id);
+        if (it == mtx.end())
+          return false;
+        const transaction* p_tx = it->second;
+        for (auto& e : outs[s.amount]) // linear search by transaction among all outputs with such amount
         {
-          uint64_t gindex = boost::get<uint64_t>(sout);
-          auto& outs_by_amount = outs[s.amount];
-          if (gindex >= outs_by_amount.size())
-            return false;
-          outs_by_amount[gindex].spent = true;
-        }
-        else if (sout.type().hash_code() == typeid(ref_by_id).hash_code()) // output by ref_by_id
-        {
-          ref_by_id out_ref_by_id = boost::get<ref_by_id>(sout);
-          const auto it = mtx.find(out_ref_by_id.tx_id);
-          if (it == mtx.end())
-            return false;
-          const transaction* p_tx = it->second;
-          for (auto& e : outs[s.amount]) // linear search by transaction among all outputs with such amount
+          if (e.p_tx == p_tx)
           {
-            if (e.p_tx == p_tx)
-            {
-              e.spent = true;
-              p_tx = nullptr; // means 'found'
-              break;
-            }
+            e.spent = true;
+            p_tx = nullptr; // means 'found'
+            break;
           }
-          if (p_tx != nullptr)
-            return false; // output, referring by ref_by_id was not found
         }
-        else
-        {
-          return false; // unknown output type
-        }
+        if (p_tx != nullptr)
+          return false; // output, referring by ref_by_id was not found
+      }
+      else
+      {
+        return false; // unknown output type
       }
     }
+  }
 
-    // Iterate in reverse is more efficiency
-    uint64_t sources_amount = 0;
-    bool sources_found = false;
-    BOOST_REVERSE_FOREACH(const map_output_t::value_type o, outs_mine)
+  uint64_t head_block_ts = get_actual_timestamp(blk_head);
+
+  // Iterate in reverse is more efficiency
+  uint64_t sources_amount = 0;
+  bool sources_found = false;
+  BOOST_REVERSE_FOREACH(const map_output_t::value_type o, outs_mine)
+  {
+    for (size_t i = 0; i < o.second.size() && !sources_found; ++i)
     {
-        for (size_t i = 0; i < o.second.size() && !sources_found; ++i)
+      size_t sender_out = o.second[i];
+      const output_index& oi = outs[o.first][sender_out];
+      if (oi.spent)
+          continue;
+      if (check_for_unlocktime)
+      {
+        uint64_t unlock_time = currency::get_tx_max_unlock_time(*oi.p_tx);
+        if (unlock_time < CURRENCY_MAX_BLOCK_NUMBER)
         {
-            size_t sender_out = o.second[i];
-            const output_index& oi = outs[o.first][sender_out];
-            if (oi.spent)
-                continue;
-            if (check_for_unlocktime)
-            {
-              if (currency::get_tx_max_unlock_time(*oi.p_tx) < CURRENCY_MAX_BLOCK_NUMBER)
-              {
-                //interpret as block index
-                if (currency::get_tx_max_unlock_time(*oi.p_tx) > blockchain.size())
-                  continue;
-              }
-              else
-              { 
-                //interpret as time
-              }
-            }
-
-
-            currency::tx_source_entry ts = AUTO_VAL_INIT(ts);
-            ts.amount = oi.amount;
-            ts.real_output_in_tx_index = oi.out_no;
-            ts.real_out_tx_key = get_tx_pub_key_from_extra(*oi.p_tx); // incoming tx public key
-            if (!fill_output_entries(outs[o.first], sender_out, nmix, ts.real_output, ts.outputs, use_ref_by_id))
-              continue;
-
-            sources.push_back(ts);
-
-            sources_amount += ts.amount;
-            sources_found = amount <= sources_amount;
+          //interpret as block index
+          if (unlock_time > blockchain.size())
+            continue;
         }
+        else
+        { 
+          //interpret as time
+          if (unlock_time > head_block_ts + DIFFICULTY_TOTAL_TARGET)
+            continue;
+        }
+      }
 
-        if (sources_found)
-            break;
+
+      currency::tx_source_entry ts = AUTO_VAL_INIT(ts);
+      ts.amount = oi.amount;
+      ts.real_out_amount_blinding_mask = oi.blinding_mask;
+      ts.real_output_in_tx_index = oi.out_no;
+      ts.real_out_tx_key = get_tx_pub_key_from_extra(*oi.p_tx); // source tx public key
+      if (!fill_output_entries(outs[o.first], sender_out, nmix, use_ref_by_id, ts.real_output, ts.outputs))
+        continue;
+
+      sources.push_back(ts);
+
+      sources_amount += ts.amount;
+      sources_found = amount <= sources_amount;
     }
 
-    if (p_sources_amount_found != nullptr)
-      *p_sources_amount_found = sources_amount;
+    if (sources_found)
+      break;
+  }
 
-    return sources_found;
+  if (p_sources_amount_found != nullptr)
+    *p_sources_amount_found = sources_amount;
+
+  return sources_found;
 }
 
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const block& blk_head,

@@ -29,13 +29,13 @@ struct pos_block_builder
     uint64_t timestamp_step = POS_SCAN_STEP);
 
   
-  void pos_block_builder::step3a(
+  void step3a(
     currency::wide_difficulty_type difficulty,
     const crypto::hash& last_pow_block_hash,
     const crypto::hash& last_pos_block_kernel_hash
     );
 
-  void pos_block_builder::step3b(
+  void step3b(
     uint64_t stake_output_amount,
     const crypto::key_image& stake_output_key_image,
     const crypto::public_key& stake_source_tx_pub_key,
