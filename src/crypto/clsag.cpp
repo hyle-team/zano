@@ -9,6 +9,8 @@
 //#include "misc_log_ex.h"
 #include "../currency_core/crypto_config.h"
 
+DISABLE_GCC_AND_CLANG_WARNING(unused-function)
+
 namespace crypto
 {
   #define DBG_VAL_PRINT(x) (void(0)) // std::cout << #x ": " << x << std::endl

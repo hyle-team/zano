@@ -594,6 +594,7 @@ bool test_generator::build_outputs_indext_for_chain(const blockchain_vector& blo
   return true;
 }
 //------------------------------------------------------------------
+/* not used, consider removing
 bool test_generator::get_output_details_by_global_index(const test_generator::blockchain_vector& blck_chain,
                                                         const test_generator::outputs_index& indexes,
                                                         uint64_t amount,
@@ -629,6 +630,7 @@ bool test_generator::get_output_details_by_global_index(const test_generator::bl
   output_key = boost::get<currency::txout_to_key>(boost::get<tx_out_bare>(tx->vout[tx_out_index]).target).key;
   return true;
 }
+*/
 //------------------------------------------------------------------
 
 bool test_generator::build_stake_modifier(stake_modifier_type& sm, const test_generator::blockchain_vector& blck_chain)
@@ -1068,9 +1070,7 @@ bool init_spent_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, 
   };
 
   for(auto& tx_pair : mtx)
-  {
-    CHECK_AND_ASSERT_MES(add_key_images_from_tx(*tx_pair.second), false, "insertion of spent key image failed for tx " << get_transaction_hash(*tx_pair.second));
-  }
+    add_key_images_from_tx(*tx_pair.second); // some key images may be added more than once (because invalid txs can't be detected here), ignore that
 
   for (auto& b : blockchain)
   {

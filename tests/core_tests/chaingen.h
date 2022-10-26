@@ -444,7 +444,7 @@ public:
                   const crypto::scalar_t& blinding_masks_sum,
                   currency::block& b);
   
-  bool get_output_details_by_global_index(const test_generator::blockchain_vector& blck_chain,
+  /*bool get_output_details_by_global_index(const test_generator::blockchain_vector& blck_chain,
                                           const test_generator::outputs_index& indexes,
                                           uint64_t amount,
                                           uint64_t global_index,
@@ -452,7 +452,7 @@ public:
                                           const currency::transaction* tx,
                                           uint64_t& tx_out_index,
                                           crypto::public_key& tx_pub_key,
-                                          crypto::public_key& output_key);
+                                          crypto::public_key& output_key);*/
 
 
   

@@ -24,5 +24,6 @@ struct zarcanum_pos_block_math : public wallet_test
 {
   zarcanum_pos_block_math();
   bool generate(std::vector<test_event_entry>& events) const;
-  bool zarcanum_pos_block_math::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
 };
