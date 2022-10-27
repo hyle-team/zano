@@ -814,6 +814,17 @@ namespace currency
     return boost::apply_visitor(input_amount_getter(), v);
   }
   //---------------------------------------------------------------
+  struct output_amount_getter : public boost::static_visitor<uint64_t>
+  {
+    template<class out_t>
+    uint64_t operator()(const out_t&)                 const { return 0; }
+    uint64_t operator()(const tx_out_bare& ob)        const { return ob.amount; }
+  };
+  inline uint64_t get_amount_from_variant(const tx_out_v& out_v)
+  {
+    return boost::apply_visitor(output_amount_getter(), out_v);
+  }
+  //---------------------------------------------------------------
   inline const tx_out_bare& get_tx_out_bare_from_out_v(const tx_out_v& o)
   {
     //this function will throw if type is not matching

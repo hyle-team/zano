@@ -577,8 +577,9 @@ bool test_generator::build_outputs_indext_for_chain(const blockchain_vector& blo
     std::vector<uint64_t>& coinbase_outs = txs_outs[currency::get_transaction_hash(blocks[h]->b.miner_tx)];
     for (size_t out_i = 0; out_i != blocks[h]->b.miner_tx.vout.size(); out_i++)
     {
-      coinbase_outs.push_back(index[boost::get<currency::tx_out_bare>(blocks[h]->b.miner_tx.vout[out_i]).amount].size());
-      index[boost::get<currency::tx_out_bare>(blocks[h]->b.miner_tx.vout[out_i]).amount].push_back(std::tuple<size_t, size_t, size_t>(h, 0, out_i));
+      uint64_t amount = get_amount_from_variant(blocks[h]->b.miner_tx.vout[out_i]);
+      coinbase_outs.push_back(index[amount].size());
+      index[amount].push_back(std::tuple<size_t, size_t, size_t>(h, 0, out_i));
     }
 
     for (size_t tx_index = 0; tx_index != blocks[h]->m_transactions.size(); tx_index++)
@@ -586,8 +587,9 @@ bool test_generator::build_outputs_indext_for_chain(const blockchain_vector& blo
       std::vector<uint64_t>& tx_outs_indx = txs_outs[currency::get_transaction_hash(blocks[h]->m_transactions[tx_index])];
       for (size_t out_i = 0; out_i != blocks[h]->m_transactions[tx_index].vout.size(); out_i++)
       {
-        tx_outs_indx.push_back(index[boost::get<currency::tx_out_bare>(blocks[h]->m_transactions[tx_index].vout[out_i]).amount].size());
-        index[boost::get<currency::tx_out_bare>(blocks[h]->m_transactions[tx_index].vout[out_i]).amount].push_back(std::tuple<size_t, size_t, size_t>(h, tx_index + 1, out_i));
+        uint64_t amount = get_amount_from_variant(blocks[h]->m_transactions[tx_index].vout[out_i]);
+        tx_outs_indx.push_back(index[amount].size());
+        index[amount].push_back(std::tuple<size_t, size_t, size_t>(h, tx_index + 1, out_i));
       }
     }
   }

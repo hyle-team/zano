@@ -106,8 +106,9 @@ bool generate_and_play(const char* const genclass_name)
 {
   std::vector<test_event_entry> events;
   bool generated = false;
-  bool result = true;
-  std::cout << ENDL << concolor::bright_white << "#TEST# " << genclass_name << concolor::normal << ENDL << ENDL;
+  bool result = false;
+  std::cout << ENDL << concolor::bright_white << "#TEST# >>>> " << genclass_name << " <<<<" << ENDL << ENDL;
+
   LOG_PRINT2("get_object_blobsize.log", "#TEST# " << genclass_name, LOG_LEVEL_3);
 
   if (!clean_data_directory())
@@ -118,29 +119,36 @@ bool generate_and_play(const char* const genclass_name)
   genclass g;
   try
   {
-    generated = g.generate(events);;
+    generated = g.generate(events);
+    if (generated)
+    {
+      std::cout << concolor::bright_white << std::string(100, '=') << std::endl <<
+        "#TEST# >>>> " << genclass_name << " <<<< start replaying events" << std::endl <<
+        std::string(100, '=') << concolor::normal << std::endl;
+      
+      result = do_replay_events(events, g);
+    }
   }
   catch (const std::exception& ex)
   {
-    LOG_ERROR(genclass_name << " generation failed: what=" << ex.what());
+    LOG_ERROR("got an exception during " << genclass_name << (generated ? " replaying: " : " generation: ") << ex.what());
   }
   catch (...)
   {
-    LOG_ERROR(genclass_name << " generation failed: generic exception");
+    LOG_ERROR("got an unknown exception during " << genclass_name << (generated ? " replaying" : " generation"));
   }
 
-  std::cout << concolor::bright_white << std::string(100, '=') << std::endl <<
-    "#TEST# >>>> " << genclass_name << " <<<< start replaying events" << std::endl <<
-    std::string(100, '=') << concolor::normal << std::endl;
-
-  if (generated && do_replay_events(events, g))
+  if (result)
   {
-    std::cout << concolor::green << "#TEST# Succeeded " << genclass_name << concolor::normal << std::endl;
+    std::cout << concolor::green << std::string(100, '=') << std::endl <<
+      "#TEST# >>>> " << genclass_name << " <<<< Succeeded" << std::endl <<
+      std::string(100, '=') << concolor::normal << std::endl;
   }
   else
   {
-    std::cout << concolor::magenta << "#TEST# Failed " << genclass_name << concolor::normal << std::endl;
-    LOG_PRINT_RED_L0("#TEST# Failed " << genclass_name);
+    std::cout << concolor::red << std::string(100, '=') << std::endl <<
+      "#TEST# >>>> " << genclass_name << " <<<< FAILED" << std::endl <<
+      std::string(100, '=') << concolor::normal << std::endl;
     result = false;
   }
   std::cout << std::endl;
