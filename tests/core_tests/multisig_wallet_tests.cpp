@@ -1194,7 +1194,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   // noramal input -> multisig output with unlock time
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
-  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 1, sources, destinations, true, true, 1);
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), ms_addr_list, amount, TESTS_DEFAULT_FEE, 1 /*nmix*/, sources, destinations, true, true, 1 /* minimum sigs */);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   uint64_t unlock_time = blk_0r.timestamp + DIFFICULTY_TOTAL_TARGET * 3 + CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS;
@@ -1251,10 +1251,17 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   ADJUST_TEST_CORE_TIME(unlock_time_2 - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS - 1);
 
   DO_CALLBACK(events, "mark_invalid_tx");
-  MAKE_TX(events, tx_3, alice_acc, bob_acc, amount - TESTS_DEFAULT_FEE * 2, blk_2);
+  // instead of MAKE_TX use manual construction to set check_for_unlocktime = false, old: MAKE_TX(events, tx_3, alice_acc, bob_acc, amount - TESTS_DEFAULT_FEE * 2, blk_2);
+  r = fill_tx_sources_and_destinations(events, blk_2, alice_acc, bob_acc, amount - TESTS_DEFAULT_FEE * 2, TESTS_DEFAULT_FEE, 0 /*nmix*/, sources, destinations, true, false /* check_for_unlocktime */);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  transaction tx_3{};
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3, get_tx_version_from_events(events), 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  ADD_CUSTOM_EVENT(events, tx_3);
+
 
   ADJUST_TEST_CORE_TIME(unlock_time_2 - CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS + 1);
-  events.push_back(tx_3);
+  ADD_CUSTOM_EVENT(events, tx_3);
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_3);
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, amount - TESTS_DEFAULT_FEE * 2));

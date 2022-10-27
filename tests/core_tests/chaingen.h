@@ -1193,6 +1193,10 @@ void append_vector_by_another_vector(U& dst, const V& src)
   test_core_time::adjust(desired_time);                                                \
   events.push_back(event_core_time(desired_time))
 
+#define ADD_CUSTOM_EVENT_CODE(VEC_EVENTS, CODE) PRINT_EVENT_N_TEXT(VEC_EVENTS, #CODE); CODE
+
+#define ADD_CUSTOM_EVENT(VEC_EVENTS, EVENT_OBJ) PRINT_EVENT_N_TEXT(VEC_EVENTS, #EVENT_OBJ); VEC_EVENTS.push_back(EVENT_OBJ)
+
 // --- gentime wallet helpers -----------------------------------------------------------------------
 
 #define CREATE_TEST_WALLET(WLT_VAR, ACCOUNT, GENESIS_BLOCK) \
