@@ -1023,19 +1023,19 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 
 #define MAKE_NEXT_BLOCK_TIMESTAMP_ADJUSTMENT(ADJ, VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC) \
-  PRINT_EVENT_N(VEC_EVENTS);                                                          \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_BLOCK_TIMESTAMP_ADJUSTMENT(" << #BLK_NAME << ")"); \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_block(ADJ, VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC);        \
   VEC_EVENTS.push_back(BLK_NAME)
 
 #define MAKE_NEXT_POS_BLOCK(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, MINERS_ACC_LIST) \
-  PRINT_EVENT_N(VEC_EVENTS);                                                          \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_POS_BLOCK(" << #BLK_NAME << ")");         \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, std::list<currency::transaction>(), MINERS_ACC_LIST); \
   VEC_EVENTS.push_back(BLK_NAME)
 
 #define MAKE_NEXT_POS_BLOCK_TX1(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, MINERS_ACC_LIST, TX_1)         \
-  PRINT_EVENT_N(VEC_EVENTS);                                                                                \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_POS_BLOCK_TX1(" << #BLK_NAME << ")");                           \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                                       \
   {                                                                                                         \
     std::list<currency::transaction>tx_list;                                                                \
@@ -1045,7 +1045,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
   VEC_EVENTS.push_back(BLK_NAME)
 
 #define MAKE_NEXT_BLOCK_NO_ADD(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC)           \
-  PRINT_EVENT_N(VEC_EVENTS);                                                          \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_BLOCK_NO_ADD(" << #BLK_NAME << ")");      \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC);             \
   VEC_EVENTS.push_back(event_special_block(BLK_NAME, event_special_block::flag_skip))
@@ -1055,7 +1055,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
   VEC_EVENTS.push_back(BLK_NAME)
 
 #define MAKE_NEXT_BLOCK_TX1(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, TX1)         \
-  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_BLOCK_TX1(" << #BLK_NAME << ")");         \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_BLOCK_TX1(" << #BLK_NAME << ", " << #TX1 << ")"); \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   {                                                                                   \
     std::list<currency::transaction> tx_list;                                         \
@@ -1066,7 +1066,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 
 #define MAKE_NEXT_BLOCK_TX_LIST(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, TXLIST)  \
-  PRINT_EVENT_N(VEC_EVENTS);                                                          \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_BLOCK_TX_LIST(" << #BLK_NAME << ", " << #TXLIST << ")"); \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
   generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, TXLIST);     \
   VEC_EVENTS.push_back(BLK_NAME)
@@ -1099,7 +1099,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 
 #define MAKE_TX_MIX_ATTR_EXTRA(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, EXTRA, CHECK_SPENDS) \
-  PRINT_EVENT_N(VEC_EVENTS);                                                           \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "transaction " << #TX_NAME);                          \
   currency::transaction TX_NAME;                                                       \
   {                                                                                    \
     bool txr = construct_tx_to_key(generator.get_hardforks(), VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS);  \
@@ -1108,7 +1108,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
   VEC_EVENTS.push_back(TX_NAME)
 
 #define MAKE_TX_FEE_MIX_ATTR_EXTRA(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, FEE, NMIX, HEAD, MIX_ATTR, EXTRA, CHECK_SPENDS) \
-  PRINT_EVENT_N(VEC_EVENTS);                                                           \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, "transaction " << #TX_NAME);                          \
   currency::transaction TX_NAME;                                                       \
   {                                                                                    \
     bool txr = construct_tx_to_key(generator.get_hardforks(), VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, std::vector<currency::attachment_v>(), CHECK_SPENDS); \
@@ -1133,7 +1133,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 #define MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, MIX_ATTR, EXTRA, ATTACH) \
   {                                                                                                \
-    PRINT_EVENT_N(VEC_EVENTS);                                                                     \
+    PRINT_EVENT_N_TEXT(VEC_EVENTS, "transaction list " << #SET_NAME);                              \
     currency::transaction t;                                                                       \
     bool r = construct_tx_to_key(generator.get_hardforks(), VEC_EVENTS, t, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, generator.last_tx_generated_secret_key, MIX_ATTR, EXTRA, ATTACH); \
     if (!r) { LOG_PRINT_YELLOW("ERROR in tx @ EVENT #" << VEC_EVENTS.size(), LOG_LEVEL_0); }       \
@@ -1189,7 +1189,7 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 // Adjust gentime and playtime "time" at once
 #define ADJUST_TEST_CORE_TIME(desired_time)                                            \
-  PRINT_EVENT_N(events);                                                               \
+  PRINT_EVENT_N_TEXT(events, "ADJUST_TEST_CORE_TIME(" << desired_time << ")");         \
   test_core_time::adjust(desired_time);                                                \
   events.push_back(event_core_time(desired_time))
 
