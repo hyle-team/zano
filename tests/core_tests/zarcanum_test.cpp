@@ -234,6 +234,7 @@ zarcanum_pos_block_math::zarcanum_pos_block_math()
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
 
   REGISTER_CALLBACK_METHOD(zarcanum_pos_block_math, c1);
+  REGISTER_CALLBACK_METHOD(zarcanum_pos_block_math, c2);
 }
 
 bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) const
@@ -248,7 +249,7 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
   account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
 
-  m_alice_amount = MK_TEST_COINS(1);
+  m_alice_amount = MK_TEST_COINS(99);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
@@ -263,8 +264,7 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
   crypto::secret_key tx_sec_key;
   r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, get_tx_version_from_events(events), tx_sec_key, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  //DO_CALLBACK(events, "mark_invalid_tx"); 
-  events.push_back(tx_0);
+  ADD_CUSTOM_EVENT(events, tx_0);
 
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
 
@@ -275,6 +275,18 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_1r, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, m_alice_amount);
+  
+  // Alice -> Bob
+  m_bob_amount = MK_TEST_COINS(15);
+
+  MAKE_TX(events, tx_1, alice_acc, bob_acc, m_bob_amount, blk_1r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);
+
+  DO_CALLBACK(events, "c2");
+
+  CREATE_TEST_WALLET(bob_wlt, bob_acc, blk_0);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_2, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, m_bob_amount);
 
   return true;
 }
@@ -284,7 +296,18 @@ bool zarcanum_pos_block_math::c1(currency::core& c, size_t ev_index, const std::
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
   alice_wlt->refresh();
 
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", m_alice_amount, 0, MK_TEST_COINS(1), 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", m_alice_amount, 0, m_alice_amount, 0, 0), false, "");
 
   return true;
 }
+
+bool zarcanum_pos_block_math::c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  bob_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", m_bob_amount, 0, 0, 0, 0), false, "");
+
+  return true;
+}
+

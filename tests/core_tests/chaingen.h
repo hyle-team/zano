@@ -212,15 +212,15 @@ VARIANT_TAG(binary_archive, event_core_time, 0xd1);
 typedef boost::variant<currency::block, currency::transaction, currency::account_base, callback_entry, serialized_block, serialized_transaction, event_visitor_settings, event_special_block, event_core_time> test_event_entry;
 typedef std::unordered_map<crypto::hash, const currency::transaction*> map_hash2tx_t;
 
-enum test_tx_split_strategy { tests_void_split_strategy, tests_null_split_strategy, tests_digits_split_strategy };
+enum test_tx_split_strategy { tests_void_split_strategy, tests_null_split_strategy, tests_digits_split_strategy, tests_random_split_strategy };
 struct test_gentime_settings
 {
-  test_gentime_settings(test_tx_split_strategy split_strategy, size_t miner_tx_max_outs, uint64_t tx_max_out_amount, uint64_t dust_threshold)
-    : split_strategy(split_strategy), miner_tx_max_outs(miner_tx_max_outs), tx_max_out_amount(tx_max_out_amount), dust_threshold(dust_threshold) {}
-  test_tx_split_strategy  split_strategy;
-  size_t                  miner_tx_max_outs;
-  uint64_t                tx_max_out_amount;
-  uint64_t                dust_threshold;
+  test_tx_split_strategy  split_strategy            = tests_digits_split_strategy;
+  size_t                  miner_tx_max_outs         = CURRENCY_MINER_TX_MAX_OUTS;
+  uint64_t                tx_max_out_amount         = WALLET_MAX_ALLOWED_OUTPUT_AMOUNT;
+  uint64_t                dust_threshold            = DEFAULT_DUST_THRESHOLD;
+  size_t                  rss_min_number_of_outputs = CURRENCY_TX_MIN_ALLOWED_OUTS; // for random split strategy: min (target) number of tx outputs, one output will be split into this many parts
+  size_t                  rss_num_digits_to_keep    = CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP; // for random split strategy: number of digits to keep
 };
 
 class test_generator;
@@ -541,7 +541,7 @@ private:
 
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;
-  static test_gentime_settings m_test_gentime_settings_default;
+  static const test_gentime_settings m_test_gentime_settings_default;
 }; // class class test_generator
 
 extern const crypto::signature invalid_signature; // invalid non-null signature for test purpose

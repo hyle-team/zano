@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -25,8 +25,6 @@
 #include "wallet_test_core_proxy.h"
 #include "pos_block_builder.h"
  
-//using namespace std;
-
 using namespace epee;
 using namespace currency;
 
@@ -34,7 +32,7 @@ using namespace currency;
 #define POS_DIFF_UP_TIMESTAMP_DELTA (DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN*2/3)
 
 std::atomic<int64_t> test_core_time::m_time_shift;
-test_gentime_settings test_generator::m_test_gentime_settings_default = test_gentime_settings(tests_digits_split_strategy, CURRENCY_MINER_TX_MAX_OUTS, WALLET_MAX_ALLOWED_OUTPUT_AMOUNT, DEFAULT_DUST_THRESHOLD);
+const test_gentime_settings test_generator::m_test_gentime_settings_default{};
 test_gentime_settings test_generator::m_test_gentime_settings = test_generator::m_test_gentime_settings_default;
 
 crypto::signature create_invalid_signature()
@@ -1346,6 +1344,18 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
       break;
     case tests_digits_split_strategy:
       tools::detail::digit_split_strategy(dsts, change_dst, tgs.dust_threshold, destinations, dust, tgs.tx_max_out_amount);
+      break;
+    case tests_random_split_strategy:
+      {
+        size_t outs_count = cache_back > 0 ? 2 : 1;
+        if (outs_count < tgs.rss_min_number_of_outputs)
+        {
+          // decompose both target and cache back amounts
+          // TODO: support tgs.tx_max_out_amount
+          decompose_amount_randomly(amount,     [&](uint64_t a){ destinations.emplace_back(a, to.back()); },            tgs.rss_min_number_of_outputs, tgs.rss_num_digits_to_keep);
+          decompose_amount_randomly(cache_back, [&](uint64_t a){ destinations.emplace_back(a, from.account_address); }, tgs.rss_min_number_of_outputs, tgs.rss_num_digits_to_keep);
+        }
+      }
       break;
     default:
       CHECK_AND_ASSERT_MES(false, false, "Invalid split strategy set in gentime settings");
