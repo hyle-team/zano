@@ -1698,7 +1698,7 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
   uint64_t total, unlocked, awaiting_in, awaiting_out, mined;
   balance_via_wallet(w, &total, &unlocked, &awaiting_in, &awaiting_out, &mined);
 
-  LOG_PRINT_CYAN("Balance for wallet " << account_name << ":" << ENDL <<
+  LOG_PRINT_CYAN("Balance for wallet " << account_name << " @ height " << w.get_top_block_height() << ":" << ENDL <<
     "unlocked:     " << print_money(unlocked) << ENDL <<
     "awaiting in:  " << print_money(awaiting_in) << ENDL <<
     "awaiting out: " << print_money(awaiting_out) << ENDL <<
