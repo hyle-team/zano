@@ -1621,9 +1621,14 @@ void get_confirmed_txs(const std::vector<currency::block>& blockchain, const map
 
 bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head)
 {
+  size_t invalid_tx_index     = UINT64_MAX;
+  size_t invalid_block_index  = UINT64_MAX;
   std::unordered_map<crypto::hash, const block*> block_index;
   for(size_t i = 0, sz = events.size(); i < sz; ++i)
   {
+    if (invalid_tx_index == i || invalid_block_index == i)
+      continue;
+
     const test_event_entry& ev = events[i];
     if (typeid(currency::block) == ev.type())
     {
@@ -1642,6 +1647,14 @@ bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<c
     {
       const transaction& tx = boost::get<transaction>(ev);
       mtx[get_transaction_hash(tx)] = &tx;
+    }
+    else if (test_chain_unit_enchanced::is_event_mark_invalid_block(ev))
+    {
+      invalid_block_index = i + 1;
+    }
+    else if (test_chain_unit_enchanced::is_event_mark_invalid_tx(ev))
+    {
+      invalid_tx_index = i + 1;
     }
   }
 

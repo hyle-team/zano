@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -318,6 +318,22 @@ public:
   bool check_offers_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_hardfork_active(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
+
+  static bool is_event_mark_invalid_block(const test_event_entry& ev)
+  {
+    if (typeid(callback_entry) != ev.type())
+      return false;
+    const callback_entry& ce = boost::get<callback_entry>(ev);
+    return ce.callback_name == "mark_invalid_block";
+  }
+
+  static bool is_event_mark_invalid_tx(const test_event_entry& ev)
+  {
+    if (typeid(callback_entry) != ev.type())
+      return false;
+    const callback_entry& ce = boost::get<callback_entry>(ev);
+    return ce.callback_name == "mark_invalid_tx";
+  }
 
 
 protected:
