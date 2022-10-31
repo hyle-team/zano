@@ -20,14 +20,9 @@ struct zarcanum_test_n_inputs_validation : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct zarcanum_pos_block_math : public wallet_test
+struct zarcanum_gen_time_balance : public wallet_test
 {
-  zarcanum_pos_block_math();
+  zarcanum_gen_time_balance();
   bool generate(std::vector<test_event_entry>& events) const;
-  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-
-  mutable uint64_t m_alice_amount = 0;
-  mutable uint64_t m_bob_amount = 0;
 };
 

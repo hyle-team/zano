@@ -547,6 +547,13 @@ private:
   static const test_gentime_settings m_test_gentime_settings_default;
 }; // class class test_generator
 
+struct test_gentime_settings_restorer
+{
+  test_gentime_settings_restorer() : m_settings(test_generator::get_test_gentime_settings()) {}
+  ~test_gentime_settings_restorer() { test_generator::set_test_gentime_settings(m_settings); }
+  test_gentime_settings m_settings;
+};
+
 extern const crypto::signature invalid_signature; // invalid non-null signature for test purpose
 static const std::vector<currency::extra_v> empty_extra;
 static const std::vector<currency::attachment_v> empty_attachment;

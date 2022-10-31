@@ -229,17 +229,15 @@ bool zarcanum_test_n_inputs_validation::generate(std::vector<test_event_entry>& 
 
 //------------------------------------------------------------------------------
 
-zarcanum_pos_block_math::zarcanum_pos_block_math()
+zarcanum_gen_time_balance::zarcanum_gen_time_balance()
 {
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
-
-  REGISTER_CALLBACK_METHOD(zarcanum_pos_block_math, c1);
-  REGISTER_CALLBACK_METHOD(zarcanum_pos_block_math, c2);
 }
 
-bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) const
+bool zarcanum_gen_time_balance::generate(std::vector<test_event_entry>& events) const
 {
-  // Test idea: 
+  // Test idea: make sure post HF4 transactions with ZC inputs and outputs are handled properly by chaingen gen-time routines
+  // (including balance check)
 
   bool r = false;
 
@@ -249,7 +247,6 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
   account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
 
-  m_alice_amount = MK_TEST_COINS(99);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
@@ -257,7 +254,11 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
 
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
-  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, m_alice_amount, TESTS_DEFAULT_FEE, 0, sources, destinations), false, "");
+
+  //
+  // tx_0: alice_amount from miner to Alice
+  uint64_t alice_amount = MK_TEST_COINS(99);
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, alice_amount, TESTS_DEFAULT_FEE, 0, sources, destinations), false, "");
 
   std::vector<extra_v> extra;
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
@@ -266,48 +267,65 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   ADD_CUSTOM_EVENT(events, tx_0);
 
+  // add tx_0 to the block
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
 
+  // rewind and check unlocked balance
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  DO_CALLBACK(events, "c1");
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, alice_amount, alice_amount, 0, 0, 0));
 
+  // do a gen-time balance check
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_1r, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4);
-  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, m_alice_amount);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, alice_amount);
   
-  // Alice -> Bob
-  m_bob_amount = MK_TEST_COINS(15);
+  //
+  // tx_1: bob_amount, Alice -> Bob
+  uint64_t bob_amount = MK_TEST_COINS(15);
 
-  MAKE_TX(events, tx_1, alice_acc, bob_acc, m_bob_amount, blk_1r);
+  MAKE_TX(events, tx_1, alice_acc, bob_acc, bob_amount, blk_1r);
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);
 
-  DO_CALLBACK(events, "c2");
+  // check Bob's balance in play time...
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, bob_amount, 0, 0, 0, 0));
 
+  // ... and in gen time
   CREATE_TEST_WALLET(bob_wlt, bob_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_2, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
-  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, m_bob_amount);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, bob_amount);
+
+  // try to construct tx with only one output (that is wrong for HF4)
+  test_gentime_settings_restorer tgsr;
+  test_gentime_settings tgs = test_generator::get_test_gentime_settings();
+  tgs.split_strategy = tests_void_split_strategy; // amount won't be splitted by test_genertor::construct_tx()
+  test_generator::set_test_gentime_settings(tgs);
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  // transfer all Bob's coins -- they should be put in one out
+  MAKE_TX(events, tx_2_bad, bob_acc, alice_acc, bob_amount - TESTS_DEFAULT_FEE, blk_2);
+  CHECK_AND_ASSERT_MES(tx_2_bad.vout.size() == 1, false, "tx_2_bad.vout.size() = " << tx_2_bad.vout.size());
+
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_3_bad, blk_2, miner_acc, tx_2_bad);
+
+  // now change split strategy and make a tx with more outputs
+  tgs.split_strategy = tests_random_split_strategy;
+  test_generator::set_test_gentime_settings(tgs);
+
+  MAKE_TX(events, tx_2, bob_acc, alice_acc, bob_amount - TESTS_DEFAULT_FEE, blk_2);
+  CHECK_AND_ASSERT_MES(tx_2.vout.size() != 1, false, "tx_2.vout.size() = " << tx_2.vout.size());
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_2);
+
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_3, 2);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, alice_amount - 2 * TESTS_DEFAULT_FEE);
+
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_3, 1);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, 0);
+
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, alice_amount - 2 * TESTS_DEFAULT_FEE, 0, 0, 0, 0));
+
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 0, 0, 0, 0, 0));
 
   return true;
 }
-
-bool zarcanum_pos_block_math::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
-  alice_wlt->refresh();
-
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", m_alice_amount, 0, m_alice_amount, 0, 0), false, "");
-
-  return true;
-}
-
-bool zarcanum_pos_block_math::c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
-  bob_wlt->refresh();
-
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", m_bob_amount, 0, 0, 0, 0), false, "");
-
-  return true;
-}
-
