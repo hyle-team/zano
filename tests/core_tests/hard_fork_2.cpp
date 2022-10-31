@@ -740,6 +740,10 @@ hard_fork_2_no_new_structures_before_hf::hard_fork_2_no_new_structures_before_hf
 
 bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_entry>& events) const
 {
+  test_gentime_settings tgs = test_generator::get_test_gentime_settings();
+  tgs.ignore_invalid_txs = false; // this test pushes originally invalid tx_0, tx_1 and tx_2 which are good after HF2, so we'd like to avoid mess with the sources among txs
+  test_generator::set_test_gentime_settings(tgs);
+
   bool r = false;
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
@@ -830,9 +834,9 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);
 
-  events.push_back(tx_0);
-  events.push_back(tx_1);
-  events.push_back(tx_2);
+  ADD_CUSTOM_EVENT(events, tx_0);
+  ADD_CUSTOM_EVENT(events, tx_1);
+  ADD_CUSTOM_EVENT(events, tx_2);
 
 
   // tx_0 with tx_payer should be accepted after HF2

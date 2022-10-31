@@ -2277,3 +2277,28 @@ bool test_chain_unit_enchanced::check_hardfork_active(currency::core& c, size_t 
 
   return true;
 }
+
+/*static*/ bool test_chain_unit_enchanced::is_event_mark_invalid_block(const test_event_entry& ev, bool use_global_gentime_settings /* = true */)
+{
+  if (use_global_gentime_settings && !test_generator::get_test_gentime_settings().ignore_invalid_blocks)
+    return false;
+
+  if (typeid(callback_entry) != ev.type())
+    return false;
+
+  const callback_entry& ce = boost::get<callback_entry>(ev);
+  return ce.callback_name == "mark_invalid_block";
+}
+
+/*static*/ bool test_chain_unit_enchanced::is_event_mark_invalid_tx(const test_event_entry& ev, bool use_global_gentime_settings /* = true */)
+{
+  if (use_global_gentime_settings && !test_generator::get_test_gentime_settings().ignore_invalid_txs)
+    return false;
+
+  if (typeid(callback_entry) != ev.type())
+    return false;
+
+  const callback_entry& ce = boost::get<callback_entry>(ev);
+  return ce.callback_name == "mark_invalid_tx";
+}
+

@@ -221,6 +221,8 @@ struct test_gentime_settings
   uint64_t                dust_threshold            = DEFAULT_DUST_THRESHOLD;
   size_t                  rss_min_number_of_outputs = CURRENCY_TX_MIN_ALLOWED_OUTS; // for random split strategy: min (target) number of tx outputs, one output will be split into this many parts
   size_t                  rss_num_digits_to_keep    = CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP; // for random split strategy: number of digits to keep
+  bool                    ignore_invalid_blocks     = true; // gen-time blockchain building: don't take into account blocks marked as invalid ("mark_invalid_block")
+  bool                    ignore_invalid_txs        = true; // gen-time blockchain building: don't take into account txs marked as invalid ("mark_invalid_txs")
 };
 
 class test_generator;
@@ -318,23 +320,8 @@ public:
   bool check_offers_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_hardfork_active(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
-
-  static bool is_event_mark_invalid_block(const test_event_entry& ev)
-  {
-    if (typeid(callback_entry) != ev.type())
-      return false;
-    const callback_entry& ce = boost::get<callback_entry>(ev);
-    return ce.callback_name == "mark_invalid_block";
-  }
-
-  static bool is_event_mark_invalid_tx(const test_event_entry& ev)
-  {
-    if (typeid(callback_entry) != ev.type())
-      return false;
-    const callback_entry& ce = boost::get<callback_entry>(ev);
-    return ce.callback_name == "mark_invalid_tx";
-  }
-
+  static bool is_event_mark_invalid_block(const test_event_entry& ev, bool use_global_gentime_settings = true);
+  static bool is_event_mark_invalid_tx(const test_event_entry& ev, bool use_global_gentime_settings = true);
 
 protected:
   struct params_top_block
