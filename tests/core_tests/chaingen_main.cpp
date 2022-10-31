@@ -1080,6 +1080,7 @@ int main(int argc, char* argv[])
 
     GENERATE_AND_PLAY(multiassets_basic_test);
     //GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
+    GENERATE_AND_PLAY(zarcanum_gen_time_balance);
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */
