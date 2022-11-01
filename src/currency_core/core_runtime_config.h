@@ -29,6 +29,13 @@ namespace currency
     {
       CHECK_AND_ASSERT_THROW_MES(hardfork_id < m_total_count, "invalid hardfork id: " << hardfork_id);
       m_height_the_hardfork_n_active_after[hardfork_id] = height_the_hardfork_is_active_after;
+
+      // set all unset previous hardforks to this height
+      for(size_t hid = hardfork_id - 1; hid + 1 != 0; --hid)
+      {
+        if (m_height_the_hardfork_n_active_after[hid] == CURRENCY_MAX_BLOCK_NUMBER)
+          m_height_the_hardfork_n_active_after[hid] = height_the_hardfork_is_active_after;
+      }
     }
 
     bool is_hardfork_active_for_height(size_t hardfork_id, uint64_t height) const
