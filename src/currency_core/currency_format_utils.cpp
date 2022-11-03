@@ -2487,18 +2487,18 @@ namespace currency
     return res;
   }
   //---------------------------------------------------------------
-  bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index)
+  bool is_out_to_acc(const account_public_address& addr, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    if (!derive_public_key(derivation, output_index, acc.account_address.spend_public_key, pk))
+    if (!derive_public_key(derivation, output_index, addr.spend_public_key, pk))
       return false;
     return pk == out_key.key;
   }
   //---------------------------------------------------------------
-  bool is_out_to_acc(const account_keys& acc, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index)
+  bool is_out_to_acc(const account_public_address& addr, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    if (!derive_public_key(derivation, output_index, acc.account_address.spend_public_key, pk))
+    if (!derive_public_key(derivation, output_index, addr.spend_public_key, pk))
       return false;
     auto it = std::find(out_multisig.keys.begin(), out_multisig.keys.end(), pk);
     if (out_multisig.keys.end() == it)
@@ -2506,16 +2506,16 @@ namespace currency
     return true;
   }
 
-  bool is_out_to_acc(const account_keys& acc, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::scalar_t& blinding_mask)
+  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::scalar_t& blinding_mask)
   {
     crypto::scalar_t h; // = crypto::hash_helper_t::hs(reinterpret_cast<const crypto::public_key&>(derivation), output_index); // h = Hs(8 * r * V, i)
     crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
 
-    crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(acc.account_address.spend_public_key); // P =? Hs(8rV, i) * G + S
+    crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(addr.spend_public_key); // P =? Hs(8rV, i) * G + S
     if (P_prime.to_public_key() != zo.stealth_address)
       return false;
     
-    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * 8 * crypto::point_t(acc.account_address.view_public_key); // Q' * 8 =? Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
+    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * 8 * crypto::point_t(addr.view_public_key); // Q' * 8 =? Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
     if (Q_prime != crypto::point_t(zo.concealing_point).modify_mul8())
       return false;
 
@@ -2579,7 +2579,7 @@ namespace currency
     const tx_out_bare& o = boost::get<tx_out_bare>(ov);
 
     CHECK_AND_ASSERT_MES(o.target.type() == typeid(txout_to_key), false, "condition failed: o.target.type() == typeid(txout_to_key)");
-    if (is_out_to_acc(acc, boost::get<txout_to_key>(o.target), derivation, offset))
+    if (is_out_to_acc(acc.account_address, boost::get<txout_to_key>(o.target), derivation, offset))
     {
       outs.emplace_back(offset, o.amount);
       money_transfered += o.amount;
@@ -2616,25 +2616,25 @@ namespace currency
       {
         VARIANT_SWITCH_BEGIN(o.target);
         VARIANT_CASE_CONST(txout_to_key, t)
-          if (is_out_to_acc(acc, t, derivation, output_index))
+          if (is_out_to_acc(acc.account_address, t, derivation, output_index))
           {
             outs.emplace_back(output_index, o.amount);
             money_transfered += o.amount;
           }
         VARIANT_CASE_CONST(txout_multisig, t)
-          if (is_out_to_acc(acc, t, derivation, output_index))
+          if (is_out_to_acc(acc.account_address, t, derivation, output_index))
           {
             outs.emplace_back(output_index, o.amount); // TODO: @#@# consider this
             //don't cout this money
           }
         VARIANT_CASE_CONST(txout_htlc, htlc)
           htlc_info hi = AUTO_VAL_INIT(hi);
-          if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, output_index))
+          if (is_out_to_acc(acc.account_address, htlc.pkey_redeem, derivation, output_index))
           {
             hi.hltc_our_out_is_before_expiration = true;
             htlc_info_list.push_back(hi);
           }
-          else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, output_index))
+          else if (is_out_to_acc(acc.account_address, htlc.pkey_refund, derivation, output_index))
           {
             hi.hltc_our_out_is_before_expiration = false;
             htlc_info_list.push_back(hi);
@@ -2648,7 +2648,7 @@ namespace currency
       VARIANT_CASE_CONST(tx_out_zarcanum, zo)
         uint64_t amount = 0;
         crypto::scalar_t blinding_mask = 0;
-        if (is_out_to_acc(acc, zo, derivation, output_index, amount, blinding_mask))
+        if (is_out_to_acc(acc.account_address, zo, derivation, output_index, amount, blinding_mask))
         {
           outs.emplace_back(output_index, amount, blinding_mask);
           open_asset_id v = AUTO_VAL_INIT(v);

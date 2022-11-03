@@ -54,7 +54,6 @@ struct pos_block_builder
     const currency::account_public_address &stakeholder_address,
     const currency::blobdata& extra_nonce = currency::blobdata(),
     size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
-    const currency::extra_alias_entry& alias = currency::extra_alias_entry(),
     currency::keypair tx_one_time_key = currency::keypair::generate());
 
   void step4_generate_coinbase_tx(size_t median_size,
@@ -62,7 +61,6 @@ struct pos_block_builder
     const currency::account_public_address &reward_and_stake_receiver_address,
     const currency::blobdata& extra_nonce = currency::blobdata(),
     size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
-    const currency::extra_alias_entry& alias = currency::extra_alias_entry(),
     currency::keypair tx_one_time_key = currency::keypair::generate());
 
   void step5_sign(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const crypto::public_key& stake_tx_out_pub_key, const currency::account_base& stakeholder_account);

@@ -1026,7 +1026,7 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
             oi.idx = out_global_idx;
             outs_vec.emplace_back(std::move(oi));
             // Is out to me?
-            if (is_out_to_acc(acc_keys, boost::get<txout_to_key>(out.target), derivation, j))
+            if (is_out_to_acc(acc_keys.account_address, boost::get<txout_to_key>(out.target), derivation, j))
               outs_mine[out.amount].push_back(out_global_idx);
           }
         VARIANT_CASE_CONST(tx_out_zarcanum, out)
@@ -1040,7 +1040,7 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
 
           uint64_t decoded_amount = 0;
           crypto::scalar_t decoded_blinding_mask{};
-          if (is_out_to_acc(acc_keys, out, derivation, j, decoded_amount, decoded_blinding_mask))
+          if (is_out_to_acc(acc_keys.account_address, out, derivation, j, decoded_amount, decoded_blinding_mask))
           {
             outs_vec.back().amount = decoded_amount;
             outs_vec.back().blinding_mask = decoded_blinding_mask;

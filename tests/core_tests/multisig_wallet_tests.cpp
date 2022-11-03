@@ -1373,7 +1373,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address(),
-      blobdata(), CURRENCY_MINER_TX_MAX_OUTS, extra_alias_entry(), tx_key);
+      blobdata(), CURRENCY_MINER_TX_MAX_OUTS, tx_key);
 
     // The builder creates PoS miner tx with normal outputs.
     // Replace all miner_tx outputs with one multisig output and re-sign it.

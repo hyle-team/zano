@@ -146,10 +146,9 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   const account_public_address &reward_and_stake_receiver_address,
   const blobdata& extra_nonce,
   size_t max_outs,
-  const extra_alias_entry& alias,
   keypair tx_one_time_key)
 {
-  step4_generate_coinbase_tx(median_size, already_generated_coins, reward_and_stake_receiver_address, reward_and_stake_receiver_address, extra_nonce, max_outs, alias, tx_one_time_key);
+  step4_generate_coinbase_tx(median_size, already_generated_coins, reward_and_stake_receiver_address, reward_and_stake_receiver_address, extra_nonce, max_outs, tx_one_time_key);
 }
 
 
@@ -159,7 +158,6 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   const account_public_address &stakeholder_address,
   const blobdata& extra_nonce,
   size_t max_outs,
-  const extra_alias_entry& alias,
   keypair tx_one_time_key)
 {
   CHECK_AND_ASSERT_THROW_MES(m_step == 3, "pos_block_builder: incorrect step sequence");

@@ -252,12 +252,12 @@ bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
 
   // use biggest possible extra nonce (255 bytes) + largest alias
-  currency::blobdata extra_none(255, 'x');
-  currency::extra_alias_entry alias = AUTO_VAL_INIT(alias);
-  alias.m_alias = std::string(255, 'a');
-  alias.m_address = miner.get_keys().account_address;
-  alias.m_text_comment = std::string(255, 'y');
-  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_none, CURRENCY_MINER_TX_MAX_OUTS, alias);
+  currency::blobdata extra_nonce(255, 'x');
+  //currency::extra_alias_entry alias = AUTO_VAL_INIT(alias); // TODO: this alias entry was ignored for a long time, now I commented it out, make sure it's okay -- sowle 
+  //alias.m_alias = std::string(255, 'a');
+  //alias.m_address = miner.get_keys().account_address;
+  //alias.m_text_comment = std::string(255, 'y');
+  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_nonce, CURRENCY_MINER_TX_MAX_OUTS);
   pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner);
   block blk_1 = pb.m_block;
 
