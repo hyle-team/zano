@@ -216,7 +216,7 @@ namespace currency
       decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD,
         [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
         [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
-      CHECK_AND_ASSERT_MES(2 <= max_outs, false, "max_out must be greather than 1");
+      CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
       while (max_outs < out_amounts.size())
       {
         out_amounts[out_amounts.size() - 2] += out_amounts.back();
