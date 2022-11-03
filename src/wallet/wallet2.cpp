@@ -3666,13 +3666,20 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
     // old PoS with non-hidden amounts
     WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(currency::txin_gen), false, "Wrong input 0 type in transaction: " << b.miner_tx.vin[0].type().name());
     WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(currency::txin_to_key), false, "Wrong input 1 type in transaction: " << b.miner_tx.vin[1].type().name());
-    auto& txin = boost::get<currency::txin_to_key>(b.miner_tx.vin[1]);
-    txin.k_image = pe.keyimage;
+    WLT_CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 && b.miner_tx.signatures[0].type() == typeid(NLSAG_sig), false, "wrong sig prepared in a PoS block");
+    WLT_CHECK_AND_ASSERT_MES(stake_out_v.type() == typeid(tx_out_bare), false, "unexpected stake output type: " << stake_out_v.type().name() << ", expected: tx_out_bare");
+    const tx_out_bare& stake_out = boost::get<tx_out_bare>(stake_out_v);
+    WLT_CHECK_AND_ASSERT_MES(stake_out.target.type() == typeid(txout_to_key), false, "unexpected stake output target type: " << stake_out.target.type().name() << ", expected: txout_to_key");
+    
 
-    WLT_CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 &&
-      b.miner_tx.signatures[0].type() == typeid(NLSAG_sig) &&
-      boost::get<NLSAG_sig>(b.miner_tx.signatures[0]).s.size() == txin.key_offsets.size(),
-      false, "Wrong signatures amount in coinbase transacton");
+    NLSAG_sig& sig = boost::get<NLSAG_sig>(b.miner_tx.signatures[0]);
+    txin_to_key& stake_input = boost::get<txin_to_key>(b.miner_tx.vin[1]);
+    const txout_to_key& stake_out_target = boost::get<txout_to_key>(stake_out.target);
+    
+    stake_input.k_image = pe.keyimage;
+    stake_input.amount = pe.amount;
+    stake_input.key_offsets.push_back(pe.g_index);
+    sig.s.resize(1);
 
     //derive secret key
     crypto::key_derivation pos_coin_derivation = AUTO_VAL_INIT(pos_coin_derivation);
@@ -3693,21 +3700,19 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
 
     // get stake output pub key (stealth address) for ring signature generation
     std::vector<const crypto::public_key*> keys_ptrs;
-    TRY_ENTRY()
-      keys_ptrs.push_back(&boost::get<currency::txout_to_key>(boost::get<tx_out_bare>(stake_out_v).target).key);
-    CATCH_ENTRY_CUSTOM("wallet2::prepare_and_sign_pos_block", { LOG_PRINT_RED_L0("unable to get output's pub key because of the exception"); }, false);
+    keys_ptrs.push_back(&stake_out_target.key);
 
     crypto::generate_ring_signature(block_hash,
-      txin.k_image,
+      stake_input.k_image,
       keys_ptrs,
       derived_secret_ephemeral_key,
       0,
-      &boost::get<NLSAG_sig>(b.miner_tx.signatures[0]).s[0]);
+      &sig.s[0]);
 
-    WLT_LOG_L4("GENERATED RING SIGNATURE: block_id " << block_hash
-      << "txin.k_image" << txin.k_image
+    WLT_LOG_L4("GENERATED RING SIGNATURE for PoS block coinbase: block_id " << block_hash
+      << "txin.k_image" << stake_input.k_image
       << "key_ptr:" << *keys_ptrs[0]
-      << "signature:" << boost::get<NLSAG_sig>(b.miner_tx.signatures[0]).s);
+      << "signature:" << sig.s);
 
     return true;
   }

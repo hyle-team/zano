@@ -216,7 +216,7 @@ namespace currency
       decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD,
         [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
         [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
-      CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
+      CHECK_AND_ASSERT_MES(2 <= max_outs, false, "max_out must be greather than 1");
       while (max_outs < out_amounts.size())
       {
         out_amounts[out_amounts.size() - 2] += out_amounts.back();
@@ -271,26 +271,16 @@ namespace currency
     {
       if (tx.version > TRANSACTION_VERSION_PRE_HF4 /* && stake is zarcanum */)
       {
-        // TODO: add Zarcanum part
-        //txin_zc_input stake_input = AUTO_VAL_INIT(stake_input);
-        //stake_input.key_offsets.push_back(pe.g_index);
-        //stake_input.k_image = pe.keyimage;
+        // just placeholders, they will be filled in wallet2::prepare_and_sign_pos_block()
         tx.vin.emplace_back(std::move(txin_zc_input()));
-        //reserve place for ring signature
         tx.signatures.emplace_back(std::move(zarcanum_sig()));
       }
       else
       {
         // old fashioned non-hidden amount direct spend PoS scheme
-        txin_to_key stake_input;
-        stake_input.amount = pe.amount;
-        stake_input.key_offsets.push_back(pe.g_index);
-        stake_input.k_image = pe.keyimage;
-        tx.vin.push_back(stake_input);
-        //reserve place for ring signature
-        NLSAG_sig nlsag;
-        nlsag.s.resize(stake_input.key_offsets.size());
-        tx.signatures.push_back(nlsag); // consider using emplace_back and avoid copying
+        // just placeholders, they will be filled in wallet2::prepare_and_sign_pos_block()
+        tx.vin.emplace_back(std::move(txin_to_key()));
+        tx.signatures.emplace_back(std::move(NLSAG_sig()));
       }
     }
 
