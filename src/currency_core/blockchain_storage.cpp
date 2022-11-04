@@ -5755,11 +5755,18 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   //check if PoS allowed in this height
   CHECK_AND_ASSERT_MES_CUSTOM(!(is_pos_bl && m_db_blocks.size() < m_core_runtime_config.pos_minimum_heigh), false, bvc.m_verification_failed = true, "PoS block not allowed on height " << m_db_blocks.size());
 
+  if (!prevalidate_miner_transaction(bl, m_db_blocks.size(), is_pos_bl))
+  {
+    LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx prevalidation");
+    bvc.m_verification_failed = true;
+    return false;
+  }
+
   //check proof of work
   TIME_MEASURE_START_PD(target_calculating_time_2);
   wide_difficulty_type current_diffic = get_next_diff_conditional(is_pos_bl);
   CHECK_AND_ASSERT_MES_CUSTOM(current_diffic, false, bvc.m_verification_failed = true, "!!!!!!!!! difficulty overhead !!!!!!!!!");
- TIME_MEASURE_FINISH_PD(target_calculating_time_2);
+  TIME_MEASURE_FINISH_PD(target_calculating_time_2);
 
  TIME_MEASURE_START_PD(longhash_calculating_time_3);
   if (is_pos_bl)
@@ -5783,16 +5790,10 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       return false;
     }
   }
- TIME_MEASURE_FINISH_PD(longhash_calculating_time_3);
+  TIME_MEASURE_FINISH_PD(longhash_calculating_time_3);
 
   size_t aliases_count_befor_block = m_db_aliases.size();
 
-  if (!prevalidate_miner_transaction(bl, m_db_blocks.size(), is_pos_bl))
-  {
-    LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx prevalidation");
-    bvc.m_verification_failed = true;
-    return false;
-  }
   size_t cumulative_block_size = 0;
   size_t coinbase_blob_size = get_object_blobsize(bl.miner_tx);
 
