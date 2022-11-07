@@ -331,6 +331,79 @@ bool zarcanum_gen_time_balance::generate(std::vector<test_event_entry>& events) 
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+zarcanum_pos_block_math::zarcanum_pos_block_math()
+{
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 0);
+}
+
+bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+
+  GENERATE_ACCOUNT(miner_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  //generator.get_tx_out_gindex
+
+  // try to make a PoS block with locked stake after the hardfork
+
+  block blk_1_pos;
+  {
+    const block& prev_block = blk_1r;
+    const transaction& stake_tx = blk_1.miner_tx;
+    const account_base& stake_acc = miner_acc;
+    size_t stake_out_in_tx_index = 0;
+    size_t stake_output_gindex = 0;
+
+    crypto::hash prev_id = get_block_hash(prev_block);
+    size_t height = get_block_height(prev_block) + 1;
+    currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
+    crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake_tx);
+
+    pos_block_builder pb;
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
+    pb.step2_set_txs(std::vector<transaction>());
+    
+    pb.step3a(diff, prev_id, null_hash);
+
+    crypto::key_derivation  derivation              {};
+    crypto::scalar_t        stake_out_blinding_mask {};
+    uint64_t                stake_output_amount     = 0;
+    crypto::public_key      stealth_address         {};
+    crypto::secret_key      secret_x                {};
+    crypto::key_image       stake_output_key_image  {};
+
+    r = generate_key_derivation(stake_tx_pub_key, stake_acc.get_keys().view_secret_key, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
+    r = is_out_to_acc(stake_acc.get_public_address(), boost::get<currency::tx_out_zarcanum>(stake_tx.vout[stake_out_in_tx_index]), derivation, stake_out_in_tx_index, stake_output_amount, stake_out_blinding_mask);
+    CHECK_AND_ASSERT_MES(r, false, "is_out_to_acc failed");
+    r = crypto::derive_public_key(derivation, stake_out_in_tx_index, stake_acc.get_public_address().spend_public_key, stealth_address);
+    CHECK_AND_ASSERT_MES(r, false, "derive_public_key failed");
+    crypto::derive_secret_key(derivation, stake_out_in_tx_index, stake_acc.get_keys().spend_secret_key, secret_x);
+    crypto::generate_key_image(stealth_address, secret_x, stake_output_key_image);
+
+
+    pb.step3b(stake_output_amount, stake_output_key_image, stake_tx_pub_key, stake_out_in_tx_index, stake_out_blinding_mask, stake_acc.get_keys().view_secret_key,
+      stake_output_gindex, prev_block.timestamp, POS_SCAN_WINDOW, POS_SCAN_STEP);
+
+    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), stake_acc.get_public_address());
+    
+    pb.step5_sign(stake_tx_pub_key, stake_out_in_tx_index, stake_tx_pub_key, stake_acc);
+
+    blk_1_pos = pb.m_block;
+  }
+
+  ADD_CUSTOM_EVENT(events, blk_1_pos);
+
+  return true;
+}
+
 //------------------------------------------------------------------------------
 
 zarcanum_txs_with_big_decoy_set::zarcanum_txs_with_big_decoy_set()
