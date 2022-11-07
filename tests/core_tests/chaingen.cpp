@@ -933,28 +933,25 @@ struct output_index
 {
   const currency::tx_out_v out_v;
   uint64_t amount;
-  size_t blk_height; // block height
-  size_t tx_no; // index of transaction in block
-  size_t out_no; // index of out in transaction
-  size_t idx;
-  bool spent;
-  bool zc_out;
+  size_t tx_no;       // index of transaction in block
+  size_t out_no;      // index of out in transaction
+  size_t idx;         // global index
+  bool spent;         // was it spent?
+  bool zc_out;        // is it a ZC output?
   const currency::block *p_blk;
   const currency::transaction *p_tx;
-  crypto::scalar_t blinding_mask; // zc outs
+  crypto::scalar_t blinding_mask; // zc outs only
 
-  output_index(const currency::tx_out_v &_out_v, uint64_t _a, size_t _h, size_t tno, size_t ono, const currency::block *_pb, const currency::transaction *_pt)
-    : out_v(_out_v), amount(_a), blk_height(_h), tx_no(tno), out_no(ono), idx(0), spent(false), zc_out(false), p_blk(_pb), p_tx(_pt), blinding_mask(0)
+  output_index(const currency::tx_out_v &_out_v, uint64_t _a, size_t tno, size_t ono, const currency::block *_pb, const currency::transaction *_pt)
+    : out_v(_out_v), amount(_a), tx_no(tno), out_no(ono), idx(0), spent(false), zc_out(false), p_blk(_pb), p_tx(_pt), blinding_mask(0)
   {}
 
   output_index(const output_index &other) = default;
-  //  : out(other.out), amount(other.amount), blk_height(other.blk_height), tx_no(other.tx_no), out_no(other.out_no), idx(other.idx), spent(other.spent), p_blk(other.p_blk), p_tx(other.p_tx)
-  //{}
 
   const std::string to_string() const
   {
     std::stringstream ss;
-    ss << "output_index{blk_height=" << blk_height
+    ss << "output_index{"
       << " tx_no=" << tx_no
       << " out_no=" << out_no
       << " amount=" << amount
@@ -965,11 +962,11 @@ struct output_index
     return ss.str();
   }
 
-  output_index& operator=(const output_index& other)
-  {
+  output_index& operator=(const output_index& other) = default;
+  /*{
     new(this) output_index(other);
     return *this;
-  }
+  }*/
 };
 
 typedef std::map<uint64_t, std::vector<size_t> > map_output_t;           // amount -> [N -> global out index]
@@ -1003,7 +1000,7 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
     for (const crypto::hash &h : blk.tx_hashes)
     {
       const map_hash2tx_t::const_iterator cit = mtx.find(h);
-      CHECK_AND_ASSERT_MES(cit != mtx.end(), false, "block at height " << get_block_height(blk) << " contains a reference to unknown tx " << h);
+      CHECK_AND_ASSERT_MES(cit != mtx.end(), false, "block at height " << height << " contains a reference to unknown tx " << h);
       vtx.push_back(cit->second);
     }
 
@@ -1022,7 +1019,7 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
           {
             std::vector<output_index>& outs_vec = outs[out.amount];
             size_t out_global_idx = outs_vec.size();
-            output_index oi(out, out.amount, height, i, j, &blk, vtx[i]);
+            output_index oi(out, out.amount, i, j, &blk, vtx[i]);
             oi.idx = out_global_idx;
             outs_vec.emplace_back(std::move(oi));
             // Is out to me?
@@ -1033,7 +1030,7 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
           std::vector<output_index>& outs_vec = outs[0]; // amount = 0 for ZC outs
           size_t out_global_idx = outs_vec.size();
 
-          output_index oi(out, 0 /* amount */, height, i, j, &blk, vtx[i]);
+          output_index oi(out, 0 /* amount */, i, j, &blk, vtx[i]);
           oi.zc_out = true;
           oi.idx = out_global_idx;
           outs_vec.emplace_back(std::move(oi));
@@ -1101,8 +1098,8 @@ bool init_spent_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, 
   return true;
 }
 
-bool fill_output_entries(const std::vector<output_index>& out_indices, size_t sender_out, size_t nmix, bool use_ref_by_id,
-                         uint64_t& real_entry_idx, std::vector<tx_source_entry::output_entry>& output_entries)
+bool fill_output_entries(const std::vector<output_index>& out_indices, size_t real_out_index, size_t nmix, bool check_for_unlocktime, bool use_ref_by_id,
+                         uint64_t next_block_height, uint64_t head_block_ts, uint64_t& real_entry_idx, std::vector<tx_source_entry::output_entry>& output_entries)
 {
   // use_ref_by_id = true; // <-- HINT: this could be used to enforce using ref_by_id across all the tests if needed
 
@@ -1118,7 +1115,7 @@ bool fill_output_entries(const std::vector<output_index>& out_indices, size_t se
       continue;
 
     bool append = false;
-    if (i == sender_out)
+    if (i == real_out_index)
     {
       append = true;
       sender_out_found = true;
@@ -1131,6 +1128,24 @@ bool fill_output_entries(const std::vector<output_index>& out_indices, size_t se
       {
         if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX || mix_attr > nmix + 1)
           continue;
+
+        if (check_for_unlocktime)
+        {
+          uint64_t unlock_time = get_tx_max_unlock_time(*oi.p_tx);
+          if (unlock_time < CURRENCY_MAX_BLOCK_NUMBER)
+          {
+            //interpret as block index
+            if (unlock_time > next_block_height)
+              continue;
+          }
+          else
+          { 
+            //interpret as time
+            if (unlock_time > head_block_ts + DIFFICULTY_TOTAL_TARGET)
+              continue;
+          }
+        }
+
       }
 
       --rest;
@@ -1237,6 +1252,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
   }
 
   uint64_t head_block_ts = get_actual_timestamp(blk_head);
+  uint64_t next_block_height = blockchain.size();
 
   // Iterate in reverse is more efficiency
   uint64_t sources_amount = 0;
@@ -1255,7 +1271,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
         if (unlock_time < CURRENCY_MAX_BLOCK_NUMBER)
         {
           //interpret as block index
-          if (unlock_time > blockchain.size())
+          if (unlock_time > next_block_height)
             continue;
         }
         else
@@ -1272,7 +1288,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       ts.real_out_amount_blinding_mask = oi.blinding_mask;
       ts.real_output_in_tx_index = oi.out_no;
       ts.real_out_tx_key = get_tx_pub_key_from_extra(*oi.p_tx); // source tx public key
-      if (!fill_output_entries(outs[o.first], sender_out, nmix, use_ref_by_id, ts.real_output, ts.outputs))
+      if (!fill_output_entries(outs[o.first], sender_out, nmix, check_for_unlocktime, use_ref_by_id, next_block_height, head_block_ts, ts.real_output, ts.outputs))
         continue;
 
       sources.push_back(ts);
@@ -1308,9 +1324,9 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
 
   uint64_t source_amount_found = 0;
   bool r = fill_tx_sources(sources, events, blk_head, from, amount + fee, nmix, std::vector<currency::tx_source_entry>(), check_for_spends, check_for_unlocktime, use_ref_by_id, &source_amount_found);
-  CHECK_AND_ASSERT_MES(r, false, "couldn't fill transaction sources: " << ENDL <<
+  CHECK_AND_ASSERT_MES(r, false, "couldn't fill transaction sources (nmix = " << nmix << "): " << ENDL <<
     "  required:      " << print_money(amount + fee) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * (amount + fee) / TESTS_DEFAULT_FEE) << " x TESTS_DEFAULT_FEE" << ENDL <<
-    "  unspent coins: " << print_money(source_amount_found) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * source_amount_found / TESTS_DEFAULT_FEE) << " x TESTS_DEFAULT_FEE" << ENDL <<
+    "  found coins:   " << print_money(source_amount_found) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * source_amount_found / TESTS_DEFAULT_FEE) << " x TESTS_DEFAULT_FEE" << ENDL <<
     "  lack of coins: " << print_money(amount + fee - source_amount_found) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * (amount + fee - source_amount_found) / TESTS_DEFAULT_FEE) << " x TESTS_DEFAULT_FEE" 
   );
 
