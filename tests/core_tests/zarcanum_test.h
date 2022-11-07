@@ -26,3 +26,10 @@ struct zarcanum_gen_time_balance : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
+struct zarcanum_txs_with_big_decoy_set : public wallet_test
+{
+  zarcanum_txs_with_big_decoy_set();
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+

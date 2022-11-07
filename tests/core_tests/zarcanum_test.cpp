@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -9,6 +9,7 @@
 
 #include "random_helper.h"
 #include "tx_builder.h"
+#include "pos_block_builder.h"
 
 
 #define  AMOUNT_TO_TRANSFER_ZARCANUM_BASIC (TESTS_DEFAULT_FEE*10)
@@ -248,7 +249,7 @@ bool zarcanum_gen_time_balance::generate(std::vector<test_event_entry>& events) 
   account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
 
 
-  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
@@ -313,7 +314,8 @@ bool zarcanum_gen_time_balance::generate(std::vector<test_event_entry>& events) 
   tgs.split_strategy = tests_random_split_strategy;
   test_generator::set_test_gentime_settings(tgs);
 
-  MAKE_TX(events, tx_2, bob_acc, alice_acc, bob_amount - TESTS_DEFAULT_FEE, blk_2);
+  size_t nmix = 7;
+  MAKE_TX_FEE_MIX(events, tx_2, bob_acc, alice_acc, bob_amount - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, nmix, blk_2);
   CHECK_AND_ASSERT_MES(tx_2.vout.size() != 1, false, "tx_2.vout.size() = " << tx_2.vout.size());
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_2);
 
@@ -329,3 +331,90 @@ bool zarcanum_gen_time_balance::generate(std::vector<test_event_entry>& events) 
 
   return true;
 }
+//------------------------------------------------------------------------------
+
+zarcanum_txs_with_big_decoy_set::zarcanum_txs_with_big_decoy_set()
+{
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 100);
+}
+
+bool zarcanum_txs_with_big_decoy_set::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure post HF4 transactions with ZC inputs and outputs are handled properly by chaingen gen-time routines
+  // (including balance check)
+
+  bool r = false;
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  uint64_t alice_amount = CURRENCY_BLOCK_REWARD;
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, alice_amount, blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // do a gen-time balance check
+  CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_1r, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, alice_amount);
+
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, alice_amount, alice_amount, 0, 0, 0));
+
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+
+  // tx_1: Alice -> miner, all coins back
+  size_t nmix = 10; // use big decoy set
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_1r, alice_acc, miner_acc, alice_amount - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, nmix, sources, destinations), false, "");
+
+  // randomly move the real output for each source entry
+  for(auto& src : sources)
+  {
+    if (src.outputs.size() > 1)
+    {
+      uint64_t rnd_from_1_to_max = 1 + crypto::rand<uint64_t>() % (src.outputs.size() - 1);
+      uint64_t new_real_output = (src.real_output + rnd_from_1_to_max) % src.outputs.size(); // to avoid new_real_output == src.real_output
+      tx_source_entry::output_entry tmp = src.outputs[new_real_output];
+      src.outputs[new_real_output] = src.outputs[src.real_output];
+      src.outputs[src.real_output] = tmp;
+      src.real_output = new_real_output;
+    }
+  }
+
+  transaction tx_1{};
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0 /* unlock time */);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  ADD_CUSTOM_EVENT(events, tx_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);
+
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, 0, 0, 0, 0, 0));
+
+
+
+  /*
+  //
+  // tx_0: alice_amount from miner to Alice
+  uint64_t alice_amount = MK_TEST_COINS(99);
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, alice_amount, TESTS_DEFAULT_FEE, 0, sources, destinations), false, "");
+
+  std::vector<extra_v> extra;
+  transaction tx_0 = AUTO_VAL_INIT(tx_0);
+  crypto::secret_key tx_sec_key;
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, get_tx_version_from_events(events), tx_sec_key, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  ADD_CUSTOM_EVENT(events, tx_0);
+
+  */
+
+  return true;
+}
+
