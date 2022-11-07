@@ -37,7 +37,7 @@ struct tx_builder
       for(const currency::tx_source_entry::output_entry& out_entry : src_entr.outputs)
         input_to_key.key_offsets.push_back(out_entry.out_reference);
 
-      input_to_key.key_offsets = currency::absolute_output_offsets_to_relative(input_to_key.key_offsets);
+      input_to_key.key_offsets = currency::absolute_output_offsets_to_relative(input_to_key.key_offsets); // TODO @#@#
       m_tx.vin.push_back(input_to_key);
     }
   }

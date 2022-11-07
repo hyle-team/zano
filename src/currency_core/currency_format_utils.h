@@ -60,6 +60,7 @@ namespace currency
   bool operator ==(const currency::void_sig& a, const currency::void_sig& b);
   bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b);
   bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
+  bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b);
 
   typedef boost::multiprecision::uint128_t uint128_tl;
 
@@ -365,7 +366,11 @@ namespace currency
   uint64_t get_block_height(const transaction& coinbase);
   uint64_t get_block_height(const block& b);
   std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);
+  // DEPRECATED: consider using prepare_outputs_entries_for_key_offsets and absolute_sorted_output_offsets_to_relative_in_place instead
   std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off);
+  bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept;
+
+
 
   // prints amount in format "3.14", "0.0"
   std::string print_money_brief(uint64_t amount);

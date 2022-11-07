@@ -1596,8 +1596,9 @@ namespace currency
   // prepare inputs
   struct input_generation_context_data
   {
-    keypair in_ephemeral;
-    //std::vector<keypair> participants_derived_keys;
+    keypair in_ephemeral    {};                           // ephemeral output key (stealth_address and secret_x)
+    size_t real_out_index   = SIZE_MAX;                   // index of real output in local outputs vector
+    std::vector<tx_source_entry::output_entry> outputs{}; // sorted by gindex
   };
   //--------------------------------------------------------------------------------
   bool generate_ZC_sig(const crypto::hash& tx_hash_for_signature, size_t input_index, const tx_source_entry& se, const input_generation_context_data& in_context,
@@ -1618,7 +1619,7 @@ namespace currency
 #ifndef NDEBUG
     {
       crypto::point_t source_amount_commitment = crypto::c_scalar_1div8 * se.amount * crypto::c_point_H + crypto::c_scalar_1div8 * se.real_out_amount_blinding_mask * crypto::c_point_G;
-      CHECK_AND_ASSERT_MES(se.outputs[se.real_output].amount_commitment == source_amount_commitment.to_public_key(), false, "real output amount commitment check failed");
+      CHECK_AND_ASSERT_MES(in_context.outputs[in_context.real_out_index].amount_commitment == source_amount_commitment.to_public_key(), false, "real output amount commitment check failed");
     }
 #endif
 
@@ -1653,10 +1654,10 @@ namespace currency
     //     se.real_out_amount_blinding_mask - blinding_mask;
 
     std::vector<crypto::CLSAG_GG_input_ref_t> ring;
-    for(size_t j = 0; j < se.outputs.size(); ++j)
-      ring.emplace_back(se.outputs[j].stealth_address, se.outputs[j].amount_commitment);
+    for(size_t j = 0; j < in_context.outputs.size(); ++j)
+      ring.emplace_back(in_context.outputs[j].stealth_address, in_context.outputs[j].amount_commitment);
 
-    return crypto::generate_CLSAG_GG(tx_hash_for_signature, ring, pseudo_out_amount_commitment, in.k_image, in_context.in_ephemeral.sec, se.real_out_amount_blinding_mask - blinding_mask, se.real_output, sig.clsags_gg);
+    return crypto::generate_CLSAG_GG(tx_hash_for_signature, ring, pseudo_out_amount_commitment, in.k_image, in_context.in_ephemeral.sec, se.real_out_amount_blinding_mask - blinding_mask, in_context.real_out_index, sig.clsags_gg);
   }
   //--------------------------------------------------------------------------------
   bool generate_NLSAG_sig(const crypto::hash& tx_hash_for_signature, const crypto::hash& tx_prefix_hash, size_t input_index, const tx_source_entry& src_entr,
@@ -1681,22 +1682,22 @@ namespace currency
         *pss_ring_s << "input #" << input_index << ", pub_keys:" << ENDL;
 
       std::vector<const crypto::public_key*> keys_ptrs;
-      for(const tx_source_entry::output_entry& o : src_entr.outputs)
+      for(const tx_source_entry::output_entry& o : in_context.outputs)
       {
         keys_ptrs.push_back(&o.stealth_address);
         if (pss_ring_s)
           *pss_ring_s << o.stealth_address << ENDL;
       }
-      sigs.resize(src_entr.outputs.size());
+      sigs.resize(in_context.outputs.size());
 
       if (!watch_only_mode)
-        crypto::generate_ring_signature(tx_hash_for_signature, get_key_image_from_txin_v(tx.vin[input_index]), keys_ptrs, in_context.in_ephemeral.sec, src_entr.real_output, sigs.data());
+        crypto::generate_ring_signature(tx_hash_for_signature, get_key_image_from_txin_v(tx.vin[input_index]), keys_ptrs, in_context.in_ephemeral.sec, in_context.real_out_index, sigs.data());
 
       if (pss_ring_s)
       {
         *pss_ring_s << "signatures:" << ENDL;
         std::for_each(sigs.begin(), sigs.end(), [&pss_ring_s](const crypto::signature& s) { *pss_ring_s << s << ENDL; });
-        *pss_ring_s << "prefix_hash: " << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_context.in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output << ENDL;
+        *pss_ring_s << "prefix_hash: " << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_context.in_ephemeral.sec << ENDL << "real_output: " << in_context.real_out_index << ENDL;
       }
     }
 
@@ -1834,7 +1835,11 @@ namespace currency
     {
       inputs_mapping[current_index] = current_index;
       current_index++;
-      in_contexts.push_back(input_generation_context_data());
+      in_contexts.push_back(input_generation_context_data{});
+      input_generation_context_data& in_context = in_contexts.back();
+
+      in_context.outputs = prepare_outputs_entries_for_key_offsets(src_entr.outputs, src_entr.real_output, in_context.real_out_index);
+
       if(src_entr.is_multisig())
       {//multisig input
         txin_multisig input_multisig = AUTO_VAL_INIT(input_multisig);
@@ -1846,7 +1851,7 @@ namespace currency
       else if (src_entr.htlc_origin.size())
       {
         //htlc redeem
-        keypair& in_ephemeral = in_contexts.back().in_ephemeral;
+        keypair& in_ephemeral = in_context.in_ephemeral;
         //txin_to_key
         if(src_entr.outputs.size() != 1)
         {
@@ -1861,11 +1866,11 @@ namespace currency
           return false;
 
         //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].stealth_address))
+        if (!(in_ephemeral.pub == src_entr.outputs.front().stealth_address))
         {
           LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
             << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].stealth_address));
+            << string_tools::pod_to_hex(src_entr.outputs.front().stealth_address));
           return false;
         }
 
@@ -1874,47 +1879,37 @@ namespace currency
         input_to_key.amount = src_entr.amount;
         input_to_key.k_image = img;
         input_to_key.hltc_origin = src_entr.htlc_origin;
+        input_to_key.key_offsets.push_back(src_entr.outputs.front().out_reference);
 
-        //fill outputs array and use relative offsets
-        for(const tx_source_entry::output_entry& out_entry : src_entr.outputs)
-          input_to_key.key_offsets.push_back(out_entry.out_reference);
-
-        input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
         tx.vin.push_back(input_to_key);
       }
       else
       {
-        //regular to key out
-        keypair& in_ephemeral = in_contexts.back().in_ephemeral;
-        //txin_to_key
-        if (src_entr.real_output >= src_entr.outputs.size())
-        {
-          LOG_ERROR("real_output index (" << src_entr.real_output << ") greater than or equal to output_keys.size()=" << src_entr.outputs.size());
-          return false;
-        }
+        // txin_to_key or txin_zc_input
+        CHECK_AND_ASSERT_MES(in_context.real_out_index < in_context.outputs.size(), false,
+          "real_output index (" << in_context.real_out_index << ") greater than or equal to in_context.outputs.size()=" << in_context.outputs.size());
+
         summary_inputs_money += src_entr.amount;
 
         //key_derivation recv_derivation;
         crypto::key_image img;
-        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
+        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_context.in_ephemeral, img))
           return false;
 
         //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].stealth_address))
+        if (!(in_context.in_ephemeral.pub == in_context.outputs[in_context.real_out_index].stealth_address))
         {
           LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-            << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].stealth_address));
+            << string_tools::pod_to_hex(in_context.in_ephemeral.pub) << ENDL << "real output_public_key:"
+            << string_tools::pod_to_hex(in_context.outputs[in_context.real_out_index].stealth_address));
           return false;
         }
 
         //fill key_offsets array with relative offsets
         std::vector<txout_ref_v> key_offsets;
-        for(const tx_source_entry::output_entry& out_entry : src_entr.outputs)
+        for(const tx_source_entry::output_entry& out_entry : in_context.outputs)
           key_offsets.push_back(out_entry.out_reference);
 
-        key_offsets = absolute_output_offsets_to_relative(key_offsets);
-        
         //TODO: Might need some refactoring since this scheme is not the clearest one(did it this way for now to keep less changes to not broke anything)
         //potentially this approach might help to support htlc and multisig without making to complicated code
         if (src_entr.is_zarcanum())
@@ -1938,15 +1933,10 @@ namespace currency
           input_to_key.k_image = img;
           input_to_key.key_offsets = std::move(key_offsets);
           tx.vin.push_back(input_to_key);
-          //NLSAG_sources.push_back(&src_entr);
         }        
       }
     }
 
-    /*if (ins_zc.elements.size())
-    {
-      tx.vin.push_back(ins_zc);
-    }*/
     uint64_t amount_of_assets = 0;
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
     if (asset_id_for_destinations != currency::null_hash)
@@ -3041,6 +3031,7 @@ namespace currency
     return res;
   }
   //---------------------------------------------------------------
+  // DEPRECATED: consider using prepare_outputs_entries_for_key_offsets and absolute_sorted_output_offsets_to_relative_in_place instead
   std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off)
   {
     std::vector<txout_ref_v> res = off;
@@ -3082,6 +3073,34 @@ namespace currency
 
 
     return res;
+  }
+  //---------------------------------------------------------------
+  bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept
+  {
+    if (offsets.size() < 2)
+      return true;
+
+    size_t i = offsets.size() - 1;
+    while (i != 0 && offsets[i].type() == typeid(ref_by_id))
+      --i;
+
+    try
+    {
+      for (; i != 0; i--)
+      {
+        uint64_t& offset_i   = boost::get<uint64_t>(offsets[i]);
+        uint64_t& offset_im1 = boost::get<uint64_t>(offsets[i - 1]);
+        if (offset_i <= offset_im1)
+          return false; // input was not properly sorted
+        offset_i -= offset_im1;
+      }
+    }
+    catch(...)
+    {
+      return false; // unexpected type in boost::get (all ref_by_id's must be at the end of 'offsets')
+    }
+
+    return true;
   }
   //---------------------------------------------------------------
   bool parse_and_validate_block_from_blob(const blobdata& b_blob, block& b)
@@ -3954,6 +3973,11 @@ namespace currency
   {
     //@#@ TODO
     return false;
+  }
+  //--------------------------------------------------------------------------------
+  bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b)
+  {
+    return a.n == b.n && a.tx_id == b.tx_id;
   }
   //--------------------------------------------------------------------------------
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs)

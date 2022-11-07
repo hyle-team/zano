@@ -30,6 +30,8 @@ namespace currency
       crypto::public_key  concealing_point;   // only for zarcaum outputs
       crypto::public_key  amount_commitment;  // only for zarcaum outputs
 
+      bool operator==(const output_entry& rhs) const { return out_reference == rhs.out_reference; } // used in prepare_outputs_entries_for_key_offsets, it's okay to do partially comparison
+
       BEGIN_SERIALIZE_OBJECT()
         FIELD(out_reference)
         FIELD(stealth_address)
@@ -161,5 +163,5 @@ namespace currency
   bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil);
   bool validate_inputs_sorting(const transaction& tx);
 
-
+  std::vector<tx_source_entry::output_entry> prepare_outputs_entries_for_key_offsets(const std::vector<tx_source_entry::output_entry>& outputs, size_t old_real_index, size_t& new_real_index) noexcept;
 }

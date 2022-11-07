@@ -3769,7 +3769,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
     }
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys.size() == required_decoys_count + 1, "for PoS stake got less good decoys than required: " << decoys.size() << " < " << required_decoys_count);
 
-    decoys.sort([](auto& l, auto& r){ return l.global_amount_index < r.global_amount_index; }); // sort them now (absolute_output_offsets_to_relative)
+    decoys.sort([](auto& l, auto& r){ return l.global_amount_index < r.global_amount_index; }); // sort them now (note absolute_sorted_output_offsets_to_relative_in_place() below)
 
     uint64_t i = 0;
     for(auto& el : decoys)
@@ -3781,7 +3781,8 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
       ring.emplace_back(el.stealth_address, el.amount_commitment, el.concealing_point);
       stake_input.key_offsets.push_back(el.global_amount_index);
     }
-    stake_input.key_offsets = absolute_output_offsets_to_relative(stake_input.key_offsets);
+    r = absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "absolute_sorted_output_offsets_to_relative_in_place failed");
   }
   else
   {

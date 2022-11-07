@@ -323,4 +323,65 @@ namespace currency
     }
     return true;
   }
+  //---------------------------------------------------------------
+  // Prepapres vector of output_entry to be used in key_offsets in a transaction input:
+  // 1) sort all entries by gindex (while moving all ref_by_id to the end, keeping they relative order)
+  // 2) convert absolute global indices to relative key_offsets 
+  std::vector<tx_source_entry::output_entry> prepare_outputs_entries_for_key_offsets(const std::vector<tx_source_entry::output_entry>& outputs, size_t old_real_index, size_t& new_real_index) noexcept
+  {
+    TRY_ENTRY()
+
+    std::vector<tx_source_entry::output_entry> result = outputs;
+    if (outputs.size() < 2)
+    {
+      new_real_index = old_real_index;
+      return result;
+    }
+
+    std::sort(result.begin(), result.end(), [](const tx_source_entry::output_entry& lhs, const tx_source_entry::output_entry& rhs)
+    {
+      if (lhs.out_reference.type() == typeid(uint64_t))
+      {
+        if (rhs.out_reference.type() == typeid(uint64_t))
+          return boost::get<uint64_t>(lhs.out_reference) < boost::get<uint64_t>(rhs.out_reference);
+        if (rhs.out_reference.type() == typeid(ref_by_id))
+          return true;
+        CHECK_AND_ASSERT_THROW_MES(false, "unexpected type in out_reference 1: " << rhs.out_reference.type().name());
+      }
+      else if (lhs.out_reference.type() == typeid(ref_by_id))
+      {
+        if (rhs.out_reference.type() == typeid(uint64_t))
+          return false;
+        if (rhs.out_reference.type() == typeid(ref_by_id))
+          return false; // don't change the order of ref_by_id elements
+        CHECK_AND_ASSERT_THROW_MES(false, "unexpected type in out_reference 2: " << rhs.out_reference.type().name());
+      }
+      return false;
+    });
+
+    // restore index of the selected element, if needed
+    if (old_real_index != SIZE_MAX)
+    {
+      CHECK_AND_ASSERT_THROW_MES(old_real_index < outputs.size(), "old_real_index is OOB");
+      auto it = std::find(result.begin(), result.end(), outputs[old_real_index]);
+      CHECK_AND_ASSERT_THROW_MES(it != result.end(), "internal error: cannot find old_real_index");
+      new_real_index = it - result.begin();
+    }
+
+    // find the last uint64_t entry - skip ref_by_id entries goint from the end to the beginnning
+    size_t i = result.size() - 1;
+    while (i != 0 && result[i].out_reference.type() == typeid(ref_by_id))
+      --i;
+
+    for (; i != 0; i--)
+    {
+      boost::get<uint64_t>(result[i].out_reference) -= boost::get<uint64_t>(result[i - 1].out_reference);
+    }
+
+    return result;
+
+    CATCH_ENTRY2(std::vector<tx_source_entry::output_entry>{});
+  }
+  //---------------------------------------------------------------
+
 }

@@ -803,7 +803,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
     BOOST_FOREACH(const currency::tx_source_entry::output_entry& out_entry, src_entr.outputs)
       input_to_key.key_offsets.push_back(out_entry.out_reference);
 
-    input_to_key.key_offsets = currency::absolute_output_offsets_to_relative(input_to_key.key_offsets);
+    input_to_key.key_offsets = currency::absolute_output_offsets_to_relative(input_to_key.key_offsets); // TODO @#@#
     tx.vin.push_back(input_to_key);
   }
 
