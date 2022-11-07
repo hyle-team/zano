@@ -3661,6 +3661,14 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   const crypto::public_key source_tx_pub_key = get_tx_pub_key_from_extra(source_tx);
   WLT_CHECK_AND_ASSERT_MES(pe.tx_out_index < source_tx.vout.size(), false, "invalid pe.tx_out_index: " << pe.tx_out_index);
   const currency::tx_out_v& stake_out_v = source_tx.vout[pe.tx_out_index];
+
+  // calculate stake_out_derivation and secret_x (derived ephemeral secret key)
+  crypto::key_derivation stake_out_derivation = AUTO_VAL_INIT(stake_out_derivation);
+  r = crypto::generate_key_derivation(source_tx_pub_key, m_account.get_keys().view_secret_key, stake_out_derivation);               // d = 8 * v * R
+  WLT_CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed, tid: " << pe.wallet_index << ", pe.tx_id: " << pe.tx_id);
+  crypto::secret_key secret_x = AUTO_VAL_INIT(secret_x);
+  crypto::derive_secret_key(stake_out_derivation, pe.tx_out_index, m_account.get_keys().spend_secret_key, secret_x);                // x = Hs(8 * v * R, i) + s
+
   if (!cxt.zarcanum)
   {
     // old PoS with non-hidden amounts
@@ -3671,29 +3679,14 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
     const tx_out_bare& stake_out = boost::get<tx_out_bare>(stake_out_v);
     WLT_CHECK_AND_ASSERT_MES(stake_out.target.type() == typeid(txout_to_key), false, "unexpected stake output target type: " << stake_out.target.type().name() << ", expected: txout_to_key");
     
-
     NLSAG_sig& sig = boost::get<NLSAG_sig>(b.miner_tx.signatures[0]);
     txin_to_key& stake_input = boost::get<txin_to_key>(b.miner_tx.vin[1]);
     const txout_to_key& stake_out_target = boost::get<txout_to_key>(stake_out.target);
     
+    // fill stake input
     stake_input.k_image = pe.keyimage;
     stake_input.amount = pe.amount;
     stake_input.key_offsets.push_back(pe.g_index);
-    sig.s.resize(1);
-
-    //derive secret key
-    crypto::key_derivation pos_coin_derivation = AUTO_VAL_INIT(pos_coin_derivation);
-    bool r = crypto::generate_key_derivation(source_tx_pub_key,
-      m_account.get_keys().view_secret_key,
-      pos_coin_derivation);
-
-    WLT_CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed, pe.tx_id: " << pe.tx_id);
-
-    crypto::secret_key derived_secret_ephemeral_key = AUTO_VAL_INIT(derived_secret_ephemeral_key);
-    crypto::derive_secret_key(pos_coin_derivation,
-      pe.tx_out_index,
-      m_account.get_keys().spend_secret_key,
-      derived_secret_ephemeral_key);
 
     // sign block actually in coinbase transaction
     crypto::hash block_hash = currency::get_block_hash(b);
@@ -3702,10 +3695,12 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
     std::vector<const crypto::public_key*> keys_ptrs;
     keys_ptrs.push_back(&stake_out_target.key);
 
+    // generate sring signature
+    sig.s.resize(1);
     crypto::generate_ring_signature(block_hash,
       stake_input.k_image,
       keys_ptrs,
-      derived_secret_ephemeral_key,
+      secret_x,
       0,
       &sig.s[0]);
 
@@ -3804,14 +3799,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   }
   #endif
 
-  // calculate secret_x
-  crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-  r = crypto::generate_key_derivation(source_tx_pub_key, m_account.get_keys().view_secret_key, derivation);
-  WLT_CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed, tid: " << pe.wallet_index << ", pe.tx_id: " << pe.tx_id);
-  crypto::secret_key secret_x = AUTO_VAL_INIT(secret_x);
-  crypto::derive_secret_key(derivation, pe.tx_out_index, m_account.get_keys().spend_secret_key, secret_x);
-
-  crypto::hash tx_hash_for_sig = get_transaction_hash(b.miner_tx); // TODO @#@# change to block hash
+  crypto::hash tx_hash_for_sig = get_transaction_hash(b.miner_tx); // TODO @#@# change to block hash after the corresponding test is made
 
   uint8_t err = 0;
   r = crypto::zarcanum_generate_proof(tx_hash_for_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,
