@@ -244,7 +244,8 @@ namespace currency
                                                              size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS, 
                                                              bool pos = false,
                                                              const pos_entry& pe = pos_entry(),
-                                                             crypto::scalar_t* blinding_masks_sum_ptr = nullptr);
+                                                             crypto::scalar_t* blinding_masks_sum_ptr = nullptr,
+                                                             const keypair* tx_one_time_key_to_use = nullptr);
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& out_blinding_mask, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);

@@ -186,8 +186,9 @@ namespace currency
     const blobdata& extra_nonce               /* = blobdata() */,
     size_t max_outs                           /* = CURRENCY_MINER_TX_MAX_OUTS */,
     bool pos                                  /* = false */,
-    const pos_entry& pe                       /* = pos_entry() */,
-    crypto::scalar_t* blinding_masks_sum_ptr  /* = nullptr */
+    const pos_entry& pe                       /* = pos_entry() */,  // only pe.stake_unlock_time and pe.stake_amount are used now, TODO: consider refactoring -- sowle
+    crypto::scalar_t* blinding_masks_sum_ptr  /* = nullptr */,
+    const keypair* tx_one_time_key_to_use     /* = nullptr */
   )
   {
     bool r = false;
@@ -250,7 +251,10 @@ namespace currency
     tx = AUTO_VAL_INIT_T(transaction);
     tx.version = tx_version;
 
-    keypair txkey = keypair::generate();
+    keypair txkey_local{};
+    if (!tx_one_time_key_to_use)
+      txkey_local = keypair::generate();
+    const keypair& txkey = tx_one_time_key_to_use ? *tx_one_time_key_to_use : txkey_local;
     add_tx_pub_key_to_extra(tx, txkey.pub);
     if (extra_nonce.size())
       if (!add_tx_extra_userdata(tx, extra_nonce))
