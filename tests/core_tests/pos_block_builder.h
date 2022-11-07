@@ -54,18 +54,22 @@ struct pos_block_builder
     const currency::account_public_address &stakeholder_address,
     const currency::blobdata& extra_nonce = currency::blobdata(),
     size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
-    currency::keypair tx_one_time_key = currency::keypair::generate());
+    const currency::keypair* tx_one_time_key_to_use = nullptr
+  );
 
   void step4_generate_coinbase_tx(size_t median_size,
     const boost::multiprecision::uint128_t& already_generated_coins,
     const currency::account_public_address &reward_and_stake_receiver_address,
     const currency::blobdata& extra_nonce = currency::blobdata(),
     size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
-    currency::keypair tx_one_time_key = currency::keypair::generate());
+    const currency::keypair* tx_one_time_key_to_use = nullptr
+  );
+
+  void step5_sign(const currency::tx_source_entry& se, const currency::account_keys& stakeholder_keys);
 
   void step5_sign(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const crypto::public_key& stake_tx_out_pub_key, const currency::account_base& stakeholder_account);
 
-  void step5_sign_zarcanum(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const currency::account_base& stakeholder_account);
+  //void step5_sign_zarcanum(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const currency::account_base& stakeholder_account);
 
 
   currency::block         m_block                         {};
@@ -76,11 +80,12 @@ struct pos_block_builder
   size_t                  m_height                        = 0;
   size_t                  m_pos_stake_output_gindex       = 0;
   //uint64_t                m_pos_stake_amount              = 0;
+  crypto::scalar_t        m_blinding_masks_sum            {}; // bliding masks of zc outputs of miner tx
 
   currency::pos_mining_context m_context                  {};
 };
 
-bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
+/* bool construct_homemade_pos_miner_tx(bool zarcanum, size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
   size_t current_block_size,
   uint64_t fee,
   uint64_t pos_stake_amount,
@@ -91,7 +96,7 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
   currency::transaction& tx,
   const currency::blobdata& extra_nonce = currency::blobdata(),
   size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
-  currency::keypair tx_one_time_key = currency::keypair::generate());
+  currency::keypair tx_one_time_key = currency::keypair::generate()); */
 
 bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::block& prev_block, const currency::block& coinstake_scr_block, const currency::account_base& acc,
   std::function<bool(currency::block&)> before_sign_cb, currency::block& output);

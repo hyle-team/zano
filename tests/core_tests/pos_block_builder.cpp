@@ -345,6 +345,7 @@ bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const bo
 
   return true;
 }
+*/
 
 
 bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::block& prev_block, const currency::block& coinstake_scr_block, const currency::account_base& acc,
