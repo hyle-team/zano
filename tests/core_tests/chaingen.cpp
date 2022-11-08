@@ -2080,11 +2080,8 @@ bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, c
   for (size_t i = 0; i < ptce->tx.vin.size(); ++i)
   {
     auto& input = ptce->tx.vin[i];
-    if (input.type() == typeid(txin_to_key))
-    {
-      auto& intk = boost::get<txin_to_key>(input);
-      CHECK_AND_ASSERT_MES(intk.key_offsets.size() == mixin + 1, false, "for input #" << i << " mixin count is " << intk.key_offsets.size() - 1 << ", expected is " << mixin);
-    }
+    const std::vector<currency::txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(input);
+    CHECK_AND_ASSERT_MES(key_offsets.size() == mixin + 1, false, "for input #" << i << " mixin count is " << key_offsets.size() - 1 << ", expected is " << mixin);
   }
 
   return true;
