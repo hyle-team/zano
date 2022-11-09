@@ -2110,9 +2110,9 @@ namespace currency
 
 
   //---------------------------------------------------------------
-  uint64_t get_tx_version(uint64_t h, const hard_forks_descriptor& hfd)
+  uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd)
   {
-    if (!hfd.is_hardfork_active_for_height(4, h))
+    if (!hfd.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, tx_expected_block_height))
     {
       return TRANSACTION_VERSION_PRE_HF4;
     }

@@ -291,7 +291,7 @@ namespace currency
     bool shuffle = true,
     uint64_t flags = 0);
 
-  uint64_t get_tx_version(uint64_t h, const hard_forks_descriptor& hfd);
+  uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd); // returns tx version based on the height of the block where the transaction is expected to be
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
   crypto::hash get_asset_id_from_descriptor(const asset_descriptor_base& adb);
 
