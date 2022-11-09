@@ -511,11 +511,11 @@ namespace currency
       if (h > 0)
       {
         auto& crc = m_blockchain_storage.get_core_runtime_config();
-        size_t hardfork_id_for_prev_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h - 1);
-        size_t hardfork_id_for_curr_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h);
+        size_t hardfork_id_for_prev_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h);
+        size_t hardfork_id_for_curr_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h + 1);
         if (hardfork_id_for_prev_block != hardfork_id_for_curr_block)
         {
-          LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " activated at height " << h, LOG_LEVEL_0);
+          LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " has been activated after the block at height " << h, LOG_LEVEL_0);
         }
       }
 
