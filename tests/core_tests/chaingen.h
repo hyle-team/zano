@@ -694,6 +694,9 @@ bool check_ring_signature_at_gen_time(const std::vector<test_event_entry>& event
 
 bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, currency::core& c);
 
+bool shuffle_source_entry(currency::tx_source_entry& se);
+bool shuffle_source_entries(std::vector<currency::tx_source_entry>& sources);
+
 //--------------------------------------------------------------------------
 template<class t_test_class>
 auto do_check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_index, const currency::transaction& tx, t_test_class& validator, int)

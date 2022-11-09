@@ -408,7 +408,7 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
 
 zarcanum_txs_with_big_decoy_set::zarcanum_txs_with_big_decoy_set()
 {
-  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 100);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 24);
 }
 
 bool zarcanum_txs_with_big_decoy_set::generate(std::vector<test_event_entry>& events) const
@@ -430,38 +430,29 @@ bool zarcanum_txs_with_big_decoy_set::generate(std::vector<test_event_entry>& ev
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   uint64_t alice_amount = CURRENCY_BLOCK_REWARD;
-  MAKE_TX(events, tx_0, miner_acc, alice_acc, alice_amount, blk_0r);
-  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+  MAKE_TX(events, tx_0_a, miner_acc, alice_acc, alice_amount, blk_0r);
+  MAKE_TX(events, tx_0_b, miner_acc, alice_acc, alice_amount, blk_0r);
+  std::list<transaction> txs{ tx_0_a, tx_0_b };
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, txs);
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // do a gen-time balance check
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_1r, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
-  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, alice_amount);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, 2 * alice_amount);
 
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, alice_amount, alice_amount, 0, 0, 0));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, 2 * alice_amount, 2 * alice_amount, 0, 0, 0));
 
   std::vector<tx_source_entry> sources;
   std::vector<tx_destination_entry> destinations;
 
-  // tx_1: Alice -> miner, all coins back
-  size_t nmix = 10; // use big decoy set
+  // tx_1: Alice -> miner with big decoy set
+  size_t nmix = 10;
   CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_1r, alice_acc, miner_acc, alice_amount - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, nmix, sources, destinations), false, "");
 
-  // randomly move the real output for each source entry
-  for(auto& src : sources)
-  {
-    if (src.outputs.size() > 1)
-    {
-      uint64_t rnd_from_1_to_max = 1 + crypto::rand<uint64_t>() % (src.outputs.size() - 1);
-      uint64_t new_real_output = (src.real_output + rnd_from_1_to_max) % src.outputs.size(); // to avoid new_real_output == src.real_output
-      tx_source_entry::output_entry tmp = src.outputs[new_real_output];
-      src.outputs[new_real_output] = src.outputs[src.real_output];
-      src.outputs[src.real_output] = tmp;
-      src.real_output = new_real_output;
-    }
-  }
+  // randomly source entries (real_output will be changed accordingly)
+  CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "shuffle_source_entries failed");
 
   transaction tx_1{};
   r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0 /* unlock time */);
@@ -469,7 +460,28 @@ bool zarcanum_txs_with_big_decoy_set::generate(std::vector<test_event_entry>& ev
   ADD_CUSTOM_EVENT(events, tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);
 
+  // tx_2 (the same as tx_1): Alice -> miner, big decoy set, all coins are back now
+  sources.clear();
+  destinations.clear();
+  nmix = 10;
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_2, alice_acc, miner_acc, alice_amount - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, nmix, sources, destinations), false, "");
+  CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "shuffle_source_entries failed");
+  transaction tx_2{};
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, get_tx_version_from_events(events), 0 /* unlock time */);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  ADD_CUSTOM_EVENT(events, tx_2);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_2);
+
+  // make sure Alice has no coins left
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, 0, 0, 0, 0, 0));
+
+  
+  // now do the same after HF4
+
+  // make sure the hardfork goes well
+  DO_CALLBACK_PARAMS(events, "check_hardfork_inactive", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
 
 
 

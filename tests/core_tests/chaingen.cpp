@@ -2087,6 +2087,29 @@ bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, c
   return true;
 }
 
+// randomly shuffles tx_source_entry, restores the correct real_output afterwards
+bool shuffle_source_entry(tx_source_entry& se)
+{
+  if (se.outputs.size() < 2)
+    return true;
+  tx_source_entry::output_entry real_out_entry = se.outputs[se.real_output];                                // store the real one
+  std::shuffle(se.outputs.begin(), se.outputs.end(), crypto::uniform_random_bit_generator{});               // shuffle
+  auto it = std::find(se.outputs.begin(), se.outputs.end(), real_out_entry);                                // where is the real one now?
+  CHECK_AND_ASSERT_MES(it != se.outputs.end(), false, "cannot find the real one output entry");
+  se.real_output = it - se.outputs.begin();                                                                 // restore the real output index
+  return true;
+}
+
+// randomly shuffles std::vector<tx_source_entry>, restores the correct real_output afterwards
+bool shuffle_source_entries(std::vector<tx_source_entry>& sources)
+{
+  for(auto& se : sources)
+    if (!shuffle_source_entry(se))
+      return false;
+  return true;
+}
+
+
 //------------------------------------------------------------------------------
 
 void test_chain_unit_base::register_callback(const std::string& cb_name, verify_callback cb)
