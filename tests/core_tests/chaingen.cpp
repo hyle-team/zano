@@ -1508,7 +1508,7 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
   std::vector<tx_destination_entry> destinations;
   if (!fill_tx_sources_and_destinations(events, blk_head, from.get_keys(), to.get_public_address(), amount, fee, nmix, sources, destinations, check_for_spends, check_for_unlocktime))
     return false;
-  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_head), hf);
+  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_head) + 1, hf); // assuming the tx will be in the next block (blk_head + 1)
   return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, tx_version, sk, 0, mix_attr);
 }
 
