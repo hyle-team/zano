@@ -32,9 +32,9 @@ struct zarcanum_pos_block_math : public test_chain_unit_enchanced
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct zarcanum_txs_with_big_decoy_set : public wallet_test
+struct zarcanum_txs_with_big_shuffled_decoy_set_shuffled : public wallet_test
 {
-  zarcanum_txs_with_big_decoy_set();
+  zarcanum_txs_with_big_shuffled_decoy_set_shuffled();
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
