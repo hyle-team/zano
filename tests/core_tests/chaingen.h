@@ -319,6 +319,7 @@ public:
   bool remove_stuck_txs(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_offers_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_hardfork_active(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_hardfork_inactive(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
   static bool is_event_mark_invalid_block(const test_event_entry& ev, bool use_global_gentime_settings = true);
   static bool is_event_mark_invalid_tx(const test_event_entry& ev, bool use_global_gentime_settings = true);

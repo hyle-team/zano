@@ -2145,6 +2145,7 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, remove_stuck_txs);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_offers_count);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_hardfork_active);
+  REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_hardfork_inactive);
 }
 
 bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
@@ -2281,10 +2282,24 @@ bool test_chain_unit_enchanced::check_hardfork_active(currency::core& c, size_t 
   const std::string& params = boost::get<callback_entry>(events[ev_index]).callback_params;
   CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(params, hardfork_id_to_check), false, "hex_to_pod failed, params = " << params);
 
-  uint64_t top_block_height = c.get_top_block_height();
-  if (!c.get_blockchain_storage().get_core_runtime_config().is_hardfork_active_for_height(hardfork_id_to_check, top_block_height))
+  if (!c.get_blockchain_storage().is_hardfork_active(hardfork_id_to_check))
   {
-    LOG_ERROR("Hardfork #" << hardfork_id_to_check << " is not active yet (top block height is " << top_block_height << ")");
+    LOG_ERROR("Hardfork #" << hardfork_id_to_check << " is not active yet (top block height is " << c.get_top_block_height() << ")");
+    return false;
+  }
+
+  return true;
+}
+
+bool test_chain_unit_enchanced::check_hardfork_inactive(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  size_t hardfork_id_to_check = 0;
+  const std::string& params = boost::get<callback_entry>(events[ev_index]).callback_params;
+  CHECK_AND_ASSERT_MES(epee::string_tools::hex_to_pod(params, hardfork_id_to_check), false, "hex_to_pod failed, params = " << params);
+
+  if (c.get_blockchain_storage().is_hardfork_active(hardfork_id_to_check))
+  {
+    LOG_ERROR("Hardfork #" << hardfork_id_to_check << " is active, which is not expected (top block height is " << c.get_top_block_height() << ")");
     return false;
   }
 
