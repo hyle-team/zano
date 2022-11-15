@@ -69,8 +69,6 @@ struct pos_block_builder
 
   void step5_sign(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const crypto::public_key& stake_tx_out_pub_key, const currency::account_base& stakeholder_account);
 
-  //void step5_sign_zarcanum(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const currency::account_base& stakeholder_account);
-
 
   currency::block         m_block                         {};
   size_t                  m_step                          = 0;
