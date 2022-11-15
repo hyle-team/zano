@@ -45,9 +45,8 @@ namespace crypto
   #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
     if (!(cond)) { LOG_PRINT_RED("zarcanum_generate_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
-
   
-  bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<crypto::CLSAG_GGXG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment,
+  bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXG_input_ref_t>& ring,
     const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
     const scalar_t& secret_x, const scalar_t& secret_q, uint64_t secret_index, const scalar_t& pseudo_out_blinding_mask, uint64_t stake_amount, const scalar_t& stake_blinding_mask,
     zarcanum_proof& result, uint8_t* p_err /* = nullptr */)
@@ -117,7 +116,7 @@ namespace crypto
     const scalar_vec_t masks2 = { bx }; // X component
     const std::vector<const public_key*> E_1div8_vec_ptr = { &result.E };
     
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks2, E_1div8_vec_ptr, result.E_range_proof), 10);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_gen<bpp_crypto_trait_zano<128>>(values, masks, masks2, E_1div8_vec_ptr, result.E_range_proof), 10);
 
     // = four-layers ring signature data outline =
     // (j in [0, ring_size-1])
@@ -144,6 +143,10 @@ namespace crypto
     //     Q[j]
     // layer 3 secret (with respect to G)
     //     secret_q
+
+    point_t pseudo_out_amount_commitment = a * crypto::c_point_H + pseudo_out_blinding_mask * crypto::c_point_G;
+    result.pseudo_out_amount_commitment = (crypto::c_scalar_1div8 * pseudo_out_amount_commitment).to_public_key();
+
     TRY_ENTRY()
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(generate_CLSAG_GGXG(m, ring, pseudo_out_amount_commitment, C, stake_ki,
       secret_x, stake_blinding_mask - pseudo_out_blinding_mask, x0, secret_q, secret_index,
@@ -152,11 +155,29 @@ namespace crypto
 
     return true;
   }
+  #undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
 
 
-  bool zarcanum_verify_proof(const hash& kernel_hash, const public_key& commitment_1div8, const scalar_t& last_pow_block_id_hashed, const zarcanum_proof& proof, uint8_t* p_err /* = nullptr */)
+
+  #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
+    if (!(cond)) { LOG_PRINT_RED("zarcanum_verify_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
+    if (p_err) { *p_err = err_code; } return false; }
+
+  bool zarcanum_verify_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXG_input_ref_t>& ring,
+    const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
+    const zarcanum_proof& sig, uint8_t* p_err /* = nullptr */)
   {
-    return false;
+    bool r = false;
+
+    // TODO @#@#
+
+    std::vector<point_t> E_for_range_proof = { point_t(sig.E) };
+    std::vector<bppe_sig_commit_ref_t> range_proofs = { bppe_sig_commit_ref_t(sig.E_range_proof, E_for_range_proof) };
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(range_proofs), 10);
+
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(verify_CLSAG_GGXG(m, ring, sig.pseudo_out_amount_commitment, sig.C, stake_ki, sig.clsag_ggxg), 1);
+
+    return true;
   }
 
 

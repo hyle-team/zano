@@ -84,9 +84,10 @@ TEST(tx_signatures_packing, 1)
 
   {
     // empty NLSAG
-    // v(0) + (1 + v(0) + 0 * 2 * 32) = 3                                                    
+    // v(1) + (1 + v(0) + 0 * 2 * 32) = 3                                                    
     sigs.clear();
     sigs.emplace_back(std::move(NLSAG_sig()));
+    ASSERT_EQ(3, t_serializable_object_to_blob(sigs).size());
     ASSERT_EQ(3, get_object_blobsize(sigs));
   }
 
@@ -96,14 +97,28 @@ TEST(tx_signatures_packing, 1)
     sigs.clear();
     for(size_t i = 0; i < 128; ++i)
       sigs.emplace_back(std::move(NLSAG_sig()));
+    ASSERT_EQ(258, t_serializable_object_to_blob(sigs).size());
     ASSERT_EQ(258, get_object_blobsize(sigs));
   }
 
   {
+    // 128 10-ring NLSAGs
+    // v(128) + 128 * (1 + v(10) + 10 * 2 * 32) = 82178
+    sigs.clear();
+    NLSAG_sig nlsag = AUTO_VAL_INIT(nlsag);
+    nlsag.s.resize(10);
+    for(size_t i = 0; i < 128; ++i)
+      sigs.push_back(nlsag);
+    ASSERT_EQ(82178, t_serializable_object_to_blob(sigs).size());
+    ASSERT_EQ(82178, get_object_blobsize(sigs));
+  }
+
+  {
     // empty ZC_sig
-    // v(0) + (1 + 32 + 32 + (1 + 10*32) + 32) = 99
+    // v(1) + (1 + 32 + 32 + (1 + 10*32) + 32) = 99
     sigs.clear();
     sigs.emplace_back(std::move(ZC_sig()));
+    ASSERT_EQ(99, t_serializable_object_to_blob(sigs).size());
     ASSERT_EQ(99, get_object_blobsize(sigs));
   }
 
@@ -113,6 +128,7 @@ TEST(tx_signatures_packing, 1)
     sigs.clear();
     for(size_t i = 0; i < 128; ++i)
       sigs.emplace_back(std::move(ZC_sig()));
+    ASSERT_EQ(12546, t_serializable_object_to_blob(sigs).size());
     ASSERT_EQ(12546, get_object_blobsize(sigs));
   }
 
@@ -124,6 +140,7 @@ TEST(tx_signatures_packing, 1)
     sigs.clear();
     for(size_t i = 0; i < 128; ++i)
       sigs.emplace_back(zc);
+    ASSERT_EQ(53506, t_serializable_object_to_blob(sigs).size());
     ASSERT_EQ(53506, get_object_blobsize(sigs));
   }
 }

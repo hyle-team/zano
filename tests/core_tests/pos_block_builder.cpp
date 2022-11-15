@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -9,23 +9,17 @@
 using namespace epee;
 using namespace currency;
 
-pos_block_builder::pos_block_builder()
-{
-  clear();
-}
-
 void pos_block_builder::clear()
 {
-  m_block = AUTO_VAL_INIT(m_block);
-  m_stake_kernel = AUTO_VAL_INIT(m_stake_kernel);
-  m_step = 0;
+  *this = pos_block_builder{};
 }
 
-void pos_block_builder::step1_init_header(size_t block_height, crypto::hash& prev_block_hash)
+
+void pos_block_builder::step1_init_header(const hard_forks_descriptor& hardforks, size_t block_height, crypto::hash& prev_block_hash)
 {
   CHECK_AND_ASSERT_THROW_MES(m_step == 0, "pos_block_builder: incorrect step sequence");
   m_block.minor_version = CURRENT_BLOCK_MINOR_VERSION;
-  m_block.major_version = BLOCK_MAJOR_VERSION_INITIAL;
+  m_block.major_version = hardforks.get_block_major_version_by_height(block_height);
   m_block.timestamp = 0; // to be set at step 3
   m_block.prev_id = prev_block_hash;
   m_block.flags = CURRENCY_BLOCK_FLAG_POS_BLOCK;
@@ -33,8 +27,11 @@ void pos_block_builder::step1_init_header(size_t block_height, crypto::hash& pre
 
   m_height = block_height;
 
+  m_context.zarcanum = hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, m_height);
+
   m_step = 1;
 }
+
 
 void pos_block_builder::step2_set_txs(const std::vector<currency::transaction>& txs)
 {
@@ -57,6 +54,7 @@ void pos_block_builder::step2_set_txs(const std::vector<currency::transaction>& 
   m_step = 2;
 }
 
+
 void pos_block_builder::step3_build_stake_kernel(
   uint64_t stake_output_amount,
   size_t stake_output_gindex,
@@ -68,54 +66,91 @@ void pos_block_builder::step3_build_stake_kernel(
   uint64_t timestamp_window,
   uint64_t timestamp_step)
 {
-  CHECK_AND_ASSERT_THROW_MES(m_step == 2, "pos_block_builder: incorrect step sequence");
-  m_pos_stake_amount = stake_output_amount;
-  m_pos_stake_output_gindex = stake_output_gindex;
+  step3a(difficulty, last_pow_block_hash, last_pos_block_kernel_hash);
 
-  m_stake_kernel.kimage = stake_output_key_image;
-  m_stake_kernel.block_timestamp = m_block.timestamp;
-  m_stake_kernel.stake_modifier.last_pow_id = last_pow_block_hash;
-  m_stake_kernel.stake_modifier.last_pos_kernel_id = last_pos_block_kernel_hash;
+  crypto::public_key stake_source_tx_pub_key  {};
+  uint64_t           stake_out_in_tx_index    = UINT64_MAX;
+  crypto::scalar_t   stake_out_blinding_mask  {};
+  crypto::secret_key view_secret              {};
+
+  step3b(stake_output_amount, stake_output_key_image, stake_source_tx_pub_key, stake_out_in_tx_index, stake_out_blinding_mask, view_secret, stake_output_gindex,
+    timestamp_lower_bound, timestamp_window, timestamp_step);
+}
+
+
+void pos_block_builder::step3a(
+  currency::wide_difficulty_type difficulty,
+  const crypto::hash& last_pow_block_hash,
+  const crypto::hash& last_pos_block_kernel_hash
+  )
+{
+  CHECK_AND_ASSERT_THROW_MES(m_step == 2, "pos_block_builder: incorrect step sequence");
+
+  stake_modifier_type sm{};
+  sm.last_pow_id = last_pow_block_hash;
+  sm.last_pos_kernel_id = last_pos_block_kernel_hash;
   if (last_pos_block_kernel_hash == null_hash)
   {
-    bool r = string_tools::parse_tpod_from_hex_string(POS_STARTER_KERNEL_HASH, m_stake_kernel.stake_modifier.last_pos_kernel_id);
+    bool r = string_tools::parse_tpod_from_hex_string(POS_STARTER_KERNEL_HASH, sm.last_pos_kernel_id);
     CHECK_AND_ASSERT_THROW_MES(r, "Failed to parse POS_STARTER_KERNEL_HASH");
   }
 
-  wide_difficulty_type stake_difficulty = difficulty / stake_output_amount;
+  m_context.init(difficulty, sm, m_context.zarcanum);
+  m_step = 31;
+}
+
+
+void pos_block_builder::step3b(
+  uint64_t stake_output_amount,
+  const crypto::key_image& stake_output_key_image,
+  const crypto::public_key& stake_source_tx_pub_key, // zarcanum only
+  uint64_t stake_out_in_tx_index,                    // zarcanum only
+  const crypto::scalar_t& stake_out_blinding_mask,   // zarcanum only
+  const crypto::secret_key& view_secret,             // zarcanum only
+  size_t stake_output_gindex,
+  uint64_t timestamp_lower_bound,
+  uint64_t timestamp_window,
+  uint64_t timestamp_step)
+{
+  CHECK_AND_ASSERT_THROW_MES(m_step == 31, "pos_block_builder: incorrect step sequence");
+
+  m_pos_stake_output_gindex = stake_output_gindex;
+
+  m_context.prepare_entry(stake_output_amount, stake_output_key_image, stake_source_tx_pub_key, stake_out_in_tx_index, stake_out_blinding_mask, view_secret);
+
   // align timestamp_lower_bound up to timestamp_step boundary if needed
   if (timestamp_lower_bound % timestamp_step != 0)
     timestamp_lower_bound = timestamp_lower_bound - (timestamp_lower_bound % timestamp_step) + timestamp_step;
   bool sk_found = false;
   for (uint64_t ts = timestamp_lower_bound; !sk_found && ts < timestamp_lower_bound + timestamp_window; ts += timestamp_step)
   {
-    m_stake_kernel.block_timestamp = ts;
-    crypto::hash sk_hash = crypto::cn_fast_hash(&m_stake_kernel, sizeof(m_stake_kernel));
-    if (check_hash(sk_hash, stake_difficulty))
-    {
+    if (m_context.do_iteration(ts))
       sk_found = true;
-    }
   }
 
   if (!sk_found)
     ASSERT_MES_AND_THROW("Could't build stake kernel");
 
   // update block header with found timestamp
-  m_block.timestamp = m_stake_kernel.block_timestamp;
+  m_block.timestamp = m_context.sk.block_timestamp;
 
   m_step = 3;
 }
+
+
+
+
 
 void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   const boost::multiprecision::uint128_t& already_generated_coins,
   const account_public_address &reward_and_stake_receiver_address,
   const blobdata& extra_nonce,
   size_t max_outs,
-  const extra_alias_entry& alias,
-  keypair tx_one_time_key)
+  const keypair* tx_one_time_key_to_use)
 {
-  step4_generate_coinbase_tx(median_size, already_generated_coins, reward_and_stake_receiver_address, reward_and_stake_receiver_address, extra_nonce, max_outs, alias, tx_one_time_key);
+  step4_generate_coinbase_tx(median_size, already_generated_coins, reward_and_stake_receiver_address, reward_and_stake_receiver_address, extra_nonce, max_outs, tx_one_time_key_to_use);
 }
+
 
 void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   const boost::multiprecision::uint128_t& already_generated_coins,
@@ -123,23 +158,27 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   const account_public_address &stakeholder_address,
   const blobdata& extra_nonce,
   size_t max_outs,
-  const extra_alias_entry& alias,
-  keypair tx_one_time_key)
+  const keypair* tx_one_time_key_to_use)
 {
   CHECK_AND_ASSERT_THROW_MES(m_step == 3, "pos_block_builder: incorrect step sequence");
 
+  uint64_t tx_version = m_context.zarcanum ? TRANSACTION_VERSION_POST_HF4 : TRANSACTION_VERSION_PRE_HF4;
+  pos_entry pe{};
+  pe.stake_unlock_time = 0; // TODO
+  pe.amount = m_context.stake_amount;
+
   // generate miner tx using incorrect current_block_size only for size estimation
   size_t estimated_block_size = m_txs_total_size;
-  bool r = construct_homemade_pos_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee, m_pos_stake_amount, m_stake_kernel.kimage,
-    m_pos_stake_output_gindex, reward_receiver_address, stakeholder_address, m_block.miner_tx, extra_nonce, max_outs, tx_one_time_key);
-  CHECK_AND_ASSERT_THROW_MES(r, "construct_homemade_pos_miner_tx failed");
+  bool r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
+    reward_receiver_address, stakeholder_address, m_block.miner_tx, tx_version, extra_nonce, max_outs, true, pe, &m_blinding_masks_sum, tx_one_time_key_to_use);
+  CHECK_AND_ASSERT_THROW_MES(r, "construct_miner_tx failed");
 
   estimated_block_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
   size_t cumulative_size = 0;
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
-    r = construct_homemade_pos_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee, m_pos_stake_amount, m_stake_kernel.kimage,
-      m_pos_stake_output_gindex, reward_receiver_address, stakeholder_address, m_block.miner_tx, extra_nonce, max_outs, tx_one_time_key);
+    r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
+    reward_receiver_address, stakeholder_address, m_block.miner_tx, tx_version, extra_nonce, max_outs, true, pe, &m_blinding_masks_sum, tx_one_time_key_to_use);
     CHECK_AND_ASSERT_THROW_MES(r, "construct_homemade_pos_miner_tx failed");
 
     cumulative_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
@@ -159,138 +198,94 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   m_step = 4;
 }
 
-void pos_block_builder::step5_sign(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const crypto::public_key& stake_tx_out_pub_key, const currency::account_base& stakeholder_account)
+// supports Zarcanum and mixins
+void pos_block_builder::step5_sign(const currency::tx_source_entry& se, const currency::account_keys& stakeholder_keys)
 {
+  bool r = false;
   CHECK_AND_ASSERT_THROW_MES(m_step == 4, "pos_block_builder: incorrect step sequence");
 
-  crypto::key_derivation pos_coin_derivation = AUTO_VAL_INIT(pos_coin_derivation);
-  bool r = crypto::generate_key_derivation(stake_tx_pub_key, stakeholder_account.get_keys().view_secret_key, pos_coin_derivation); // derivation(tx_pub; view_sec)
+  // calculate stake_out_derivation and secret_x (derived ephemeral secret key)
+  crypto::key_derivation stake_out_derivation = AUTO_VAL_INIT(stake_out_derivation);
+  r = crypto::generate_key_derivation(se.real_out_tx_key, stakeholder_keys.view_secret_key, stake_out_derivation);            // d = 8 * v * R
   CHECK_AND_ASSERT_THROW_MES(r, "generate_key_derivation failed");
+  crypto::secret_key secret_x = AUTO_VAL_INIT(secret_x);
+  crypto::derive_secret_key(stake_out_derivation, se.real_output_in_tx_index, stakeholder_keys.spend_secret_key, secret_x);   // x = Hs(8 * v * R, i) + s
 
-  crypto::secret_key derived_secret_ephemeral_key = AUTO_VAL_INIT(derived_secret_ephemeral_key);
-  crypto::derive_secret_key(pos_coin_derivation, stake_tx_out_index, stakeholder_account.get_keys().spend_secret_key, derived_secret_ephemeral_key); // derivation.derive(spend_sec, out_idx) => input ephemeral secret key
+  if (m_context.zarcanum)
+  {
+    // Zarcanum
+    zarcanum_sig& sig = boost::get<zarcanum_sig>(m_block.miner_tx.signatures[0]);
+    txin_zc_input& stake_input = boost::get<txin_zc_input>(m_block.miner_tx.vin[1]);
 
-  // sign block actually in coinbase transaction
-  crypto::hash block_hash = currency::get_block_hash(m_block);
-  std::vector<const crypto::public_key*> keys_ptrs(1, &stake_tx_out_pub_key);
-  crypto::generate_ring_signature(block_hash, m_stake_kernel.kimage, keys_ptrs, derived_secret_ephemeral_key, 0, &boost::get<currency::NLSAG_sig>(m_block.miner_tx.signatures[0]).s[0]);
+    stake_input.k_image = m_context.sk.kimage;
+
+    std::vector<crypto::CLSAG_GGXG_input_ref_t> ring;
+    for(const auto& el : se.outputs)
+    {
+      stake_input.key_offsets.push_back(el.out_reference);
+      ring.emplace_back(el.stealth_address, el.amount_commitment, el.concealing_point);
+    }
+    r = absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
+    CHECK_AND_ASSERT_THROW_MES(r, "absolute_sorted_output_offsets_to_relative_in_place failed");
+
+    crypto::hash tx_hash_for_sig = get_transaction_hash(m_block.miner_tx); // TODO @#@# change to block hash after the corresponding test is made
+
+    uint8_t err = 0;
+    r = crypto::zarcanum_generate_proof(tx_hash_for_sig, m_context.kernel_hash, ring, m_context.last_pow_block_id_hashed, m_context.sk.kimage,
+      secret_x, m_context.secret_q, se.real_output, m_blinding_masks_sum, m_context.stake_amount, m_context.stake_out_blinding_mask,
+      static_cast<crypto::zarcanum_proof&>(sig), &err);
+    CHECK_AND_ASSERT_THROW_MES(r, "zarcanum_generate_proof failed, err: " << (int)err);
+  }
+  else
+  {
+    // old PoS with non-hidden amounts
+    NLSAG_sig& sig = boost::get<NLSAG_sig>(m_block.miner_tx.signatures[0]);
+    txin_to_key& stake_input = boost::get<txin_to_key>(m_block.miner_tx.vin[1]);
+
+    stake_input.k_image = m_context.sk.kimage;
+    stake_input.amount = m_context.stake_amount;
+    stake_input.key_offsets.push_back(m_pos_stake_output_gindex);
+
+    crypto::hash block_hash = currency::get_block_hash(m_block);
+    std::vector<const crypto::public_key*> keys_ptrs(1, &se.outputs.front().stealth_address);
+    sig.s.resize(1);
+    crypto::generate_ring_signature(block_hash, m_context.sk.kimage, keys_ptrs, secret_x, 0, sig.s.data());
+  }
 
   m_step = 5;
 }
 
-bool construct_homemade_pos_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
-  size_t current_block_size,
-  uint64_t fee,
-  uint64_t pos_stake_amount,
-  crypto::key_image pos_stake_keyimage,
-  size_t pos_stake_gindex,
-  const account_public_address &reward_receiving_address,
-  const account_public_address &stakeholder_address,
-  transaction& tx,
-  const blobdata& extra_nonce /*= blobdata()*/,
-  size_t max_outs /*= CURRENCY_MINER_TX_MAX_OUTS*/,
-  keypair tx_one_time_key /*= keypair::generate()*/)
+
+void pos_block_builder::step5_sign(const crypto::public_key& stake_tx_pub_key, size_t stake_tx_out_index, const crypto::public_key& stake_tx_out_pub_key,
+  const currency::account_base& stakeholder_account)
 {
-  boost::value_initialized<transaction> new_tx;
-  tx = new_tx;
+  CHECK_AND_ASSERT_THROW_MES(!m_context.zarcanum, "for zarcanum use another overloading");
 
-  tx.version = TRANSACTION_VERSION_PRE_HF4;
-  set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  tx_source_entry se{};
 
-  // calculate block reward
-  uint64_t block_reward;
-  bool r = get_block_reward(true, median_size, current_block_size, already_generated_coins, block_reward, height);
-  CHECK_AND_ASSERT_MES(r, false, "Block is too big");
-  block_reward += fee;
+  se.real_out_tx_key = stake_tx_pub_key;
+  se.real_output_in_tx_index = stake_tx_out_index;
+  se.outputs.emplace_back(m_pos_stake_output_gindex, stake_tx_out_pub_key);
 
-  // decompose reward into outputs and populate tx.vout
-  std::vector<size_t> out_amounts;
-  decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD,
-    [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
-    [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
-
-  CHECK_AND_ASSERT_MES(2 <= max_outs, false, "max_out must be greather than 1");
-  while (out_amounts.size() + 1 > max_outs)
-  {
-    out_amounts[out_amounts.size() - 2] += out_amounts.back();
-    out_amounts.resize(out_amounts.size() - 1);
-  }
-
-  // reward
-  bool burn_money = reward_receiving_address.spend_public_key == null_pkey && reward_receiving_address.view_public_key == null_pkey; // if true, burn reward, so no one on Earth can spend them
-  for (size_t output_index = 0; output_index < out_amounts.size(); ++output_index)
-  {
-    txout_to_key tk;
-    tk.key = null_pkey; // null means burn money
-    tk.mix_attr = 0;
-
-    if (!burn_money)
-    {
-      r = currency::derive_public_key_from_target_address(reward_receiving_address, tx_one_time_key.sec, output_index, tk.key); // derivation(view_pub; tx_sec).derive(output_index, spend_pub) => output pub key
-      CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
-    }
-
-    tx_out_bare out;
-    out.amount = out_amounts[output_index];
-    out.target = tk;
-    tx.vout.push_back(out);
-  }
-
-  // stake
-  burn_money = stakeholder_address.spend_public_key == null_pkey && stakeholder_address.view_public_key == null_pkey; // if true, burn stake
-  {
-    txout_to_key tk;
-    tk.key = null_pkey; // null means burn money
-    tk.mix_attr = 0;
-
-    if (!burn_money)
-    {
-      r = currency::derive_public_key_from_target_address(stakeholder_address, tx_one_time_key.sec, tx.vout.size(), tk.key);
-      CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
-    }
-
-    tx_out_bare out;
-    out.amount = pos_stake_amount;
-    out.target = tk;
-    tx.vout.push_back(out);
-  }
-
-  // take care about extra
-  add_tx_pub_key_to_extra(tx, tx_one_time_key.pub);
-  if (extra_nonce.size())
-    if (!add_tx_extra_userdata(tx, extra_nonce))
-      return false;
-  
-  // populate ins with 1) money-generating and 2) PoS
-  txin_gen in;
-  in.height = height;
-  tx.vin.push_back(in);
-
-  txin_to_key posin;
-  posin.amount = pos_stake_amount;
-  posin.key_offsets.push_back(pos_stake_gindex);
-  posin.k_image = pos_stake_keyimage;
-  tx.vin.push_back(posin);
-  //reserve place for ring signature
-  tx.signatures.resize(1);
-  boost::get<currency::NLSAG_sig>(tx.signatures[0]).s.resize(posin.key_offsets.size());
-
-  return true;
+  step5_sign(se, stakeholder_account.get_keys());
 }
+
 
 bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::block& prev_block, const currency::block& coinstake_scr_block, const currency::account_base& acc,
   std::function<bool(currency::block&)> before_sign_cb, currency::block& output)
 {
+  blockchain_storage& bcs = c.get_blockchain_storage();
+
   // these values (median and diff) are correct only for the next main chain block, it's incorrect for altblocks, especially for old altblocks
   // but for now we assume they will work fine
-  uint64_t block_size_median = c.get_blockchain_storage().get_current_comulative_blocksize_limit() / 2;
-  currency::wide_difficulty_type difficulty = c.get_blockchain_storage().get_next_diff_conditional(true);
+  uint64_t block_size_median = bcs.get_current_comulative_blocksize_limit() / 2;
+  currency::wide_difficulty_type difficulty = bcs.get_next_diff_conditional(true);
 
   crypto::hash prev_id = get_block_hash(prev_block);
   size_t height = get_block_height(prev_block) + 1;
 
   block_extended_info bei = AUTO_VAL_INIT(bei);
-  bool r = c.get_blockchain_storage().get_block_extended_info_by_hash(prev_id, bei);
+  bool r = bcs.get_block_extended_info_by_hash(prev_id, bei);
   CHECK_AND_ASSERT_MES(r, false, "get_block_extended_info_by_hash failed for hash = " << prev_id);
 
 
@@ -305,7 +300,7 @@ bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::
   crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(bcs.get_core_runtime_config().hard_forks, height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, difficulty, prev_id, null_hash, prev_block.timestamp);
   pb.step4_generate_coinbase_tx(block_size_median, bei.already_generated_coins, acc.get_public_address());

@@ -87,7 +87,7 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
   {
     CRITICAL_REGION_LOCAL(s_locker);
     loc_helper::txs_accessor() = &txs;
-    r = c.get_blockchain_storage().create_block_template(b, miner_addr, miner_addr, diff, height_from_template, extra, false, pe, loc_helper::fill_block_template_func);
+    r = c.get_blockchain_storage().create_block_template(miner_addr, miner_addr, extra, false, pe, loc_helper::fill_block_template_func, b, diff, height_from_template);
   }
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 

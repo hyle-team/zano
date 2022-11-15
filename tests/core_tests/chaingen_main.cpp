@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -106,8 +106,9 @@ bool generate_and_play(const char* const genclass_name)
 {
   std::vector<test_event_entry> events;
   bool generated = false;
-  bool result = true;
-  std::cout << ENDL << concolor::bright_white << "#TEST# " << genclass_name << concolor::normal << ENDL << ENDL;
+  bool result = false;
+  std::cout << ENDL << concolor::bright_white << "#TEST# >>>> " << genclass_name << " <<<<" << ENDL << ENDL;
+
   LOG_PRINT2("get_object_blobsize.log", "#TEST# " << genclass_name, LOG_LEVEL_3);
 
   if (!clean_data_directory())
@@ -118,29 +119,36 @@ bool generate_and_play(const char* const genclass_name)
   genclass g;
   try
   {
-    generated = g.generate(events);;
+    generated = g.generate(events);
+    if (generated)
+    {
+      std::cout << concolor::bright_white << std::string(100, '=') << std::endl <<
+        "#TEST# >>>> " << genclass_name << " <<<< start replaying events" << std::endl <<
+        std::string(100, '=') << concolor::normal << std::endl;
+      
+      result = do_replay_events(events, g);
+    }
   }
   catch (const std::exception& ex)
   {
-    LOG_ERROR(genclass_name << " generation failed: what=" << ex.what());
+    LOG_ERROR("got an exception during " << genclass_name << (generated ? " replaying: " : " generation: ") << ex.what());
   }
   catch (...)
   {
-    LOG_ERROR(genclass_name << " generation failed: generic exception");
+    LOG_ERROR("got an unknown exception during " << genclass_name << (generated ? " replaying" : " generation"));
   }
 
-  std::cout << concolor::bright_white << std::string(100, '=') << std::endl <<
-    "#TEST# >>>> " << genclass_name << " <<<< start replaying events" << std::endl <<
-    std::string(100, '=') << concolor::normal << std::endl;
-
-  if (generated && do_replay_events(events, g))
+  if (result)
   {
-    std::cout << concolor::green << "#TEST# Succeeded " << genclass_name << concolor::normal << std::endl;
+    std::cout << concolor::green << std::string(100, '=') << std::endl <<
+      "#TEST# >>>> " << genclass_name << " <<<< Succeeded" << std::endl <<
+      std::string(100, '=') << concolor::normal << std::endl;
   }
   else
   {
-    std::cout << concolor::magenta << "#TEST# Failed " << genclass_name << concolor::normal << std::endl;
-    LOG_PRINT_RED_L0("#TEST# Failed " << genclass_name);
+    std::cout << concolor::red << std::string(100, '=') << std::endl <<
+      "#TEST# >>>> " << genclass_name << " <<<< FAILED" << std::endl <<
+      std::string(100, '=') << concolor::normal << std::endl;
     result = false;
   }
   std::cout << std::endl;
@@ -667,6 +675,7 @@ int main(int argc, char* argv[])
 
   po::options_description desc_options("Allowed options");
   command_line::add_arg(desc_options, command_line::arg_help);
+  command_line::add_arg(desc_options, command_line::arg_log_level);
   command_line::add_arg(desc_options, arg_test_data_path);
   command_line::add_arg(desc_options, arg_generate_test_data);
   command_line::add_arg(desc_options, arg_play_test_data);
@@ -695,6 +704,16 @@ int main(int argc, char* argv[])
   {
     std::cout << desc_options << std::endl;
     return 0;
+  }
+
+  if (command_line::has_arg(g_vm, command_line::arg_log_level))
+  {
+    int new_log_level = command_line::get_arg(g_vm, command_line::arg_log_level);
+    if (new_log_level >= LOG_LEVEL_MIN && new_log_level <= LOG_LEVEL_MAX && log_space::get_set_log_detalisation_level(false) != new_log_level)
+    {
+      log_space::get_set_log_detalisation_level(true, new_log_level);
+      LOG_PRINT_L0("LOG_LEVEL set to " << new_log_level);
+    }
   }
 
   if (command_line::has_arg(g_vm, arg_stop_on_fail))
@@ -760,8 +779,6 @@ int main(int argc, char* argv[])
     MARK_TEST_AS_POSTPONED(after_hard_fork_1_cumulative_difficulty); // reason: set_pos_to_low_timestamp is not supported anymore
     MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
     MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
-
-    MARK_TEST_AS_POSTPONED(zarcanum_basic_test);
 
 #undef MARK_TEST_AS_POSTPONED
 
@@ -1063,6 +1080,8 @@ int main(int argc, char* argv[])
 
     GENERATE_AND_PLAY(multiassets_basic_test);
     GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
+    GENERATE_AND_PLAY(zarcanum_gen_time_balance);
+    GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */

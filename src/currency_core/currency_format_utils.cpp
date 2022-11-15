@@ -183,10 +183,13 @@ namespace currency
     const account_public_address &stakeholder_address,
     transaction& tx,
     uint64_t tx_version,
-    const blobdata& extra_nonce,
-    size_t max_outs,
-    bool pos,
-    const pos_entry& pe)
+    const blobdata& extra_nonce               /* = blobdata() */,
+    size_t max_outs                           /* = CURRENCY_MINER_TX_MAX_OUTS */,
+    bool pos                                  /* = false */,
+    const pos_entry& pe                       /* = pos_entry() */,  // only pe.stake_unlock_time and pe.stake_amount are used now, TODO: consider refactoring -- sowle
+    crypto::scalar_t* blinding_masks_sum_ptr  /* = nullptr */,
+    const keypair* tx_one_time_key_to_use     /* = nullptr */
+  )
   {
     bool r = false;
 
@@ -248,7 +251,10 @@ namespace currency
     tx = AUTO_VAL_INIT_T(transaction);
     tx.version = tx_version;
 
-    keypair txkey = keypair::generate();
+    keypair txkey_local{};
+    if (!tx_one_time_key_to_use)
+      txkey_local = keypair::generate();
+    const keypair& txkey = tx_one_time_key_to_use ? *tx_one_time_key_to_use : txkey_local;
     add_tx_pub_key_to_extra(tx, txkey.pub);
     if (extra_nonce.size())
       if (!add_tx_extra_userdata(tx, extra_nonce))
@@ -269,26 +275,16 @@ namespace currency
     {
       if (tx.version > TRANSACTION_VERSION_PRE_HF4 /* && stake is zarcanum */)
       {
-        // TODO: add Zarcanum part
-        //txin_zc_input stake_input = AUTO_VAL_INIT(stake_input);
-        //stake_input.key_offsets.push_back(pe.g_index);
-        //stake_input.k_image = pe.keyimage;
+        // just placeholders, they will be filled in wallet2::prepare_and_sign_pos_block()
         tx.vin.emplace_back(std::move(txin_zc_input()));
-        //reserve place for ring signature
         tx.signatures.emplace_back(std::move(zarcanum_sig()));
       }
       else
       {
         // old fashioned non-hidden amount direct spend PoS scheme
-        txin_to_key stake_input;
-        stake_input.amount = pe.amount;
-        stake_input.key_offsets.push_back(pe.g_index);
-        stake_input.k_image = pe.keyimage;
-        tx.vin.push_back(stake_input);
-        //reserve place for ring signature
-        NLSAG_sig nlsag;
-        nlsag.s.resize(stake_input.key_offsets.size());
-        tx.signatures.push_back(nlsag); // consider using emplace_back and avoid copying
+        // just placeholders, they will be filled in wallet2::prepare_and_sign_pos_block()
+        tx.vin.emplace_back(std::move(txin_to_key()));
+        tx.signatures.emplace_back(std::move(NLSAG_sig()));
       }
     }
 
@@ -332,6 +328,9 @@ namespace currency
       //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
       set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
     }
+
+    if (blinding_masks_sum_ptr)
+      *blinding_masks_sum_ptr = blinding_masks_sum;
 
     return true;
   }
@@ -386,6 +385,9 @@ namespace currency
         VARIANT_SWITCH_BEGIN(sig_v);
         VARIANT_CASE_CONST(ZC_sig, zc_sig);
           sum_of_pseudo_out_amount_commitments += crypto::point_t(zc_sig.pseudo_out_amount_commitment); // *1/8
+          ++zc_sigs_count;
+        VARIANT_CASE_CONST(zarcanum_sig, sig);
+          sum_of_pseudo_out_amount_commitments += crypto::point_t(sig.pseudo_out_amount_commitment); // *1/8
           ++zc_sigs_count;
         VARIANT_SWITCH_END();
       }
@@ -927,12 +929,12 @@ namespace currency
         crypto::derivation_to_scalar((const crypto::key_derivation&)derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
 
         out.stealth_address = (h * crypto::c_point_G + crypto::point_t(apa.spend_public_key)).to_public_key();
-        out.concealing_point = (crypto::c_scalar_1div8 * crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(apa.view_public_key)).to_public_key(); // Q = 1/8 * Hs(domain_sep, h) * V
+        out.concealing_point = (crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(apa.view_public_key)).to_public_key(); // Q = 1/8 * Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
       
         crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
       
-        out_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        out_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_BLINDING_MASK, h); // f = Hs(domain_sep, Hs(8 * r * V, i) )
         out.amount_commitment = (crypto::c_scalar_1div8 * de.amount * crypto::c_point_H + crypto::c_scalar_1div8 * out_blinding_mask * crypto::c_point_G).to_public_key(); // A = 1/8 * a * H + 1/8 * f * G
 
         if (de.addr.front().is_auditable())
@@ -1594,8 +1596,9 @@ namespace currency
   // prepare inputs
   struct input_generation_context_data
   {
-    keypair in_ephemeral;
-    //std::vector<keypair> participants_derived_keys;
+    keypair in_ephemeral    {};                           // ephemeral output key (stealth_address and secret_x)
+    size_t real_out_index   = SIZE_MAX;                   // index of real output in local outputs vector
+    std::vector<tx_source_entry::output_entry> outputs{}; // sorted by gindex
   };
   //--------------------------------------------------------------------------------
   bool generate_ZC_sig(const crypto::hash& tx_hash_for_signature, size_t input_index, const tx_source_entry& se, const input_generation_context_data& in_context,
@@ -1616,7 +1619,7 @@ namespace currency
 #ifndef NDEBUG
     {
       crypto::point_t source_amount_commitment = crypto::c_scalar_1div8 * se.amount * crypto::c_point_H + crypto::c_scalar_1div8 * se.real_out_amount_blinding_mask * crypto::c_point_G;
-      CHECK_AND_ASSERT_MES(se.outputs[se.real_output].amount_commitment == source_amount_commitment.to_public_key(), false, "real output amount commitment check failed");
+      CHECK_AND_ASSERT_MES(in_context.outputs[in_context.real_out_index].amount_commitment == source_amount_commitment.to_public_key(), false, "real output amount commitment check failed");
     }
 #endif
 
@@ -1651,10 +1654,10 @@ namespace currency
     //     se.real_out_amount_blinding_mask - blinding_mask;
 
     std::vector<crypto::CLSAG_GG_input_ref_t> ring;
-    for(size_t j = 0; j < se.outputs.size(); ++j)
-      ring.emplace_back(se.outputs[j].stealth_address, se.outputs[j].amount_commitment);
+    for(size_t j = 0; j < in_context.outputs.size(); ++j)
+      ring.emplace_back(in_context.outputs[j].stealth_address, in_context.outputs[j].amount_commitment);
 
-    return crypto::generate_CLSAG_GG(tx_hash_for_signature, ring, pseudo_out_amount_commitment, in.k_image, in_context.in_ephemeral.sec, se.real_out_amount_blinding_mask - blinding_mask, se.real_output, sig.clsags_gg);
+    return crypto::generate_CLSAG_GG(tx_hash_for_signature, ring, pseudo_out_amount_commitment, in.k_image, in_context.in_ephemeral.sec, se.real_out_amount_blinding_mask - blinding_mask, in_context.real_out_index, sig.clsags_gg);
   }
   //--------------------------------------------------------------------------------
   bool generate_NLSAG_sig(const crypto::hash& tx_hash_for_signature, const crypto::hash& tx_prefix_hash, size_t input_index, const tx_source_entry& src_entr,
@@ -1679,22 +1682,22 @@ namespace currency
         *pss_ring_s << "input #" << input_index << ", pub_keys:" << ENDL;
 
       std::vector<const crypto::public_key*> keys_ptrs;
-      for(const tx_source_entry::output_entry& o : src_entr.outputs)
+      for(const tx_source_entry::output_entry& o : in_context.outputs)
       {
         keys_ptrs.push_back(&o.stealth_address);
         if (pss_ring_s)
           *pss_ring_s << o.stealth_address << ENDL;
       }
-      sigs.resize(src_entr.outputs.size());
+      sigs.resize(in_context.outputs.size());
 
       if (!watch_only_mode)
-        crypto::generate_ring_signature(tx_hash_for_signature, get_key_image_from_txin_v(tx.vin[input_index]), keys_ptrs, in_context.in_ephemeral.sec, src_entr.real_output, sigs.data());
+        crypto::generate_ring_signature(tx_hash_for_signature, get_key_image_from_txin_v(tx.vin[input_index]), keys_ptrs, in_context.in_ephemeral.sec, in_context.real_out_index, sigs.data());
 
       if (pss_ring_s)
       {
         *pss_ring_s << "signatures:" << ENDL;
         std::for_each(sigs.begin(), sigs.end(), [&pss_ring_s](const crypto::signature& s) { *pss_ring_s << s << ENDL; });
-        *pss_ring_s << "prefix_hash: " << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_context.in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output << ENDL;
+        *pss_ring_s << "prefix_hash: " << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_context.in_ephemeral.sec << ENDL << "real_output: " << in_context.real_out_index << ENDL;
       }
     }
 
@@ -1832,7 +1835,11 @@ namespace currency
     {
       inputs_mapping[current_index] = current_index;
       current_index++;
-      in_contexts.push_back(input_generation_context_data());
+      in_contexts.push_back(input_generation_context_data{});
+      input_generation_context_data& in_context = in_contexts.back();
+
+      in_context.outputs = prepare_outputs_entries_for_key_offsets(src_entr.outputs, src_entr.real_output, in_context.real_out_index);
+
       if(src_entr.is_multisig())
       {//multisig input
         txin_multisig input_multisig = AUTO_VAL_INIT(input_multisig);
@@ -1844,7 +1851,7 @@ namespace currency
       else if (src_entr.htlc_origin.size())
       {
         //htlc redeem
-        keypair& in_ephemeral = in_contexts.back().in_ephemeral;
+        keypair& in_ephemeral = in_context.in_ephemeral;
         //txin_to_key
         if(src_entr.outputs.size() != 1)
         {
@@ -1859,11 +1866,11 @@ namespace currency
           return false;
 
         //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].stealth_address))
+        if (!(in_ephemeral.pub == src_entr.outputs.front().stealth_address))
         {
           LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
             << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].stealth_address));
+            << string_tools::pod_to_hex(src_entr.outputs.front().stealth_address));
           return false;
         }
 
@@ -1872,47 +1879,37 @@ namespace currency
         input_to_key.amount = src_entr.amount;
         input_to_key.k_image = img;
         input_to_key.hltc_origin = src_entr.htlc_origin;
+        input_to_key.key_offsets.push_back(src_entr.outputs.front().out_reference);
 
-        //fill outputs array and use relative offsets
-        for(const tx_source_entry::output_entry& out_entry : src_entr.outputs)
-          input_to_key.key_offsets.push_back(out_entry.out_reference);
-
-        input_to_key.key_offsets = absolute_output_offsets_to_relative(input_to_key.key_offsets);
         tx.vin.push_back(input_to_key);
       }
       else
       {
-        //regular to key out
-        keypair& in_ephemeral = in_contexts.back().in_ephemeral;
-        //txin_to_key
-        if (src_entr.real_output >= src_entr.outputs.size())
-        {
-          LOG_ERROR("real_output index (" << src_entr.real_output << ") greater than or equal to output_keys.size()=" << src_entr.outputs.size());
-          return false;
-        }
+        // txin_to_key or txin_zc_input
+        CHECK_AND_ASSERT_MES(in_context.real_out_index < in_context.outputs.size(), false,
+          "real_output index (" << in_context.real_out_index << ") greater than or equal to in_context.outputs.size()=" << in_context.outputs.size());
+
         summary_inputs_money += src_entr.amount;
 
         //key_derivation recv_derivation;
         crypto::key_image img;
-        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
+        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_context.in_ephemeral, img))
           return false;
 
         //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].stealth_address))
+        if (!(in_context.in_ephemeral.pub == in_context.outputs[in_context.real_out_index].stealth_address))
         {
           LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-            << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs[src_entr.real_output].stealth_address));
+            << string_tools::pod_to_hex(in_context.in_ephemeral.pub) << ENDL << "real output_public_key:"
+            << string_tools::pod_to_hex(in_context.outputs[in_context.real_out_index].stealth_address));
           return false;
         }
 
         //fill key_offsets array with relative offsets
         std::vector<txout_ref_v> key_offsets;
-        for(const tx_source_entry::output_entry& out_entry : src_entr.outputs)
+        for(const tx_source_entry::output_entry& out_entry : in_context.outputs)
           key_offsets.push_back(out_entry.out_reference);
 
-        key_offsets = absolute_output_offsets_to_relative(key_offsets);
-        
         //TODO: Might need some refactoring since this scheme is not the clearest one(did it this way for now to keep less changes to not broke anything)
         //potentially this approach might help to support htlc and multisig without making to complicated code
         if (src_entr.is_zarcanum())
@@ -1936,15 +1933,10 @@ namespace currency
           input_to_key.k_image = img;
           input_to_key.key_offsets = std::move(key_offsets);
           tx.vin.push_back(input_to_key);
-          //NLSAG_sources.push_back(&src_entr);
         }        
       }
     }
 
-    /*if (ins_zc.elements.size())
-    {
-      tx.vin.push_back(ins_zc);
-    }*/
     uint64_t amount_of_assets = 0;
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
     if (asset_id_for_destinations != currency::null_hash)
@@ -2106,45 +2098,21 @@ namespace currency
       }
 
       LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
-
-      //input_index++;
-      //in_context_index++;
     }
-    /*
-    for(const tx_source_entry& source_entry : sources)
-    {
-      crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, input_index, tx_prefix_hash);
-      CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
-      std::stringstream ss_ring_s;
 
-      if (source_entry.is_zarcanum())
-      {
-        // ZC
-        // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
-        r = generate_ZC_sig(tx_hash_for_signature, input_index, source_entry, in_contexts[in_context_index], sender_account_keys, blinding_masks_sum, flags, local_blinding_masks_sum, tx);
-        CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
-      }
-      else
-      {
-        // NLSAG
-        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, input_index, source_entry, sender_account_keys, in_contexts[in_context_index], txkey, flags, tx, &ss_ring_s);
-        CHECK_AND_ASSERT_MES(r, false, "generate_NLSAG_sig failed");
-      }
+    //size_t prefix_size = get_object_blobsize(static_cast<const transaction_prefix&>(tx));
+    //size_t full_blob_size = t_serializable_object_to_blob(tx).size();
+    //size_t estimated_blob_size = get_object_blobsize(tx);
+    //CHECK_AND_ASSERT_MES(full_blob_size == estimated_blob_size, false, "!");
 
-      LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
-
-      input_index++;
-      in_context_index++;
-    }
-    */
     return true;
   }
 
 
   //---------------------------------------------------------------
-  uint64_t get_tx_version(uint64_t h, const hard_forks_descriptor& hfd)
+  uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd)
   {
-    if (!hfd.is_hardfork_active_for_height(4, h))
+    if (!hfd.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, tx_expected_block_height))
     {
       return TRANSACTION_VERSION_PRE_HF4;
     }
@@ -2503,18 +2471,18 @@ namespace currency
     return res;
   }
   //---------------------------------------------------------------
-  bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index)
+  bool is_out_to_acc(const account_public_address& addr, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    if (!derive_public_key(derivation, output_index, acc.account_address.spend_public_key, pk))
+    if (!derive_public_key(derivation, output_index, addr.spend_public_key, pk))
       return false;
     return pk == out_key.key;
   }
   //---------------------------------------------------------------
-  bool is_out_to_acc(const account_keys& acc, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index)
+  bool is_out_to_acc(const account_public_address& addr, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index)
   {
     crypto::public_key pk;
-    if (!derive_public_key(derivation, output_index, acc.account_address.spend_public_key, pk))
+    if (!derive_public_key(derivation, output_index, addr.spend_public_key, pk))
       return false;
     auto it = std::find(out_multisig.keys.begin(), out_multisig.keys.end(), pk);
     if (out_multisig.keys.end() == it)
@@ -2522,16 +2490,16 @@ namespace currency
     return true;
   }
 
-  bool is_out_to_acc(const account_keys& acc, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::scalar_t& blinding_mask)
+  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::scalar_t& blinding_mask)
   {
     crypto::scalar_t h; // = crypto::hash_helper_t::hs(reinterpret_cast<const crypto::public_key&>(derivation), output_index); // h = Hs(8 * r * V, i)
     crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
 
-    crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(acc.account_address.spend_public_key); // P =? Hs(8rV, i) * G + S
+    crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(addr.spend_public_key); // P =? Hs(8rV, i) * G + S
     if (P_prime.to_public_key() != zo.stealth_address)
       return false;
     
-    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(acc.account_address.view_public_key); // Q' * 8 =? Hs(domain_sep, h) * V
+    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * 8 * crypto::point_t(addr.view_public_key); // Q' * 8 =? Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
     if (Q_prime != crypto::point_t(zo.concealing_point).modify_mul8())
       return false;
 
@@ -2595,7 +2563,7 @@ namespace currency
     const tx_out_bare& o = boost::get<tx_out_bare>(ov);
 
     CHECK_AND_ASSERT_MES(o.target.type() == typeid(txout_to_key), false, "condition failed: o.target.type() == typeid(txout_to_key)");
-    if (is_out_to_acc(acc, boost::get<txout_to_key>(o.target), derivation, offset))
+    if (is_out_to_acc(acc.account_address, boost::get<txout_to_key>(o.target), derivation, offset))
     {
       outs.emplace_back(offset, o.amount);
       money_transfered += o.amount;
@@ -2632,25 +2600,25 @@ namespace currency
       {
         VARIANT_SWITCH_BEGIN(o.target);
         VARIANT_CASE_CONST(txout_to_key, t)
-          if (is_out_to_acc(acc, t, derivation, output_index))
+          if (is_out_to_acc(acc.account_address, t, derivation, output_index))
           {
             outs.emplace_back(output_index, o.amount);
             money_transfered += o.amount;
           }
         VARIANT_CASE_CONST(txout_multisig, t)
-          if (is_out_to_acc(acc, t, derivation, output_index))
+          if (is_out_to_acc(acc.account_address, t, derivation, output_index))
           {
             outs.emplace_back(output_index, o.amount); // TODO: @#@# consider this
             //don't cout this money
           }
         VARIANT_CASE_CONST(txout_htlc, htlc)
           htlc_info hi = AUTO_VAL_INIT(hi);
-          if (is_out_to_acc(acc, htlc.pkey_redeem, derivation, output_index))
+          if (is_out_to_acc(acc.account_address, htlc.pkey_redeem, derivation, output_index))
           {
             hi.hltc_our_out_is_before_expiration = true;
             htlc_info_list.push_back(hi);
           }
-          else if (is_out_to_acc(acc, htlc.pkey_refund, derivation, output_index))
+          else if (is_out_to_acc(acc.account_address, htlc.pkey_refund, derivation, output_index))
           {
             hi.hltc_our_out_is_before_expiration = false;
             htlc_info_list.push_back(hi);
@@ -2664,7 +2632,7 @@ namespace currency
       VARIANT_CASE_CONST(tx_out_zarcanum, zo)
         uint64_t amount = 0;
         crypto::scalar_t blinding_mask = 0;
-        if (is_out_to_acc(acc, zo, derivation, output_index, amount, blinding_mask))
+        if (is_out_to_acc(acc.account_address, zo, derivation, output_index, amount, blinding_mask))
         {
           outs.emplace_back(output_index, amount, blinding_mask);
           open_asset_id v = AUTO_VAL_INIT(v);
@@ -3063,6 +3031,7 @@ namespace currency
     return res;
   }
   //---------------------------------------------------------------
+  // DEPRECATED: consider using prepare_outputs_entries_for_key_offsets and absolute_sorted_output_offsets_to_relative_in_place instead
   std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off)
   {
     std::vector<txout_ref_v> res = off;
@@ -3104,6 +3073,34 @@ namespace currency
 
 
     return res;
+  }
+  //---------------------------------------------------------------
+  bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept
+  {
+    if (offsets.size() < 2)
+      return true;
+
+    size_t i = offsets.size() - 1;
+    while (i != 0 && offsets[i].type() == typeid(ref_by_id))
+      --i;
+
+    try
+    {
+      for (; i != 0; i--)
+      {
+        uint64_t& offset_i   = boost::get<uint64_t>(offsets[i]);
+        uint64_t& offset_im1 = boost::get<uint64_t>(offsets[i - 1]);
+        if (offset_i <= offset_im1)
+          return false; // input was not properly sorted
+        offset_i -= offset_im1;
+      }
+    }
+    catch(...)
+    {
+      return false; // unexpected type in boost::get (all ref_by_id's must be at the end of 'offsets')
+    }
+
+    return true;
   }
   //---------------------------------------------------------------
   bool parse_and_validate_block_from_blob(const blobdata& b_blob, block& b)
@@ -3976,6 +3973,11 @@ namespace currency
   {
     //@#@ TODO
     return false;
+  }
+  //--------------------------------------------------------------------------------
+  bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b)
+  {
+    return a.n == b.n && a.tx_id == b.tx_id;
   }
   //--------------------------------------------------------------------------------
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs)

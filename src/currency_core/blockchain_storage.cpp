@@ -37,6 +37,7 @@
 #include "tx_semantic_validation.h"
 #include "crypto/RIPEMD160_helper.h"
 #include "crypto/bitcoin/sha256_helper.h"
+#include "crypto_config.h"
 
 
 #undef LOG_DEFAULT_CHANNEL 
@@ -1280,7 +1281,10 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   }
   if (pos)
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "coinstake transaction in the block has the wrong type");
+    if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+      CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "coinstake tx has incorrect type of input #1: " << b.miner_tx.vin[1].type().name());
+    else
+      CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "coinstake tx has incorrect type of input #1: " << b.miner_tx.vin[1].type().name());
   }
 
   if (m_core_runtime_config.is_hardfork_active_for_height(1, height))
@@ -1315,11 +1319,19 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
     return false;
   }
 
-  if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
+  if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 2, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zc_outs_range_proof)");
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment[1].type() == typeid(zc_balance_proof), false, "coinbase transaction wrong attachmenttype #1 (expected: zc_balance_proof)");
+    if (pos)
+    {
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 1, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zc_outs_range_proof)");
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 2, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zc_outs_range_proof)");
+      CHECK_AND_ASSERT_MES(b.miner_tx.attachment[1].type() == typeid(zc_balance_proof), false, "coinbase transaction wrong attachmenttype #1 (expected: zc_balance_proof)");
+    }
   }
   else
   {
@@ -1394,24 +1406,25 @@ uint64_t blockchain_storage::get_current_comulative_blocksize_limit() const
   return m_db_current_block_cumul_sz_limit;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::create_block_template(block& b,
-                                               const account_public_address& miner_address, 
+bool blockchain_storage::create_block_template(const account_public_address& miner_address,
+                                               const blobdata& ex_nonce,
+                                               block& b,
                                                wide_difficulty_type& diffic, 
-                                               uint64_t& height, 
-                                               const blobdata& ex_nonce) const
+                                               uint64_t& height) const
 {
-  return create_block_template(b, miner_address, miner_address, diffic, height, ex_nonce, false, pos_entry());
+  return create_block_template(miner_address, miner_address, ex_nonce, false, pos_entry(), nullptr, b, diffic, height);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::create_block_template(block& b, 
-                                               const account_public_address& miner_address, 
+bool blockchain_storage::create_block_template(const account_public_address& miner_address,
                                                const account_public_address& stakeholder_address,
-                                               wide_difficulty_type& diffic, 
-                                               uint64_t& height, 
-                                               const blobdata& ex_nonce, 
-                                               bool pos, 
+                                               const blobdata& ex_nonce,
+                                               bool pos,
                                                const pos_entry& pe,
-                                               fill_block_template_func_t custom_fill_block_template_func /* = nullptr */) const
+                                               fill_block_template_func_t custom_fill_block_template_func,
+                                               block& b,
+                                               wide_difficulty_type& diffic,
+                                               uint64_t& height,
+                                               crypto::scalar_t* blinding_mask_sum_ptr /* = nullptr */) const
 {
   create_block_template_params params = AUTO_VAL_INIT(params);
   params.miner_address = miner_address;
@@ -1422,9 +1435,12 @@ bool blockchain_storage::create_block_template(block& b,
   params.pcustom_fill_block_template_func = custom_fill_block_template_func;
   create_block_template_response resp = AUTO_VAL_INIT(resp);
   bool r = create_block_template(params, resp);
+
   b = resp.b;
   diffic = resp.diffic;
-  height = resp.height;  
+  height = resp.height;
+  if (blinding_mask_sum_ptr)
+    *blinding_mask_sum_ptr = resp.blinding_mask_sum;
   return r;
 }
 
@@ -1508,7 +1524,8 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    ex_nonce, 
                                                    CURRENCY_MINER_TX_MAX_OUTS, 
                                                    pos,
-                                                   pe);
+                                                   pe,
+                                                   &resp.blinding_mask_sum);
   CHECK_AND_ASSERT_MES(r, false, "Failed to construc miner tx, first chance");
   uint64_t coinbase_size = get_object_blobsize(b.miner_tx);
   // "- 100" - to reserve room for PoS additions into miner tx
@@ -5419,7 +5436,36 @@ bool blockchain_storage::validate_pos_block(const block& b,
 
   if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
   {
-    return false; // not implemented yet, TODO @#@#
+    CHECK_AND_ASSERT_MES(b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4, false, "Zarcanum PoS: miner tx with version " << b.miner_tx.version << " is not allowed");
+    CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "incorrect input 1 type: " << b.miner_tx.vin[1].type().name() << ", txin_zc_input expected");
+    const txin_zc_input& stake_input = boost::get<txin_zc_input>(b.miner_tx.vin[1]);
+    CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1, false, "incorrect number of stake input signatures: " << b.miner_tx.signatures.size());
+    CHECK_AND_ASSERT_MES(b.miner_tx.signatures[0].type() == typeid(zarcanum_sig), false, "incorrect sig 0 type: " << b.miner_tx.signatures[0].type().name());
+    const zarcanum_sig& sig = boost::get<zarcanum_sig>(b.miner_tx.signatures[0]);
+    const crypto::hash miner_tx_hash = get_transaction_hash(b.miner_tx);
+
+    // TODO @#@# do general input check for main chain blocks only?
+    uint64_t max_related_block_height = 0;
+    std::vector<crypto::public_key> dummy_output_keys; // won't be used
+    uint64_t dummy_source_max_unlock_time_for_pos_coinbase_dummy = 0; // won't be used
+    scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
+    r = get_output_keys_for_input_with_checks(b.miner_tx, stake_input, dummy_output_keys, max_related_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex);
+    CHECK_AND_ASSERT_MES(r, false, "get_output_keys_for_input_with_checks failed for stake input");
+    CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() == stake_input.key_offsets.size(), false, "incorrect number of referenced outputs found: " << scan_contex.zc_outs.size() << ", while " << stake_input.key_offsets.size() << " is expected.");
+    // build a ring of references
+    vector<crypto::CLSAG_GGXG_input_ref_t> ring;
+    ring.reserve(scan_contex.zc_outs.size());
+    for(auto& zc_out : scan_contex.zc_outs)
+      ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.concealing_point);
+
+    crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
+
+    uint8_t err = 0;
+    r = crypto::zarcanum_verify_proof(miner_tx_hash, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, sig, &err);
+    CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << err);
+
+    final_diff = basic_diff; // just for logs
+    return true;
   }
   else
   {
@@ -5703,17 +5749,24 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     m_is_in_checkpoint_zone = false;
 
   crypto::hash proof_hash = null_hash;
-  uint64_t pos_coinstake_amount = 0; 
+  uint64_t pos_coinstake_amount = UINT64_MAX; 
   wide_difficulty_type this_coin_diff = 0;
   bool is_pos_bl = is_pos_block(bl);
   //check if PoS allowed in this height
   CHECK_AND_ASSERT_MES_CUSTOM(!(is_pos_bl && m_db_blocks.size() < m_core_runtime_config.pos_minimum_heigh), false, bvc.m_verification_failed = true, "PoS block not allowed on height " << m_db_blocks.size());
 
+  if (!prevalidate_miner_transaction(bl, m_db_blocks.size(), is_pos_bl))
+  {
+    LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx prevalidation");
+    bvc.m_verification_failed = true;
+    return false;
+  }
+
   //check proof of work
   TIME_MEASURE_START_PD(target_calculating_time_2);
   wide_difficulty_type current_diffic = get_next_diff_conditional(is_pos_bl);
   CHECK_AND_ASSERT_MES_CUSTOM(current_diffic, false, bvc.m_verification_failed = true, "!!!!!!!!! difficulty overhead !!!!!!!!!");
- TIME_MEASURE_FINISH_PD(target_calculating_time_2);
+  TIME_MEASURE_FINISH_PD(target_calculating_time_2);
 
  TIME_MEASURE_START_PD(longhash_calculating_time_3);
   if (is_pos_bl)
@@ -5737,16 +5790,10 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       return false;
     }
   }
- TIME_MEASURE_FINISH_PD(longhash_calculating_time_3);
+  TIME_MEASURE_FINISH_PD(longhash_calculating_time_3);
 
   size_t aliases_count_befor_block = m_db_aliases.size();
 
-  if (!prevalidate_miner_transaction(bl, m_db_blocks.size(), is_pos_bl))
-  {
-    LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx prevalidation");
-    bvc.m_verification_failed = true;
-    return false;
-  }
   size_t cumulative_block_size = 0;
   size_t coinbase_blob_size = get_object_blobsize(bl.miner_tx);
 
@@ -6049,7 +6096,12 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   { // PoS
     int64_t actual_ts = get_block_datetime(bei.bl); // signed int is intentionally used here
     int64_t ts_diff = actual_ts - m_core_runtime_config.get_core_time();
-    powpos_str_entry << "PoS:\t" << proof_hash << ", stake amount: " << print_money_brief(pos_coinstake_amount) << ", final_difficulty: " << this_coin_diff;
+    powpos_str_entry << "PoS:\t" << proof_hash << ", stake amount: ";
+    if (pos_coinstake_amount != UINT64_MAX)
+      powpos_str_entry << print_money_brief(pos_coinstake_amount);
+    else
+      powpos_str_entry << "hidden";
+    powpos_str_entry << ", final_difficulty: " << this_coin_diff;
     timestamp_str_entry << ", actual ts: " << actual_ts << " (diff: " << std::showpos << ts_diff << "s) block ts: " << std::noshowpos << bei.bl.timestamp << " (shift: " << std::showpos << static_cast<int64_t>(bei.bl.timestamp) - actual_ts << ")";
   }
   else

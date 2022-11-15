@@ -355,7 +355,7 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe)
   {
-    return m_blockchain_storage.create_block_template(b, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
+    return m_blockchain_storage.create_block_template(adr, stakeholder_address, ex_nonce, pos, pe, nullptr, b, diffic, height);
   }
   //-----------------------------------------------------------------------------------------------
   bool core::get_block_template(const create_block_template_params& params, create_block_template_response& resp)
@@ -511,11 +511,11 @@ namespace currency
       if (h > 0)
       {
         auto& crc = m_blockchain_storage.get_core_runtime_config();
-        size_t hardfork_id_for_prev_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h - 1);
-        size_t hardfork_id_for_curr_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h);
+        size_t hardfork_id_for_prev_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h);
+        size_t hardfork_id_for_curr_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h + 1);
         if (hardfork_id_for_prev_block != hardfork_id_for_curr_block)
         {
-          LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " activated at height " << h, LOG_LEVEL_0);
+          LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " has been activated after the block at height " << h, LOG_LEVEL_0);
         }
       }
 

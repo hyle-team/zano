@@ -79,7 +79,7 @@ bool gen_pos_coinstake_already_spent::generate(std::vector<test_event_entry>& ev
   crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
   pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), alice.get_public_address());
@@ -130,7 +130,7 @@ bool gen_pos_incorrect_timestamp::generate(std::vector<test_event_entry>& events
   crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   // use incorrect timestamp_step
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp - 1, POS_SCAN_WINDOW, POS_SCAN_STEP - 1);
@@ -148,7 +148,7 @@ bool gen_pos_incorrect_timestamp::generate(std::vector<test_event_entry>& events
 
   // Now try PoS timestamp window boundaries.
   pb.clear();
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   // move timestamp to the future
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, ts + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT + 1, POS_SCAN_WINDOW, POS_SCAN_STEP);
@@ -162,7 +162,7 @@ bool gen_pos_incorrect_timestamp::generate(std::vector<test_event_entry>& events
 
   // lower limit
   pb.clear();
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   // move timestamp to the future
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, genesis_ts - POS_SCAN_WINDOW, POS_SCAN_WINDOW, POS_SCAN_STEP);
@@ -247,17 +247,17 @@ bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
   crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
 
   // use biggest possible extra nonce (255 bytes) + largest alias
-  currency::blobdata extra_none(255, 'x');
-  currency::extra_alias_entry alias = AUTO_VAL_INIT(alias);
-  alias.m_alias = std::string(255, 'a');
-  alias.m_address = miner.get_keys().account_address;
-  alias.m_text_comment = std::string(255, 'y');
-  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_none, CURRENCY_MINER_TX_MAX_OUTS, alias);
+  currency::blobdata extra_nonce(255, 'x');
+  //currency::extra_alias_entry alias = AUTO_VAL_INIT(alias); // TODO: this alias entry was ignored for a long time, now I commented it out, make sure it's okay -- sowle 
+  //alias.m_alias = std::string(255, 'a');
+  //alias.m_address = miner.get_keys().account_address;
+  //alias.m_text_comment = std::string(255, 'y');
+  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_nonce, CURRENCY_MINER_TX_MAX_OUTS);
   pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner);
   block blk_1 = pb.m_block;
 
@@ -301,7 +301,7 @@ bool gen_pos_min_allowed_height::generate(std::vector<test_event_entry>& events)
   crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>(1, tx_1));
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
   pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address());
@@ -353,7 +353,7 @@ bool gen_pos_invalid_coinbase::generate(std::vector<test_event_entry>& events) c
   crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
   pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), alice_acc.get_public_address());

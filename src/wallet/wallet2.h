@@ -43,6 +43,7 @@
 #include "common/pod_array_file_container.h"
 #include "wallet_chain_shortener.h"
 #include "tor-connect/torlib/tor_lib_iface.h"
+#include "currency_core/pos_mining.h"
 
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
@@ -412,27 +413,17 @@ namespace tools
       uint64_t m_unlock_time = 0;
     };
 
-    struct mining_context
+    struct mining_context : public currency::pos_mining_context
     {
       std::string   status;
 
-      bool          is_pos_allowed = false;;
-      bool          zarcanum = false;
+      bool          is_pos_allowed = false;
 
       uint64_t      index = 0; // index in m_transfers 
       uint64_t      stake_unlock_time = 0;
-      //uint64_t      block_timestamp;
       uint64_t      height = 0;
       uint64_t      starter_timestamp = 0;
       crypto::hash  last_block_hash = currency::null_hash;
-
-      crypto::scalar_t last_pow_block_id_hashed;    // Zarcanum notation: f'
-      crypto::scalar_t secret_q;                    // Zarcanum notation: q
-      boost::multiprecision::uint256_t z_l_div_z_D; // Zarcanum notation: z * floor( l / (z * D) )  (max possible value (assuming z=2^64) :  z * 2^252 / (z * 1) ~= 2^252)
-      crypto::hash     kernel_hash;                 // Zarcanum notation: h
-
-      currency::wide_difficulty_type basic_diff;
-      currency::stake_kernel sk;
 
       uint64_t      iterations_processed = 0;
       uint64_t      total_items_checked = 0;
@@ -699,7 +690,7 @@ namespace tools
     bool fill_mining_context(mining_context& ctx);
     
     void get_transfers(wallet2::transfer_container& incoming_transfers) const;
-    std::string get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const;
+    std::string get_transfers_str(bool include_spent = true, bool include_unspent = true) const;
 
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;
@@ -840,7 +831,7 @@ namespace tools
     //next functions in public area only becausce of test_generator
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
-    bool prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const currency::pos_entry& pe) const;
+    bool prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const currency::pos_entry& pe, const crypto::scalar_t& blinding_masks_sum) const;
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
@@ -968,7 +959,7 @@ private:
     std::string get_alias_for_address(const std::string& addr);
     std::vector<std::string> get_aliases_for_address(const std::string& addr);
     bool is_connected_to_net();
-    bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time) const;
+    bool is_transfer_okay_for_pos(const transfer_details& tr, bool is_zarcanum_hf, uint64_t& stake_unlock_time) const;
     bool scan_unconfirmed_outdate_tx();
     const currency::transaction& get_transaction_by_id(const crypto::hash& tx_hash);
     void rise_on_transfer2(const wallet_public::wallet_transfer_info& wti);
@@ -1342,7 +1333,7 @@ namespace tools
       auto& tr = m_transfers[transfer_index];
 
       uint64_t stake_unlock_time = 0;
-      if (!is_transfer_okay_for_pos(tr, stake_unlock_time))
+      if (!is_transfer_okay_for_pos(tr, cxt.zarcanum, stake_unlock_time))
         continue;
 
       

@@ -49,7 +49,7 @@ bool wallet_test::check_balance_via_build_wallets(currency::core& c, size_t ev_i
   r = generator.build_wallets(get_block_hash(*top_block), accounts, w, c.get_blockchain_storage().get_core_runtime_config());
   CHECK_AND_ASSERT_MES(r && w.size() == 1 && w[0].wallet != 0, false, "check_balance: failed to build wallets");
 
-  if (!check_balance_via_wallet(*w[0].wallet, epee::string_tools::num_to_string_fast(pcb.account_index).c_str(), pcb.total_balance, pcb.mined_balance, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
+  if (!check_balance_via_wallet(*w[0].wallet, get_test_account_name_by_id(pcb.account_index).c_str(), pcb.total_balance, pcb.mined_balance, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
     return false;
 
   return true;
@@ -67,11 +67,24 @@ bool wallet_test::check_balance(currency::core& c, size_t ev_index, const std::v
   bool has_aliases = false;
   w->scan_tx_pool(has_aliases);
 
-  if (!check_balance_via_wallet(*w.get(), epee::string_tools::num_to_string_fast(pcb.account_index).c_str(), pcb.total_balance, pcb.mined_balance, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
+  if (!check_balance_via_wallet(*w.get(), get_test_account_name_by_id(pcb.account_index).c_str(), pcb.total_balance, pcb.mined_balance, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
     return false;
 
   return true;
 }
+
+ std::string wallet_test::get_test_account_name_by_id(size_t acc_id)
+ {
+   switch(acc_id)
+   {
+   case MINER_ACC_IDX: return "miner";
+   case ALICE_ACC_IDX: return "Alice";
+   case BOB_ACC_IDX:   return "Bob";
+   case CAROL_ACC_IDX: return "Carol";
+   case DAN_ACC_IDX:   return "Dan";
+   default:            return "unknown";
+   }
+ }
 
 std::shared_ptr<tools::wallet2> wallet_test::init_playtime_test_wallet(const std::vector<test_event_entry>& events, currency::core& c, const account_base& acc) const
 {

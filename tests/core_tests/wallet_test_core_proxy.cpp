@@ -32,9 +32,16 @@ bool wallet_test_core_proxy::update_blockchain(const std::vector<test_event_entr
   for (auto b : m_blocks)
     std::for_each(b->b.tx_hashes.begin(), b->b.tx_hashes.end(), [&confirmed_txs](const crypto::hash& h) { confirmed_txs.insert(h); });
 
-  for (auto e : events)
+  size_t invalid_tx_index = UINT64_MAX;
+  for (size_t i = 0; i < events.size(); ++i)
   {
-    if (e.type() != typeid(currency::transaction))
+    const test_event_entry& e = events[i];
+    if (test_chain_unit_enchanced::is_event_mark_invalid_tx(e))
+    {
+      invalid_tx_index = i + 1;
+      continue;
+    }
+    if (e.type() != typeid(currency::transaction) || i == invalid_tx_index)
       continue;
 
     const currency::transaction& tx = boost::get<currency::transaction>(e);

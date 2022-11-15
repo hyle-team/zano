@@ -60,6 +60,7 @@ namespace currency
   bool operator ==(const currency::void_sig& a, const currency::void_sig& b);
   bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b);
   bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
+  bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b);
 
   typedef boost::multiprecision::uint128_t uint128_tl;
 
@@ -243,7 +244,9 @@ namespace currency
                                                              const blobdata& extra_nonce = blobdata(), 
                                                              size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS, 
                                                              bool pos = false,
-                                                             const pos_entry& pe = pos_entry());
+                                                             const pos_entry& pe = pos_entry(),
+                                                             crypto::scalar_t* blinding_masks_sum_ptr = nullptr,
+                                                             const keypair* tx_one_time_key_to_use = nullptr);
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& out_blinding_mask, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
@@ -288,7 +291,7 @@ namespace currency
     bool shuffle = true,
     uint64_t flags = 0);
 
-  uint64_t get_tx_version(uint64_t h, const hard_forks_descriptor& hfd);
+  uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd); // returns tx version based on the height of the block where the transaction is expected to be
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
   crypto::hash get_asset_id_from_descriptor(const asset_descriptor_base& adb);
 
@@ -306,9 +309,9 @@ namespace currency
   bool add_tx_extra_userdata(transaction& tx, const blobdata& extra_nonce);
 
   crypto::hash get_multisig_out_id(const transaction& tx, size_t n);
-  bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index);
-  bool is_out_to_acc(const account_keys& acc, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index);
-  bool is_out_to_acc(const account_keys& acc, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount);
+  bool is_out_to_acc(const account_public_address& addr, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index);
+  bool is_out_to_acc(const account_public_address& addr, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index);
+  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::scalar_t& blinding_mask);
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation);
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list);
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation);
@@ -363,7 +366,11 @@ namespace currency
   uint64_t get_block_height(const transaction& coinbase);
   uint64_t get_block_height(const block& b);
   std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);
+  // DEPRECATED: consider using prepare_outputs_entries_for_key_offsets and absolute_sorted_output_offsets_to_relative_in_place instead
   std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off);
+  bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept;
+
+
 
   // prints amount in format "3.14", "0.0"
   std::string print_money_brief(uint64_t amount);
@@ -811,6 +818,17 @@ namespace currency
   inline uint64_t get_amount_from_variant(const txin_v& v)
   {
     return boost::apply_visitor(input_amount_getter(), v);
+  }
+  //---------------------------------------------------------------
+  struct output_amount_getter : public boost::static_visitor<uint64_t>
+  {
+    template<class out_t>
+    uint64_t operator()(const out_t&)                 const { return 0; }
+    uint64_t operator()(const tx_out_bare& ob)        const { return ob.amount; }
+  };
+  inline uint64_t get_amount_from_variant(const tx_out_v& out_v)
+  {
+    return boost::apply_visitor(output_amount_getter(), out_v);
   }
   //---------------------------------------------------------------
   inline const tx_out_bare& get_tx_out_bare_from_out_v(const tx_out_v& o)

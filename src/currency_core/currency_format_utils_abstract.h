@@ -129,8 +129,9 @@ namespace currency
         return boost::get<specific_type_t>(ai);
       }
     }
-    ASSERT_MES_AND_THROW("Objec not found");
+    ASSERT_MES_AND_THROW("Object with type " << typeid(specific_type_t).name() << " was not found in a container");
   }
+  //---------------------------------------------------------------
   // if cb returns true, it means "continue", false -- means "stop"
   template<typename specific_type_t, typename variant_container_t, typename callback_t>
   bool process_type_in_variant_container(const variant_container_t& av, callback_t& cb, bool return_value_if_none_found = true)

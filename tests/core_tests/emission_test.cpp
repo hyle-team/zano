@@ -92,7 +92,7 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
       crypto::hash prev_id = get_block_hash(b);
       crypto::hash stake_tx_hash = stake_tx_outs.front().first;
       size_t stake_output_idx    = stake_tx_outs.front().second;
-      auto tce_ptr = c.get_blockchain_storage().get_tx_chain_entry(stake_tx_hash);
+      auto tce_ptr = bcs.get_tx_chain_entry(stake_tx_hash);
       CHECK_AND_ASSERT_MES(tce_ptr, false, "");
       CHECK_AND_ASSERT_MES(stake_output_idx < tce_ptr->m_global_output_indexes.size(), false, "");
 
@@ -105,11 +105,11 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
       generate_key_image_helper(m_miner_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
       crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
-      difficulty = c.get_blockchain_storage().get_next_diff_conditional(true);
+      difficulty = bcs.get_next_diff_conditional(true);
       //size_t median_size = 0; // little hack: we're using small blocks (only coinbase tx), so we're in CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE - don't need to calc median size
 
       pb.clear();
-      pb.step1_init_header(get_block_height(b) + 1, prev_id);
+      pb.step1_init_header(bcs.get_core_runtime_config().hard_forks, get_block_height(b) + 1, prev_id);
       pb.step2_set_txs(std::vector<transaction>());
       pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, difficulty, prev_id, null_hash, timestamp);
       pb.step4_generate_coinbase_tx(0, already_generated_coins, m_miner_acc.get_public_address());

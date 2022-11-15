@@ -32,15 +32,18 @@ namespace crypto
   struct CLSAG_GG_input_ref_t
   {
     CLSAG_GG_input_ref_t(const public_key& stealth_address, const public_key& amount_commitment)
-      : stealth_address(stealth_address), amount_commitment(amount_commitment) {}
+      : stealth_address(stealth_address), amount_commitment(amount_commitment)
+    {}
 
-    const public_key& stealth_address;   // not premultiplied by 1/8, TODO @#@#: make sure it's okay
-    const public_key& amount_commitment; // multiplied by 1/8
+    const public_key& stealth_address;   // P, not premultiplied by 1/8, TODO @#@#: make sure it's okay
+    const public_key& amount_commitment; // A, premultiplied by 1/8
   };
 
+  // pseudo_out_amount_commitment -- not premultiplied by 1/8
   bool generate_CLSAG_GG(const hash& m, const std::vector<CLSAG_GG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const key_image& ki,
     const scalar_t& secret_x, const scalar_t& secret_f, uint64_t secret_index, CLSAG_GG_signature& sig);
 
+  // pseudo_out_amount_commitment -- premultiplied by 1/8
   bool verify_CLSAG_GG(const hash& m, const std::vector<CLSAG_GG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment, const key_image& ki,
     const CLSAG_GG_signature& sig);
 
@@ -71,10 +74,15 @@ namespace crypto
     const public_key& concealing_point; // Q, premultiplied by 1/8
   };
 
+  // pseudo_out_amount_commitment -- not premultiplied by 1/8
+  // extended_amount_commitment   -- not premultiplied by 1/8
   bool generate_CLSAG_GGXG(const hash& m, const std::vector<CLSAG_GGXG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const point_t& extended_amount_commitment, const key_image& ki,
     const scalar_t& secret_0_xp, const scalar_t& secret_1_f, const scalar_t& secret_2_x, const scalar_t& secret_3_q, uint64_t secret_index, CLSAG_GGXG_signature& sig);
 
-  bool verify_CLSAG_GGXG(const hash& m, const std::vector<CLSAG_GGXG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment, const public_key& extended_amount_commitment, const key_image& ki,
-    const CLSAG_GGXG_signature& sig);
+  // pseudo_out_amount_commitment -- premultiplied by 1/8
+  // extended_amount_commitment   -- premultiplied by 1/8
+  // may throw an exception TODO @#@# make sure it's okay
+  bool verify_CLSAG_GGXG(const hash& m, const std::vector<CLSAG_GGXG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment,
+    const public_key& extended_amount_commitment, const key_image& ki, const CLSAG_GGXG_signature& sig);
 
 } // namespace crypto

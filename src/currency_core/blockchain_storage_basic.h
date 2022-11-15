@@ -144,6 +144,7 @@ namespace currency
     block b;
     wide_difficulty_type diffic;
     uint64_t height;
+    crypto::scalar_t blinding_mask_sum; // sum of all the outputs' blinding masks
   };
 
   typedef std::unordered_map<crypto::hash, transaction> transactions_map;

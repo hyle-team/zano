@@ -60,7 +60,6 @@ bool hard_fork_2_tx_payer_in_wallet::generate(std::vector<test_event_entry>& eve
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -307,7 +306,6 @@ bool hard_fork_2_tx_receiver_in_wallet::generate(std::vector<test_event_entry>& 
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
@@ -448,7 +446,6 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::generate(std::vector<test_event
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -640,7 +637,6 @@ bool hard_fork_2_auditable_addresses_basics::generate(std::vector<test_event_ent
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -740,13 +736,16 @@ hard_fork_2_no_new_structures_before_hf::hard_fork_2_no_new_structures_before_hf
 
 bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_entry>& events) const
 {
+  test_gentime_settings tgs = test_generator::get_test_gentime_settings();
+  tgs.ignore_invalid_txs = false; // this test pushes originally invalid tx_0, tx_1 and tx_2 which are good after HF2, so we'd like to avoid mess with the sources among txs
+  test_generator::set_test_gentime_settings(tgs);
+
   bool r = false;
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -830,9 +829,9 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);
 
-  events.push_back(tx_0);
-  events.push_back(tx_1);
-  events.push_back(tx_2);
+  ADD_CUSTOM_EVENT(events, tx_0);
+  ADD_CUSTOM_EVENT(events, tx_1);
+  ADD_CUSTOM_EVENT(events, tx_2);
 
 
   // tx_0 with tx_payer should be accepted after HF2
@@ -884,7 +883,6 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::generate(std::vector<test_
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -1158,7 +1156,6 @@ bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::generate(std::vector<te
   alice_acc.set_createtime(ts);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   events.push_back(event_core_time(ts));
 
@@ -1276,7 +1273,6 @@ bool hard_fork_2_incorrect_alias_update<before_hf_2>::generate(std::vector<test_
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 

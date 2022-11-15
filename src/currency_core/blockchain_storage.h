@@ -260,8 +260,8 @@ namespace currency
     wide_difficulty_type get_cached_next_difficulty(bool pos) const;
 
     
-    bool create_block_template(block& b, const account_public_address& miner_address, const account_public_address& stakeholder_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func = nullptr) const;
-    bool create_block_template(block& b, const account_public_address& miner_address, wide_difficulty_type& di, uint64_t& height, const blobdata& ex_nonce) const;
+    bool create_block_template(const account_public_address& miner_address, const blobdata& ex_nonce, block& b, wide_difficulty_type& di, uint64_t& height) const;
+    bool create_block_template(const account_public_address& miner_address, const account_public_address& stakeholder_address, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func, block& b, wide_difficulty_type& di, uint64_t& height, crypto::scalar_t* blinding_mask_sum_ptr = nullptr) const;
     bool create_block_template(const create_block_template_params& params, create_block_template_response& resp) const;
 
     bool have_block(const crypto::hash& id) const;
@@ -331,6 +331,9 @@ namespace currency
     bool validate_instance(const std::string& path);
     bool is_tx_expired(const transaction& tx) const;
     std::shared_ptr<const transaction_chain_entry> find_key_image_and_related_tx(const crypto::key_image& ki, crypto::hash& id_result) const;
+
+    // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
+    bool is_hardfork_active(size_t hardfork_id) const;
 
     wide_difficulty_type block_difficulty(size_t i)const;
     bool forecast_difficulty(std::vector<std::pair<uint64_t, wide_difficulty_type>> &out_height_2_diff_vector, bool pos) const;
@@ -675,10 +678,6 @@ namespace currency
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const;
     bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
-
-    // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
-    bool is_hardfork_active(size_t hardfork_id) const;
-
 
 
 

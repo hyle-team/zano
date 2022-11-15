@@ -332,6 +332,10 @@ namespace currency
 #pragma pack (push, 1)
     struct out_entry
     {
+      out_entry() = default;
+      out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address, const crypto::public_key& amount_commitment, const crypto::public_key& concealing_point)
+        : global_amount_index(global_amount_index), stealth_address(stealth_address), amount_commitment(amount_commitment), concealing_point(concealing_point)
+      {}
       uint64_t global_amount_index;
       crypto::public_key stealth_address;
       crypto::public_key concealing_point;
@@ -805,28 +809,17 @@ namespace currency
       blobdata explicit_transaction;
       std::string extra_text;
       std::string wallet_address;
-      std::string stakeholder_address;
-      bool pos_block;              //is pos block 
-      //uint64_t pos_amount;         //do we still need it?
-      //uint64_t pos_g_index;        //
-      //crypto::hash tx_id;
-      //uint64_t tx_out_index;
-      //uint64_t stake_unlock_time;
-
-      pos_entry pe;                     // for making PoS blocks
+      std::string stakeholder_address;  // address for stake return (PoS blocks)
+      pos_entry pe;                     // for PoS blocks
+      bool pos_block;                   // is pos block 
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_BLOB_AS_HEX_STRING(explicit_transaction)
         KV_SERIALIZE(extra_text)
         KV_SERIALIZE(wallet_address)   
         KV_SERIALIZE(stakeholder_address);
-        KV_SERIALIZE(pos_block)
-        //KV_SERIALIZE(pos_amount)
-        //KV_SERIALIZE(pos_g_index)
-        //KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
-        //KV_SERIALIZE(tx_out_index)
-        //KV_SERIALIZE(stake_unlock_time)
         KV_SERIALIZE(pe)
+        KV_SERIALIZE(pos_block)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -837,6 +830,7 @@ namespace currency
       crypto::hash seed;
       blobdata blocktemplate_blob;
       std::string prev_hash;
+      crypto::scalar_t blinding_masks_sum; // sum of outputs' blinding masks (for zc outs)
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -845,6 +839,7 @@ namespace currency
         KV_SERIALIZE_POD_AS_HEX_STRING(seed)
         KV_SERIALIZE(blocktemplate_blob)
         KV_SERIALIZE(prev_hash)
+        KV_SERIALIZE(blinding_masks_sum)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };
