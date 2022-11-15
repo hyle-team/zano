@@ -3131,6 +3131,31 @@ uint64_t wallet2::balance() const
   return balance(stub, stub, stub, stub);
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::add_custom_asset_id(const crypto::hash& asset_id)
+{
+  currency::COMMAND_RPC_GET_ASSET_INFO::request req = AUTO_VAL_INIT(req);
+  currency::COMMAND_RPC_GET_ASSET_INFO::response resp = AUTO_VAL_INIT(resp);
+
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, resp);
+  if (resp.status == API_RETURN_CODE_OK)
+  {
+    m_custom_assets[asset_id] = resp.asset_descriptor;
+    return true;
+  }
+  return false;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::delete_custom_asset_id(const crypto::hash& asset_id)
+{
+  auto it = m_custom_assets.find(asset_id);
+  if (it != m_custom_assets.end())
+  {
+    m_custom_assets.erase(it);
+  }
+ 
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) const
 {
   incoming_transfers = m_transfers;

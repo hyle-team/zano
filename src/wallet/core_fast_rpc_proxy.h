@@ -133,6 +133,11 @@ namespace tools
       return m_rpc.on_get_pool_info(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
+    virtual bool call_COMMAND_RPC_GET_ASSET_INFO(const currency::COMMAND_RPC_GET_ASSET_INFO::request& req, currency::COMMAND_RPC_GET_ASSET_INFO::response& res)override
+    {
+      return m_rpc.on_get_asset_info(req, res, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override
     {
       return tools::get_transfer_address(adr_str, addr, payment_id, this);

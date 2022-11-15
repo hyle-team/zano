@@ -813,6 +813,7 @@ namespace tools
         return;
       
       a & m_own_asset_descriptors;
+      a & m_custom_assets;
     }
 
     void wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history);
@@ -894,6 +895,8 @@ namespace tools
     void set_disable_tor_relay(bool disable);
     uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
+
+    bool add_custom_asset_id(const crypto::hash& asset_id);
     
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
@@ -1091,6 +1094,9 @@ private:
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
     std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
     std::unordered_map<crypto::hash, wallet_own_asset_context> m_own_asset_descriptors;
+    std::unordered_map<crypto::hash, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
+    std::unordered_map<crypto::hash, currency::asset_descriptor_base> m_whitelisted_assets; //assets that manually added by user
+
 
     std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
     amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index

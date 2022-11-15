@@ -82,6 +82,29 @@ namespace currency
     };
   };
 
+  struct COMMAND_RPC_GET_ASSET_INFO
+  {
+    struct request
+    {
+      crypto::hash asset_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      asset_descriptor_base asset_descriptor;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+        KV_SERIALIZE(asset_descriptor)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct COMMAND_RPC_GET_HEIGHT
   {
     struct request
