@@ -897,7 +897,9 @@ namespace tools
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
 
     bool add_custom_asset_id(const crypto::hash& asset_id);
-    
+    bool delete_custom_asset_id(const crypto::hash& asset_id);
+    bool load_whitelisted_tokens_list();
+
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
     we use deterministic origin, if given some particular htlc_hash, then we use this hash, and this means that 

@@ -3156,6 +3156,11 @@ bool wallet2::delete_custom_asset_id(const crypto::hash& asset_id)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::load_whitelisted_tokens_list()
+{
+
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) const
 {
   incoming_transfers = m_transfers;
