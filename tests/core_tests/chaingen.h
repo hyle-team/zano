@@ -491,6 +491,9 @@ public:
 
   bool add_block_info(const currency::block& b, const std::list<currency::transaction>& tx_list);
 
+  bool remove_block_info(const currency::block& blk);
+  bool remove_block_info(const crypto::hash& block_id);
+
   bool construct_block(currency::block& blk, 
     uint64_t height, 
     const crypto::hash& prev_id,

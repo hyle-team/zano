@@ -154,22 +154,20 @@ void test_generator::add_block(const currency::block& blk,
   uint64_t block_reward;
   get_block_reward(is_pos_block(blk), misc_utils::median(block_sizes), block_size, already_generated_coins, block_reward, currency::get_block_height(blk));
 
-  crypto::hash block_hash = get_block_hash(blk);
-  m_blocks_info[block_hash] = block_info(blk, already_generated_coins + block_reward, block_size, cum_diff, tx_list, ks_hash);
- 
-  
-  std::stringstream ss_tx_hashes;
-  for (auto& h : blk.tx_hashes)
-  {
-    ss_tx_hashes << "    [tx]: " << h << ENDL;
-  }
-
-  LOG_PRINT_MAGENTA("ADDED_BLOCK[" << block_hash << "][" << (is_pos_block(blk)? "PoS":"PoW") <<"][" << get_block_height(blk) << "][cumul_diff:" << cum_diff << "]" << ENDL << ss_tx_hashes.str(), LOG_LEVEL_0);
+  add_block_info(block_info(blk, already_generated_coins + block_reward, block_size, cum_diff, tx_list, ks_hash));
 }
 
 void test_generator::add_block_info(const block_info& bi)
 {
-  m_blocks_info[get_block_hash(bi.b)] = bi;
+  crypto::hash block_hash = get_block_hash(bi.b);
+  m_blocks_info[block_hash] = bi;
+
+  std::stringstream ss_tx_hashes;
+  for (auto& h : bi.b.tx_hashes)
+  {
+    ss_tx_hashes << "    [tx]: " << h << ENDL;
+  }
+  LOG_PRINT_MAGENTA("ADDED_BLOCK[" << block_hash << "][" << (is_pos_block(bi.b)? "PoS":"PoW") <<"][" << get_block_height(bi.b) << "][cumul_diff:" << bi.cumul_difficulty << "]" << ENDL << ss_tx_hashes.str(), LOG_LEVEL_0);
 }
 
 bool test_generator::add_block_info(const currency::block& b, const std::list<currency::transaction>& tx_list)
@@ -179,7 +177,8 @@ bool test_generator::add_block_info(const currency::block& b, const std::list<cu
     txs_total_size += get_object_blobsize(tx);
   uint64_t mined_money = get_reward_from_miner_tx(b.miner_tx);
   crypto::hash sk_hash = null_hash;
-  if (is_pos_block(b))
+  bool pos = is_pos_block(b);
+  if (pos)
   {
     stake_kernel sk = AUTO_VAL_INIT(sk);
     std::vector<const block_info*> chain;
@@ -198,10 +197,24 @@ bool test_generator::add_block_info(const currency::block& b, const std::list<cu
     sk_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
   }
   add_block_info(block_info(b, get_already_generated_coins(b.prev_id) + mined_money,
-    txs_total_size + get_object_blobsize(b.miner_tx), get_cumul_difficulty_for_next_block(b.prev_id), tx_list, sk_hash));
+    txs_total_size + get_object_blobsize(b.miner_tx), get_cumul_difficulty_for_next_block(b.prev_id, !pos), tx_list, sk_hash));
   return true;
 }
 
+bool test_generator::remove_block_info(const crypto::hash& block_id)
+{
+  if (m_blocks_info.erase(block_id) == 1)
+  {
+    LOG_PRINT_MAGENTA("REMOVED BLOCK[" << block_id << "]", LOG_LEVEL_0);
+    return true;
+  }
+  return false;
+}
+
+bool test_generator::remove_block_info(const currency::block& blk)
+{
+  return remove_block_info(get_block_hash(blk));
+}
 
 
 bool test_generator::construct_block(currency::block& blk, 
