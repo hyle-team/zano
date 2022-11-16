@@ -393,14 +393,26 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
     blk_1_pos = pb.m_block;
   }
 
+  //CHECK_AND_ASSERT_MES(blk_1_pos.miner_tx.signatures.size() == 1, false, "unexpected signatures size");
+  //zarcanum_sig& sig = boost::get<zarcanum_sig>(blk_1_pos.miner_tx.signatures[0]);
+  //sig.y0 = 0;  // invalidate sig
+
   generator.add_block_info(blk_1_pos, std::list<transaction>{});
   ADD_CUSTOM_EVENT(events, blk_1_pos);
 
+  // make a PoS block and than change its nonce, so its hash also changes
+  // this block should fail
   std::list<currency::account_base> miner_stake_sources( {miner_acc} );
   MAKE_NEXT_POS_BLOCK(events, blk_2, blk_1_pos, miner_acc, miner_stake_sources);
+  generator.remove_block_info(blk_2);
+  events.pop_back();
+  blk_2.nonce = 0xc0ffee; // this will change block's hash
+  generator.add_block_info(blk_2, std::list<transaction>{});
+  DO_CALLBACK(events, "mark_invalid_block");
+  ADD_CUSTOM_EVENT(events, blk_2);
 
-  MAKE_NEXT_POS_BLOCK(events, blk_3, blk_2, miner_acc, miner_stake_sources);
-  MAKE_NEXT_POS_BLOCK(events, blk_4, blk_3, miner_acc, miner_stake_sources);
+  //MAKE_NEXT_POS_BLOCK(events, blk_3, blk_2, miner_acc, miner_stake_sources);
+  //MAKE_NEXT_POS_BLOCK(events, blk_4, blk_3, miner_acc, miner_stake_sources);
 
   return true;
 }
