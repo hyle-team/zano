@@ -413,6 +413,7 @@ public:
   //-----------
   static currency::wide_difficulty_type get_difficulty_for_next_block(const std::vector<const block_info*>& blocks, bool pow = true);
   currency::wide_difficulty_type get_difficulty_for_next_block(const crypto::hash& head_id, bool pow = true) const;
+  bool get_params_for_next_pos_block(const crypto::hash& head_id, currency::wide_difficulty_type& pos_difficulty, crypto::hash& last_pow_block_hash, crypto::hash& last_pos_block_kernel_hash) const;
   currency::wide_difficulty_type get_cumul_difficulty_for_next_block(const crypto::hash& head_id, bool pow = true) const;
   void get_block_chain(std::vector<const block_info*>& blockchain, const crypto::hash& head, size_t n) const;
   void get_last_n_block_sizes(std::vector<size_t>& block_sizes, const crypto::hash& head, size_t n) const;

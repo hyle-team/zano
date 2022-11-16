@@ -712,6 +712,7 @@ bool test_generator::build_stake_modifier(stake_modifier_type& sm, const test_ge
   return true;
 }
 
+
 currency::wide_difficulty_type test_generator::get_difficulty_for_next_block(const crypto::hash& head_id, bool pow) const
 {
   std::vector<const block_info*> blocks;
@@ -719,6 +720,29 @@ currency::wide_difficulty_type test_generator::get_difficulty_for_next_block(con
 
   return get_difficulty_for_next_block(blocks, pow);
 }
+
+
+bool test_generator::get_params_for_next_pos_block(const crypto::hash& head_id, currency::wide_difficulty_type& pos_difficulty, crypto::hash& last_pow_block_hash,
+  crypto::hash& last_pos_block_kernel_hash) const
+{
+  std::vector<const block_info*> blocks;
+  get_block_chain(blocks, head_id, std::numeric_limits<size_t>::max());
+
+  pos_difficulty = get_difficulty_for_next_block(blocks, false);
+
+  uint64_t pos_idx = get_last_block_of_type(true, blocks);
+  if (pos_idx != 0)
+    last_pos_block_kernel_hash = blocks[pos_idx]->ks_hash;
+
+  uint64_t pow_idx = get_last_block_of_type(false, blocks);
+  if (pow_idx == 0)
+    return false;
+
+  last_pow_block_hash = get_block_hash(blocks[pow_idx]->b);
+
+  return true;
+}
+
 
 /* static */ currency::wide_difficulty_type test_generator::get_difficulty_for_next_block(const std::vector<const block_info*>& blocks, bool pow)
 {
