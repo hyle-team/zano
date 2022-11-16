@@ -2562,10 +2562,10 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   VARIANT_CASE_CONST(tx_out_zarcanum, toz)
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
-    oen.amount_commitment   = toz.amount_commitment;
-    oen.concealing_point    = toz.concealing_point;
     oen.global_amount_index = g_index;
     oen.stealth_address     = toz.stealth_address;
+    oen.amount_commitment   = toz.amount_commitment;
+    oen.concealing_point    = toz.concealing_point;
   }
   VARIANT_SWITCH_END();
 
@@ -5442,7 +5442,6 @@ bool blockchain_storage::validate_pos_block(const block& b,
     CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1, false, "incorrect number of stake input signatures: " << b.miner_tx.signatures.size());
     CHECK_AND_ASSERT_MES(b.miner_tx.signatures[0].type() == typeid(zarcanum_sig), false, "incorrect sig 0 type: " << b.miner_tx.signatures[0].type().name());
     const zarcanum_sig& sig = boost::get<zarcanum_sig>(b.miner_tx.signatures[0]);
-    const crypto::hash miner_tx_hash = get_transaction_hash(b.miner_tx);
 
     // TODO @#@# do general input check for main chain blocks only?
     uint64_t max_related_block_height = 0;
@@ -5461,8 +5460,8 @@ bool blockchain_storage::validate_pos_block(const block& b,
     crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
 
     uint8_t err = 0;
-    r = crypto::zarcanum_verify_proof(miner_tx_hash, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, sig, &err);
-    CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << err);
+    r = crypto::zarcanum_verify_proof(id, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, sig, &err);
+    CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << (int)err);
 
     final_diff = basic_diff; // just for logs
     return true;
