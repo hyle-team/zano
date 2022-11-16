@@ -319,7 +319,7 @@ namespace currency
     {
       std::list<uint64_t> amounts;
       uint64_t            decoys_count;       // how many decoy outputs needed (per amount)
-      uint64_t            height_upper_limit; // all the decoy outputs must be either older than, or the same age as this height
+      uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
       bool                use_forced_mix_outs;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(amounts)
@@ -335,6 +335,9 @@ namespace currency
       out_entry() = default;
       out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address, const crypto::public_key& amount_commitment, const crypto::public_key& concealing_point)
         : global_amount_index(global_amount_index), stealth_address(stealth_address), amount_commitment(amount_commitment), concealing_point(concealing_point)
+      {}
+      out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address)
+        : global_amount_index(global_amount_index), stealth_address(stealth_address), amount_commitment{}, concealing_point{}
       {}
       uint64_t global_amount_index;
       crypto::public_key stealth_address;
