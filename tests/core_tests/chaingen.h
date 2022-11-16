@@ -375,9 +375,16 @@ public:
     crypto::hash ks_hash;
   };
 
-  //               amount             vec_ind, tx_index, out index in tx
-  typedef std::map<uint64_t, std::vector<std::tuple<size_t, size_t, size_t> > > outputs_index;
-  typedef std::unordered_map<crypto::hash, std::vector<uint64_t> > tx_global_indexes;
+
+  struct out_index_info
+  {
+    size_t block_height;
+    size_t in_block_tx_index;
+    size_t in_tx_out_index;
+  };
+
+  typedef std::map<uint64_t, std::vector<out_index_info> > outputs_index;                     // amount  -> [gindex -> out_index_info]
+  typedef std::unordered_map<crypto::hash, std::vector<uint64_t> > tx_global_indexes;         // tx_hash -> vector of tx's outputs global indices
 
   typedef std::vector<const block_info*> blockchain_vector;
   
