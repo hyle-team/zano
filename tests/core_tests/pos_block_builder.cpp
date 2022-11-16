@@ -228,7 +228,7 @@ void pos_block_builder::step5_sign(const currency::tx_source_entry& se, const cu
       ring.emplace_back(el.stealth_address, el.amount_commitment, el.concealing_point);
     }
 
-    crypto::hash tx_hash_for_sig = get_transaction_hash(m_block.miner_tx); // TODO @#@# change to block hash after the corresponding test is made
+    crypto::hash tx_hash_for_sig = get_block_hash(m_block);
 
     uint8_t err = 0;
     r = crypto::zarcanum_generate_proof(tx_hash_for_sig, m_context.kernel_hash, ring, m_context.last_pow_block_id_hashed, m_context.sk.kimage,
