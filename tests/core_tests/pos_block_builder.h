@@ -82,25 +82,3 @@ struct pos_block_builder
 
   currency::pos_mining_context m_context                  {};
 };
-
-/* bool construct_homemade_pos_miner_tx(bool zarcanum, size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
-  size_t current_block_size,
-  uint64_t fee,
-  uint64_t pos_stake_amount,
-  crypto::key_image pos_stake_keyimage,
-  size_t pos_stake_gindex,
-  const currency::account_public_address &reward_receiving_address,
-  const currency::account_public_address &stakeholder_address,
-  currency::transaction& tx,
-  const currency::blobdata& extra_nonce = currency::blobdata(),
-  size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS,
-  currency::keypair tx_one_time_key = currency::keypair::generate()); */
-
-bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::block& prev_block, const currency::block& coinstake_scr_block, const currency::account_base& acc,
-  std::function<bool(currency::block&)> before_sign_cb, currency::block& output);
-
-inline bool mine_next_pos_block_in_playtime(currency::core& c, const currency::block& prev_block, const currency::block& coinstake_scr_block, const currency::account_base& acc,
-  std::function<bool(currency::block&)> before_sign_cb, currency::block& output)
-{
-  return mine_next_pos_block_in_playtime_sign_cb(c, prev_block, coinstake_scr_block, acc, [](currency::block&){ return true; }, output);
-}
