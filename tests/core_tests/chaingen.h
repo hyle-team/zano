@@ -428,7 +428,6 @@ public:
   
   bool find_kernel(const std::list<currency::account_base>& accs,
                    const blockchain_vector& blck_chain,
-                   const outputs_index& indexes,
                    wallets_vector& wallets,
                    currency::pos_entry& pe,
                    size_t& found_wallet_index,
@@ -438,6 +437,7 @@ public:
   bool build_wallets(const blockchain_vector& blocks,
                      const std::list<currency::account_base>& accs,
                      const tx_global_indexes& txs_outs,
+                     const outputs_index& oi,
                      wallets_vector& wallets,
                      const currency::core_runtime_config& cc = currency::get_default_core_runtime_config());
   
