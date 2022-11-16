@@ -43,7 +43,7 @@ namespace crypto
   }
 
   #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-    if (!(cond)) { LOG_PRINT_RED("zarcanum_generate_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
+    if (!(cond)) { LOG_PRINT_RED("zarcanum_generate_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
   
   bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXG_input_ref_t>& ring,
@@ -160,7 +160,7 @@ namespace crypto
 
 
   #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-    if (!(cond)) { LOG_PRINT_RED("zarcanum_verify_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
+    if (!(cond)) { LOG_PRINT_RED("zarcanum_verify_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
   bool zarcanum_verify_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXG_input_ref_t>& ring,
