@@ -273,7 +273,7 @@ public:
     
     if (m_unverifiable_tx_index == event_idx)
     {
-      CHECK_AND_ASSERT_MES(tvc.m_verification_failed, false, ENDL << "event #" << event_idx << ": the tx passed normally, although it had been marked as unverifiable" << ENDL);
+      CHECK_AND_ASSERT_MES(tvc.m_verification_impossible, false, ENDL << "event #" << event_idx << ": the tx passed normally, although it had been marked as unverifiable" << ENDL);
       return tvc.m_verification_impossible;
     }
 
