@@ -266,10 +266,18 @@ public:
   bool check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_idx, const currency::transaction& /*tx*/)
   {
     if (m_invalid_tx_index == event_idx)
+    {
+      CHECK_AND_ASSERT_MES(tvc.m_verification_failed, false, ENDL << "event #" << event_idx << ": the tx passed the verification, although it had been marked as invalid" << ENDL);
       return tvc.m_verification_failed;
+    }
     
     if (m_unverifiable_tx_index == event_idx)
+    {
+      CHECK_AND_ASSERT_MES(tvc.m_verification_failed, false, ENDL << "event #" << event_idx << ": the tx passed normally, although it had been marked as unverifiable" << ENDL);
       return tvc.m_verification_impossible;
+    }
+
+    CHECK_AND_ASSERT_MES(tx_added, false, ENDL << "event #" << event_idx << ": the tx has not been added for some reason" << ENDL);
 
     return !tvc.m_verification_failed && tx_added;
   }
@@ -277,10 +285,16 @@ public:
   bool check_block_verification_context(const currency::block_verification_context& bvc, size_t event_idx, const currency::block& /*block*/)
   {
     if (m_invalid_block_index == event_idx)
+    {
+      CHECK_AND_ASSERT_MES(bvc.m_verification_failed, false, ENDL << "event #" << event_idx << ": the block passed the verification, although it had been marked as invalid" << ENDL);
       return bvc.m_verification_failed;
+    }
 
     if (m_orphan_block_index == event_idx)
+    {
+      CHECK_AND_ASSERT_MES(bvc.m_marked_as_orphaned, false, ENDL << "event #" << event_idx << ": the block passed normally, although it had been marked as orphaned" << ENDL);
       return bvc.m_marked_as_orphaned;
+    }
 
     return !bvc.m_verification_failed;
   }
