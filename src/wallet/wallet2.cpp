@@ -3158,7 +3158,8 @@ bool wallet2::delete_custom_asset_id(const crypto::hash& asset_id)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens_list()
 {
-
+  epee::net_utils::http::https_simple_client https_client;
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) const
