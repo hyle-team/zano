@@ -60,7 +60,7 @@ set(DISABLE_TOR FALSE CACHE BOOL "Disable TOR library(and related tor-connect su
 set(TESTNET FALSE CACHE BOOL "Compile for testnet")
 set(BUILD_GUI FALSE CACHE BOOL "Build qt-daemon")
 
-include_directories(src contrib/eos_portable_archive contrib contrib/epee/include "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
+include_directories(src contrib/eos_portable_archive contrib contrib/epee/include ${OPENSSL_INCLUDE_DIR} "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
 
 add_definitions(-DSTATICLIB)
 

@@ -51,6 +51,7 @@ namespace tools
     virtual bool call_COMMAND_RPC_GET_OFFERS_EX(const currency::COMMAND_RPC_GET_OFFERS_EX::request& req, currency::COMMAND_RPC_GET_OFFERS_EX::response& res){ return false; }
     virtual bool call_COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN(const currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::request& req, currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response& res){ return false; }
     virtual bool call_COMMAND_RPC_GET_POOL_INFO(const currency::COMMAND_RPC_GET_POOL_INFO::request& req, currency::COMMAND_RPC_GET_POOL_INFO::response& res) { return false; }
+    virtual bool call_COMMAND_RPC_GET_ASSET_INFO(const currency::COMMAND_RPC_GET_ASSET_INFO::request& req, currency::COMMAND_RPC_GET_ASSET_INFO::response& res) { return false; }
 
     i_core_proxy()
     {
