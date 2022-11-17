@@ -770,6 +770,24 @@ namespace currency
   };
 
 
+  struct asset_descriptor_with_id: public asset_descriptor_base
+  {
+    crypto::hash asset_id = currency::null_hash;
+
+    /*
+    BEGIN_VERSIONED_SERIALIZE()
+      FIELD(*static_cast<asset_descriptor_base>(this))
+      FIELD(asset_id)
+    END_SERIALIZE()
+    */
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_CHAIN_BASE(asset_descriptor_base)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
 #define ASSET_DESCRIPTOR_OPERATION_UNDEFINED     0
 #define ASSET_DESCRIPTOR_OPERATION_REGISTER      1
 #define ASSET_DESCRIPTOR_OPERATION_EMMIT         2

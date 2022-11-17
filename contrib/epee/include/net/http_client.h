@@ -1051,6 +1051,52 @@ namespace epee
         }
       };
 
+      template<typename transport_t>
+      bool fetch_url_t(transport_t& tr, const url_content& u_c, std::string& response_body, const std::string& method = "GET", const std::string& request_body = "", unsigned int timeout = 1000)
+      {
+        fields_list additional_params;
+        if (!tr.is_connected() && !u_c.host.empty())
+        {
+          if (!tr.connect(u_c.host, static_cast<int>(u_c.port), timeout))
+          {
+            LOG_PRINT_L2("invoke_request: cannot connect to " << u_c.host << ":" << u_c.port);
+            return false;
+          }
+        }
+        const http_response_info* ppresponse_info = nullptr;
+        if (tr.invoke(u_c.uri, "GET", request_body, &ppresponse_info, additional_params) && ppresponse_info)
+        {
+          response_body = ppresponse_info->m_body;
+          return true;
+        }
+        return false;
+      }
+
+
+      bool fetch_url(const std::string& url, std::string& response_body, const std::string& method = "GET", const std::string& request_body = "", unsigned int timeout = 1000)
+      {
+        try
+        {
+          url_content u_c = AUTO_VAL_INIT(u_c);
+          bool res = epee::net_utils::parse_url(url, u_c);
+          CHECK_AND_ASSERT_MES(res, false, "failed to parse url: " << url);
+          if (u_c.schema == "https")
+          {
+            https_simple_client tr;
+            return fetch_url_t(tr, u_c, response_body, method, request_body, timeout);
+          }
+          else
+          {
+            http_simple_client tr;
+            return fetch_url_t(tr, u_c, response_body, method, request_body, timeout);
+          }
+        }
+        catch (...)
+        {
+          return false;
+        }
+
+      }
 
     } // namespace http
 

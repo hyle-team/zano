@@ -1178,6 +1178,18 @@ namespace wallet_public
     };
   };
 
+  struct assets_whitelist
+  {
+    std::vector<currency::asset_descriptor_with_id> assets;
+    crypto::signature signature = currency::null_sig;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(assets)
+      KV_SERIALIZE_POD_AS_HEX_STRING(signature)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   inline std::string get_escrow_contract_state_name(uint32_t state)
   {
     switch (state)

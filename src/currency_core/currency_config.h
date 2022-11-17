@@ -270,3 +270,7 @@ static_assert(CURRENCY_MINER_TX_MAX_OUTS <= CURRENCY_TX_MAX_ALLOWED_OUTS, "Miner
 static_assert(PREMINE_AMOUNT / WALLET_MAX_ALLOWED_OUTPUT_AMOUNT < CURRENCY_MINER_TX_MAX_OUTS, "Premine can't be divided into reasonable number of outs");
 
 #define CURRENCY_RELAY_TXS_MAX_COUNT                    5
+
+
+#define WALLET_ASSETS_WHITELIST_URL                     "https://zano.org/assets_whitelist.json"
+#define WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY   "" //TODO@#@

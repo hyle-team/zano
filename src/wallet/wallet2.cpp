@@ -3158,7 +3158,15 @@ bool wallet2::delete_custom_asset_id(const crypto::hash& asset_id)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens_list()
 {
-  epee::net_utils::http::https_simple_client https_client;
+  std::string body;
+  wallet_public::assets_whitelist aw = AUTO_VAL_INIT(aw);
+  if (epee::net_utils::get_http_json_t(WALLET_ASSETS_WHITELIST_URL, aw))
+  {
+    for (auto it = aw.assets.begin(); it != aw.assets.end(); it++)
+    {
+      m_whitelisted_assets[it->asset_id] = static_cast<currency::asset_descriptor_base>(*it);
+    }    
+  }
   return true;
 }
 //----------------------------------------------------------------------------------------------------
