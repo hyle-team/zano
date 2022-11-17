@@ -650,7 +650,7 @@ namespace epee
     class async_blocked_mode_client_t : public blocked_mode_client_t<is_ssl>
     {
     public:
-      async_blocked_mode_client_t() :m_send_deadline(blocked_mode_client::m_io_service)
+      async_blocked_mode_client_t() :m_send_deadline(blocked_mode_client_t<is_ssl>::m_io_service)
       {
 
         // No deadline is required until the first socket operation is started. We
