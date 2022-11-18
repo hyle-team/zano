@@ -3774,12 +3774,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
 
     // generate sring signature
     sig.s.resize(1);
-    crypto::generate_ring_signature(block_hash,
-      stake_input.k_image,
-      keys_ptrs,
-      secret_x,
-      0,
-      &sig.s[0]);
+    crypto::generate_ring_signature(block_hash, stake_input.k_image, keys_ptrs, secret_x, 0, sig.s.data());
 
     WLT_LOG_L4("GENERATED RING SIGNATURE for PoS block coinbase: block_id " << block_hash
       << "txin.k_image" << stake_input.k_image
@@ -3877,7 +3872,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   }
   #endif
 
-  crypto::hash tx_hash_for_sig = get_transaction_hash(b.miner_tx); // TODO @#@# change to block hash after the corresponding test is made
+  crypto::hash tx_hash_for_sig = get_block_hash(b);
 
   uint8_t err = 0;
   r = crypto::zarcanum_generate_proof(tx_hash_for_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,

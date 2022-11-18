@@ -28,7 +28,7 @@ namespace crypto
 #define DBG_PRINT(x)     (void(0)) // std::cout << x << ENDL
 
 #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-    if (!(cond)) { LOG_PRINT_RED("bppe_gen: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
+    if (!(cond)) { LOG_PRINT_RED("bppe_gen: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
 
@@ -366,7 +366,7 @@ namespace crypto
   bool bppe_verify(const std::vector<bppe_sig_commit_ref_t>& sigs, uint8_t* p_err = nullptr)
   {
 #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-    if (!(cond)) { LOG_PRINT_RED("bppe_verify: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
+    if (!(cond)) { LOG_PRINT_RED("bppe_verify: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
     DBG_PRINT(ENDL << " . . . . bppe_verify() . . . . ");

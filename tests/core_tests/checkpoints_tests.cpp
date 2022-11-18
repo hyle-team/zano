@@ -13,6 +13,53 @@ using namespace epee;
 using namespace crypto;
 using namespace currency;
 
+// helpers
+
+bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::block& prev_block, const currency::block& coinstake_scr_block, const currency::account_base& acc,
+  std::function<bool(currency::block&)> before_sign_cb, currency::block& output)
+{
+  blockchain_storage& bcs = c.get_blockchain_storage();
+
+  // these values (median and diff) are correct only for the next main chain block, it's incorrect for altblocks, especially for old altblocks
+  // but for now we assume they will work fine
+  uint64_t block_size_median = bcs.get_current_comulative_blocksize_limit() / 2;
+  currency::wide_difficulty_type difficulty = bcs.get_next_diff_conditional(true);
+
+  crypto::hash prev_id = get_block_hash(prev_block);
+  size_t height = get_block_height(prev_block) + 1;
+
+  block_extended_info bei = AUTO_VAL_INIT(bei);
+  bool r = bcs.get_block_extended_info_by_hash(prev_id, bei);
+  CHECK_AND_ASSERT_MES(r, false, "get_block_extended_info_by_hash failed for hash = " << prev_id);
+
+
+  const transaction& stake = coinstake_scr_block.miner_tx;
+  crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
+  size_t stake_output_idx = 0;
+  size_t stake_output_gidx = 0;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
+  crypto::key_image stake_output_key_image;
+  keypair kp;
+  generate_key_image_helper(acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
+
+  pos_block_builder pb;
+  pb.step1_init_header(bcs.get_core_runtime_config().hard_forks, height, prev_id);
+  pb.step2_set_txs(std::vector<transaction>());
+  pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, difficulty, prev_id, null_hash, prev_block.timestamp);
+  pb.step4_generate_coinbase_tx(block_size_median, bei.already_generated_coins, acc.get_public_address());
+
+  if (!before_sign_cb(pb.m_block))
+    return false;
+
+  pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, acc);
+  output = pb.m_block;
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
 checkpoints_test::checkpoints_test()
 {
   REGISTER_CALLBACK_METHOD(checkpoints_test, set_checkpoint);

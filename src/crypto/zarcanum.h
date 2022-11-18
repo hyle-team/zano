@@ -52,6 +52,7 @@ namespace crypto
 
   bool zarcanum_verify_proof(const hash& m, const hash& kernel_hash, const std::vector<crypto::CLSAG_GGXG_input_ref_t>& ring,
     const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
+    const mp::uint128_t& pos_difficulty,
     const zarcanum_proof& sig, uint8_t* p_err = nullptr);
 
 } // namespace crypto

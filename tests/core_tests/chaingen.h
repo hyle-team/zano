@@ -266,10 +266,18 @@ public:
   bool check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_idx, const currency::transaction& /*tx*/)
   {
     if (m_invalid_tx_index == event_idx)
+    {
+      CHECK_AND_ASSERT_MES(tvc.m_verification_failed, false, ENDL << "event #" << event_idx << ": the tx passed the verification, although it had been marked as invalid" << ENDL);
       return tvc.m_verification_failed;
+    }
     
     if (m_unverifiable_tx_index == event_idx)
+    {
+      CHECK_AND_ASSERT_MES(tvc.m_verification_impossible, false, ENDL << "event #" << event_idx << ": the tx passed normally, although it had been marked as unverifiable" << ENDL);
       return tvc.m_verification_impossible;
+    }
+
+    CHECK_AND_ASSERT_MES(tx_added, false, ENDL << "event #" << event_idx << ": the tx has not been added for some reason" << ENDL);
 
     return !tvc.m_verification_failed && tx_added;
   }
@@ -277,10 +285,16 @@ public:
   bool check_block_verification_context(const currency::block_verification_context& bvc, size_t event_idx, const currency::block& /*block*/)
   {
     if (m_invalid_block_index == event_idx)
+    {
+      CHECK_AND_ASSERT_MES(bvc.m_verification_failed, false, ENDL << "event #" << event_idx << ": the block passed the verification, although it had been marked as invalid" << ENDL);
       return bvc.m_verification_failed;
+    }
 
     if (m_orphan_block_index == event_idx)
+    {
+      CHECK_AND_ASSERT_MES(bvc.m_marked_as_orphaned, false, ENDL << "event #" << event_idx << ": the block passed normally, although it had been marked as orphaned" << ENDL);
       return bvc.m_marked_as_orphaned;
+    }
 
     return !bvc.m_verification_failed;
   }
@@ -375,9 +389,16 @@ public:
     crypto::hash ks_hash;
   };
 
-  //               amount             vec_ind, tx_index, out index in tx
-  typedef std::map<uint64_t, std::vector<std::tuple<size_t, size_t, size_t> > > outputs_index;
-  typedef std::unordered_map<crypto::hash, std::vector<uint64_t> > tx_global_indexes;
+
+  struct out_index_info
+  {
+    size_t block_height;
+    size_t in_block_tx_index;
+    size_t in_tx_out_index;
+  };
+
+  typedef std::map<uint64_t, std::vector<out_index_info> > outputs_index;                     // amount  -> [gindex -> out_index_info]
+  typedef std::unordered_map<crypto::hash, std::vector<uint64_t> > tx_global_indexes;         // tx_hash -> vector of tx's outputs global indices
 
   typedef std::vector<const block_info*> blockchain_vector;
   
@@ -406,6 +427,7 @@ public:
   //-----------
   static currency::wide_difficulty_type get_difficulty_for_next_block(const std::vector<const block_info*>& blocks, bool pow = true);
   currency::wide_difficulty_type get_difficulty_for_next_block(const crypto::hash& head_id, bool pow = true) const;
+  bool get_params_for_next_pos_block(const crypto::hash& head_id, currency::wide_difficulty_type& pos_difficulty, crypto::hash& last_pow_block_hash, crypto::hash& last_pos_block_kernel_hash) const;
   currency::wide_difficulty_type get_cumul_difficulty_for_next_block(const crypto::hash& head_id, bool pow = true) const;
   void get_block_chain(std::vector<const block_info*>& blockchain, const crypto::hash& head, size_t n) const;
   void get_last_n_block_sizes(std::vector<size_t>& block_sizes, const crypto::hash& head, size_t n) const;
@@ -421,7 +443,6 @@ public:
   
   bool find_kernel(const std::list<currency::account_base>& accs,
                    const blockchain_vector& blck_chain,
-                   const outputs_index& indexes,
                    wallets_vector& wallets,
                    currency::pos_entry& pe,
                    size_t& found_wallet_index,
@@ -431,6 +452,7 @@ public:
   bool build_wallets(const blockchain_vector& blocks,
                      const std::list<currency::account_base>& accs,
                      const tx_global_indexes& txs_outs,
+                     const outputs_index& oi,
                      wallets_vector& wallets,
                      const currency::core_runtime_config& cc = currency::get_default_core_runtime_config());
   
@@ -482,6 +504,9 @@ public:
   void add_block_info(const block_info& bi);
 
   bool add_block_info(const currency::block& b, const std::list<currency::transaction>& tx_list);
+
+  bool remove_block_info(const currency::block& blk);
+  bool remove_block_info(const crypto::hash& block_id);
 
   bool construct_block(currency::block& blk, 
     uint64_t height, 

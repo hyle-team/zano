@@ -14,6 +14,10 @@ namespace crypto
   const scalar_t      c_zarcanum_z_coeff_s  = { 0,                  1,                  0,                  0                  }; // c_scalar_2p64
   const mp::uint256_t c_zarcanum_z_coeff_mp = c_zarcanum_z_coeff_s.as_boost_mp_type<mp::uint256_t>();
 
+  #define DBG_VAL_PRINT(x) (void(0)) // std::cout << #x ": " << x << std::endl
+  #define DBG_PRINT(x)     (void(0)) // std::cout << x << std::endl
+
+
   mp::uint256_t zarcanum_precalculate_l_div_z_D(const mp::uint128_t& pos_difficulty)
   {
     //LOG_PRINT_GREEN_L0(ENDL << "floor( l / (z * D) ) =     " << c_scalar_L.as_boost_mp_type<mp::uint256_t>() / (c_zarcanum_z_coeff_mp * pos_difficulty));
@@ -43,7 +47,7 @@ namespace crypto
   }
 
   #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-    if (!(cond)) { LOG_PRINT_RED("zarcanum_generate_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
+    if (!(cond)) { LOG_PRINT_RED("zarcanum_generate_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
   
   bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXG_input_ref_t>& ring,
@@ -51,6 +55,7 @@ namespace crypto
     const scalar_t& secret_x, const scalar_t& secret_q, uint64_t secret_index, const scalar_t& pseudo_out_blinding_mask, uint64_t stake_amount, const scalar_t& stake_blinding_mask,
     zarcanum_proof& result, uint8_t* p_err /* = nullptr */)
   {
+    DBG_PRINT("zarcanum_generate_proof");
     const scalar_t a = stake_amount;
     const scalar_t h = scalar_t(kernel_hash);
     const scalar_t f_plus_q = stake_blinding_mask + secret_q;
@@ -84,6 +89,9 @@ namespace crypto
 
     point_t F = h * C_prime - dz * C + E + last_pow_block_id_hashed * h * c_point_H;
 
+    DBG_VAL_PRINT(h); DBG_VAL_PRINT(last_pow_block_id_hashed); DBG_VAL_PRINT(dz);
+    DBG_VAL_PRINT(C); DBG_VAL_PRINT(C_prime); DBG_VAL_PRINT(E); DBG_VAL_PRINT(F);
+
     scalar_t r0 = scalar_t::random();
     scalar_t r1 = scalar_t::random();
     scalar_t r2 = scalar_t::random();
@@ -92,9 +100,9 @@ namespace crypto
 
     point_t R_01 = r0 * c_point_X + r1 * c_point_H_plus_G;
     point_t R_23 = r2 * c_point_X + r3 * c_point_H_minus_G;
-    point_t R_4  = r4 * c_point_G;
+    point_t R_4  = r4 * c_point_X;
 
-    hash_helper_t::hs_t hash_calc(3);
+    hash_helper_t::hs_t hash_calc(7);
     hash_calc.add_32_chars(CRYPTO_HDS_ZARCANUM_PROOF_HASH);
     hash_calc.add_point(R_01);
     hash_calc.add_point(R_23);
@@ -160,25 +168,64 @@ namespace crypto
 
 
   #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-    if (!(cond)) { LOG_PRINT_RED("zarcanum_verify_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
+    if (!(cond)) { LOG_PRINT_RED("zarcanum_verify_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
   bool zarcanum_verify_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXG_input_ref_t>& ring,
     const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
+    const mp::uint128_t& pos_difficulty,
     const zarcanum_proof& sig, uint8_t* p_err /* = nullptr */)
   {
+    DBG_PRINT("zarcanum_verify_proof");
     bool r = false;
 
-    // TODO @#@#
+    // make sure 0 < d <= l / floor(z * D)
+    const mp::uint256_t l_div_z_D_mp = crypto::zarcanum_precalculate_l_div_z_D(pos_difficulty);
+    const scalar_t l_div_z_D(l_div_z_D_mp);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(!sig.d.is_zero() && sig.d < l_div_z_D, 2);
+    const scalar_t dz = sig.d * c_zarcanum_z_coeff_s;
 
-    std::vector<point_t> E_for_range_proof = { point_t(sig.E) };
+    // calculate h
+    const scalar_t h = scalar_t(kernel_hash);
+
+    // calculate F
+    point_t C_prime = point_t(sig.C_prime);
+    C_prime.modify_mul8();
+    point_t C = point_t(sig.C);
+    C.modify_mul8();
+    point_t E = point_t(sig.E);
+    E.modify_mul8();
+    point_t F = h * C_prime - dz * C + E + last_pow_block_id_hashed * h * c_point_H;
+
+    DBG_VAL_PRINT(h); DBG_VAL_PRINT(last_pow_block_id_hashed); DBG_VAL_PRINT(dz);
+    DBG_VAL_PRINT(C); DBG_VAL_PRINT(C_prime); DBG_VAL_PRINT(E); DBG_VAL_PRINT(F);
+
+    // check three proofs with a shared Fiat-Shamir challenge c
+    point_t C_plus_C_prime  = C + C_prime;
+    point_t C_minus_C_prime = C - C_prime;
+    hash_helper_t::hs_t hash_calc(7);
+    hash_calc.add_32_chars(CRYPTO_HDS_ZARCANUM_PROOF_HASH);
+    hash_calc.add_point(sig.y0 * c_point_X + sig.y1 * c_point_H_plus_G - sig.c * C_plus_C_prime);             // y_0 * X + y1 (H + G) - c (C + C')
+    hash_calc.add_point(sig.y2 * c_point_X + sig.y3 * c_point_H_minus_G - sig.c * C_minus_C_prime);           // y_2 * X + y3 (H - G) - c (C - C')
+    hash_calc.add_point(sig.y4 * c_point_X - sig.c * F);                                                      // y_4 * X - c * F
+    hash_calc.add_point(C_plus_C_prime);
+    hash_calc.add_point(C_minus_C_prime);
+    hash_calc.add_point(F);
+    scalar_t c_prime = hash_calc.calc_hash();
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.c == c_prime, 3);
+
+    // check extended range proof for E
+    std::vector<point_t> E_for_range_proof = { point_t(sig.E) }; // consider changing to 8*sig.E to avoid additional conversion
     std::vector<bppe_sig_commit_ref_t> range_proofs = { bppe_sig_commit_ref_t(sig.E_range_proof, E_for_range_proof) };
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(range_proofs), 10);
 
+    // check extended CLSAG-GGXG ring signature
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(verify_CLSAG_GGXG(m, ring, sig.pseudo_out_amount_commitment, sig.C, stake_ki, sig.clsag_ggxg), 1);
 
     return true;
   }
+
+  #undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
 
 
 

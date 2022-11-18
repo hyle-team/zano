@@ -14,10 +14,51 @@
 
 #define  AMOUNT_TO_TRANSFER_ZARCANUM_BASIC (TESTS_DEFAULT_FEE*10)
 
-
 using namespace currency;
 
 //------------------------------------------------------------------------------
+// helpers
+
+void invalidate_CLSAG_GGXG_sig(crypto::CLSAG_GGXG_signature& sig)
+{
+  sig.c = 7;
+}
+
+void invalidate_bppe_sig(crypto::bppe_signature& sig)
+{
+  sig.delta_1.make_random();
+}
+
+void invalidate_pub_key(crypto::public_key& pk)
+{
+  pk.data[5] = 0x33;
+}
+
+bool invalidate_zarcanum_sig(size_t n, zarcanum_sig& sig)
+{
+  switch(n)
+  {
+  case 0:                                                         break;
+  case 1:  invalidate_pub_key(sig.C);                             break;
+  case 2:  sig.c.make_random();                                   break;
+  case 3:  invalidate_CLSAG_GGXG_sig(sig.clsag_ggxg);             break;
+  case 4:  invalidate_pub_key(sig.C_prime);                       break;
+  case 5:  sig.d.make_random();                                   break;
+  case 6:  invalidate_pub_key(sig.E);                             break;
+  case 7:  invalidate_bppe_sig(sig.E_range_proof);                break;
+  case 8:  invalidate_pub_key(sig.pseudo_out_amount_commitment);  break;
+  case 9:  sig.y0.make_random();                                  break;
+  case 10: sig.y1.make_random();                                  break;
+  case 11: sig.y2.make_random();                                  break;
+  case 12: sig.y3.make_random();                                  break;
+  case 13: sig.y4.make_random();                                  break;
+  default:                                                        return false;
+  }
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
 
 zarcanum_basic_test::zarcanum_basic_test()
 {
@@ -339,6 +380,48 @@ zarcanum_pos_block_math::zarcanum_pos_block_math()
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 0);
 }
 
+bool make_next_pos_block(test_generator& generator, std::vector<test_event_entry>& events, const block& prev_block, const account_base& stake_acc,
+  uint64_t amount_to_find, size_t nmix, block& result)
+{
+  bool r = false;
+  std::vector<tx_source_entry> sources;
+
+  size_t height = get_block_height(prev_block) + 1;
+  crypto::hash prev_id = get_block_hash(prev_block);
+  r = fill_tx_sources(sources, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, true, true, false);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "");
+  auto it = std::max_element(sources.begin(), sources.end(), [&](const tx_source_entry& lhs, const tx_source_entry& rhs){ return lhs.amount < rhs.amount; });
+  const tx_source_entry& se = *it;
+  const tx_source_entry::output_entry& oe = se.outputs[se.real_output];
+
+  crypto::key_image stake_output_key_image  {};
+  currency::keypair ephemeral_keys          {};
+  r = generate_key_image_helper(stake_acc.get_keys(), se.real_out_tx_key, se.real_output_in_tx_index, ephemeral_keys, stake_output_key_image);
+  CHECK_AND_ASSERT_MES(r, false, "generate_key_image_helper failed");
+  uint64_t stake_output_gindex = boost::get<uint64_t>(oe.out_reference);
+
+  currency::wide_difficulty_type pos_diff{};
+  crypto::hash last_pow_block_hash{}, last_pos_block_kernel_hash{};
+  r = generator.get_params_for_next_pos_block(prev_id, pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
+  CHECK_AND_ASSERT_MES(r, false, "get_params_for_next_pos_block failed");
+
+  pos_block_builder pb;
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
+  pb.step2_set_txs(std::vector<transaction>());
+
+  pb.step3a(pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
+
+  pb.step3b(se.amount, stake_output_key_image, se.real_out_tx_key, se.real_output_in_tx_index, se.real_out_amount_blinding_mask, stake_acc.get_keys().view_secret_key,
+    stake_output_gindex, prev_block.timestamp, POS_SCAN_WINDOW, POS_SCAN_STEP);
+
+  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), stake_acc.get_public_address());
+    
+  pb.step5_sign(se, stake_acc.get_keys());
+  result = pb.m_block;
+  return true;
+}
+
 bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) const
 {
   bool r = false;
@@ -347,62 +430,43 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 10);
 
-  //generator.get_tx_out_gindex
-
-  // try to make a PoS block with locked stake after the hardfork
-
-  block blk_1_pos;
+  // blocks with an invalid zarcanum sig
+  for(size_t i = 1; ; ++i)
   {
-    const block& prev_block = blk_1r;
-    const transaction& stake_tx = blk_1.miner_tx;
-    const account_base& stake_acc = miner_acc;
-    size_t stake_out_in_tx_index = 0;
-    size_t stake_output_gindex = 0;
-
-    crypto::hash prev_id = get_block_hash(prev_block);
-    size_t height = get_block_height(prev_block) + 1;
-    currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
-    crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake_tx);
-
-    pos_block_builder pb;
-    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
-    pb.step2_set_txs(std::vector<transaction>());
-    
-    pb.step3a(diff, prev_id, null_hash);
-
-    crypto::key_derivation  derivation              {};
-    crypto::scalar_t        stake_out_blinding_mask {};
-    uint64_t                stake_output_amount     = 0;
-    crypto::public_key      stealth_address         {};
-    crypto::secret_key      secret_x                {};
-    crypto::key_image       stake_output_key_image  {};
-
-    r = generate_key_derivation(stake_tx_pub_key, stake_acc.get_keys().view_secret_key, derivation);
-    CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
-    r = is_out_to_acc(stake_acc.get_public_address(), boost::get<currency::tx_out_zarcanum>(stake_tx.vout[stake_out_in_tx_index]), derivation, stake_out_in_tx_index, stake_output_amount, stake_out_blinding_mask);
-    CHECK_AND_ASSERT_MES(r, false, "is_out_to_acc failed");
-    r = crypto::derive_public_key(derivation, stake_out_in_tx_index, stake_acc.get_public_address().spend_public_key, stealth_address);
-    CHECK_AND_ASSERT_MES(r, false, "derive_public_key failed");
-    crypto::derive_secret_key(derivation, stake_out_in_tx_index, stake_acc.get_keys().spend_secret_key, secret_x);
-    crypto::generate_key_image(stealth_address, secret_x, stake_output_key_image);
-
-
-    pb.step3b(stake_output_amount, stake_output_key_image, stake_tx_pub_key, stake_out_in_tx_index, stake_out_blinding_mask, stake_acc.get_keys().view_secret_key,
-      stake_output_gindex, prev_block.timestamp, POS_SCAN_WINDOW, POS_SCAN_STEP);
-
-    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), stake_acc.get_public_address());
-    
-    pb.step5_sign(stake_tx_pub_key, stake_out_in_tx_index, stake_tx_pub_key, stake_acc);
-
-    blk_1_pos = pb.m_block;
+    block blk_1_pos_bad;
+    CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_1r, miner_acc, COIN, 10, blk_1_pos_bad), false, "");
+    LOG_PRINT_CYAN("i = " << i, LOG_LEVEL_0);
+    if (!invalidate_zarcanum_sig(i, boost::get<zarcanum_sig>(blk_1_pos_bad.miner_tx.signatures[0])))
+      break;
+    generator.add_block_info(blk_1_pos_bad, std::list<transaction>{});
+    DO_CALLBACK(events, "mark_invalid_block");
+    ADD_CUSTOM_EVENT(events, blk_1_pos_bad);
   }
 
-  ADD_CUSTOM_EVENT(events, blk_1_pos);
+  // make a normal PoS block
+  std::list<currency::account_base> miner_stake_sources( {miner_acc} );
+  MAKE_NEXT_POS_BLOCK(events, blk_2, blk_1r, miner_acc, miner_stake_sources);
+  // ... and a PoW block
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+
+  // make a PoS block and than change its nonce, so its hash also changes
+  // this block should fail
+  MAKE_NEXT_POS_BLOCK(events, blk_4_bad, blk_3, miner_acc, miner_stake_sources);
+  generator.remove_block_info(blk_4_bad);
+  events.pop_back();
+  blk_4_bad.nonce = 0xc0ffee; // this will change block's hash
+  generator.add_block_info(blk_4_bad, std::list<transaction>{});
+  DO_CALLBACK(events, "mark_invalid_block");
+  ADD_CUSTOM_EVENT(events, blk_4_bad);
+
+  // finally, make a normal block
+  MAKE_NEXT_POS_BLOCK(events, blk_4, blk_3, miner_acc, miner_stake_sources);
 
   return true;
 }
+
 
 //------------------------------------------------------------------------------
 

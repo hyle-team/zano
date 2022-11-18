@@ -87,7 +87,7 @@ namespace currency
     result.outputs_count = outs_count;
     uint8_t err = 0;
     bool r = crypto::bpp_gen<>(amounts, blinding_masks, commitments_1div8, result.bpp, &err);
-    CHECK_AND_ASSERT_MES(r, false, "bpp_gen failed with error " << err);
+    CHECK_AND_ASSERT_MES(r, false, "bpp_gen failed with error " << (int)err);
 
     return true;
   }
