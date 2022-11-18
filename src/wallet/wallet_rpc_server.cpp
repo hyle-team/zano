@@ -112,11 +112,11 @@ namespace tools
         {
           LOG_PRINT_RED("no connection to the daemon", LOG_LEVEL_0);
         }
-        catch(std::exception& e)
+        catch (std::exception& e)
         {
           LOG_ERROR("exeption caught in wallet_rpc_server::idle_handler: " << e.what());
         }
-        catch(...)
+        catch (...)
         {
           LOG_ERROR("unknown exeption caught in wallet_rpc_server::idle_handler");
         }
@@ -157,26 +157,26 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
   {
-    response.m_response_code = 200; 
-    response.m_response_comment = "Ok"; 
-    std::string reference_stub; 
-    bool call_found = false; 
+    response.m_response_code = 200;
+    response.m_response_comment = "Ok";
+    std::string reference_stub;
+    bool call_found = false;
     if (m_deaf)
     {
-      response.m_response_code = 500; 
-      response.m_response_comment = "Internal Server Error"; 
+      response.m_response_code = 500;
+      response.m_response_comment = "Internal Server Error";
       return true;
     }
     if (!handle_http_request_map(query_info, response, m_conn_context, call_found, reference_stub) && response.m_response_code == 200)
     {
-      response.m_response_code = 500; 
-      response.m_response_comment = "Internal Server Error"; 
+      response.m_response_code = 500;
+      response.m_response_comment = "Internal Server Error";
       return true;
     }
     if (!call_found)
     {
-      response.m_response_code = 404; 
-      response.m_response_comment = "Not Found"; 
+      response.m_response_code = 404;
+      response.m_response_comment = "Not Found";
       return true;
     }
     return true;
@@ -186,22 +186,18 @@ namespace tools
   {
     try
     {
-      res.balance = m_wallet.balance();
-      res.unlocked_balance = m_wallet.unlocked_balance();
+      //      res.balance = m_wallet.balance();
+      //      res.unlocked_balance = m_wallet.unlocked_balance();
       uint64_t mined = 0;
-      std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances;
-      m_wallet.balance(balances, mined);
-      auto it = balances.find(currency::null_hash);
-      if (it != balances.end())
+      //     std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances;
+      m_wallet.balance(res.balances, mined);
+      for (auto it = res.balances.begin(); it != res.balances.end(); it++)
       {
-        res.balance = it->second.total;
-        res.unlocked_balance = it->second.unlocked;
-      }
-      for (auto el : balances)
-      {
-        res.balances.push_back(wallet_public::asset_balance_entry());
-        static_cast<wallet_public::asset_balance_entry_base&>(res.balances.back()) = el.second;
-        res.balances.back().asset_id = el.first;
+        if (it->asset_info.asset_id == currency::null_hash)
+        {
+          res.balance = it->total;
+          res.unlocked_balance = it->unlocked;
+        }
       }
     }
     catch (std::exception& e)

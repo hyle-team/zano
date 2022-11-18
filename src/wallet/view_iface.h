@@ -215,8 +215,7 @@ public:
   
   struct wallet_info
   {
-    uint64_t unlocked_balance;
-    uint64_t balance;
+    std::vector<tools::wallet_public::asset_balance_entry> balances;
 		uint64_t mined_total;
     std::string address;
     std::string view_sec_key;
@@ -225,8 +224,7 @@ public:
     bool is_watch_only;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(unlocked_balance)
-      KV_SERIALIZE(balance)
+      KV_SERIALIZE(balances)
 			KV_SERIALIZE(mined_total)			
       KV_SERIALIZE(address)
       KV_SERIALIZE(view_sec_key)

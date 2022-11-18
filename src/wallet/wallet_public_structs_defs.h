@@ -166,10 +166,10 @@ namespace wallet_public
 
   struct asset_balance_entry : public asset_balance_entry_base
   {
-    crypto::hash asset_id = currency::null_hash;
+    currency::asset_descriptor_with_id asset_info;
     //v2
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(asset_id)
+      KV_SERIALIZE(asset_info)
       KV_CHAIN_BASE(asset_balance_entry_base)
     END_KV_SERIALIZE_MAP()
   };

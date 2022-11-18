@@ -3125,6 +3125,44 @@ bool wallet2::balance(std::unordered_map<crypto::hash, wallet_public::asset_bala
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::balance(std::vector<wallet_public::asset_balance_entry>& balances, uint64_t& mined)
+{
+  std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances_map;
+  this->balance(balances_map, mined);
+  for (const auto& item : balances_map)
+  {
+    asset_descriptor_base* asset_ptr = nullptr;
+    //check if asset is whitelisted or customly added
+    auto it = m_whitelisted_assets.find(item.first);
+    if (it == m_whitelisted_assets.end())
+    {
+      //check if it custom asset
+      auto it_cust = m_custom_assets.find(item.first);
+      if (it_cust == m_custom_assets.end())
+      {
+        continue;
+      }
+      else
+      {
+        asset_ptr = &it_cust->second;
+      }
+    }
+    else
+    {
+      asset_ptr = &it->second;
+    }
+    
+    balances.push_back(wallet_public::asset_balance_entry());
+    wallet_public::asset_balance_entry& new_item = balances.back();
+    static_cast<asset_balance_entry_base&>(new_item) = item.second;
+    new_item.asset_info.asset_id = item.first;
+    CHECK_AND_ASSERT_THROW_MES(asset_ptr, "Internal error: asset_ptr i nullptr");
+    static_cast<asset_descriptor_base&>(new_item.asset_info) = *asset_ptr;
+  }
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 uint64_t wallet2::balance() const
 {
   uint64_t stub = 0;
