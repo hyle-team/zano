@@ -702,7 +702,7 @@ namespace epee
 
           boost::system::error_code ec;
 
-          size_t writen = m_sct_back.get_socket().write_some(boost::asio::buffer(data, sz), ec);
+          size_t writen = blocked_mode_client_t<is_ssl>::m_sct_back.get_socket().write_some(boost::asio::buffer(data, sz), ec);
 
           if (!writen || ec)
           {
