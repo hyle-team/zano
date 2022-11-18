@@ -745,7 +745,7 @@ namespace epee
           // asynchronous operations are cancelled. This allows the blocked
           // connect(), read_line() or write_line() functions to return.
           LOG_PRINT_L3("Timed out socket");
-          m_sct_back.get_socket().close();
+          blocked_mode_client_t<is_ssl>::m_sct_back.get_socket().close();
 
           // There is no longer an active deadline. The expiry is set to positive
           // infinity so that the actor takes no action until a new deadline is set.
