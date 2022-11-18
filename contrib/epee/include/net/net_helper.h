@@ -668,7 +668,7 @@ namespace epee
 
       bool shutdown()
       {
-        blocked_mode_client::shutdown();
+        blocked_mode_client_t<is_ssl>::shutdown();
         m_send_deadline.cancel();
         return true;
       }
@@ -753,7 +753,7 @@ namespace epee
         }
 
         // Put the actor back to sleep.
-        m_send_deadline.async_wait(boost::bind(&async_blocked_mode_client::check_send_deadline, this));
+        m_send_deadline.async_wait(boost::bind(&async_blocked_mode_client_t<is_ssl>::check_send_deadline, this));
       }
     };
 
