@@ -5,9 +5,14 @@ PROJECT(Zano)
 
 set(VERSION "1.0")
 
-#  if(POLICY CMP0043)
-#    cmake_policy(SET CMP0043 OLD)
-#  endif()
+if(POLICY CMP0043)
+  cmake_policy(SET CMP0043 NEW)
+endif()
+if(POLICY CMP0043)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
+
 
 #  if(POLICY CMP0020)
 #    cmake_policy(SET CMP0020 OLD)
@@ -50,6 +55,7 @@ message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}, and built ty
  
 enable_testing()
 
+find_package(OpenSSL REQUIRED)
 
 if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10.5)          

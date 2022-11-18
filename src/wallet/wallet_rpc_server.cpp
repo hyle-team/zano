@@ -189,7 +189,6 @@ namespace tools
       //      res.balance = m_wallet.balance();
       //      res.unlocked_balance = m_wallet.unlocked_balance();
       uint64_t mined = 0;
-      //     std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances;
       m_wallet.balance(res.balances, mined);
       for (auto it = res.balances.begin(); it != res.balances.end(); it++)
       {

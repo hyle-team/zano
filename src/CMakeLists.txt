@@ -158,7 +158,7 @@ add_dependencies(stratum version ${PCH_LIB_NAME})
 ENABLE_SHARED_PCH(stratum STRATUM)
 
 
-target_link_libraries(currency_core lmdb mdbx OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(currency_core lmdb mdbx)
 
 add_executable(daemon ${DAEMON} ${P2P} ${CURRENCY_PROTOCOL})
 add_dependencies(daemon version)
@@ -199,7 +199,7 @@ if(BUILD_GUI)
   QT5_USE_MODULES(Zano WebEngineWidgets WebChannel)
   find_package(Qt5PrintSupport REQUIRED)
 
-  target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic ethash Qt5::WebEngineWidgets Qt5::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES}OpenSSL::SSL OpenSSL::Crypto)
+  target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic ethash Qt5::WebEngineWidgets Qt5::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
   if (UNIX AND NOT APPLE)
 	target_link_libraries(Zano rt)
   endif()

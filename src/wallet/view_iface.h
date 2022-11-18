@@ -215,7 +215,7 @@ public:
   
   struct wallet_info
   {
-    std::vector<tools::wallet_public::asset_balance_entry> balances;
+    std::list<tools::wallet_public::asset_balance_entry> balances;
 		uint64_t mined_total;
     std::string address;
     std::string view_sec_key;

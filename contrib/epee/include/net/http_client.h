@@ -1072,7 +1072,7 @@ namespace epee
         return false;
       }
 
-
+      inline 
       bool fetch_url(const std::string& url, std::string& response_body, const std::string& method = "GET", const std::string& request_body = "", unsigned int timeout = 1000)
       {
         try
