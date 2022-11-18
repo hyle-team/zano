@@ -1724,7 +1724,7 @@ void wallets_manager::prepare_wallet_status_info(wallet_vs_options& wo, view::wa
   wsi.is_mining = wo.do_mining;
   wsi.wallet_id = wo.wallet_id;
   wsi.is_alias_operations_available = !wo.has_related_alias_in_unconfirmed;
-  wsi.balance = wo.w->get()->balance(wsi.unlocked_balance, wsi.awaiting_in, wsi.awaiting_out, wsi.minied_total);
+  wo.w->get()->balance(wsi.balances, wsi.minied_total);
 }
 std::string wallets_manager::check_available_sources(uint64_t wallet_id, std::list<uint64_t>& amounts)
 {
