@@ -6696,22 +6696,24 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
 
 
   const txin_v& input_v = input_tx.vin[input_index];
-  const txin_to_key& input_to_key = get_to_key_input_from_txin_v(input_v);
+  const crypto::key_image& input_key_image = get_key_image_from_txin_v(input_v);
+  const std::vector<txout_ref_v>& input_key_offsets = get_key_offsets_from_txin_v(input_v);
+  const uint64_t input_amount = get_amount_from_variant(input_v);
 
   // check case b1: key_image spent status in main chain, should be either non-spent or has spent height >= split_height
-  auto p = m_db_spent_keys.get(input_to_key.k_image);
-  CHECK_AND_ASSERT_MES(p == nullptr || *p >= split_height, false, "key image " << input_to_key.k_image << " has been already spent in main chain at height " << *p << ", split height: " << split_height);
+  auto p = m_db_spent_keys.get(input_key_image);
+  CHECK_AND_ASSERT_MES(p == nullptr || *p >= split_height, false, "key image " << input_key_image << " has been already spent in main chain at height " << *p << ", split height: " << split_height);
 
   TIME_MEASURE_START(ki_lookup_time);
   //check key_image in altchain  
   //check among this alt block already collected key images first
-  if (collected_keyimages.find(input_to_key.k_image) != collected_keyimages.end())
+  if (collected_keyimages.find(input_key_image) != collected_keyimages.end())
   {
     // cases b2, b3
-    LOG_ERROR("key image " << input_to_key.k_image << " already spent in this alt block");
+    LOG_ERROR("key image " << input_key_image << " already spent in this alt block");
     return false;
   }
-  auto ki_it = m_altblocks_keyimages.find(input_to_key.k_image);
+  auto ki_it = m_altblocks_keyimages.find(input_key_image);
   if (ki_it != m_altblocks_keyimages.end())
   {    
     //have some entry for this key image. Check if this key image belongs to this alt chain
@@ -6721,18 +6723,18 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       if (alt_chain_block_ids.find(h) != alt_chain_block_ids.end())
       {
         // cases b2, b3
-        LOG_ERROR("key image " << input_to_key.k_image << " already spent in altchain");
+        LOG_ERROR("key image " << input_key_image << " already spent in altchain");
         return false;
       }
     }
   }
   //update altchain with key image
-  collected_keyimages.insert(input_to_key.k_image);
+  collected_keyimages.insert(input_key_image);
   TIME_MEASURE_FINISH(ki_lookup_time);
   ki_lookuptime = ki_lookup_time;
 
-  std::vector<txout_ref_v> abs_key_offsets = relative_output_offsets_to_absolute(input_to_key.key_offsets);
-  CHECK_AND_ASSERT_MES(abs_key_offsets.size() > 0 && abs_key_offsets.size() == input_to_key.key_offsets.size(), false, "internal error: abs_key_offsets.size()==" << abs_key_offsets.size() << ", input_to_key.key_offsets.size()==" << input_to_key.key_offsets.size());
+  std::vector<txout_ref_v> abs_key_offsets = relative_output_offsets_to_absolute(input_key_offsets);
+  CHECK_AND_ASSERT_MES(abs_key_offsets.size() > 0 && abs_key_offsets.size() == input_key_offsets.size(), false, "internal error: abs_key_offsets.size()==" << abs_key_offsets.size() << ", input_key_offsets.size()==" << input_key_offsets.size());
   // eventually we should found all public keys for all outputs this input refers to, for checking ring signature
   std::vector<crypto::public_key> pub_keys(abs_key_offsets.size(), null_pkey); 
 
@@ -6747,7 +6749,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   
   if (!alt_chain.empty())
   {
-    auto abg_it = alt_chain.back()->second.gindex_lookup_table.find(input_to_key.amount);
+    auto abg_it = alt_chain.back()->second.gindex_lookup_table.find(input_amount);
     if (abg_it != alt_chain.back()->second.gindex_lookup_table.end())
     {
       amount_touched_altchain = true;
@@ -6757,13 +6759,13 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     else
     {
       //quite easy, 
-      global_outs_for_amount = m_db_outputs.get_item_size(input_to_key.amount);
+      global_outs_for_amount = m_db_outputs.get_item_size(input_amount);
     }
   }
   else
   {
     //quite easy, 
-    global_outs_for_amount = m_db_outputs.get_item_size(input_to_key.amount);
+    global_outs_for_amount = m_db_outputs.get_item_size(input_amount);
   }
   
   CHECK_AND_ASSERT_MES(pub_keys.size() == abs_key_offsets.size(), false, "pub_keys.size()==" << pub_keys.size() << "  !=  abs_key_offsets.size()==" << abs_key_offsets.size()); // just a little bit of paranoia
@@ -6781,7 +6783,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     {
       uint64_t offset_gindex = boost::get<uint64_t>(off);
       CHECK_AND_ASSERT_MES(amount_touched_altchain || (offset_gindex < global_outs_for_amount), false,
-        "invalid global output index " << offset_gindex << " for amount=" << input_to_key.amount << 
+        "invalid global output index " << offset_gindex << " for amount=" << input_amount << 
         ", max is " << global_outs_for_amount << 
         ", referred to by offset #" << pk_n << 
         ", amount_touched_altchain = " << amount_touched_altchain);
@@ -6790,7 +6792,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
         bool found_the_key = false;
         for (auto alt_it = alt_chain.rbegin(); alt_it != alt_chain.rend(); alt_it++)
         {
-          auto it_aag = (*alt_it)->second.gindex_lookup_table.find(input_to_key.amount);
+          auto it_aag = (*alt_it)->second.gindex_lookup_table.find(input_amount);
           if (it_aag == (*alt_it)->second.gindex_lookup_table.end())
           {
             CHECK_AND_ASSERT_MES(alt_it != alt_chain.rbegin(), false, "internal error: was marked as amount_touched_altchain but unable to find on first entry");
@@ -6804,8 +6806,8 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
             //TODO: At the moment we ignore check of mix_attr against mixing to simplify alt chain check, but in future consider it for stronger validation
             uint64_t local_offset = offset_gindex - it_aag->second;
             auto& alt_keys = (*alt_it)->second.outputs_pub_keys;            
-            CHECK_AND_ASSERT_MES(local_offset < alt_keys[input_to_key.amount].size(), false, "Internal error: local_offset=" << local_offset << " while alt_keys[" << input_to_key.amount << " ].size()=" << alt_keys.size());
-            const output_key_or_htlc_v& out_in_alt = alt_keys[input_to_key.amount][local_offset];
+            CHECK_AND_ASSERT_MES(local_offset < alt_keys[input_amount].size(), false, "Internal error: local_offset=" << local_offset << " while alt_keys[" << input_amount << " ].size()=" << alt_keys.size());
+            const output_key_or_htlc_v& out_in_alt = alt_keys[input_amount][local_offset];
             
             /*
             here we do validation against compatibility of input and output type
@@ -6842,8 +6844,8 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
           continue;
         //otherwise lookup in main chain index
       }
-      auto p = m_db_outputs.get_subitem(input_to_key.amount, offset_gindex);
-      CHECK_AND_ASSERT_MES(p != nullptr, false, "global output was not found, amount: " << input_to_key.amount << ", gindex: " << offset_gindex << ", referred to by offset #" << pk_n);
+      auto p = m_db_outputs.get_subitem(input_amount, offset_gindex);
+      CHECK_AND_ASSERT_MES(p != nullptr, false, "global output was not found, amount: " << input_amount << ", gindex: " << offset_gindex << ", referred to by offset #" << pk_n);
       tx_id = p->tx_id;
       out_n = p->out_no;
     }
@@ -6965,10 +6967,21 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     VARIANT_SWITCH_END();
   }
 
+  // @#@# TODO review the following checks!
 
   // do input checks (attachment_info, ring signature and extra signature, etc.)
-  r = check_input_signature(input_tx, input_index, input_to_key, input_tx_hash, pub_key_pointers);
-  CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
+  VARIANT_SWITCH_BEGIN(input_v);
+  VARIANT_CASE_CONST(txin_to_key, input_to_key)
+    r = check_input_signature(input_tx, input_index, input_to_key, input_tx_hash, pub_key_pointers);
+    CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
+  VARIANT_CASE_CONST(txin_zc_input, input_zc);
+    uint64_t max_related_block_height = 0;
+    r = check_tx_input(input_tx, input_index, input_zc, input_tx_hash, max_related_block_height);
+    CHECK_AND_ASSERT_MES(r, false, "check_tx_input failed");
+  VARIANT_CASE_OTHER()
+    LOG_ERROR("unexpected input type: " << input_v.type().name());
+    return false;
+  VARIANT_SWITCH_END();
 
 
   // TODO: consider checking input_tx for valid extra attachment info as it's checked in check_tx_inputs()
