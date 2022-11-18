@@ -5428,7 +5428,8 @@ bool blockchain_storage::validate_pos_block(const block& b,
   // build kernel and calculate hash
   stake_kernel sk = AUTO_VAL_INIT(sk);
   stake_modifier_type sm = AUTO_VAL_INIT(sm);
-  bool r = build_stake_modifier(sm, alt_chain, split_height);
+  uint64_t last_pow_block_height = 0;
+  bool r = build_stake_modifier(sm, alt_chain, split_height, nullptr, &last_pow_block_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to build_stake_modifier");
   r = build_kernel(stake_key_image, sk, sm, b.timestamp);
   CHECK_AND_ASSERT_MES(r, false, "failed to build kernel_stake");
@@ -5451,6 +5452,9 @@ bool blockchain_storage::validate_pos_block(const block& b,
     r = get_output_keys_for_input_with_checks(b.miner_tx, stake_input, dummy_output_keys, max_related_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex);
     CHECK_AND_ASSERT_MES(r, false, "get_output_keys_for_input_with_checks failed for stake input");
     CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() == stake_input.key_offsets.size(), false, "incorrect number of referenced outputs found: " << scan_contex.zc_outs.size() << ", while " << stake_input.key_offsets.size() << " is expected.");
+    // make sure that all referring inputs are either older then, or the same age as, the most resent PoW block.
+    CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_block_height, false, "stake input refs' max related block height is " << max_related_block_height << " while last PoW block height is " << last_pow_block_height);    
+
     // build a ring of references
     vector<crypto::CLSAG_GGXG_input_ref_t> ring;
     ring.reserve(scan_contex.zc_outs.size());
@@ -5460,10 +5464,8 @@ bool blockchain_storage::validate_pos_block(const block& b,
     crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
 
     uint8_t err = 0;
-    r = crypto::zarcanum_verify_proof(id, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, sig, &err);
+    r = crypto::zarcanum_verify_proof(id, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, basic_diff, sig, &err);
     CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << (int)err);
-
-    final_diff = basic_diff; // just for logs
     return true;
   }
   else
@@ -6097,10 +6099,12 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     int64_t ts_diff = actual_ts - m_core_runtime_config.get_core_time();
     powpos_str_entry << "PoS:\t" << proof_hash << ", stake amount: ";
     if (pos_coinstake_amount != UINT64_MAX)
+    {
       powpos_str_entry << print_money_brief(pos_coinstake_amount);
+      powpos_str_entry << ", final_difficulty: " << this_coin_diff;
+    }
     else
       powpos_str_entry << "hidden";
-    powpos_str_entry << ", final_difficulty: " << this_coin_diff;
     timestamp_str_entry << ", actual ts: " << actual_ts << " (diff: " << std::showpos << ts_diff << "s) block ts: " << std::noshowpos << bei.bl.timestamp << " (shift: " << std::showpos << static_cast<int64_t>(bei.bl.timestamp) - actual_ts << ")";
   }
   else
@@ -6451,7 +6455,9 @@ bool blockchain_storage::build_kernel(const block& bl, stake_kernel& kernel, uin
   return build_kernel(txin.k_image, kernel, stake_modifier, bl.timestamp);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::build_stake_modifier(stake_modifier_type& sm, const alt_chain_type& alt_chain, uint64_t split_height, crypto::hash *p_last_block_hash /* = nullptr */) const
+bool blockchain_storage::build_stake_modifier(stake_modifier_type& sm, const alt_chain_type& alt_chain, uint64_t split_height,
+  crypto::hash* p_last_block_hash /* = nullptr */,
+  uint64_t* p_last_pow_block_height /* = nullptr */ ) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   sm = stake_modifier_type();
@@ -6472,6 +6478,9 @@ bool blockchain_storage::build_stake_modifier(stake_modifier_type& sm, const alt
 
   if (p_last_block_hash != nullptr)
     *p_last_block_hash = get_block_hash(m_db_blocks.back()->bl);
+
+  if (p_last_pow_block_height != nullptr)
+    *p_last_pow_block_height = pbei_last_pow->height;
 
   return true;
 }

@@ -346,7 +346,7 @@ namespace currency
       stake_kernel& kernel,
       const stake_modifier_type& stake_modifier,
       uint64_t timestamp) const;
-    bool build_stake_modifier(stake_modifier_type& sm, const alt_chain_type& alt_chain = alt_chain_type(), uint64_t split_height = 0, crypto::hash *p_last_block_hash = nullptr) const;
+    bool build_stake_modifier(stake_modifier_type& sm, const alt_chain_type& alt_chain = alt_chain_type(), uint64_t split_height = 0, crypto::hash* p_last_block_hash = nullptr, uint64_t* p_last_pow_block_height = nullptr) const;
 
     bool validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const;
     bool validate_pos_block(const block& b, const crypto::hash& id, bool for_altchain)const;
@@ -660,7 +660,7 @@ namespace currency
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();
     bool prune_ring_signatures_and_attachments(uint64_t height, uint64_t& transactions_pruned, uint64_t& signatures_pruned, uint64_t& attachments_pruned);
-    //    bool build_stake_modifier_for_alt(const alt_chain_type& alt_chain, stake_modifier_type& sm);
+
     template<class visitor_t>
     bool enum_blockchain(visitor_t& v, const alt_chain_type& alt_chain = alt_chain_type(), uint64_t split_height = 0) const;
     bool update_spent_tx_flags_for_input(uint64_t amount, const txout_ref_v& o, bool spent);
