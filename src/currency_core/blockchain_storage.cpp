@@ -1810,9 +1810,16 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     //check if PoS block allowed on this height
     CHECK_AND_ASSERT_MES_CUSTOM(!(pos_block && abei.height < m_core_runtime_config.pos_minimum_heigh), false, bvc.m_verification_failed = true, "PoS block is not allowed on this height");
 
+    // miner tx prevalidation (light checks)
+    if (!prevalidate_miner_transaction(b, abei.height, pos_block))
+    {
+      LOG_PRINT_RED_L0("Alternative block " << id << " @ " << coinbase_height << "has invalid miner transaction.");
+      bvc.m_verification_failed = true;
+      return false;
+    }
 
+    // PoW / PoS validation (heavy checks)
     wide_difficulty_type current_diff = get_next_diff_conditional2(pos_block, alt_chain, connection_height, abei);
-    
     CHECK_AND_ASSERT_MES_CUSTOM(current_diff, false, bvc.m_verification_failed = true, "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!");
     
     crypto::hash proof_of_work = null_hash;
@@ -1841,13 +1848,6 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
       //
     }
 
-    if (!prevalidate_miner_transaction(b, abei.height, pos_block))
-    {
-      LOG_PRINT_RED_L0("Block with id: " << string_tools::pod_to_hex(id)
-        << " (as alternative) have wrong miner transaction.");
-      bvc.m_verification_failed = true;
-      return false;
-    }
     std::unordered_set<crypto::key_image> alt_block_keyimages;
     uint64_t ki_lookup_total = 0;
     if (!validate_alt_block_txs(b, id, alt_block_keyimages, abei, alt_chain, connection_height, ki_lookup_total))
