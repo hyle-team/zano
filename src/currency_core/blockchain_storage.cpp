@@ -1654,9 +1654,10 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
 {
   if (is_pos_block(b))
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.vin.size()>=2, false, "paranoid check failed");
-    CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "paranoid type check failed");
-    purge_keyimage_from_big_heap(boost::get<txin_to_key>(b.miner_tx.vin[1]).k_image, block_id);
+    CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() == 2, false, "paranoid check failed");
+    crypto::key_image ki{};
+    CHECK_AND_ASSERT_MES(get_key_image_from_txin_v(b.miner_tx.vin[1], ki), false, "cannot get key image from input #1");
+    purge_keyimage_from_big_heap(ki, block_id);
   }
   for (auto tx_id : b.tx_hashes)
   {
