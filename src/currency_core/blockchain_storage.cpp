@@ -802,8 +802,8 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   CHECK_AND_ASSERT_MES_NO_RET(res, "pop_transaction_from_global_index failed for tx " << tx_id);
   bool res_erase = m_db_transactions.erase_validate(tx_id);
   CHECK_AND_ASSERT_MES_NO_RET(res_erase, "Failed to m_transactions.erase with id = " << tx_id);
-  
-  LOG_PRINT_L1("transaction " << tx_id << (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history"));
+
+  LOG_PRINT_L1("transaction " << tx_id << " from block @ " << tx_res_ptr->m_keeper_block_height << (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history"));
   return res;
 }
 
@@ -1012,7 +1012,7 @@ bool blockchain_storage::rollback_blockchain_switching(std::list<block_ws_txs>& 
     CHECK_AND_ASSERT_MES(r && bvc.m_added_to_main_chain, false, "PANIC!!! failed to add (again) block while chain switching during the rollback!");
   }
 
-  LOG_PRINT_L0("Rollback success.");
+  LOG_PRINT_L0("Rollback succeeded.");
   return true;
 }
 //------------------------------------------------------------------
@@ -1125,6 +1125,7 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
       //when machine time was wrongly set for a few hours back, then blocks which was detached from main chain 
       //couldn't be added as alternative due to timestamps validation(timestamps assumed as from future)
       //thanks @Gigabyted for reporting this problem
+      LOG_PRINT("REORGANIZE FAILED because ex-main block wasn't added as alt, but we pretend it was successfull (see also comments in sources)", LOG_LEVEL_0);
       break;
     }
   }
@@ -1918,7 +1919,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
       << ENDL << "id:\t" << id
       << ENDL << "prev\t" << abei.bl.prev_id
       << ENDL << ss_pow_pos_info.str()
-      << ENDL << "HEIGHT " << abei.height << ", difficulty: " << abei.difficulty << ", cumul_diff_precise: " << abei.cumulative_diff_precise << ", cumul_diff_adj: " << abei.cumulative_diff_adjusted << " (current mainchain cumul_diff_adj: " << m_db_blocks.back()->cumulative_diff_adjusted << ", ki lookup total: " << ki_lookup_total <<")"
+      << ENDL << "HEIGHT " << abei.height << ", difficulty: " << abei.difficulty << ", cumul_diff_precise: " << abei.cumulative_diff_precise << ", cumul_diff_adj: " << abei.cumulative_diff_adjusted << ", txs: " << abei.bl.tx_hashes.size() << " (current mainchain cumul_diff_adj: " << m_db_blocks.back()->cumulative_diff_adjusted << ", total ki lookups: " << ki_lookup_total <<")"
       , LOG_LEVEL_0);
 
     if (is_reorganize_required(*m_db_blocks.back(), alt_chain, proof))
