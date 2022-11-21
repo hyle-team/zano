@@ -6976,6 +6976,9 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   VARIANT_CASE_CONST(txin_to_key, input_to_key)
     r = check_input_signature(input_tx, input_index, input_to_key, input_tx_hash, pub_key_pointers);
     CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
+  VARIANT_CASE_CONST(txin_htlc, input_htlc);
+    r = check_input_signature(input_tx, input_index, input_htlc, input_tx_hash, pub_key_pointers);
+    CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
   VARIANT_CASE_CONST(txin_zc_input, input_zc);
     if (is_pos_miner_tx(input_tx))
     {
