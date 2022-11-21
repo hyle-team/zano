@@ -6975,9 +6975,16 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     r = check_input_signature(input_tx, input_index, input_to_key, input_tx_hash, pub_key_pointers);
     CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
   VARIANT_CASE_CONST(txin_zc_input, input_zc);
-    uint64_t max_related_block_height = 0;
-    r = check_tx_input(input_tx, input_index, input_zc, input_tx_hash, max_related_block_height);
-    CHECK_AND_ASSERT_MES(r, false, "check_tx_input failed");
+    if (is_pos_miner_tx(input_tx))
+    {
+      // TODO @#@# Special case: handling Zarcanum PoS block input
+    }
+    else
+    {
+      uint64_t max_related_block_height = 0;
+      r = check_tx_input(input_tx, input_index, input_zc, input_tx_hash, max_related_block_height);
+      CHECK_AND_ASSERT_MES(r, false, "check_tx_input failed");
+    }
   VARIANT_CASE_OTHER()
     LOG_ERROR("unexpected input type: " << input_v.type().name());
     return false;
@@ -7313,7 +7320,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {
-      if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
+      if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc) || tx.vin[n].type() == typeid(txin_zc_input))
       {
         uint64_t ki_lookup = 0;
         r = validate_alt_block_input(tx, collected_keyimages, alt_chain_tx_ids, id, tx_id, n, split_height, alt_chain, alt_chain_block_ids, ki_lookup);
