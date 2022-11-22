@@ -802,8 +802,8 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   CHECK_AND_ASSERT_MES_NO_RET(res, "pop_transaction_from_global_index failed for tx " << tx_id);
   bool res_erase = m_db_transactions.erase_validate(tx_id);
   CHECK_AND_ASSERT_MES_NO_RET(res_erase, "Failed to m_transactions.erase with id = " << tx_id);
-  
-  LOG_PRINT_L1("transaction " << tx_id << (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history"));
+
+  LOG_PRINT_L1("transaction " << tx_id << " from block @ " << tx_res_ptr->m_keeper_block_height << (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history"));
   return res;
 }
 
@@ -1012,7 +1012,7 @@ bool blockchain_storage::rollback_blockchain_switching(std::list<block_ws_txs>& 
     CHECK_AND_ASSERT_MES(r && bvc.m_added_to_main_chain, false, "PANIC!!! failed to add (again) block while chain switching during the rollback!");
   }
 
-  LOG_PRINT_L0("Rollback success.");
+  LOG_PRINT_L0("Rollback succeeded.");
   return true;
 }
 //------------------------------------------------------------------
@@ -1125,6 +1125,7 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
       //when machine time was wrongly set for a few hours back, then blocks which was detached from main chain 
       //couldn't be added as alternative due to timestamps validation(timestamps assumed as from future)
       //thanks @Gigabyted for reporting this problem
+      LOG_PRINT("REORGANIZE FAILED because ex-main block wasn't added as alt, but we pretend it was successfull (see also comments in sources)", LOG_LEVEL_0);
       break;
     }
   }
@@ -1654,9 +1655,10 @@ bool blockchain_storage::purge_altblock_keyimages_from_big_heap(const block& b, 
 {
   if (is_pos_block(b))
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.vin.size()>=2, false, "paranoid check failed");
-    CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "paranoid type check failed");
-    purge_keyimage_from_big_heap(boost::get<txin_to_key>(b.miner_tx.vin[1]).k_image, block_id);
+    CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() == 2, false, "paranoid check failed");
+    crypto::key_image ki{};
+    CHECK_AND_ASSERT_MES(get_key_image_from_txin_v(b.miner_tx.vin[1], ki), false, "cannot get key image from input #1");
+    purge_keyimage_from_big_heap(ki, block_id);
   }
   for (auto tx_id : b.tx_hashes)
   {
@@ -1809,9 +1811,16 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     //check if PoS block allowed on this height
     CHECK_AND_ASSERT_MES_CUSTOM(!(pos_block && abei.height < m_core_runtime_config.pos_minimum_heigh), false, bvc.m_verification_failed = true, "PoS block is not allowed on this height");
 
+    // miner tx prevalidation (light checks)
+    if (!prevalidate_miner_transaction(b, abei.height, pos_block))
+    {
+      LOG_PRINT_RED_L0("Alternative block " << id << " @ " << coinbase_height << "has invalid miner transaction.");
+      bvc.m_verification_failed = true;
+      return false;
+    }
 
+    // PoW / PoS validation (heavy checks)
     wide_difficulty_type current_diff = get_next_diff_conditional2(pos_block, alt_chain, connection_height, abei);
-    
     CHECK_AND_ASSERT_MES_CUSTOM(current_diff, false, bvc.m_verification_failed = true, "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!");
     
     crypto::hash proof_of_work = null_hash;
@@ -1840,13 +1849,6 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
       //
     }
 
-    if (!prevalidate_miner_transaction(b, abei.height, pos_block))
-    {
-      LOG_PRINT_RED_L0("Block with id: " << string_tools::pod_to_hex(id)
-        << " (as alternative) have wrong miner transaction.");
-      bvc.m_verification_failed = true;
-      return false;
-    }
     std::unordered_set<crypto::key_image> alt_block_keyimages;
     uint64_t ki_lookup_total = 0;
     if (!validate_alt_block_txs(b, id, alt_block_keyimages, abei, alt_chain, connection_height, ki_lookup_total))
@@ -1917,7 +1919,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
       << ENDL << "id:\t" << id
       << ENDL << "prev\t" << abei.bl.prev_id
       << ENDL << ss_pow_pos_info.str()
-      << ENDL << "HEIGHT " << abei.height << ", difficulty: " << abei.difficulty << ", cumul_diff_precise: " << abei.cumulative_diff_precise << ", cumul_diff_adj: " << abei.cumulative_diff_adjusted << " (current mainchain cumul_diff_adj: " << m_db_blocks.back()->cumulative_diff_adjusted << ", ki lookup total: " << ki_lookup_total <<")"
+      << ENDL << "HEIGHT " << abei.height << ", difficulty: " << abei.difficulty << ", cumul_diff_precise: " << abei.cumulative_diff_precise << ", cumul_diff_adj: " << abei.cumulative_diff_adjusted << ", txs: " << abei.bl.tx_hashes.size() << " (current mainchain cumul_diff_adj: " << m_db_blocks.back()->cumulative_diff_adjusted << ", total ki lookups: " << ki_lookup_total <<")"
       , LOG_LEVEL_0);
 
     if (is_reorganize_required(*m_db_blocks.back(), alt_chain, proof))
@@ -6974,10 +6976,20 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   VARIANT_CASE_CONST(txin_to_key, input_to_key)
     r = check_input_signature(input_tx, input_index, input_to_key, input_tx_hash, pub_key_pointers);
     CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
+  VARIANT_CASE_CONST(txin_htlc, input_htlc);
+    r = check_input_signature(input_tx, input_index, input_htlc, input_tx_hash, pub_key_pointers);
+    CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
   VARIANT_CASE_CONST(txin_zc_input, input_zc);
-    uint64_t max_related_block_height = 0;
-    r = check_tx_input(input_tx, input_index, input_zc, input_tx_hash, max_related_block_height);
-    CHECK_AND_ASSERT_MES(r, false, "check_tx_input failed");
+    if (is_pos_miner_tx(input_tx))
+    {
+      // TODO @#@# Special case: handling Zarcanum PoS block input
+    }
+    else
+    {
+      uint64_t max_related_block_height = 0;
+      r = check_tx_input(input_tx, input_index, input_zc, input_tx_hash, max_related_block_height);
+      CHECK_AND_ASSERT_MES(r, false, "check_tx_input failed");
+    }
   VARIANT_CASE_OTHER()
     LOG_ERROR("unexpected input type: " << input_v.type().name());
     return false;
@@ -7313,7 +7325,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {
-      if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc))
+      if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc) || tx.vin[n].type() == typeid(txin_zc_input))
       {
         uint64_t ki_lookup = 0;
         r = validate_alt_block_input(tx, collected_keyimages, alt_chain_tx_ids, id, tx_id, n, split_height, alt_chain, alt_chain_block_ids, ki_lookup);

@@ -448,7 +448,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
           const out_index_info& oii = it->second[gindex];
           if (rqt.height_upper_limit != 0 && oii.block_height > rqt.height_upper_limit)
             continue;
-          const transaction& tx = oii.in_block_tx_index == 0 ? m_blockchain[oii.block_height]->b.miner_tx : m_blockchain[oii.block_height]->m_transactions[oii.in_block_tx_index];
+          const transaction& tx = oii.in_block_tx_index == 0 ? m_blockchain[oii.block_height]->b.miner_tx : m_blockchain[oii.block_height]->m_transactions[oii.in_block_tx_index - 1];
           auto& out_v = tx.vout[oii.in_tx_out_index];
           uint8_t mix_attr = 0;
           if (!get_mix_attr_from_tx_out_v(out_v, mix_attr))
@@ -591,6 +591,7 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
 {
   bool r = false;
   uint64_t last_block_ts = !blck_chain.empty() ? blck_chain.back()->b.timestamp : test_core_time::get_time();
+  uint64_t iterations_processed_total = 0;
 
   //lets try to find block
   for (size_t wallet_index = 0, size = wallets.size(); wallet_index < size; ++wallet_index)
@@ -636,7 +637,10 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
 
       return true;
     }
+    iterations_processed_total += context.iterations_processed;
   }
+
+  LOG_PRINT_RED("PoS mining iteration failed, kernel was not found. Iterations processed across " << wallets.size() << " wallet(s): " << iterations_processed_total, LOG_LEVEL_0);
 
   return false;
 }
