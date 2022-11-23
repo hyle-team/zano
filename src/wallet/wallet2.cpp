@@ -4830,15 +4830,16 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
   if (fake_outputs_count)
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
-    req.use_forced_mix_outs = false; //add this feature to UI later
-    req.decoys_count = fake_outputs_count + 1;// add one to make possible (if need) to skip real output key
+    req.height_upper_limit = m_last_pow_block_h;  // request decoys to be either older than, or the same age as stake output's height
+    req.use_forced_mix_outs = false; // TODO: add this feature to UI later
+    req.decoys_count = fake_outputs_count + 1;    // one more to be able to skip a decoy in case it hits the real output
     for (uint64_t i: selected_indicies)
     {
       auto it = m_transfers.begin() + i;
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->m_ptx_wallet_info->m_tx.vout.size() > it->m_internal_output_index,
         "m_internal_output_index = " << it->m_internal_output_index <<
         " is greater or equal to outputs count = " << it->m_ptx_wallet_info->m_tx.vout.size());
-      req.amounts.push_back(it->amount());
+      req.amounts.push_back(it->is_zc() ? 0 : it->m_amount);
     }
 
     bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, daemon_resp);
