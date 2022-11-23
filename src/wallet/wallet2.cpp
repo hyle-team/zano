@@ -1890,6 +1890,21 @@ void wallet2::transfer(uint64_t amount, const currency::account_public_address& 
   this->transfer(dst, 0, 0, TX_DEFAULT_FEE, extra, attachments, get_current_split_strategy(), tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::transfer(uint64_t amount, size_t fake_outs_count, const currency::account_public_address& acc, uint64_t fee /* = TX_DEFAULT_FEE*/,
+  const crypto::hash& asset_id /* = currency::null_hash */)
+{
+  std::vector<currency::extra_v> extra;
+  std::vector<currency::attachment_v> attachments;
+  transaction result_tx = AUTO_VAL_INIT(result_tx);
+
+  std::vector<tx_destination_entry> dst;
+  dst.resize(1);
+  dst.back().addr.push_back(acc);
+  dst.back().amount = amount;
+  dst.back().asset_id = asset_id;
+  this->transfer(dst, fake_outs_count, 0, fee, extra, attachments, get_current_split_strategy(), tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD), result_tx);
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::hash& asset_id)
 {
   transaction result_tx = AUTO_VAL_INIT(result_tx);

@@ -131,9 +131,10 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", transfer_amount * batches_to_Alice_count, UINT64_MAX, transfer_amount * batches_to_Alice_count), false, "");
 
-  //create transfer from post-zarcanum inputs to post-zarcanum inputs
+  //create transfer from post-zarcanum inputs to post-zarcanum inputs with mixins
   uint64_t transfer_amount2 = AMOUNT_TO_TRANSFER_ZARCANUM_BASIC;
-  alice_wlt->transfer(transfer_amount2, m_accounts[BOB_ACC_IDX].get_public_address());
+  size_t nmix = 10;
+  alice_wlt->transfer(transfer_amount2, nmix, m_accounts[BOB_ACC_IDX].get_public_address());
   LOG_PRINT_MAGENTA("Zarcanum-2-zarcanum transaction sent from Alice to Bob " << print_money_brief(transfer_amount2), LOG_LEVEL_0);
 
 
