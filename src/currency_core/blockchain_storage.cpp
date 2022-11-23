@@ -1146,7 +1146,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   std::vector<uint64_t> timestamps;
   std::vector<wide_difficulty_type> commulative_difficulties;
   if (!m_db_blocks.size())
-    return DIFFICULTY_STARTER;
+    return DIFFICULTY_POW_STARTER;
   //skip genesis timestamp
   TIME_MEASURE_START_PD(target_calculating_enum_blocks);
   CRITICAL_REGION_BEGIN(m_targetdata_cache_lock);
@@ -1168,11 +1168,11 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   TIME_MEASURE_START_PD(target_calculating_calc);
   if (m_core_runtime_config.is_hardfork_active_for_height(1, m_db_blocks.size()))
   {
-    dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+    dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   }
   else
   {
-    dif = next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+    dif = next_difficulty_1(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   }
   
 
@@ -1187,7 +1187,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
   std::vector<wide_difficulty_type> commulative_difficulties;
   size_t count = 0;
   if (!m_db_blocks.size())
-    return DIFFICULTY_STARTER;
+    return DIFFICULTY_POW_STARTER;
 
   auto cb = [&](const block_extended_info& bei, bool is_main){
     if (!bei.height)
@@ -1206,9 +1206,9 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
 
   wide_difficulty_type diff = 0;
   if(m_core_runtime_config.is_hardfork_active_for_height(1, abei.height))
-    diff = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+    diff = next_difficulty_2(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   else
-    diff = next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+    diff = next_difficulty_1(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   return diff;
 }
 //------------------------------------------------------------------
@@ -1268,7 +1268,7 @@ wide_difficulty_type blockchain_storage::get_next_difficulty_for_alternative_cha
     commulative_difficulties.push_back(m_db_blocks[i]->cumulative_diff_precise);
   } 
 
-  return next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET:DIFFICULTY_POW_TARGET);
+  return next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET:DIFFICULTY_POW_TARGET, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t height, bool pos) const
@@ -2821,7 +2821,7 @@ bool blockchain_storage::forecast_difficulty(std::vector<std::pair<uint64_t, wid
    out_height_2_diff_vector.push_back(std::make_pair(height, last_block_diff_for_this_type)); // the first element corresponds to the last block of this type
    for (size_t i = 0; i < DIFFICULTY_CUT; ++i)
    {
-     wide_difficulty_type diff = next_difficulty_1(timestamps, cumulative_difficulties, target_seconds);
+     wide_difficulty_type diff = next_difficulty_1(timestamps, cumulative_difficulties, target_seconds, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
      height += avg_interval;
      out_height_2_diff_vector.push_back(std::make_pair(height, diff));
  
