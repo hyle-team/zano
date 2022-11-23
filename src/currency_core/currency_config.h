@@ -65,7 +65,7 @@
 #define CURRENCY_MINER_TX_MAX_OUTS                      CURRENCY_TX_MAX_ALLOWED_OUTS
 #define CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP       3
 
-#define DIFFICULTY_STARTER                              1
+#define DIFFICULTY_POW_STARTER                          1
 #define DIFFICULTY_POS_TARGET                           120 // seconds
 #define DIFFICULTY_POW_TARGET                           120 // seconds
 #define DIFFICULTY_TOTAL_TARGET                         ((DIFFICULTY_POS_TARGET + DIFFICULTY_POW_TARGET) / 4)
@@ -110,6 +110,7 @@
 #define STRATUM_DEFAULT_PORT                            11777
 #define P2P_NETWORK_ID_TESTNET_FLAG                     0
 #define P2P_MAINTAINERS_PUB_KEY                         "8f138bb73f6d663a3746a542770781a09579a7b84cb4125249e95530824ee607"
+#define DIFFICULTY_POS_STARTER                          1
 #else 
 #define P2P_DEFAULT_PORT                                (11112 + CURRENCY_FORMATION_VERSION)
 #define RPC_DEFAULT_PORT                                12111
@@ -117,6 +118,7 @@
 #define STRARUM_DEFAULT_PORT                            51113
 #define P2P_NETWORK_ID_TESTNET_FLAG                     1
 #define P2P_MAINTAINERS_PUB_KEY                         "aaa2d7aabc8d383fd53a3ae898697b28f236ceade6bafc1eecff413a6a02272a"
+#define DIFFICULTY_POS_STARTER                          625000000000
 #endif
 
 #define P2P_NETWORK_ID_VER                              (CURRENCY_FORMATION_VERSION+0)

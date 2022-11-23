@@ -2769,7 +2769,7 @@ bool premine_wallet_test::generate(std::vector<test_event_entry>& events) const
   currency::generate_genesis_block(blk_0_info.b);
   blk_0_info.already_generated_coins = get_outs_money_amount(blk_0_info.b.miner_tx);
   blk_0_info.block_size = get_object_blobsize(blk_0_info.b.miner_tx);
-  blk_0_info.cumul_difficulty = DIFFICULTY_STARTER;
+  blk_0_info.cumul_difficulty = DIFFICULTY_POW_STARTER;
   blk_0_info.ks_hash = currency::null_hash;
   blk_0_info.m_transactions.clear();
   events.push_back(blk_0_info.b);

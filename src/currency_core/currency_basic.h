@@ -42,6 +42,7 @@
 #include "misc_language.h"
 #include "block_flags.h"
 #include "etc_custom_serialization.h"
+#include "difficulty.h"
 
 namespace currency
 {
@@ -56,6 +57,10 @@ namespace currency
   const static crypto::hash gdefault_genesis = epee::string_tools::hex_to_pod<crypto::hash>("CC608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB99852");
   const static crypto::hash ffff_hash = epee::string_tools::hex_to_pod<crypto::hash>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
+  const static wide_difficulty_type global_difficulty_pow_starter = DIFFICULTY_POW_STARTER;
+  const static wide_difficulty_type global_difficulty_pos_starter = DIFFICULTY_POS_STARTER;
+  const static uint64_t             global_difficulty_pos_target  = DIFFICULTY_POS_TARGET;
+  const static uint64_t             global_difficulty_pow_target  = DIFFICULTY_POW_TARGET;
 
   typedef std::string payment_id_t;
 

@@ -766,7 +766,7 @@ bool test_generator::get_params_for_next_pos_block(const crypto::hash& head_id, 
   std::vector<uint64_t> timestamps;
   std::vector<wide_difficulty_type> commulative_difficulties;
   if (!blocks.size())
-    return DIFFICULTY_STARTER;
+    return DIFFICULTY_POW_STARTER;
 
   for (size_t i = blocks.size() - 1; i != 0; --i)
   {
@@ -775,7 +775,7 @@ bool test_generator::get_params_for_next_pos_block(const crypto::hash& head_id, 
     timestamps.push_back(blocks[i]->b.timestamp);
     commulative_difficulties.push_back(blocks[i]->cumul_difficulty);
   }
-  return next_difficulty_1(timestamps, commulative_difficulties, pow ? DIFFICULTY_POW_TARGET : DIFFICULTY_POS_TARGET);
+  return next_difficulty_1(timestamps, commulative_difficulties, pow ? global_difficulty_pow_target : global_difficulty_pos_target, pow ? global_difficulty_pow_starter : global_difficulty_pos_starter);
 }
 
 currency::wide_difficulty_type test_generator::get_cumul_difficulty_for_next_block(const crypto::hash& head_id, bool pow) const
