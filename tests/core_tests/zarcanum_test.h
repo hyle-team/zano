@@ -38,4 +38,10 @@ struct zarcanum_txs_with_big_shuffled_decoy_set_shuffled : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
+struct zarcanum_in_alt_chain : public wallet_test
+{
+  zarcanum_in_alt_chain();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
 
