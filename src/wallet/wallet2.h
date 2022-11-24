@@ -573,6 +573,7 @@ namespace tools
     uint64_t unlocked_balance() const;
 
     void transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::hash& asset_id = currency::null_hash);
+    void transfer(uint64_t amount, size_t fake_outs_count, const currency::account_public_address& acc, uint64_t fee = TX_DEFAULT_FEE, const crypto::hash& asset_id = currency::null_hash);
     void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx, const crypto::hash& asset_id = currency::null_hash);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts,

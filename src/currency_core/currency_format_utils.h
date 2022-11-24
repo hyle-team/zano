@@ -815,9 +815,16 @@ namespace currency
     uint64_t operator()(const txin_zc_input&)         const { return 0; }
     uint64_t operator()(const txin_gen& i)            const { return 0; }
   };
-  inline uint64_t get_amount_from_variant(const txin_v& v)
+  inline uint64_t get_amount_from_variant(const txin_v& v) noexcept
   {
-    return boost::apply_visitor(input_amount_getter(), v);
+    try
+    {
+      return boost::apply_visitor(input_amount_getter(), v);
+    }
+    catch(...)
+    {
+      return 0;
+    }
   }
   //---------------------------------------------------------------
   struct output_amount_getter : public boost::static_visitor<uint64_t>

@@ -1146,7 +1146,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   std::vector<uint64_t> timestamps;
   std::vector<wide_difficulty_type> commulative_difficulties;
   if (!m_db_blocks.size())
-    return DIFFICULTY_STARTER;
+    return DIFFICULTY_POW_STARTER;
   //skip genesis timestamp
   TIME_MEASURE_START_PD(target_calculating_enum_blocks);
   CRITICAL_REGION_BEGIN(m_targetdata_cache_lock);
@@ -1168,11 +1168,11 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   TIME_MEASURE_START_PD(target_calculating_calc);
   if (m_core_runtime_config.is_hardfork_active_for_height(1, m_db_blocks.size()))
   {
-    dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+    dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   }
   else
   {
-    dif = next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+    dif = next_difficulty_1(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   }
   
 
@@ -1187,7 +1187,7 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
   std::vector<wide_difficulty_type> commulative_difficulties;
   size_t count = 0;
   if (!m_db_blocks.size())
-    return DIFFICULTY_STARTER;
+    return DIFFICULTY_POW_STARTER;
 
   auto cb = [&](const block_extended_info& bei, bool is_main){
     if (!bei.height)
@@ -1206,9 +1206,9 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
 
   wide_difficulty_type diff = 0;
   if(m_core_runtime_config.is_hardfork_active_for_height(1, abei.height))
-    diff = next_difficulty_2(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+    diff = next_difficulty_2(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   else
-    diff = next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET : DIFFICULTY_POW_TARGET);
+    diff = next_difficulty_1(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   return diff;
 }
 //------------------------------------------------------------------
@@ -1268,7 +1268,7 @@ wide_difficulty_type blockchain_storage::get_next_difficulty_for_alternative_cha
     commulative_difficulties.push_back(m_db_blocks[i]->cumulative_diff_precise);
   } 
 
-  return next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET:DIFFICULTY_POW_TARGET);
+  return next_difficulty_1(timestamps, commulative_difficulties, pos ? DIFFICULTY_POS_TARGET:DIFFICULTY_POW_TARGET, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t height, bool pos) const
@@ -2508,10 +2508,10 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   CRITICAL_REGION_LOCAL(m_read_lock);
   auto out_ptr = m_db_outputs.get_subitem(amount, g_index);
   auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
-  CHECK_AND_ASSERT_MES(tx_ptr, false, "internal error: transaction with id " << out_ptr->tx_id << ENDL <<
-    ", used in mounts global index for amount=" << amount << ": g_index=" << g_index << "not found in transactions index");
+  CHECK_AND_ASSERT_MES(tx_ptr, false, "internal error: transaction " << out_ptr->tx_id << " was not found in transaction DB, amount: " << print_money_brief(amount) <<
+    ", g_index: " << g_index);
   CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() > out_ptr->out_no, false, "internal error: in global outs index, transaction out index="
-    << out_ptr->out_no << " more than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
+    << out_ptr->out_no << " is greater than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
 
   CHECK_AND_ASSERT_MES(amount != 0 || height_upper_limit != 0, false, "height_upper_limit must be nonzero for hidden amounts (amount = 0)");
 
@@ -2587,7 +2587,7 @@ size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount) const
     --i;
     auto out_ptr = m_db_outputs.get_subitem(amount, i);
     auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
-    CHECK_AND_ASSERT_MES(tx_ptr, 0, "internal error: failed to find transaction from outputs index with tx_id=" << out_ptr->tx_id);
+    CHECK_AND_ASSERT_MES(tx_ptr, 0, "internal error: failed to find transaction from outputs index with tx_id=" << out_ptr->tx_id << ", amount: " << print_money_brief(amount));
     if (tx_ptr->m_keeper_block_height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW <= get_current_blockchain_size())
       return i+1;
   } while (i != 0);
@@ -2821,7 +2821,7 @@ bool blockchain_storage::forecast_difficulty(std::vector<std::pair<uint64_t, wid
    out_height_2_diff_vector.push_back(std::make_pair(height, last_block_diff_for_this_type)); // the first element corresponds to the last block of this type
    for (size_t i = 0; i < DIFFICULTY_CUT; ++i)
    {
-     wide_difficulty_type diff = next_difficulty_1(timestamps, cumulative_difficulties, target_seconds);
+     wide_difficulty_type diff = next_difficulty_1(timestamps, cumulative_difficulties, target_seconds, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
      height += avg_interval;
      out_height_2_diff_vector.push_back(std::make_pair(height, diff));
  
@@ -3476,21 +3476,26 @@ bool blockchain_storage::get_outs(uint64_t amount, std::list<crypto::public_key>
 bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx, const crypto::hash& tx_id)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  size_t i = tx.vout.size()-1;
+
+  auto do_pop_output = [&](size_t i, uint64_t amount) -> bool {
+    uint64_t sz = m_db_outputs.get_item_size(amount);
+    CHECK_AND_ASSERT_MES(sz, false, "transactions outs global index: empty index for amount: " << amount);
+    auto back_item = m_db_outputs.get_subitem(amount, sz - 1);
+    CHECK_AND_ASSERT_MES(back_item->tx_id == tx_id, false, "transactions outs global index consistency broken: tx id missmatch");
+    CHECK_AND_ASSERT_MES(back_item->out_no == i, false, "transactions outs global index consistency broken: in transaction index missmatch");
+    m_db_outputs.pop_back_item(amount);
+    return true;
+  };
+
+  size_t i = tx.vout.size() - 1;
   BOOST_REVERSE_FOREACH(const auto& otv, tx.vout)
   {
     VARIANT_SWITCH_BEGIN(otv);
     VARIANT_CASE_CONST(tx_out_bare, ot)
       if (ot.target.type() == typeid(txout_to_key) || ot.target.type() == typeid(txout_htlc))
       {
-        uint64_t sz = m_db_outputs.get_item_size(ot.amount);
-        CHECK_AND_ASSERT_MES(sz, false, "transactions outs global index: empty index for amount: " << ot.amount);
-        auto back_item = m_db_outputs.get_subitem(ot.amount, sz - 1);
-        CHECK_AND_ASSERT_MES(back_item->tx_id == tx_id, false, "transactions outs global index consistency broken: tx id missmatch");
-        CHECK_AND_ASSERT_MES(back_item->out_no == i, false, "transactions outs global index consistency broken: in transaction index missmatch");
-        m_db_outputs.pop_back_item(ot.amount);
-        //if (!it->second.size())
-        //  m_db_outputs.erase(it);
+        if (!do_pop_output(i, ot.amount))
+          return false;
       }
       else if (ot.target.type() == typeid(txout_multisig))
       {
@@ -3500,7 +3505,9 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
         CHECK_AND_ASSERT_MES(res, false, "Internal error: multisig out not found, multisig_out_id " << multisig_out_id << "in multisig outs index");
       }
     VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      //@#@
+      // TODO: @#@# temporary comment this section and make a test for the corresponding bug
+      if (!do_pop_output(i, 0))
+        return false;
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
     --i;

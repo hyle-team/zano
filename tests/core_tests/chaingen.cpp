@@ -640,7 +640,14 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
     iterations_processed_total += context.iterations_processed;
   }
 
-  LOG_PRINT_RED("PoS mining iteration failed, kernel was not found. Iterations processed across " << wallets.size() << " wallet(s): " << iterations_processed_total, LOG_LEVEL_0);
+  LOG_PRINT_RED("PoS mining iteration failed, kernel was not found. Iterations processed across " << wallets.size() << " wallet(s): " << iterations_processed_total  << ENDL <<
+    "Stake wallet(s) transfers:", LOG_LEVEL_0);
+
+  for (size_t wallet_index = 0, size = wallets.size(); wallet_index < size; ++wallet_index)
+  {
+    std::shared_ptr<tools::wallet2> w = wallets[wallet_index].wallet;
+    LOG_PRINT_L0("wallet #" << wallet_index << " @ block " << w->get_top_block_height() << ENDL << wallets[wallet_index].wallet->dump_trunsfers());
+  }
 
   return false;
 }
@@ -766,7 +773,7 @@ bool test_generator::get_params_for_next_pos_block(const crypto::hash& head_id, 
   std::vector<uint64_t> timestamps;
   std::vector<wide_difficulty_type> commulative_difficulties;
   if (!blocks.size())
-    return DIFFICULTY_STARTER;
+    return DIFFICULTY_POW_STARTER;
 
   for (size_t i = blocks.size() - 1; i != 0; --i)
   {
@@ -775,7 +782,7 @@ bool test_generator::get_params_for_next_pos_block(const crypto::hash& head_id, 
     timestamps.push_back(blocks[i]->b.timestamp);
     commulative_difficulties.push_back(blocks[i]->cumul_difficulty);
   }
-  return next_difficulty_1(timestamps, commulative_difficulties, pow ? DIFFICULTY_POW_TARGET : DIFFICULTY_POS_TARGET);
+  return next_difficulty_1(timestamps, commulative_difficulties, pow ? global_difficulty_pow_target : global_difficulty_pos_target, pow ? global_difficulty_pow_starter : global_difficulty_pos_starter);
 }
 
 currency::wide_difficulty_type test_generator::get_cumul_difficulty_for_next_block(const crypto::hash& head_id, bool pow) const
