@@ -227,9 +227,9 @@ zarcanum_test_n_inputs_validation::zarcanum_test_n_inputs_validation()
 bool zarcanum_test_n_inputs_validation::generate(std::vector<test_event_entry>& events) const
 {
   uint64_t ts_start = 1338224400;
-
   GENERATE_ACCOUNT(miner_account);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_account, ts_start);
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
   REWIND_BLOCKS(events, blk_0r, blk_0, miner_account);
 
   std::vector<tx_source_entry> sources;
