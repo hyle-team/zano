@@ -252,10 +252,11 @@
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   999999999
 #else
-#define ZANO_HARDFORK_01_AFTER_HEIGHT                   1440
-#define ZANO_HARDFORK_02_AFTER_HEIGHT                   1800
-#define ZANO_HARDFORK_03_AFTER_HEIGHT                   1801
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   999999999
+/////// Zarcanum Testnet Pre-Alpha //////////////////////////////
+#define ZANO_HARDFORK_01_AFTER_HEIGHT                   1
+#define ZANO_HARDFORK_02_AFTER_HEIGHT                   2
+#define ZANO_HARDFORK_03_AFTER_HEIGHT                   3
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   4
 #endif
 
 
