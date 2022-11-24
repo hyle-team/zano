@@ -166,10 +166,10 @@ namespace wallet_public
 
   struct asset_balance_entry : public asset_balance_entry_base
   {
-    crypto::hash asset_id = currency::null_hash;
+    currency::asset_descriptor_with_id asset_info;
     //v2
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(asset_id)
+      KV_SERIALIZE(asset_info)
       KV_CHAIN_BASE(asset_balance_entry_base)
     END_KV_SERIALIZE_MAP()
   };
@@ -1177,6 +1177,18 @@ namespace wallet_public
       END_KV_SERIALIZE_MAP()
     };
   };
+
+  struct assets_whitelist
+  {
+    std::vector<currency::asset_descriptor_with_id> assets;
+    crypto::signature signature = currency::null_sig;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(assets)
+      KV_SERIALIZE_POD_AS_HEX_STRING(signature)
+    END_KV_SERIALIZE_MAP()
+  };
+
 
   inline std::string get_escrow_contract_state_name(uint32_t state)
   {

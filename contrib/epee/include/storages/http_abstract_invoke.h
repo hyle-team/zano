@@ -34,6 +34,19 @@ namespace epee
 {
   namespace net_utils
   {
+
+    template<class t_response>
+    bool get_http_json_t(const std::string& url, t_response& result_struct, unsigned int timeout = 5000, const std::string& method = "GET")
+    {
+      std::string body;
+      if (!http::fetch_url(url, body, method, "", timeout))
+      {
+        return false;
+      }
+      return serialization::load_t_from_json(result_struct, body);
+    }
+
+
     template<class t_request, class t_response, class t_transport>
     bool invoke_http_json_remote_command2(const std::string& url, t_request& out_struct, t_response& result_struct, t_transport& transport, unsigned int timeout = 5000, const std::string& method = "GET")
     {

@@ -168,6 +168,11 @@ namespace tools
     return invoke_http_json_rpc_update_is_disconnect("get_pool_info", req, res);
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool default_http_core_proxy::call_COMMAND_RPC_GET_ASSET_INFO(const currency::COMMAND_RPC_GET_ASSET_INFO::request& req, currency::COMMAND_RPC_GET_ASSET_INFO::response& res)
+  {
+    return invoke_http_json_rpc_update_is_disconnect("get_asset_info", req, res);
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
   {
     return tools::get_transfer_address(adr_str, addr, payment_id, this);

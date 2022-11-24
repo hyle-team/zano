@@ -732,7 +732,6 @@ namespace currency
   };
 
 
-
   struct asset_descriptor_base
   {
     uint64_t            total_max_supply = 0;
@@ -740,6 +739,7 @@ namespace currency
     uint8_t             decimal_point = 12;
     std::string         ticker;
     std::string         full_name;
+    std::string         meta_info;
     crypto::public_key  owner = currency::null_pkey;
 
     BEGIN_VERSIONED_SERIALIZE()
@@ -748,6 +748,7 @@ namespace currency
       FIELD(decimal_point)
       FIELD(ticker)
       FIELD(full_name)
+      FIELD(meta_info)
       FIELD(owner)
     END_SERIALIZE()
 
@@ -758,8 +759,37 @@ namespace currency
       BOOST_SERIALIZE(decimal_point)
       BOOST_SERIALIZE(ticker)
       BOOST_SERIALIZE(full_name)
+      BOOST_SERIALIZE(meta_info)
       BOOST_SERIALIZE(owner)
     END_BOOST_SERIALIZATION()
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(total_max_supply)
+      KV_SERIALIZE(current_supply)
+      KV_SERIALIZE(decimal_point)
+      KV_SERIALIZE(ticker)
+      KV_SERIALIZE(full_name)
+      KV_SERIALIZE(meta_info)
+      KV_SERIALIZE_POD_AS_HEX_STRING(owner)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+  struct asset_descriptor_with_id: public asset_descriptor_base
+  {
+    crypto::hash asset_id = currency::null_hash;
+
+    /*
+    BEGIN_VERSIONED_SERIALIZE()
+      FIELD(*static_cast<asset_descriptor_base>(this))
+      FIELD(asset_id)
+    END_SERIALIZE()
+    */
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_CHAIN_BASE(asset_descriptor_base)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+    END_KV_SERIALIZE_MAP()
   };
 
 

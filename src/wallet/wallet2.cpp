@@ -3140,10 +3140,87 @@ bool wallet2::balance(std::unordered_map<crypto::hash, wallet_public::asset_bala
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, uint64_t& mined) const
+{
+  std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances_map;
+  this->balance(balances_map, mined);
+  for (const auto& item : balances_map)
+  {
+    const asset_descriptor_base* asset_ptr = nullptr;
+    //check if asset is whitelisted or customly added
+    auto it = m_whitelisted_assets.find(item.first);
+    if (it == m_whitelisted_assets.end())
+    {
+      //check if it custom asset
+      auto it_cust = m_custom_assets.find(item.first);
+      if (it_cust == m_custom_assets.end())
+      {
+        continue;
+      }
+      else
+      {
+        asset_ptr = &it_cust->second;
+      }
+    }
+    else
+    {
+      asset_ptr = &it->second;
+    }
+    
+    balances.push_back(wallet_public::asset_balance_entry());
+    wallet_public::asset_balance_entry& new_item = balances.back();
+    static_cast<wallet_public::asset_balance_entry_base&>(new_item) = item.second;
+    new_item.asset_info.asset_id = item.first;
+    CHECK_AND_ASSERT_THROW_MES(asset_ptr, "Internal error: asset_ptr i nullptr");
+    static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = *asset_ptr;
+  }
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 uint64_t wallet2::balance() const
 {
   uint64_t stub = 0;
   return balance(stub, stub, stub, stub);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::add_custom_asset_id(const crypto::hash& asset_id)
+{
+  currency::COMMAND_RPC_GET_ASSET_INFO::request req = AUTO_VAL_INIT(req);
+  currency::COMMAND_RPC_GET_ASSET_INFO::response resp = AUTO_VAL_INIT(resp);
+
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, resp);
+  if (resp.status == API_RETURN_CODE_OK)
+  {
+    m_custom_assets[asset_id] = resp.asset_descriptor;
+    return true;
+  }
+  return false;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::delete_custom_asset_id(const crypto::hash& asset_id)
+{
+  auto it = m_custom_assets.find(asset_id);
+  if (it != m_custom_assets.end())
+  {
+    m_custom_assets.erase(it);
+  }
+ 
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::load_whitelisted_tokens_list()
+{
+  std::string body;
+  wallet_public::assets_whitelist aw = AUTO_VAL_INIT(aw);
+  if (epee::net_utils::get_http_json_t(WALLET_ASSETS_WHITELIST_URL, aw))
+  {
+    for (auto it = aw.assets.begin(); it != aw.assets.end(); it++)
+    {
+      m_whitelisted_assets[it->asset_id] = static_cast<currency::asset_descriptor_base>(*it);
+    }    
+  }
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) const

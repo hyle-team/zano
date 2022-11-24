@@ -197,26 +197,19 @@ public:
       wallet_state_error = 3
     };
 
-    uint64_t balance;
-    uint64_t unlocked_balance;
-    uint64_t awaiting_in;
-    uint64_t awaiting_out;
+    std::list<tools::wallet_public::asset_balance_entry> balances;
     uint64_t minied_total;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_CHAIN_BASE(wallet_status_info_base)
-      KV_SERIALIZE(balance)
-      KV_SERIALIZE(unlocked_balance)
-      KV_SERIALIZE(awaiting_in)
-      KV_SERIALIZE(awaiting_out)
+      KV_SERIALIZE(balances)
       KV_SERIALIZE(minied_total)
     END_KV_SERIALIZE_MAP()
   };  
   
   struct wallet_info
   {
-    uint64_t unlocked_balance;
-    uint64_t balance;
+    std::list<tools::wallet_public::asset_balance_entry> balances;
 		uint64_t mined_total;
     std::string address;
     std::string view_sec_key;
@@ -225,8 +218,7 @@ public:
     bool is_watch_only;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(unlocked_balance)
-      KV_SERIALIZE(balance)
+      KV_SERIALIZE(balances)
 			KV_SERIALIZE(mined_total)			
       KV_SERIALIZE(address)
       KV_SERIALIZE(view_sec_key)
