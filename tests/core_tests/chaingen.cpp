@@ -640,7 +640,14 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
     iterations_processed_total += context.iterations_processed;
   }
 
-  LOG_PRINT_RED("PoS mining iteration failed, kernel was not found. Iterations processed across " << wallets.size() << " wallet(s): " << iterations_processed_total, LOG_LEVEL_0);
+  LOG_PRINT_RED("PoS mining iteration failed, kernel was not found. Iterations processed across " << wallets.size() << " wallet(s): " << iterations_processed_total  << ENDL <<
+    "Stake wallet(s) transfers:", LOG_LEVEL_0);
+
+  for (size_t wallet_index = 0, size = wallets.size(); wallet_index < size; ++wallet_index)
+  {
+    std::shared_ptr<tools::wallet2> w = wallets[wallet_index].wallet;
+    LOG_PRINT_L0("wallet #" << wallet_index << " @ block " << w->get_top_block_height() << ENDL << wallets[wallet_index].wallet->dump_trunsfers());
+  }
 
   return false;
 }

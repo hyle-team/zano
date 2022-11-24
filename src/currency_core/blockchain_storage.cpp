@@ -2508,10 +2508,10 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   CRITICAL_REGION_LOCAL(m_read_lock);
   auto out_ptr = m_db_outputs.get_subitem(amount, g_index);
   auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
-  CHECK_AND_ASSERT_MES(tx_ptr, false, "internal error: transaction with id " << out_ptr->tx_id << ENDL <<
-    ", used in mounts global index for amount=" << amount << ": g_index=" << g_index << "not found in transactions index");
+  CHECK_AND_ASSERT_MES(tx_ptr, false, "internal error: transaction " << out_ptr->tx_id << " was not found in transaction DB, amount: " << print_money_brief(amount) <<
+    ", g_index: " << g_index);
   CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() > out_ptr->out_no, false, "internal error: in global outs index, transaction out index="
-    << out_ptr->out_no << " more than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
+    << out_ptr->out_no << " is greater than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
 
   CHECK_AND_ASSERT_MES(amount != 0 || height_upper_limit != 0, false, "height_upper_limit must be nonzero for hidden amounts (amount = 0)");
 
@@ -2587,7 +2587,7 @@ size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount) const
     --i;
     auto out_ptr = m_db_outputs.get_subitem(amount, i);
     auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
-    CHECK_AND_ASSERT_MES(tx_ptr, 0, "internal error: failed to find transaction from outputs index with tx_id=" << out_ptr->tx_id);
+    CHECK_AND_ASSERT_MES(tx_ptr, 0, "internal error: failed to find transaction from outputs index with tx_id=" << out_ptr->tx_id << ", amount: " << print_money_brief(amount));
     if (tx_ptr->m_keeper_block_height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW <= get_current_blockchain_size())
       return i+1;
   } while (i != 0);
