@@ -3476,21 +3476,26 @@ bool blockchain_storage::get_outs(uint64_t amount, std::list<crypto::public_key>
 bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx, const crypto::hash& tx_id)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  size_t i = tx.vout.size()-1;
+
+  auto do_pop_output = [&](size_t i, uint64_t amount) -> bool {
+    uint64_t sz = m_db_outputs.get_item_size(amount);
+    CHECK_AND_ASSERT_MES(sz, false, "transactions outs global index: empty index for amount: " << amount);
+    auto back_item = m_db_outputs.get_subitem(amount, sz - 1);
+    CHECK_AND_ASSERT_MES(back_item->tx_id == tx_id, false, "transactions outs global index consistency broken: tx id missmatch");
+    CHECK_AND_ASSERT_MES(back_item->out_no == i, false, "transactions outs global index consistency broken: in transaction index missmatch");
+    m_db_outputs.pop_back_item(amount);
+    return true;
+  };
+
+  size_t i = tx.vout.size() - 1;
   BOOST_REVERSE_FOREACH(const auto& otv, tx.vout)
   {
     VARIANT_SWITCH_BEGIN(otv);
     VARIANT_CASE_CONST(tx_out_bare, ot)
       if (ot.target.type() == typeid(txout_to_key) || ot.target.type() == typeid(txout_htlc))
       {
-        uint64_t sz = m_db_outputs.get_item_size(ot.amount);
-        CHECK_AND_ASSERT_MES(sz, false, "transactions outs global index: empty index for amount: " << ot.amount);
-        auto back_item = m_db_outputs.get_subitem(ot.amount, sz - 1);
-        CHECK_AND_ASSERT_MES(back_item->tx_id == tx_id, false, "transactions outs global index consistency broken: tx id missmatch");
-        CHECK_AND_ASSERT_MES(back_item->out_no == i, false, "transactions outs global index consistency broken: in transaction index missmatch");
-        m_db_outputs.pop_back_item(ot.amount);
-        //if (!it->second.size())
-        //  m_db_outputs.erase(it);
+        if (!do_pop_output(i, ot.amount))
+          return false;
       }
       else if (ot.target.type() == typeid(txout_multisig))
       {
@@ -3500,7 +3505,9 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
         CHECK_AND_ASSERT_MES(res, false, "Internal error: multisig out not found, multisig_out_id " << multisig_out_id << "in multisig outs index");
       }
     VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      //@#@
+      // TODO: @#@# temporary comment this section and make a test for the corresponding bug
+      if (!do_pop_output(i, 0))
+        return false;
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
     --i;
