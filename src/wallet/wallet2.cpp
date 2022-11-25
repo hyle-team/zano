@@ -1782,7 +1782,7 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
         m_chain.clear();
       }
     }
-    else if (height == processed_blocks_count)
+    else if (height == processed_blocks_count && been_matched_block)
     {
       //regular block handling
       //self check
