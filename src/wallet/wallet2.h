@@ -714,7 +714,7 @@ namespace tools
     void submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx);
 
     void sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
-      uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
+      uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
     inline uint64_t get_blockchain_current_size() const {
