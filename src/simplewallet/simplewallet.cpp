@@ -225,6 +225,8 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "Export transaction history in CSV file");
   m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, _1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, _1), "Enable relaying transactions over TOR network(enabled by default)");
+  m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, _1), "Deploys new asset in the network, with current wallet as a maintainer");
+
 }
 //----------------------------------------------------------------------------------------------------
 simple_wallet::~simple_wallet()
@@ -756,7 +758,15 @@ bool simple_wallet::refresh(const std::vector<std::string>& args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::vector<std::string>()*/)
 {
-  success_msg_writer() << "balance: " << print_money(m_wallet->balance()) << ", unlocked balance: " << print_money(m_wallet->unlocked_balance());
+  std::list<tools::wallet_public::asset_balance_entry> balances;
+  uint64_t mined = 0;
+  m_wallet->balance(balances, mined);
+  std::stringstream ss;
+  for (const tools::wallet_public::asset_balance_entry& b : balances)
+  {
+    ss << std::setw(21) << print_fixed_decimal_point(b.total, b.asset_info.decimal_point) << "\t" << b.asset_info.ticker << ENDL;
+  }
+  success_msg_writer() << "Balance: " << ENDL << ss.str();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1754,7 +1764,39 @@ bool simple_wallet::tor_disable(const std::vector<std::string> &args)
   success_msg_writer(true) << "TOR relaying disabled";
   return true;
 }
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
+{
+  asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  if (!args.size() || args.size() > 1)
+  {
+    fail_msg_writer() << "invalid agruments count: " << args.size() << ", expected 1";
+  }
+  bool r = epee::serialization::load_t_from_json_file(adb, args[0]);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load json file with asset specification: " << args[0];
+  }
+  tx_destination_entry td = AUTO_VAL_INIT(td);
+  td.addr.push_back(m_wallet->get_account().get_public_address());
+  td.amount = adb.current_supply;
+  td.asset_id = currency::ffff_hash;
+  std::vector<currency::tx_destination_entry> destinations;
+  destinations.push_back(td);
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  crypto::hash result_asset_id = currency::null_hash;
+  m_wallet->publish_new_asset(adb, destinations, result_tx, result_asset_id);
 
+  success_msg_writer(true) << "New asset deployed: " << ENDL 
+    << "Asset ID: "<< result_asset_id << ENDL 
+    << "Title: " << adb.full_name << ENDL
+    << "Ticker: " << adb.ticker << ENDL
+    << "Emitted: " << print_fixed_decimal_point(adb.current_supply, adb.decimal_point) << ENDL
+    << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
+    ;
+
+  return true;
+}
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::sweep_below(const std::vector<std::string> &args)
 {

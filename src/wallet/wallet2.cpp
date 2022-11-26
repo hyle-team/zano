@@ -2319,6 +2319,8 @@ bool wallet2::scan_unconfirmed_outdate_tx()
 //----------------------------------------------------------------------------------------------------
 void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic<bool>& stop)
 {
+  load_whitelisted_tokens_if_not_loaded();
+
   received_money = false;
   blocks_fetched = 0;
   size_t added_blocks = 0;
@@ -3146,27 +3148,37 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
   this->balance(balances_map, mined);
   for (const auto& item : balances_map)
   {
+    asset_descriptor_base native_asset_info = AUTO_VAL_INIT(native_asset_info);
+    native_asset_info.full_name = CURRENCY_NAME_SHORT_BASE;
+    native_asset_info.ticker = CURRENCY_NAME_ABR;
+    native_asset_info.decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
     const asset_descriptor_base* asset_ptr = nullptr;
     //check if asset is whitelisted or customly added
-    auto it = m_whitelisted_assets.find(item.first);
-    if (it == m_whitelisted_assets.end())
+    if (item.first == currency::null_hash)
     {
-      //check if it custom asset
-      auto it_cust = m_custom_assets.find(item.first);
-      if (it_cust == m_custom_assets.end())
-      {
-        continue;
-      }
-      else
-      {
-        asset_ptr = &it_cust->second;
-      }
+      asset_ptr = &native_asset_info;
     }
     else
     {
-      asset_ptr = &it->second;
-    }
-    
+      auto it = m_whitelisted_assets.find(item.first);
+      if (it == m_whitelisted_assets.end())
+      {
+        //check if it custom asset
+        auto it_cust = m_custom_assets.find(item.first);
+        if (it_cust == m_custom_assets.end())
+        {
+          continue;
+        }
+        else
+        {
+          asset_ptr = &it_cust->second;
+        }
+      }
+      else
+      {
+        asset_ptr = &it->second;
+      }
+    }    
     balances.push_back(wallet_public::asset_balance_entry());
     wallet_public::asset_balance_entry& new_item = balances.back();
     static_cast<wallet_public::asset_balance_entry_base&>(new_item) = item.second;
@@ -3209,8 +3221,9 @@ bool wallet2::delete_custom_asset_id(const crypto::hash& asset_id)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::load_whitelisted_tokens_list()
+bool wallet2::load_whitelisted_tokens()
 {
+  m_whitelisted_assets.clear();
   std::string body;
   wallet_public::assets_whitelist aw = AUTO_VAL_INIT(aw);
   if (epee::net_utils::get_http_json_t(WALLET_ASSETS_WHITELIST_URL, aw))
@@ -3221,6 +3234,15 @@ bool wallet2::load_whitelisted_tokens_list()
     }    
   }
   return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::load_whitelisted_tokens_if_not_loaded()
+{
+  if (m_whitelisted_assets.size())
+  {
+    return true;
+  }
+  return load_whitelisted_tokens();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) const

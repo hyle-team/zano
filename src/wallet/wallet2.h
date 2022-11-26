@@ -901,7 +901,8 @@ namespace tools
 
     bool add_custom_asset_id(const crypto::hash& asset_id);
     bool delete_custom_asset_id(const crypto::hash& asset_id);
-    bool load_whitelisted_tokens_list();
+    bool load_whitelisted_tokens_if_not_loaded();
+    bool load_whitelisted_tokens();
 
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
