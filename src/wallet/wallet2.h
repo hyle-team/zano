@@ -901,8 +901,8 @@ namespace tools
 
     bool add_custom_asset_id(const crypto::hash& asset_id);
     bool delete_custom_asset_id(const crypto::hash& asset_id);
-    bool load_whitelisted_tokens_if_not_loaded();
-    bool load_whitelisted_tokens();
+    bool load_whitelisted_tokens_if_not_loaded() const;
+    bool load_whitelisted_tokens()const;
 
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
@@ -1101,7 +1101,7 @@ private:
     std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
     std::unordered_map<crypto::hash, wallet_own_asset_context> m_own_asset_descriptors;
     std::unordered_map<crypto::hash, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
-    std::unordered_map<crypto::hash, currency::asset_descriptor_base> m_whitelisted_assets; //assets that manually added by user
+    mutable std::unordered_map<crypto::hash, currency::asset_descriptor_base> m_whitelisted_assets; //assets that whitelisted
 
 
     std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration

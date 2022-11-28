@@ -3144,6 +3144,7 @@ bool wallet2::balance(std::unordered_map<crypto::hash, wallet_public::asset_bala
 //----------------------------------------------------------------------------------------------------
 bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, uint64_t& mined) const
 {
+  load_whitelisted_tokens_if_not_loaded();
   std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances_map;
   this->balance(balances_map, mined);
   for (const auto& item : balances_map)
@@ -3221,7 +3222,7 @@ bool wallet2::delete_custom_asset_id(const crypto::hash& asset_id)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::load_whitelisted_tokens()
+bool wallet2::load_whitelisted_tokens() const
 {
   m_whitelisted_assets.clear();
   std::string body;
@@ -3236,7 +3237,7 @@ bool wallet2::load_whitelisted_tokens()
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::load_whitelisted_tokens_if_not_loaded()
+bool wallet2::load_whitelisted_tokens_if_not_loaded() const
 {
   if (m_whitelisted_assets.size())
   {
