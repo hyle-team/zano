@@ -1237,6 +1237,19 @@ bool simple_wallet::validate_wrap_status(uint64_t amount)
   }
 }
 //----------------------------------------------------------------------------------------------------
+bool preprocess_asset_id(std::string& address_arg, crypto::hash& asset_id)
+{
+  auto p = address_arg.find(':');
+  if (p == std::string::npos)
+    return true;
+  std::string asset_id_str = address_arg.substr(0, p);
+  std::string address_itself = address_arg.substr(p+1, address_arg.size());
+  if (!epee::string_tools::parse_tpod_from_hex_string(asset_id_str, asset_id))
+    return false;
+  address_arg = address_itself;
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::transfer(const std::vector<std::string> &args_)
 {
   if (!try_connect_to_daemon())
@@ -1282,14 +1295,20 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   for (size_t i = 0; i < local_args.size(); i += 2) 
   {
     std::string integrated_payment_id;
-    currency::tx_destination_entry de;
-    de.addr.resize(1);
+    currency::tx_destination_entry de = AUTO_VAL_INIT(de);
+    de.addr.resize(1);    
 
     bool ok = currency::parse_amount(de.amount, local_args[i + 1]);
     if (!ok || 0 == de.amount)
     {
       fail_msg_writer() << "amount is wrong: " << local_args[i] << ' ' << local_args[i + 1] <<
         ", expected number from 0 to " << print_money(std::numeric_limits<uint64_t>::max());
+      return true;
+    }
+
+    if (!preprocess_asset_id(local_args[i], de.asset_id))
+    {
+      fail_msg_writer() << "address is wrong: " << local_args[i];
       return true;
     }
     
@@ -1317,7 +1336,8 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
       de.addr.front() = acc;
       wrapped_transaction = true;
       //encrypt body with a special way
-    }else if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(local_args[i], de.addr.front(), integrated_payment_id)))
+    }
+    else if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(local_args[i], de.addr.front(), integrated_payment_id)))
     {
       fail_msg_writer() << "wrong address: " << local_args[i];
       return true;
