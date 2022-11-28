@@ -5468,23 +5468,25 @@ bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_o
 {
   if (!td.is_spendable())
     return false;
-  VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
-  VARIANT_CASE_CONST(tx_out_bare, o);
+
+  const tx_out_v &out_v = td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index];
+
+  uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+  if (get_mix_attr_from_tx_out_v(out_v, mix_attr))
   {
+    if (!currency::is_mixattr_applicable_for_fake_outs_counter(mix_attr, fake_outputs_count))
+      return false;
+  }
+
+  VARIANT_SWITCH_BEGIN(out_v);
+  VARIANT_CASE_CONST(tx_out_bare, o);
     if (o.target.type() == typeid(txout_htlc))
     {
       if (fake_outputs_count != 0)
         return false;
     }
-    else
-    {
-      if (!currency::is_mixattr_applicable_for_fake_outs_counter(boost::get<currency::txout_to_key>(o.target).mix_attr, fake_outputs_count))
-        return false;
-    }
-  }
-  VARIANT_CASE_CONST(tx_out_zarcanum, o);
-  //@#@      
   VARIANT_SWITCH_END();
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
