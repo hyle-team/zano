@@ -55,8 +55,8 @@ message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}, and built ty
  
 enable_testing()
 
-find_package(OpenSSL REQUIRED)
 set(OPENSSL_USE_STATIC_LIBS TRUE) # link statically
+find_package(OpenSSL REQUIRED)
 
 
 if(APPLE)
