@@ -91,7 +91,7 @@ namespace currency
 
   struct tx_destination_entry
   {
-    uint64_t amount;                                    //money
+    uint64_t amount = 0;                                    //money
     std::list<account_public_address>   addr;           //destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
     size_t   minimum_sigs = 0;                              //if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
     uint64_t amount_to_provide = 0;                         //amount money that provided by initial creator of tx, used with partially created transactions

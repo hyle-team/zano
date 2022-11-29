@@ -35,10 +35,12 @@ namespace view
   {
     std::string address;
     std::string amount;
+    crypto::hash asset_id;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(address)
       KV_SERIALIZE(amount)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
   };
 
