@@ -72,8 +72,8 @@ namespace currency
           << "kernel info:           " << ENDL
           << print_stake_kernel_info(this->sk) 
           << "kernel_hash:           " << this->kernel_hash << ENDL
-          << "lhs:                   " << lhs << ENDL
-          << "rhs:                   " << rhs
+          << "lhs:                   " << crypto::scalar_t(lhs) << ENDL
+          << "rhs:                   " << crypto::scalar_t(rhs)
           , LOG_LEVEL_0);
 
       }
