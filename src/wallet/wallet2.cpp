@@ -3145,6 +3145,7 @@ bool wallet2::balance(std::unordered_map<crypto::hash, wallet_public::asset_bala
 bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, uint64_t& mined) const
 {
   load_whitelisted_tokens_if_not_loaded();
+  balances.clear();
   std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances_map;
   this->balance(balances_map, mined);
   for (const auto& item : balances_map)
