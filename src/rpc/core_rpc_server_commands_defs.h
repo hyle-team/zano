@@ -82,16 +82,19 @@ namespace currency
     };
   };
 
+  struct asset_id_kv
+  {
+    crypto::hash asset_id;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   struct COMMAND_RPC_GET_ASSET_INFO
   {
-    struct request
-    {
-      crypto::hash asset_id;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
-      END_KV_SERIALIZE_MAP()
-    };
+    typedef asset_id_kv request;
 
     struct response
     {

@@ -766,7 +766,7 @@ bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::v
   std::stringstream ss;
   for (const tools::wallet_public::asset_balance_entry& b : balances)
   {
-    ss << std::setw(21) << print_fixed_decimal_point(b.total, b.asset_info.decimal_point) << "\t" << b.asset_info.ticker << ENDL;
+    ss << std::setw(21) << print_fixed_decimal_point(b.total, b.asset_info.decimal_point) << "\t" << b.asset_info.ticker << "\t" << b.asset_info.asset_id << ENDL;
   }
   success_msg_writer() << "Balance: " << ENDL << ss.str();
   return true;

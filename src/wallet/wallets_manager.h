@@ -148,7 +148,7 @@ public:
     std::vector<uint64_t>& days);
   std::string is_pos_allowed();
   void toggle_pos_mining();
-  std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
+  std::string transfer(uint64_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
   std::string is_valid_brain_restore_data(const std::string& seed_phrase, const std::string& seed_password);
   std::string get_seed_phrase_info(const std::string& seed_phrase, const std::string& seed_password, view::seed_phrase_info& result);
@@ -162,6 +162,9 @@ public:
   std::string get_qt_dev_tools_option() const { return m_qt_dev_tools; }
   void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
   bool set_use_tor(bool use_tor);
+  std::string add_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor);
+  std::string delete_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id);
+
 private:
   void main_worker(const po::variables_map& vm);
   bool init_local_daemon();

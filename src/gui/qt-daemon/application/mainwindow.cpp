@@ -2127,6 +2127,27 @@ QString MainWindow::get_mining_estimate(const QString& param)
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+QString MainWindow::add_custom_asset_id(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_and_asset_id, waid);
+  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_ASSET_INFO::response, ar);
+
+  ar.error_code = m_backend.add_custom_asset_id(waid.wallet_id, waid.asset_id, ar.response_data.asset_descriptor);
+  ar.response_data.status = ar.error_code;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+QString MainWindow::remove_custom_asset_id(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_and_asset_id, waid);
+  default_ar.error_code = m_backend.delete_custom_asset_id(waid.wallet_id, waid.asset_id);
+  return MAKE_RESPONSE(default_ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
 QString MainWindow::backup_wallet_keys(const QString& param)
 {
   TRY_ENTRY();

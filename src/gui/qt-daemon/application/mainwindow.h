@@ -168,7 +168,10 @@ public:
   QString get_default_fee();
   QString get_options();  
   void    bool_toggle_icon(const QString& param);
-  
+  QString add_custom_asset_id(const QString& param);
+  QString remove_custom_asset_id(const QString& param);
+
+
   bool    get_is_disabled_notifications();
   bool    set_is_disabled_notifications(const bool& param);
   QString export_wallet_history(const QString& param);

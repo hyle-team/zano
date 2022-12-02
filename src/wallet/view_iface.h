@@ -426,10 +426,10 @@ public:
 
   struct get_recent_transfers_request
   {
-    uint64_t wallet_id;
-    uint64_t offset;
-    uint64_t count;
-    bool exclude_mining_txs;
+    uint64_t wallet_id = 0;
+    uint64_t offset = 0;
+    uint64_t count = 0;
+    bool exclude_mining_txs = false;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -439,9 +439,20 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct wallet_and_asset_id
+  {
+    uint64_t wallet_id = 0;
+    crypto::hash asset_id = currency::null_hash;
+    
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+    END_KV_SERIALIZE_MAP()
+  };
+
   struct reset_pass_request
   {
-    uint64_t wallet_id;
+    uint64_t wallet_id = 0;
     std::string pass;
 
     BEGIN_KV_SERIALIZE_MAP()

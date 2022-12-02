@@ -1361,7 +1361,7 @@ std::string wallets_manager::request_alias_update(const currency::alias_rpc_deta
 }
 
 
-std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
+std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
 {
 
   std::vector<currency::tx_destination_entry> dsts;
@@ -1674,6 +1674,23 @@ std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std
     return API_RETURN_CODE_OK;
   else
     return API_RETURN_CODE_FAIL;
+}
+std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, w);
+  if(w.w->get()->add_custom_asset_id(asset_id, asset_descriptor))
+    return API_RETURN_CODE_OK;
+  else
+    return API_RETURN_CODE_FAIL;
+}
+std::string wallets_manager::delete_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, w);
+  if (w.w->get()->delete_custom_asset_id(asset_id))
+    return API_RETURN_CODE_OK;
+  else
+    return API_RETURN_CODE_FAIL;
+
 }
 std::string wallets_manager::is_wallet_password_valid(uint64_t wallet_id, const std::string& pass)
 {

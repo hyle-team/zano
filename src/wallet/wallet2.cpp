@@ -3152,7 +3152,10 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
 
   for (auto& own_asset : m_own_asset_descriptors)
   {
-    custom_assets_local[own_asset.first] = own_asset.second.asset_descriptor;
+    if (m_whitelisted_assets.find(own_asset.first) == m_whitelisted_assets.end())
+    {
+      custom_assets_local[own_asset.first] = own_asset.second.asset_descriptor;
+    }
   }
 
   asset_descriptor_base native_asset_info = AUTO_VAL_INIT(native_asset_info);
@@ -3218,6 +3221,7 @@ bool wallet2::add_custom_asset_id(const crypto::hash& asset_id, asset_descriptor
 {
   currency::COMMAND_RPC_GET_ASSET_INFO::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_ASSET_INFO::response resp = AUTO_VAL_INIT(resp);
+  req.asset_id = asset_id;
 
   bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, resp);
   if (resp.status == API_RETURN_CODE_OK)
