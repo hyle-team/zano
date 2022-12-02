@@ -899,7 +899,7 @@ namespace tools
     uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
 
-    bool add_custom_asset_id(const crypto::hash& asset_id);
+    bool add_custom_asset_id(const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor);
     bool delete_custom_asset_id(const crypto::hash& asset_id);
     bool load_whitelisted_tokens_if_not_loaded() const;
     bool load_whitelisted_tokens()const;

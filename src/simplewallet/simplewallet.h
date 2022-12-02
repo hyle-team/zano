@@ -89,6 +89,9 @@ namespace currency
     bool tor_enable(const std::vector<std::string> &args);
     bool tor_disable(const std::vector<std::string> &args);
     bool deploy_new_asset(const std::vector<std::string> &args);
+    bool add_custom_asset_id(const std::vector<std::string> &args);
+    bool remove_custom_asset_id(const std::vector<std::string> &args);
+
     bool validate_wrap_status(uint64_t amount);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);
