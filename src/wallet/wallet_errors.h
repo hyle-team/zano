@@ -438,8 +438,19 @@ namespace tools
         for (size_t i = 0; i < m_sources.size(); ++i)
         {
           const currency::tx_source_entry& src = m_sources[i];
-          ss << "\n  source " << i << ":";
-          ss << "\n    amount: " << currency::print_money(src.amount);
+          ss << "\n  " << i << ": ";
+          ss << " amount: " << std::setw(21) << currency::print_money(src.amount);
+          ss << src.is_zarcanum() ? " ZC  " : " old ";
+          ss << " asset_id: " << src.asset_id;
+           for (size_t j = 0; j < src.outputs.size(); ++j)
+          {
+            const currency::tx_source_entry::output_entry& out = src.outputs[j];
+            if (out.out_reference.type() == typeid(uint64_t))
+              ss << "\n      ref #" << j << ": " << boost::get<uint64_t>(out.out_reference);
+            else
+              ss << "\n      ref #" << j << ": ref by id";
+           }
+
           // It's not good, if logs will contain such much data
           //ss << "\n    real_output: " << src.real_output;
           //ss << "\n    real_output_in_tx_index: " << src.real_output_in_tx_index;
@@ -462,7 +473,7 @@ namespace tools
           {
             ss << currency::get_account_address_as_str(a) << ";";
           } 
-          ss << " anount: " << currency::print_money(dst.amount);
+          ss << " amount: " << std::setw(21) << currency::print_money(dst.amount);
           ss << " asset_id: " << dst.asset_id;
         }
 
