@@ -440,7 +440,7 @@ namespace tools
           const currency::tx_source_entry& src = m_sources[i];
           ss << "\n  " << i << ": ";
           ss << " amount: " << std::setw(21) << currency::print_money(src.amount);
-          ss << src.is_zarcanum() ? " ZC  " : " old ";
+          ss << (src.is_zarcanum() ? " ZC  " : " old ");
           ss << " asset_id: " << src.asset_id;
            for (size_t j = 0; j < src.outputs.size(); ++j)
           {
