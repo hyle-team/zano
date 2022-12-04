@@ -223,9 +223,9 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this,ph::_1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "submit_transfer <signed_tx_file> - broadcast signed tx");
   m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "Export transaction history in CSV file");
-  m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, _1), "Enable relaying transactions over TOR network(enabled by default)");
-  m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, _1), "Enable relaying transactions over TOR network(enabled by default)");
-  m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, _1), "Deploys new asset in the network, with current wallet as a maintainer");
+  m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
+  m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
+  m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "Deploys new asset in the network, with current wallet as a maintainer");
 
 }
 //----------------------------------------------------------------------------------------------------
