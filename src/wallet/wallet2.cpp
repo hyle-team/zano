@@ -5816,7 +5816,7 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   else
   {
     // pre-HF4
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(asset_id != currency::null_hash, "assets are not allowed prior to HF4");
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(asset_id == currency::null_hash, "assets are not allowed prior to HF4");
     currency::tx_destination_entry change_dts = AUTO_VAL_INIT(change_dts);
     if (needed_money < found_money)
     {
