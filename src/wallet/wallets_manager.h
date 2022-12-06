@@ -104,7 +104,7 @@ public:
   std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);
   std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist, bool exclude_mining_txs = false);
-  std::string get_wallet_info(size_t wallet_id, view::wallet_info& wi);
+  std::string get_wallet_info(uint64_t wallet_id, view::wallet_info& wi);
   std::string get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts);
   std::string create_proposal(const view::create_proposal_param_gui& cpp);
   std::string accept_proposal(size_t wallet_id, const crypto::hash& contract_id);

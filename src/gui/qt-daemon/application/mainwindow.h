@@ -170,6 +170,7 @@ public:
   void    bool_toggle_icon(const QString& param);
   QString add_custom_asset_id(const QString& param);
   QString remove_custom_asset_id(const QString& param);
+  QString get_wallet_info(const QString& param);
 
 
   bool    get_is_disabled_notifications();

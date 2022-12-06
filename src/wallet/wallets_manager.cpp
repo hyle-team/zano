@@ -1538,7 +1538,7 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
   return response_info.m_body;
 }
 
-std::string wallets_manager::get_wallet_info(size_t wallet_id, view::wallet_info& wi)
+std::string wallets_manager::get_wallet_info(uint64_t wallet_id, view::wallet_info& wi)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   return get_wallet_info(w, wi);

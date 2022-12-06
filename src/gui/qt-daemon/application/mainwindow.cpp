@@ -2150,6 +2150,17 @@ QString MainWindow::remove_custom_asset_id(const QString& param)
   return MAKE_RESPONSE(default_ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+QString MainWindow::get_wallet_info(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_id_obj, waid);
+  PREPARE_RESPONSE(view::wallet_info, ar);
+  default_ar.error_code = m_backend.get_wallet_info(waid.wallet_id, ar.response_data);
+  return MAKE_RESPONSE(default_ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
 QString MainWindow::backup_wallet_keys(const QString& param)
 {
   TRY_ENTRY();
