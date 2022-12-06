@@ -142,6 +142,8 @@ bool MainWindow::init_window()
   m_view->page()->setWebChannel(m_channel);
 
   QWidget* central_widget_to_be_set = m_view;
+  double zoom_factor_test = 0.75;
+  m_view->setZoomFactor(zoom_factor_test);
 
   std::string qt_dev_tools_option = m_backend.get_qt_dev_tools_option();
   if (!qt_dev_tools_option.empty())

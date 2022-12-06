@@ -2372,7 +2372,7 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
   }
   
 
-  WLT_LOG("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money_brief(balance()) << ", unlocked: " << print_money_brief(unlocked_balance()), blocks_fetched > 0 ? LOG_LEVEL_1 : LOG_LEVEL_2);
+  WLT_LOG("Refresh done, blocks received: " << blocks_fetched, blocks_fetched > 0 ? LOG_LEVEL_1 : LOG_LEVEL_2);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::handle_expiration_list(uint64_t tx_expiration_ts_median)
@@ -3162,37 +3162,31 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
   native_asset_info.full_name = CURRENCY_NAME_SHORT_BASE;
   native_asset_info.ticker = CURRENCY_NAME_ABR;
   native_asset_info.decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
+  custom_assets_local[currency::null_hash] = native_asset_info;
 
   for (const auto& item : balances_map)
   {
     asset_descriptor_base asset_info = AUTO_VAL_INIT(asset_info);
     //check if asset is whitelisted or customly added
-    if (item.first == currency::null_hash)
+    auto it = m_whitelisted_assets.find(item.first);
+    if (it == m_whitelisted_assets.end())
     {
-      asset_info = native_asset_info;
-    }
-    else
-    {
-      auto it = m_whitelisted_assets.find(item.first);
-      if (it == m_whitelisted_assets.end())
+      //check if it custom asset
+      auto it_cust = custom_assets_local.find(item.first);
+      if (it_cust == custom_assets_local.end())
       {
-        //check if it custom asset
-        auto it_cust = custom_assets_local.find(item.first);
-        if (it_cust == custom_assets_local.end())
-        {
-          continue;
-        }
-        else
-        {
-          asset_info = it_cust->second;
-          custom_assets_local.erase(it_cust);
-        }
+        continue;
       }
       else
       {
-        asset_info = it->second;
+        asset_info = it_cust->second;
+        custom_assets_local.erase(it_cust);
       }
-    }    
+    }
+    else
+    {
+      asset_info = it->second;
+    }  
     balances.push_back(wallet_public::asset_balance_entry());
     wallet_public::asset_balance_entry& new_item = balances.back();
     static_cast<wallet_public::asset_balance_entry_base&>(new_item) = item.second;
