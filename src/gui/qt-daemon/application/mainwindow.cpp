@@ -2156,8 +2156,8 @@ QString MainWindow::get_wallet_info(const QString& param)
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::wallet_id_obj, waid);
   PREPARE_RESPONSE(view::wallet_info, ar);
-  default_ar.error_code = m_backend.get_wallet_info(waid.wallet_id, ar.response_data);
-  return MAKE_RESPONSE(default_ar);
+  ar.error_code = m_backend.get_wallet_info(waid.wallet_id, ar.response_data);
+  return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
